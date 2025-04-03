@@ -1,0 +1,28 @@
+{ "format" : "base", # There might be more later -- e.g. "relationship", "list", "set"
+  "id"      : 123, # an ID, i.e. a 32-character string
+  "context" : 456, # an optional id
+  "comments on context": false,
+  "title":[
+    # There must be at least one.
+    "This text gets indexed.",
+    "Maybe searching other text could find this note."],
+  "other link text defaults": [
+    # The titles are also defaults,
+    # but there will be a command to go straight to
+    # the ones that aren't titles.
+    "This field is handy if this repo is private",
+    "and you want to link to it from public."
+  ],
+  "unindexed body":
+    "this string could span pages",
+  "content": [
+    1,
+    2,
+    3
+  ],
+  "subscriptions": [
+    11,
+    12,
+    13
+  ]
+}
