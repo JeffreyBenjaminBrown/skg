@@ -1,6 +1,7 @@
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, Write, Read};
 use serde::{Serialize, Deserialize};
+use serde_json;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SkgNode {
@@ -14,11 +15,57 @@ struct SkgNode {
     nodes_subscribed: Vec<String>, }
 
 fn main() -> io::Result<()> {
+    // Create and write the example node to file
     let example = skgnode_example();
     let out_filename = "example_generated.skg";
     write_skgnode_to_file(&example, out_filename)?;
     println!("SkgNode has been written to {}", out_filename);
+
+    let read_node = skgnode_from_file(out_filename)?;
+    let reversed = reverse_skgnode(&read_node);
+    let reversed_filename = "example_reversed.skg";
+    write_skgnode_to_file(&reversed, reversed_filename)?;
+    println!("Reversed SkgNode has been written to {}",
+             reversed_filename);
     Ok(()) }
+
+fn skgnode_from_file(file_path: &str) -> io::Result<SkgNode> {
+    // Open the file
+    let mut file = File::open(file_path)?;
+
+    // Read file contents into a string
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    // Deserialize the JSON string into a SkgNode
+    let skgnode: SkgNode = serde_json::from_str(&contents)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+    Ok(skgnode)
+}
+
+fn reverse_skgnode(node: &SkgNode) -> SkgNode {
+    // Create a new SkgNode with reversed lists
+    let mut reversed_titles = node.titles.clone();
+    reversed_titles.reverse();
+
+    let mut reversed_nodes_contained = node.nodes_contained.clone();
+    reversed_nodes_contained.reverse();
+
+    let mut reversed_nodes_subscribed = node.nodes_subscribed.clone();
+    reversed_nodes_subscribed.reverse();
+
+    SkgNode {
+        format: node.format.clone(),
+        id: node.id.clone(),
+        context: node.context.clone(),
+        is_comment: node.is_comment,
+        titles: reversed_titles,
+        unindexed_text: node.unindexed_text.clone(),
+        nodes_contained: reversed_nodes_contained,
+        nodes_subscribed: reversed_nodes_subscribed,
+    }
+}
 
 fn skgnode_example() -> SkgNode
 { SkgNode {
