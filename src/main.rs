@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Schema {
+struct SkgNode {
     format: String,
     id: String,
     context: Option<String>,
@@ -14,44 +14,32 @@ struct Schema {
     nodes_subscribed: Vec<String>,
 }
 
-fn write_schema_to_file(schema: &Schema, file_path: &str) -> io::Result<()> {
+fn write_skgnode_to_file(
+    skgnode: &SkgNode, file_path: &str)
+    -> io::Result<()> {
     let mut file = File::create(file_path)?;
 
-    // Opening brace
-    writeln!(file, "{{")?;
-
-    // format (string)
-    writeln!(file, "  \"format\" : \"{}\",", schema.format)?;
-
-    // id (string)
-    writeln!(file, "  \"id\" : \"{}\",", schema.id)?;
-
-    // context (optional string)
-    if let Some(context) = &schema.context {
+    writeln!(file, "{{ \"format\" : \"{}\",", skgnode.format)?;
+    writeln!(file, "  \"id\" : \"{}\",", skgnode.id)?;
+    if let Some(context) = &skgnode.context {
         writeln!(file, "  \"context\" : \"{}\",", context)?;
     }
-
-    // is_comment (boolean) - Changed to match Rust field name
-    writeln!(file, "  \"is_comment\": {},", schema.is_comment)?;
-
-    // titles (array of strings)
+    writeln!(file, "  \"is_comment\": {},", skgnode.is_comment)?;
     writeln!(file, "  \"title\":[")?;
-    for (i, title) in schema.titles.iter().enumerate() {
-        if i < schema.titles.len() - 1 {
+    for (i, title) in skgnode.titles.iter().enumerate() {
+        if i < skgnode.titles.len() - 1 {
             writeln!(file, "    \"{}\",", escape_string(title))?;
         } else {
             writeln!(file, "    \"{}\"", escape_string(title))?;
         }
     }
     writeln!(file, "  ],")?;
-
-    // unindexed_text (string)
-    writeln!(file, "  \"unindexed\":\n    \"{}\",", escape_string(&schema.unindexed_text))?;
-
-    // nodes_contained (array of strings)
-    writeln!(file, "  \"content\": [")?;
-    for (i, content_id) in schema.nodes_contained.iter().enumerate() {
-        if i < schema.nodes_contained.len() - 1 {
+    writeln!(file, "  \"unindexed text\":\n    \"{}\",",
+             escape_string(&skgnode.unindexed_text))?;
+    writeln!(file, "  \"nodes_contained\": [")?;
+    for (i, content_id) in
+        skgnode.nodes_contained.iter().enumerate() {
+        if i < skgnode.nodes_contained.len() - 1 {
             writeln!(file, "    \"{}\",", content_id)?;
         } else {
             writeln!(file, "    \"{}\"", content_id)?;
@@ -59,20 +47,16 @@ fn write_schema_to_file(schema: &Schema, file_path: &str) -> io::Result<()> {
     }
     writeln!(file, "  ],")?;
 
-    // nodes_subscribed (array of strings)
-    writeln!(file, "  \"subscriptions\": [")?;
-    for (i, subscription_id) in schema.nodes_subscribed.iter().enumerate() {
-        if i < schema.nodes_subscribed.len() - 1 {
+    writeln!(file, "  \"nodes_subscribed\": [")?;
+    for (i, subscription_id)
+        in skgnode.nodes_subscribed.iter().enumerate() {
+        if i < skgnode.nodes_subscribed.len() - 1 {
             writeln!(file, "    \"{}\",", subscription_id)?;
         } else {
             writeln!(file, "    \"{}\"", subscription_id)?;
         }
     }
-    writeln!(file, "  ]")?;
-
-    // Closing brace
-    write!(file, "}}")?;
-
+    writeln!(file, "]}}")?;
     Ok(())
 }
 
@@ -81,8 +65,7 @@ fn escape_string(s: &str) -> String {
 }
 
 fn main() -> io::Result<()> {
-    // Create an example schema instance
-    let schema = Schema {
+    let example = SkgNode {
         format: "base".to_string(),
         id: "123".to_string(),
         context: Some("456".to_string()),
@@ -96,10 +79,9 @@ fn main() -> io::Result<()> {
         nodes_subscribed: vec!["11".to_string(), "12".to_string(), "13".to_string()],
     };
 
-    // Write the schema to a file
-    write_schema_to_file(&schema, "TADA.skg")?;
-
-    println!("Schema has been written to TADA.skg");
+    let out_filename = "example_generated.skg";
+    write_skgnode_to_file(&example, out_filename)?;
+    println!("SkgNode has been written to {}", out_filename);
 
     Ok(())
 }
