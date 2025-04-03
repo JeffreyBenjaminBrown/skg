@@ -38,13 +38,15 @@ fn write_skgnode_to_file(
     -> io::Result<()> {
     let mut file = File::create(file_path)?;
 
-    writeln!(file, "{{ \"format\" : \"{}\",", skgnode.format)?;
-    writeln!(file, "  \"id\" : \"{}\",", skgnode.id)?;
+    writeln!(file, "{{ \"format\" : \"{}\",",
+             skgnode.format)?;
+    writeln!(file, "  \"id\" : \"{}\",",
+             skgnode.id)?;
     if let Some(context) = &skgnode.context {
         writeln!(file, "  \"context\" : \"{}\",", context)?;
     }
     writeln!(file, "  \"is_comment\": {},", skgnode.is_comment)?;
-    writeln!(file, "  \"title\":[")?;
+    writeln!(file, "  \"titles\":[")?;
     for (i, title) in skgnode.titles.iter().enumerate() {
         if i < skgnode.titles.len() - 1 {
             writeln!(file, "    \"{}\",", escape_string(title))?;
@@ -52,8 +54,7 @@ fn write_skgnode_to_file(
             writeln!(file, "    \"{}\"", escape_string(title))?;
         }
     }
-    writeln!(file, "  ],")?;
-    writeln!(file, "  \"unindexed text\":\n    \"{}\",",
+    writeln!(file, "  ], \"unindexed_text\":\n    \"{}\",",
              escape_string(&skgnode.unindexed_text))?;
     writeln!(file, "  \"nodes_contained\": [")?;
     for (i, content_id) in
@@ -64,9 +65,7 @@ fn write_skgnode_to_file(
             writeln!(file, "    \"{}\"", content_id)?;
         }
     }
-    writeln!(file, "  ],")?;
-
-    writeln!(file, "  \"nodes_subscribed\": [")?;
+    writeln!(file, "  ], \"nodes_subscribed\": [")?;
     for (i, subscription_id)
         in skgnode.nodes_subscribed.iter().enumerate() {
         if i < skgnode.nodes_subscribed.len() - 1 {
