@@ -14,24 +14,30 @@ struct SkgNode {
     nodes_subscribed: Vec<String>, }
 
 fn main() -> io::Result<()> {
-    let example = SkgNode {
-        format: "base".to_string(),
-        id: "123".to_string(),
-        context: Some("456".to_string()),
-        is_comment: false,
-        titles: vec![
-            "This text gets indexed.".to_string(),
-            "Maybe searching other text could find this note.".to_string(),
-        ],
-        unindexed_text: "this single string could span pages".to_string(),
-        nodes_contained: vec!["1".to_string(), "2".to_string(), "3".to_string()],
-        nodes_subscribed: vec!["11".to_string(), "12".to_string(), "13".to_string()],
-    };
-
+    let example = skgnode_example();
     let out_filename = "example_generated.skg";
     write_skgnode_to_file(&example, out_filename)?;
     println!("SkgNode has been written to {}", out_filename);
     Ok(()) }
+
+fn skgnode_example() -> SkgNode
+{ SkgNode {
+    format: "base".to_string(),
+    id: "123".to_string(),
+    context: Some("456".to_string()),
+    is_comment: false,
+    titles: vec![
+        "This text gets indexed.".to_string(),
+        "Maybe searching other text could find this note.".to_string(),
+    ],
+    unindexed_text: "this one string could span pages".to_string(),
+    nodes_contained: vec!["1".to_string(),
+                          "2".to_string(),
+                          "3".to_string()],
+    nodes_subscribed: vec!["11".to_string(),
+                           "12".to_string(),
+                           "13".to_string()],
+} }
 
 fn write_skgnode_to_file(
     skgnode: &SkgNode, file_path: &str)
