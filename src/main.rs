@@ -18,16 +18,16 @@ fn main() -> io::Result<()> {
     // Write the example node to a file.
     let example = skgnode_example();
     let out_filename = "example_generated.skg";
-    write_skgnode_to_file(&example, out_filename)?;
+    write_skgnode_to_path(&example, out_filename)?;
 
     // Read that file, reverse its lists, write to another file.
-    let read_node = skgnode_from_file(out_filename)?;
+    let read_node = read_skgnode_from_path(out_filename)?;
     let reversed = reverse_skgnode(&read_node);
     let reversed_filename = "example_reversed.skg";
-    write_skgnode_to_file(&reversed, reversed_filename)?;
+    write_skgnode_to_path(&reversed, reversed_filename)?;
     Ok(()) }
 
-fn skgnode_from_file(file_path: &str) -> io::Result<SkgNode> {
+fn read_skgnode_from_path(file_path: &str) -> io::Result<SkgNode> {
     let mut file = File::open(file_path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -80,7 +80,7 @@ fn skgnode_example() -> SkgNode
                            "13".to_string()],
 } }
 
-fn write_skgnode_to_file(
+fn write_skgnode_to_path(
     skgnode: &SkgNode, file_path: &str)
     -> io::Result<()> {
     let mut file = File::create(file_path)?;
