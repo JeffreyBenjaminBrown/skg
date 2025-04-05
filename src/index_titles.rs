@@ -1,3 +1,7 @@
+// This uses Tantivy to create an index
+// associating titles to filenames,
+// potentially many to one.
+
 use tantivy::collector::TopDocs;
 use tantivy::schema as schema;
 use tantivy::{Index, doc};
