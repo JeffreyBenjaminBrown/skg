@@ -17,8 +17,8 @@ fn test_skgnode_io() {
     write_skgnode_to_path(&reversed, reversed_filename).unwrap();
 
     // Verify that the generated files match expected files
-    let expected_example_path = "tests/fixtures/example.skg";
-    let expected_reversed_path = "tests/fixtures/reversed.skg";
+    let expected_example_path = "tests/fixtures/file_io/example.skg";
+    let expected_reversed_path = "tests/fixtures/file_io/reversed.skg";
     let generated_example = fs::read(out_filename).unwrap();
     let expected_example = fs::read(expected_example_path).unwrap();
     let generated_reversed = fs::read(reversed_filename).unwrap();
