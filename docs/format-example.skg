@@ -11,15 +11,8 @@
     # There must be at least one.
     "This text gets indexed.",
     "So does this text."],
-  "other link text defaults": [
-    # The titles are also defaults,
-    # but there will be a command to go straight to
-    # the ones that aren't titles.
-    "This field is handy if this repo is private",
-    "and you want to link to it from public."
-  ],
   "unindexed body":
-    "this string could span pages",
+    "this string could be empty or span pages",
   "content": [
     1,
     2,

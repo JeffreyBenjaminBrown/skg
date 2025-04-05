@@ -85,43 +85,42 @@ fn write_skgnode_to_path(
     -> io::Result<()> {
     let mut file = File::create(file_path)?;
 
-    writeln!(file, "{{ \"format\" : \"{}\",",
+    writeln!(file, "{{\"format\" : \"{}\",",
              skgnode.format)?;
-    writeln!(file, "  \"id\" : \"{}\",",
+    writeln!(file, "\"id\" : \"{}\",",
              skgnode.id)?;
     if let Some(context) = &skgnode.context {
-        writeln!(file, "  \"context\" : \"{}\",", context)?;
+        writeln!(file, "\"context\" : \"{}\",", context)?;
     }
-    writeln!(file, "  \"is_comment\": {},", skgnode.is_comment)?;
-    writeln!(file, "  \"titles\":[")?;
+    writeln!(file, "\"is_comment\": {},", skgnode.is_comment)?;
+    writeln!(file, "\"titles\":[")?;
     for (i, title) in skgnode.titles.iter().enumerate() {
         if i < skgnode.titles.len() - 1 {
-            writeln!(file, "    \"{}\",", escape_string(title))?;
+            writeln!(file, "  \"{}\",", escape_string(title))?;
         } else {
-            writeln!(file, "    \"{}\"", escape_string(title))?;
+            writeln!(file, "  \"{}\"", escape_string(title))?;
         }
     }
-    writeln!(file, "  ], \"unindexed_text\":\n    \"{}\",",
+    writeln!(file, "],\"unindexed_text\":\n  \"{}\",",
              escape_string(&skgnode.unindexed_text))?;
-    writeln!(file, "  \"nodes_contained\": [")?;
+    writeln!(file, "\"nodes_contained\":[")?;
     for (i, content_id) in
         skgnode.nodes_contained.iter().enumerate() {
         if i < skgnode.nodes_contained.len() - 1 {
-            writeln!(file, "    \"{}\",", content_id)?;
+            writeln!(file, "  \"{}\",", content_id)?;
         } else {
-            writeln!(file, "    \"{}\"", content_id)?;
+            writeln!(file, "  \"{}\"", content_id)?;
         }
     }
-    writeln!(file, "  ], \"nodes_subscribed\": [")?;
+    writeln!(file, "],\"nodes_subscribed\":[")?;
     for (i, subscription_id)
         in skgnode.nodes_subscribed.iter().enumerate() {
         if i < skgnode.nodes_subscribed.len() - 1 {
-            writeln!(file, "    \"{}\",", subscription_id)?;
+            writeln!(file, "  \"{}\",", subscription_id)?;
         } else {
-            writeln!(file, "    \"{}\"", subscription_id)?;
+            writeln!(file, "  \"{}\"]}}", subscription_id)?;
         }
     }
-    writeln!(file, "]}}")?;
     Ok(()) }
 
 fn escape_string(s: &str) -> String {
