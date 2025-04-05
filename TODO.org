@@ -1,0 +1,3 @@
+* optimizations
+** If `titles` were the first field in the .skg format
+   then the Tantivy indexing would need to read less

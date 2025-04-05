@@ -1,6 +1,6 @@
 exit # This is not a script, just snippets.
 
-CONTAINER_NAME=title-search
+CONTAINER_NAME=skg
 NATIVE=/home/jeff/hodal/skg
 docker run --name $CONTAINER_NAME -it -d \
   -v $NATIVE:/home/ubuntu                \

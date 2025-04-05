@@ -1,5 +1,5 @@
 *~
 .bash_history
 /Cargo.lock
-/generated-data
+/tests/generated
 /target
