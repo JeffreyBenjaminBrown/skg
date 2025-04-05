@@ -1,3 +1,5 @@
+// This code is tested by /tests/file_io.rs
+
 use std::fs::File;
 use std::io::{self, Write, Read};
 use serde_json;

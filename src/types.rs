@@ -1,3 +1,5 @@
+// This code is tested by /tests/file_io.rs
+
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
