@@ -17,13 +17,13 @@ struct SkgNode {
 fn main() -> io::Result<()> {
     // Write the example node to a file.
     let example = skgnode_example();
-    let out_filename = "example_generated.skg";
+    let out_filename = "generated-data/example.skg";
     write_skgnode_to_path(&example, out_filename)?;
 
     // Read that file, reverse its lists, write to another file.
     let read_node = read_skgnode_from_path(out_filename)?;
     let reversed = reverse_skgnode(&read_node);
-    let reversed_filename = "example_reversed.skg";
+    let reversed_filename = "generated-data/reversed.skg";
     write_skgnode_to_path(&reversed, reversed_filename)?;
     Ok(()) }
 

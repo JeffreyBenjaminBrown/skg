@@ -1,11 +1,16 @@
-{ "format" : "base", # There might be more later -- e.g. "relationship", "list", "set"
-  "id"      : 123, # an ID, i.e. a 32-character string
-  "context" : 456, # an optional id
+# Every file in .skg format is valid .json,
+# although not vice-versa.
+# This file is almost a valid .skg file,
+# except that JSON makes no allowance for comments.
+
+{ "format" : "base", # There might be more options later -- e.g. "relationship", "list", "set".
+  "id"      : 123, # an ID, i.e. a 32-character string.
+  "context" : 456, # an optional ID
   "comments on context": false,
   "title":[
     # There must be at least one.
     "This text gets indexed.",
-    "Maybe searching other text could find this note."],
+    "So does this text."],
   "other link text defaults": [
     # The titles are also defaults,
     # but there will be a command to go straight to
