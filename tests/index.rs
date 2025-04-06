@@ -21,7 +21,7 @@ fn test_index
   let schema = schema_builder.build();
 
   // Touch all the .skg files that will be indexed,
-  // so that the index needs rebuilding.
+  // so that the index needs to be completely rebuilt.
   for entry in fs::read_dir("tests/index/fixtures")?
   { let path = entry?.path();
     if path.extension().map_or(false, |ext| ext == "skg")

@@ -1,6 +1,6 @@
 use std::fs;
 
-use skg::types::{skgnode_example, reverse_skgnode};
+use skg::types::{SkgNode, skgnode_example};
 use skg::file_io::{read_skgnode_from_path, write_skgnode_to_path};
 
 #[test]
@@ -33,3 +33,30 @@ fn test_skgnode_io() {
     assert_eq!(generated_reversed, expected_reversed,
 	       "Generated reversed file doesn't match expected");
 }
+
+pub fn reverse_skgnode(node: &SkgNode) -> SkgNode {
+    // Create a new SkgNode with reversed lists.
+    // This is only for testing purposes,
+    // to show reading from and writing to disk work.
+    let mut reversed_titles = node.titles.clone();
+    reversed_titles.reverse();
+
+    let mut reversed_nodes_contained =
+        node.nodes_contained.clone();
+    reversed_nodes_contained.reverse();
+
+    let mut reversed_nodes_subscribed =
+        node.nodes_subscribed.clone();
+    reversed_nodes_subscribed.reverse();
+
+    SkgNode {
+        path: node.path.clone(),
+        format: node.format.clone(),
+        id: node.id.clone(),
+        context: node.context.clone(),
+        is_comment: node.is_comment,
+        titles: reversed_titles,
+        unindexed_text: node.unindexed_text.clone(),
+        nodes_contained: reversed_nodes_contained,
+        nodes_subscribed: reversed_nodes_subscribed,
+    } }
