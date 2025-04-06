@@ -1,9 +1,23 @@
+* revise SkgNode
+  ID :: just a kind of String
+  node :: {
+    id :: ID
+    comments_on :: Optional ID # If this node talks about another.
+    path :: a path in the filesystem }
+  contains      :: Relationship <Node, Node> # Two constraints: (1) Acyclic. (2) Uniqueness in the second (right) position -- that is, if (N contains M) then there can exist no N' distinct from N such that (N' contains M). In TypeDB this can be expressed as "contains sub relation, @acyclic, relates container, relates contained @unique;".
+  subscribed to :: Relationship <Node, Node> # Unconstrained.
+  unsubscribed from :: Relationship <Node, Node> # Unconstrained.
+* "context" is redundant!
+  It is implied by the `contains` relationship,
+  assuming `contains` is acyclic.
 * TypeDB branch
   move from main to test
 * move some functions
   skgnode_example and reverse_skgnode
   should be in `tests/file_io.rs`
   rather than in `src/file_io.rs`
+* rename index.rs to index_titles.rs
+  in both src/ and tests/
 * optimizations
 ** If `titles` were the first field in the .skg format
    then the Tantivy indexing would need to read less
