@@ -1,5 +1,9 @@
 * TypeDB branch
   move from main to test
+* move some functions
+  skgnode_example and reverse_skgnode
+  should be in `tests/file_io.rs`
+  rather than in `src/file_io.rs`
 * optimizations
 ** If `titles` were the first field in the .skg format
    then the Tantivy indexing would need to read less
