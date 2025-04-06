@@ -4,7 +4,8 @@ use std::time::SystemTime;
 use tantivy::schema as schema;
 
 use skg::index_titles::{
-    get_or_create_index, update_index, search_index, print_search_results};
+    get_or_create_index, update_index, search_index,
+    print_search_results};
 
 #[test]
 fn test_index
