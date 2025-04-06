@@ -7,18 +7,18 @@ use skg::file_io::{read_skgnode_from_path, write_skgnode_to_path};
 fn test_skgnode_io() {
     // Write the example node to a file
     let example = skgnode_example();
-    let out_filename = "tests/generated/file_io/example.skg";
+    let out_filename = "tests/file_io/generated/example.skg";
     write_skgnode_to_path(&example, out_filename).unwrap();
 
     // Read that file, reverse its lists, write to another file
     let read_node = read_skgnode_from_path(out_filename).unwrap();
     let reversed = reverse_skgnode(&read_node);
-    let reversed_filename = "tests/generated/file_io/reversed.skg";
+    let reversed_filename = "tests/file_io/generated/reversed.skg";
     write_skgnode_to_path(&reversed, reversed_filename).unwrap();
 
     // Verify that the generated files match expected files
-    let expected_example_path = "tests/fixtures/file_io/example.skg";
-    let expected_reversed_path = "tests/fixtures/file_io/reversed.skg";
+    let expected_example_path = "tests/file_io/fixtures/example.skg";
+    let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
     let generated_example = fs::read(out_filename).unwrap();
     let expected_example = fs::read(expected_example_path).unwrap();
     let generated_reversed = fs::read(reversed_filename).unwrap();

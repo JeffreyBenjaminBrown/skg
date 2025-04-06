@@ -10,7 +10,7 @@ use skg::index_titles::{
 #[test]
 fn test_index
     () -> Result<(), Box<dyn std::error::Error>>
-{ fs::create_dir_all("tests/generated/indexing")?;
+{ fs::create_dir_all("tests/index/generated")?;
 
   // Define the schema
   let mut schema_builder = schema::Schema::builder();
@@ -22,7 +22,7 @@ fn test_index
 
   // Touch all the .skg files that will be indexed,
   // so that the index needs rebuilding.
-  for entry in fs::read_dir("tests/fixtures/indexing")?
+  for entry in fs::read_dir("tests/index/fixtures")?
   { let path = entry?.path();
     if path.extension().map_or(false, |ext| ext == "skg")
     { let now = SystemTime::now();
@@ -31,13 +31,13 @@ fn test_index
 	  filetime::FileTime::from_system_time(now))?; } }
 
   // Build, or find and update, the index
-  let index_path = "tests/generated/indexing/index.tantivy";
+  let index_path = "tests/index/generated/index.tantivy";
   let index = get_or_create_index(schema.clone(), index_path)?;
   let indexed_count = update_index(
       &index,
       path_field,
       title_field,
-      "tests/fixtures/indexing",
+      "tests/index/fixtures",
       Path::new(index_path))?;
 
   assert!(indexed_count > 0,
