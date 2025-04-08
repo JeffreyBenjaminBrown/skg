@@ -45,8 +45,8 @@ pub struct SkgNode {
     // (But Rust still needes that one, to send it to Emacs.)
 
     pub titles: Vec<String>,
-    pub id: Vec<ID>, // Must be nonempty. Can be more than 1 because
-                     // nodes might be merged.
+    pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
+                      // nodes might be merged.
     pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
     pub properties: Vec<SkgNodeProperty>,
     pub nodes_contained: Vec<ID>,
@@ -64,7 +64,7 @@ pub fn skgnode_example() -> SkgNode
         "Maybe searching other text could find this note.".to_string(),
 	"JSON escapes \"quotation marks\" in text.".to_string() ],
 
-    id: vec![ ID::new("123") ],
+    ids: vec![ ID::new("123") ],
     unindexed_text: "this one string could span pages".to_string(),
     properties: vec![
 	SkgNodeProperty::CommentsOn(ID::new("42")),

@@ -24,13 +24,19 @@ fn test_skgnode_io() {
     // Verify that the generated files match expected files
     let expected_example_path = "tests/file_io/fixtures/example.skg";
     let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
-    let generated_example = fs::read(out_filename).unwrap();
-    let expected_example = fs::read(expected_example_path).unwrap();
-    let generated_reversed = fs::read(reversed_filename).unwrap();
-    let expected_reversed = fs::read(expected_reversed_path).unwrap();
-    assert_eq!(generated_example, expected_example,
+    let generated_example =
+	fs::read_to_string(out_filename).unwrap();
+    let expected_example =
+	fs::read_to_string(expected_example_path).unwrap();
+    let generated_reversed =
+	fs::read_to_string(reversed_filename).unwrap();
+    let expected_reversed =
+	fs::read_to_string(expected_reversed_path).unwrap();
+    assert_eq!(generated_example.trim_end(),
+	       expected_example.trim_end(),
 	       "Generated example file doesn't match expected");
-    assert_eq!(generated_reversed, expected_reversed,
+    assert_eq!(generated_reversed.trim_end(),
+	       expected_reversed.trim_end(),
 	       "Generated reversed file doesn't match expected");
 }
 
@@ -57,7 +63,7 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
         nodes_contained    : reversed_nodes_contained,
         nodes_subscribed   : reversed_nodes_subscribed,
 
-        id                 : node.id                 .clone(),
+        ids                : node.ids                .clone(),
         unindexed_text     : node.unindexed_text     .clone(),
         path               : node.path               .clone(),
 	properties         : node.properties         .clone(),

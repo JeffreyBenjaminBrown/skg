@@ -4,7 +4,7 @@
     "Maybe searching other text could find this note.",
     "JSON escapes \"quotation marks\" in text."
   ],
-  "id": [
+  "ids": [
     "123"
   ],
   "unindexed_text": "this one string could span pages",
