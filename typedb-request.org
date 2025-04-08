@@ -122,6 +122,11 @@ fn main() {
 ```
 # src/types.rs
 
+use serde::{Serialize, Deserialize};
+use std::fmt;
+use std::ops::Deref;
+use std::path::PathBuf;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID(String);
 
@@ -150,23 +155,32 @@ impl From<&str> for ID {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SkgNodeProperty {
-    CommentsOn(ID),
-    NoTantivyIndex,
+    CommentsOn(ID), // Relevant to TypeDB
+    NoTantivyIndex, // Relevant to Tantivy
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
     // Tantivy will receive some of this data,
     // and TypeDB some other subset.
-    // And at least one field, `unindexed_text`, is known to neither.
+    // At least one field, `unindexed_text`, is known to neither.
 
     pub titles: Vec<String>,
-    pub ids: Vec<ID>, // Must be nonempty. Can be multiple
-                      // because nodes might be merged.
+    pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
+                      // nodes might be merged.
     pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
+
+    // Each #[serde directive applies to the field after it.
+    // serde(default) says use the default value (for Vec it's [])
+    // if no value is provided when reading from disk.
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub properties: Vec<SkgNodeProperty>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_contained: Vec<ID>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_subscribed: Vec<ID>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_unsubscribed: Vec<ID>,
 
     #[serde(skip)]  // `path` is not represented in the JSON.
@@ -174,10 +188,21 @@ pub struct SkgNode {
 }
 ```
 * some functions I have implemented
+```
+# src/file_io.rs
+
 pub fn read_skgnode_from_path
     <P: AsRef<Path>>
     (file_path: P)
      -> io::Result<SkgNode>
+{ let file_path = file_path.as_ref();
+  let contents = fs::read_to_string(file_path)?;
+  let mut skgnode: SkgNode = serde_json::from_str(&contents)
+      .map_err(
+	  |e| io::Error::new(
+	      io::ErrorKind::InvalidData, e.to_string()))?;
+  skgnode.path = file_path.to_path_buf(); // not part of the JSON
+  Ok(skgnode) }
 
 /// A line in the typedef of SkgNode prevents the field `path`
 /// from being part of the JSON representation.
@@ -185,6 +210,13 @@ pub fn write_skgnode_to_path
     <P: AsRef<Path>>
     (skgnode: &SkgNode, file_path: P)
      -> io::Result<()>
+{ let json_string = serde_json::to_string(skgnode)
+      .map_err(
+	  |e| io::Error::new(
+	      io::ErrorKind::InvalidData, e.to_string()))?;
+  fs::write(file_path, json_string)?;
+  Ok(()) }
+```
 * your task
 I would like you to write some Rust code that:
 
@@ -196,4 +228,5 @@ I would like you to write some Rust code that:
 Note that not all the information in a Rust SkgNode is represented in TypeDB. Moreover, of what is represented, some is represented as properties of the nodes (like in Rust), but other information is represented as relationships. In particular:
 
 (a) If a SkgNode only has one ID, then that is the `id` attribute of its corresponding TypeDB node. If it has any more IDs, those data are encoded as `extra_id` relationships.
-(b) If SkgNode N has a `nodes_contained` field with the ID Mi of node M, that information should be encoded in TypeDB as the relationsship `contains N M`. Similarly for
+
+(b) If SkgNode N has a `nodes_contained` field with the ID Mi of node M, that information should be encoded in TypeDB as the relationsship `contains N M`. Similarly for `nodes_subscribed`, `nodes_unsubscribed` and `comments_on`.

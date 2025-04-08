@@ -1,4 +1,8 @@
-* comparing two JSON files should ignore whitespace, newlines
+* `contains` should be acyclic
+  The TypeDB AI says I can use `distinct` instead,
+  but the docs on `distinct` don't suggest that's true.
+* the TypeDB schema should be in a separate file
+* test each field and constraint of the SKG type
 * TypeDB data model
 ** pseudocode
    type ID = String
