@@ -24,6 +24,7 @@ fn test_skgnode_io() {
     // Verify that the generated files match expected files
     let expected_example_path = "tests/file_io/fixtures/example.skg";
     let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
+
     let generated_example =
 	fs::read_to_string(out_filename).unwrap();
     let expected_example =
@@ -32,12 +33,20 @@ fn test_skgnode_io() {
 	fs::read_to_string(reversed_filename).unwrap();
     let expected_reversed =
 	fs::read_to_string(expected_reversed_path).unwrap();
-    assert_eq!(generated_example.trim_end(),
-	       expected_example.trim_end(),
-	       "Generated example file doesn't match expected");
-    assert_eq!(generated_reversed.trim_end(),
-	       expected_reversed.trim_end(),
-	       "Generated reversed file doesn't match expected");
+
+    let parsed_generated_example: serde_json::Value =
+	serde_json::from_str(&generated_example).unwrap();
+    let parsed_expected_example: serde_json::Value =
+	serde_json::from_str(&expected_example).unwrap();
+    let parsed_generated_reversed: serde_json::Value =
+	serde_json::from_str(&generated_reversed).unwrap();
+    let parsed_expected_reversed: serde_json::Value =
+	serde_json::from_str(&expected_reversed).unwrap();
+
+    assert_eq!(parsed_generated_example, parsed_expected_example,
+               "Generated example file doesn't match expected");
+    assert_eq!(parsed_generated_reversed, parsed_expected_reversed,
+               "Generated reversed file doesn't match expected");
 }
 
 pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {

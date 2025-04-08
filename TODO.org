@@ -1,3 +1,4 @@
+* comparing two JSON files should ignore whitespace, newlines
 * TypeDB data model
 ** pseudocode
    type ID = String

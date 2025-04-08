@@ -26,7 +26,7 @@ pub fn write_skgnode_to_path
     <P: AsRef<Path>>
     (skgnode: &SkgNode, file_path: P)
      -> io::Result<()>
-{ let json_string = serde_json::to_string_pretty(skgnode)
+{ let json_string = serde_json::to_string(skgnode)
       .map_err(
 	  |e| io::Error::new(
 	      io::ErrorKind::InvalidData, e.to_string()))?;
