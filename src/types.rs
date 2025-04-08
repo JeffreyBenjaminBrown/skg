@@ -33,24 +33,32 @@ impl From<&str> for ID {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SkgNodeProperty {
-    CommentsOn(ID),
-    NoTantivyIndex,
+    CommentsOn(ID), // Relevant to TypeDB
+    NoTantivyIndex, // Relevant to Tantivy
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
     // Tantivy will receive some of this data,
     // and TypeDB some other subset.
-    // And at least one field, `unindexed_text`, is known to neither.
-    // (But Rust still needes that one, to send it to Emacs.)
+    // At least one field, `unindexed_text`, is known to neither.
 
     pub titles: Vec<String>,
     pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
                       // nodes might be merged.
     pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
+
+    // Each #[serde directive applies to the field after it.
+    // serde(default) says use the default value (for Vec it's [])
+    // if no value is provided when reading from disk.
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub properties: Vec<SkgNodeProperty>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_contained: Vec<ID>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_subscribed: Vec<ID>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes_unsubscribed: Vec<ID>,
 
     #[serde(skip)]  // `path` is not represented in the JSON.
