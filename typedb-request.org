@@ -1,0 +1,199 @@
+This request is long. To help myself navigate it, I've put it in org format.
+* the schema
+I'd like you to write some Rust code that implements this TypeDB schema:
+```
+define
+
+id sub attribute,
+    value string;
+
+path sub attribute,
+    value string;
+
+node sub entity,
+    owns id @key,
+    owns path @unique,
+    plays contains:container,
+    plays contains:contained,
+    plays comments_on:commenter,
+    plays comments_on:commentee,
+    plays subscribed_to:subscriber,
+    plays subscribed_to:subscription,
+    plays unsubscribed_from:unsubscriber,
+    plays unsubscribed_from:unsubscription,
+    plays extra_id:node;
+
+contains sub relation,
+    @acyclic,
+    relates container,
+    relates contained @unique;
+
+comments_on sub relation,
+    relates commenter @unique,
+    relates commentee;
+
+subscribed_to sub relation,
+    relates subscriber,
+    relates subscribee;
+
+unsubscribed_from sub relation,
+    relates unsubscriber,
+    relates unsubscribee;
+
+extra_id sub relation,
+relates node,
+    relates extra_id @unique;
+
+extra_id sub attribute,
+    value string;
+```
+* the new TypeDB syntax
+I suspect you were trained with an earlier version of the TypeDB grammer, which has changed somewhat as of the newest version (3). Here is some Rust code that demonstrates the new TypeDB syntax. (I don't intend to use this demonstration for anything; it's just to illustrate TypeDB's new syntax.)
+```
+use typedb_driver::{
+    Credentials, DriverOptions, TransactionType, TypeDBDriver,
+};
+use futures::StreamExt;
+
+fn main() {
+    async_std::task::block_on(async {
+        // Connect to TypeDB server with credentials
+        let driver = TypeDBDriver::new_core(
+            TypeDBDriver::DEFAULT_ADDRESS,
+            Credentials::new("admin", "password"),
+            DriverOptions::new(false, None).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        // Check for existing database or create a new one
+        let db_name = "test_db";
+        if !driver.databases().contains(db_name).await.unwrap() {
+            println!("Creating database '{}'...", db_name);
+            driver.databases().create(db_name).await.unwrap();
+        }
+
+        let database = driver.databases().get(db_name).await.unwrap();
+        println!("Connected to database: {}", database.name());
+
+        // Define a schema
+        let transaction = driver.transaction(database.name(), TransactionType::Schema).await.unwrap();
+        let define_query = r#"
+        define
+          entity person, owns name;
+          attribute name, value string;
+        "#;
+
+        let result = transaction.query(define_query).await;
+        match result {
+            Ok(_)      => println!("Schema defined successfully"),
+            Err(error) => println!("Error defining schema: {}", error),
+        }
+
+        transaction.commit().await.unwrap();
+        println!("Schema transaction committed");
+
+        // List all entity types to verify
+        let transaction = driver.transaction(database.name(), TransactionType::Read).await.unwrap();
+        let query_result = transaction.query("match entity $x;")
+	    .await.unwrap();
+
+        let mut rows = Vec::new();
+        let mut stream = query_result.into_rows();
+        while let Some(row_result) = stream.next().await {
+            if let Ok(row) = row_result {
+                rows.push(row);
+            }
+        }
+
+        println!("Found {} entity types:", rows.len());
+
+        for row in rows {
+            if let Ok(Some(concept)) = row.get("x") {
+                println!("- {}", concept.get_label());
+            }
+        }
+
+        println!("Test complete!");
+    })
+}
+```
+* some types I have implemented
+```
+# src/types.rs
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ID(String);
+
+impl ID {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        ID(s.into()) }
+    pub fn as_str(&self) -> &str {
+        &self.0 } }
+
+impl Deref for ID { // Lets ID be used like a String in (more?) cases.
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0 } }
+
+impl fmt::Display for ID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0) } }
+
+impl From<String> for ID {
+    fn from(s: String) -> Self {
+        ID(s) } }
+
+impl From<&str> for ID {
+    fn from(s: &str) -> Self {
+        ID(s.to_string()) } }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum SkgNodeProperty {
+    CommentsOn(ID),
+    NoTantivyIndex,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SkgNode {
+    // Tantivy will receive some of this data,
+    // and TypeDB some other subset.
+    // And at least one field, `unindexed_text`, is known to neither.
+
+    pub titles: Vec<String>,
+    pub ids: Vec<ID>, // Must be nonempty. Can be multiple
+                      // because nodes might be merged.
+    pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
+    pub properties: Vec<SkgNodeProperty>,
+    pub nodes_contained: Vec<ID>,
+    pub nodes_subscribed: Vec<ID>,
+    pub nodes_unsubscribed: Vec<ID>,
+
+    #[serde(skip)]  // `path` is not represented in the JSON.
+    pub path: PathBuf,  // It is instead inferred from filepath.
+}
+```
+* some functions I have implemented
+pub fn read_skgnode_from_path
+    <P: AsRef<Path>>
+    (file_path: P)
+     -> io::Result<SkgNode>
+
+/// A line in the typedef of SkgNode prevents the field `path`
+/// from being part of the JSON representation.
+pub fn write_skgnode_to_path
+    <P: AsRef<Path>>
+    (skgnode: &SkgNode, file_path: P)
+     -> io::Result<()>
+* your task
+I would like you to write some Rust code that:
+
+(1) Reads every .skg file in `tests/typedb/fixtures/`.
+(2) Creates a TypeDB database called `skg`.
+(3) Creates in `skg` the entities, attributes and relationships implied by step (1).
+(4) Prints the ID of the node N for which the relationship "contains N M" exists, where M is the node whose ID is the string "2".
+
+Note that not all the information in a Rust SkgNode is represented in TypeDB. Moreover, of what is represented, some is represented as properties of the nodes (like in Rust), but other information is represented as relationships. In particular:
+
+(a) If a SkgNode only has one ID, then that is the `id` attribute of its corresponding TypeDB node. If it has any more IDs, those data are encoded as `extra_id` relationships.
+(b) If SkgNode N has a `nodes_contained` field with the ID Mi of node M, that information should be encoded in TypeDB as the relationsship `contains N M`. Similarly for
