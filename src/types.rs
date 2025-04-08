@@ -31,40 +31,51 @@ impl From<&str> for ID {
     fn from(s: &str) -> Self {
         ID(s.to_string()) } }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum SkgNodeProperty {
+    CommentsOn(ID),
+    NotIndexed,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
     // Tantivy will receive some of this data,
     // and TypeDB some other subset.
     // And at least one field, `unindexed_text`, is known to neither.
+    // (But Rust still needes that one, to send it to Emacs.)
 
-    #[serde(skip)]  // Next field is not read from or written to JSON.
-    pub path: PathBuf,  // Inferred from file location.
-
-    pub format: String,
-    pub id: ID,
-    pub context: Option<ID>,
-    pub is_comment: bool,
     pub titles: Vec<String>,
-    pub unindexed_text: String, // unknown to both Tantivy & TypeDB
+    pub id: Vec<ID>, // Must be nonempty. Can be more than 1 because
+                     // nodes might be merged.
+    pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
+    pub properties: Vec<SkgNodeProperty>,
     pub nodes_contained: Vec<ID>,
-    pub nodes_subscribed: Vec<ID>, }
+    pub nodes_subscribed: Vec<ID>,
+    pub nodes_unsubscribed: Vec<ID>,
+
+    #[serde(skip)]  // `path` is not represented in the JSON.
+    pub path: PathBuf,  // It is instead inferred from filepath.
+}
 
 pub fn skgnode_example() -> SkgNode
 { SkgNode {
-    path: PathBuf::from(
-	"tests/file_io/generated/example.skg"),
-    format: "base".to_string(),
-    id: ID::new("123"),
-    context: Some(ID::new("456")),
-    is_comment: false,
     titles: vec![
         "This text gets indexed.".to_string(),
         "Maybe searching other text could find this note.".to_string(),
-	"\"Quotation marks\" in titles are escaped.".to_string() ],
+	"JSON escapes \"quotation marks\" in text.".to_string() ],
+
+    id: vec![ ID::new("123") ],
     unindexed_text: "this one string could span pages".to_string(),
+    properties: vec![
+	SkgNodeProperty::CommentsOn(ID::new("42")),
+    ],
     nodes_contained: vec![ID::new("1"),
                           ID::new("2"),
                           ID::new("3")],
     nodes_subscribed: vec![ID::new("11"),
                            ID::new("12"),
-                           ID::new("13")], } }
+                           ID::new("13")],
+    nodes_unsubscribed: vec![],
+    path: PathBuf::from(
+	"tests/file_io/generated/example.skg"),
+} }

@@ -1,18 +1,27 @@
-{"format" : "base",
-"id" : "123",
-"context" : "456",
-"is_comment": false,
-"titles":[
-  "This text gets indexed.",
-  "Maybe searching other text could find this note.",
-  "\"Quotation marks\" in titles are escaped."
-],"unindexed_text":
-  "this one string could span pages",
-"nodes_contained":[
-  "1",
-  "2",
-  "3"
-],"nodes_subscribed":[
-  "11",
-  "12",
-  "13"]}
+{
+  "titles": [
+    "This text gets indexed.",
+    "Maybe searching other text could find this note.",
+    "JSON escapes \"quotation marks\" in text."
+  ],
+  "id": [
+    "123"
+  ],
+  "unindexed_text": "this one string could span pages",
+  "properties": [
+    {
+      "CommentsOn": "42"
+    }
+  ],
+  "nodes_contained": [
+    "1",
+    "2",
+    "3"
+  ],
+  "nodes_subscribed": [
+    "11",
+    "12",
+    "13"
+  ],
+  "nodes_unsubscribed": []
+}
