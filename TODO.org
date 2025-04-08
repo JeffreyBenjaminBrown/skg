@@ -1,16 +1,68 @@
-* revise SkgNode
-  type SkgProperty = IsComment | NotIndexed
+* TypeDB data model
+** pseudocode
+   type ID = String
 
-  newstype ID = String
+   type node = Node {
+     id :: ID # no two nodes should share the same ID
+     path :: a path in the filesystem
+     }
 
-  type node = Node {
-    id :: [ID] # must be nonempty
-    path :: a path in the filesystem
-    properties :: [SkgProperty] }
+   contains      :: Relationship <Node, Node>     # Two constraints: (1) Acyclic. (2) Uniqueness in the first (left) position, i.e. if (N contains M) then there can exist no N' distinct from N such that (N' contains M).
 
-  contains      :: Relationship <Node, Node>     # Two constraints: (1) Acyclic. (2) Uniqueness in the second (right) position -- that is, if (N contains M) then there can exist no N' distinct from N such that (N' contains M). In TypeDB this can be expressed as "contains sub relation, @acyclic, relates container, relates contained @unique;".
-  subscribed to :: Relationship <Node, Node>     # Unconstrained.
-  unsubscribed from :: Relationship <Node, Node> # Unconstrained.
+   comments_on   :: Relationship <Node, Node>     # One constraint: Uniqueness in the second (right) position, i.e. if (N comments on M) then there can be no M' such that (N comments on M').
+
+   subscribed_to :: Relationship <Node, Node>     # Unconstrained.
+
+   unsubscribed_from :: Relationship <Node, Node> # Unconstrained.
+
+   extra_id :: Relationship <Node, ID> # Constraint: unique in the first (left) position. That is, if (node N has extra ID I) then no other node M should bear the same relationship to I. Moreover (this might not be expressible in TypeDB), the ID field of no other node M should be equal to I.
+** in typeDB
+#+BEGIN_SRC haskell
+define
+
+id sub attribute,
+    value string;
+
+path sub attribute,
+    value string;
+
+node sub entity,
+    owns id @key,
+    owns path,
+    plays contains:container,
+    plays contains:contained,
+    plays comments_on:commenter,
+    plays comments_on:commentee,
+    plays subscribed_to:subscriber,
+    plays subscribed_to:subscription,
+    plays unsubscribed_from:unsubscriber,
+    plays unsubscribed_from:unsubscription,
+    plays extra_id:node;
+
+contains sub relation,
+    @acyclic,
+    relates container,
+    relates contained @unique;
+
+comments_on sub relation,
+    relates commenter @unique,
+    relates commentee;
+
+subscribed_to sub relation,
+    relates subscriber,
+    relates subscribee;
+
+unsubscribed_from sub relation,
+    relates unsubscriber,
+    relates unsubscribee;
+
+extra_id sub relation,
+    relates node,
+    relates additional_id @unique;
+
+additional_id sub attribute,
+    value string;
+#+END_SRC
 * TypeDB branch
   move from main to test
 * optimizations

@@ -34,7 +34,7 @@ impl From<&str> for ID {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SkgNodeProperty {
     CommentsOn(ID),
-    NotIndexed,
+    NoTantivyIndex,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
