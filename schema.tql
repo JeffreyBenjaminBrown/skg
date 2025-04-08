@@ -1,0 +1,30 @@
+define
+  attribute id, value string;
+  attribute path, value string;
+  entity node,
+    owns id @key,
+    owns path @unique,
+    plays contains:container,
+    plays contains:contained,
+    plays comments_on:commenter,
+    plays comments_on:commentee,
+    plays subscribed_to:subscriber,
+    plays subscribed_to:subscribee,
+    plays unsubscribed_from:unsubscriber,
+    plays unsubscribed_from:unsubscribee,
+    plays extra_id:node;
+  relation contains,
+    relates container,
+    relates contained @card(1..1);
+  relation comments_on,
+    relates commenter @card(1..1),
+    relates commentee;
+  relation subscribed_to,
+    relates subscriber,
+    relates subscribee;
+  relation unsubscribed_from,
+    relates unsubscriber,
+    relates unsubscribee;
+  relation extra_id,
+    relates node,
+    relates id @card(1..1);

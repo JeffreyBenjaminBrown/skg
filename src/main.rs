@@ -1,5 +1,9 @@
+// PITFALL: Deletes any existing TypeDB db named `skg`.
+
+use futures::StreamExt;
 use std::error::Error;
 use std::fs;
+use std::io;
 use std::path::Path;
 use typedb_driver::{
     TypeDBDriver,
@@ -7,8 +11,6 @@ use typedb_driver::{
     Credentials,
     DriverOptions,
 };
-use std::io;
-use futures::StreamExt;
 
 // Import from your crate
 use skg::types::{SkgNode, SkgNodeProperty};
@@ -26,53 +28,26 @@ async fn run_typedb_process() -> Result<(), Box<dyn Error>> {
     let driver_options = DriverOptions::new(false, None)?;
     let driver = TypeDBDriver::new("127.0.0.1:1729", credentials, driver_options).await?;
 
-    // Check if database exists, if not create it
+    // Delete database if it already exists.
+    // Then create a fresh one.
     let db_name = "skg";
     let databases = driver.databases();
-    if !databases.contains(db_name).await? {
-        println!("Creating database '{}'...", db_name);
-        databases.create(db_name).await?;
-    } else {
-        println!("Database '{}' already exists", db_name);
+    if databases.contains(db_name).await? {
+        println!("Deleting existing database '{}'...",
+		 db_name);
+	let database = databases.get(db_name).await?;
+	database.delete().await?;
     }
+    println!("Creating database '{}'...", db_name);
+    databases.create(db_name).await?;
 
     // 3. Create schema and populate database with data
     // Create schema transaction
     let schema_tx = driver.transaction(db_name, TransactionType::Schema).await?;
 
-    // Define the schema
-    let schema = r#"
-  define
-    attribute id, value string;
-    attribute path, value string;
-    entity node,
-        owns id @key,
-        owns path @unique,
-        plays contains:container,
-        plays contains:contained,
-        plays comments_on:commenter,
-        plays comments_on:commentee,
-        plays subscribed_to:subscriber,
-        plays subscribed_to:subscribee,
-        plays unsubscribed_from:unsubscriber,
-        plays unsubscribed_from:unsubscribee,
-        plays extra_id:node;
-    relation contains,
-        relates container,
-        relates contained @card(1..1);
-    relation comments_on,
-        relates commenter @card(1..1),
-        relates commentee;
-    relation subscribed_to,
-        relates subscriber,
-        relates subscribee;
-    relation unsubscribed_from,
-        relates unsubscriber,
-        relates unsubscribee;
-    relation extra_id,
-        relates node,
-        relates id @card(1..1);
-    "#;
+    let schema = fs::read_to_string
+	("schema.tql")
+	.expect("Failed to read TypeDB schema file");
 
     schema_tx.query(schema).await?;
     schema_tx.commit().await?;
@@ -143,8 +118,8 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
                 r#"match
                     $n isa node, has id "{}";
                 insert
-                    $r(node: $n, extra_id: $e) isa extra_id;
-                    $e isa extra_id, has extra_id "{}";"#,
+                    $r isa extra_id (node: $n, id: $e);
+                    $e isa id, has value "{}";"#,
                 primary_id,
                 extra_id.as_str()
             );
@@ -156,11 +131,13 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
     // Handle contained nodes
     for contained_id in &node.nodes_contained {
         let contains_query = format!(
-            r#"match
-                $container isa node, has id "{}";
-                $contained isa node, has id "{}";
-            insert
-                $r(container: $container, contained: $contained) isa contains;"#,
+            r#" match
+                  $container isa node, has id "{}";
+                  $contained isa node, has id "{}";
+                insert
+                  $r isa contains
+                    (container: $container,
+                     contained: $contained);"#,
             primary_id,
             contained_id.as_str()
         );
@@ -175,7 +152,9 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
                 $subscriber isa node, has id "{}";
                 $subscribee isa node, has id "{}";
             insert
-                $r(subscriber: $subscriber, subscribee: $subscribee) isa subscribed_to;"#,
+                $r isa subscribed_to
+                  (subscriber: $subscriber,
+                   subscribee: $subscribee) ;"#,
             primary_id,
             subscribed_id.as_str()
         );
@@ -190,7 +169,9 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
                 $unsubscriber isa node, has id "{}";
                 $unsubscribee isa node, has id "{}";
             insert
-                $r(unsubscriber: $unsubscriber, unsubscribee: $unsubscribee) isa unsubscribed_from;"#,
+                $r isa unsubscribed_from
+                  (unsubscriber: $unsubscriber,
+                   unsubscribee: $unsubscribee);"#,
             primary_id,
             unsubscribed_id.as_str()
         );
@@ -225,7 +206,8 @@ async fn find_container_of_node_with_id(target_id: &str, tx: &typedb_driver::Tra
         r#"match
             $container isa node, has id $container_id;
             $contained isa node, has id "{}";
-            $rel(container: $container, contained: $contained) isa contains;
+            $rel isa contains (container: $container,
+                               contained: $contained);
             get $container_id;"#,
         target_id
     );
