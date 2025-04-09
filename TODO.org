@@ -1,3 +1,5 @@
+* Can a file include multiple comments_on properties?
+  It shouldn't.
 * `contains` should be acyclic
   The TypeDB AI says I can use `distinct` instead,
   but the docs on `distinct` don't suggest that's true.

@@ -12,7 +12,7 @@ use typedb_driver::{
     DriverOptions,
 };
 
-use skg::types::{SkgNode};
+use skg::types::{ID, SkgNode, SkgNodeProperty};
 use skg::file_io::read_skgnode_from_path;
 
 #[tokio::main]
@@ -144,23 +144,101 @@ async fn create_relationships_from_node(
     node: &SkgNode,
     tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
-    let primary_id = // create_node() ensures this exists
-	node.ids[0].as_str();
-    for contained_id in &node.nodes_contained {
-        tx.query(
-	    format!( r#"
-              match
-                $container isa node, has id "{}";
-                $contained isa node, has id "{}";
-              insert
-                $r isa contains
-                  (container: $container,
-                   contained: $contained);"#,
+    let primary_id = node.ids[0].as_str();
+    insert_extra_ids   ( &node, tx ) . await?;
+    insert_comment_rel ( &node, tx ) . await?;
+    insert_from_list( primary_id,
+		      &node.nodes_contained,
+		      "contains",
+		      "container",
+		      "contained",
+		      tx ).await?;
+    insert_from_list( primary_id,
+		      &node.nodes_subscribed,
+		      "subscribed_to",
+		      "subscriber",
+		      "subscribee",
+		      tx ).await?;
+    insert_from_list( primary_id,
+		      &node.nodes_unsubscribed,
+		      "unsubscribed_from",
+		      "unsubscriber",
+		      "unsubscribee",
+		      tx ).await?;
+    Ok (()) }
+
+async fn insert_comment_rel(
+    node: &SkgNode,
+    tx: &typedb_driver::Transaction
+) -> Result<(), Box<dyn Error>> {
+    let primary_id = node.ids[0].as_str();
+    for property in &node.properties {
+	// TODO | PITFALL: This is inefficient.
+	// Better to have the file store a properties list,
+	// but the SkgNode represent each as a standalone field,
+	// usually empty.
+        if let SkgNodeProperty::CommentsOn(commented_id) = property {
+            let query = format!( r#"
+                match
+                    $commenter isa node, has id "{}";
+                    $commentee isa node, has id "{}";
+                insert
+                    $r isa comments_on
+                      (commenter: $commenter,
+                       commentee: $commentee);"#,
+                primary_id,
+                commented_id.as_str()
+            );
+            tx.query(query).await?; } }
+    Ok (()) }
+
+async fn insert_extra_ids (
+    node : &SkgNode,
+    tx: &typedb_driver::Transaction
+) -> Result<(), Box<dyn Error>> {
+    if node.ids.len() > 1 {
+	let primary_id = node.ids[0].as_str();
+	let extra_ids: Vec<&ID> =
+	    node.ids.iter().skip(1).collect();
+	for extra_id in extra_ids {
+            let query = format!(
+		r#"
+                  match
+                      $n isa node, has id "{}";
+                  insert
+                      $r isa extra_id (node: $n, id: $e);
+                      $e isa id "{}";"#,
+		primary_id,
+		extra_id.as_str() );
+            tx.query(query).await?; } }
+    Ok (()) }
+
+async fn insert_from_list(
+    primary_id: &str,
+    id_list: &Vec<ID>,   // This would be node.nodes_contained, etc.
+    relation_name: &str, // "contains", "subscribed_to", etc.
+    from_role: &str,     // "container", "subscriber", etc.
+    to_role: &str,       // "contained", "subscribee", etc.
+    tx: &typedb_driver::Transaction
+) -> Result<(), Box<dyn Error>> {
+    for target_id in id_list {
+        let query = format!(r#"
+            match
+              $from isa node, has id "{}";
+              $to isa node, has id "{}";
+            insert
+              $r isa {}
+                ({}: $from,
+                 {}: $to);"#,
             primary_id,
-            contained_id.as_str() )
-	).await?; }
-    // TODO : Handle extra IDs, subscribed nodes, unsubscribed nodes, and the comments_on property
-    Ok(()) }
+            target_id.as_str(),
+            relation_name,
+            from_role,
+            to_role
+        );
+        tx.query(query).await?;
+    }
+    Ok (()) }
 
 async fn print_all_contains_relationships (
     db_name : &str,
