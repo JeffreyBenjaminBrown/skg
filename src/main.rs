@@ -1,4 +1,5 @@
-// PITFALL: Deletes any existing TypeDB database named `skg-test`,
+// TODO | PITFALL:
+// Deletes any existing TypeDB database named `skg-test`,
 
 use futures::StreamExt;
 use std::error::Error;
@@ -177,8 +178,8 @@ async fn insert_comment_rel(
 	// Better to have the file store a properties list,
 	// but the SkgNode represent each as a standalone field,
 	// usually empty.
-        if let SkgNodeProperty::CommentsOn(commented_id) = property {
-            let query = format!( r#"
+        if let SkgNodeProperty::CommentsOn(commented_id) = property {            tx.query (
+	    format!( r#"
                 match
                     $commenter isa node, has id "{}";
                     $commentee isa node, has id "{}";
@@ -188,8 +189,7 @@ async fn insert_comment_rel(
                        commentee: $commentee);"#,
                 primary_id,
                 commented_id.as_str()
-            );
-            tx.query(query).await?; } }
+            ) ) . await?; } }
     Ok (()) }
 
 async fn insert_extra_ids (
@@ -201,16 +201,16 @@ async fn insert_extra_ids (
 	let extra_ids: Vec<&ID> =
 	    node.ids.iter().skip(1).collect();
 	for extra_id in extra_ids {
-            let query = format!(
-		r#"
-                  match
-                      $n isa node, has id "{}";
-                  insert
-                      $r isa extra_id (node: $n, id: $e);
-                      $e isa id "{}";"#,
-		primary_id,
-		extra_id.as_str() );
-            tx.query(query).await?; } }
+            tx.query(
+		format!( r#"
+                    match
+                        $n isa node, has id "{}";
+                    insert
+                        $r isa extra_id (node: $n, id: $e);
+                        $e isa id "{}";"#,
+		    primary_id,
+		    extra_id.as_str() ) )
+		. await?; } }
     Ok (()) }
 
 async fn insert_from_list(
@@ -222,22 +222,20 @@ async fn insert_from_list(
     tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
     for target_id in id_list {
-        let query = format!(r#"
-            match
-              $from isa node, has id "{}";
-              $to isa node, has id "{}";
-            insert
-              $r isa {}
-                ({}: $from,
-                 {}: $to);"#,
-            primary_id,
-            target_id.as_str(),
-            relation_name,
-            from_role,
-            to_role
-        );
-        tx.query(query).await?;
-    }
+        tx.query (
+	    format! ( r#"
+                match
+                  $from isa node, has id "{}";
+                  $to isa node, has id "{}";
+                insert
+                  $r isa {}
+                    ({}: $from,
+                     {}: $to);"#,
+                primary_id,
+                target_id.as_str(),
+                relation_name,
+                from_role,
+                to_role ) ).await?; }
     Ok (()) }
 
 async fn print_all_contains_relationships (
@@ -246,57 +244,47 @@ async fn print_all_contains_relationships (
 ) -> Result<(), Box<dyn Error>> {
     let tx = driver.transaction(
 	db_name, TransactionType::Read).await?;
-    let query = r#"match
+    let answer = tx.query (
+	r#"match
         $container isa node, has id $container_id;
         $contained isa node, has id $contained_id;
-        $rel isa contains (container: $container, contained: $contained);
-        select $container_id, $contained_id;"#;
-    let query_answer = tx.query(query).await?;
-    let mut stream = query_answer.into_rows();
+        $rel isa contains (container: $container,
+                           contained: $contained);
+        select $container_id, $contained_id;"# ) . await?;
+    let mut stream = answer.into_rows();
     println!("All 'contains' relationships in the database:");
     while let Some(row_result) = stream.next().await {
         let row = row_result?;
-        // Use String instead of &str to avoid the lifetime issues
         let container_id = match row.get("container_id")? {
             Some(c) => c.to_string(),
-            None => "unknown".to_string(),
-        };
+            None => "unknown".to_string() };
         let contained_id = match row.get("contained_id")? {
             Some(c) => c.to_string(),
-            None => "unknown".to_string(),
-        };
-        println!("  Node '{}' contains node '{}'", container_id, contained_id);
-    }
-    println!();
-    Ok(())
-}
+            None => "unknown".to_string() };
+        println!("  Node '{}' contains node '{}'",
+		 container_id, contained_id); }
+    println! ();
+    Ok (()) }
 
-async fn find_container_of_node_with_id(
+async fn find_container_of_node_with_id (
     db_name : &str,
     driver : &TypeDBDriver,
     target_id: &str
 ) -> Result<String, Box<dyn Error>> {
     let tx = driver.transaction(
 	db_name, TransactionType::Read).await?;
-    let query = format!(
-        r#"match
-            $container isa node, has id $container_id;
-            $contained isa node, has id "{}";
-            $rel isa contains (container: $container,
-                               contained: $contained);
-            select $container_id;"#,
-        target_id
-    );
-
-    let query_answer = tx.query(query).await?;
-    let mut stream = query_answer.into_rows();
-
+    let answer = tx.query(
+	format!( r#" match
+                       $container isa node, has id $container_id;
+                       $contained isa node, has id "{}";
+                       $rel isa contains (container: $container,
+                                          contained: $contained);
+                       select $container_id;"#,
+		     target_id ) ) . await?;
+    let mut stream = answer.into_rows();
     if let Some(row_result) = stream.next().await {
         let row = row_result?;
         if let Some(concept) = row.get("container_id")? {
-            return Ok(concept.to_string());
-        }
-    }
-
-    Err(format!("No container found for node with ID '{}'", target_id).into())
-}
+            return Ok(concept.to_string()); } }
+    Err(format!("No container found for node with ID '{}'",
+		target_id).into()) }
