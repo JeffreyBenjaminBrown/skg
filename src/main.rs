@@ -43,12 +43,50 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
 	db_name, &driver, &skg_nodes ) . await?;
     create_all_relationships (
 	db_name, &driver, &skg_nodes ) . await?;
-    print_all_contains_relationships(
-	db_name, &driver             ) . await?;
-    let container_id = find_container_of_node_with_id(
-	db_name, &driver, "2"        ) . await?;
 
-    println!("The ID of the node that contains node with ID '2' is: {}", container_id);
+    print_all_of_some_binary_rel (
+	db_name,
+	&driver,
+	r#" match
+          $container isa node, has id $container_id;
+          $contained isa node, has id $contained_id;
+          $rel isa contains (container: $container,
+                             contained: $contained);
+          select $container_id, $contained_id;"#,
+	"contains",
+	"container_id",
+	"contained_id" ).await?;
+
+    print_all_of_some_binary_rel (
+	db_name,
+	&driver,
+	r#" match
+          $subscriber isa node, has id $from;
+          $subscribee isa node, has id $to;
+          $rel isa subscribed_to (subscriber: $subscriber,
+                                  subscribee: $subscribee);
+          select $from, $to;"#,
+	"subscribed_to",
+	"from",
+	"to" ).await?;
+
+    print_all_of_some_binary_rel (
+	db_name,
+	&driver,
+	r#" match
+          $unsubscriber isa node, has id $from;
+          $unsubscribee isa node, has id $to;
+          $rel isa unsubscribed_from (unsubscriber: $unsubscriber,
+                                      unsubscribee: $unsubscribee);
+          select $from, $to;"#,
+	"unsubscribed_to",
+	"from",
+	"to" ).await?;
+
+    println! (
+	"The node containing the node with ID '2' has ID: {}",
+	find_container_of_node_with_id (
+	    db_name, &driver, "2" ) . await? );
     Ok(()) }
 
 async fn make_fresh_db_destroying_earlier_one (
@@ -239,31 +277,31 @@ async fn insert_from_list(
                 to_role ) ).await?; }
     Ok (()) }
 
-async fn print_all_contains_relationships (
-    db_name : &str,
-    driver : &TypeDBDriver
+async fn print_all_of_some_binary_rel (
+    db_name: &str,
+    driver: &TypeDBDriver,
+    query: &str,
+    rel_name: &str,
+    member1_variable: &str, // PITFALL: Must correspond to `query`.
+    member2_variable: &str, // PITFALL: Must correspond to `query`.
 ) -> Result<(), Box<dyn Error>> {
     let tx = driver.transaction(
-	db_name, TransactionType::Read).await?;
-    let answer = tx.query (
-	r#"match
-        $container isa node, has id $container_id;
-        $contained isa node, has id $contained_id;
-        $rel isa contains (container: $container,
-                           contained: $contained);
-        select $container_id, $contained_id;"# ) . await?;
+        db_name, TransactionType::Read).await?;
+    let answer = tx.query(query).await?;
     let mut stream = answer.into_rows();
-    println!("All 'contains' relationships in the database:");
+    println!( "All '{}' relationships in the database:",
+	       rel_name);
     while let Some(row_result) = stream.next().await {
         let row = row_result?;
-        let container_id = match row.get("container_id")? {
+        let id1 = match row.get(member1_variable)? {
             Some(c) => c.to_string(),
-            None => "unknown".to_string() };
-        let contained_id = match row.get("contained_id")? {
+            None => "unknown".to_string()
+        };
+        let id2 = match row.get(member2_variable)? {
             Some(c) => c.to_string(),
-            None => "unknown".to_string() };
-        println!("  Node '{}' contains node '{}'",
-		 container_id, contained_id); }
+            None => "unknown".to_string()
+        };
+        println!("  Node '{}' {} node '{}'", id1, rel_name, id2); }
     println! ();
     Ok (()) }
 
