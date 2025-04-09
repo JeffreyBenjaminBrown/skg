@@ -208,7 +208,7 @@ async fn find_container_of_node_with_id(target_id: &str, tx: &typedb_driver::Tra
             $contained isa node, has id "{}";
             $rel isa contains (container: $container,
                                contained: $contained);
-            get $container_id;"#,
+            select $container_id;"#,
         target_id
     );
 
