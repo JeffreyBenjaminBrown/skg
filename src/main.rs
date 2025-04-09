@@ -178,18 +178,19 @@ async fn insert_comment_rel(
 	// Better to have the file store a properties list,
 	// but the SkgNode represent each as a standalone field,
 	// usually empty.
-        if let SkgNodeProperty::CommentsOn(commented_id) = property {            tx.query (
-	    format!( r#"
-                match
-                    $commenter isa node, has id "{}";
-                    $commentee isa node, has id "{}";
-                insert
-                    $r isa comments_on
-                      (commenter: $commenter,
-                       commentee: $commentee);"#,
-                primary_id,
-                commented_id.as_str()
-            ) ) . await?; } }
+        if let SkgNodeProperty::CommentsOn(commented_id) = property {
+	    tx.query (
+		format!( r#"
+                    match
+                        $commenter isa node, has id "{}";
+                        $commentee isa node, has id "{}";
+                    insert
+                        $r isa comments_on
+                          (commenter: $commenter,
+                           commentee: $commentee);"#,
+                    primary_id,
+                    commented_id.as_str()
+		) ) . await?; } }
     Ok (()) }
 
 async fn insert_extra_ids (

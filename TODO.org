@@ -1,10 +1,38 @@
+* test each element of the schema
+** extra_id
+** comments_on
+   Node 4 comments on Node 2 via extra ID 22.
+** subscribed_to
+** unsubscribed_from
+** DONE contains
+   Node 1 contains 2 and 3,
+   and the test confirms it.
+* incorporate extra_id into queries
+  e.g. in insert_comment_rel:
+
+  match
+      $commenter isa node, has id "{}";
+      {{ $commentee isa node, has id "{}"; }} or
+      {{ $commentee isa node;
+         $e isa id "{}";
+         $rel isa extra_id (node: $commentee,
+                            id: $e); }} ;
+  insert
+      $r isa comments_on
+        (commenter: $commenter,
+         commentee: $commentee);"#,
+* test each element of the schema with extra ids
+** comments_on
+** subscribed_to
+** unsubscribed_from
+** contains
+* test each constraint of the schema
 * Can a file include multiple comments_on properties?
   It shouldn't.
 * `contains` should be acyclic
   The TypeDB AI says I can use `distinct` instead,
   but the docs on `distinct` don't suggest that's true.
 * the TypeDB schema should be in a separate file
-* test each field and constraint of the SKG type
 * TypeDB data model
 ** pseudocode
    type ID = String
