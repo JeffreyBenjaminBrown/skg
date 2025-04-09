@@ -15,7 +15,7 @@ use typedb_driver::{
 use skg::types::{SkgNode};
 use skg::file_io::read_skgnode_from_path;
 
-async fn make_fresh_db_obliterating_earlier_one (
+async fn make_fresh_db_destroying_earlier_one (
     db_name : &str,
     driver : &TypeDBDriver
 )-> Result<(), Box<dyn Error>> {
@@ -30,59 +30,75 @@ async fn make_fresh_db_obliterating_earlier_one (
     databases.create(db_name).await?;
     Ok (()) }
 
-async fn do_typedb() -> Result<(), Box<dyn Error>> {
-    let skg_nodes = read_skg_files("tests/typedb/fixtures")?;
-    println!( "Done: Read {} .skg files", skg_nodes.len() );
+async fn define_schema (
+    db_name : &str,
+    driver : &TypeDBDriver
+)-> Result<(), Box<dyn Error>> {
+    let tx = driver.transaction(
+	db_name, TransactionType::Schema).await?;
+    let schema = fs::read_to_string
+	("schema.tql")
+	.expect("Failed to read TypeDB schema file");
+    println!("Defining schema ...");
+    tx.query(schema).await?;
+    tx.commit().await?;
+    Ok (()) }
 
+async fn create_nodes (
+    db_name : &str,
+    driver : &TypeDBDriver,
+    skg_nodes : &Vec<SkgNode>
+)-> Result<(), Box<dyn Error>> {
+    let tx = driver.transaction(
+	db_name, TransactionType::Write).await?;
+    println!("Creating nodes ...");
+    for node in skg_nodes {
+	create_node(node, &tx).await?; }
+    tx.commit().await?;
+    Ok (()) }
+
+async fn create_all_relationships (
+    db_name : &str,
+    driver : &TypeDBDriver,
+    skg_nodes : &Vec<SkgNode>
+)-> Result<(), Box<dyn Error>> {
+    let tx = driver.transaction(
+	db_name, TransactionType::Write).await?;
+    println!("Creating relationships ...");
+    for node in skg_nodes {
+	create_relationships(node, &tx).await?; }
+    tx.commit().await?;
+    Ok (()) }
+
+async fn do_typedb() -> Result<(), Box<dyn Error>> {
+    let skg_nodes : Vec<SkgNode> =
+	read_skg_files("tests/typedb/fixtures")?;
+    println!( "Done: Read {} .skg files", skg_nodes.len() );
     let driver = TypeDBDriver::new(
 	"127.0.0.1:1729",
 	Credentials::new("admin", "password"),
 	DriverOptions::new(false, None)?
     ).await?;
-
     let db_name = "skg-test";
-    make_fresh_db_obliterating_earlier_one (
-	db_name, &driver ) . await?;
 
-    // Create schema
-    let schema_tx = driver.transaction(db_name, TransactionType::Schema).await?;
-
-    let schema = fs::read_to_string
-	("schema.tql")
-	.expect("Failed to read TypeDB schema file");
-
-    schema_tx.query(schema).await?;
-    schema_tx.commit().await?;
-    println!("Schema defined successfully");
-
-    // Create nodes
-    let node_tx = driver.transaction(db_name, TransactionType::Write).await?;
-    for node in &skg_nodes {
-	create_node(node, &node_tx).await?;
-    }
-    node_tx.commit().await?;
-    println!("All nodes created successfully");
-
-    // Create relationships
-    let rel_tx = driver.transaction(db_name, TransactionType::Write).await?;
-    for node in &skg_nodes {
-	create_relationships(node, &rel_tx).await?;
-    }
-    rel_tx.commit().await?;
-    println!("All relationships created successfully");
-
-    // Print all contains relationships in the database
-    let relationships_tx = driver.transaction(db_name, TransactionType::Read).await?;
-    print_all_contains_relationships(&relationships_tx).await?;
-
-    // 4. Query to find the container of node with ID "2"
-    let query_tx = driver.transaction(db_name, TransactionType::Read).await?;
-    let container_id = find_container_of_node_with_id("2", &query_tx).await?;
+    // If any of the following needs a transaction, it opens a new one.
+    // Thus all nodes are created before any relationships,
+    // ensuring that all members of the relationship tp be made exist.
+    make_fresh_db_destroying_earlier_one (
+	db_name, &driver             ) . await?;
+    define_schema (
+	db_name, &driver             ) . await?;
+    create_nodes (
+	db_name, &driver, &skg_nodes ) . await?;
+    create_all_relationships (
+	db_name, &driver, &skg_nodes ) . await?;
+    print_all_contains_relationships(
+	db_name, &driver             ) . await?;
+    let container_id = find_container_of_node_with_id(
+	db_name, &driver, "2"        ) . await?;
 
     println!("The ID of the node that contains node with ID '2' is: {}", container_id);
-
-    Ok(())
-}
+    Ok(()) }
 
 fn read_skg_files<P: AsRef<Path>>(dir_path: P) -> io::Result<Vec<SkgNode>> {
     let mut skg_nodes = Vec::new();
@@ -159,7 +175,12 @@ async fn create_relationships(node: &SkgNode, tx: &typedb_driver::Transaction) -
     Ok(())
 }
 
-async fn print_all_contains_relationships(tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
+async fn print_all_contains_relationships (
+    db_name : &str,
+    driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+    let tx = driver.transaction(
+	db_name, TransactionType::Read).await?;
     let query = r#"match
         $container isa node, has id $container_id;
         $contained isa node, has id $contained_id;
@@ -185,8 +206,13 @@ async fn print_all_contains_relationships(tx: &typedb_driver::Transaction) -> Re
     Ok(())
 }
 
-async fn find_container_of_node_with_id(target_id: &str, tx: &typedb_driver::Transaction) -> Result<String, Box<dyn Error>> {
-    // Query to find the container of the node with ID "2"
+async fn find_container_of_node_with_id(
+    db_name : &str,
+    driver : &TypeDBDriver,
+    target_id: &str
+) -> Result<String, Box<dyn Error>> {
+    let tx = driver.transaction(
+	db_name, TransactionType::Read).await?;
     let query = format!(
         r#"match
             $container isa node, has id $container_id;
