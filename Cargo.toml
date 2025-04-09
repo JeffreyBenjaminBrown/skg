@@ -15,3 +15,6 @@ tokio = { version = "1", features = ["full"] }
 typedb-driver = "3.1.0"
 walkdir = "2.4"
 zstd = "0.13"
+
+[lints.rust]
+unused_parens = "allow"

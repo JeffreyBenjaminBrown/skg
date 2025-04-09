@@ -101,84 +101,66 @@ async fn create_all_relationships (
 	db_name, TransactionType::Write).await?;
     println!("Creating relationships ...");
     for node in skg_nodes {
-	create_relationships(node, &tx).await?; }
+	create_relationships_from_node(node, &tx).await?; }
     tx.commit().await?;
     Ok (()) }
 
-fn read_skg_files<P: AsRef<Path>>(dir_path: P) -> io::Result<Vec<SkgNode>> {
+fn read_skg_files <P: AsRef<Path>> (dir_path: P)
+				    -> io::Result<Vec<SkgNode>> {
     let mut skg_nodes = Vec::new();
+    let entries : std::fs::ReadDir = // an iterator
+	fs::read_dir(dir_path)? ;
+    for entry in entries
+    { let entry : std::fs::DirEntry = entry?;
+      let path = entry.path();
+      if ( path.is_file() &&
+	   path.extension().map_or(false, |ext| ext == "skg") )
+      { println!("Reading file: {}", path.display());
+	let node = read_skgnode_from_path(&path)?;
+	skg_nodes.push(node); } }
+    Ok (skg_nodes) }
 
-    let entries = fs::read_dir(dir_path)?;
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "skg") {
-	    println!("Reading file: {}", path.display());
-            let node = read_skgnode_from_path(&path)?;
-            skg_nodes.push(node);
-        }
-    }
-
-    Ok(skg_nodes)
-}
-
-async fn create_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
-    // Just the node creation part of your existing populate_node function
+async fn create_node(
+    node: &SkgNode,
+    tx: &typedb_driver::Transaction
+) -> Result<(), Box<dyn Error>> {
+    let path_str : String =
+	node.path.to_string_lossy().to_string();
     if node.ids.is_empty() {
-        return Err("Node must have at least one ID".into());
-    }
-
+        return Err( format!( "Node {} has no IDs.",
+			      path_str )
+		    . into() ); }
     let primary_id = node.ids[0].as_str();
-    let path_str = node.path.to_string_lossy().to_string();
-
-    // Create the node entity with primary ID and path attributes
     let insert_node_query = format!(
         r#"insert $n isa node,
             has id "{}",
             has path "{}";"#,
         primary_id,
-        path_str
-    );
-
+        path_str );
     tx.query(insert_node_query).await?;
-    Ok(())
-}
+    Ok (()) }
 
-async fn create_relationships(node: &SkgNode, tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
-    // Only the relationship parts of your existing populate_node function
-    if node.ids.is_empty() {
-        return Err("Node must have at least one ID".into());
-    }
-
-    let primary_id = node.ids[0].as_str();
-
-    // Handle contained nodes
+async fn create_relationships_from_node(
+    node: &SkgNode,
+    tx: &typedb_driver::Transaction
+) -> Result<(), Box<dyn Error>> {
+    let primary_id = // create_node() ensures this exists
+	node.ids[0].as_str();
     for contained_id in &node.nodes_contained {
-        println!("Attempting to create contains relationship: '{}' contains '{}'",
-                 primary_id, contained_id.as_str());
-
-        let contains_query = format!(
-            r#" match
-                  $container isa node, has id "{}";
-                  $contained isa node, has id "{}";
-                insert
-                  $r isa contains
-                    (container: $container,
-                     contained: $contained);"#,
+        tx.query(
+	    format!( r#"
+              match
+                $container isa node, has id "{}";
+                $contained isa node, has id "{}";
+              insert
+                $r isa contains
+                  (container: $container,
+                   contained: $contained);"#,
             primary_id,
-            contained_id.as_str()
-        );
-
-        tx.query(contains_query).await?;
-        println!("  Successfully created contains relationship");
-    }
-
-    // The rest of your relationship handling code...
-    // Handle extra IDs, subscribed nodes, unsubscribed nodes, and comments_on property
-
-    Ok(())
-}
+            contained_id.as_str() )
+	).await?; }
+    // TODO : Handle extra IDs, subscribed nodes, unsubscribed nodes, and the comments_on property
+    Ok(()) }
 
 async fn print_all_contains_relationships (
     db_name : &str,
