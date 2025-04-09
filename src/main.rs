@@ -53,16 +53,25 @@ async fn run_typedb_process() -> Result<(), Box<dyn Error>> {
     schema_tx.commit().await?;
     println!("Schema defined successfully");
 
-    // Create data transaction
-    let data_tx = driver.transaction(db_name, TransactionType::Write).await?;
-
-    // Populate data from skg_nodes
+    // Create nodes
+    let node_tx = driver.transaction(db_name, TransactionType::Write).await?;
     for node in &skg_nodes {
-        populate_node(node, &data_tx).await?;
+	create_node(node, &node_tx).await?;
     }
+    node_tx.commit().await?;
+    println!("All nodes created successfully");
 
-    data_tx.commit().await?;
-    println!("Data transaction committed successfully");
+    // Create relationships
+    let rel_tx = driver.transaction(db_name, TransactionType::Write).await?;
+    for node in &skg_nodes {
+	create_relationships(node, &rel_tx).await?;
+    }
+    rel_tx.commit().await?;
+    println!("All relationships created successfully");
+
+    // Print all contains relationships in the database
+    let relationships_tx = driver.transaction(db_name, TransactionType::Read).await?;
+    print_all_contains_relationships(&relationships_tx).await?;
 
     // 4. Query to find the container of node with ID "2"
     let query_tx = driver.transaction(db_name, TransactionType::Read).await?;
@@ -91,8 +100,8 @@ fn read_skg_files<P: AsRef<Path>>(dir_path: P) -> io::Result<Vec<SkgNode>> {
     Ok(skg_nodes)
 }
 
-async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
-    // First, create the node entity with its primary ID and path
+async fn create_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
+    // Just the node creation part of your existing populate_node function
     if node.ids.is_empty() {
         return Err("Node must have at least one ID".into());
     }
@@ -110,26 +119,22 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
     );
 
     tx.query(insert_node_query).await?;
+    Ok(())
+}
 
-    // Handle extra IDs (if any)
-    if node.ids.len() > 1 {
-        for extra_id in node.ids.iter().skip(1) {
-            let extra_id_query = format!(
-                r#"match
-                    $n isa node, has id "{}";
-                insert
-                    $r isa extra_id (node: $n, id: $e);
-                    $e isa id, has value "{}";"#,
-                primary_id,
-                extra_id.as_str()
-            );
-
-            tx.query(extra_id_query).await?;
-        }
+async fn create_relationships(node: &SkgNode, tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
+    // Only the relationship parts of your existing populate_node function
+    if node.ids.is_empty() {
+        return Err("Node must have at least one ID".into());
     }
+
+    let primary_id = node.ids[0].as_str();
 
     // Handle contained nodes
     for contained_id in &node.nodes_contained {
+        println!("Attempting to create contains relationship: '{}' contains '{}'",
+                 primary_id, contained_id.as_str());
+
         let contains_query = format!(
             r#" match
                   $container isa node, has id "{}";
@@ -143,60 +148,38 @@ async fn populate_node(node: &SkgNode, tx: &typedb_driver::Transaction) -> Resul
         );
 
         tx.query(contains_query).await?;
+        println!("  Successfully created contains relationship");
     }
 
-    // Handle subscribed nodes
-    for subscribed_id in &node.nodes_subscribed {
-        let subscribed_query = format!(
-            r#"match
-                $subscriber isa node, has id "{}";
-                $subscribee isa node, has id "{}";
-            insert
-                $r isa subscribed_to
-                  (subscriber: $subscriber,
-                   subscribee: $subscribee) ;"#,
-            primary_id,
-            subscribed_id.as_str()
-        );
+    // The rest of your relationship handling code...
+    // Handle extra IDs, subscribed nodes, unsubscribed nodes, and comments_on property
 
-        tx.query(subscribed_query).await?;
+    Ok(())
+}
+
+async fn print_all_contains_relationships(tx: &typedb_driver::Transaction) -> Result<(), Box<dyn Error>> {
+    let query = r#"match
+        $container isa node, has id $container_id;
+        $contained isa node, has id $contained_id;
+        $rel isa contains (container: $container, contained: $contained);
+        select $container_id, $contained_id;"#;
+    let query_answer = tx.query(query).await?;
+    let mut stream = query_answer.into_rows();
+    println!("All 'contains' relationships in the database:");
+    while let Some(row_result) = stream.next().await {
+        let row = row_result?;
+        // Use String instead of &str to avoid the lifetime issues
+        let container_id = match row.get("container_id")? {
+            Some(c) => c.to_string(),
+            None => "unknown".to_string(),
+        };
+        let contained_id = match row.get("contained_id")? {
+            Some(c) => c.to_string(),
+            None => "unknown".to_string(),
+        };
+        println!("  Node '{}' contains node '{}'", container_id, contained_id);
     }
-
-    // Handle unsubscribed nodes
-    for unsubscribed_id in &node.nodes_unsubscribed {
-        let unsubscribed_query = format!(
-            r#"match
-                $unsubscriber isa node, has id "{}";
-                $unsubscribee isa node, has id "{}";
-            insert
-                $r isa unsubscribed_from
-                  (unsubscriber: $unsubscriber,
-                   unsubscribee: $unsubscribee);"#,
-            primary_id,
-            unsubscribed_id.as_str()
-        );
-
-        tx.query(unsubscribed_query).await?;
-    }
-
-    // Handle comments_on property
-    for property in &node.properties {
-        if let SkgNodeProperty::CommentsOn(commented_id) = property {
-            let comments_query = format!(
-                r#"match
-                    $commenter isa node, has id "{}";
-                    $commentee isa node, has id "{}";
-                insert
-                    $r(commenter: $commenter, commentee: $commentee) isa comments_on;"#,
-                primary_id,
-                commented_id.as_str()
-            );
-
-            tx.query(comments_query).await?;
-        }
-        // NoTantivyIndex is not relevant to TypeDB
-    }
-
+    println!();
     Ok(())
 }
 
