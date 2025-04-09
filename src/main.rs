@@ -30,7 +30,7 @@ async fn run_typedb_process() -> Result<(), Box<dyn Error>> {
 
     // Delete database if it already exists.
     // Then create a fresh one.
-    let db_name = "skg";
+    let db_name = "skg-test";
     let databases = driver.databases();
     if databases.contains(db_name).await? {
         println!("Deleting existing database '{}'...",
