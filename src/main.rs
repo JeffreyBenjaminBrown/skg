@@ -1,4 +1,4 @@
-// PITFALL: Deletes any existing TypeDB db named `skg`.
+// PITFALL: Deletes any existing TypeDB database named `skg-test`,
 
 use futures::StreamExt;
 use std::error::Error;
@@ -12,25 +12,13 @@ use typedb_driver::{
     DriverOptions,
 };
 
-// Import from your crate
-use skg::types::{SkgNode, SkgNodeProperty};
+use skg::types::{SkgNode};
 use skg::file_io::read_skgnode_from_path;
 
-async fn run_typedb_process() -> Result<(), Box<dyn Error>> {
-    // 1. Read all .skg files from tests/typedb/fixtures/
-    let fixtures_path = "tests/typedb/fixtures";
-    let skg_nodes = read_skg_files(fixtures_path)?;
-
-    println!("Read {} .skg files from {}", skg_nodes.len(), fixtures_path);
-
-    // 2. Connect to TypeDB and create a database called 'skg'
-    let credentials = Credentials::new("admin", "password");
-    let driver_options = DriverOptions::new(false, None)?;
-    let driver = TypeDBDriver::new("127.0.0.1:1729", credentials, driver_options).await?;
-
-    // Delete database if it already exists.
-    // Then create a fresh one.
-    let db_name = "skg-test";
+async fn make_fresh_db_obliterating_earlier_one (
+    db_name : &str,
+    driver : &TypeDBDriver
+)-> Result<(), Box<dyn Error>> {
     let databases = driver.databases();
     if databases.contains(db_name).await? {
         println!("Deleting existing database '{}'...",
@@ -40,9 +28,23 @@ async fn run_typedb_process() -> Result<(), Box<dyn Error>> {
     }
     println!("Creating database '{}'...", db_name);
     databases.create(db_name).await?;
+    Ok (()) }
 
-    // 3. Create schema and populate database with data
-    // Create schema transaction
+async fn do_typedb() -> Result<(), Box<dyn Error>> {
+    let skg_nodes = read_skg_files("tests/typedb/fixtures")?;
+    println!( "Done: Read {} .skg files", skg_nodes.len() );
+
+    let driver = TypeDBDriver::new(
+	"127.0.0.1:1729",
+	Credentials::new("admin", "password"),
+	DriverOptions::new(false, None)?
+    ).await?;
+
+    let db_name = "skg-test";
+    make_fresh_db_obliterating_earlier_one (
+	db_name, &driver ) . await?;
+
+    // Create schema
     let schema_tx = driver.transaction(db_name, TransactionType::Schema).await?;
 
     let schema = fs::read_to_string
@@ -211,5 +213,5 @@ async fn find_container_of_node_with_id(target_id: &str, tx: &typedb_driver::Tra
 // Main function with tokio runtime
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    run_typedb_process().await
+    do_typedb().await
 }
