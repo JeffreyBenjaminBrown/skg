@@ -15,6 +15,41 @@ use typedb_driver::{
 use skg::types::{SkgNode};
 use skg::file_io::read_skgnode_from_path;
 
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    do_typedb().await
+}
+
+async fn do_typedb() -> Result<(), Box<dyn Error>> {
+    let skg_nodes : Vec<SkgNode> =
+	read_skg_files("tests/typedb/fixtures")?;
+    println!( "Done: Read {} .skg files", skg_nodes.len() );
+    let driver = TypeDBDriver::new(
+	"127.0.0.1:1729",
+	Credentials::new("admin", "password"),
+	DriverOptions::new(false, None)?
+    ).await?;
+    let db_name = "skg-test";
+
+    // If any of the following needs a transaction, it opens a new one.
+    // Thus all nodes are created before any relationships,
+    // ensuring that all members of the relationship tp be made exist.
+    make_fresh_db_destroying_earlier_one (
+	db_name, &driver             ) . await?;
+    define_schema (
+	db_name, &driver             ) . await?;
+    create_nodes (
+	db_name, &driver, &skg_nodes ) . await?;
+    create_all_relationships (
+	db_name, &driver, &skg_nodes ) . await?;
+    print_all_contains_relationships(
+	db_name, &driver             ) . await?;
+    let container_id = find_container_of_node_with_id(
+	db_name, &driver, "2"        ) . await?;
+
+    println!("The ID of the node that contains node with ID '2' is: {}", container_id);
+    Ok(()) }
+
 async fn make_fresh_db_destroying_earlier_one (
     db_name : &str,
     driver : &TypeDBDriver
@@ -69,36 +104,6 @@ async fn create_all_relationships (
 	create_relationships(node, &tx).await?; }
     tx.commit().await?;
     Ok (()) }
-
-async fn do_typedb() -> Result<(), Box<dyn Error>> {
-    let skg_nodes : Vec<SkgNode> =
-	read_skg_files("tests/typedb/fixtures")?;
-    println!( "Done: Read {} .skg files", skg_nodes.len() );
-    let driver = TypeDBDriver::new(
-	"127.0.0.1:1729",
-	Credentials::new("admin", "password"),
-	DriverOptions::new(false, None)?
-    ).await?;
-    let db_name = "skg-test";
-
-    // If any of the following needs a transaction, it opens a new one.
-    // Thus all nodes are created before any relationships,
-    // ensuring that all members of the relationship tp be made exist.
-    make_fresh_db_destroying_earlier_one (
-	db_name, &driver             ) . await?;
-    define_schema (
-	db_name, &driver             ) . await?;
-    create_nodes (
-	db_name, &driver, &skg_nodes ) . await?;
-    create_all_relationships (
-	db_name, &driver, &skg_nodes ) . await?;
-    print_all_contains_relationships(
-	db_name, &driver             ) . await?;
-    let container_id = find_container_of_node_with_id(
-	db_name, &driver, "2"        ) . await?;
-
-    println!("The ID of the node that contains node with ID '2' is: {}", container_id);
-    Ok(()) }
 
 fn read_skg_files<P: AsRef<Path>>(dir_path: P) -> io::Result<Vec<SkgNode>> {
     let mut skg_nodes = Vec::new();
@@ -234,10 +239,4 @@ async fn find_container_of_node_with_id(
     }
 
     Err(format!("No container found for node with ID '{}'", target_id).into())
-}
-
-// Main function with tokio runtime
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    do_typedb().await
 }
