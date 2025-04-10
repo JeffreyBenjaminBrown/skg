@@ -1,9 +1,8 @@
 define
+
   attribute id, value string;
   attribute path, value string;
-  entity extra_id,
-    owns id @key,
-    plays has_extra_id:extra_id;
+
   entity node,
     owns id @key,
     owns path @unique,
@@ -11,21 +10,27 @@ define
     plays contains:contained,
     plays comments_on:commenter,
     plays comments_on:commentee,
-    plays subscribed_to:subscriber,
-    plays subscribed_to:subscribee,
-    plays unsubscribed_from:unsubscriber,
-    plays unsubscribed_from:unsubscribee,
+    plays subscribes:subscriber,
+    plays subscribes:subscribee,
+    plays unsubscribes:unsubscriber,
+    plays unsubscribes:unsubscribee,
     plays has_extra_id:node;
+
+  entity extra_id,
+    # A typical node only has one id, its primary key. But when nodes are merged, `extra_id` is used to associate more than one id with the merge result. The naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field.
+    owns id @key,
+    plays has_extra_id:extra_id;
+
   relation contains,
     relates container,
     relates contained @card(1..1);
   relation comments_on,
     relates commenter @card(1..1),
     relates commentee;
-  relation subscribed_to,
+  relation subscribes,
     relates subscriber,
     relates subscribee;
-  relation unsubscribed_from,
+  relation unsubscribes,
     relates unsubscriber,
     relates unsubscribee;
   relation has_extra_id,

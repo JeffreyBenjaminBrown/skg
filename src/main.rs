@@ -44,7 +44,7 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
     create_all_relationships (
         db_name, &driver, &skg_nodes ) . await?;
 
-    print_all_of_some_binary_rel (
+    print_all_of_some_binary_rel ( // extra ids
         db_name,
         &driver,
         r#" match
@@ -57,7 +57,20 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
         "ni",
         "ei" ).await?;
 
-    print_all_of_some_binary_rel (
+    print_all_of_some_binary_rel ( // comments
+        db_name,
+        &driver,
+        r#" match
+          $r isa node, has id $ri;
+          $e isa node, has id $ei;
+          $rel isa comments_on (commenter: $r,
+                                commentee: $e);
+          select $ri, $ei;"#,
+        "comments_on",
+        "ri",
+        "ei" ).await?;
+
+    print_all_of_some_binary_rel ( // contents
         db_name,
         &driver,
         r#" match
@@ -70,29 +83,29 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
         "container_id",
         "contained_id" ).await?;
 
-    print_all_of_some_binary_rel (
+    print_all_of_some_binary_rel ( // subscription
         db_name,
         &driver,
         r#" match
           $subscriber isa node, has id $from;
           $subscribee isa node, has id $to;
-          $rel isa subscribed_to (subscriber: $subscriber,
+          $rel isa subscribes (subscriber: $subscriber,
                                   subscribee: $subscribee);
           select $from, $to;"#,
-        "subscribed_to",
+        "subscribes",
         "from",
         "to" ).await?;
 
-    print_all_of_some_binary_rel (
+    print_all_of_some_binary_rel ( // unsubscription
         db_name,
         &driver,
         r#" match
           $unsubscriber isa node, has id $from;
           $unsubscribee isa node, has id $to;
-          $rel isa unsubscribed_from (unsubscriber: $unsubscriber,
+          $rel isa unsubscribes (unsubscriber: $unsubscriber,
                                       unsubscribee: $unsubscribee);
           select $from, $to;"#,
-        "unsubscribed_to",
+        "unsubscribes",
         "from",
         "to" ).await?;
 
@@ -189,7 +202,7 @@ async fn create_node(
         primary_id,
         path_str );
     tx.query(insert_node_query).await?;
-    insert_extra_ids ( &node, tx ) . await?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their extra ids. `extra_id`s are basically optional attributes of a node; they have no meaning in their own right, other than as another way to refer to the node.
+    insert_extra_ids ( &node, tx ) . await?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
     Ok (()) }
 
 async fn create_relationships_from_node(
@@ -206,13 +219,13 @@ async fn create_relationships_from_node(
                       tx ).await?;
     insert_from_list( primary_id,
                       &node.nodes_subscribed,
-                      "subscribed_to",
+                      "subscribes",
                       "subscriber",
                       "subscribee",
                       tx ).await?;
     insert_from_list( primary_id,
                       &node.nodes_unsubscribed,
-                      "unsubscribed_from",
+                      "unsubscribes",
                       "unsubscriber",
                       "unsubscribee",
                       tx ).await?;
@@ -233,12 +246,17 @@ async fn insert_comment_rel(
                 format!( r#"
                     match
                         $commenter isa node, has id "{}";
-                        $commentee isa node, has id "{}";
+                        {{ $commentee isa node, has id "{}"; }} or
+                        {{ $commentee isa node;
+                           $e isa extra_id, has id "{}";
+                           $rel isa has_extra_id (node: $commentee,
+                                                  extra_id: $e); }} ;
                     insert
                         $r isa comments_on
                           (commenter: $commenter,
                            commentee: $commentee);"#,
                     primary_id,
+                    commented_id.as_str(),
                     commented_id.as_str()
                 ) ) . await?; } }
     Ok (()) }
@@ -268,7 +286,7 @@ async fn insert_extra_ids (
 async fn insert_from_list(
     primary_id: &str,
     id_list: &Vec<ID>,   // This would be node.nodes_contained, etc.
-    relation_name: &str, // "contains", "subscribed_to", etc.
+    relation_name: &str, // "contains", "subscribes", etc.
     from_role: &str,     // "container", "subscriber", etc.
     to_role: &str,       // "contained", "subscribee", etc.
     tx: &typedb_driver::Transaction

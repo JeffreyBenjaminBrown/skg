@@ -1,30 +1,25 @@
-* test each element of the schema
-** DONE extra_id
-** comments_on
-   Node 4 comments on Node 2 via extra ID 22.
-** DONE subscribed_to
-** DONE unsubscribed_from
-** DONE contains
 * incorporate extra_id into queries
-  e.g. in insert_comment_rel:
+Follow the model for comments_on:
 
   match
       $commenter isa node, has id "{}";
       {{ $commentee isa node, has id "{}"; }} or
       {{ $commentee isa node;
-         $e isa id "{}";
-         $rel isa extra_id (node: $commentee,
-                            id: $e); }} ;
+         $e isa extra_id, has id "{}";
+         $rel isa has_extra_id (node: $commentee,
+                                extra_id: $e); }} ;
   insert
       $r isa comments_on
         (commenter: $commenter,
          commentee: $commentee);"#,
 * test each element of the schema with extra ids
-** comments_on
+** DONE comments_on
+   Node 4 comments on Node 2 via extra ID 22.
 ** subscribed_to
 ** unsubscribed_from
 ** contains
 * test each constraint of the schema
+  Some violations might not be representable in the .skg format.
 * Can a file include multiple comments_on properties?
   It shouldn't.
 * `contains` should be acyclic
