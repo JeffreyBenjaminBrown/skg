@@ -296,12 +296,17 @@ async fn insert_from_list(
             format! ( r#"
                 match
                   $from isa node, has id "{}";
-                  $to isa node, has id "{}";
+                  {{ $to isa node, has id "{}"; }} or
+                  {{ $to isa node;
+                     $e isa extra_id, has id "{}";
+                     $rel isa has_extra_id (node: $to,
+                                            extra_id: $e); }};
                 insert
                   $r isa {}
                     ({}: $from,
                      {}: $to);"#,
                 primary_id,
+                target_id.as_str(),
                 target_id.as_str(),
                 relation_name,
                 from_role,
