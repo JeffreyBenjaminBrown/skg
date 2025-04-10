@@ -9,13 +9,13 @@ fn test_skgnode_io() {
     let example = skgnode_example();
     let out_filename = example.path.clone();
     write_skgnode_to_path( &example,
-			    out_filename.to_str().expect(
-				"Invalid UTF-8 in path")
+                            out_filename.to_str().expect(
+                                "Invalid UTF-8 in path")
     ) . unwrap();
 
     // Read that file, reverse its lists, write to another file
     let read_node = read_skgnode_from_path(
-	out_filename.to_str().expect("Invalid UTF-8 in path")
+        out_filename.to_str().expect("Invalid UTF-8 in path")
     ).unwrap();
     let reversed = reverse_some_of_skgnode(&read_node);
     let reversed_filename = "tests/file_io/generated/reversed.skg";
@@ -26,22 +26,22 @@ fn test_skgnode_io() {
     let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
 
     let generated_example =
-	fs::read_to_string(out_filename).unwrap();
+        fs::read_to_string(out_filename).unwrap();
     let expected_example =
-	fs::read_to_string(expected_example_path).unwrap();
+        fs::read_to_string(expected_example_path).unwrap();
     let generated_reversed =
-	fs::read_to_string(reversed_filename).unwrap();
+        fs::read_to_string(reversed_filename).unwrap();
     let expected_reversed =
-	fs::read_to_string(expected_reversed_path).unwrap();
+        fs::read_to_string(expected_reversed_path).unwrap();
 
     let parsed_generated_example: serde_json::Value =
-	serde_json::from_str(&generated_example).unwrap();
+        serde_json::from_str(&generated_example).unwrap();
     let parsed_expected_example: serde_json::Value =
-	serde_json::from_str(&expected_example).unwrap();
+        serde_json::from_str(&expected_example).unwrap();
     let parsed_generated_reversed: serde_json::Value =
-	serde_json::from_str(&generated_reversed).unwrap();
+        serde_json::from_str(&generated_reversed).unwrap();
     let parsed_expected_reversed: serde_json::Value =
-	serde_json::from_str(&expected_reversed).unwrap();
+        serde_json::from_str(&expected_reversed).unwrap();
 
     assert_eq!(parsed_generated_example, parsed_expected_example,
                "Generated example file doesn't match expected");
@@ -75,6 +75,6 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
         ids                : node.ids                .clone(),
         unindexed_text     : node.unindexed_text     .clone(),
         path               : node.path               .clone(),
-	properties         : node.properties         .clone(),
-	nodes_unsubscribed : node.nodes_unsubscribed .clone(),
+        properties         : node.properties         .clone(),
+        nodes_unsubscribed : node.nodes_unsubscribed .clone(),
     } }

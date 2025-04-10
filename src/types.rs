@@ -70,12 +70,12 @@ pub fn skgnode_example() -> SkgNode
     titles: vec![
         "This text gets indexed.".to_string(),
         "Maybe searching other text could find this note.".to_string(),
-	"JSON escapes \"quotation marks\" in text.".to_string() ],
+        "JSON escapes \"quotation marks\" in text.".to_string() ],
 
     ids: vec![ ID::new("123") ],
     unindexed_text: "this one string could span pages".to_string(),
     properties: vec![
-	SkgNodeProperty::CommentsOn(ID::new("42")),
+        SkgNodeProperty::CommentsOn(ID::new("42")),
     ],
     nodes_contained: vec![ID::new("1"),
                           ID::new("2"),
@@ -85,5 +85,5 @@ pub fn skgnode_example() -> SkgNode
                            ID::new("13")],
     nodes_unsubscribed: vec![],
     path: PathBuf::from(
-	"tests/file_io/generated/example.skg"),
+        "tests/file_io/generated/example.skg"),
 } }

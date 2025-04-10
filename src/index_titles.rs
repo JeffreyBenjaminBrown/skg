@@ -50,8 +50,8 @@ pub fn extract_skg_titles(path: &Path) -> Vec<String> {
     if let Ok(content) = fs::read_to_string(path)
     { if let Ok(json_value) = from_str::<Value>(&content)
       { if let Some(titles_array) =
-	json_value.get("titles").and_then(|t| t.as_array())
-	{ for title_value in titles_array
+        json_value.get("titles").and_then(|t| t.as_array())
+        { for title_value in titles_array
           { if let Some(title_str) = title_value.as_str()
             { titles.push(strip_org_links(title_str)); } } } } }
     titles }
@@ -62,7 +62,7 @@ pub fn extract_skg_titles(path: &Path) -> Vec<String> {
 // That is, the ID and brackets of a link in a title are not indexed.
 pub fn strip_org_links(text: &str) -> String {
     let link_re = Regex::new(
-	r"\[\[.*?\]\[(.*?)\]\]").unwrap();
+        r"\[\[.*?\]\[(.*?)\]\]").unwrap();
     let mut result = String::from(text);
     let mut in_offset = 0; // offset in the input string
     for cap in link_re.captures_iter(text) {
@@ -74,8 +74,8 @@ pub fn strip_org_links(text: &str) -> String {
         let end_pos = whole_match.end() - in_offset;
 
         result.replace_range(
-	    start_pos .. end_pos,
-	    link_label.as_str());
+            start_pos .. end_pos,
+            link_label.as_str());
         in_offset += whole_match.len() - link_label.len(); }
     result }
 
@@ -86,7 +86,7 @@ pub fn delete_documents_with_path(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path_str = path.to_string_lossy().to_string();
     let term = tantivy::Term::from_field_text(
-	path_field, &path_str);
+        path_field, &path_str);
     writer.delete_term(term); // Delete anything with this path
     Ok(()) }
 
@@ -117,7 +117,7 @@ pub fn index_titles_at_path(
     let mut count = 0;
     for title in titles {
         add_document_and_title_to_index(
-	    writer, path, title, path_field, title_field)?;
+            writer, path, title, path_field, title_field)?;
         count += 1; }
     Ok(count) }
 
@@ -129,24 +129,24 @@ pub fn update_index(
     index_path: &Path
 ) -> Result<usize, Box<dyn std::error::Error>> {
     println!("Updating index with .skg files in the {} directory...",
-	     data_dir);
+             data_dir);
     let mut index_writer = index.writer(50_000_000)?;
     let mut indexed_count = 0;
     let index_mtime = get_modification_time(index_path)
         .unwrap_or(SystemTime::UNIX_EPOCH);
     for entry in WalkDir::new(data_dir)
-	.into_iter().filter_map(Result::ok)
+        .into_iter().filter_map(Result::ok)
     { let path = entry.path();
       if !needs_indexing(path, index_mtime)
       { if path.extension().map_or(
-	  false, |ext| ext == "skg")
-	{ println!("Skipping unchanged file: {}",
-		   path.display()); }
+          false, |ext| ext == "skg")
+        { println!("Skipping unchanged file: {}",
+                   path.display()); }
         continue; }
       let titles = extract_skg_titles(path);
       if !titles.is_empty()
       { println!("Indexing: {} with {} titles",
-		 path.display(), titles.len());
+                 path.display(), titles.len());
         for title in &titles {
             println!("  - Title: {}", title); }
         let titles_indexed = index_titles_at_path(
@@ -158,7 +158,7 @@ pub fn update_index(
         indexed_count += titles_indexed; } }
     if indexed_count > 0
     { println!("Indexed {} files. Committing changes...",
-	       indexed_count);
+               indexed_count);
       index_writer.commit()?;
     } else { println!("No new or modified files found."); }
     Ok (indexed_count) }
@@ -168,15 +168,15 @@ pub fn search_index(
     title_field: schema::Field,
     query_text: &str
 ) -> Result< (Vec<(f32, tantivy::DocAddress)>,
-	      tantivy::Searcher),
-	    Box<dyn std::error::Error>> {
+              tantivy::Searcher),
+            Box<dyn std::error::Error>> {
     println!(
-	"\nFinding files with titles matching \"{}\".",
-	query_text);
+        "\nFinding files with titles matching \"{}\".",
+        query_text);
     let reader = index.reader()?;
     let searcher = reader.searcher();
     let query_parser =
-	tantivy::query::QueryParser::for_index(
+        tantivy::query::QueryParser::for_index(
         &index, vec![title_field]);
     let query = query_parser.parse_query(query_text)?;
     let best_matches = searcher.search(
@@ -193,7 +193,7 @@ pub fn print_search_results(
         println!("No matches found.");
     } else {
         let mut path_to_results: std::collections::HashMap
-	    <String, Vec<(f32, String)>> =
+            <String, Vec<(f32, String)>> =
             std::collections::HashMap::new();
         for (score, doc_address) in best_matches {
             let retrieved_doc = searcher.doc(doc_address)?;
@@ -212,6 +212,6 @@ pub fn print_search_results(
             println!("File: {}", path);
             for (score, title) in titles {
                 println!("  - Score: {:.2} | Title: {}",
-			 score, title); }
+                         score, title); }
             println!(); } }
     Ok(()) }

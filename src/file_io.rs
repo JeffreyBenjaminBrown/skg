@@ -15,8 +15,8 @@ pub fn read_skgnode_from_path
   let contents = fs::read_to_string(file_path)?;
   let mut skgnode: SkgNode = serde_json::from_str(&contents)
       .map_err(
-	  |e| io::Error::new(
-	      io::ErrorKind::InvalidData, e.to_string()))?;
+          |e| io::Error::new(
+              io::ErrorKind::InvalidData, e.to_string()))?;
   skgnode.path = file_path.to_path_buf(); // not part of the JSON
   Ok(skgnode) }
 
@@ -28,7 +28,7 @@ pub fn write_skgnode_to_path
      -> io::Result<()>
 { let json_string = serde_json::to_string(skgnode)
       .map_err(
-	  |e| io::Error::new(
-	      io::ErrorKind::InvalidData, e.to_string()))?;
+          |e| io::Error::new(
+              io::ErrorKind::InvalidData, e.to_string()))?;
   fs::write(file_path, json_string)?;
   Ok(()) }
