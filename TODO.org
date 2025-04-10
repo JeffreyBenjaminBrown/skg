@@ -1,10 +1,13 @@
-* test each constraint of the schema
-  Some violations might not be representable in the .skg format.
-* Can a file include multiple comments_on properties?
-  It shouldn't.
-* `contains` should be acyclic
-  The TypeDB AI says I can use `distinct` instead,
-  but the docs on `distinct` don't suggest that's true.
+* move TypeDB code out of `main`
+* constraints
+** test each constraint of the schema
+   Some violations might not be representable in the .skg format.
+** Can a file include multiple comments_on properties?
+   It shouldn't.
+** `contains` should be acyclic
+   The TypeDB AI says I can use `distinct` instead,
+   but the docs on `distinct` don't suggest that's true.
 * optimizations
+** unify Tantivy and TypeDB indexation
 ** If `titles` were the first field in the .skg format
    then the Tantivy indexing would need to read less
