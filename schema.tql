@@ -1,6 +1,9 @@
 define
   attribute id, value string;
   attribute path, value string;
+  entity extra_id,
+    owns id @key,
+    plays has_extra_id:extra_id;
   entity node,
     owns id @key,
     owns path @unique,
@@ -12,7 +15,7 @@ define
     plays subscribed_to:subscribee,
     plays unsubscribed_from:unsubscriber,
     plays unsubscribed_from:unsubscribee,
-    plays extra_id:node;
+    plays has_extra_id:node;
   relation contains,
     relates container,
     relates contained @card(1..1);
@@ -25,6 +28,6 @@ define
   relation unsubscribed_from,
     relates unsubscriber,
     relates unsubscribee;
-  relation extra_id,
+  relation has_extra_id,
     relates node,
-    relates id @card(1..1);
+    relates extra_id @card(1..1);

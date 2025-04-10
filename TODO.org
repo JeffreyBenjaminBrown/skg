@@ -1,12 +1,10 @@
 * test each element of the schema
-** extra_id
+** DONE extra_id
 ** comments_on
    Node 4 comments on Node 2 via extra ID 22.
-** subscribed_to
-** unsubscribed_from
+** DONE subscribed_to
+** DONE unsubscribed_from
 ** DONE contains
-   Node 1 contains 2 and 3,
-   and the test confirms it.
 * incorporate extra_id into queries
   e.g. in insert_comment_rel:
 

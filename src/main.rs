@@ -48,6 +48,19 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
 	db_name,
 	&driver,
 	r#" match
+          $n isa node, has id $ni;
+          $e isa extra_id, has id $ei;
+          $rel isa has_extra_id (node: $n,
+                                 extra_id: $e);
+          select $ni, $ei;"#,
+        "has_extra_id",
+        "ni",
+        "ei" ).await?;
+
+    print_all_of_some_binary_rel (
+        db_name,
+        &driver,
+        r#" match
           $container isa node, has id $container_id;
           $contained isa node, has id $contained_id;
           $rel isa contains (container: $container,
@@ -154,8 +167,7 @@ fn read_skg_files <P: AsRef<Path>> (dir_path: P)
       let path = entry.path();
       if ( path.is_file() &&
 	   path.extension().map_or(false, |ext| ext == "skg") )
-      { println!("Reading file: {}", path.display());
-	let node = read_skgnode_from_path(&path)?;
+      { let node = read_skgnode_from_path(&path)?;
 	skg_nodes.push(node); } }
     Ok (skg_nodes) }
 
@@ -177,6 +189,7 @@ async fn create_node(
         primary_id,
         path_str );
     tx.query(insert_node_query).await?;
+    insert_extra_ids ( &node, tx ) . await?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their extra ids. `extra_id`s are basically optional attributes of a node; they have no meaning in their own right, other than as another way to refer to the node.
     Ok (()) }
 
 async fn create_relationships_from_node(
@@ -184,7 +197,6 @@ async fn create_relationships_from_node(
     tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
     let primary_id = node.ids[0].as_str();
-    insert_extra_ids   ( &node, tx ) . await?;
     insert_comment_rel ( &node, tx ) . await?;
     insert_from_list( primary_id,
 		      &node.nodes_contained,
@@ -245,11 +257,12 @@ async fn insert_extra_ids (
                     match
                         $n isa node, has id "{}";
                     insert
-                        $r isa extra_id (node: $n, id: $e);
-                        $e isa id "{}";"#,
-		    primary_id,
-		    extra_id.as_str() ) )
-		. await?; } }
+                        $e isa extra_id, has id "{}";
+                        $r isa has_extra_id
+                           (node: $n, extra_id: $e);"#,
+                    primary_id,
+                    extra_id.as_str() ) )
+                . await?; } }
     Ok (()) }
 
 async fn insert_from_list(
@@ -282,8 +295,8 @@ async fn print_all_of_some_binary_rel (
     driver: &TypeDBDriver,
     query: &str,
     rel_name: &str,
-    member1_variable: &str, // PITFALL: Must correspond to `query`.
-    member2_variable: &str, // PITFALL: Must correspond to `query`.
+    member1_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
+    member2_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
 ) -> Result<(), Box<dyn Error>> {
     let tx = driver.transaction(
         db_name, TransactionType::Read).await?;
