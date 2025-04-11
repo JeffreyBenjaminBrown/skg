@@ -1,4 +1,5 @@
-* move TypeDB code out of `main`
+* TypeDB must know about links
+  in both title and *body*
 * persist TypeDB data
   consider too how Tantivy data is persisted
 * constraints
