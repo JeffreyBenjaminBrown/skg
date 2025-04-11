@@ -24,6 +24,14 @@ pub async fn find_node_containing_node (
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("container_id")? {
-      return Ok(concept.to_string()); } }
+      return Ok(extract_id(&concept.to_string())); } }
   Err(format!("No container found for node with ID '{}'",
               target_id).into()) }
+
+pub fn extract_id(attribute_str: &str) -> String {
+  if let Some(start) = attribute_str.find('"') {
+    if let Some(end) = attribute_str[start + 1..] . find('"') {
+      return attribute_str [start + 1 .. start + 1 + end]
+        . to_string(); } }
+  panic!( "Failed to extract ID from TypeDB output: {}",
+           attribute_str) }

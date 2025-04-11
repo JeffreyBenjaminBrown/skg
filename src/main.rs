@@ -11,7 +11,7 @@ use typedb_driver::{
 };
 
 use skg::typedb::create::{make_db_destroying_earlier_one};
-use skg::typedb::search::{find_node_containing_node};
+use skg::typedb::search::{find_node_containing_node, extract_id};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -95,7 +95,7 @@ async fn do_typedb() -> Result<(), Box<dyn Error>> {
     "to" ).await?;
 
   println! (
-    "The node containing the node with ID '2' has ID: {}",
+    "The node containing the node with ID 2 has ID: {}",
     find_node_containing_node (
       db_name, &driver, "2" ) . await? );
   Ok(()) }
@@ -116,14 +116,21 @@ async fn print_all_of_some_binary_rel (
                rel_name);
     while let Some(row_result) = stream.next().await {
         let row = row_result?;
-        let id1 = match row.get(member1_variable)? {
+        let id1_raw = match row.get(member1_variable)? {
             Some(c) => c.to_string(),
             None => "unknown".to_string()
         };
-        let id2 = match row.get(member2_variable)? {
+        let id2_raw = match row.get(member2_variable)? {
             Some(c) => c.to_string(),
             None => "unknown".to_string()
         };
-        println!("  Node '{}' {} node '{}'", id1, rel_name, id2); }
+
+        // Extract just the ID values
+        let id1 = extract_id(&id1_raw);
+        let id2 = extract_id(&id2_raw);
+
+        println!("  Node: {} {} node: {}", id1, rel_name, id2);
+    }
     println! ();
-    Ok (()) }
+    Ok (())
+}
