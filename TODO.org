@@ -1,4 +1,6 @@
 * move TypeDB code out of `main`
+* persist TypeDB data
+  consider too how Tantivy data is persisted
 * constraints
 ** test each constraint of the schema
    Some violations might not be representable in the .skg format.
