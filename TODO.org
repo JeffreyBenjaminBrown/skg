@@ -1,5 +1,12 @@
 * TypeDB must know about links
   in both title and *body*
+** in Rust
+*** create a type for links
+    with ID and link text
+*** create a new SkgNode field, "link_targets"
+*** parse links in text and body
+** in TypeDB, create a new relation, "links"
+   links (from: node, to: node)
 * persist TypeDB data
   consider too how Tantivy data is persisted
 * constraints

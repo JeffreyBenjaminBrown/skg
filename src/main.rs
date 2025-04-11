@@ -11,6 +11,7 @@ use typedb_driver::{
 };
 
 use skg::typedb::create::{make_db_destroying_earlier_one};
+use skg::typedb::search::{find_node_containing_node};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -126,26 +127,3 @@ async fn print_all_of_some_binary_rel (
         println!("  Node '{}' {} node '{}'", id1, rel_name, id2); }
     println! ();
     Ok (()) }
-
-async fn find_node_containing_node (
-  db_name : &str,
-  driver : &TypeDBDriver,
-  target_id: &str
-) -> Result<String, Box<dyn Error>> {
-  let tx = driver.transaction(
-    db_name, TransactionType::Read).await?;
-  let answer = tx.query(
-    format!( r#" match
-                   $container isa node, has id $container_id;
-                   $contained isa node, has id "{}";
-                   $rel isa contains (container: $container,
-                                      contained: $contained);
-                 select $container_id;"#,
-                 target_id ) ) . await?;
-  let mut stream = answer.into_rows();
-  if let Some(row_result) = stream.next().await {
-    let row = row_result?;
-    if let Some(concept) = row.get("container_id")? {
-      return Ok(concept.to_string()); } }
-  Err(format!("No container found for node with ID '{}'",
-              target_id).into()) }
