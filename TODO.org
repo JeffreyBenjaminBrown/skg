@@ -1,6 +1,5 @@
 * Why do I see nothing printed by index_titles::update_index when I run the tests?
-* Why can't the unindexed text contain newlines?
-* TypeDB must know about links
+* DONE ? TypeDB must know about links
   in both title and *body*
 ** in Rust
 *** create a type for links

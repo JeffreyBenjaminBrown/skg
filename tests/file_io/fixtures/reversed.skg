@@ -4,7 +4,9 @@ titles:
 - This text gets indexed.
 ids:
 - '123'
-unindexed_text: this one string could span pages
+unindexed_text: |-
+  This one string could span pages.
+  It better be okay with newlines.
 properties:
 - !CommentsOn '42'
 - NoTantivyIndex

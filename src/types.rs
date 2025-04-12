@@ -146,7 +146,8 @@ pub fn skgnode_example() -> SkgNode {
       "YAML does not escape \"quotation marks\" in text."
         .to_string() ],
     ids: vec![ ID::new("123") ],
-    unindexed_text: "this one string could span pages".to_string(),
+    unindexed_text: r#"This one string could span pages.
+It better be okay with newlines."#.to_string(),
     properties: vec![
       SkgNodeProperty::CommentsOn(ID::new("42")),
       SkgNodeProperty::NoTantivyIndex, ],
