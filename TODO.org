@@ -1,4 +1,3 @@
-* rename tests/index/ -> tests/index_titles/
 * Why do I see nothing printed by index_titles::update_index when I run the tests?
 * Why can't the unindexed text contain newlines?
 * TypeDB must know about links
