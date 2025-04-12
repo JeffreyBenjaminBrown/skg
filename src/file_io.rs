@@ -11,37 +11,39 @@ use crate::links::extract_links;
 pub fn read_skgnode_from_path
   <P: AsRef<Path>>
   (file_path: P)
-   -> io::Result<SkgNode>
-{ let file_path = file_path.as_ref();
-  let contents = fs::read_to_string(file_path)?;
-  let mut skgnode: SkgNode = serde_yaml::from_str(&contents)
-  .map_err(
-    |e| io::Error::new(
-      io::ErrorKind::InvalidData, e.to_string()))?;
+   -> io::Result<SkgNode> {
+    let file_path = file_path.as_ref();
+    let contents = fs::read_to_string(file_path)?;
+    let mut skgnode: SkgNode = serde_yaml::from_str(&contents)
+      .map_err(
+        |e| io::Error::new(
+          io::ErrorKind::InvalidData, e.to_string()))?;
 
-  // The rest of this information is not represented as a field
-  // in the .skg file.
+    // The rest of this information is not represented as a field
+    // in the .skg file.
 
-  skgnode.path = file_path.to_path_buf();
-  let mut links = Vec::new(); // extracted from titles, unindexed text
-  for title in &skgnode.titles {
-    links.extend(extract_links(title)); }
-  links.extend(extract_links(&skgnode.unindexed_text));
-  skgnode.links = links;
-  Ok (skgnode) }
+    skgnode.path = file_path.to_path_buf();
+
+    // Get links from titles and unindexed text
+    let mut links = Vec::new();
+    for title in &skgnode.titles {
+      links.extend(extract_links(title)); }
+    links.extend(extract_links(&skgnode.unindexed_text));
+    skgnode.links = links;
+    Ok (skgnode) }
 
 /// A line in the typedef of SkgNode prevents the field `path`
 /// from being part of the .skg representation.
 pub fn write_skgnode_to_path
   <P: AsRef<Path>>
   (skgnode: &SkgNode, file_path: P)
-   -> io::Result<()>
-{ let yaml_string = serde_yaml::to_string(skgnode)
-  .map_err(
-    |e| io::Error::new(
-      io::ErrorKind::InvalidData, e.to_string()))?;
-  fs::write(file_path, yaml_string)?;
-  Ok (()) }
+   -> io::Result<()> {
+    let yaml_string = serde_yaml::to_string(skgnode)
+      .map_err(
+        |e| io::Error::new(
+          io::ErrorKind::InvalidData, e.to_string()))?;
+    fs::write(file_path, yaml_string)?;
+    Ok (()) }
 
 #[cfg(test)]
 mod tests {

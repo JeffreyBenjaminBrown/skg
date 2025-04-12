@@ -15,8 +15,8 @@ use serde_yaml::from_str;
 pub fn get_or_create_index(
   schema: schema::Schema,
   index_path: &str
-) -> Result<Index, Box<dyn std::error::Error>>
-{ let path = Path::new(index_path);
+) -> Result<Index, Box<dyn std::error::Error>> {
+  let path = Path::new(index_path);
   if path.exists() {
     println!("Opening existing index at {:?}", path);
     Ok(Index::open_in_dir(path)?)
@@ -27,8 +27,8 @@ pub fn get_or_create_index(
 
 pub fn get_modification_time(
   path: &Path)
-  -> Result<SystemTime, Box<dyn std::error::Error>>
-{ let metadata = fs::metadata(path)?;
+  -> Result<SystemTime, Box<dyn std::error::Error>> {
+  let metadata = fs::metadata(path)?;
   Ok(metadata.modified()?) }
 
 pub fn needs_indexing( // based on modification time
@@ -47,13 +47,14 @@ pub fn needs_indexing( // based on modification time
 
 pub fn extract_skg_titles(path: &Path) -> Vec<String> {
   let mut titles = Vec::new();
-  if let Ok(content) = fs::read_to_string(path)
-  { if let Ok(yaml_value) = from_str::<serde_yaml::Value>(&content)
-    { if let Some(titles_array) =
-      yaml_value.get("titles").and_then(|t| t.as_sequence())
-      { for title_value in titles_array
-        { if let Some(title_str) = title_value.as_str()
-          { titles.push(strip_org_links(title_str)); } } } } }
+  if let Ok(content) = fs::read_to_string(path) {
+    if let Ok(yaml_value) =
+      from_str::<serde_yaml::Value>(&content) {
+      if let Some(titles_array) =
+        yaml_value.get("titles").and_then(|t| t.as_sequence()) {
+          for title_value in titles_array {
+            if let Some(title_str) = title_value.as_str() {
+              titles.push(strip_org_links(title_str)); } } } } }
   titles }
 
 // Titles can include links,

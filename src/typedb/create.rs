@@ -92,12 +92,12 @@ pub fn read_skg_files
     let mut skg_nodes = Vec::new();
     let entries : std::fs::ReadDir = // an iterator
       fs::read_dir(dir_path)? ;
-    for entry in entries
-    { let entry : std::fs::DirEntry = entry?;
+    for entry in entries {
+      let entry : std::fs::DirEntry = entry?;
       let path = entry.path();
       if ( path.is_file() &&
-           path.extension().map_or(false, |ext| ext == "skg") )
-      { let node = read_skgnode_from_path(&path)?;
+           path.extension().map_or(false, |ext| ext == "skg") ) {
+        let node = read_skgnode_from_path(&path)?;
         skg_nodes.push(node); } }
     Ok (skg_nodes) }
 

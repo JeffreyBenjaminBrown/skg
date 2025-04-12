@@ -138,26 +138,26 @@ impl fmt::Display for LinkParseError {
 
 impl Error for LinkParseError {}
 
-pub fn skgnode_example() -> SkgNode
-{ SkgNode {
-  titles: vec![
-    "This text gets indexed.".to_string(),
-    "Maybe searching other text could find this note.".to_string(),
-    "YAML does not escape \"quotation marks\" in text.".to_string() ],
-  ids: vec![ ID::new("123") ],
-  unindexed_text: "this one string could span pages".to_string(),
-  properties: vec![
-    SkgNodeProperty::CommentsOn(ID::new("42")),
-    SkgNodeProperty::NoTantivyIndex,
-  ],
-  nodes_contained: vec![ID::new("1"),
-                        ID::new("2"),
-                        ID::new("3")],
-  nodes_subscribed: vec![ID::new("11"),
-                         ID::new("12"),
-                         ID::new("13")],
-  nodes_unsubscribed: vec![],
-  path: PathBuf::from(
-    "tests/file_io/generated/example.skg"),
-  links: vec![],
-} }
+pub fn skgnode_example() -> SkgNode {
+  SkgNode {
+    titles: vec![
+      "This text gets indexed.".to_string(),
+      "Maybe searching other text could find this note.".to_string(),
+      "YAML does not escape \"quotation marks\" in text."
+        .to_string() ],
+    ids: vec![ ID::new("123") ],
+    unindexed_text: "this one string could span pages".to_string(),
+    properties: vec![
+      SkgNodeProperty::CommentsOn(ID::new("42")),
+      SkgNodeProperty::NoTantivyIndex, ],
+    nodes_contained: vec![ID::new("1"),
+                          ID::new("2"),
+                          ID::new("3")],
+    nodes_subscribed: vec![ID::new("11"),
+                           ID::new("12"),
+                           ID::new("13")],
+    nodes_unsubscribed: vec![],
+    path: PathBuf::from(
+      "tests/file_io/generated/example.skg"),
+    links: vec![],
+  } }
