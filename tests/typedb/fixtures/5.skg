@@ -1,7 +1,7 @@
 {"ids" : ["5","55"],
 "titles":[
-  "perfect match",
+  "this title includes a [[id:22][link to another file]]",
   "test second"
 ],"unindexed_text":
-  "this one string could span pages"
+  "this unindexed text includes more links:  [[id:33][to the third]] and [[id:55][even to itself]]"
 }

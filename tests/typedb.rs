@@ -83,6 +83,24 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
     expected_contains.insert(("1".to_string(), "3".to_string()));
     assert_eq!(contains_pairs, expected_contains);
 
+    let link_pairs = collect_all_of_some_binary_rel(
+      db_name,
+      &driver,
+      r#" match
+            $source isa node, has id $source_id;
+            $dest   isa node, has id $dest_id;
+            $rel    isa links_to (source: $source,
+                                  dest:   $dest);
+          select $source_id, $dest_id;"#,
+      "source_id",
+      "dest_id"
+    ).await?;
+    let mut expected_contains = HashSet::new();
+    expected_contains.insert(("5".to_string(), "2".to_string()));
+    expected_contains.insert(("5".to_string(), "3".to_string()));
+    expected_contains.insert(("5".to_string(), "5".to_string()));
+    assert_eq!(link_pairs, expected_contains);
+
     let subscribes_pairs = collect_all_of_some_binary_rel(
       db_name,
       &driver,

@@ -1,3 +1,4 @@
+* Why can't the unindexed text contain newlines?
 * TypeDB must know about links
   in both title and *body*
 ** in Rust
@@ -7,6 +8,7 @@
 *** parse links in text and body
 ** in TypeDB, create a new relation, "links"
    links (from: node, to: node)
+* Export from TypeDB to files?
 * persist TypeDB data
   consider too how Tantivy data is persisted
 * constraints

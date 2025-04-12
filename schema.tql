@@ -8,6 +8,8 @@ define
     owns path @unique,
     plays contains:container,
     plays contains:contained,
+    plays links_to:source,
+    plays links_to:dest,
     plays comments_on:commenter,
     plays comments_on:commentee,
     plays subscribes:subscriber,
@@ -24,6 +26,9 @@ define
   relation contains,
     relates container,
     relates contained @card(1..1);
+  relation links_to,
+    relates source,
+    relates dest;
   relation comments_on,
     relates commenter @card(1..1),
     relates commentee;

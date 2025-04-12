@@ -134,6 +134,18 @@ pub async fn create_relationships_from_node(
                     "container",
                     "contained",
                     tx ).await?;
+
+  insert_from_list(
+    primary_id,
+    &node.links.iter ()
+      . map ( |link| ID::from(link.id.clone()) )
+      . collect::<Vec<ID>>(),
+    "links_to",
+    "source",
+    "dest",
+    tx
+  ).await?;
+
   insert_from_list( primary_id,
                     &node.nodes_subscribed,
                     "subscribes",
