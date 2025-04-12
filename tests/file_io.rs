@@ -67,14 +67,15 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
         node.nodes_subscribed.clone();
     reversed_nodes_subscribed.reverse();
 
-    SkgNode {
-        titles             : reversed_titles,
-        nodes_contained    : reversed_nodes_contained,
-        nodes_subscribed   : reversed_nodes_subscribed,
+  SkgNode {
+    titles             : reversed_titles,
+    nodes_contained    : reversed_nodes_contained,
+    nodes_subscribed   : reversed_nodes_subscribed,
 
-        ids                : node.ids                .clone(),
-        unindexed_text     : node.unindexed_text     .clone(),
-        path               : node.path               .clone(),
-        properties         : node.properties         .clone(),
-        nodes_unsubscribed : node.nodes_unsubscribed .clone(),
-    } }
+    ids                : node.ids                .clone(),
+    unindexed_text     : node.unindexed_text     .clone(),
+    path               : node.path               .clone(),
+    properties         : node.properties         .clone(),
+    nodes_unsubscribed : node.nodes_unsubscribed .clone(),
+    links              : node.links              .clone(),
+  } }

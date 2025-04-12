@@ -53,10 +53,11 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_unsubscribed: Vec<ID>,
 
-  #[serde(skip)]  // `path` is not represented in the JSON.
-  pub path: PathBuf,  // It is instead inferred from filepath.
+  #[serde(skip)]        // `path` is not represented in the JSON.
+  pub path: PathBuf,    // It is instead inferred from filepath.
+  #[serde(skip)]        // `links` is not represented in the JSON.
+  pub links: Vec<Link>, // it comes from the titles and unindexed text.
 }
-
 
 //
 // Functions
@@ -158,4 +159,5 @@ pub fn skgnode_example() -> SkgNode
   nodes_unsubscribed: vec![],
   path: PathBuf::from(
     "tests/file_io/generated/example.skg"),
+  links: vec![],
 } }
