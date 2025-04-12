@@ -1,43 +1,33 @@
-// This code is tested by /tests/file_io.rs
-
 use serde::{Serialize, Deserialize};
+use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::str::FromStr;
+
+
+//
+// The types
+// (without functions; those come later in this file)
+//
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID(String);
 
-impl ID {
-  pub fn new<S: Into<String>>(s: S) -> Self {
-    ID(s.into()) }
-  pub fn as_str(&self) -> &str {
-    &self.0 } }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Link {
+  pub id: String,
+  pub label: String, }
 
-impl Deref for ID {
-  // Lets ID be used like a String in (more?) cases.
-  type Target = String;
-  fn deref(&self) -> &Self::Target {
-    &self.0 } }
-
-impl fmt::Display for ID {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>)
-         -> fmt::Result {
-    write!(f, "{}", self.0) } }
-
-impl From<String> for ID {
-  fn from(s: String) -> Self {
-    ID(s) } }
-
-impl From<&str> for ID {
-  fn from(s: &str) -> Self {
-    ID(s.to_string()) } }
+#[derive(Debug)]
+pub enum LinkParseError {
+  InvalidFormat,
+  MissingDivider, }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SkgNodeProperty {
-  CommentsOn(ID), // Relevant to TypeDB
-  NoTantivyIndex, // Relevant to Tantivy
-}
+  CommentsOn(ID),   // Relevant to TypeDB
+  NoTantivyIndex, } // Relevant to Tantivy
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
@@ -66,6 +56,86 @@ pub struct SkgNode {
   #[serde(skip)]  // `path` is not represented in the JSON.
   pub path: PathBuf,  // It is instead inferred from filepath.
 }
+
+
+//
+// Functions
+//
+
+impl ID {
+  pub fn new<S: Into<String>>(s: S) -> Self {
+    ID(s.into()) }
+  pub fn as_str(&self) -> &str {
+    &self.0 } }
+
+impl Deref for ID {
+  // Lets ID be used like a String in (more?) cases.
+  type Target = String;
+  fn deref(&self) -> &Self::Target {
+    &self.0 } }
+
+impl fmt::Display for ID {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>)
+         -> fmt::Result {
+    write!(f, "{}", self.0) } }
+
+impl From<String> for ID {
+  fn from(s: String) -> Self {
+    ID(s) } }
+
+impl From<&str> for ID {
+  fn from(s: &str) -> Self {
+    ID(s.to_string()) } }
+
+impl Link {
+  pub fn new(id: impl Into<String>,
+             label: impl Into<String>)
+             -> Self {
+    Link { id: id.into(),
+           label: label.into(),
+    } } }
+
+impl fmt::Display for Link {
+  /// Format: [[id:LINK_ID][LINK_LABEL]]
+  fn fmt(&self,
+         f: &mut fmt::Formatter<'_>)
+         -> fmt::Result {
+    write!(f, "[[id:{}][{}]]", self.id, self.label)
+  } }
+
+impl FromStr for Link {
+  type Err = LinkParseError;
+
+  fn from_str(text: &str) -> Result<Self, Self::Err> {
+    if ( !text.starts_with("[[id:") ||
+          !text.ends_with("]]") ) {
+      return Err(LinkParseError::InvalidFormat); }
+
+    let interior = &text[5..text.len()-2];
+
+    if let Some(idx) = interior.find("][") {
+      let id = &interior[0..idx];
+      let label = &interior[idx+2..];
+      Ok ( Link {
+        id: id.to_string(),
+        label: label.to_string(),
+      } )
+    } else {
+      Err(LinkParseError::MissingDivider)
+    } } }
+
+impl fmt::Display for LinkParseError {
+  fn fmt( &self,
+          f: &mut fmt::Formatter<'_>)
+          -> fmt::Result {
+    match self {
+      LinkParseError::InvalidFormat =>
+        write!(f, "Invalid link format. Expected [[id:LINK_ID][LINK_LABEL]]"),
+      LinkParseError::MissingDivider =>
+        write!(f, "Missing divider between ID and label. Expected ]["),
+    } } }
+
+impl Error for LinkParseError {}
 
 pub fn skgnode_example() -> SkgNode
 { SkgNode {
