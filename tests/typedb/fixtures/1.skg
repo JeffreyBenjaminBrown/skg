@@ -1,11 +1,13 @@
-{"ids" : ["1"],
-"titles":[
-  "title 1"
-],"unindexed_text":
-  "this one string could span pages",
-"nodes_contained":[
-  "2",
-  "33"
-],"nodes_unsubscribed":[
-  "4","55"
-]}
+ids:
+- 1
+titles:
+- title 1
+unindexed_text: |
+  This one string could span pages,
+  but if it has a newline, something borks.
+nodes_contained:
+- 2
+- 33
+nodes_unsubscribed:
+- 4
+- 55

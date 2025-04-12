@@ -34,14 +34,14 @@ fn test_skgnode_io() {
     let expected_reversed =
         fs::read_to_string(expected_reversed_path).unwrap();
 
-    let parsed_generated_example: serde_json::Value =
-        serde_json::from_str(&generated_example).unwrap();
-    let parsed_expected_example: serde_json::Value =
-        serde_json::from_str(&expected_example).unwrap();
-    let parsed_generated_reversed: serde_json::Value =
-        serde_json::from_str(&generated_reversed).unwrap();
-    let parsed_expected_reversed: serde_json::Value =
-        serde_json::from_str(&expected_reversed).unwrap();
+    let parsed_generated_example: serde_yaml::Value =
+        serde_yaml::from_str(&generated_example).unwrap();
+    let parsed_expected_example: serde_yaml::Value =
+        serde_yaml::from_str(&expected_example).unwrap();
+    let parsed_generated_reversed: serde_yaml::Value =
+        serde_yaml::from_str(&generated_reversed).unwrap();
+    let parsed_expected_reversed: serde_yaml::Value =
+        serde_yaml::from_str(&expected_reversed).unwrap();
 
     assert_eq!(parsed_generated_example, parsed_expected_example,
                "Generated example file doesn't match expected");

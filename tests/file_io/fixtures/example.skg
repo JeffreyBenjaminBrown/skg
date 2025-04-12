@@ -1,26 +1,18 @@
-{
-  "titles": [
-    "This text gets indexed.",
-    "Maybe searching other text could find this note.",
-    "JSON escapes \"quotation marks\" in text."
-  ],
-  "ids": [
-    "123"
-  ],
-  "unindexed_text": "this one string could span pages",
-  "properties": [
-    {
-      "CommentsOn": "42"
-    }
-  ],
-  "nodes_contained": [
-    "1",
-    "2",
-    "3"
-  ],
-  "nodes_subscribed": [
-    "11",
-    "12",
-    "13"
-  ]
-}
+titles:
+- This text gets indexed.
+- Maybe searching other text could find this note.
+- YAML does not escape "quotation marks" in text.
+ids:
+- '123'
+unindexed_text: this one string could span pages
+properties:
+- !CommentsOn '42'
+- NoTantivyIndex
+nodes_contained:
+- '1'
+- '2'
+- '3'
+nodes_subscribed:
+- '11'
+- '12'
+- '13'

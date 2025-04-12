@@ -1,9 +1,9 @@
 // This code is tested by /tests/file_io.rs
 
+use serde_yaml;
 use std::fs::{self};
 use std::io::{self};
 use std::path::{Path};
-use serde_json;
 
 use crate::types::SkgNode;
 use crate::links::extract_links;
@@ -14,34 +14,34 @@ pub fn read_skgnode_from_path
    -> io::Result<SkgNode>
 { let file_path = file_path.as_ref();
   let contents = fs::read_to_string(file_path)?;
-  let mut skgnode: SkgNode = serde_json::from_str(&contents)
+  let mut skgnode: SkgNode = serde_yaml::from_str(&contents)
   .map_err(
     |e| io::Error::new(
       io::ErrorKind::InvalidData, e.to_string()))?;
-  skgnode.path = file_path.to_path_buf(); // not part of the JSON
 
-  // Extract links from titles and unindexed text
-  let mut links = Vec::new();
+  // The rest of this information is not represented as a field
+  // in the .skg file.
+
+  skgnode.path = file_path.to_path_buf();
+  let mut links = Vec::new(); // extracted from titles, unindexed text
   for title in &skgnode.titles {
-    links.extend ( extract_links ( title ) ); }
-  links.extend(
-    extract_links ( &skgnode.unindexed_text ) );
+    links.extend(extract_links(title)); }
+  links.extend(extract_links(&skgnode.unindexed_text));
   skgnode.links = links;
-
   Ok (skgnode) }
 
 /// A line in the typedef of SkgNode prevents the field `path`
-/// from being part of the JSON representation.
+/// from being part of the .skg representation.
 pub fn write_skgnode_to_path
   <P: AsRef<Path>>
   (skgnode: &SkgNode, file_path: P)
    -> io::Result<()>
-{ let json_string = serde_json::to_string(skgnode)
+{ let yaml_string = serde_yaml::to_string(skgnode)
   .map_err(
     |e| io::Error::new(
       io::ErrorKind::InvalidData, e.to_string()))?;
-  fs::write(file_path, json_string)?;
-  Ok(()) }
+  fs::write(file_path, yaml_string)?;
+  Ok (()) }
 
 #[cfg(test)]
 mod tests {
@@ -75,9 +75,13 @@ mod tests {
     };
 
     // Write the node to a file
-    let json = serde_json::to_string(&test_node)?;
+    let yaml = serde_yaml::to_string(&test_node)
+      .map_err (
+        |e| io::Error::new(
+          io::ErrorKind::InvalidData,
+          e.to_string()))?;
     let mut file = File::create(&file_path)?;
-    file.write_all(json.as_bytes())?;
+    file.write_all(yaml.as_bytes())?;
 
     // Read the node back from the file
     let read_node = read_skgnode_from_path(&file_path)?;

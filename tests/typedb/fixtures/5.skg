@@ -1,7 +1,8 @@
-{"ids" : ["5","55"],
-"titles":[
-  "this title includes a [[id:22][link to another file]]",
-  "test second"
-],"unindexed_text":
-  "this unindexed text includes more links:  [[id:33][to the third]] and [[id:55][even to itself]]"
-}
+ids:
+- '5'
+- '55'
+titles:
+- this title includes a [[id:22][link to another file]]
+- test second
+unindexed_text: |
+  this unindexed text includes more links:  [[id:33][to the third]] and [[id:55][even to itself]]

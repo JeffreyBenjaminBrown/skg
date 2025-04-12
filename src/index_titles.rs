@@ -10,7 +10,7 @@ use regex::Regex;
 use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
-use serde_json::{Value, from_str};
+use serde_yaml::from_str;
 
 pub fn get_or_create_index(
   schema: schema::Schema,
@@ -35,22 +35,22 @@ pub fn needs_indexing( // based on modification time
   path: &Path,
   index_mtime: SystemTime
 ) -> bool {
-  if path.to_string_lossy().contains("index.tantivy")
-  { return false; } // Skip files in the index directory
-  if !path.extension().map_or(false, |ext| ext == "skg")
-  { return false; } // Skip non-org files
-  match get_modification_time(path)
-  { Ok(file_mtime) => file_mtime > index_mtime,
-    Err(_) => true // If modification time is unknown,
-    // assume it needs indexing.
+  if path.to_string_lossy().contains("index.tantivy") {
+    return false; } // Skip files in the index directory
+  if !path.extension().map_or( false, |ext| ext == "skg" ) {
+    return false; } // Skip non-skg files
+  match get_modification_time(path) {
+    Ok(file_mtime) => file_mtime > index_mtime,
+    Err(_) => true // If its modification time is unknown,
+                   // assume it needs indexing.
   } }
 
 pub fn extract_skg_titles(path: &Path) -> Vec<String> {
   let mut titles = Vec::new();
   if let Ok(content) = fs::read_to_string(path)
-  { if let Ok(json_value) = from_str::<Value>(&content)
+  { if let Ok(yaml_value) = from_str::<serde_yaml::Value>(&content)
     { if let Some(titles_array) =
-      json_value.get("titles").and_then(|t| t.as_array())
+      yaml_value.get("titles").and_then(|t| t.as_sequence())
       { for title_value in titles_array
         { if let Some(title_str) = title_value.as_str()
           { titles.push(strip_org_links(title_str)); } } } } }
@@ -135,32 +135,30 @@ pub fn update_index(
   let index_mtime = get_modification_time(index_path)
     .unwrap_or(SystemTime::UNIX_EPOCH);
   for entry in WalkDir::new(data_dir)
-    .into_iter().filter_map(Result::ok)
-  { let path = entry.path();
-    if !needs_indexing(path, index_mtime)
-    { if path.extension().map_or(
-      false, |ext| ext == "skg")
-      { println!("Skipping unchanged file: {}",
-                 path.display()); }
-      continue; }
-    let titles = extract_skg_titles(path);
-    if !titles.is_empty()
-    { println!("Indexing: {} with {} titles",
-               path.display(), titles.len());
-      for title in &titles {
-        println!("  - Title: {}", title); }
-      let titles_indexed = index_titles_at_path(
-        &mut index_writer,
-        path,
-        &titles,
-        path_field,
-        title_field )?;
-      indexed_count += titles_indexed; } }
-  if indexed_count > 0
-  { println!("Indexed {} files. Committing changes...",
-             indexed_count);
+    .into_iter().filter_map(Result::ok) {
+      let path = entry.path();
+      if !needs_indexing(path, index_mtime) {
+        continue; } // skip this file
+      let titles = extract_skg_titles(path);
+      if !titles.is_empty() {
+        println!( "Indexing: {} with {} titles",
+                   path.display(),
+                   titles.len() );
+        for title in &titles {
+          println!("  - Title: {}", title); }
+        let titles_indexed = index_titles_at_path(
+          &mut index_writer,
+          path,
+          &titles,
+          path_field,
+          title_field)?;
+        indexed_count += titles_indexed;
+      } }
+  if indexed_count > 0 {
+    println!("Indexed {} files. Committing changes...", indexed_count);
     index_writer.commit()?;
-  } else { println!("No new or modified files found."); }
+  } else {
+    println!("No new or modified files found."); }
   Ok (indexed_count) }
 
 pub fn search_index(

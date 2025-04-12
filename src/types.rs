@@ -53,10 +53,10 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_unsubscribed: Vec<ID>,
 
-  #[serde(skip)]        // `path` is not represented in the JSON.
-  pub path: PathBuf,    // It is instead inferred from filepath.
-  #[serde(skip)]        // `links` is not represented in the JSON.
-  pub links: Vec<Link>, // it comes from the titles and unindexed text.
+  #[serde(skip)]        // `path` is not represented in the file, but
+  pub path: PathBuf,    // inferred from filepath.
+  #[serde(skip)]        // `links` is not represented in the file, but
+  pub links: Vec<Link>, // inferred from titles and unindexed text.
 }
 
 //
@@ -143,12 +143,12 @@ pub fn skgnode_example() -> SkgNode
   titles: vec![
     "This text gets indexed.".to_string(),
     "Maybe searching other text could find this note.".to_string(),
-    "JSON escapes \"quotation marks\" in text.".to_string() ],
-
+    "YAML does not escape \"quotation marks\" in text.".to_string() ],
   ids: vec![ ID::new("123") ],
   unindexed_text: "this one string could span pages".to_string(),
   properties: vec![
     SkgNodeProperty::CommentsOn(ID::new("42")),
+    SkgNodeProperty::NoTantivyIndex,
   ],
   nodes_contained: vec![ID::new("1"),
                         ID::new("2"),

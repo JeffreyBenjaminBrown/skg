@@ -1,9 +1,10 @@
-{"ids" : ["3","33"],
-"titles":[
-  "title 3"
-],"unindexed_text":
-  "this one string could span pages",
-"nodes_subscribed":[
-  "44",
-  "55"
-]}
+ids:
+- '3'
+- '33'
+titles:
+- title 3
+unindexed_text: |
+  this one string could span pages
+nodes_subscribed:
+- '44'
+- '55'

@@ -1,16 +1,14 @@
-{"format" : "base",
-"id" : "123",
-"context" : "456",
-"is_comment": false,
-"titles":[
-  "This is a second test file."
-],"unindexed_text":
-  "this one string could span pages",
-"nodes_contained":[
-  "1",
-  "2",
-  "3"
-],"nodes_subscribed":[
-  "11",
-  "12",
-  "13"]}
+id: '123'
+context: '456'
+is_comment: false
+titles:
+  - This is a second test file.
+unindexed_text: this one string could span pages
+nodes_contained:
+  - '1'
+  - '2'
+  - '3'
+nodes_subscribed:
+  - '11'
+  - '12'
+  - '13'
