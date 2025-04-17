@@ -14,9 +14,10 @@ use typedb_driver::{
 
 use skg::typedb::create::{make_db_destroying_earlier_one};
 use skg::typedb::search::{
+  extract_id_from_typedb_string_rep,
   find_node_containing_node,
-  get_node_path,
-  extract_id };
+  get_path_from_node_id,
+};
 
 #[test]
 fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
@@ -176,7 +177,7 @@ async fn collect_all_of_some_binary_rel(
     let id2_raw = match row.get(member2_variable)? {
       Some(c) => c.to_string(),
       None => "unknown".to_string() };
-    let id1 = extract_id(&id1_raw);
-    let id2 = extract_id(&id2_raw);
-    results.insert((id1, id2)); }
+    let id1 = extract_id_from_typedb_string_rep ( &id1_raw);
+    let id2 = extract_id_from_typedb_string_rep ( &id2_raw);
+    results.insert ( (id1, id2)); }
   Ok(results) }

@@ -24,7 +24,8 @@ pub async fn find_node_containing_node (
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("container_id")? {
-      return Ok(extract_id(&concept.to_string())); } }
+      return Ok(extract_id_from_typedb_string_rep(
+        &concept.to_string())); } }
   Err(format!("No container found for node with ID '{}'",
               target_id).into()) }
 
@@ -51,11 +52,14 @@ pub async fn get_path_from_node_id (
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("path")? {
-      return Ok(extract_id(&concept.to_string())); } }
+      return Ok(extract_id_from_typedb_string_rep(
+        &concept.to_string())); } }
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
 
-pub fn extract_id(attribute_str: &str) -> String {
+pub fn extract_id_from_typedb_string_rep(
+  attribute_str: &str)
+  -> String {
   if let Some(start) = attribute_str.find('"') {
     if let Some(end) = attribute_str[start + 1..] . find('"') {
       return attribute_str [start + 1 .. start + 1 + end]
