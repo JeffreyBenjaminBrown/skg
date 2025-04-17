@@ -1,7 +1,9 @@
 use std::fs;
+use tempfile::NamedTempFile;
 
+use skg::file_io::{
+  read_skgnode_from_path, write_skgnode_to_path};
 use skg::types::{SkgNode, skgnode_example};
-use skg::file_io::{read_skgnode_from_path, write_skgnode_to_path};
 
 #[test]
 fn test_skgnode_io() {
@@ -47,7 +49,27 @@ fn test_skgnode_io() {
                "Generated example file doesn't match expected");
     assert_eq!(parsed_generated_reversed, parsed_expected_reversed,
                "Generated reversed file doesn't match expected");
+
+  verify_unindexed_text_not_needed();
 }
+
+fn verify_unindexed_text_not_needed() {
+  // If a SkgNode's `unindexed_text` is the empty string,
+  // then that field need not be written to disk.
+
+  let mut node = read_skgnode_from_path (
+    "tests/file_io/fixtures/example.skg" ) . unwrap();
+  node.unindexed_text = String::new(); // mutate it
+  let temp_file = NamedTempFile::new().unwrap();
+  let temp_path = temp_file.path();
+  write_skgnode_to_path(
+    &node, temp_path ) . unwrap();
+  let file_content =
+    fs::read_to_string(temp_path).unwrap();
+  assert!( !file_content.contains("unindexed"),
+            "Expected 'unindexed' to be absent from the serialized YAML, but it was found.\nFile content:\n{}",
+            file_content);
+  println!("Verified: Empty unindexed_text was omitted from YAML output"); }
 
 pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     // Create a new SkgNode with some reversed lists --

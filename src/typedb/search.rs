@@ -65,9 +65,8 @@ pub async fn recursive_s_expression_from_node(
     driver: &TypeDBDriver,
     node_id: &str
 ) -> Result<String, Box<dyn Error>> {
-    // Create the outer structure of the s-expression
   let root_node = helps_recursive_s_expression_from_node (
-    db_name, driver, node_id).await?;
+    db_name, driver, node_id ).await?;
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
     root_node );

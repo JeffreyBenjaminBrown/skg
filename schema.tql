@@ -23,6 +23,10 @@ define
     owns id @key,
     plays has_extra_id:extra_id;
 
+  relation has_extra_id,
+    relates node,
+    relates extra_id @card(1..1);
+
   relation contains,
     relates container,
     relates contained @card(1..1);
@@ -38,6 +42,3 @@ define
   relation unsubscribes,
     relates unsubscriber,
     relates unsubscribee;
-  relation has_extra_id,
-    relates node,
-    relates extra_id @card(1..1);

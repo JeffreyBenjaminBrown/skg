@@ -38,6 +38,8 @@ pub struct SkgNode {
   pub titles: Vec<String>,
   pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
   // nodes might be merged.
+
+  #[serde(default, skip_serializing_if = "String::is_empty")]
   pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
 
   // Each #[serde directive applies to the field after it.

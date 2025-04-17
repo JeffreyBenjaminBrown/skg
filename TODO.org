@@ -1,31 +1,7 @@
-* unindexed_text should not need representation if empty
 * represent a document in Rust, via JSON
-** format example
-   { "view" : "single document",
-     "title" : "the title",
-     "author" : "the author",
-     "content" : [ {
-       "id":"1",
-       "headline":"This is a top-level headline.",
-       "more content":"This is some text just below the headline, without an org-bullet."
-       "content" : [
-         { "id":"2",
-           "headline":"This is a second-level headline.",
-           "more content":"This is some text just below the headline, without an org-bullet." },
-         { "id":"3",
-           "headline":"This is another second-level headline, brother to the first second-level headline.",
-           "more content":"This is some text just below the headline, without an org-bullet." }
-         ] } ] }
-** the metadata branch
-   Title, author and view
-   can be the first branch, and read-only.
-   Title should be the root of that branch.
-** Each line has an ID property.
-   Emacs will represent this as a non-text property,
-   like invisibility.
-   From Rust the document sent could be JSON.
-** when Emacs requests a node
-   offer to get its context, if it is not its own context
+** add the unindexed_text
+** add an optional "focused" node to the YAML
+** find the root ancestor
 * Export from TypeDB to files?
 * persist TypeDB data
   consider too how Tantivy data is persisted
