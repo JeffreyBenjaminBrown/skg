@@ -1,13 +1,30 @@
-* Why do I see nothing printed by index_titles::update_index when I run the tests?
-* DONE ? TypeDB must know about links
-  in both title and *body*
-** in Rust
-*** create a type for links
-    with ID and link text
-*** create a new SkgNode field, "link_targets"
-*** parse links in text and body
-** in TypeDB, create a new relation, "links"
-   links (from: node, to: node)
+* represent a document in Rust, via JSON
+** format example
+   { "view" : "single document",
+     "title" : "the title",
+     "author" : "the author",
+     "content" : [ {
+       "id":"1",
+       "headline":"This is a top-level headline.",
+       "more content":"This is some text just below the headline, without an org-bullet."
+       "content" : [
+         { "id":"2",
+           "headline":"This is a second-level headline.",
+           "more content":"This is some text just below the headline, without an org-bullet." },
+         { "id":"3",
+           "headline":"This is another second-level headline, brother to the first second-level headline.",
+           "more content":"This is some text just below the headline, without an org-bullet." }
+         ] } ] }
+** the metadata branch
+   Title, author and view
+   can be the first branch, and read-only.
+   Title should be the root of that branch.
+** Each line has an ID property.
+   Emacs will represent this as a non-text property,
+   like invisibility.
+   From Rust the document sent could be JSON.
+** when Emacs requests a node
+   offer to get its context, if it is not its own context
 * Export from TypeDB to files?
 * persist TypeDB data
   consider too how Tantivy data is persisted

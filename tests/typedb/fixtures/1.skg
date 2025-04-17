@@ -4,7 +4,7 @@ titles:
 - title 1
 unindexed_text: |
   This one string could span pages,
-  but if it has a newline, something borks.
+  and it can include newlines, no problem.
 nodes_contained:
 - 2
 - 33

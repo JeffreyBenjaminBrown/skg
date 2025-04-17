@@ -13,7 +13,10 @@ use typedb_driver::{
 };
 
 use skg::typedb::create::{make_db_destroying_earlier_one};
-use skg::typedb::search::{find_node_containing_node, extract_id};
+use skg::typedb::search::{
+  find_node_containing_node,
+  get_node_path,
+  extract_id };
 
 #[test]
 fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
@@ -28,6 +31,13 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
 
     make_db_destroying_earlier_one(
       db_name, &driver).await?;
+
+    let path_to_4 = get_path_from_node_id (
+      db_name, &driver, "4") . await?;
+    let path_to_44 = get_path_from_node_id (
+      db_name, &driver, "44") . await?;
+    assert_eq!(path_to_4,  "tests/typedb/fixtures/4.skg");
+    assert_eq!(path_to_44, "tests/typedb/fixtures/4.skg");
 
     let has_extra_id_pairs = collect_all_of_some_binary_rel(
       db_name,
