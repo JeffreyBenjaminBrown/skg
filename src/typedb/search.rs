@@ -1,9 +1,13 @@
 use futures::StreamExt;
+use serde_json::{json, Value};
 use std::error::Error;
+use std::io;
 use typedb_driver::{
     TypeDBDriver,
     TransactionType,
 };
+
+use crate::file_io::read_skgnode_from_path;
 
 pub async fn find_node_containing_node (
   db_name : &str,
@@ -56,6 +60,47 @@ pub async fn get_path_from_node_id (
         &concept.to_string())); } }
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
+
+pub async fn build_view (
+    db_name: &str,
+    driver: &TypeDBDriver,
+    node_id: &str
+) -> Result<Value, Box<dyn Error>> {
+  let root_node = build_node_json(
+    db_name, driver, node_id).await?;
+  let view = json!({
+    "view": "single document",
+    "content": [root_node]
+  });
+  Ok (view) }
+
+async fn build_node_json(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &str
+) -> Result<Value, Box<dyn Error>> {
+  let path = get_path_from_node_id(db_name, driver, node_id).await?;
+  let node = read_skgnode_from_path(path)?;
+  let headline = node.titles.first()
+    .ok_or_else(|| io::Error::new(
+      io::ErrorKind::InvalidData,
+      format!("Node with ID {} has no titles", node_id)
+    ))?
+    .to_string();
+  let mut node_json = json!({
+    "id": node_id,
+    "headline": headline });
+  if !node.nodes_contained.is_empty() {
+    let mut contained_nodes = Vec::new();
+    for contained_id in &node.nodes_contained {
+      // "Box" the recursive future call
+      let contained_node = Box::pin(
+        build_node_json(
+          db_name, driver, contained_id ) ) . await?;
+      contained_nodes.push(contained_node); }
+    if !contained_nodes.is_empty() {
+      node_json["content"] = json!(contained_nodes); } }
+  Ok (node_json) }
 
 pub fn extract_id_from_typedb_string_rep(
   attribute_str: &str)
