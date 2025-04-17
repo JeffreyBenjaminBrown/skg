@@ -31,7 +31,7 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
     let db_name = "skg-test";
 
     make_db_destroying_earlier_one(
-      db_name, &driver).await?;
+      "tests/typedb/fixtures", db_name, &driver ) . await?;
 
     let path_to_4 = get_path_from_node_id (
       db_name, &driver, "4") . await?;

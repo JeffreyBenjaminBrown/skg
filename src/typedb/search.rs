@@ -1,5 +1,4 @@
 use futures::StreamExt;
-use serde_json::{json, Value};
 use std::error::Error;
 use std::io;
 use typedb_driver::{
@@ -61,46 +60,54 @@ pub async fn get_path_from_node_id (
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
 
-pub async fn build_view (
+pub async fn recursive_s_expression_from_node(
     db_name: &str,
     driver: &TypeDBDriver,
     node_id: &str
-) -> Result<Value, Box<dyn Error>> {
-  let root_node = build_node_json(
+) -> Result<String, Box<dyn Error>> {
+    // Create the outer structure of the s-expression
+  let root_node = helps_recursive_s_expression_from_node (
     db_name, driver, node_id).await?;
-  let view = json!({
-    "view": "single document",
-    "content": [root_node]
-  });
-  Ok (view) }
+  let sexpr = format!(
+    "((view . \"single document\")\n (content . ({})))",
+    root_node );
+  Ok (sexpr) }
 
-async fn build_node_json(
+async fn helps_recursive_s_expression_from_node(
   db_name: &str,
   driver: &TypeDBDriver,
   node_id: &str
-) -> Result<Value, Box<dyn Error>> {
-  let path = get_path_from_node_id(db_name, driver, node_id).await?;
-  let node = read_skgnode_from_path(path)?;
+) -> Result<String, Box<dyn Error>> {
+  let path = get_path_from_node_id(
+    db_name, driver, node_id).await?;
+  let node = read_skgnode_from_path ( path ) ?;
   let headline = node.titles.first()
     .ok_or_else(|| io::Error::new(
       io::ErrorKind::InvalidData,
-      format!("Node with ID {} has no titles", node_id)
-    ))?
-    .to_string();
-  let mut node_json = json!({
-    "id": node_id,
-    "headline": headline });
-  if !node.nodes_contained.is_empty() {
-    let mut contained_nodes = Vec::new();
+      format!("Node with ID {} has no titles",
+              node_id)
+    ))? . to_string();
+  let mut node_sexpr = format!(
+    "(\"id\" . \"{}\")\n  (\"headline\" . \"{}\")",
+    node_id,
+    escape_string_for_s_expression ( &headline ) );
+  if !node.nodes_contained.is_empty() { // recursion
+    let mut contained_sexpr = Vec::new();
     for contained_id in &node.nodes_contained {
-      // "Box" the recursive future call
       let contained_node = Box::pin(
-        build_node_json(
-          db_name, driver, contained_id ) ) . await?;
-      contained_nodes.push(contained_node); }
-    if !contained_nodes.is_empty() {
-      node_json["content"] = json!(contained_nodes); } }
-  Ok (node_json) }
+        helps_recursive_s_expression_from_node(
+          db_name, driver, contained_id)).await?;
+      contained_sexpr.push(format!("({})", contained_node)); }
+    if !contained_sexpr.is_empty() {
+      let content_str = contained_sexpr.join("\n     ");
+      node_sexpr = format!(
+        "{}\n  (\"content\" . (\n     {}\n  ))",
+        node_sexpr,
+        content_str); } }
+  Ok (node_sexpr) }
+
+fn escape_string_for_s_expression(s: &str) -> String {
+  s . replace("\\", "\\\\") . replace("\"", "\\\"") }
 
 pub fn extract_id_from_typedb_string_rep(
   attribute_str: &str)

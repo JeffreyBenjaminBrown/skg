@@ -1,0 +1,9 @@
+ids:
+- 1
+titles:
+- a top-level title
+unindexed_text: |
+  This one string could span pages,
+nodes_contained:
+- 2
+- 3

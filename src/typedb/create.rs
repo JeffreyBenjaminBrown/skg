@@ -11,11 +11,12 @@ use crate::types::{ID, SkgNode, SkgNodeProperty};
 use crate::file_io::read_skgnode_from_path;
 
 pub async fn make_db_destroying_earlier_one (
+  data_folder : &str,
   db_name : &str,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
   let skg_nodes : Vec<SkgNode> =
-    read_skg_files("tests/typedb/fixtures")?;
+    read_skg_files( data_folder )?;
   println!( "{} .skg files were read", skg_nodes.len() );
   // If any of the following needs a transaction, it opens a new one.
   // Thus all nodes are created before any relationships,

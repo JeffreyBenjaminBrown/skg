@@ -1,3 +1,4 @@
+* unindexed_text should not need representation if empty
 * represent a document in Rust, via JSON
 ** format example
    { "view" : "single document",
