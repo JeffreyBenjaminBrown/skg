@@ -82,8 +82,18 @@ pub async fn get_container_path_from_node (
               node_id).into ()) }
 
 pub async fn recursive_s_expression_from_node(
-  // Given a node, this finds its root container, and returns
-  // an s-expression representing a document built from there.
+  /*Given a node, this finds its root container, and returns
+an s-expression representing a document built from there.
+
+Important properties of that s-expression include:
+    `view` : `single document`
+    `content` : a length-1 list of nodes.
+  where each "node" contains the following:
+    `headline` : the text of a headline (bullet)
+    `focused` : absent everywhere except for one node, the node which the document was summoned in order to view.
+    `unindexed_text` : possibly absent, the text just under the bullet.
+    `content`: possibly absent, a list of nodes.
+  Thus the document is recursive. */
   db_name: &str,
   driver: &TypeDBDriver,
   focus: &str
@@ -98,13 +108,14 @@ pub async fn recursive_s_expression_from_node(
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
     helps_recursive_s_expression_from_node(
-      db_name, driver, root_id).await?);
+      db_name, driver, root_id, focus).await?);
   Ok (sexpr) }
 
 async fn helps_recursive_s_expression_from_node(
   db_name: &str,
   driver: &TypeDBDriver,
-  node_id: &str
+  node_id: &str,
+  focus: &str
 ) -> Result<String, Box<dyn Error>> {
   let path = get_container_path_from_node(
     db_name, driver, node_id).await?;
@@ -119,6 +130,11 @@ async fn helps_recursive_s_expression_from_node(
     "(\"id\" . \"{}\")\n  (\"headline\" . \"{}\")",
     node_id,
     escape_string_for_s_expression ( &headline ) );
+  if node_id == focus {
+    node_sexpr = format!(
+      "{}\n  (\"focused\" . t)",
+      node_sexpr // PITFALL: self-referential
+    ); }
   if let Some(text) = &node.unindexed_text {
     // Only happens if unindexed_text is present.
     node_sexpr = format!(
@@ -130,7 +146,7 @@ async fn helps_recursive_s_expression_from_node(
     for contained_id in &node.nodes_contained {
       let contained_node = Box::pin(
         helps_recursive_s_expression_from_node(
-          db_name, driver, contained_id)).await?;
+          db_name, driver, contained_id, focus)).await?;
       contained_sexpr.push(format!("({})",
                                    contained_node)); }
     if !contained_sexpr.is_empty() {
