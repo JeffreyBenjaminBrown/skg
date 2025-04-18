@@ -82,15 +82,14 @@ pub async fn get_path_from_node_id (
               node_id).into ()) }
 
 pub async fn recursive_s_expression_from_node(
-    db_name: &str,
-    driver: &TypeDBDriver,
-    node_id: &str
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &str
 ) -> Result<String, Box<dyn Error>> {
-  let root_node = helps_recursive_s_expression_from_node (
-    db_name, driver, node_id ).await?;
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
-    root_node );
+    helps_recursive_s_expression_from_node (
+      db_name, driver, node_id ).await? );
   Ok (sexpr) }
 
 async fn helps_recursive_s_expression_from_node(
