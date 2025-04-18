@@ -8,10 +8,10 @@ use typedb_driver::{
 
 use crate::file_io::read_skgnode_from_path;
 
-pub async fn find_node_containing_node (
+pub async fn find_container_of (
   db_name : &str,
   driver : &TypeDBDriver,
-  target_id: &str
+  node: &str
 ) -> Result<String, Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Read).await?;
@@ -22,7 +22,7 @@ pub async fn find_node_containing_node (
                    $rel isa contains (container: $container,
                                       contained: $contained);
                  select $container_id;"#,
-                 target_id ) ) . await?;
+                 node ) ) . await?;
   let mut stream = answer.into_rows();
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
@@ -30,7 +30,7 @@ pub async fn find_node_containing_node (
       return Ok(extract_id_from_typedb_string_rep(
         &concept.to_string())); } }
   Err(format!("No container found for node with ID '{}'",
-              target_id).into()) }
+              node).into()) }
 
 pub async fn get_path_from_node_id (
   db_name: &str,

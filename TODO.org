@@ -1,5 +1,4 @@
 * represent a document in Rust, via JSON
-** add the unindexed_text
 ** add an optional "focused" node to the YAML
 ** find the root ancestor
 * Export from TypeDB to files?

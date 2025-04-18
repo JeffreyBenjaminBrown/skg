@@ -15,7 +15,7 @@ use typedb_driver::{
 use skg::typedb::create::{make_db_destroying_earlier_one};
 use skg::typedb::search::{
   extract_id_from_typedb_string_rep,
-  find_node_containing_node,
+  find_container_of,
   get_path_from_node_id,
 };
 
@@ -150,7 +150,7 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
     expected_unsubscribes.insert(("1".to_string(), "5".to_string()));
     assert_eq!(unsubscribes_pairs, expected_unsubscribes);
 
-    let container_node = find_node_containing_node(
+    let container_node = find_container_of(
       db_name, &driver, "2").await?;
     assert_eq!(container_node, "1");
 
