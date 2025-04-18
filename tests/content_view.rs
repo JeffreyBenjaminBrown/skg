@@ -29,9 +29,17 @@ fn test_recursive_s_expression_from_node
 
     // Print the view from node "1".
     // TODO: Automatize.
-    println!("Building view from node with ID 1...");
+    println!("Building view from node with ID 2...");
     let view = recursive_s_expression_from_node(
-      db_name, &driver, "1").await?;
+      db_name, &driver, "2").await?;
+    println!("Document View Output:");
+    println!("{}", view);
+
+    // Print the view from node "5".
+    // TODO: Automatize.
+    println!("Building view from node with ID 5...");
+    let view = recursive_s_expression_from_node(
+      db_name, &driver, "5").await?;
     println!("Document View Output:");
     println!("{}", view);
 

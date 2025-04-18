@@ -82,14 +82,23 @@ pub async fn get_path_from_node_id (
               node_id).into ()) }
 
 pub async fn recursive_s_expression_from_node(
+  // Given a node, this finds its root container, and returns
+  // an s-expression representing a document built from there.
   db_name: &str,
   driver: &TypeDBDriver,
-  node_id: &str
+  node: &str
 ) -> Result<String, Box<dyn Error>> {
+  let path = path_to_root_container(db_name, driver, node).await?;
+  let root_id = path.last()
+    .ok_or_else(
+      || io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("Empty path returned for node '{}'", node)
+      ))?;
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
-    helps_recursive_s_expression_from_node (
-      db_name, driver, node_id ).await? );
+    helps_recursive_s_expression_from_node(
+      db_name, driver, root_id).await?);
   Ok (sexpr) }
 
 async fn helps_recursive_s_expression_from_node(
