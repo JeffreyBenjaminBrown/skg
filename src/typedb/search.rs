@@ -90,13 +90,20 @@ async fn helps_recursive_s_expression_from_node(
     "(\"id\" . \"{}\")\n  (\"headline\" . \"{}\")",
     node_id,
     escape_string_for_s_expression ( &headline ) );
+  if let Some(text) = &node.unindexed_text {
+    // Only happens if unindexed_text is present.
+    node_sexpr = format!(
+      "{}\n  (\"unindexed_text\" . \"{}\")",
+      node_sexpr, // PITFALL: self-referential
+      escape_string_for_s_expression(text)); }
   if !node.nodes_contained.is_empty() { // recursion
     let mut contained_sexpr = Vec::new();
     for contained_id in &node.nodes_contained {
       let contained_node = Box::pin(
         helps_recursive_s_expression_from_node(
           db_name, driver, contained_id)).await?;
-      contained_sexpr.push(format!("({})", contained_node)); }
+      contained_sexpr.push(format!("({})",
+                                   contained_node)); }
     if !contained_sexpr.is_empty() {
       let content_str = contained_sexpr.join("\n     ");
       node_sexpr = format!(
