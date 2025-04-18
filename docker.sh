@@ -5,6 +5,7 @@ NATIVE=/home/jeff/hodal/skg
 docker run --name $CONTAINER_NAME -it -d \
   -v $NATIVE:/home/ubuntu                \
   -p 1729:1729                           \
+  -p 1730:1730                           \
   --platform linux/amd64                 \
   --user 1000:1000                       \
   jeffreybbrown/hode:latest # CAREFUL! new? latest?

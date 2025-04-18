@@ -1,25 +1,33 @@
-* automate the test of recursive_s_expression_from_node
-** in tests/content_view.rs
-** currently it prints to screen
-* represent a document in Rust, via JSON
-** add an optional "focused" node to the YAML
-* Export from TypeDB to files?
-* persist TypeDB data
-  consider too how Tantivy data is persisted
-* constraints
-** test each constraint of the schema
-   Some violations might not be representable in the .skg format.
-** Can a file include multiple comments_on properties?
-   It shouldn't.
-** `contains` should be acyclic
-   The TypeDB AI says I can use `distinct` instead,
-   but the docs on `distinct` don't suggest that's true.
-* optimizations
-** unify Tantivy and TypeDB indexation
-** If `titles` were the first field in the .skg format
-   then the Tantivy indexing would need to read less
-* later
-** Verify cardinality constraints are working.
-   It should be impossible to make a node
-   be contained by two different nodes.
-** A function should test that all IDs are distinct in the repo.
+alternative next steps
+* transfer the document to Emacs
+* decide about subscriptions in the content view
+  It seems like they should be inlined, rather than links.
+  But one should be able to create a separate buffer,
+  consisting of only the subscription view,
+  or toggling between that
+  and the view with no subscription lensing.
+* blocked by one of the above
+** collect subscriptions in content-view
+** edit from Emacs
+** use unsubscriptions
+   Ideally these would be collected as part of the document-building process. One builds a vector of (node,[unsubscription]) pairs from the root node through the contains-path to the node currently being processed. All unsubscriptions in that vector apply to this node.
+* less conceptual
+** persist TypeDB data
+   consider too how Tantivy data is persisted
+** automate the test of recursive_s_expression_from_node
+*** in tests/content_view.rs
+*** currently it prints to screen
+** graph constraints
+*** test each constraint of the schema
+    Some violations might not be representable in the .skg format.
+*** Can a file include multiple comments_on properties?
+    It shouldn't.
+*** `contains` should be acyclic
+    The TypeDB AI says I can use `distinct` instead,
+    but the docs on `distinct` don't suggest that's true.
+*** Ttest that all IDs are distinct in the repo.
+    maybe in Rust, not TypeDB
+** optimizations
+*** unify Tantivy and TypeDB indexation
+*** If `titles` were the first field in the .skg format
+    then the Tantivy indexing would need to read less

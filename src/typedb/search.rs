@@ -85,12 +85,12 @@ pub async fn recursive_s_expression_from_node(
   /*Given a node, this finds its root container, and returns
 an s-expression representing a document built from there.
 
-Important properties of that s-expression include:
+Properties (tags) in the resulting s-expression include:
     `view` : `single document`
     `content` : a length-1 list of nodes.
   where each "node" contains the following:
     `headline` : the text of a headline (bullet)
-    `focused` : absent everywhere except for one node, the node which the document was summoned in order to view.
+    `focused` : absent almost everywhere, but `t` for the node which the document was summoned in order to view.
     `unindexed_text` : possibly absent, the text just under the bullet.
     `content`: possibly absent, a list of nodes.
   Thus the document is recursive. */
