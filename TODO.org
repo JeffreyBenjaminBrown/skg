@@ -1,4 +1,6 @@
-* find the root ancestor
+* automate the test of recursive_s_expression_from_node
+** in tests/content_view.rs
+** currently it prints to screen
 * represent a document in Rust, via JSON
 ** add an optional "focused" node to the YAML
 * Export from TypeDB to files?

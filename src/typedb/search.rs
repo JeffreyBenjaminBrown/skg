@@ -8,6 +8,27 @@ use typedb_driver::{
 
 use crate::file_io::read_skgnode_from_path;
 
+pub async fn path_to_root_container (
+  // Returns the path from the given node to the root container
+  // The first element is the original node, and the last is the root.
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node: &str
+) -> Result<Vec<String>, Box<dyn Error>> {
+  let mut path = vec![node.to_string()];
+  let mut current_node = node.to_string();
+  loop {
+    match find_container_of (
+      db_name, driver, &current_node) . await {
+      Ok(container_id) => {
+        // Found a container, so add it to the path.
+        path.push(container_id.clone());
+        current_node = container_id;
+      }, Err(_) => {
+        // No container found; this is the root.
+        break; } } }
+  Ok (path) }
+
 pub async fn find_container_of (
   db_name : &str,
   driver : &TypeDBDriver,
