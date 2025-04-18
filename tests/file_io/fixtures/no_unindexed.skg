@@ -1,0 +1,17 @@
+titles:
+- This text gets indexed.
+- Maybe searching other text could find this note.
+- YAML does not escape "quotation marks" in text.
+ids:
+- '123'
+properties:
+- !CommentsOn '42'
+- NoTantivyIndex
+nodes_contained:
+- '1'
+- '2'
+- '3'
+nodes_subscribed:
+- '11'
+- '12'
+- '13'

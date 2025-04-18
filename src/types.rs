@@ -39,8 +39,9 @@ pub struct SkgNode {
   pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
   // nodes might be merged.
 
-  #[serde(default, skip_serializing_if = "String::is_empty")]
-  pub unindexed_text: String, // Unknown to both Tantivy & TypeDB
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub unindexed_text: // Unknown to both Tantivy & TypeDB
+  Option<String>,
 
   // Each #[serde directive applies to the field after it.
   // serde(default) says use the default value (for Vec it's [])
@@ -148,8 +149,8 @@ pub fn skgnode_example() -> SkgNode {
       "YAML does not escape \"quotation marks\" in text."
         .to_string() ],
     ids: vec![ ID::new("123") ],
-    unindexed_text: r#"This one string could span pages.
-It better be okay with newlines."#.to_string(),
+    unindexed_text: Some( r#"This one string could span pages.
+It better be okay with newlines."# . to_string() ),
     properties: vec![
       SkgNodeProperty::CommentsOn(ID::new("42")),
       SkgNodeProperty::NoTantivyIndex, ],

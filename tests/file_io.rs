@@ -1,5 +1,4 @@
 use std::fs;
-use tempfile::NamedTempFile;
 
 use skg::file_io::{
   read_skgnode_from_path, write_skgnode_to_path};
@@ -59,17 +58,15 @@ fn verify_unindexed_text_not_needed() {
 
   let mut node = read_skgnode_from_path (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
-  node.unindexed_text = String::new(); // mutate it
-  let temp_file = NamedTempFile::new().unwrap();
-  let temp_path = temp_file.path();
+  node.unindexed_text = None; // mutate it
   write_skgnode_to_path(
-    &node, temp_path ) . unwrap();
-  let file_content =
-    fs::read_to_string(temp_path).unwrap();
-  assert!( !file_content.contains("unindexed"),
-            "Expected 'unindexed' to be absent from the serialized YAML, but it was found.\nFile content:\n{}",
-            file_content);
-  println!("Verified: Empty unindexed_text was omitted from YAML output"); }
+    &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
+  assert_eq!(
+    fs::read_to_string(
+      "tests/file_io/generated/no_unindexed.skg").unwrap(),
+    fs::read_to_string(
+      "tests/file_io/fixtures/no_unindexed.skg").unwrap(),
+    "Deleting unindexed_text did not have the intended effect."); }
 
 pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     // Create a new SkgNode with some reversed lists --
