@@ -53,7 +53,7 @@ pub async fn find_container_of (
   Err(format!("No container found for node with ID '{}'",
               node).into()) }
 
-pub async fn get_path_from_node_id (
+pub async fn get_container_path_from_node (
   db_name: &str,
   driver: &TypeDBDriver,
   node_id: &str
@@ -86,14 +86,14 @@ pub async fn recursive_s_expression_from_node(
   // an s-expression representing a document built from there.
   db_name: &str,
   driver: &TypeDBDriver,
-  node: &str
+  focus: &str
 ) -> Result<String, Box<dyn Error>> {
-  let path = path_to_root_container(db_name, driver, node).await?;
+  let path = path_to_root_container(db_name, driver, focus).await?;
   let root_id = path.last()
     .ok_or_else(
       || io::Error::new(
         io::ErrorKind::InvalidData,
-        format!("Empty path returned for node '{}'", node)
+        format!("Empty path returned for node '{}'", focus)
       ))?;
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
@@ -106,7 +106,7 @@ async fn helps_recursive_s_expression_from_node(
   driver: &TypeDBDriver,
   node_id: &str
 ) -> Result<String, Box<dyn Error>> {
-  let path = get_path_from_node_id(
+  let path = get_container_path_from_node(
     db_name, driver, node_id).await?;
   let node = read_skgnode_from_path ( path ) ?;
   let headline = node.titles.first()

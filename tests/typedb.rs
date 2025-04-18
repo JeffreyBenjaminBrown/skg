@@ -16,7 +16,7 @@ use skg::typedb::create::{make_db_destroying_earlier_one};
 use skg::typedb::search::{
   extract_id_from_typedb_string_rep,
   find_container_of,
-  get_path_from_node_id,
+  get_container_path_from_node,
 };
 
 #[test]
@@ -33,9 +33,9 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
     make_db_destroying_earlier_one(
       "tests/typedb/fixtures", db_name, &driver ) . await?;
 
-    let path_to_4 = get_path_from_node_id (
+    let path_to_4 = get_container_path_from_node (
       db_name, &driver, "4") . await?;
-    let path_to_44 = get_path_from_node_id (
+    let path_to_44 = get_container_path_from_node (
       db_name, &driver, "44") . await?;
     assert_eq!(path_to_4,  "tests/typedb/fixtures/4.skg");
     assert_eq!(path_to_44, "tests/typedb/fixtures/4.skg");
