@@ -3,6 +3,13 @@ name = "skg"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "rust/lib.rs"
+
+[[bin]]
+name = "skg"
+path = "rust/main.rs"
+
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }
 filetime = "0.2"
