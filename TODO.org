@@ -1,6 +1,6 @@
+* find the root ancestor
 * represent a document in Rust, via JSON
 ** add an optional "focused" node to the YAML
-** find the root ancestor
 * Export from TypeDB to files?
 * persist TypeDB data
   consider too how Tantivy data is persisted
@@ -16,3 +16,8 @@
 ** unify Tantivy and TypeDB indexation
 ** If `titles` were the first field in the .skg format
    then the Tantivy indexing would need to read less
+* later
+** Verify cardinality constraints are working.
+   It should be impossible to make a node
+   be contained by two different nodes.
+** A function should test that all IDs are distinct in the repo.
