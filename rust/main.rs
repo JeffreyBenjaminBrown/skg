@@ -34,19 +34,8 @@ fn handle_emacs(mut stream: TcpStream) {
       match extract_request_type(&line) {
         Ok(request_type) => {
           if request_type == "single document" {
-            match extract_node_id_from_document_request(
-              &line) {
-              Ok(node_id) => {
-                let s_expression =
-                  generate_s_expression(&node_id);
-                send_response(
-                  &mut stream, &s_expression); },
-              Err(err) => {
-                let error_msg = format!(
-                  "Error extracting node ID: {}", err);
-                println!("{}", error_msg);
-                send_response(&mut stream, &error_msg);
-              } } }
+            handle_single_document_request(
+              &mut stream, &line); }
           else {
             let error_msg = format!(
               "Unsupported request type: {}",
@@ -62,6 +51,19 @@ fn handle_emacs(mut stream: TcpStream) {
               err)); } };
       line.clear(); }
   println!("Emacs disconnected: {peer}"); }
+
+fn handle_single_document_request(
+  stream: &mut TcpStream,
+  request: &str) {
+  match extract_node_id_from_document_request(request) {
+    Ok(node_id) => {
+      let s_expression = generate_s_expression(&node_id);
+      send_response(stream, &s_expression); },
+    Err(err) => {
+      let error_msg = format!(
+        "Error extracting node ID: {}", err);
+      println!("{}", error_msg);
+      send_response(stream, &error_msg); } } }
 
 fn extract_request_type(
   request: &str)
@@ -85,7 +87,6 @@ fn extract_node_id_from_document_request (
   request: &str)
   -> Result<String, String> {
   let id_pattern = "(id . \"";
-
   if let Some(id_start) = request.find(id_pattern) {
     let id_start = id_start + id_pattern.len();
     if let Some(id_end) = request[id_start..].find("\"") {
