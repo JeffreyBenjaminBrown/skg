@@ -19,12 +19,13 @@
            :buffer "*skg-doc-raw*"
            :host "127.0.0.1"
            :service 1730
-           :filter #'skg-doc-interpret-response
+           :filter ;; handles the response
+           #'skg-open-org-buffer-from-rust-s-exp
            :coding 'utf-8
            :nowait nil)))
   skg-doc--proc)
 
-(defun skg-doc-interpret-response (proc string)
+(defun skg-open-org-buffer-from-rust-s-exp (proc string)
   "Interpret the s-expression from the Rust server and display as org-mode."
   (with-current-buffer
       (get-buffer-create skg-doc-buffer-name)
@@ -32,80 +33,46 @@
           (s-expr (car (read-from-string string))))
       (erase-buffer)
       (org-mode)
-      (skg-doc-insert-org-from-sexpr s-expr))
+      (let ((content (cdr (assq 'content s-expr))))
+        ;; Ignore `view` key, focus on `content` key.
+        (skg-doc-insert-node content 1)))
     (set-buffer-modified-p nil)
     (switch-to-buffer (current-buffer))))
 
-(defun skg-doc-get-property (node property)
+(defun skg-doc-get-property (node property-key)
   "Get PROPERTY from NODE."
+  (message "skg-doc-get-property going.")
   (when (and node (consp node))
     (if (and (symbolp (car node))
-             (eq (car node) property))
+             (eq (car node) property-key))
         (cdr node)
-      (cdr (assq property node)))))
-
-(defun skg-doc-insert-org-from-sexpr (s-expr)
-  "Insert org-mode content from S-EXPR."
-  (let ((content (cdr (assq 'content s-expr))))
-    ;; Check if content is a list of nodes or a single node with properties
-    (if (and (consp content) (consp (car content)) (not (listp (cdar content))))
-        ;; It's a single node with properties
-        (skg-doc-insert-node content 1)
-      ;; It's a list of nodes
-      (dolist (node content)
-        (skg-doc-insert-node node 1)))))
+      (cdr (assq property-key node)))))
 
 (defun skg-doc-insert-node (node level)
   "Insert NODE at indentation LEVEL."
-  (let*
-      ((is-node-list (and (listp node)
-                          (listp (car node))
-                          (symbolp (caar node))))
-       (id
-        (if is-node-list
-            (cdr (assq 'id node))
-          (skg-doc-get-property node 'id)))
-       (headline
-        (if is-node-list
-            (cdr (assq 'headline node))
-          (skg-doc-get-property node 'headline)))
-       (unindexed-text
-        (if is-node-list
-            (cdr (assq 'unindexed_text node))
-          (skg-doc-get-property node 'unindexed_text)))
-       (focused
-        (if is-node-list
-            (cdr (assq 'focused node))
-          (skg-doc-get-property node 'focused)))
-       (content
-        (if is-node-list
-            (cdr (assq 'content node))
-          (skg-doc-get-property node 'content))))
+  (let* ( (id (cdr (assq 'id node)))
+          (headline (cdr (assq 'headline node)))
+          (unindexed-text
+           (cdr (assq 'unindexed_text node)))
+          (focused (cdr (assq 'focused node)))
+          (content (cdr (assq 'content node))) )
 
-    (when headline ;; Only happens if there is a headline
-      (let ((bullet (make-string level ?*))
-            (start (point)))
-        (insert bullet " ")
-        (add-text-properties
-         start (+ start level) ;; the bullet
-         (append (list 'id id)
-                 (when focused (list 'focused t)))))
-      (insert headline)
-      (when unindexed-text
-        (insert "\n" unindexed-text))
-      (insert "\n")
-      (when content
-        (if (and (listp content)
-                 (listp (car content))
-                 (listp (caar content)))
-            ;; List of nodes
-            (dolist (child content)
-              (skg-doc-insert-node child
-                                   (1+ level)))
-          ;; Single node (shouldn't happen)
-          (when (listp content)
-            (skg-doc-insert-node content
-                                 (1+ level))))))))
+    (let ;; insert bullet with text properties
+        ((bullet (make-string level ?*))
+          (start (point)))
+      (insert bullet " ")
+      (add-text-properties
+       start (+ start level) ;; where the bullet is
+       (append (list 'id id)
+               (when focused (list 'focused t)))))
+    (insert headline)
+    (when unindexed-text
+      (insert "\n" unindexed-text))
+    (insert "\n")
+    (when content
+      (dolist (child content)
+        (skg-doc-insert-node child
+                             (1+ level))))))
 
 (defun request-document-from-node (node-id)
   "Request a document (as an s-expression)."
