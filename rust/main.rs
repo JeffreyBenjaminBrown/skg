@@ -27,7 +27,8 @@ fn handle_emacs(mut stream: TcpStream) {
   let mut reader = BufReader::new(
     stream . try_clone() . unwrap() );
   let mut line = String::new();
-  while let Ok(n) = reader.read_line(&mut line) {
+  while let Ok(n) =
+    reader.read_line(&mut line) { // reads until a newline
     if n == 0 { break; } // emacs disconnected
     let node_id = line.trim_end().to_string();
     println!("Received request for node: {node_id}");
@@ -58,5 +59,6 @@ fn generate_s_expression(node_id: &str) -> String {
   result }
 
 fn send_response(stream: &mut TcpStream, response: &str) {
-  writeln! ( stream, "{}", response ) . unwrap();
+  writeln! ( // appends a newline
+    stream, "{}", response ) . unwrap();
   stream . flush() . unwrap() ; }

@@ -49,7 +49,7 @@
       (cdr (assq property-key node)))))
 
 (defun skg-doc-insert-node (node level)
-  "Insert NODE at indentation LEVEL."
+  "The recursive workhorse for building up the org document. It inserts NODE at indentation LEVEL."
   (let* ( (id (cdr (assq 'id node)))
           (headline (cdr (assq 'headline node)))
           (unindexed-text
