@@ -111,16 +111,20 @@ fn generate_s_expression(node_id: &str) -> String {
         "Error connecting to TypeDB: {}", e) };
     let db_name = "skg-test";
     if let Err(e) = make_db_destroying_earlier_one (
-      "tests/content_view/fixtures", db_name, &driver ) . await {
-      return format!("Failed to initialize database: {}", e); }
+      "tests/content_view/fixtures", db_name, &driver )
+      . await {
+        return format!(
+          "Failed to initialize database: {}", e); }
     match recursive_s_expression_from_node(
       db_name, &driver, node_id).await {
       Ok(s_expr) => s_expr,
-      Err(e) => format!("Error generating s-expression: {}", e)
-    } } );
+      Err(e) => format!(
+        "Error generating s-expression: {}", e) } } );
   result }
 
-fn send_response(stream: &mut TcpStream, response: &str) {
+fn send_response(
+  stream: &mut TcpStream,
+  response: &str) {
   writeln! ( // appends a newline
     stream, "{}", response ) . unwrap();
   stream . flush() . unwrap() ; }
