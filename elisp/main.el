@@ -1,6 +1,6 @@
 ;; USAGE
 ;; (skg-doc-connect)
-;; (request-document-from-node "5")
+;; (request-document-from-node "4")
 ;; (skg-doc-disconnect)
 
 (defvar skg-doc--proc nil
@@ -39,16 +39,16 @@
 (defun skg-doc-get-property (node property)
   "Get PROPERTY from NODE."
   (when (and node (consp node))
-    (if (and (stringp (car node))
-             (equal (car node) property))
+    (if (and (symbolp (car node))
+             (eq (car node) property))
         (cdr node)
-      (cdr (assoc property node)))))
+      (cdr (assq property node)))))
 
 (defun skg-doc-insert-org-from-sexpr (s-expr)
   "Insert org-mode content from S-EXPR."
-  (let ((content (cdr (assoc 'content s-expr))))
+  (let ((content (cdr (assq 'content s-expr))))
     ;; Check if content is a list of nodes or a single node with properties
-    (if (and (consp content) (consp (car content)) (stringp (cdar content)))
+    (if (and (consp content) (consp (car content)) (not (listp (cdar content))))
         ;; It's a single node with properties
         (skg-doc-insert-node content 1)
       ;; It's a list of nodes
@@ -60,38 +60,34 @@
   (let*
       ((is-node-list (and (listp node)
                           (listp (car node))
-                          (stringp (caar node))))
-       ;; Extract properties based on whether this is a node list or node object
+                          (symbolp (caar node))))
        (id
         (if is-node-list
-            (cdr (assoc "id" node))
-          (skg-doc-get-property node "id")))
+            (cdr (assq 'id node))
+          (skg-doc-get-property node 'id)))
        (headline
         (if is-node-list
-            (cdr (assoc "headline" node))
-          (skg-doc-get-property node "headline")))
+            (cdr (assq 'headline node))
+          (skg-doc-get-property node 'headline)))
        (unindexed-text
         (if is-node-list
-            (cdr (assoc "unindexed_text" node))
-          (skg-doc-get-property node "unindexed_text")))
+            (cdr (assq 'unindexed_text node))
+          (skg-doc-get-property node 'unindexed_text)))
        (focused
         (if is-node-list
-            (cdr (assoc "focused" node))
-          (skg-doc-get-property node "focused")))
+            (cdr (assq 'focused node))
+          (skg-doc-get-property node 'focused)))
        (content
         (if is-node-list
-            (cdr (assoc "content" node))
-          (skg-doc-get-property node "content"))))
+            (cdr (assq 'content node))
+          (skg-doc-get-property node 'content))))
 
-    ;; Only proceed if we have a headline
-    (when headline
-      ;; Create the bullet (asterisks) with text properties for ID and focused
-      (let ((bullets (make-string level ?*))
+    (when headline ;; Only happens if there is a headline
+      (let ((bullet (make-string level ?*))
             (start (point)))
-        (insert bullets " ")
-        ;; Add text properties to the bullets
+        (insert bullet " ")
         (add-text-properties
-         start (+ start level)
+         start (+ start level) ;; the bullet
          (append (list 'id id)
                  (when focused (list 'focused t)))))
       (insert headline)

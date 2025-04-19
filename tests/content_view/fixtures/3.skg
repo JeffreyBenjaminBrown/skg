@@ -2,5 +2,7 @@ ids:
 - 3
 titles:
 - another second-level headline
-unindexed_text: |
+unindexed_text: |-
   This one string could span pages,
+  and in fact
+  spans three lines.

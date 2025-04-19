@@ -2,8 +2,9 @@ ids:
 - 1
 titles:
 - a top-level title
-unindexed_text: |
+unindexed_text: |-
   This one string could span pages,
+  but in fact only spans two lines.
 nodes_contained:
 - 2
 - 3
