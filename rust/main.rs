@@ -29,37 +29,38 @@ fn handle_emacs(mut stream: TcpStream) {
   let mut line = String::new();
   while let Ok(n) =
     reader.read_line(&mut line) { // reads until a newline
-    if n == 0 { break; } // emacs disconnected
-    println!("Received request: {}", line.trim_end());
-    match extract_request_type(&line) {
-      Ok(request_type) => {
-        if request_type == "single document" {
-          match extract_node_id_from_document_request(
-            &line) {
-            Ok(node_id) => {
-              let s_expression =
-                generate_s_expression(&node_id);
-              send_response(
-                &mut stream, &s_expression); },
-            Err(err) => {
-              let error_msg = format!(
-                "Error extracting node ID: {}", err);
-              println!("{}", error_msg);
-              send_response(&mut stream, &error_msg);
-            } } }
-        else {
-          let error_msg = format!(
-            "Unsupported request type: {}", request_type);
-          println!("{}", error_msg);
-          send_response(&mut stream, &error_msg); } },
-      Err(err) => {
-        println!("Error determining request type: {}",
-                 err);
-        send_response(
-          &mut stream, &format!(
-            "Error determining request type: {}",
-            err)); } };
-    line.clear(); }
+      if n == 0 { break; } // emacs disconnected
+      println!("Received request: {}", line.trim_end());
+      match extract_request_type(&line) {
+        Ok(request_type) => {
+          if request_type == "single document" {
+            match extract_node_id_from_document_request(
+              &line) {
+              Ok(node_id) => {
+                let s_expression =
+                  generate_s_expression(&node_id);
+                send_response(
+                  &mut stream, &s_expression); },
+              Err(err) => {
+                let error_msg = format!(
+                  "Error extracting node ID: {}", err);
+                println!("{}", error_msg);
+                send_response(&mut stream, &error_msg);
+              } } }
+          else {
+            let error_msg = format!(
+              "Unsupported request type: {}",
+              request_type);
+            println!("{}", error_msg);
+            send_response(&mut stream, &error_msg); } },
+        Err(err) => {
+          println!("Error determining request type: {}",
+                   err);
+          send_response(
+            &mut stream, &format!(
+              "Error determining request type: {}",
+              err)); } };
+      line.clear(); }
   println!("Emacs disconnected: {peer}"); }
 
 fn extract_request_type(
@@ -73,12 +74,12 @@ fn extract_request_type(
         return Ok(request[req_start..
                           (req_start + req_end)]
                   .to_string());
-    } else {
-      return Err("Could not find end of request type in request"
-                 .to_string()); }
+      } else {
+        return Err( "Could not find quotation mark ending request type in request."
+                     .to_string()); }
   } else {
-    return Err("Could not find request type in request"
-               .to_string() ); } }
+    return Err( "Could not find request type in request."
+                 .to_string() ); } }
 
 fn extract_node_id_from_document_request (
   request: &str)
