@@ -1,6 +1,7 @@
 *~
 .bash_history
 /Cargo.lock
-/tests/generated
+/devel-handy/temp.org
 /target
 /tests/*/generated/
+/tests/generated
