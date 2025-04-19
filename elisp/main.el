@@ -59,7 +59,7 @@
 
     (let ;; insert bullet with text properties
         ((bullet (make-string level ?*))
-          (start (point)))
+         (start (point)))
       (insert bullet " ")
       (add-text-properties
        start (+ start level) ;; where the bullet is
@@ -77,8 +77,10 @@
 (defun request-document-from-node (node-id)
   "Request a document (as an s-expression)."
   (interactive "sNode ID: ")
-  (let ((proc (skg-doc-connect)))
-    (process-send-string proc (concat node-id "\n"))))
+  (let* ((proc (skg-doc-connect))
+         (request-sexp
+          (format "((request . \"single document\") (id . \"%s\"))\n" node-id)))
+    (process-send-string proc request-sexp)))
 
 (defun skg-doc-disconnect ()
   "Manually close the connection to the Rust server."

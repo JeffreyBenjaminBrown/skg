@@ -30,12 +30,31 @@ fn handle_emacs(mut stream: TcpStream) {
   while let Ok(n) =
     reader.read_line(&mut line) { // reads until a newline
     if n == 0 { break; } // emacs disconnected
-    let node_id = line.trim_end().to_string();
-    println!("Received request for node: {node_id}");
-    let s_expression = generate_s_expression ( &node_id );
-    send_response ( &mut stream, &s_expression );
+    println!("Received request: {}", line.trim_end());
+    let node_id = match parse_request(&line) {
+      Ok(id) => id,
+      Err(err) => {
+        println!("Error parsing request: {}", err);
+        send_response(
+          &mut stream, &format!(
+            "Error parsing request: {}", err));
+        line.clear();
+        continue; } };
+    let s_expression = generate_s_expression(&node_id);
+    send_response(&mut stream, &s_expression);
     line.clear(); }
   println!("Emacs disconnected: {peer}"); }
+
+fn parse_request(request: &str) -> Result<String, String> {
+  let id_pattern = "(id . \"";
+  if let Some(id_start) = request.find(id_pattern) {
+    let id_start = id_start + id_pattern.len();
+    if let Some(id_end) =
+      request[id_start..].find("\"") {
+      return Ok(
+        request[id_start..(id_start + id_end)]
+          .to_string()); } }
+  Err("Could not find ID in request".to_string() ) }
 
 fn generate_s_expression(node_id: &str) -> String {
   let result = block_on ( async {
