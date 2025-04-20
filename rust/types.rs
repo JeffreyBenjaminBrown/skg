@@ -12,11 +12,11 @@ use std::str::FromStr;
 //
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ID(String);
+pub struct ID(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
-  pub id: String,
+  pub id: ID,
   pub label: String, }
 
 #[derive(Debug)]
@@ -90,7 +90,7 @@ impl Link {
   pub fn new(id: impl Into<String>,
              label: impl Into<String>)
              -> Self {
-    Link { id: id.into(),
+    Link { id: ID(id.into()),
            label: label.into(),
     } } }
 
@@ -116,7 +116,7 @@ impl FromStr for Link {
       let id = &interior[0..idx];
       let label = &interior[idx+2..];
       Ok ( Link {
-        id: id.to_string(),
+        id: ID(id.to_string()),
         label: label.to_string(),
       } )
     } else {

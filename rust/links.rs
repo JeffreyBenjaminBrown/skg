@@ -36,8 +36,8 @@ mod tests {
   fn test_link_from_str_valid() {
     let text = "[[id:abc123][My Link]]";
     let link: Link = text.parse().unwrap();
-    assert_eq!(link.id, "abc123");
-    assert_eq!(link.label, "My Link");
+    assert_eq! ( link.id, "abc123".into() );
+    assert_eq! ( link.label, "My Link");
   }
 
   #[test]
@@ -74,9 +74,9 @@ mod tests {
   fn test_extract_links_single() {
     let text = "This text has one [[id:abc123][My Link]] in it.";
     let links = extract_links(text);
-    assert_eq!(links.len(), 1);
-    assert_eq!(links[0].id, "abc123");
-    assert_eq!(links[0].label, "My Link");
+    assert_eq! ( links.len(), 1 ) ;
+    assert_eq! ( links[0].id, "abc123".into() );
+    assert_eq! ( links[0].label, "My Link" ) ;
   }
 
   #[test]
@@ -84,9 +84,9 @@ mod tests {
     let text = "This text has [[id:abc123][First Link]] and [[id:def456][Second Link]] in it.";
     let links = extract_links(text);
     assert_eq!(links.len(), 2);
-    assert_eq!(links[0].id, "abc123");
+    assert_eq!(links[0].id, "abc123".into() );
     assert_eq!(links[0].label, "First Link");
-    assert_eq!(links[1].id, "def456");
+    assert_eq!(links[1].id, "def456".into() );
     assert_eq!(links[1].label, "Second Link");
   }
 
@@ -95,7 +95,9 @@ mod tests {
     let text = "Link with UUID: [[id:846207ef-11d6-49e4-89b4-4558b2989a60][My UUID Link]]";
     let links = extract_links(text);
     assert_eq!(links.len(), 1);
-    assert_eq!(links[0].id, "846207ef-11d6-49e4-89b4-4558b2989a60");
+    assert_eq!(
+      links[0].id,
+      "846207ef-11d6-49e4-89b4-4558b2989a60".into() );
     assert_eq!(links[0].label, "My UUID Link");
   }
 
@@ -104,7 +106,7 @@ mod tests {
     let text = "Link with nested brackets: [[id:abc123][Link [with] brackets]]";
     let links = extract_links(text);
     assert_eq!(links.len(), 1);
-    assert_eq!(links[0].id, "abc123");
+    assert_eq!(links[0].id, "abc123".into() );
     assert_eq!(links[0].label, "Link [with] brackets");
   }
 }

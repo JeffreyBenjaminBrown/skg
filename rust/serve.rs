@@ -10,6 +10,7 @@ use futures::executor::block_on;
 
 use crate::typedb::create::make_db_destroying_earlier_one;
 use crate::typedb::search::recursive_s_expression_from_node;
+use crate::types::ID;
 
 pub fn serve() -> std::io::Result<()> {
   let listener = TcpListener::bind("0.0.0.0:1730")?;
@@ -86,13 +87,13 @@ fn extract_request_type(
 
 fn extract_node_id_from_document_request (
   request: &str)
-  -> Result<String, String> {
+  -> Result<ID, String> {
   let id_pattern = "(id . \"";
   if let Some(id_start) = request.find(id_pattern) {
     let id_start = id_start + id_pattern.len();
     if let Some(id_end) = request[id_start..].find("\"") {
-      return Ok(request[id_start..(id_start + id_end)]
-                .to_string());
+      return Ok(ID(request[id_start..(id_start + id_end)]
+                .to_string()));
     } else {
       return Err("Could not find end of ID in request"
                  .to_string()); }
@@ -100,7 +101,7 @@ fn extract_node_id_from_document_request (
     return Err("Could not find ID in request"
                .to_string()); } }
 
-fn generate_s_expression(node_id: &str) -> String {
+fn generate_s_expression(node_id: &ID) -> String {
   let result = block_on ( async {
     let driver = match TypeDBDriver::new(
       "127.0.0.1:1729",

@@ -96,15 +96,15 @@ mod tests {
 
     // Check links from titles
     assert!(read_node.links.iter()
-            .any ( |link| link.id == "link1" &&
+            .any ( |link| link.id == "link1".into() &&
                     link.label == "First Link"));
     assert!(read_node.links.iter()
-            .any ( |link| link.id == "link2" &&
+            .any ( |link| link.id == "link2".into() &&
                     link.label == "Second Link"));
     assert!(read_node.links.iter()
-            .any ( |link| link.id == "link3" &&
+            .any ( |link| link.id == "link3".into() &&
                     link.label == "Third Link"));
     assert!(read_node.links.iter()
-            .any ( |link| link.id == "link4"
+            .any ( |link| link.id == "link4".into()
                     && link.label == "Fourth Link"));
     Ok (()) } }

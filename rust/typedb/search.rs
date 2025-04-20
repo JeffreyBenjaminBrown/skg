@@ -7,16 +7,17 @@ use typedb_driver::{
 };
 
 use crate::file_io::read_skgnode_from_path;
+use crate::types::ID;
 
 pub async fn path_to_root_container (
   // Returns the path from the given node to the root container
   // The first element is the original node, and the last is the root.
   db_name: &str,
   driver: &TypeDBDriver,
-  node: &str
-) -> Result<Vec<String>, Box<dyn Error>> {
-  let mut path = vec![node.to_string()];
-  let mut current_node = node.to_string();
+  node: &ID
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let mut path = vec![node.clone()];
+  let mut current_node = node.clone();
   loop {
     match find_container_of (
       db_name, driver, &current_node) . await {
@@ -32,8 +33,8 @@ pub async fn path_to_root_container (
 pub async fn find_container_of (
   db_name : &str,
   driver : &TypeDBDriver,
-  node: &str
-) -> Result<String, Box<dyn Error>> {
+  node: &ID
+) -> Result<ID, Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Read).await?;
   let answer = tx.query(
@@ -48,15 +49,16 @@ pub async fn find_container_of (
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("container_id")? {
-      return Ok(extract_id_from_typedb_string_rep(
-        &concept.to_string())); } }
+      return Ok ( ID (
+        extract_payload_from_typedb_string_rep(
+          &concept.to_string() ) ) ); } }
   Err(format!("No container found for node with ID '{}'",
               node).into()) }
 
-pub async fn get_container_path_from_node (
+pub async fn get_filepath_from_node (
   db_name: &str,
   driver: &TypeDBDriver,
-  node_id: &str
+  node_id: &ID
 ) -> Result<String, Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Read).await?;
@@ -76,7 +78,7 @@ pub async fn get_container_path_from_node (
   if let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("path")? {
-      return Ok(extract_id_from_typedb_string_rep(
+      return Ok(extract_payload_from_typedb_string_rep(
         &concept.to_string())); } }
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
@@ -96,7 +98,7 @@ Properties (tags) in the resulting s-expression include:
   Thus the document is recursive. */
   db_name: &str,
   driver: &TypeDBDriver,
-  focus: &str
+  focus: &ID
 ) -> Result<String, Box<dyn Error>> {
   let path = path_to_root_container(db_name, driver, focus).await?;
   let root_id = path.last()
@@ -114,10 +116,10 @@ Properties (tags) in the resulting s-expression include:
 async fn helps_recursive_s_expression_from_node(
   db_name: &str,
   driver: &TypeDBDriver,
-  node_id: &str,
-  focus: &str
+  node_id: &ID,
+  focus: &ID
 ) -> Result<String, Box<dyn Error>> {
-  let path = get_container_path_from_node(
+  let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
   let node = read_skgnode_from_path ( path ) ?;
   let headline = node.titles.first()
@@ -160,12 +162,12 @@ async fn helps_recursive_s_expression_from_node(
 fn escape_string_for_s_expression(s: &str) -> String {
   s . replace("\\", "\\\\") . replace("\"", "\\\"") }
 
-pub fn extract_id_from_typedb_string_rep(
+pub fn extract_payload_from_typedb_string_rep(
   attribute_str: &str)
   -> String {
   if let Some(start) = attribute_str.find('"') {
     if let Some(end) = attribute_str[start + 1..] . find('"') {
       return attribute_str [start + 1 .. start + 1 + end]
         . to_string(); } }
-  panic!( "Failed to extract ID from TypeDB output: {}",
+  panic!( "Failed to extract payload from TypeDB output: {}",
            attribute_str) }

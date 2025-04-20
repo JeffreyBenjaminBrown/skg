@@ -12,6 +12,7 @@ use skg::typedb::create::make_db_destroying_earlier_one;
 use skg::typedb::search::{
   recursive_s_expression_from_node,
   path_to_root_container };
+use skg::types::ID;
 
 #[test]
 fn test_recursive_s_expression_from_node
@@ -30,8 +31,9 @@ fn test_recursive_s_expression_from_node
     // Print the view from node "1".
     // TODO: Automatize.
     println!("Building view from node with ID 2...");
-    let view = recursive_s_expression_from_node(
-      db_name, &driver, "2").await?;
+    let view = recursive_s_expression_from_node (
+      db_name, &driver, &ID("2".to_string() )
+      ) . await?;
     println!("Document View Output:");
     println!("{}", view);
 
@@ -39,18 +41,21 @@ fn test_recursive_s_expression_from_node
     // TODO: Automatize.
     println!("Building view from node with ID 5...");
     let view = recursive_s_expression_from_node(
-      db_name, &driver, "5").await?;
+      db_name, &driver, &ID("5".to_string() )
+    ) . await?;
     println!("Document View Output:");
     println!("{}", view);
 
     // Test the path from node "4" to the root container
-    match path_to_root_container(db_name, &driver, "4").await {
+    match path_to_root_container(
+      db_name, &driver, &ID("4".to_string() )
+    ).await {
       Ok(path) => { assert_eq!(
         path,
         vec![
-          "4".to_string(),
-          "2".to_string(),
-          "1".to_string() ],
+          ID ( "4".to_string() ),
+          ID ( "2".to_string() ),
+          ID ( "1".to_string() ) ],
         "Unexpected path to root container from node '4'.");
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }

@@ -14,10 +14,11 @@ use typedb_driver::{
 
 use skg::typedb::create::{make_db_destroying_earlier_one};
 use skg::typedb::search::{
-  extract_id_from_typedb_string_rep,
+  extract_payload_from_typedb_string_rep,
   find_container_of,
-  get_container_path_from_node,
+  get_filepath_from_node,
 };
+use skg::types::ID;
 
 #[test]
 fn test_typedb_integration(
@@ -35,10 +36,10 @@ fn test_typedb_integration(
       "tests/typedb/fixtures", db_name, &driver )
       . await?;
 
-    let path_to_4 = get_container_path_from_node (
-      db_name, &driver, "4") . await?;
-    let path_to_44 = get_container_path_from_node (
-      db_name, &driver, "44") . await?;
+    let path_to_4 = get_filepath_from_node (
+      db_name, &driver, &ID("4".to_string() ) ) . await?;
+    let path_to_44 = get_filepath_from_node (
+      db_name, &driver, &ID("44".to_string() ) ) . await?;
     assert_eq!(path_to_4,  "tests/typedb/fixtures/4.skg");
     assert_eq!(path_to_44, "tests/typedb/fixtures/4.skg");
 
@@ -154,8 +155,9 @@ fn test_typedb_integration(
     assert_eq!(unsubscribes_pairs, expected_unsubscribes);
 
     let container_node = find_container_of(
-      db_name, &driver, "2").await?;
-    assert_eq!(container_node, "1");
+      db_name, &driver, &ID("2".to_string() )
+    ).await?;
+    assert_eq!(container_node, ID("1".to_string() ) );
 
     Ok (()) } ) }
 
@@ -180,7 +182,10 @@ async fn collect_all_of_some_binary_rel(
     let id2_raw = match row.get(member2_variable)? {
       Some(c) => c.to_string(),
       None => "unknown".to_string() };
-    let id1 = extract_id_from_typedb_string_rep ( &id1_raw);
-    let id2 = extract_id_from_typedb_string_rep ( &id2_raw);
-    results.insert ( (id1, id2)); }
+    let id1 = ID ( extract_payload_from_typedb_string_rep (
+      &id1_raw) );
+    let id2 = ID ( extract_payload_from_typedb_string_rep (
+      &id2_raw) );
+    results.insert ( (id1.to_string(),
+                      id2.to_string() ) ); }
   Ok(results) }
