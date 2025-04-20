@@ -20,7 +20,8 @@ use skg::typedb::search::{
 };
 
 #[test]
-fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
+fn test_typedb_integration(
+) -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
     let driver = TypeDBDriver::new(
@@ -31,7 +32,8 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
     let db_name = "skg-test";
 
     make_db_destroying_earlier_one(
-      "tests/typedb/fixtures", db_name, &driver ) . await?;
+      "tests/typedb/fixtures", db_name, &driver )
+      . await?;
 
     let path_to_4 = get_container_path_from_node (
       db_name, &driver, "4") . await?;
@@ -74,7 +76,8 @@ fn test_typedb_integration() -> Result<(), Box<dyn Error>> {
       "ei"
     ).await?;
     let mut expected_comments_on = HashSet::new();
-    expected_comments_on.insert(("4".to_string(), "2".to_string()));
+    expected_comments_on.insert(
+      ("4".to_string(), "2".to_string()));
     assert_eq!(comments_on_pairs, expected_comments_on);
 
     let contains_pairs = collect_all_of_some_binary_rel(

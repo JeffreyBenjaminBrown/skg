@@ -7,9 +7,8 @@ ids:
 unindexed_text: |-
   This one string could span pages.
   It better be okay with newlines.
-properties:
-- !CommentsOn '42'
-- NoTantivyIndex
+comments_on: '42'
+no_tantivy_index: true
 nodes_contained:
 - '1'
 - '2'

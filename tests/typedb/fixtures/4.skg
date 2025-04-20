@@ -1,8 +1,7 @@
 ids:
 - '4'
 - '44'
-properties:
-- !CommentsOn '22'
+comments_on: '22'
 titles:
 - This is a [[id:shgulasdghu][test]] of a second kind.
 unindexed_text: |

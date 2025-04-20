@@ -1,0 +1,1 @@
+* distinguish comments, subscriptions in .skg format

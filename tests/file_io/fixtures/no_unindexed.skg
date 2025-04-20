@@ -4,9 +4,8 @@ titles:
 - YAML does not escape "quotation marks" in text.
 ids:
 - '123'
-properties:
-- !CommentsOn '42'
-- NoTantivyIndex
+comments_on: '42'
+no_tantivy_index: true
 nodes_contained:
 - '1'
 - '2'

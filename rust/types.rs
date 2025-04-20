@@ -24,11 +24,6 @@ pub enum LinkParseError {
   InvalidFormat,
   MissingDivider, }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum SkgNodeProperty {
-  CommentsOn(ID),   // Relevant to TypeDB
-  NoTantivyIndex, } // Relevant to Tantivy
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
   // Tantivy will receive some of this data,
@@ -43,12 +38,12 @@ pub struct SkgNode {
   pub unindexed_text: // Unknown to both Tantivy & TypeDB
   Option<String>,
 
-  // Each #[serde directive applies to the field after it.
-  // serde(default) says use the default value (for Vec it's [])
-  // if no value is provided when reading from disk.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub comments_on: Option<ID>, // Replaces CommentsOn property
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub properties: Vec<SkgNodeProperty>,
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub no_tantivy_index: bool, // Replaces NoTantivyIndex property
+
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_contained: Vec<ID>,
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -151,9 +146,8 @@ pub fn skgnode_example() -> SkgNode {
     ids: vec![ ID::new("123") ],
     unindexed_text: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    properties: vec![
-      SkgNodeProperty::CommentsOn(ID::new("42")),
-      SkgNodeProperty::NoTantivyIndex, ],
+    comments_on: Some(ID::new("42")),
+    no_tantivy_index: true,
     nodes_contained: vec![ID::new("1"),
                           ID::new("2"),
                           ID::new("3")],

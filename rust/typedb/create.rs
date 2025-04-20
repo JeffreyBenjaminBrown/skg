@@ -7,7 +7,7 @@ use typedb_driver::{
     TransactionType,
 };
 
-use crate::types::{ID, SkgNode, SkgNodeProperty};
+use crate::types::{ID, SkgNode};
 use crate::file_io::read_skgnode_from_path;
 
 pub async fn make_db_destroying_earlier_one (
@@ -188,12 +188,7 @@ pub async fn insert_comment_rel(
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
   let primary_id = node.ids[0].as_str();
-  for property in &node.properties {
-    // TODO | PITFALL: This is inefficient.
-    // Better to have the file store a properties list,
-    // but the SkgNode represent each as a standalone field,
-    // usually empty.
-    if let SkgNodeProperty::CommentsOn(commented_id) = property {
+    if let Some(commented_id) = &node.comments_on {
       tx.query (
         format!( r#"
                     match
@@ -210,7 +205,7 @@ pub async fn insert_comment_rel(
                     primary_id,
                     commented_id.as_str(),
                     commented_id.as_str()
-        ) ) . await?; } }
+        ) ) . await?; }
   Ok (()) }
 
 pub async fn insert_from_list(

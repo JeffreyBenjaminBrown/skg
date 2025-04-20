@@ -1,6 +1,8 @@
 exit # This is not a unitary script,
      # just some handy commands.
 
+cargo run 2>&1 | tee output.log
+
 cargo test --test index -- --nocapture
 
 # The Emacs find-grep command,
