@@ -1,16 +1,17 @@
-// PITFALL | TODO: This deletes and rebuilds the TypeDB data
+// PITFALL | TODO: Deletes and rebuilds the TypeDB data
 // at every request.
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Credentials,
+                    DriverOptions};
 use futures::executor::block_on;
 
-use skg::typedb::create::make_db_destroying_earlier_one;
-use skg::typedb::search::recursive_s_expression_from_node;
+use crate::typedb::create::make_db_destroying_earlier_one;
+use crate::typedb::search::recursive_s_expression_from_node;
 
-fn main() -> std::io::Result<()> {
+pub fn serve() -> std::io::Result<()> {
   let listener = TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
   for stream in listener.incoming() {
