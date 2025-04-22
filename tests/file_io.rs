@@ -70,7 +70,7 @@ fn verify_unindexed_text_not_needed() {
 
 pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     // Create a new SkgNode with some reversed lists --
-    // specifically, `titles`, `nodes_contained`
+    // specifically, `titles`, `contains`
     // and `nodes_subscribed`.
     // This is only for testing purposes,
     // to show reading from and writing to disk work;
@@ -78,9 +78,9 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     let mut reversed_titles = node.titles.clone();
     reversed_titles.reverse();
 
-    let mut reversed_nodes_contained =
-        node.nodes_contained.clone();
-    reversed_nodes_contained.reverse();
+    let mut reversed_contains =
+        node.contains.clone();
+    reversed_contains.reverse();
 
     let mut reversed_nodes_subscribed =
         node.nodes_subscribed.clone();
@@ -88,7 +88,7 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
 
   SkgNode {
     titles             : reversed_titles,
-    nodes_contained    : reversed_nodes_contained,
+    contains           : reversed_contains,
     nodes_subscribed   : reversed_nodes_subscribed,
 
     ids                : node.ids                .clone(),

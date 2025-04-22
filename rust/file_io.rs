@@ -72,7 +72,7 @@ mod tests {
       unindexed_text: Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]".to_string()),
       comments_on: None,
       no_tantivy_index: false,
-      nodes_contained: vec![],
+      contains: vec![],
       nodes_subscribed: vec![],
       ignores: vec![],
       replaces_view_of: vec![],

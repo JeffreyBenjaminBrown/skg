@@ -9,7 +9,7 @@ unindexed_text: |-
   It better be okay with newlines.
 comments_on: '42'
 no_tantivy_index: true
-nodes_contained:
+contains:
 - '1'
 - '2'
 - '3'

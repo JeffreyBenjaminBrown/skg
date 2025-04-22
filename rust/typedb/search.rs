@@ -143,9 +143,9 @@ async fn helps_recursive_s_expression_from_node(
       "{}\n  (unindexed_text . \"{}\")",
       node_sexpr, // PITFALL: self-referential
       escape_string_for_s_expression(text)); }
-  if !node.nodes_contained.is_empty() { // recursion
+  if !node.contains.is_empty() { // recursion
     let mut contained_sexpr = Vec::new();
-    for contained_id in &node.nodes_contained {
+    for contained_id in &node.contains {
       let contained_node = Box::pin(
         helps_recursive_s_expression_from_node(
           db_name, driver, contained_id, focus)).await?;

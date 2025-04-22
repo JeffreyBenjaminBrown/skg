@@ -4,7 +4,7 @@ is_comment: false
 titles:
   - This is a second test file.
 unindexed_text: this one string could span pages
-nodes_contained:
+contains:
   - '1'
   - '2'
   - '3'

@@ -4,5 +4,5 @@ titles:
 - a second-level title
 unindexed_text: |-
   More text here.
-nodes_contained:
+contains:
 - 4

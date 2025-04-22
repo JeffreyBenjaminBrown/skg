@@ -130,7 +130,7 @@ pub async fn create_relationships_from_node(
   let primary_id = node.ids[0].as_str();
   insert_comment_rel ( &node, tx ) . await?;
   insert_from_list( primary_id,
-                    &node.nodes_contained,
+                    &node.contains,
                     "contains",
                     "container",
                     "contained",
@@ -216,7 +216,7 @@ pub async fn insert_comment_rel(
 
 pub async fn insert_from_list(
   primary_id: &str,
-  id_list: &Vec<ID>,   // This would be node.nodes_contained, etc.
+  id_list: &Vec<ID>,   // This would be node.contains, etc.
   relation_name: &str, // "contains", "subscribes", etc.
   from_role: &str,     // "container", "subscriber", etc.
   to_role: &str,       // "contained", "subscribee", etc.

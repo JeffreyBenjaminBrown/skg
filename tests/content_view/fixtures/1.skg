@@ -5,6 +5,6 @@ titles:
 unindexed_text: |-
   This one string could span pages,
   but in fact only spans two lines.
-nodes_contained:
+contains:
 - 2
 - 3
