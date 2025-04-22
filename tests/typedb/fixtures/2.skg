@@ -5,6 +5,6 @@ titles:
 - title 2
 unindexed_text: |
   this one string could span pages
-nodes_subscribed:
+subscribes_to:
 - '4'
 - '5'

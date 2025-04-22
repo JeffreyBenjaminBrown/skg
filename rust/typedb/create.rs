@@ -148,7 +148,7 @@ pub async fn create_relationships_from_node(
   ).await?;
 
   insert_from_list( primary_id,
-                    &node.nodes_subscribed,
+                    &node.subscribes_to,
                     "subscribes",
                     "subscriber",
                     "subscribee",

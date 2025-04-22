@@ -48,7 +48,7 @@ pub struct SkgNode {
   pub contains: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub nodes_subscribed: Vec<ID>,
+  pub subscribes_to: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub ignores: Vec<ID>,
@@ -155,12 +155,12 @@ pub fn skgnode_example() -> SkgNode {
 It better be okay with newlines."# . to_string() ),
     comments_on: Some(ID::new("42")),
     no_tantivy_index: true,
-    contains: vec![ID::new("1"),
-                          ID::new("2"),
-                          ID::new("3")],
-    nodes_subscribed: vec![ID::new("11"),
-                           ID::new("12"),
-                           ID::new("13")],
+    contains: vec![ ID::new("1"),
+                    ID::new("2"),
+                    ID::new("3")],
+    subscribes_to: vec![ID::new("11"),
+                        ID::new("12"),
+                        ID::new("13")],
     ignores: vec![],
     replaces_view_of: vec![],
     path: PathBuf::from(

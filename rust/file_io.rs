@@ -73,7 +73,7 @@ mod tests {
       comments_on: None,
       no_tantivy_index: false,
       contains: vec![],
-      nodes_subscribed: vec![],
+      subscribes_to: vec![],
       ignores: vec![],
       replaces_view_of: vec![],
       links: vec![],

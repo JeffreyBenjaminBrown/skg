@@ -13,7 +13,7 @@ contains:
 - '3'
 - '2'
 - '1'
-nodes_subscribed:
+subscribes_to:
 - '13'
 - '12'
 - '11'
