@@ -16,6 +16,8 @@ define
     plays subscribes:subscribee,
     plays unsubscribes:unsubscriber,
     plays unsubscribes:unsubscribee,
+    plays replaces_view:replacement,
+    plays replaces_view:replaced,
     plays has_extra_id:node;
 
   entity extra_id,
@@ -42,3 +44,6 @@ define
   relation unsubscribes,
     relates unsubscriber,
     relates unsubscribee;
+  relation replaces_view,
+    relates replacement,
+    relates replaced;

@@ -154,6 +154,23 @@ fn test_typedb_integration(
     expected_unsubscribes.insert(("1".to_string(), "5".to_string()));
     assert_eq!(unsubscribes_pairs, expected_unsubscribes);
 
+    let replacement_pairs = collect_all_of_some_binary_rel(
+      db_name,
+      &driver,
+      r#" match
+            $replacement isa node, has id $from;
+            $replaced isa node, has id $to;
+            $rel isa replaces_view (replacement: $replacement,
+                                    replaced:    $replaced);
+          select $from, $to;"#,
+      "from",
+      "to"
+    ).await?;
+    let mut expected_replacements = HashSet::new();
+    expected_replacements.insert(("5".to_string(), "3".to_string()));
+    expected_replacements.insert(("5".to_string(), "4".to_string()));
+    assert_eq!(replacement_pairs, expected_replacements);
+
     let container_node = find_container_of(
       db_name, &driver, &ID("2".to_string() )
     ).await?;

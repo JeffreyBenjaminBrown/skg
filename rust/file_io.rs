@@ -75,6 +75,7 @@ mod tests {
       nodes_contained: vec![],
       nodes_subscribed: vec![],
       nodes_unsubscribed: vec![],
+      replaces_view_of: vec![],
       links: vec![],
       path: PathBuf::new(),
     };

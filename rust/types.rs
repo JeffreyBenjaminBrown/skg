@@ -46,15 +46,21 @@ pub struct SkgNode {
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_contained: Vec<ID>,
+
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_subscribed: Vec<ID>,
+
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub nodes_unsubscribed: Vec<ID>,
 
-  #[serde(skip)]        // `path` is not represented in the file, but
-  pub path: PathBuf,    // inferred from filepath.
-  #[serde(skip)]        // `links` is not represented in the file, but
-  pub links: Vec<Link>, // inferred from titles and unindexed text.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub replaces_view_of: Vec<ID>,
+
+  #[serde(skip)] // inferred from filepath
+  pub path: PathBuf,
+
+  #[serde(skip)] // inferred from titles and unindexed text
+  pub links: Vec<Link>,
 }
 
 //
@@ -155,6 +161,7 @@ It better be okay with newlines."# . to_string() ),
                            ID::new("12"),
                            ID::new("13")],
     nodes_unsubscribed: vec![],
+    replaces_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),
     links: vec![],

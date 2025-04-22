@@ -159,6 +159,12 @@ pub async fn create_relationships_from_node(
                     "unsubscriber",
                     "unsubscribee",
                     tx ).await?;
+  insert_from_list( primary_id,
+                    &node.replaces_view_of,
+                    "replaces_view",
+                    "replacement",
+                    "replaced",
+                    tx ).await?;
   Ok (()) }
 
 pub async fn insert_extra_ids (
