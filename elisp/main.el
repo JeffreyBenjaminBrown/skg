@@ -1,7 +1,17 @@
-;; USAGE
+;; USAGE:
+;; First evaluate the whole buffer (`M-x eval-buffer`).
+;; Then evaluate the following commands individually.
+;;
 ;; (skg-doc-connect)
 ;; (request-document-from-node "4")
 ;; (skg-doc-disconnect)
+;;
+;; The second of those asks Rust to ask TypeDB for
+;; data around the node with ID "4",
+;; build an s-expression representing an org-document
+;; based on the result, and send that to Emacs,
+;; and then causes Emacs to open an org-mode buffer
+;; displaying the results.
 
 (defvar skg-doc--proc nil
   "Persistent TCP connection to the Rust backend.")

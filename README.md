@@ -2,10 +2,14 @@
 
 ## If you've already got Rust and TypeDB
 
-Start the typedb server
+First start the TypeDB server
 (by typing just that: `typedb server`).
 
 In a separate shell, run `cargo run`.
+This starts the Rust server (the bulk of this code).
+
+Now visit [this Emacs lisp program](elisp/main.el)
+and read the top comment for further instructions.
 
 ## To run it in a tailor-made Docker container
 
