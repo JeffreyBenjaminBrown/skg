@@ -1,1 +1,3 @@
-* Incorporate replaces_view_of in tests
+* immediate-ish
+** The view Rust builds should incorporate all relations.
+   subscription, unsubscription, view replacement

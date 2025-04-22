@@ -1,8 +1,13 @@
 define
 
+  # A probably-unique identifier for a node.
+  # (Note that nodes can have multiple IDs -- see `extra_id` below.)
   attribute id, value string;
+
+  # A place in the filesystem.
   attribute path, value string;
 
+  # "The graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
     owns path @unique,
@@ -21,7 +26,7 @@ define
     plays has_extra_id:node;
 
   entity extra_id,
-    # A typical node only has one id, its primary key. But when nodes are merged, `extra_id` is used to associate more than one id with the merge result. The naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field.
+    # A typical node only has one ID, its primary key. But when nodes are merged, `extra_id` is used to associate more than one ID with the merge result. The naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field. (If attributes could be members of relationships, the `extra_id` entity would not be needed.)
     owns id @key,
     plays has_extra_id:extra_id;
 
@@ -29,15 +34,22 @@ define
     relates node,
     relates extra_id @card(1..1);
 
+  # Like the relationship from an org headline to its subheadlines,
+  # or from an org file (title) to its headlines.
+  # See `docs/content-model.md` for details.
   relation contains,
     relates container,
     relates contained @card(1..1);
+
+  # Derived from the node's text content (of which TypeDB is unaware).
+  # Links are org-roam style plain text. That is, they look like:
+  #  [[id:<id>][<label>]]
   relation links_to,
     relates source,
     relates dest;
-  relation comments_on,
-    relates commenter @card(1..1),
-    relates commentee;
+
+  # To understand subscribes, unsubscribes and replaces_view,
+  # see `docs/sharing-model.md`.
   relation subscribes,
     relates subscriber,
     relates subscribee;
@@ -47,3 +59,8 @@ define
   relation replaces_view,
     relates replacement,
     relates replaced;
+
+  # Unused, so far.
+  relation comments_on,
+    relates commenter @card(1..1),
+    relates commentee;

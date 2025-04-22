@@ -24,3 +24,7 @@ Enter it (using something like the
 Run `cd` to go to the home folder (`/home/ubuntu`).
 
 Then go to "If you've already got Rust and TypeDB" above.
+
+# data model
+
+See [[the schema](schema.tql)], [[the content model](docs/content-model.md)] and [[the sharing model](docs/sharing-model.md)].
