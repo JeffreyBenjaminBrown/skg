@@ -74,7 +74,7 @@ mod tests {
       no_tantivy_index: false,
       nodes_contained: vec![],
       nodes_subscribed: vec![],
-      nodes_unsubscribed: vec![],
+      ignores: vec![],
       replaces_view_of: vec![],
       links: vec![],
       path: PathBuf::new(),

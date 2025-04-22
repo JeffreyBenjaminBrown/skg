@@ -8,6 +8,6 @@ unindexed_text: |
 nodes_contained:
 - 2
 - 33
-nodes_unsubscribed:
+ignores:
 - 4
 - 55

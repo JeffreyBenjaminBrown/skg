@@ -154,10 +154,10 @@ pub async fn create_relationships_from_node(
                     "subscribee",
                     tx ).await?;
   insert_from_list( primary_id,
-                    &node.nodes_unsubscribed,
-                    "unsubscribes",
-                    "unsubscriber",
-                    "unsubscribee",
+                    &node.ignores,
+                    "ignores",
+                    "ignorer",
+                    "ignored",
                     tx ).await?;
   insert_from_list( primary_id,
                     &node.replaces_view_of,

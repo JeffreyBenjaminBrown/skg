@@ -19,8 +19,8 @@ define
     plays comments_on:commentee,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
-    plays unsubscribes:unsubscriber,
-    plays unsubscribes:unsubscribee,
+    plays ignores:ignorer,
+    plays ignores:ignored,
     plays replaces_view:replacement,
     plays replaces_view:replaced,
     plays has_extra_id:node;
@@ -48,14 +48,14 @@ define
     relates source,
     relates dest;
 
-  # To understand subscribes, unsubscribes and replaces_view,
+  # To understand subscribes, ignores and replaces_view,
   # see `docs/sharing-model.md`.
   relation subscribes,
     relates subscriber,
     relates subscribee;
-  relation unsubscribes,
-    relates unsubscriber,
-    relates unsubscribee;
+  relation ignores,
+    relates ignorer,
+    relates ignored;
   relation replaces_view,
     relates replacement,
     relates replaced;

@@ -137,22 +137,22 @@ fn test_typedb_integration(
       .collect();
     assert_eq!(subscribes_pairs, expected_subscribes);
 
-    let unsubscribes_pairs = collect_all_of_some_binary_rel(
+    let ignores_pairs = collect_all_of_some_binary_rel(
       db_name,
       &driver,
       r#" match
-            $unsubscriber isa node, has id $from;
-            $unsubscribee isa node, has id $to;
-            $rel isa unsubscribes (unsubscriber: $unsubscriber,
-                                   unsubscribee: $unsubscribee);
+            $ignorer isa node, has id $from;
+            $ignored isa node, has id $to;
+            $rel isa ignores (ignorer: $ignorer,
+                              ignored: $ignored);
           select $from, $to;"#,
       "from",
       "to"
     ).await?;
-    let mut expected_unsubscribes = HashSet::new();
-    expected_unsubscribes.insert(("1".to_string(), "4".to_string()));
-    expected_unsubscribes.insert(("1".to_string(), "5".to_string()));
-    assert_eq!(unsubscribes_pairs, expected_unsubscribes);
+    let mut expected_ignores = HashSet::new();
+    expected_ignores.insert(("1".to_string(), "4".to_string()));
+    expected_ignores.insert(("1".to_string(), "5".to_string()));
+    assert_eq!(ignores_pairs, expected_ignores);
 
     let replacement_pairs = collect_all_of_some_binary_rel(
       db_name,

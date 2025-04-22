@@ -7,8 +7,8 @@ use std::str::FromStr;
 
 
 //
-// The types
-// (without functions; those come later in this file)
+// Types
+// (functions come later)
 //
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -51,7 +51,7 @@ pub struct SkgNode {
   pub nodes_subscribed: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub nodes_unsubscribed: Vec<ID>,
+  pub ignores: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub replaces_view_of: Vec<ID>,
@@ -62,6 +62,7 @@ pub struct SkgNode {
   #[serde(skip)] // inferred from titles and unindexed text
   pub links: Vec<Link>,
 }
+
 
 //
 // Functions
@@ -160,7 +161,7 @@ It better be okay with newlines."# . to_string() ),
     nodes_subscribed: vec![ID::new("11"),
                            ID::new("12"),
                            ID::new("13")],
-    nodes_unsubscribed: vec![],
+    ignores: vec![],
     replaces_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),
