@@ -1,0 +1,78 @@
+(defun xxx () ;; just for testing
+  (interactive)
+  (message "%S" (parse-branch)))
+
+(defun parse-heading-at-point ()
+  "Returns a string without properties.
+ASSUMES point is on a heading.
+MOVES POINT to beginning of line."
+  (interactive)
+  (beginning-of-line)
+  (let ((heading-text (substring-no-properties
+                       (string-trim
+                        (org-get-heading t t t t)))))
+    `(heading . ,heading-text)))
+
+(defun parse-heading-body-at-point ()
+  "Returns a string without properties.
+ASSUMES point is on the first line of a heading body.
+MOVES POINT to the first line after the body."
+  (beginning-of-line)
+  (let ((body-start (point))
+        (body-end
+         ;; Find the next heading or end of buffer
+         (if (re-search-forward "^\\*+ " nil t)
+             (match-beginning 0)
+           (point-max))))
+    (when (< body-start body-end)
+      (let ((body-text (string-trim
+                        (buffer-substring-no-properties
+                         body-start body-end))))
+        (if ;; For consistency. Otherwise, if this body
+            ;; is the last thing in the file,
+            ;; point does not end up after it.
+            (= body-end (point-max))
+            (goto-char (point-max)))
+        `(unindexed_text . ,body-text)))))
+
+(defun parse-heading-at-point-and-maybe-body ()
+  "Parse the heading at point and its body text if any.
+ASSUMES point is on a heading.
+MOVES POINT to the line just after the parsed content."
+  (let* ((heading-sexp (parse-heading-at-point))
+         (body-sexp nil)
+         (result nil))
+    (forward-line)
+    (unless (org-at-heading-p) ;; whether at a heading
+      (setq body-sexp (parse-heading-body-at-point)))
+    (progn ;; combine the (one and maybe another) results
+      (setq result (list heading-sexp))
+      (when body-sexp
+        (setq result (append result (list body-sexp)))))
+    result))
+
+(defun parse-branch ()
+  "Parse the current heading, its body,
+and (recursively) any child branches.
+ASSUMES point is on a heading."
+  (let* ((initial-level (org-outline-level))
+         (node-data (parse-heading-at-point-and-maybe-body))
+         (child-data nil))
+    (when (and (org-at-heading-p) ;; Look for children
+               (> (org-outline-level) initial-level))
+      ;; PITFALL: One might think it sufficient to test
+      ;; for whether org-outline-level is equal to (1 + initial-level).
+      ;; But the first child in an org file might be indented
+      ;; even further than that.
+      ;; Nonetheless, this is only processing the immediate children
+      ;; of the initial node. Their children in turn are processed
+      ;; by the recursive call to `parse-branch` below.
+      (setq child-data '())
+      (while (and (org-at-heading-p)
+                  (> (org-outline-level) initial-level))
+        (push (parse-branch) child-data)))
+    (when child-data
+      (setq node-data
+            (append node-data
+                    `((content . ,(nreverse child-data))))))
+    node-data))

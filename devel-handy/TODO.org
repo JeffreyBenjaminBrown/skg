@@ -1,36 +1,4 @@
-* immediate-ish
-** TODO build a view/doc in Rust using all relations
-*** view replacement
-**** TODO algorithm?
-**** a thought experiment
-***** the data
-      Suppose C0 contains C1, which contains C2.
-      Suppose the user replaces C1 with C1',
-      which is like C1 except lacking C2.
-***** if the user asks for C0
-      :PROPERTIES:
-      :ID:       8417f18f-9c4c-4295-994b-487dd581b7c9
-      :END:
-      C0 has not been changed,
-      but (by default) skg should show C0 containing C1',
-      rather than C1.
-      Something should indicate that this, the user's view,
-      has diverged from the original author's.
-***** If the user asks for C1, [[id:8417f18f-9c4c-4295-994b-487dd581b7c9][same result]].
-***** If the user asks for C2
-      Navigate from C2 to its containers.
-      It is only contained in C1,
-      but C1' replaces C1 and ignores C2.
-      Therefore C2 is uncontained.
-*** subscription
-    Suppose N subscribes to S, and S contains C.
-    If C is not among the content of N,
-    then it is listed under a top-level headline of N
-    labeled "unincorporated subscribed content".
-*** ignoring
-    If N ignores I, then I is stripped from
-    the "unincorporated subscribed content" of N.
-** Does subscription-lensing causes duplicate IDs?
-** Do I need the config files to build a view from Rust?
-   I don't think so.
-   I'll need it to act in Rust on a view from Emacs.
+* Add focus and id to s-exp from Emacs to Rust.
+* Handle "bad" org files.
+  What if the first in a layer of bullets
+  is indented more than the others?
