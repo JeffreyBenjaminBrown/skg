@@ -1,4 +1,1 @@
 * Add focus and id to s-exp from Emacs to Rust.
-* Handle "bad" org files.
-  What if the first in a layer of bullets
-  is indented more than the others?

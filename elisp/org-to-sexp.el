@@ -4,14 +4,11 @@
 
 (defun parse-heading-at-point ()
   "Returns a string without properties.
-ASSUMES point is on a heading.
-MOVES POINT to beginning of line."
+ASSUMES point is on a heading."
   (interactive)
-  (beginning-of-line)
-  (let ((heading-text (substring-no-properties
-                       (string-trim
-                        (org-get-heading t t t t)))))
-    `(heading . ,heading-text)))
+  `(heading . ,(substring-no-properties
+                (string-trim
+                 (org-get-heading t t t t)))))
 
 (defun parse-heading-body-at-point ()
   "Returns a string without properties.
@@ -28,8 +25,8 @@ MOVES POINT to the first line after the body."
       (let ((body-text (string-trim
                         (buffer-substring-no-properties
                          body-start body-end))))
-        (if ;; For consistency. Otherwise, if this body
-            ;; is the last thing in the file,
+        (if ;; Without this, if this body
+            ;; were the last thing in the file,
             ;; point does not end up after it.
             (= body-end (point-max))
             (goto-char (point-max)))
