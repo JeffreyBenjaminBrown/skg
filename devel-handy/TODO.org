@@ -1,1 +1,1 @@
-* Add focus and id to s-exp from Emacs to Rust.
+* Add focus to s-exp from Emacs to Rust.

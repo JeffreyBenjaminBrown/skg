@@ -2,13 +2,30 @@
   (interactive)
   (message "%S" (parse-branch)))
 
+(defun find-first-id-property-on-line ()
+  "The value of the `id` property on this line,
+or nil if there is none."
+  (save-excursion
+    (let ( (found-pos nil) )
+      (setq found-pos (text-property-not-all
+                       (line-beginning-position)
+                       (line-end-position)
+                       'id nil) )
+      (when found-pos
+        (get-text-property found-pos 'id)))))
+
 (defun parse-heading-at-point ()
-  "Returns a string without properties.
+  "Returns an alist with heading and id (if present).
 ASSUMES point is on a heading."
   (interactive)
-  `(heading . ,(substring-no-properties
-                (string-trim
-                 (org-get-heading t t t t)))))
+  (let* ( (id-value (find-first-id-property-on-line))
+          (heading-value (substring-no-properties
+                          (string-trim
+                           (org-get-heading t t t t))))
+          (result `((heading . ,heading-value))))
+    (when id-value
+      (setq result (append result `((id . ,id-value)))))
+    result))
 
 (defun parse-heading-body-at-point ()
   "Returns a string without properties.
@@ -36,16 +53,14 @@ MOVES POINT to the first line after the body."
   "Parse the heading at point and its body text if any.
 ASSUMES point is on a heading.
 MOVES POINT to the line just after the parsed content."
-  (let* ((heading-sexp (parse-heading-at-point))
+  (let* ((heading-data (parse-heading-at-point))
          (body-sexp nil)
-         (result nil))
+         (result heading-data))
     (forward-line)
     (unless (org-at-heading-p) ;; whether at a heading
       (setq body-sexp (parse-heading-body-at-point)))
-    (progn ;; combine the (one and maybe another) results
-      (setq result (list heading-sexp))
-      (when body-sexp
-        (setq result (append result (list body-sexp)))))
+    (when body-sexp ;; there is a body
+      (setq result (append result (list body-sexp))))
     result))
 
 (defun parse-branch ()
