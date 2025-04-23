@@ -1,17 +1,20 @@
-# USAGE
+# the point
 
-## If you've already got Rust and TypeDB
+Your notes are trees with hyperlinks, like org-mode. Everyone's are. Surf everyone's notes, rearranging them (really your view of them) however you like.
 
-First start the TypeDB server
-(by typing just that: `typedb server`).
+# data model
 
-In a separate shell, run `cargo run`.
-This starts the Rust server (the bulk of this code).
+See [[the schema](schema.tql)], [[the content model](docs/content-model.md)] and [[the sharing model](docs/sharing-model.md)].
 
-Now visit [this Emacs lisp program](elisp/main.el)
-and read the top comment for further instructions.
+# I'm not done yet.
 
-## To run it in a tailor-made Docker container
+This really doesn't let you do much yet.
+
+# usage
+
+alternatives
+
+## Install nothing! Run it in a tailor-made Docker container.
 
 Find that container at https://github.com/JeffreyBenjaminBrown/docker-typedb-rust and build it.
 
@@ -25,6 +28,13 @@ Run `cd` to go to the home folder (`/home/ubuntu`).
 
 Then go to "If you've already got Rust and TypeDB" above.
 
-# data model
+## Without Docker, if you've already got Rust and TypeDB
 
-See [[the schema](schema.tql)], [[the content model](docs/content-model.md)] and [[the sharing model](docs/sharing-model.md)].
+First start the TypeDB server
+(by typing just that: `typedb server`).
+
+In a separate shell, run `cargo run`.
+This starts the Rust server (the bulk of this code).
+
+Now visit [this Emacs lisp program](elisp/main.el)
+and read the top comment for further instructions.
