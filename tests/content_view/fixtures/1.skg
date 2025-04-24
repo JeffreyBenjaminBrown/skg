@@ -2,7 +2,7 @@ ids:
 - 1
 titles:
 - a top-level title
-unindexed_text: |-
+body: |-
   This one string could span pages,
   but in fact only spans two lines.
 contains:

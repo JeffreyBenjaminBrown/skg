@@ -63,7 +63,7 @@
   (let* ( (id (cdr (assq 'id node)))
           (headline (cdr (assq 'headline node)))
           (unindexed-text
-           (cdr (assq 'unindexed_text node)))
+           (cdr (assq 'body node)))
           (focused (cdr (assq 'focused node)))
           (content (cdr (assq 'content node))) )
 

@@ -28,21 +28,25 @@ pub enum LinkParseError {
 pub struct SkgNode {
   // Tantivy will receive some of this data,
   // and TypeDB some other subset.
-  // At least one field, `unindexed_text`, is known to neither.
+  // At least one field, `body`, is known to neither.
 
+  // The first title is the text displayed in a heading.
+  // Other titles are just for search.
   pub titles: Vec<String>,
   pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
   // nodes might be merged.
 
+  // The body is all text (if any)
+  // between this heading and the next (if any).
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub unindexed_text: // Unknown to both Tantivy & TypeDB
+  pub body: // Unknown to both Tantivy & TypeDB
   Option<String>,
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub comments_on: Option<ID>, // Replaces CommentsOn property
+  pub comments_on: Option<ID>,
 
   #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-  pub no_tantivy_index: bool, // Replaces NoTantivyIndex property
+  pub no_tantivy_index: bool,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>,
@@ -151,7 +155,7 @@ pub fn skgnode_example() -> SkgNode {
       "YAML does not escape \"quotation marks\" in text."
         .to_string() ],
     ids: vec![ ID::new("123") ],
-    unindexed_text: Some( r#"This one string could span pages.
+    body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
     comments_on: Some(ID::new("42")),
     no_tantivy_index: true,

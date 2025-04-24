@@ -3,7 +3,7 @@ ids:
 - '22'
 titles:
 - title 2
-unindexed_text: |
+body: |
   this one string could span pages
 subscribes_to:
 - '4'

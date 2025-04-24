@@ -49,16 +49,16 @@ fn test_skgnode_io() {
     assert_eq!(parsed_generated_reversed, parsed_expected_reversed,
                "Generated reversed file doesn't match expected");
 
-  verify_unindexed_text_not_needed();
+  verify_body_not_needed();
 }
 
-fn verify_unindexed_text_not_needed() {
-  // If a SkgNode's `unindexed_text` is the empty string,
+fn verify_body_not_needed() {
+  // If a SkgNode's `body` is the empty string,
   // then that field need not be written to disk.
 
   let mut node = read_skgnode_from_path (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
-  node.unindexed_text = None; // mutate it
+  node.body = None; // mutate it
   write_skgnode_to_path(
     &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
   assert_eq!(
@@ -66,7 +66,7 @@ fn verify_unindexed_text_not_needed() {
       "tests/file_io/generated/no_unindexed.skg").unwrap(),
     fs::read_to_string(
       "tests/file_io/fixtures/no_unindexed.skg").unwrap(),
-    "Deleting unindexed_text did not have the intended effect."); }
+    "Deleting body did not have the intended effect."); }
 
 pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     // Create a new SkgNode with some reversed lists --
@@ -92,7 +92,7 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     subscribes_to      : reversed_subscribes_to,
 
     ids                : node.ids                .clone(),
-    unindexed_text     : node.unindexed_text     .clone(),
+    body               : node.body               .clone(),
     path               : node.path               .clone(),
     comments_on        : node.comments_on        .clone(),
     no_tantivy_index   : node.no_tantivy_index,

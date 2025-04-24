@@ -4,7 +4,7 @@ titles:
 - This text gets indexed.
 ids:
 - '123'
-unindexed_text: |-
+body: |-
   This one string could span pages.
   It better be okay with newlines.
 comments_on: '42'

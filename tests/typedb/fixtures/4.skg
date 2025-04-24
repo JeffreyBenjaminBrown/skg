@@ -4,5 +4,5 @@ ids:
 comments_on: '22'
 titles:
 - This is a [[id:shgulasdghu][test]] of a second kind.
-unindexed_text: |
+body: |
   this one string could span pages

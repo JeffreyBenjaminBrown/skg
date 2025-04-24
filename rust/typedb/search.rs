@@ -93,7 +93,7 @@ Properties (tags) in the resulting s-expression include:
   where each "node" contains the following:
     `headline` : the text of a headline (bullet)
     `focused` : absent almost everywhere, but `t` for the node which the document was summoned in order to view.
-    `unindexed_text` : possibly absent, the text just under the bullet.
+    `body` : possibly absent, the text just under the bullet.
     `content`: possibly absent, a list of nodes.
   Thus the document is recursive. */
   db_name: &str,
@@ -137,10 +137,10 @@ async fn helps_recursive_s_expression_from_node(
       "{}\n  (focused . t)",
       node_sexpr // PITFALL: self-referential
     ); }
-  if let Some(text) = &node.unindexed_text {
-    // Only happens if unindexed_text is present.
+  if let Some(text) = &node.body {
+    // Only happens if body is present.
     node_sexpr = format!(
-      "{}\n  (unindexed_text . \"{}\")",
+      "{}\n  (body . \"{}\")",
       node_sexpr, // PITFALL: self-referential
       escape_string_for_s_expression(text)); }
   if !node.contains.is_empty() { // recursion

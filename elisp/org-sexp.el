@@ -23,7 +23,7 @@ ASSUMES point is on a heading."
       (setq result (append result `((id . ,id-value)))))
     result))
 
-(defun org-sexp-parse-heading-body-at-point ()
+(defun org-sexp-parse-body-at-point ()
   "Returns a string without properties.
 ASSUMES point is on the first line of a heading body.
 MOVES POINT to the first line after the body."
@@ -43,7 +43,7 @@ MOVES POINT to the first line after the body."
             ;; point does not end up after it.
             (= body-end (point-max))
             (goto-char (point-max)))
-        `(unindexed_text . ,body-text)))))
+        `(body . ,body-text)))))
 
 (defun org-sexp-parse-heading-at-point-and-maybe-body
     (&optional focused-line-number)
@@ -59,7 +59,7 @@ the returned alist will include the pair (focused . t)."
          (result heading-data))
     (forward-line)
     (unless (org-at-heading-p) ;; whether at a heading
-      (setq body-sexp (org-sexp-parse-heading-body-at-point)))
+      (setq body-sexp (org-sexp-parse-body-at-point)))
     (when body-sexp ;; there is a body
       (setq result (append result (list body-sexp))))
     (let ((end-line (line-number-at-pos)))

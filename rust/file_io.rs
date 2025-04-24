@@ -28,7 +28,7 @@ pub fn read_skgnode_from_path
     let mut links = Vec::new();
     for title in &skgnode.titles {
       links.extend(extract_links(title)); }
-    if let Some(text) = &skgnode.unindexed_text {
+    if let Some(text) = &skgnode.body {
       // Ignores the None case
       links.extend(extract_links(text)); }
     skgnode.links = links;
@@ -62,14 +62,14 @@ mod tests {
     let dir = tempdir()?;
     let file_path = dir.path().join("test_node.skg");
 
-    // Create a test node with links in titles and unindexed_text
+    // Create a test node with links in titles and body
     let test_node = SkgNode {
       titles: vec![
         "Title with link [[id:link1][First Link]]".to_string(),
         "Another title [[id:link2][Second Link]]".to_string(),
       ],
       ids: vec![ID::new("test123")],
-      unindexed_text: Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]".to_string()),
+      body: Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]".to_string()),
       comments_on: None,
       no_tantivy_index: false,
       contains: vec![],

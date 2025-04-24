@@ -1,3 +1,0 @@
-* s-exp from Emacs to Rust
-** collect whole buffer
-** add focus
