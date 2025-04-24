@@ -1,7 +1,3 @@
-(defun xxx () ;; just for testing
-  (interactive)
-  (message "%S" (org-sexp-parse-branch)))
-
 (defun find-first-id-property-on-line ()
   "The value of the `id` property on this line,
 or nil if there is none."
@@ -89,3 +85,20 @@ ASSUMES point is on a heading."
             (append node-data
                     `((content . ,(nreverse child-data))))))
     node-data))
+
+(defun org-sexp-parse-all-branches ()
+  "Returns an s-exp of the form `(content . results)`, where `results` is a list containing the result of calling `org-sexp-parse-branch`.
+
+PITFALL: The s-expression might look malformed, because there's no (.) shown between `content` and `results`. But that's just a quirk of how Emacs displays a cons cell when the cdr is a list."
+  (save-excursion
+    (progn ;; go to the first heading
+      (goto-char (point-min))
+      (unless
+          (org-at-heading-p)
+        (condition-case nil
+            (outline-next-heading)
+          (error nil))))
+    (let ((results nil)) ;; parse each branch
+      (while (org-at-heading-p)
+        (push (org-sexp-parse-branch) results))
+      `(content . ,(nreverse results)))))
