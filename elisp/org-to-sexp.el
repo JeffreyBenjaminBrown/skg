@@ -1,6 +1,6 @@
 (defun xxx () ;; just for testing
   (interactive)
-  (message "%S" (parse-branch)))
+  (message "%S" (org-sexp-parse-branch)))
 
 (defun find-first-id-property-on-line ()
   "The value of the `id` property on this line,
@@ -14,7 +14,7 @@ or nil if there is none."
       (when found-pos
         (get-text-property found-pos 'id)))))
 
-(defun parse-heading-at-point ()
+(defun org-sexp-parse-heading-at-point ()
   "Returns an alist with heading and id (if present).
 ASSUMES point is on a heading."
   (interactive)
@@ -27,7 +27,7 @@ ASSUMES point is on a heading."
       (setq result (append result `((id . ,id-value)))))
     result))
 
-(defun parse-heading-body-at-point ()
+(defun org-sexp-parse-heading-body-at-point ()
   "Returns a string without properties.
 ASSUMES point is on the first line of a heading body.
 MOVES POINT to the first line after the body."
@@ -49,26 +49,27 @@ MOVES POINT to the first line after the body."
             (goto-char (point-max)))
         `(unindexed_text . ,body-text)))))
 
-(defun parse-heading-at-point-and-maybe-body ()
+(defun org-sexp-parse-heading-at-point-and-maybe-body ()
   "Parse the heading at point and its body text if any.
 ASSUMES point is on a heading.
 MOVES POINT to the line just after the parsed content."
-  (let* ((heading-data (parse-heading-at-point))
+  (let* ((heading-data (org-sexp-parse-heading-at-point))
          (body-sexp nil)
          (result heading-data))
     (forward-line)
     (unless (org-at-heading-p) ;; whether at a heading
-      (setq body-sexp (parse-heading-body-at-point)))
+      (setq body-sexp (org-sexp-parse-heading-body-at-point)))
     (when body-sexp ;; there is a body
       (setq result (append result (list body-sexp))))
     result))
 
-(defun parse-branch ()
+(defun org-sexp-parse-branch ()
   "Parse the current heading, its body,
 and (recursively) any child branches.
 ASSUMES point is on a heading."
   (let* ((initial-level (org-outline-level))
-         (node-data (parse-heading-at-point-and-maybe-body))
+         (node-data
+          (org-sexp-parse-heading-at-point-and-maybe-body))
          (child-data nil))
     (when (and (org-at-heading-p) ;; Look for children
                (> (org-outline-level) initial-level))
@@ -78,11 +79,11 @@ ASSUMES point is on a heading."
       ;; even further than that.
       ;; Nonetheless, this is only processing the immediate children
       ;; of the initial node. Their children in turn are processed
-      ;; by the recursive call to `parse-branch` below.
+      ;; by the recursive call to `org-sexp-parse-branch` below.
       (setq child-data '())
       (while (and (org-at-heading-p)
                   (> (org-outline-level) initial-level))
-        (push (parse-branch) child-data)))
+        (push (org-sexp-parse-branch) child-data)))
     (when child-data
       (setq node-data
             (append node-data
