@@ -8,4 +8,5 @@
 
 (defun xxx ()
   (interactive)
-  (message "%S" (org-sexp-parse-all-branches)))
+  (message "%S"
+           (org-sexp-parse-all-branches)))
