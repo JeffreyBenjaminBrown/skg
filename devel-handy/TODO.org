@@ -1,3 +1,6 @@
+* modify copy/kill/paste behavior
+** are there forms I haven't covered?
+   that is, something resembling copy/paste/kill but not using those words?
 * update typedb driver to 3.2.0
   in Cargo.toml
 ** If that doesn't work
