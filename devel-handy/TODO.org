@@ -1,0 +1,4 @@
+* update typedb driver to 3.2.0
+  in Cargo.toml
+** If that doesn't work
+   Try rebuilding the Docker container from scratch.

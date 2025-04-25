@@ -14,10 +14,13 @@ path = "rust/main.rs"
 async-std = { version = "1.12", features = ["attributes"] }
 filetime = "0.2"
 futures = "0.3"
+git2 = "0.18"
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
-# serde_json = "1.0"
 serde_yaml = "0.9"
+# serde_json = "1.0"
+sexp = "1.1"
+similar = "2.2.1"
 tantivy = "0.19.0"
 tempfile = "3.3.0"
 tokio = { version = "1", features = ["full"] }
