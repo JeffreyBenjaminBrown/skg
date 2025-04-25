@@ -15,7 +15,8 @@
   "If at a heading, add a random 3-digit ID to it, both visibly and as a property of the bullet."
   (interactive)
   (when (org-at-heading-p)
-    (let* ((random-id (number-to-string (+ 100 (random 900))))
+    (let* ((random-id (number-to-string
+                       (random 1000)))
            (current-point (point))
            (heading-start (line-beginning-position))
            (stars-end (save-excursion
