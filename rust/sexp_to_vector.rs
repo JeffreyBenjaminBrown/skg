@@ -58,17 +58,20 @@ fn parse_property_pair(
   if let List(pair) = item {
     // TODO: If only one of the branches below fires,
     // determine which, and delete the other.
-    if pair.len() == 3 &&
-      matches!(&pair[1], Atom(S(s)) if s == ".") {
-        // Case 1: Three elements,
-        // the middle one a dot: (key . value)
-        if let Atom(S(key)) = &pair[0] {
-          return Ok((key.clone(), pair[2].clone())); }
-      } else if pair.len() == 2 {
-        // Case 2: Two elements (key value)
-        // Might be needed by the `content` field.
-        if let Atom(S(key)) = &pair[0] {
-          return Ok((key.clone(), pair[1].clone())); } }
+    // (Wait until I'm getting real data from Emacs.)
+
+    if ( pair.len() == 3 &&
+         matches!( &pair[1],
+                    Atom(S(s)) if s == ".") ) {
+      // Case 1: Three elements,
+      // the middle one a dot: (key . value)
+      if let Atom(S(key)) = &pair[0] {
+        return Ok((key.clone(), pair[2].clone())); }
+    } else if pair.len() == 2 {
+      // Case 2: Two elements (key value)
+      // Might be needed by the `content` field.
+      if let Atom(S(key)) = &pair[0] {
+        return Ok((key.clone(), pair[1].clone())); } }
     return Err(format!(
       "Malformed property pair: {:?}", item));
   } else { return Err(
@@ -150,18 +153,18 @@ mod tests {
    (body . "This one string could span pages,
 but in fact only spans two lines.")
    (content
-    ( (id . "2")
-      (heading . "a second-level title")
-      (focused . t)
-      (body . "More text here.")
-      (content
-       ( (id . "4")
-         (heading . "a third-level title, with no body"))))
-    ( (id . "3")
-      (heading . "another second-level heading")
-      (body . "This one string could span pages,
+    ( ( (id . "2")
+        (heading . "a second-level title")
+        (focused . t)
+        (body . "More text here.")
+        (content
+         ( ( (id . "4")
+             (heading . "a third-level title, with no body")))))
+      ( (id . "3")
+        (heading . "another second-level heading")
+        (body . "This one string could span pages,
 and in fact
-spans three lines.")))))"#;
+spans three lines."))))))"#;
 
     let result = parse_sexp_to_branches(input);
     assert!(result.is_ok(),
@@ -178,7 +181,7 @@ spans three lines.")))))"#;
     assert_eq!(top_branch.heading, "a top-level title");
     assert_eq!(top_branch.body,
                Some("This one string could span pages,
-  but in fact only spans two lines.".to_string()));
+but in fact only spans two lines.".to_string()));
     assert!(!top_branch.focused);
     assert_eq!(top_branch.branches.len(), 2,
                "Top branch should have 2 children");
@@ -213,8 +216,8 @@ spans three lines.")))))"#;
                "another second-level heading");
     assert_eq!(child2.body,
                Some("This one string could span pages,
-  and in fact
-  spans three lines.".to_string()));
+and in fact
+spans three lines.".to_string()));
     assert!(!child2.focused);
     assert!(child2.branches.is_empty()); }
 
