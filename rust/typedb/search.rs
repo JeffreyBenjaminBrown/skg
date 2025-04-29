@@ -83,7 +83,7 @@ pub async fn get_filepath_from_node (
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
 
-pub async fn recursive_s_expression_from_node(
+pub async fn single_document_view(
   /*Given a node, this finds its root container, and returns
 an s-expression representing a document built from there.
 
@@ -100,20 +100,20 @@ Properties (tags) in the resulting s-expression include:
   driver: &TypeDBDriver,
   focus: &ID
 ) -> Result<String, Box<dyn Error>> {
-  let path = path_to_root_container(db_name, driver, focus).await?;
-  let root_id = path.last()
-    .ok_or_else(
-      || io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("Empty path returned for node '{}'", focus)
-      ))?;
+  let path = path_to_root_container(
+    db_name, driver, focus) . await?;
+  let root_id = path.last() . ok_or_else(
+    || io::Error::new(
+      io::ErrorKind::InvalidData,
+      format!("Empty path returned for node '{}'", focus)
+    ))?;
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
-    helps_recursive_s_expression_from_node(
+    recursive_s_expression_from_node(
       db_name, driver, root_id, focus).await?);
   Ok (sexpr) }
 
-async fn helps_recursive_s_expression_from_node(
+async fn recursive_s_expression_from_node(
   db_name: &str,
   driver: &TypeDBDriver,
   node_id: &ID,
@@ -147,7 +147,7 @@ async fn helps_recursive_s_expression_from_node(
     let mut contained_sexpr = Vec::new();
     for contained_id in &node.contains {
       let contained_node = Box::pin(
-        helps_recursive_s_expression_from_node(
+        recursive_s_expression_from_node(
           db_name, driver, contained_id, focus)).await?;
       contained_sexpr.push(format!("({})",
                                    contained_node)); }

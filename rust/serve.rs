@@ -9,7 +9,7 @@ use typedb_driver::{TypeDBDriver, Credentials,
 use futures::executor::block_on;
 
 use crate::typedb::create::make_db_destroying_earlier_one;
-use crate::typedb::search::recursive_s_expression_from_node;
+use crate::typedb::search::single_document_view;
 use crate::types::ID;
 
 pub fn serve() -> std::io::Result<()> {
@@ -117,7 +117,7 @@ fn generate_s_expression(node_id: &ID) -> String {
       . await {
         return format!(
           "Failed to initialize database: {}", e); }
-    match recursive_s_expression_from_node(
+    match single_document_view(
       db_name, &driver, node_id).await {
       Ok(s_expr) => s_expr,
       Err(e) => format!(

@@ -10,12 +10,12 @@ use typedb_driver::{
 
 use skg::typedb::create::make_db_destroying_earlier_one;
 use skg::typedb::search::{
-  recursive_s_expression_from_node,
+  single_document_view,
   path_to_root_container };
 use skg::types::ID;
 
 #[test]
-fn test_recursive_s_expression_from_node
+fn test_single_document_view
   () -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
@@ -31,7 +31,7 @@ fn test_recursive_s_expression_from_node
     // Print the view from node "1".
     // TODO: Automatize.
     println!("Building view from node with ID 2...");
-    let view = recursive_s_expression_from_node (
+    let view = single_document_view (
       db_name, &driver, &ID("2".to_string() )
       ) . await?;
     println!("Document View Output:");
@@ -40,7 +40,7 @@ fn test_recursive_s_expression_from_node
     // Print the view from node "5".
     // TODO: Automatize.
     println!("Building view from node with ID 5...");
-    let view = recursive_s_expression_from_node(
+    let view = single_document_view(
       db_name, &driver, &ID("5".to_string() )
     ) . await?;
     println!("Document View Output:");
