@@ -153,7 +153,7 @@ but in fact only spans two lines.")
       (heading . "another second-level heading")
       (body . "This one string could span pages,
 and in fact
-spans three lines."))))))"#;
+spans three lines.")))))"#;
 
   let result = parse_sexp_to_branches(input);
   assert!(result.is_ok(),

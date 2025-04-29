@@ -1,31 +1,3 @@
-* modify copy/kill/paste/undo behavior
-** PITFALL: Don't assume there's just one IDs involved.
-   Multiple bullets may have been copied/pasted/etc.
-** cases
-*** copy
-    Easy. If copying, don't copy the IDs.
-*** paste
-    If pasting, remove the IDs from the copy that remains in the kill-ring, if it had one.
-    Don't assume the top kill-ring entry was pasted.
-*** kill
-    No modification needed.
-    Properties remain intact in the kill-ring.
-*** undo
-**** of paste
-     Restore the IDs of the copy in the kill-ring,
-     if it ever had one.
-**** of kill
-     Strip the IDs from the copy in the kill-ring,
-     if it had one.
-** strange cases
-*** query-replace
-    copying once into the replace field would be cheating
-*** org-mode "tree cloning"
-** modifying undo
-   Deletion in the undo stack is represented as `(BEG . END)`.
-** for speed, if needed
-   Maintain a map from IDs to kill-ring items.
-   This would prevent ever having to look through the entire ring.
 * update typedb driver to 3.2.0
   in Cargo.toml
 ** If that doesn't work
