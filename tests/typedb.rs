@@ -218,7 +218,7 @@ async fn test_recursive_document (
                     (content
                      . ( ((id . "b")
                           (heading . "b")
-                          (body . "repeated above")
+                          (body . "Repeated above. Edit there, not here.")
                           (repeated . t))
                          ))))))))))) "#;
   let expected_sexp = sexp::parse(expected_sexp_str)

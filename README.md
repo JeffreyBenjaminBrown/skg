@@ -36,5 +36,5 @@ First start the TypeDB server
 In a separate shell, run `cargo run`.
 This starts the Rust server (the bulk of this code).
 
-Now visit [this Emacs lisp program](elisp/main.el)
+Now visit [this Emacs lisp program](elisp/client.el)
 and read the top comment for further instructions.

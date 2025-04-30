@@ -133,7 +133,7 @@ async fn recursive_s_expression_from_node(
 
   if visited.iter().any(|id| id == node_id) { // was already visited
     let node_sexpr = format!(
-      "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"repeated above\")\n  (repeated . t)",
+      "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
       node_id,
       escape_string_for_s_expression(&heading)
     );
