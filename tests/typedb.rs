@@ -1,8 +1,13 @@
+// cargo test --test typedb -- --nocapture
+
 // TODO | PITFALL:
 // Deletes any existing TypeDB database named `skg-test`,
 
 use futures::executor::block_on;
 use futures::StreamExt;
+use sexp::{ Sexp::{self, Atom, List},
+            Atom::S,
+            parse };
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
@@ -17,6 +22,7 @@ use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
   get_filepath_from_node,
+  single_document_view,
 };
 use skg::types::ID;
 
@@ -96,6 +102,9 @@ fn test_typedb_integration(
     let mut expected_contains = HashSet::new();
     expected_contains.insert(("1".to_string(), "2".to_string()));
     expected_contains.insert(("1".to_string(), "3".to_string()));
+    expected_contains.insert(("a".to_string(), "b".to_string()));
+    expected_contains.insert(("b".to_string(), "c".to_string()));
+    expected_contains.insert(("c".to_string(), "b".to_string()));
     assert_eq!(contains_pairs, expected_contains);
 
     let link_pairs = collect_all_of_some_binary_rel(
@@ -176,7 +185,79 @@ fn test_typedb_integration(
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
+    test_recursive_document (
+      db_name, &driver ) . await?;
+
     Ok (()) } ) }
+
+async fn test_recursive_document (
+  db_name: &str,
+  driver: &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+  let result_sexp_str = single_document_view (
+    db_name,
+    driver,
+    &ID("a".to_string())
+  ) . await?;
+  let result_sexp = sexp::parse(&result_sexp_str)
+    .map_err(|e| format!(
+      "Failed to parse result S-expression: {}", e))?;
+
+  let expected_sexp_str = r#"
+( (view . "single document")
+  ( content
+    . ( (id . "a")
+        (heading . "a")
+        (focused . t)
+        (content
+         . ( ((id . "b")
+              (heading . "b")
+              (content
+               . ( ((id . "c")
+                    (heading . "c")
+                    (content
+                     . ( ((id . "b")
+                          (heading . "b")
+                          (body . "repeated above")
+                          (repeated . t))
+                         ))))))))))) "#;
+  let expected_sexp = sexp::parse(expected_sexp_str)
+    .map_err(|e| format!(
+      "Failed to parse expected S-expression: {}", e))?;
+  assert_eq!(
+    result_sexp,
+    expected_sexp,
+    "Rsults (first sexp) does not match expected (second):\n{}\n\nExpected:\n{}",
+    print_sexp_pretty ( &result_sexp),
+    print_sexp_pretty ( &expected_sexp) );
+  Ok (() ) }
+
+fn print_sexp_pretty(sexp: &Sexp) -> String {
+  match sexp {
+    Sexp::Atom(S(s)) => format!("\"{}\"", s),
+    Sexp::List(items) => {
+      if items.is_empty() {
+        "()".to_string()
+      } else if items.len() == 3 && match_atom_s(&items[1], ".") {
+        // Special case for dotted pairs
+        format!("({} . {})",
+                print_sexp_pretty(&items[0]),
+                print_sexp_pretty(&items[2]))
+      } else {
+        let items_str = items.iter()
+          .map(|item| print_sexp_pretty(item))
+          .collect::<Vec<_>>()
+          .join(" ");
+        format!("({})", items_str) } }
+    _ => // Otherwise use standard debug formatting
+      format!("{:?}", sexp), } }
+
+fn match_atom_s(
+  sexp: &Sexp,
+  value: &str) -> bool {
+  if let Sexp::Atom(S(s)) = sexp {
+    s == value
+  } else { false } }
 
 async fn collect_all_of_some_binary_rel(
   db_name: &str,
@@ -205,4 +286,4 @@ async fn collect_all_of_some_binary_rel(
       &id2_raw) );
     results.insert ( (id1.to_string(),
                       id2.to_string() ) ); }
-  Ok(results) }
+  Ok (results) }

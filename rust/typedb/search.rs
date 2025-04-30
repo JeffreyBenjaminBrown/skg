@@ -110,14 +110,16 @@ Properties (tags) in the resulting s-expression include:
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
     recursive_s_expression_from_node(
-      db_name, driver, root_id, focus).await?);
+      db_name, driver, root_id, focus, &mut Vec::new() )
+      . await?);
   Ok (sexpr) }
 
 async fn recursive_s_expression_from_node(
   db_name: &str,
   driver: &TypeDBDriver,
   node_id: &ID,
-  focus: &ID
+  focus: &ID,
+  visited: &mut Vec<ID>
 ) -> Result<String, Box<dyn Error>> {
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
@@ -128,6 +130,17 @@ async fn recursive_s_expression_from_node(
       format!("Node with ID {} has no titles",
               node_id)
     ))? . to_string();
+
+  if visited.iter().any(|id| id == node_id) { // was already visited
+    let node_sexpr = format!(
+      "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"repeated above\")\n  (repeated . t)",
+      node_id,
+      escape_string_for_s_expression(&heading)
+    );
+    return Ok(node_sexpr);
+  }
+
+  visited.push ( node_id.clone() );
   let mut node_sexpr = format!(
     "(id . \"{}\")\n  (heading . \"{}\")",
     node_id,
@@ -148,7 +161,8 @@ async fn recursive_s_expression_from_node(
     for contained_id in &node.contains {
       let contained_node = Box::pin(
         recursive_s_expression_from_node(
-          db_name, driver, contained_id, focus)).await?;
+          db_name, driver, contained_id, focus, visited
+        ) ) . await?;
       contained_sexpr.push(format!("({})",
                                    contained_node)); }
     if !contained_sexpr.is_empty() {
