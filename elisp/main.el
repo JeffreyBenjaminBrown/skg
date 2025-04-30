@@ -61,7 +61,7 @@
 (defun skg-doc-insert-node (node level)
   "The recursive workhorse for building up the org document. It inserts NODE at indentation LEVEL."
   (let* ( (id (cdr (assq 'id node)))
-          (headline (cdr (assq 'headline node)))
+          (heading (cdr (assq 'heading node)))
           (unindexed-text
            (cdr (assq 'body node)))
           (focused (cdr (assq 'focused node)))
@@ -75,7 +75,7 @@
        start (+ start level) ;; where the bullet is
        (append (list 'id id)
                (when focused (list 'focused t)))))
-    (insert headline)
+    (insert heading)
     (when unindexed-text
       (insert "\n" unindexed-text))
     (insert "\n")

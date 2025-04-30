@@ -91,7 +91,7 @@ Properties (tags) in the resulting s-expression include:
     `view` : `single document`
     `content` : a length-1 list of nodes.
   where each "node" contains the following:
-    `headline` : the text of a headline (bullet)
+    `heading` : the text of a heading (bullet)
     `focused` : absent almost everywhere, but `t` for the node which the document was summoned in order to view.
     `body` : possibly absent, the text just under the bullet.
     `content`: possibly absent, a list of nodes.
@@ -122,16 +122,16 @@ async fn recursive_s_expression_from_node(
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
   let node = read_skgnode_from_path ( path ) ?;
-  let headline = node.titles.first()
+  let heading = node.titles.first()
     .ok_or_else(|| io::Error::new(
       io::ErrorKind::InvalidData,
       format!("Node with ID {} has no titles",
               node_id)
     ))? . to_string();
   let mut node_sexpr = format!(
-    "(id . \"{}\")\n  (headline . \"{}\")",
+    "(id . \"{}\")\n  (heading . \"{}\")",
     node_id,
-    escape_string_for_s_expression ( &headline ) );
+    escape_string_for_s_expression ( &heading ) );
   if node_id == focus {
     node_sexpr = format!(
       "{}\n  (focused . t)",

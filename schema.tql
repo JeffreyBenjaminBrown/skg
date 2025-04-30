@@ -7,7 +7,7 @@ define
   # A place in the filesystem.
   attribute path, value string;
 
-  # "The graph" is made of nodes, which resemble org-headlines.
+  # "The graph" is made of nodes, which resemble org-headings.
   entity node,
     owns id @key,
     owns path @unique,
@@ -34,8 +34,8 @@ define
     relates node,
     relates extra_id @card(1..1);
 
-  # Like the relationship from an org headline to its subheadlines,
-  # or from an org file (title) to its headlines.
+  # Like the relationship from an org heading to its subheadings,
+  # or from an org file (title) to its headings.
   # See `docs/content-model.md` for details.
   relation contains,
     relates container,

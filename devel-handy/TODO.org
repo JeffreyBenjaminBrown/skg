@@ -1,0 +1,13 @@
+* "repeated" bodies
+** In Rust, when building the document
+   if a node is repeated,
+   do not recurse into its children,
+   and replace its body with "repeated earlier",
+   in system-colored text.
+** In Emacs
+*** keep the "repeated" property.
+*** Permit copying the ID at point, and searching
+    for other nodes with that ID in the same document.
+** In Rust, when saving a document
+   If a node has repeated = t,
+   do not use that data to modify it.

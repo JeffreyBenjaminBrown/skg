@@ -1,6 +1,6 @@
 # How text content is modeled in skg
 
-Skg data is a collection of "nodes". Like a headline in Emacs org-mode, each node has a title, some non-title text content, and a list of other nodes it contains.
+Skg data is a collection of "nodes". Like a heading in Emacs org-mode, each node has a title, some non-title text content, and a list of other nodes it contains.
 
 When a user requests a view of a node, they get not just that node's content, but the content of each thing it contains, and the content of each of those things, etc. The result is a tree. And if the node they requested a view of is contained in some other node, they get that node, too, and all of its content.
 
