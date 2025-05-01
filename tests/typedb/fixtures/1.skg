@@ -2,7 +2,7 @@ ids:
 - 1
 titles:
 - title 1
-body: |
+body: |-
   This one string could span pages,
   and it can include newlines, no problem.
 contains:

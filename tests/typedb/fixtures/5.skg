@@ -4,7 +4,7 @@ ids:
 titles:
 - this title includes a [[id:22][link to another file]]
 - test second
-body: |
+body: |-
   this body includes more links:  [[id:33][to the third]] and [[id:55][even to itself]]
 replaces_view_of:
 - 3
