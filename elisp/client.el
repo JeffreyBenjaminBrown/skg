@@ -3,7 +3,7 @@
 ;; Then evaluate the following commands individually.
 ;;
 ;; (skg-doc-connect)
-;; (request-document-from-node "4")
+;; (request-document-from-node "a")
 ;; (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
@@ -65,6 +65,7 @@
           (body
            (cdr (assq 'body node)))
           (focused (cdr (assq 'focused node)))
+          (repeated (cdr (assq 'repeated node)))
           (content (cdr (assq 'content node))) )
 
     (let ;; insert bullet with text properties
@@ -73,8 +74,10 @@
       (insert bullet " ")
       (add-text-properties
        start (+ start level) ;; where the bullet is
-       (append (list 'id id)
-               (when focused (list 'focused t)))))
+       (append (when focused (list 'focused t))
+               (when repeated (list 'repeated t))
+               (list 'id id)
+               )))
     (insert heading)
     (when body
       (insert "\n" body))

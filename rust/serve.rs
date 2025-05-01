@@ -113,7 +113,7 @@ fn generate_s_expression(node_id: &ID) -> String {
         "Error connecting to TypeDB: {}", e) };
     let db_name = "skg-test";
     if let Err(e) = make_db_destroying_earlier_one (
-      "tests/content_view/fixtures", db_name, &driver )
+      "tests/typedb/fixtures", db_name, &driver )
       . await {
         return format!(
           "Failed to initialize database: {}", e); }
