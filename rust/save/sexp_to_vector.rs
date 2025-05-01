@@ -6,16 +6,7 @@ use sexp::{Sexp::{self, Atom, List},
 use std::collections::HashMap;
 use std::vec::Vec;
 
-use crate::types::ID;
-
-#[derive(Debug, Clone)]
-struct OrgBranch {
-  id       : Option<ID>,
-  heading  : String, // a term fron org-mode
-  body     : Option<String>, // a term fron org-mode
-  focused  : bool, // where the Emacs cursor is
-  repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
-  branches : Vec<OrgBranch>, }
+use crate::types::{ID,OrgBranch};
 
 fn parse_sexp_to_branches(
   sexp_str: &str)

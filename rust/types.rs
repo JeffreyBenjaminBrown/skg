@@ -24,6 +24,16 @@ pub enum LinkParseError {
   InvalidFormat,
   MissingDivider, }
 
+#[derive(Debug, Clone)]
+pub struct OrgBranch {
+  // S-expressions from Emacs are interpreted as these.
+  pub id       : Option<ID>,
+  pub heading  : String, // a term fron org-mode
+  pub body     : Option<String>, // a term fron org-mode
+  pub focused  : bool, // where the Emacs cursor is
+  pub repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
+  pub branches : Vec<OrgBranch>, }
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SkgNode {
   // Tantivy will receive some of this data,
