@@ -42,9 +42,6 @@ pub struct SkgNode {
   pub body: // Unknown to both Tantivy & TypeDB
   Option<String>,
 
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub comments_on: Option<ID>,
-
   #[serde(default, skip_serializing_if = "std::ops::Not::not")]
   pub no_tantivy_index: bool,
 
@@ -157,7 +154,6 @@ pub fn skgnode_example() -> SkgNode {
     ids: vec![ ID::new("123") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    comments_on: Some(ID::new("42")),
     no_tantivy_index: true,
     contains: vec![ ID::new("1"),
                     ID::new("2"),

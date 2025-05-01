@@ -15,8 +15,6 @@ define
     plays contains:contained,
     plays links_to:source,
     plays links_to:dest,
-    plays comments_on:commenter,
-    plays comments_on:commentee,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
     plays ignores:ignorer,
@@ -59,8 +57,3 @@ define
   relation replaces_view,
     relates replacement,
     relates replaced;
-
-  # Unused, so far.
-  relation comments_on,
-    relates commenter @card(1..1),
-    relates commentee;

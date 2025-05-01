@@ -128,7 +128,6 @@ pub async fn create_relationships_from_node(
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
   let primary_id = node.ids[0].as_str();
-  insert_comment_rel ( &node, tx ) . await?;
   insert_from_list( primary_id,
                     &node.contains,
                     "contains",
@@ -187,31 +186,6 @@ pub async fn insert_extra_ids (
                     primary_id,
                     extra_id.as_str() ) )
         . await?; } }
-  Ok (()) }
-
-pub async fn insert_comment_rel(
-  node: &SkgNode,
-  tx: &typedb_driver::Transaction
-) -> Result<(), Box<dyn Error>> {
-  let primary_id = node.ids[0].as_str();
-    if let Some(commented_id) = &node.comments_on {
-      tx.query (
-        format!( r#"
-                    match
-                        $commenter isa node, has id "{}";
-                        {{ $commentee isa node, has id "{}"; }} or
-                        {{ $commentee isa node;
-                           $e isa extra_id, has id "{}";
-                           $rel isa has_extra_id (node: $commentee,
-                                                  extra_id: $e); }} ;
-                    insert
-                        $r isa comments_on
-                          (commenter: $commenter,
-                           commentee: $commentee);"#,
-                    primary_id,
-                    commented_id.as_str(),
-                    commented_id.as_str()
-        ) ) . await?; }
   Ok (()) }
 
 pub async fn insert_from_list(

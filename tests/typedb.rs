@@ -70,23 +70,6 @@ fn test_typedb_integration(
       .collect();
     assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
-    let comments_on_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
-      r#" match
-            $r isa node, has id $ri;
-            $e isa node, has id $ei;
-            $rel isa comments_on (commenter: $r,
-                                  commentee: $e);
-          select $ri, $ei;"#,
-      "ri",
-      "ei"
-    ).await?;
-    let mut expected_comments_on = HashSet::new();
-    expected_comments_on.insert(
-      ("4".to_string(), "2".to_string()));
-    assert_eq!(comments_on_pairs, expected_comments_on);
-
     let contains_pairs = collect_all_of_some_binary_rel(
       db_name,
       &driver,

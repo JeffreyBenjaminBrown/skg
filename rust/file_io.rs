@@ -70,7 +70,6 @@ mod tests {
       ],
       ids: vec![ID::new("test123")],
       body: Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]".to_string()),
-      comments_on: None,
       no_tantivy_index: false,
       contains: vec![],
       subscribes_to: vec![],

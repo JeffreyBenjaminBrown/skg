@@ -94,7 +94,6 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
     ids                : node.ids                .clone(),
     body               : node.body               .clone(),
     path               : node.path               .clone(),
-    comments_on        : node.comments_on        .clone(),
     no_tantivy_index   : node.no_tantivy_index,
     ignores            : node.ignores            .clone(),
     replaces_view_of   : node.replaces_view_of   .clone(),
