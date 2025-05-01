@@ -212,6 +212,7 @@ async fn test_recursive_document (
         (content
          . ( ((id . "b")
               (heading . "b")
+              ("body" . "b has a body")
               (content
                . ( ((id . "c")
                     (heading . "c")

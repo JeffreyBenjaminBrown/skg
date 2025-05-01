@@ -1,4 +1,4 @@
-// cargo test --lib sexp_to_vector::tests  2>&1 | tee output.log
+// cargo test --lib save::sexp_to_vector::tests 2>&1 | tee output.log
 
 use sexp::{Sexp::{self, Atom, List},
            Atom::S,

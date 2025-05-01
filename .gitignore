@@ -1,5 +1,6 @@
 *~
 temp-*
+temp/
 .bash_history
 /Cargo.lock
 /devel-handy/temp.org
