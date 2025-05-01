@@ -78,10 +78,9 @@
                (when repeated (list 'repeated t))
                (list 'id id)
                )))
-    (insert heading)
+    (insert heading "\n")
     (when body
-      (insert "\n" body))
-    (insert "\n")
+      (insert body "\n"))
     (when content
       (dolist (child content)
         (skg-doc-insert-node child
