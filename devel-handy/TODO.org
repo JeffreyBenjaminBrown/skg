@@ -1,8 +1,4 @@
-* "repeated" bodies
-** In Emacs
-*** Permit copying the ID at point, and searching
-    for other nodes with that ID in the same document.
-** In Rust, when saving a document
+* resume rust/sexp_to_vector.rs
+** Consider `repeated` when saving
    If a node has repeated = t,
    do not use that data to modify it.
-* resume rust/sexp_to_vector.rs

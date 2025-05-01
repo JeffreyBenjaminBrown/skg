@@ -11,9 +11,10 @@ use crate::types::ID;
 #[derive(Debug, Clone)]
 struct OrgBranch {
   id       : Option<ID>,
-  heading  : String,
-  body     : Option<String>,
-  focused  : bool,
+  heading  : String, // a term fron org-mode
+  body     : Option<String>, // a term fron org-mode
+  focused  : bool, // where the Emacs cursor is
+  repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
   branches : Vec<OrgBranch>, }
 
 fn parse_sexp_to_branches(
@@ -104,6 +105,8 @@ fn parse_branch(
       _ => None, };
     let focused = // value not needed
       props.contains_key("focused");
+    let repeated = // value not needed
+      props.contains_key("repeated");
     let branches = match props.get("content") {
       Some(List(content_items)) => {
         let content_vec = content_items.clone();
@@ -114,6 +117,7 @@ fn parse_branch(
                      heading,
                      body,
                      focused,
+                     repeated,
                      branches, } ) }
   else { Err (
     "Branch must be a list".to_string()) } }
@@ -142,6 +146,7 @@ mod tests {
     assert_eq!(branch.body,
                None);
     assert!(branch.focused);
+    assert!( ! branch.repeated);
     assert!(branch.branches.is_empty()); }
 
   #[test]
@@ -182,7 +187,7 @@ spans three lines."))))))"#;
     assert_eq!(top_branch.body,
                Some("This one string could span pages,
 but in fact only spans two lines.".to_string()));
-    assert!(!top_branch.focused);
+    assert!( ! top_branch.focused);
     assert_eq!(top_branch.branches.len(), 2,
                "Top branch should have 2 children");
 
@@ -205,7 +210,7 @@ but in fact only spans two lines.".to_string()));
     assert_eq!(grandchild.heading,
                "a third-level title, with no body");
     assert_eq!(grandchild.body, None);
-    assert!(!grandchild.focused);
+    assert!( ! grandchild.focused);
     assert!(grandchild.branches.is_empty());
 
     // Check second child (id: "3")
@@ -218,7 +223,7 @@ but in fact only spans two lines.".to_string()));
                Some("This one string could span pages,
 and in fact
 spans three lines.".to_string()));
-    assert!(!child2.focused);
+    assert!( ! child2.focused);
     assert!(child2.branches.is_empty()); }
 
   #[test]
