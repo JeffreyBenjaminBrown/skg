@@ -1,6 +1,5 @@
 * "repeated" bodies
 ** In Emacs
-*** Keep the "repeated" property received from Rust.
 *** Permit copying the ID at point, and searching
     for other nodes with that ID in the same document.
 ** In Rust, when saving a document

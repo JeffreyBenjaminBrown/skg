@@ -1,6 +1,6 @@
 (defun first-id-property-on-line ()
-  "The value of the `id` property on this line,
-or nil if there is none."
+  "RETURNS the value of the `id` property on this line
+(which can be of any type) or nil if there is none."
   (save-excursion
     (let ( (found-pos nil) )
       (setq found-pos (text-property-not-all
@@ -10,8 +10,9 @@ or nil if there is none."
       (when found-pos
         (get-text-property found-pos 'id)))))
 
-(defun org-sexp-parse-heading-at-point ()
-  "Returns an alist with heading and id (if present).
+(defun org-to-sexp-parse-heading-at-point ()
+  "RETURNS an alist with heading and id (if present).
+Example: ((heading . STRING) (id . STRING))
 ASSUMES point is on a heading."
   (interactive)
   (let* ( (id-value (first-id-property-on-line))
@@ -23,8 +24,9 @@ ASSUMES point is on a heading."
       (setq result (append result `((id . ,id-value)))))
     result))
 
-(defun org-sexp-parse-body-at-point ()
-  "Returns a string without properties.
+(defun org-to-sexp-parse-body-at-point ()
+  "RETURNS either nil or a string without properties,
+of the form (body . STRING).
 ASSUMES point is on the first line of a heading body.
 MOVES POINT to the first line after the body."
   (beginning-of-line)
@@ -45,21 +47,27 @@ MOVES POINT to the first line after the body."
             (goto-char (point-max)))
         `(body . ,body-text)))))
 
-(defun org-sexp-parse-heading-at-point-and-maybe-body
+(defun org-to-sexp-parse-heading-at-point-and-maybe-body
     (&optional focused-line-number)
-  "Parse the heading at point and its body text if any.
+  "Parses the heading at point and its body text if any.
+
+RETURNS an alist with these keys (some optional):
+  heading  : string,
+  ?id      : string,
+  ?body    : string,
+  ?focused : t or absent.
 ASSUMES point is on a heading.
-MOVES POINT to the line just after the parsed content.
+SIDE EFFECTS: Moves point to the line just after the parsed content.
 
 If `focused-line-number` is given and lies within the parsed region,
 the returned alist will include the pair (focused . t)."
   (let* ((start-line (line-number-at-pos))
-         (heading-data (org-sexp-parse-heading-at-point))
+         (heading-data (org-to-sexp-parse-heading-at-point))
          (body-sexp nil)
          (result heading-data))
     (forward-line)
     (unless (org-at-heading-p) ;; whether at a heading
-      (setq body-sexp (org-sexp-parse-body-at-point)))
+      (setq body-sexp (org-to-sexp-parse-body-at-point)))
     (when body-sexp ;; there is a body
       (setq result (append result (list body-sexp))))
     (let ((end-line (line-number-at-pos)))
@@ -69,14 +77,22 @@ the returned alist will include the pair (focused . t)."
         (setq result (append result '((focused . t)))))
       result)))
 
-(defun org-sexp-parse-branch
+(defun org-to-sexp-parse-branch
     (&optional focused-line-number)
   "Parse the current heading, its body,
 and (recursively) any child branches.
+
+RETURNS an alist with these keys (some optional):
+  heading  : string,
+  ?id      : string,
+  ?body    : string,
+  ?focused : t or absent,
+  ?content : list of alists.
+
 ASSUMES point is on a heading."
   (let* ((initial-level (org-outline-level))
          (node-data
-          (org-sexp-parse-heading-at-point-and-maybe-body
+          (org-to-sexp-parse-heading-at-point-and-maybe-body
            focused-line-number))
          (child-data nil))
     (when (and (org-at-heading-p) ;; Look for children
@@ -88,11 +104,11 @@ ASSUMES point is on a heading."
       ;; that is, it might skip a generation, or any number of them.
       ;; Nonetheless, this is only processing the immediate children
       ;; of the initial node. Their children in turn are processed
-      ;; by the recursive call to `org-sexp-parse-branch` below.
+      ;; by the recursive call to `org-to-sexp-parse-branch` below.
       (setq child-data '())
       (while (and (org-at-heading-p)
                   (> (org-outline-level) initial-level))
-        (push (org-sexp-parse-branch focused-line-number)
+        (push (org-to-sexp-parse-branch focused-line-number)
               child-data)))
     (when child-data
       (setq node-data
@@ -100,8 +116,13 @@ ASSUMES point is on a heading."
                     `((content . ,(nreverse child-data))))))
     node-data))
 
-(defun org-sexp-parse-all-branches ()
-  "Returns an s-exp of the form `(content . results)`, where `results` is a list containing the result of calling `org-sexp-parse-branch`.
+(defun org-to-sexp-parse-all-branches ()
+  "Returns an s-exp of the form `(content . results)`, where `results` is a list containing the result of calling `org-to-sexp-parse-branch`.
+
+RETURNS: a single cons cell:
+  (content . LIST-OF-ALISTS),
+  where the cdr is a list of the kind of thing
+  returned by `org-to-sexp-parse-branch`.
 
 PITFALL: The s-expression might look malformed, because there's no (.) shown between `content` and `results`. But that's just a quirk of how Emacs displays a cons cell when the cdr is a list."
   (save-excursion
@@ -115,8 +136,8 @@ PITFALL: The s-expression might look malformed, because there's no (.) shown bet
             (error nil))))
       (let ((results nil)) ;; parse each branch
         (while (org-at-heading-p)
-          (push (org-sexp-parse-branch focused-line-number)
+          (push (org-to-sexp-parse-branch focused-line-number)
                 results))
         `(content . ,(nreverse results))))))
 
-(provide 'org-sexp)
+(provide 'org-to-sexp)

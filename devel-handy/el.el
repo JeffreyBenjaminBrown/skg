@@ -9,7 +9,7 @@
 (defun xxx ()
   (interactive)
   (message "%S"
-           (org-sexp-parse-all-branches)))
+           (org-to-sexp-parse-all-branches)))
 
 (defun 2id-insert ()
   "If at a heading, add a random 3-digit ID to it, both visibly and as a property of the bullet."
