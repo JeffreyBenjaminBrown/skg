@@ -24,7 +24,7 @@ pub fn read_skgnode_from_path
 
     skgnode.path = file_path.to_path_buf();
 
-    // Get links from titles and unindexed text
+    // Get links from titles and body
     let mut links = Vec::new();
     for title in &skgnode.titles {
       links.extend(extract_links(title)); }

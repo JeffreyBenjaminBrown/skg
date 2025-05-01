@@ -6,3 +6,4 @@
 ** In Rust, when saving a document
    If a node has repeated = t,
    do not use that data to modify it.
+* resume rust/sexp_to_vector.rs

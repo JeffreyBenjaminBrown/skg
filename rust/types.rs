@@ -63,7 +63,7 @@ pub struct SkgNode {
   #[serde(skip)] // inferred from filepath
   pub path: PathBuf,
 
-  #[serde(skip)] // inferred from titles and unindexed text
+  #[serde(skip)] // inferred from titles and body
   pub links: Vec<Link>,
 }
 

@@ -62,7 +62,7 @@
   "The recursive workhorse for building up the org document. It inserts NODE at indentation LEVEL."
   (let* ( (id (cdr (assq 'id node)))
           (heading (cdr (assq 'heading node)))
-          (unindexed-text
+          (body
            (cdr (assq 'body node)))
           (focused (cdr (assq 'focused node)))
           (content (cdr (assq 'content node))) )
@@ -76,8 +76,8 @@
        (append (list 'id id)
                (when focused (list 'focused t)))))
     (insert heading)
-    (when unindexed-text
-      (insert "\n" unindexed-text))
+    (when body
+      (insert "\n" body))
     (insert "\n")
     (when content
       (dolist (child content)
