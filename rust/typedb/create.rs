@@ -15,9 +15,9 @@ pub async fn make_db_destroying_earlier_one (
   db_name : &str,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let skg_nodes : Vec<FileNode> =
+  let filenodes : Vec<FileNode> =
     read_skg_files( data_folder )?;
-  println!( "{} .skg files were read", skg_nodes.len() );
+  println!( "{} .skg files were read", filenodes.len() );
   // If any of the following needs a transaction, it opens a new one.
   // Thus all nodes are created before any relationships,
   // ensuring that all members of the relationship tp be made exist.
@@ -26,9 +26,9 @@ pub async fn make_db_destroying_earlier_one (
   define_schema (
     db_name, &driver             ) . await?;
   create_nodes (
-    db_name, &driver, &skg_nodes ) . await?;
+    db_name, &driver, &filenodes ) . await?;
   create_all_relationships (
-    db_name, &driver, &skg_nodes ) . await?;
+    db_name, &driver, &filenodes ) . await?;
   Ok (()) }
 
 pub async fn make_empty_db_destroying_earlier_one (
@@ -63,12 +63,12 @@ pub async fn define_schema (
 pub async fn create_nodes (
   db_name : &str,
   driver : &TypeDBDriver,
-  skg_nodes : &Vec<FileNode>
+  filenodes : &Vec<FileNode>
 )-> Result<(), Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Write).await?;
   println!("Creating nodes ...");
-  for node in skg_nodes {
+  for node in filenodes {
     create_node(node, &tx).await?; }
   tx.commit().await?;
   Ok (()) }
@@ -76,12 +76,12 @@ pub async fn create_nodes (
 pub async fn create_all_relationships (
   db_name : &str,
   driver : &TypeDBDriver,
-  skg_nodes : &Vec<FileNode>
+  filenodes : &Vec<FileNode>
 )-> Result<(), Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Write).await?;
   println!("Creating relationships ...");
-  for node in skg_nodes {
+  for node in filenodes {
     create_relationships_from_node(node, &tx).await?; }
   tx.commit().await?;
   Ok (()) }
@@ -90,7 +90,7 @@ pub fn read_skg_files
   <P: AsRef<Path>>
   (dir_path: P)
    -> io::Result<Vec<FileNode>> {
-    let mut skg_nodes = Vec::new();
+    let mut filenodes = Vec::new();
     let entries : std::fs::ReadDir = // an iterator
       fs::read_dir(dir_path)? ;
     for entry in entries {
@@ -99,8 +99,8 @@ pub fn read_skg_files
       if ( path.is_file() &&
            path.extension().map_or(false, |ext| ext == "skg") ) {
         let node = read_filenode(&path)?;
-        skg_nodes.push(node); } }
-    Ok (skg_nodes) }
+        filenodes.push(node); } }
+    Ok (filenodes) }
 
 pub async fn create_node(
   node: &FileNode,
