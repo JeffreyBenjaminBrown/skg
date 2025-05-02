@@ -1,4 +1,4 @@
-// cargo test --lib save::sexp_to_vector::tests 2>&1 | tee output.log
+// cargo test --lib save::sexp_to_vector::tests 2>&1 | tee temp/output.log
 
 use sexp::{Sexp::{self, Atom, List},
            Atom::S,
@@ -7,6 +7,47 @@ use std::collections::HashMap;
 use std::vec::Vec;
 
 use crate::types::{ID,OrgNode};
+
+fn node_sexp_to_orgnode(
+  sexp: Sexp)
+  -> Result<OrgNode, String> {
+  if let List(items) = sexp {
+    let mut props = HashMap::new();
+    for item in items {
+      if let List(_) = item {
+        match pair_sexp_to_string_pair(&item) {
+          Ok((key, value)) => {
+            props.insert(key, value);
+          },
+          Err(e) => return Err(e), } } }
+    let heading = match props.get("heading") {
+      Some(Atom(S(h))) => h.clone(),
+      _ => return Err(
+        "Missing or invalid heading".to_string() ), };
+    let id = match props.get("id") {
+      Some(Atom(S(id_str)))
+        => Some(ID::new(id_str)),
+      _ => None, };
+    let body = match props.get("body") {
+      Some(Atom(S(b))) => Some(b.clone() ),
+      _ => None, };
+    let focused = // value not needed
+      props.contains_key("focused");
+    let repeated = // value not needed
+      props.contains_key("repeated");
+    let branches = match props.get("content") {
+      Some(List(content_items)) => {
+        let content_vec = content_items.clone();
+        content_sexps_to_orgnodes(content_vec)? },
+      _ => Vec::new(), }; // No children
+    Ok ( OrgNode { id,
+                   heading,
+                   body,
+                   focused,
+                   repeated,
+                   branches, } ) }
+  else { Err (
+    "Branch must be a list".to_string()) } }
 
 fn content_sexp_to_orgnodes(
   sexp_str: &str)
@@ -21,7 +62,8 @@ fn content_sexp_to_orgnodes(
           let content_items = items.into_iter()
             .skip(1) // skip the 'content' atom
             .collect::<Vec<_>>();
-          return content_sexps_to_orgnodes(content_items); } } }
+          return content_sexps_to_orgnodes(
+            content_items); } } }
     return Err(
       // PITFALL: Don't wrap this in an `else` branch,
       // because that way it would not catch failures
@@ -68,50 +110,6 @@ fn pair_sexp_to_string_pair(
       "Malformed property pair: {:?}", item));
   } else { return Err(
     "Property pair must be a list".to_string()); } }
-
-fn node_sexp_to_orgnode(
-  sexp: Sexp)
-  -> Result<OrgNode, String> {
-  if let List(items) = sexp {
-    let mut props = HashMap::new();
-
-    for item in items {
-      if let List(_) = item {
-        match pair_sexp_to_string_pair(&item) {
-          Ok((key, value)) => {
-            props.insert(key, value);
-          },
-          Err(e) => return Err(e), } } }
-
-    let heading = match props.get("heading") {
-      Some(Atom(S(h))) => h.clone(),
-      _ => return Err(
-        "Missing or invalid heading".to_string() ), };
-    let id = match props.get("id") {
-      Some(Atom(S(id_str)))
-        => Some(ID::new(id_str)),
-      _ => None, };
-    let body = match props.get("body") {
-      Some(Atom(S(b))) => Some(b.clone() ),
-      _ => None, };
-    let focused = // value not needed
-      props.contains_key("focused");
-    let repeated = // value not needed
-      props.contains_key("repeated");
-    let branches = match props.get("content") {
-      Some(List(content_items)) => {
-        let content_vec = content_items.clone();
-        content_sexps_to_orgnodes(content_vec)? },
-      _ => Vec::new(), }; // No children
-
-    Ok ( OrgNode { id,
-                   heading,
-                   body,
-                   focused,
-                   repeated,
-                   branches, } ) }
-  else { Err (
-    "Branch must be a list".to_string()) } }
 
 #[cfg(test)]
 mod tests {
