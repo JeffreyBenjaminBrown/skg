@@ -3,6 +3,3 @@
   using `extract_links` from rust/links.rs
 * resume in rust/save/
 ** Deal with absent IDs.
-** Consider `repeated` when saving
-   If a node has repeated = t,
-   do not use that data to modify it.
