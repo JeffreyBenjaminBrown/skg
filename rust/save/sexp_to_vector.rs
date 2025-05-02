@@ -8,7 +8,7 @@ use std::vec::Vec;
 
 use crate::types::{ID,OrgNode};
 
-fn parse_sexp_to_branches(
+fn content_sexp_to_orgnodes(
   sexp_str: &str)
   -> Result<Vec<OrgNode>, String> {
   let sexp = parse(sexp_str)
@@ -21,7 +21,7 @@ fn parse_sexp_to_branches(
           let content_items = items.into_iter()
             .skip(1) // skip the 'content' atom
             .collect::<Vec<_>>();
-          return parse_branches(content_items); } } }
+          return content_sexps_to_orgnodes(content_items); } } }
     return Err(
       // PITFALL: Don't wrap this in an `else` branch,
       // because that way it would not catch failures
@@ -32,19 +32,19 @@ fn parse_sexp_to_branches(
     "Could not parse input as an (s-expression) list."
       .to_string()) } }
 
-fn parse_branches(
+fn content_sexps_to_orgnodes(
   items: Vec<Sexp>)
   -> Result<Vec<OrgNode>, String> {
   let mut branches = Vec::new();
   for (index, item) in items.into_iter().enumerate() {
-    match parse_branch(item) {
+    match node_sexp_to_orgnode(item) {
       Ok(branch) => branches.push(branch),
       Err(err) => return Err(format!(
         "Failed to parse branch at index {}: {}",
         index, err)) } }
   Ok(branches) }
 
-fn parse_property_pair(
+fn pair_sexp_to_string_pair(
   item: &Sexp)
   -> Result<(String, Sexp), String> {
   if let List(pair) = item {
@@ -69,7 +69,7 @@ fn parse_property_pair(
   } else { return Err(
     "Property pair must be a list".to_string()); } }
 
-fn parse_branch(
+fn node_sexp_to_orgnode(
   sexp: Sexp)
   -> Result<OrgNode, String> {
   if let List(items) = sexp {
@@ -77,7 +77,7 @@ fn parse_branch(
 
     for item in items {
       if let List(_) = item {
-        match parse_property_pair(&item) {
+        match pair_sexp_to_string_pair(&item) {
           Ok((key, value)) => {
             props.insert(key, value);
           },
@@ -101,7 +101,7 @@ fn parse_branch(
     let branches = match props.get("content") {
       Some(List(content_items)) => {
         let content_vec = content_items.clone();
-        parse_branches(content_vec)? },
+        content_sexps_to_orgnodes(content_vec)? },
       _ => Vec::new(), }; // No children
 
     Ok ( OrgNode { id,
@@ -123,7 +123,7 @@ mod tests {
 (content ( (id . "5")
            (heading . "this node is an island")
            (focused . t)))"#;
-    let result = parse_sexp_to_branches(input);
+    let result = content_sexp_to_orgnodes(input);
     assert!(result.is_ok(),
             "Parse failed, got {:?}", result);
     let branches = result.unwrap();
@@ -162,7 +162,7 @@ but in fact only spans two lines.")
 and in fact
 spans three lines."))))))"#;
 
-    let result = parse_sexp_to_branches(input);
+    let result = content_sexp_to_orgnodes(input);
     assert!(result.is_ok(),
             "Parse failed, got {:?}", result);
 
@@ -218,7 +218,7 @@ spans three lines.".to_string()));
     assert!(child2.branches.is_empty()); }
 
   #[test]
-  fn test_parse_property_pair() {
+  fn test_pair_sexp_to_string_pair() {
     fn s(value: &str) -> Sexp {
       Atom(S(value.to_string())) }
     fn l(items: Vec<Sexp>) -> Sexp {
@@ -226,7 +226,7 @@ spans three lines.".to_string()));
 
     // (key value) - should pass
     let pair1 = l(vec![s("key"), s("value")]);
-    let result1 = parse_property_pair(&pair1);
+    let result1 = pair_sexp_to_string_pair(&pair1);
     assert!(result1.is_ok());
     let (key1, value1) = result1.unwrap();
     assert_eq!(key1, "key");
@@ -236,7 +236,7 @@ spans three lines.".to_string()));
     let pair2 = l(vec![ s("key"),
                         l(vec![s("item1"),
                                s("item2") ]) ]);
-    let result2 = parse_property_pair(&pair2);
+    let result2 = pair_sexp_to_string_pair(&pair2);
     assert!(result2.is_ok());
     let (key2, value2) = result2.unwrap();
     assert_eq!(key2, "key");
@@ -247,7 +247,7 @@ spans three lines.".to_string()));
     let pair3 = l(vec![s("key"),
                        s("."),
                        s("value")]);
-    let result3 = parse_property_pair(&pair3);
+    let result3 = pair_sexp_to_string_pair(&pair3);
     assert!(result3.is_ok());
     let (key3, value3) = result3.unwrap();
     assert_eq!(key3, "key");
@@ -258,7 +258,7 @@ spans three lines.".to_string()));
                         s("."),
                         l(vec![s("item1"),
                                s("item2") ]) ]);
-    let result4 = parse_property_pair(&pair4);
+    let result4 = pair_sexp_to_string_pair(&pair4);
     assert!(result4.is_ok());
     let (key4, value4) = result4.unwrap();
     assert_eq!(key4, "key");
@@ -268,5 +268,5 @@ spans three lines.".to_string()));
     let pair5 = l(vec![s("key"),
                        s("value1"),
                        s("value2")]);
-    let result5 = parse_property_pair(&pair5);
+    let result5 = pair_sexp_to_string_pair(&pair5);
     assert!(result5.is_err()); } }
