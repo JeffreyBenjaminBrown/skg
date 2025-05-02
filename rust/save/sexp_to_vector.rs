@@ -8,7 +8,7 @@ use std::vec::Vec;
 
 use crate::types::{ID,OrgNode};
 
-fn node_sexp_to_orgnode(
+pub fn node_sexp_to_orgnode(
   sexp: Sexp)
   -> Result<OrgNode, String> {
   if let List(items) = sexp {
@@ -49,7 +49,7 @@ fn node_sexp_to_orgnode(
   else { Err (
     "Branch must be a list".to_string()) } }
 
-fn content_sexp_to_orgnodes(
+pub fn content_sexp_to_orgnodes(
   sexp_str: &str)
   -> Result<Vec<OrgNode>, String> {
   let sexp = parse(sexp_str)
@@ -74,7 +74,7 @@ fn content_sexp_to_orgnodes(
     "Could not parse input as an (s-expression) list."
       .to_string()) } }
 
-fn content_sexps_to_orgnodes(
+pub fn content_sexps_to_orgnodes(
   items: Vec<Sexp>)
   -> Result<Vec<OrgNode>, String> {
   let mut branches = Vec::new();
