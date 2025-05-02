@@ -26,6 +26,7 @@ pub enum LinkParseError {
 
 #[derive(Debug, Clone)]
 pub struct OrgNode {
+  // A recursive representation of nodes, useful for communicating with Emacs. Omits things Emacs does not need to know, like `path`. To completely describe the data we would need a collection of FileNodes, which omit nothing.
   pub id       : Option<ID>,
   pub heading  : String, // a term fron org-mode
   pub body     : Option<String>, // a term fron org-mode
@@ -35,9 +36,8 @@ pub struct OrgNode {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FileNode {
-  // Tantivy will receive some of this data,
-  // and TypeDB some other subset.
-  // At least one field, `body`, is known to neither.
+  // Competes with OrgNode as a representation of nodes, but whereas OrgNode omits information Emacs does not need, FileNode omits nothing. There is a 1-to-1 correspondence between FileNodes and actual files. This is the representation used to initialize the TypeDB and Tantivy databases.
+  // Tantivy will receive some of this data, and TypeDB some other subset. And at least one field, `body`, is known to neither; it is instead read from files on disk when building a document for Emacs.
 
   pub titles: Vec<String>, // The first title is the text displayed in a heading. Other titles are just for search.
 
@@ -81,7 +81,7 @@ impl ID {
     &self.0 } }
 
 impl Deref for ID {
-  // Lets ID be used like a String in (more?) cases.
+  // lets ID be used like a String in (more?) case
   type Target = String;
   fn deref(&self) -> &Self::Target {
     &self.0 } }
