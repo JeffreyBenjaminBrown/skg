@@ -6,11 +6,11 @@ use sexp::{Sexp::{self, Atom, List},
 use std::collections::HashMap;
 use std::vec::Vec;
 
-use crate::types::{ID,OrgBranch};
+use crate::types::{ID,OrgNode};
 
 fn parse_sexp_to_branches(
   sexp_str: &str)
-  -> Result<Vec<OrgBranch>, String> {
+  -> Result<Vec<OrgNode>, String> {
   let sexp = parse(sexp_str)
     .map_err( |e| format!(
       "Failed to parse s-expression: {}", e))?;
@@ -34,7 +34,7 @@ fn parse_sexp_to_branches(
 
 fn parse_branches(
   items: Vec<Sexp>)
-  -> Result<Vec<OrgBranch>, String> {
+  -> Result<Vec<OrgNode>, String> {
   let mut branches = Vec::new();
   for (index, item) in items.into_iter().enumerate() {
     match parse_branch(item) {
@@ -71,7 +71,7 @@ fn parse_property_pair(
 
 fn parse_branch(
   sexp: Sexp)
-  -> Result<OrgBranch, String> {
+  -> Result<OrgNode, String> {
   if let List(items) = sexp {
     let mut props = HashMap::new();
 
@@ -104,12 +104,12 @@ fn parse_branch(
         parse_branches(content_vec)? },
       _ => Vec::new(), }; // No children
 
-    Ok ( OrgBranch { id,
-                     heading,
-                     body,
-                     focused,
-                     repeated,
-                     branches, } ) }
+    Ok ( OrgNode { id,
+                   heading,
+                   body,
+                   focused,
+                   repeated,
+                   branches, } ) }
   else { Err (
     "Branch must be a list".to_string()) } }
 

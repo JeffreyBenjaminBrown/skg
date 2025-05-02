@@ -6,7 +6,7 @@ use typedb_driver::{
     TransactionType,
 };
 
-use crate::file_io::read_skgnode_from_path;
+use crate::file_io::read_filenode;
 use crate::types::ID;
 
 pub async fn path_to_root_container (
@@ -123,7 +123,7 @@ async fn recursive_s_expression_from_node(
 ) -> Result<String, Box<dyn Error>> {
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
-  let node = read_skgnode_from_path ( path ) ?;
+  let node = read_filenode ( path ) ?;
   let heading = node.titles.first()
     .ok_or_else(|| io::Error::new(
       io::ErrorKind::InvalidData,

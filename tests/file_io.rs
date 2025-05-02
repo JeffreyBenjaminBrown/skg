@@ -1,26 +1,26 @@
 use std::fs;
 
 use skg::file_io::{
-  read_skgnode_from_path, write_skgnode_to_path};
-use skg::types::{SkgNode, skgnode_example};
+  read_filenode, write_filenode};
+use skg::types::{FileNode, filenode_example};
 
 #[test]
-fn test_skgnode_io() {
+fn test_filenode_io() {
     // Write the example node to a file
-    let example = skgnode_example();
+    let example = filenode_example();
     let out_filename = example.path.clone();
-    write_skgnode_to_path( &example,
-                            out_filename.to_str().expect(
-                                "Invalid UTF-8 in path")
+    write_filenode( &example,
+                     out_filename.to_str().expect(
+                       "Invalid UTF-8 in path")
     ) . unwrap();
 
     // Read that file, reverse its lists, write to another file
-    let read_node = read_skgnode_from_path(
+    let read_node = read_filenode(
         out_filename.to_str().expect("Invalid UTF-8 in path")
     ).unwrap();
-    let reversed = reverse_some_of_skgnode(&read_node);
+    let reversed = reverse_some_of_filenode(&read_node);
     let reversed_filename = "tests/file_io/generated/reversed.skg";
-    write_skgnode_to_path(&reversed, reversed_filename).unwrap();
+    write_filenode(&reversed, reversed_filename).unwrap();
 
     // Verify that the generated files match expected files
     let expected_example_path = "tests/file_io/fixtures/example.skg";
@@ -53,13 +53,13 @@ fn test_skgnode_io() {
 }
 
 fn verify_body_not_needed() {
-  // If a SkgNode's `body` is the empty string,
+  // If a FileNode's `body` is the empty string,
   // then that field need not be written to disk.
 
-  let mut node = read_skgnode_from_path (
+  let mut node = read_filenode (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
   node.body = None; // mutate it
-  write_skgnode_to_path(
+  write_filenode(
     &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
   assert_eq!(
     fs::read_to_string(
@@ -68,8 +68,8 @@ fn verify_body_not_needed() {
       "tests/file_io/fixtures/no_unindexed.skg").unwrap(),
     "Deleting body did not have the intended effect."); }
 
-pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
-    // Create a new SkgNode with some reversed lists --
+pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
+    // Create a new FileNode with some reversed lists --
     // specifically, `titles`, `contains`
     // and `subscribes_to`.
     // This is only for testing purposes,
@@ -86,7 +86,7 @@ pub fn reverse_some_of_skgnode(node: &SkgNode) -> SkgNode {
         node.subscribes_to.clone();
     reversed_subscribes_to.reverse();
 
-  SkgNode {
+  FileNode {
     titles             : reversed_titles,
     contains           : reversed_contains,
     subscribes_to      : reversed_subscribes_to,

@@ -5,16 +5,16 @@ use std::fs::{self};
 use std::io::{self};
 use std::path::{Path};
 
-use crate::types::SkgNode;
+use crate::types::FileNode;
 use crate::links::extract_links;
 
-pub fn read_skgnode_from_path
+pub fn read_filenode
   <P: AsRef<Path>>
   (file_path: P)
-   -> io::Result<SkgNode> {
+   -> io::Result<FileNode> {
     let file_path = file_path.as_ref();
     let contents = fs::read_to_string(file_path)?;
-    let mut skgnode: SkgNode = serde_yaml::from_str(&contents)
+    let mut filenode: FileNode = serde_yaml::from_str(&contents)
       .map_err(
         |e| io::Error::new(
           io::ErrorKind::InvalidData, e.to_string()))?;
@@ -22,25 +22,25 @@ pub fn read_skgnode_from_path
     // The rest of this information is not represented as a field
     // in the .skg file.
 
-    skgnode.path = file_path.to_path_buf();
+    filenode.path = file_path.to_path_buf();
 
     // Get links from titles and body
     let mut links = Vec::new();
-    for title in &skgnode.titles {
+    for title in &filenode.titles {
       links.extend(extract_links(title)); }
-    if let Some(text) = &skgnode.body {
+    if let Some(text) = &filenode.body {
       // Ignores the None case
       links.extend(extract_links(text)); }
-    skgnode.links = links;
-    Ok (skgnode) }
+    filenode.links = links;
+    Ok (filenode) }
 
-/// A line in the typedef of SkgNode prevents the field `path`
+/// A line in the typedef of FileNode prevents the field `path`
 /// from being part of the .skg representation.
-pub fn write_skgnode_to_path
+pub fn write_filenode
   <P: AsRef<Path>>
-  (skgnode: &SkgNode, file_path: P)
+  (filenode: &FileNode, file_path: P)
    -> io::Result<()> {
-    let yaml_string = serde_yaml::to_string(skgnode)
+    let yaml_string = serde_yaml::to_string(filenode)
       .map_err(
         |e| io::Error::new(
           io::ErrorKind::InvalidData, e.to_string()))?;
@@ -54,7 +54,7 @@ mod tests {
   use std::io::Write;
   use std::path::{PathBuf};
   use tempfile::tempdir;
-  use crate::types::{ID, SkgNode};
+  use crate::types::{ID, FileNode};
 
   #[test]
   fn test_links_extracted_during_read() -> io::Result<()> {
@@ -63,7 +63,7 @@ mod tests {
     let file_path = dir.path().join("test_node.skg");
 
     // Create a test node with links in titles and body
-    let test_node = SkgNode {
+    let test_node = FileNode {
       titles: vec![
         "Title with link [[id:link1][First Link]]".to_string(),
         "Another title [[id:link2][Second Link]]".to_string(),
@@ -89,7 +89,7 @@ mod tests {
     file.write_all(yaml.as_bytes())?;
 
     // Read the node back from the file
-    let read_node = read_skgnode_from_path(&file_path)?;
+    let read_node = read_filenode(&file_path)?;
 
     // Verify links were extracted correctly
     assert_eq!(read_node.links.len(), 4);

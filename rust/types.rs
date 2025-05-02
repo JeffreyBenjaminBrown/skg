@@ -25,31 +25,26 @@ pub enum LinkParseError {
   MissingDivider, }
 
 #[derive(Debug, Clone)]
-pub struct OrgBranch {
-  // S-expressions from Emacs are interpreted as these.
+pub struct OrgNode {
   pub id       : Option<ID>,
   pub heading  : String, // a term fron org-mode
   pub body     : Option<String>, // a term fron org-mode
   pub focused  : bool, // where the Emacs cursor is
   pub repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
-  pub branches : Vec<OrgBranch>, }
+  pub branches : Vec<OrgNode>, }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SkgNode {
+pub struct FileNode {
   // Tantivy will receive some of this data,
   // and TypeDB some other subset.
   // At least one field, `body`, is known to neither.
 
-  // The first title is the text displayed in a heading.
-  // Other titles are just for search.
-  pub titles: Vec<String>,
-  pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because
-  // nodes might be merged.
+  pub titles: Vec<String>, // The first title is the text displayed in a heading. Other titles are just for search.
 
-  // The body is all text (if any)
-  // between this heading and the next (if any).
+  pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because nodes might be merged.
+
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: // Unknown to both Tantivy & TypeDB
+  pub body: // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
   Option<String>,
 
   #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -154,8 +149,8 @@ impl fmt::Display for LinkParseError {
 
 impl Error for LinkParseError {}
 
-pub fn skgnode_example() -> SkgNode {
-  SkgNode {
+pub fn filenode_example() -> FileNode {
+  FileNode {
     titles: vec![
       "This text gets indexed.".to_string(),
       "Maybe searching other text could find this note.".to_string(),

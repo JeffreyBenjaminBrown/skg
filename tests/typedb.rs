@@ -5,9 +5,8 @@
 
 use futures::executor::block_on;
 use futures::StreamExt;
-use sexp::{ Sexp::{self, Atom, List},
-            Atom::S,
-            parse };
+use sexp::{ Sexp::{self},
+            Atom::S, };
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{

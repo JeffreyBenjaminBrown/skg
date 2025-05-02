@@ -10,8 +10,8 @@ pub fn random_org_roam_id() -> String {
 
 pub fn extract_links (text: &str)
                       -> Vec<Link> {
-  // The non-greedy pattern .*? prevents capturing too much.
   let link_pattern = Regex::new(
+    // non-greedy .*? pattern avoids capturing too much.
     r"\[\[id:(.*?)\]\[(.*?)\]\]").unwrap();
   let mut links = Vec::new();
   for capture in link_pattern.captures_iter(text) {

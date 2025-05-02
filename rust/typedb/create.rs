@@ -7,15 +7,15 @@ use typedb_driver::{
     TransactionType,
 };
 
-use crate::types::{ID, SkgNode};
-use crate::file_io::read_skgnode_from_path;
+use crate::types::{ID, FileNode};
+use crate::file_io::read_filenode;
 
 pub async fn make_db_destroying_earlier_one (
   data_folder : &str,
   db_name : &str,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let skg_nodes : Vec<SkgNode> =
+  let skg_nodes : Vec<FileNode> =
     read_skg_files( data_folder )?;
   println!( "{} .skg files were read", skg_nodes.len() );
   // If any of the following needs a transaction, it opens a new one.
@@ -63,7 +63,7 @@ pub async fn define_schema (
 pub async fn create_nodes (
   db_name : &str,
   driver : &TypeDBDriver,
-  skg_nodes : &Vec<SkgNode>
+  skg_nodes : &Vec<FileNode>
 )-> Result<(), Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Write).await?;
@@ -76,7 +76,7 @@ pub async fn create_nodes (
 pub async fn create_all_relationships (
   db_name : &str,
   driver : &TypeDBDriver,
-  skg_nodes : &Vec<SkgNode>
+  skg_nodes : &Vec<FileNode>
 )-> Result<(), Box<dyn Error>> {
   let tx = driver.transaction(
     db_name, TransactionType::Write).await?;
@@ -89,7 +89,7 @@ pub async fn create_all_relationships (
 pub fn read_skg_files
   <P: AsRef<Path>>
   (dir_path: P)
-   -> io::Result<Vec<SkgNode>> {
+   -> io::Result<Vec<FileNode>> {
     let mut skg_nodes = Vec::new();
     let entries : std::fs::ReadDir = // an iterator
       fs::read_dir(dir_path)? ;
@@ -98,12 +98,12 @@ pub fn read_skg_files
       let path = entry.path();
       if ( path.is_file() &&
            path.extension().map_or(false, |ext| ext == "skg") ) {
-        let node = read_skgnode_from_path(&path)?;
+        let node = read_filenode(&path)?;
         skg_nodes.push(node); } }
     Ok (skg_nodes) }
 
 pub async fn create_node(
-  node: &SkgNode,
+  node: &FileNode,
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
   let path_str : String =
@@ -124,7 +124,7 @@ pub async fn create_node(
   Ok (()) }
 
 pub async fn create_relationships_from_node(
-  node: &SkgNode,
+  node: &FileNode,
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
   let primary_id = node.ids[0].as_str();
@@ -167,7 +167,7 @@ pub async fn create_relationships_from_node(
   Ok (()) }
 
 pub async fn insert_extra_ids (
-  node : &SkgNode,
+  node : &FileNode,
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
   if node.ids.len() > 1 {
