@@ -56,7 +56,7 @@ pub struct FileNode {
   pub subscribes_to: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub ignores: Vec<ID>,
+  pub hides_in_subscriptions: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub replaces_view_of: Vec<ID>,
@@ -164,7 +164,7 @@ It better be okay with newlines."# . to_string() ),
     subscribes_to: vec![ID::new("11"),
                         ID::new("12"),
                         ID::new("13")],
-    ignores: vec![],
+    hides_in_subscriptions: vec![],
     replaces_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),

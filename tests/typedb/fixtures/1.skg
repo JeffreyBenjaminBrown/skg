@@ -8,6 +8,6 @@ body: |-
 contains:
 - 2
 - 33
-ignores:
+hides_in_subscriptions:
 - 4
 - 55

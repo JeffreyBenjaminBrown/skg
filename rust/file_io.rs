@@ -74,7 +74,7 @@ mod tests {
       body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
       contains: vec![],
       subscribes_to: vec![],
-      ignores: vec![],
+      hides_in_subscriptions: vec![],
       replaces_view_of: vec![],
       hyperlinks: vec![],
       path: PathBuf::new(),

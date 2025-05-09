@@ -34,7 +34,7 @@ fn test_convert_sexp_to_filenode() {
   assert_eq!(file_node.body, None);
   assert!(file_node.contains.is_empty());
   assert!(file_node.subscribes_to.is_empty());
-  assert!(file_node.ignores.is_empty());
+  assert!(file_node.hides_in_subscriptions.is_empty());
   assert!(file_node.replaces_view_of.is_empty());
   assert!(file_node.hyperlinks.is_empty());
 }

@@ -42,11 +42,11 @@ fn orgnode_to_filenodes_recursive (
     // Repeated nodes are not excluded here.
       .filter_map( |child| child.id.clone() )
       .collect(),
-    subscribes_to    : Vec::new(),
-    ignores          : Vec::new(),
-    replaces_view_of : Vec::new(),
-    path             : "".into(),
-    hyperlinks            : Vec::new(),
+    subscribes_to          : Vec::new(),
+    hides_in_subscriptions : Vec::new(),
+    replaces_view_of       : Vec::new(),
+    path                   : "".into(),
+    hyperlinks             : Vec::new(),
   };
   nodes.push(node);
 

@@ -17,8 +17,8 @@ define
     plays hyperlinks_to:dest,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
-    plays ignores:ignorer,
-    plays ignores:ignored,
+    plays hides_in_subscriptions:hider,
+    plays hides_in_subscriptions:hidden,
     plays replaces_view:replacement,
     plays replaces_view:replaced,
     plays has_extra_id:node;
@@ -46,14 +46,17 @@ define
     relates source,
     relates dest;
 
-  # To understand subscribes, ignores and replaces_view,
+  # To understand the relations
+  #   subscribes,
+  #   hides_in_subscriptions, and
+  #   replaces_view,
   # see `docs/sharing-model.md`.
   relation subscribes,
     relates subscriber,
     relates subscribee;
-  relation ignores,
-    relates ignorer,
-    relates ignored;
+  relation hides_in_subscriptions,
+    relates hider,
+    relates hidden;
   relation replaces_view,
     relates replacement,
     relates replaced;

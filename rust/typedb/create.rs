@@ -153,10 +153,10 @@ pub async fn create_relationships_from_node(
                     "subscribee",
                     tx ).await?;
   insert_from_list( primary_id,
-                    &node.ignores,
-                    "ignores",
-                    "ignorer",
-                    "ignored",
+                    &node.hides_in_subscriptions,
+                    "hides_in_subscriptions",
+                    "hider",
+                    "hidden",
                     tx ).await?;
   insert_from_list( primary_id,
                     &node.replaces_view_of,

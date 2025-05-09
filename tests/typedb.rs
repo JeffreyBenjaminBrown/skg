@@ -128,22 +128,25 @@ fn test_typedb_integration(
       .collect();
     assert_eq!(subscribes_pairs, expected_subscribes);
 
-    let ignores_pairs = collect_all_of_some_binary_rel(
+    let hides_pairs = collect_all_of_some_binary_rel(
       db_name,
       &driver,
       r#" match
-            $ignorer isa node, has id $from;
-            $ignored isa node, has id $to;
-            $rel isa ignores (ignorer: $ignorer,
-                              ignored: $ignored);
+            $hider isa node, has id $from;
+            $hidden isa node, has id $to;
+            $rel isa hides_in_subscriptions
+              ( hider:  $hider,
+                hidden: $hidden);
           select $from, $to;"#,
       "from",
       "to"
     ).await?;
-    let mut expected_ignores = HashSet::new();
-    expected_ignores.insert(("1".to_string(), "4".to_string()));
-    expected_ignores.insert(("1".to_string(), "5".to_string()));
-    assert_eq!(ignores_pairs, expected_ignores);
+    let mut expected_hides_in_subscriptions = HashSet::new();
+    expected_hides_in_subscriptions.insert((
+      "1".to_string(), "4".to_string()));
+    expected_hides_in_subscriptions.insert((
+      "1".to_string(), "5".to_string()));
+    assert_eq!(hides_pairs, expected_hides_in_subscriptions);
 
     let replacement_pairs = collect_all_of_some_binary_rel(
       db_name,
@@ -158,8 +161,10 @@ fn test_typedb_integration(
       "to"
     ).await?;
     let mut expected_replacements = HashSet::new();
-    expected_replacements.insert(("5".to_string(), "3".to_string()));
-    expected_replacements.insert(("5".to_string(), "4".to_string()));
+    expected_replacements.insert((
+      "5".to_string(), "3".to_string()));
+    expected_replacements.insert((
+      "5".to_string(), "4".to_string()));
     assert_eq!(replacement_pairs, expected_replacements);
 
     let container_node = find_container_of(
