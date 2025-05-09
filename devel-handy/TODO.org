@@ -1,8 +1,5 @@
 * resume in rust/save/
   serial
-** populate absent IDs
-** populate the `links` field
-   using `extract_links` from rust/links.rs
 ** add and use a `folded` field to OrgNode
    Rust will need this in order to restore state
    when it sends the document (with some new IDs)
@@ -12,12 +9,12 @@
     Compare each FileNode received (after interpretation) from Emacs to the file it corresponds to. Read the TypeDB db to see if an ID (which might not be the primary one) corresponds to something extant.
     If the file is absent, create it.
     If the file differs in any way from the FileNode, update it.
-    Keep a list of paths to all files modified or created. For files modified, track whether their text, content and/or links have changed.
+    Keep a list of paths to all files modified or created. For files modified, track whether their text, content and/or hyperlinks have changed.
     Orphaned content becomes uncontained, not deleted.
 *** update TypeDB
     If a file is new, load it as normal.
     Create relationships only after loading all entities (as is currently the case on initial load) so that all members of each relationship to create exist.
-    If a file was modified, delete and recreate all of its out-links and contents. Change none of its other ("incoming") links.
+    If a file was modified, delete and recreate all of its out-links (hyperlinks, content, subscriptions). Change none of its other ("incoming") links.
 *** to Tantivy
     If a file is new, load it as normal.
     If a file's text was modified, reload it.

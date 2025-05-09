@@ -137,10 +137,10 @@ pub async fn create_relationships_from_node(
 
   insert_from_list(
     primary_id,
-    &node.links.iter ()
-      . map ( |link| ID::from(link.id.clone()) )
+    &node.hyperlinks.iter ()
+      . map ( |hyperlink| ID::from(hyperlink.id.clone()) )
       . collect::<Vec<ID>>(),
-    "links_to",
+    "hyperlinks_to",
     "source",
     "dest",
     tx

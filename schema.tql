@@ -13,8 +13,8 @@ define
     owns path @unique,
     plays contains:container,
     plays contains:contained,
-    plays links_to:source,
-    plays links_to:dest,
+    plays hyperlinks_to:source,
+    plays hyperlinks_to:dest,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
     plays ignores:ignorer,
@@ -40,9 +40,9 @@ define
     relates contained @card(1..1);
 
   # Derived from the node's text content (of which TypeDB is unaware).
-  # Links are org-roam style plain text. That is, they look like:
+  # Hyperlinks are org-roam style plain text. That is, they look like:
   #  [[id:<id>][<label>]]
-  relation links_to,
+  relation hyperlinks_to,
     relates source,
     relates dest;
 

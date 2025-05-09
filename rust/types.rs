@@ -15,12 +15,13 @@ use std::str::FromStr;
 pub struct ID(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Link {
+pub struct Hyperlink {
+  // Hyperlinks are represented in, and must be parsed from, the raw text fields `titles` and `body`.
   pub id: ID,
   pub label: String, }
 
 #[derive(Debug)]
-pub enum LinkParseError {
+pub enum HyperlinkParseError {
   InvalidFormat,
   MissingDivider, }
 
@@ -66,7 +67,7 @@ pub struct FileNode {
   pub path: PathBuf,
 
   #[serde(skip)] // inferred from titles and body
-  pub links: Vec<Link>,
+  pub hyperlinks: Vec<Hyperlink>,
 }
 
 
@@ -99,55 +100,55 @@ impl From<&str> for ID {
   fn from(s: &str) -> Self {
     ID(s.to_string()) } }
 
-impl Link {
+impl Hyperlink {
   pub fn new(id: impl Into<String>,
              label: impl Into<String>)
              -> Self {
-    Link { id: ID(id.into()),
+    Hyperlink { id: ID(id.into()),
            label: label.into(),
     } } }
 
-impl fmt::Display for Link {
-  /// Format: [[id:LINK_ID][LINK_LABEL]]
+impl fmt::Display for Hyperlink {
+  /// Format: [[id:HYPERLINK_ID][HYPERLINK_LABEL]]
   fn fmt(&self,
          f: &mut fmt::Formatter<'_>)
          -> fmt::Result {
     write!(f, "[[id:{}][{}]]", self.id, self.label)
   } }
 
-impl FromStr for Link {
-  type Err = LinkParseError;
+impl FromStr for Hyperlink {
+  type Err = HyperlinkParseError;
 
   fn from_str(text: &str) -> Result<Self, Self::Err> {
     if ( !text.starts_with("[[id:") ||
           !text.ends_with("]]") ) {
-      return Err(LinkParseError::InvalidFormat); }
+      return Err(HyperlinkParseError::InvalidFormat); }
 
     let interior = &text[5..text.len()-2];
 
     if let Some(idx) = interior.find("][") {
       let id = &interior[0..idx];
       let label = &interior[idx+2..];
-      Ok ( Link {
+      Ok ( Hyperlink {
         id: ID(id.to_string()),
         label: label.to_string(),
       } )
     } else {
-      Err(LinkParseError::MissingDivider)
+      Err(HyperlinkParseError::MissingDivider)
     } } }
 
-impl fmt::Display for LinkParseError {
+impl fmt::Display for HyperlinkParseError {
   fn fmt( &self,
           f: &mut fmt::Formatter<'_>)
           -> fmt::Result {
     match self {
-      LinkParseError::InvalidFormat =>
-        write!(f, "Invalid link format. Expected [[id:LINK_ID][LINK_LABEL]]"),
-      LinkParseError::MissingDivider =>
+      HyperlinkParseError::InvalidFormat =>
+        write!(f, "Invalid hyperlink format. Expected [[id:HYPERLINK_ID][HYPERLINK_LABEL]]"),
+      HyperlinkParseError::MissingDivider =>
         write!(f, "Missing divider between ID and label. Expected ]["),
     } } }
 
-impl Error for LinkParseError {}
+impl Error for HyperlinkParseError {}
 
 pub fn filenode_example() -> FileNode {
   FileNode {
@@ -170,5 +171,5 @@ It better be okay with newlines."# . to_string() ),
     replaces_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),
-    links: vec![],
+    hyperlinks: vec![],
   } }

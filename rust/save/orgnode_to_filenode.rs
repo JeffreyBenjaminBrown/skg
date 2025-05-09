@@ -47,7 +47,7 @@ fn orgnode_to_filenodes_recursive (
     ignores          : Vec::new(),
     replaces_view_of : Vec::new(),
     path             : "".into(),
-    links            : Vec::new(),
+    hyperlinks            : Vec::new(),
   };
   nodes.push(node);
 

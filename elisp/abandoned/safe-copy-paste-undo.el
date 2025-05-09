@@ -3,7 +3,7 @@
 ;; an ID *can* be `contained` in more than one place.
 ;; If the user wants to avoid that (as in org-roam),
 ;; they can. If they don't,
-;; following a link with multiple targets will
+;; following a hyperlink with multiple targets will
 ;; bring up a menu of options to the user.
 
 ;; Define advice functions for all kill/copy/paste operations

@@ -6,7 +6,7 @@ use std::io::{self};
 use std::path::{Path};
 
 use crate::types::FileNode;
-use crate::links::extract_links;
+use crate::hyperlinks::extract_hyperlinks;
 
 pub fn read_filenode
   <P: AsRef<Path>>
@@ -24,14 +24,14 @@ pub fn read_filenode
 
     filenode.path = file_path.to_path_buf();
 
-    // Get links from titles and body
-    let mut links = Vec::new();
+    // Get hyperlinks from titles and body
+    let mut hyperlinks = Vec::new();
     for title in &filenode.titles {
-      links.extend(extract_links(title)); }
+      hyperlinks.extend(extract_hyperlinks(title)); }
     if let Some(text) = &filenode.body {
       // Ignores the None case
-      links.extend(extract_links(text)); }
-    filenode.links = links;
+      hyperlinks.extend(extract_hyperlinks(text)); }
+    filenode.hyperlinks = hyperlinks;
     Ok (filenode) }
 
 /// A line in the typedef of FileNode prevents the field `path`
@@ -57,25 +57,27 @@ mod tests {
   use crate::types::{ID, FileNode};
 
   #[test]
-  fn test_links_extracted_during_read() -> io::Result<()> {
+  fn test_hyperlinks_extracted_during_read() -> io::Result<()> {
     // Create a temporary directory
     let dir = tempdir()?;
     let file_path = dir.path().join("test_node.skg");
 
-    // Create a test node with links in titles and body
+    // Create a test node with hyperlinks in titles and body
     let test_node = FileNode {
       titles: vec![
-        "Title with link [[id:link1][First Link]]".to_string(),
-        "Another title [[id:link2][Second Link]]".to_string(),
+        "Title with hyperlink [[id:hyperlink1][First Hyperlink]]"
+          .to_string(),
+        "Another title [[id:hyperlink2][Second Hyperlink]]"
+          .to_string(),
       ],
       ids: vec![ID::new("test123")],
-      body: Some("Some text with a link [[id:link3][Third Link]] and another [[id:link4][Fourth Link]]".to_string()),
+      body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
       no_tantivy_index: false,
       contains: vec![],
       subscribes_to: vec![],
       ignores: vec![],
       replaces_view_of: vec![],
-      links: vec![],
+      hyperlinks: vec![],
       path: PathBuf::new(),
     };
 
@@ -91,20 +93,20 @@ mod tests {
     // Read the node back from the file
     let read_node = read_filenode(&file_path)?;
 
-    // Verify links were extracted correctly
-    assert_eq!(read_node.links.len(), 4);
+    // Verify hyperlinks were extracted correctly
+    assert_eq!(read_node.hyperlinks.len(), 4);
 
-    // Check links from titles
-    assert!(read_node.links.iter()
-            .any ( |link| link.id == "link1".into() &&
-                    link.label == "First Link"));
-    assert!(read_node.links.iter()
-            .any ( |link| link.id == "link2".into() &&
-                    link.label == "Second Link"));
-    assert!(read_node.links.iter()
-            .any ( |link| link.id == "link3".into() &&
-                    link.label == "Third Link"));
-    assert!(read_node.links.iter()
-            .any ( |link| link.id == "link4".into()
-                    && link.label == "Fourth Link"));
+    // Check hyperlinks from titles
+    assert!(read_node.hyperlinks.iter()
+            .any ( |hyperlink| hyperlink.id == "hyperlink1".into() &&
+                    hyperlink.label == "First Hyperlink"));
+    assert!(read_node.hyperlinks.iter()
+            .any ( |hyperlink| hyperlink.id == "hyperlink2".into() &&
+                    hyperlink.label == "Second Hyperlink"));
+    assert!(read_node.hyperlinks.iter()
+            .any ( |hyperlink| hyperlink.id == "hyperlink3".into() &&
+                    hyperlink.label == "Third Hyperlink"));
+    assert!(read_node.hyperlinks.iter()
+            .any ( |hyperlink| hyperlink.id == "hyperlink4".into()
+                    && hyperlink.label == "Fourth Hyperlink"));
     Ok (()) } }

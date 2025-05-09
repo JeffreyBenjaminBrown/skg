@@ -54,21 +54,21 @@ pub fn extract_skg_titles(path: &Path) -> Vec<String> {
         yaml_value.get("titles").and_then(|t| t.as_sequence()) {
           for title_value in titles_array {
             if let Some(title_str) = title_value.as_str() {
-              titles.push(strip_org_links(title_str)); } } } } }
+              titles.push(strip_org_hyperlinks(title_str)); } } } } }
   titles }
 
-// Titles can include links,
-// but can be searched for as if each link
+// Titles can include hyperlinks,
+// but can be searched for as if each hyperlink
 // was equal to its label.
-// That is, the ID and brackets of a link in a title are not indexed.
-pub fn strip_org_links(text: &str) -> String {
-  let link_re = Regex::new(
+// That is, the ID and brackets of a hyperlink in a title are not indexed.
+pub fn strip_org_hyperlinks(text: &str) -> String {
+  let hyperlink_re = Regex::new(
     r"\[\[.*?\]\[(.*?)\]\]").unwrap();
   let mut result = String::from(text);
   let mut in_offset = 0; // offset in the input string
-  for cap in link_re.captures_iter(text) {
+  for cap in hyperlink_re.captures_iter(text) {
     let whole_match = cap.get(0).unwrap();
-    let link_label = cap.get(1).unwrap();
+    let hyperlink_label = cap.get(1).unwrap();
 
     // Define the range to modify
     let start_pos = whole_match.start() - in_offset;
@@ -76,8 +76,8 @@ pub fn strip_org_links(text: &str) -> String {
 
     result.replace_range(
       start_pos .. end_pos,
-      link_label.as_str());
-    in_offset += whole_match.len() - link_label.len(); }
+      hyperlink_label.as_str());
+    in_offset += whole_match.len() - hyperlink_label.len(); }
   result }
 
 pub fn delete_documents_with_path(
