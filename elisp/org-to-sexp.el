@@ -19,9 +19,14 @@ ASSUMES point is on a heading."
           (heading-value (substring-no-properties
                           (string-trim
                            (org-get-heading t t t t))))
+          (is-folded (save-excursion
+                       (beginning-of-line)
+                       (org-fold-folded-p)))
           (result `((heading . ,heading-value))))
     (when id-value
       (setq result (append result `((id . ,id-value)))))
+    (when is-folded
+      (setq result (append result '((folded . t)))))
     result))
 
 (defun org-to-sexp-parse-body-at-point ()

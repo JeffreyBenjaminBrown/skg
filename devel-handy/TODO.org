@@ -1,9 +1,10 @@
 * resume in rust/save/
   serial
-** add and use a `folded` field to OrgNode
+** use the `folded` field in OrgNode
    Rust will need this in order to restore state
    when it sends the document (with some new IDs)
    back to Emacs.
+** delete no_tantivy_index
 ** write to disk, then Tantivy and TypeDB
 *** update files
     Compare each FileNode received (after interpretation) from Emacs to the file it corresponds to. Read the TypeDB db to see if an ID (which might not be the primary one) corresponds to something extant.

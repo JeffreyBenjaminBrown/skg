@@ -31,6 +31,8 @@ pub fn node_sexp_to_orgnode(
     let body = match props.get("body") {
       Some(Atom(S(b))) => Some(b.clone() ),
       _ => None, };
+    let folded = // value not needed
+      props.contains_key("folded");
     let focused = // value not needed
       props.contains_key("focused");
     let repeated = // value not needed
@@ -40,12 +42,13 @@ pub fn node_sexp_to_orgnode(
         let content_vec = content_items.clone();
         content_sexps_to_orgnodes(content_vec)? },
       _ => Vec::new(), }; // No children
-    Ok ( OrgNode { id,
-                   heading,
-                   body,
-                   focused,
-                   repeated,
-                   branches, } ) }
+    Ok ( OrgNode { id       : id,
+                   heading  : heading,
+                   body     : body,
+                   folded   : folded,
+                   focused  : focused,
+                   repeated : repeated,
+                   branches : branches, } ) }
   else { Err (
     "Branch must be a list".to_string()) } }
 

@@ -31,6 +31,7 @@ pub struct OrgNode {
   pub id       : Option<ID>,
   pub heading  : String, // a term fron org-mode
   pub body     : Option<String>, // a term fron org-mode
+  pub folded   : bool, // folded in the org-roam sense
   pub focused  : bool, // where the Emacs cursor is
   pub repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
   pub branches : Vec<OrgNode>, }
