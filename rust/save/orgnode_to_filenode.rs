@@ -38,7 +38,6 @@ fn orgnode_to_filenodes_recursive (
       None => ID::new(
         Uuid::new_v4() . to_string() ) } ],
     body: branch.body.clone(),
-    no_tantivy_index: false,
     contains: branch.branches.iter()
     // Repeated nodes are not excluded here.
       .filter_map( |child| child.id.clone() )

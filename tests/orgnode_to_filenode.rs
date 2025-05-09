@@ -32,7 +32,6 @@ fn test_convert_sexp_to_filenode() {
   assert_eq!(file_node.ids.len(), 1);
   assert_eq!(file_node.ids[0].as_str(), "1");
   assert_eq!(file_node.body, None);
-  assert_eq!(file_node.no_tantivy_index, false);
   assert!(file_node.contains.is_empty());
   assert!(file_node.subscribes_to.is_empty());
   assert!(file_node.ignores.is_empty());

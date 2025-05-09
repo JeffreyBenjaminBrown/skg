@@ -4,7 +4,6 @@ titles:
 - YAML does not escape "quotation marks" in text.
 ids:
 - '123'
-no_tantivy_index: true
 contains:
 - '1'
 - '2'

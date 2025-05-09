@@ -94,7 +94,6 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     ids                : node.ids                .clone(),
     body               : node.body               .clone(),
     path               : node.path               .clone(),
-    no_tantivy_index   : node.no_tantivy_index,
     ignores            : node.ignores            .clone(),
     replaces_view_of   : node.replaces_view_of   .clone(),
     hyperlinks         : node.hyperlinks         .clone(),

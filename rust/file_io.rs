@@ -72,7 +72,6 @@ mod tests {
       ],
       ids: vec![ID::new("test123")],
       body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
-      no_tantivy_index: false,
       contains: vec![],
       subscribes_to: vec![],
       ignores: vec![],

@@ -49,9 +49,6 @@ pub struct FileNode {
   pub body: // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
   Option<String>,
 
-  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-  pub no_tantivy_index: bool,
-
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>,
 
@@ -161,7 +158,6 @@ pub fn filenode_example() -> FileNode {
     ids: vec![ ID::new("123") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    no_tantivy_index: true,
     contains: vec![ ID::new("1"),
                     ID::new("2"),
                     ID::new("3")],

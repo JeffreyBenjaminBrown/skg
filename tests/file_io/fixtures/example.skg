@@ -7,7 +7,6 @@ ids:
 body: |-
   This one string could span pages.
   It better be okay with newlines.
-no_tantivy_index: true
 contains:
 - '1'
 - '2'
