@@ -1,7 +1,6 @@
 ids:
 - 2
-titles:
-- a second-level title
+title: a second-level title
 body: |-
   More text here.
 contains:

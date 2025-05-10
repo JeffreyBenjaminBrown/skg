@@ -45,17 +45,17 @@ pub fn needs_indexing( // based on modification time
                    // assume it needs indexing.
   } }
 
-pub fn extract_skg_titles(path: &Path) -> Vec<String> {
-  let mut titles = Vec::new();
-  if let Ok(content) = fs::read_to_string(path) {
-    if let Ok(yaml_value) =
-      from_str::<serde_yaml::Value>(&content) {
-      if let Some(titles_array) =
-        yaml_value.get("titles").and_then(|t| t.as_sequence()) {
-          for title_value in titles_array {
-            if let Some(title_str) = title_value.as_str() {
-              titles.push(strip_org_hyperlinks(title_str)); } } } } }
-  titles }
+pub fn extract_skg_title(path: &Path) -> Option<String> {
+  if let Ok(file_content) = fs::read_to_string(path) {
+    if let Ok(yaml_value) = ( from_str::<serde_yaml::Value>
+                              (&file_content) ) {
+      if let Some(title_value) = yaml_value.get("title") {
+        if let Some(title_str) = title_value.as_str() {
+          return Some(
+            strip_org_hyperlinks(
+              title_str));
+        } } } }
+  None }
 
 // Titles can include hyperlinks,
 // but can be searched for as if each hyperlink
@@ -105,22 +105,19 @@ pub fn add_document_and_title_to_index(
   ))?;
   Ok (()) }
 
-pub fn index_titles_at_path(
+pub fn index_title_at_path (
   writer: &mut tantivy::IndexWriter,
   path: &Path,
-  titles: &[String],
+  title: &String,
   path_field: schema::Field,
   title_field: schema::Field
-) -> Result<usize, Box<dyn std::error::Error>> {
-  if titles.is_empty() {
-    return Ok(0); }
-  delete_documents_with_path(writer, path, path_field)?;
-  let mut count = 0;
-  for title in titles {
-    add_document_and_title_to_index(
-      writer, path, title, path_field, title_field)?;
-    count += 1; }
-  Ok(count) }
+) -> Result < (),
+              Box < dyn std::error::Error > > {
+  delete_documents_with_path(
+    writer, path, path_field)?;
+  add_document_and_title_to_index(
+    writer, path, title, path_field, title_field)?;
+  Ok (( )) }
 
 pub fn update_index(
   index: &Index,
@@ -140,21 +137,16 @@ pub fn update_index(
       let path = entry.path();
       if !needs_indexing(path, index_mtime) {
         continue; } // skip this file
-      let titles = extract_skg_titles(path);
-      if !titles.is_empty() {
-        println!( "Indexing: {} with {} titles",
-                   path.display(),
-                   titles.len() );
-        for title in &titles {
-          println!("  - Title: {}", title); }
-        let titles_indexed = index_titles_at_path(
+      if let Some(title) = extract_skg_title(path) {
+        index_title_at_path(
           &mut index_writer,
           path,
-          &titles,
+          &title,
           path_field,
           title_field)?;
-        indexed_count += titles_indexed;
+        indexed_count += 1;
       } }
+
   if indexed_count > 0 {
     println!("Indexed {} files. Committing changes...", indexed_count);
     index_writer.commit()?;

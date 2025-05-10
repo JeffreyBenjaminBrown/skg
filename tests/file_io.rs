@@ -69,28 +69,23 @@ fn verify_body_not_needed() {
     "Deleting body did not have the intended effect."); }
 
 pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
-    // Create a new FileNode with some reversed lists --
-    // specifically, `titles`, `contains`
-    // and `subscribes_to`.
+    // Create a new FileNode reversing two of its lists,
+    // `contains` and `subscribes_to`.
     // This is only for testing purposes,
     // to show reading from and writing to disk work;
     // there's no other reason anyone would want to do this.
-    let mut reversed_titles = node.titles.clone();
-    reversed_titles.reverse();
-
     let mut reversed_contains =
         node.contains.clone();
     reversed_contains.reverse();
-
     let mut reversed_subscribes_to =
         node.subscribes_to.clone();
     reversed_subscribes_to.reverse();
 
   FileNode {
-    titles                 : reversed_titles,
     contains               : reversed_contains,
     subscribes_to          : reversed_subscribes_to,
 
+    title                  : node.title            .clone(),
     ids                    : node.ids              .clone(),
     body                   : node.body             .clone(),
     path                   : node.path             .clone(),

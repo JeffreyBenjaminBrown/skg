@@ -1,7 +1,6 @@
 ids:
 - 1
-titles:
-- a top-level title
+title: a top-level title
 body: |-
   This one string could span pages,
   but in fact only spans two lines.

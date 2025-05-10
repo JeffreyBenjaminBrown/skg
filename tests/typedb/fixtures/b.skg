@@ -1,7 +1,6 @@
 ids:
 - b
-titles:
-- b
+title: b
 body: b has a body
 contains:
 - c

@@ -124,21 +124,23 @@ async fn recursive_s_expression_from_node(
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
   let node = read_filenode ( path ) ?;
-  let heading = node.titles.first()
-    .ok_or_else(|| io::Error::new(
-      io::ErrorKind::InvalidData,
-      format!("Node with ID {} has no titles",
-              node_id)
-    ))? . to_string();
-
-  if visited.iter().any(|id| id == node_id) { // was already visited
+  if node.title.is_empty() {
+    return Err(
+      Box::new(
+        io::Error::new(
+          io::ErrorKind::InvalidData,
+          format!("Node with ID {} has an empty title",
+                  node_id)
+        ) ) ); }
+  let heading = node.title.to_string();
+  if visited.iter().any(|id| id == node_id) {
+    // In this case it was already visited.
     let node_sexpr = format!(
       "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
       node_id,
       escape_string_for_s_expression(&heading)
     );
-    return Ok(node_sexpr);
-  }
+    return Ok(node_sexpr); }
 
   visited.push ( node_id.clone() );
   let mut node_sexpr = format!(

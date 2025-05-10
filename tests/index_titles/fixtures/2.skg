@@ -1,8 +1,7 @@
 id: '123'
 context: '456'
 is_comment: false
-titles:
-  - This is a second test file.
+title: This is a second test file.
 body: this one string could span pages
 contains:
   - '1'

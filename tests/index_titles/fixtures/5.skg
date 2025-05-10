@@ -1,9 +1,7 @@
 id: '123'
 context: '456'
 is_comment: false
-titles:
-  - perfect match
-  - test second
+title: perfect match test second
 body: this one string could span pages
 contains:
   - '1'

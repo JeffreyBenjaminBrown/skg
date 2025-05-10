@@ -1,7 +1,6 @@
 ids:
 - 1
-titles:
-- title 1
+title: title 1
 body: |-
   This one string could span pages,
   and it can include newlines, no problem.

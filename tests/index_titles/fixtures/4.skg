@@ -1,8 +1,7 @@
 id: '123'
 context: '456'
 is_comment: false
-titles:
-  - This is a [[id:shgulasdghu][test]] of a second kind.
+title: This is a [[id:shgulasdghu][test]] of a second kind.
 body: this one string could span pages
 contains:
   - '1'

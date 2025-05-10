@@ -1,9 +1,7 @@
 ids:
 - '5'
 - '55'
-titles:
-- this title includes a [[id:22][hyperlink to another file]]
-- test second
+title: this title includes a [[id:22][hyperlink to another file]]
 body: |-
   this body includes more hyperlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
 replaces_view_of:

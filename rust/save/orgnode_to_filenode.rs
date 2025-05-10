@@ -32,7 +32,7 @@ fn orgnode_to_filenodes_recursive (
     if nodes.iter().any(|node| node.ids.contains(id)) {
       return; } }
   let node = FileNode {
-    titles: vec![branch.heading.clone()],
+    title: branch.heading.clone(),
     ids: vec![ match &branch.id {
       Some(id) => id.clone(),
       None => ID::new(

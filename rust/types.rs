@@ -16,7 +16,7 @@ pub struct ID(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hyperlink {
-  // Hyperlinks are represented in, and must be parsed from, the raw text fields `titles` and `body`.
+  // Hyperlinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
   pub id: ID,
   pub label: String, }
 
@@ -41,9 +41,9 @@ pub struct FileNode {
   // Competes with OrgNode as a representation of nodes, but whereas OrgNode omits information Emacs does not need, FileNode omits nothing. There is a 1-to-1 correspondence between FileNodes and actual files. This is the representation used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. And at least one field, `body`, is known to neither; it is instead read from files on disk when building a document for Emacs.
 
-  pub titles: Vec<String>, // The first title is the text displayed in a heading. Other titles are just for search.
+  pub title: String,
 
-  pub ids: Vec<ID>, // Must be nonempty. Can be more than 1 because nodes might be merged.
+  pub ids: Vec<ID>, // Must be nonempty. Can include more than 1 because nodes might be merged.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
@@ -64,7 +64,7 @@ pub struct FileNode {
   #[serde(skip)] // inferred from filepath
   pub path: PathBuf,
 
-  #[serde(skip)] // inferred from titles and body
+  #[serde(skip)] // inferred from title and body
   pub hyperlinks: Vec<Hyperlink>,
 }
 
@@ -150,11 +150,7 @@ impl Error for HyperlinkParseError {}
 
 pub fn filenode_example() -> FileNode {
   FileNode {
-    titles: vec![
-      "This text gets indexed.".to_string(),
-      "Maybe searching other text could find this note.".to_string(),
-      "YAML does not escape \"quotation marks\" in text."
-        .to_string() ],
+    title: "This text gets indexed.".to_string(),
     ids: vec![ ID::new("123") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),

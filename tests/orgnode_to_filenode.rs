@@ -27,8 +27,7 @@ fn test_convert_sexp_to_filenode() {
   assert_eq!(file_nodes.len(), 1,
              "Expected exactly one FileNode");
   let file_node = &file_nodes[0];
-  assert_eq!(file_node.titles.len(), 1);
-  assert_eq!(file_node.titles[0], "a title");
+  assert_eq!(file_node.title, "a title");
   assert_eq!(file_node.ids.len(), 1);
   assert_eq!(file_node.ids[0].as_str(), "1");
   assert_eq!(file_node.body, None);
@@ -91,12 +90,12 @@ fn test_convert_circular_sexp_to_filenode() {
     |n| n.ids[0].as_str() == "2")
     . expect("Node with ID '2' not found");
 
-  assert_eq!(node1.titles[0], "1");
+  assert_eq!(node1.title, "1");
   assert_eq!(node1.contains.len(), 1,
              "Node 1 should contain node 2");
   assert_eq!(node1.contains[0].as_str(), "2");
 
-  assert_eq!(node2.titles[0], "2");
+  assert_eq!(node2.title, "2");
   assert_eq!(node2.contains.len(), 1,
              "Node 2 should contain node 1");
   assert_eq!(node2.contains[0].as_str(), "1");

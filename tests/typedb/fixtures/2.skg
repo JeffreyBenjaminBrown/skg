@@ -1,8 +1,7 @@
 ids:
 - '2'
 - '22'
-titles:
-- title 2
+title: title 2
 body: |-
   this one string could span pages
 subscribes_to:

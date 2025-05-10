@@ -1,7 +1,4 @@
-titles:
-- YAML does not escape "quotation marks" in text.
-- Maybe searching other text could find this note.
-- This text gets indexed.
+title: This text gets indexed.
 ids:
 - '123'
 body: |-

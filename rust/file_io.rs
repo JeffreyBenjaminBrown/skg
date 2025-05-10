@@ -24,10 +24,11 @@ pub fn read_filenode
 
     filenode.path = file_path.to_path_buf();
 
-    // Get hyperlinks from titles and body
+    // Get hyperlinks from title and body
     let mut hyperlinks = Vec::new();
-    for title in &filenode.titles {
-      hyperlinks.extend(extract_hyperlinks(title)); }
+    hyperlinks.extend(
+      extract_hyperlinks(
+        &filenode.title));
     if let Some(text) = &filenode.body {
       // Ignores the None case
       hyperlinks.extend(extract_hyperlinks(text)); }
@@ -64,12 +65,8 @@ mod tests {
 
     // Create a test node with hyperlinks in titles and body
     let test_node = FileNode {
-      titles: vec![
-        "Title with hyperlink [[id:hyperlink1][First Hyperlink]]"
-          .to_string(),
-        "Another title [[id:hyperlink2][Second Hyperlink]]"
-          .to_string(),
-      ],
+      title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
+        .to_string(),
       ids: vec![ID::new("test123")],
       body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
       contains: vec![],

@@ -1,6 +1,4 @@
 * simplify
-** make title a single field
-   using multiple is needlessly complex at this stage
 ** Redesign types.
 *** motivation
     There are no OrgNodes or FileNodes.
@@ -17,7 +15,7 @@
    pub repeated : bool,
    pub branches : Vec<OrgNode>, }
 **** pub struct FileNode {
-   pub titles: Vec<String>,
+   pub title: String,
    pub ids: Vec<ID>,
    pub body: Option<String>,
    pub contains: Vec<ID>,

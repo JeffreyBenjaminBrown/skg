@@ -1,7 +1,6 @@
 ids:
 - 3
-titles:
-- another second-level heading
+title: another second-level heading
 body: |-
   This one string could span pages,
   and in fact
