@@ -13,13 +13,13 @@ pub fn hyperlinks_from_filenode(
   -> Vec<Hyperlink> {
   let mut hyperlinks = Vec::new();
   hyperlinks.extend (
-    extract_hyperlinks ( &filenode.title ) );
+    hyperlinks_from_text ( &filenode.title ) );
   if let Some(text) = &filenode.body {
     hyperlinks.extend (
-      extract_hyperlinks ( text ) ); }
+      hyperlinks_from_text ( text ) ); }
   hyperlinks }
 
-pub fn extract_hyperlinks (text: &str)
+pub fn hyperlinks_from_text (text: &str)
                       -> Vec<Hyperlink> {
   let hyperlink_pattern = Regex::new(
     // non-greedy .*? pattern avoids capturing too much.
@@ -77,25 +77,25 @@ mod tests {
   }
 
   #[test]
-  fn test_extract_hyperlinks_empty() {
+  fn test_hyperlinks_from_text_empty() {
     let text = "This text has no hyperlinks.";
-    let hyperlinks = extract_hyperlinks(text);
+    let hyperlinks = hyperlinks_from_text(text);
     assert_eq!(hyperlinks.len(), 0);
   }
 
   #[test]
-  fn test_extract_hyperlinks_single() {
+  fn test_hyperlinks_from_text_single() {
     let text = "This text has one [[id:abc123][My Hyperlink]] in it.";
-    let hyperlinks = extract_hyperlinks(text);
+    let hyperlinks = hyperlinks_from_text(text);
     assert_eq! ( hyperlinks.len(), 1 ) ;
     assert_eq! ( hyperlinks[0].id, "abc123".into() );
     assert_eq! ( hyperlinks[0].label, "My Hyperlink" ) ;
   }
 
   #[test]
-  fn test_extract_hyperlinks_multiple() {
+  fn test_hyperlinks_from_text_multiple() {
     let text = "This text has [[id:abc123][First Hyperlink]] and [[id:def456][Second Hyperlink]] in it.";
-    let hyperlinks = extract_hyperlinks(text);
+    let hyperlinks = hyperlinks_from_text(text);
     assert_eq!(hyperlinks.len(), 2);
     assert_eq!(hyperlinks[0].id, "abc123".into() );
     assert_eq!(hyperlinks[0].label, "First Hyperlink");
@@ -104,9 +104,9 @@ mod tests {
   }
 
   #[test]
-  fn test_extract_hyperlinks_with_uuid() {
+  fn test_hyperlinks_from_text_with_uuid() {
     let text = "Hyperlink with UUID: [[id:846207ef-11d6-49e4-89b4-4558b2989a60][My UUID Hyperlink]]";
-    let hyperlinks = extract_hyperlinks(text);
+    let hyperlinks = hyperlinks_from_text(text);
     assert_eq!(hyperlinks.len(), 1);
     assert_eq!(
       hyperlinks[0].id,
@@ -115,9 +115,9 @@ mod tests {
   }
 
   #[test]
-  fn test_extract_hyperlinks_with_nested_brackets() {
+  fn test_hyperlinks_from_text_with_nested_brackets() {
     let text = "Hyperlink with nested brackets: [[id:abc123][Hyperlink [with] brackets]]";
-    let hyperlinks = extract_hyperlinks(text);
+    let hyperlinks = hyperlinks_from_text(text);
     assert_eq!(hyperlinks.len(), 1);
     assert_eq!(hyperlinks[0].id, "abc123".into() );
     assert_eq!(hyperlinks[0].label, "Hyperlink [with] brackets");
