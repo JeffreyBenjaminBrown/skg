@@ -1,12 +1,23 @@
 use regex::Regex;
 use uuid::Uuid;
 
-use crate::types::{Hyperlink};
+use crate::types::{Hyperlink, FileNode};
 
 pub fn random_org_roam_id() -> String {
   // Kind of silly --
   // giving this another name isn't necessary.
   Uuid::new_v4().to_string() }
+
+pub fn hyperlinks_from_filenode(
+  filenode: &FileNode)
+  -> Vec<Hyperlink> {
+  let mut hyperlinks = Vec::new();
+  hyperlinks.extend (
+    extract_hyperlinks ( &filenode.title ) );
+  if let Some(text) = &filenode.body {
+    hyperlinks.extend (
+      extract_hyperlinks ( text ) ); }
+  hyperlinks }
 
 pub fn extract_hyperlinks (text: &str)
                       -> Vec<Hyperlink> {
@@ -23,8 +34,10 @@ pub fn extract_hyperlinks (text: &str)
 
 #[cfg(test)]
 mod tests {
+  use std::path::PathBuf;
+
   use super::*;
-  use crate::types::{HyperlinkParseError};
+  use crate::types::{HyperlinkParseError, ID};
 
   #[test]
   fn test_hyperlink_to_string() {
@@ -108,5 +121,33 @@ mod tests {
     assert_eq!(hyperlinks.len(), 1);
     assert_eq!(hyperlinks[0].id, "abc123".into() );
     assert_eq!(hyperlinks[0].label, "Hyperlink [with] brackets");
+  }
+
+  #[test]
+  fn test_hyperlinks_from_filenode() {
+    let test_node = FileNode {
+      title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string(),
+      ids: vec![ID::new("id")],
+      body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]" . to_string()),
+      contains: vec![],
+      subscribes_to: vec![],
+      hides_in_subscriptions: vec![],
+      replaces_view_of: vec![],
+      path: PathBuf::from("path"),
+    };
+    let hyperlinks = hyperlinks_from_filenode(&test_node);
+    assert_eq!(hyperlinks.len(), 4);
+    assert!(hyperlinks.iter()
+            .any(|hyperlink| hyperlink.id == "hyperlink1".into() &&
+                 hyperlink.label == "First Hyperlink"));
+    assert!(hyperlinks.iter()
+            .any(|hyperlink| hyperlink.id == "hyperlink2".into() &&
+                 hyperlink.label == "Second Hyperlink"));
+    assert!(hyperlinks.iter()
+            .any(|hyperlink| hyperlink.id == "hyperlink3".into() &&
+                 hyperlink.label == "Third Hyperlink"));
+    assert!(hyperlinks.iter()
+            .any(|hyperlink| hyperlink.id == "hyperlink4".into() &&
+                 hyperlink.label == "Fourth Hyperlink"));
   }
 }

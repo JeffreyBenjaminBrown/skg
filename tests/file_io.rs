@@ -92,5 +92,4 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     hides_in_subscriptions :
       node.hides_in_subscriptions .                 clone(),
     replaces_view_of       : node.replaces_view_of .clone(),
-    hyperlinks             : node.hyperlinks       .clone(),
   } }

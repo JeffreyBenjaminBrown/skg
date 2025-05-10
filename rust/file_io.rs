@@ -6,7 +6,6 @@ use std::io::{self};
 use std::path::{Path};
 
 use crate::types::FileNode;
-use crate::hyperlinks::extract_hyperlinks;
 
 pub fn read_filenode
   <P: AsRef<Path>>
@@ -23,16 +22,6 @@ pub fn read_filenode
     // in the .skg file.
 
     filenode.path = file_path.to_path_buf();
-
-    // Get hyperlinks from title and body
-    let mut hyperlinks = Vec::new();
-    hyperlinks.extend(
-      extract_hyperlinks(
-        &filenode.title));
-    if let Some(text) = &filenode.body {
-      // Ignores the None case
-      hyperlinks.extend(extract_hyperlinks(text)); }
-    filenode.hyperlinks = hyperlinks;
     Ok (filenode) }
 
 /// A line in the typedef of FileNode prevents the field `path`
@@ -53,7 +42,6 @@ mod tests {
   use super::*;
   use std::fs::File;
   use std::io::Write;
-  use std::path::{PathBuf};
   use tempfile::tempdir;
   use crate::types::{ID, FileNode};
 
@@ -73,8 +61,7 @@ mod tests {
       subscribes_to: vec![],
       hides_in_subscriptions: vec![],
       replaces_view_of: vec![],
-      hyperlinks: vec![],
-      path: PathBuf::new(),
+      path: file_path.clone(),
     };
 
     // Write the node to a file
@@ -83,26 +70,12 @@ mod tests {
         |e| io::Error::new(
           io::ErrorKind::InvalidData,
           e.to_string()))?;
-    let mut file = File::create(&file_path)?;
+    let mut file = File::create( &file_path )?;
     file.write_all(yaml.as_bytes())?;
 
     // Read the node back from the file
     let read_node = read_filenode(&file_path)?;
 
-    // Verify hyperlinks were extracted correctly
-    assert_eq!(read_node.hyperlinks.len(), 4);
-
-    // Check hyperlinks from titles
-    assert!(read_node.hyperlinks.iter()
-            .any ( |hyperlink| hyperlink.id == "hyperlink1".into() &&
-                    hyperlink.label == "First Hyperlink"));
-    assert!(read_node.hyperlinks.iter()
-            .any ( |hyperlink| hyperlink.id == "hyperlink2".into() &&
-                    hyperlink.label == "Second Hyperlink"));
-    assert!(read_node.hyperlinks.iter()
-            .any ( |hyperlink| hyperlink.id == "hyperlink3".into() &&
-                    hyperlink.label == "Third Hyperlink"));
-    assert!(read_node.hyperlinks.iter()
-            .any ( |hyperlink| hyperlink.id == "hyperlink4".into()
-                    && hyperlink.label == "Fourth Hyperlink"));
-    Ok (()) } }
+    assert_eq!( test_node, read_node,
+                "Nodes should have matched." );
+    Ok (( )) }}

@@ -2,7 +2,7 @@
 
 use sexp::parse;
 
-use skg::types::{ID,OrgNode,FileNode};
+use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgnode_to_filenode::{
   orgnodes_to_filenodes,
   orgnode_to_filenodes };
@@ -10,6 +10,7 @@ use skg::save::sexp_to_orgnodes::{
   node_sexp_to_orgnode,
   content_sexp_to_orgnodes,
   content_sexps_to_orgnodes };
+use skg::types::{ID,OrgNode,FileNode};
 
 #[test]
 fn test_convert_sexp_to_filenode() {
@@ -35,7 +36,8 @@ fn test_convert_sexp_to_filenode() {
   assert!(file_node.subscribes_to.is_empty());
   assert!(file_node.hides_in_subscriptions.is_empty());
   assert!(file_node.replaces_view_of.is_empty());
-  assert!(file_node.hyperlinks.is_empty());
+  assert!( hyperlinks_from_filenode ( &file_node )
+           . is_empty() );
 }
 
 #[test]

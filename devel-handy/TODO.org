@@ -1,11 +1,11 @@
-* simplify
-** Redesign types.
-*** motivation
+* rename extract_hyperlinks -> hyperlinks_from_text
+* Redesign types.
+** motivation
     There are no OrgNodes or FileNodes.
     The clean separation is between data stored on disk,
     data interpreted from disk into TypeDB (hyperlinks),
     and data regarding the view (folded, focused, repeated).
-*** extant types
+** extant types
 **** pub struct OrgNode {
    pub id       : Option<ID>,
    pub heading  : String,
@@ -24,8 +24,8 @@
    pub replaces_view_of: Vec<ID>,
    pub path: PathBuf,
    pub hyperlinks: Vec<Hyperlink>,
-*** new types
-**** graph data
+** new types
+*** graph data
    pub id                       : Option<ID>,
    pub heading                  : String,
    pub body                     : Option<String>
@@ -35,7 +35,7 @@
    pub replaces_view_of         : Vec<ID>,
    pub path                     : PathBuf,
    pub hyperlinks               : Vec<Hyperlink>,
-**** view data
+*** view data
    pub folded   : bool,
    pub focused  : bool,
    pub repeated : bool,

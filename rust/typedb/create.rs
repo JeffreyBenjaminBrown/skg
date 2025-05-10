@@ -9,6 +9,7 @@ use typedb_driver::{
 
 use crate::types::{ID, FileNode};
 use crate::file_io::read_filenode;
+use crate::hyperlinks::hyperlinks_from_filenode;
 
 pub async fn make_db_destroying_earlier_one (
   data_folder : &str,
@@ -137,9 +138,11 @@ pub async fn create_relationships_from_node(
 
   insert_from_list(
     primary_id,
-    &node.hyperlinks.iter ()
-      . map ( |hyperlink| ID::from(hyperlink.id.clone()) )
-      . collect::<Vec<ID>>(),
+    & ( hyperlinks_from_filenode ( &node )
+        . iter ()
+        . map ( |hyperlink|
+                 ID::from ( hyperlink.id.clone() ) )
+        . collect::<Vec<ID>>() ),
     "hyperlinks_to",
     "source",
     "dest",

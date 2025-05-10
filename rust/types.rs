@@ -36,7 +36,7 @@ pub struct OrgNode {
   pub repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
   pub branches : Vec<OrgNode>, }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct FileNode {
   // Competes with OrgNode as a representation of nodes, but whereas OrgNode omits information Emacs does not need, FileNode omits nothing. There is a 1-to-1 correspondence between FileNodes and actual files. This is the representation used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. And at least one field, `body`, is known to neither; it is instead read from files on disk when building a document for Emacs.
@@ -63,9 +63,6 @@ pub struct FileNode {
 
   #[serde(skip)] // inferred from filepath
   pub path: PathBuf,
-
-  #[serde(skip)] // inferred from title and body
-  pub hyperlinks: Vec<Hyperlink>,
 }
 
 
@@ -164,5 +161,4 @@ It better be okay with newlines."# . to_string() ),
     replaces_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),
-    hyperlinks: vec![],
   } }
