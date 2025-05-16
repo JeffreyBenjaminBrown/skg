@@ -6,15 +6,15 @@ Skg is an app for collecting, creating and sharing information. I believe it off
 
 This "data model" is thousands of years old -- ordinary books with citations use it. But citations are slow. Apps let you create and follow links much faster. Some popular apps that do this today include org-roam, Roam, Notion, Obsidian, OneNote, and Tana; I think there are literally dozens of others.
 
-Some apps use different terms. I have tried to use the most common ones. Each user's data will consist of a collection of "documents" (or "notes"), each of which  is a `tree` with `hyperlinks`. That is, each document is just ordinary text, which can be divided into sections, subsections, sub-subsections, etc., and in which there can be hyperlinks.
+Some people use different terms for the same things. I have tried to use the most common ones. Each user's data will consist of a collection of "documents" (or "notes"), each of which  is a `tree` with `hyperlinks`. That is, each document is just ordinary text, which can be divided into sections, subsections, sub-subsections, etc., and in which there can be hyperlinks.
 
-That's all been standard for years. But unlike previous technologies, Skg will let you split, merge and rearrange anyone's notes, safely mixing your public and private notes with anything they have shared with you, without needing ownership. When you incorporate another author's notes into yours, you can still receive updates if the other author changes things. Skg app will also let you learn more about your own notes from how others incorporate yours into theirs (when they share that they did).
+That's all been standard for years. But unlike previous technologies, Skg will let you split, merge and rearrange anyone's notes, safely mixing your public and private notes with anything they have shared with you, without needing ownership. When you incorporate someone else's notes into yours, you can (and by default will) receive updates if they change things. Skg will also let you learn more about your own notes from how others incorporate yours into theirs (if they share that they did, and if you want to know).
 
 # adressing some common fears
 
 ## it's free
 
-Skg is free and open-source. No cloud tyrant needs to control your data. But that said, sharing data through some big cloud provider will be convenient.
+Skg is free and open-source (see the [[license](LICENSE.md)]. No cloud tyrant needs to control your data. But that said, sharing data through some big cloud provider will be convenient.
 
 ## anonymity and lurking are both fine
 
@@ -49,13 +49,13 @@ Anybody who has shared notes in a good student group has felt the benefits that 
 
 If you are unfamiliar with those processes, but you know how helpful taking notes has been for your own understanding, just imagine doing that with good collaborators. (Yes, your collaborators will be good, because you control your view of others' work. You won't have to see contributions you don't care about.)
 
-## Skg is the best solution yet to the sharing problem.
+## Skg solves the sharing problem.
 
-I think so, at least. To explain why, I have to first make explicit the data model most of us are used to.
+To explain why sharing data is a hard problem, and to argue that nothing before Skg has solved it, I have to first make explicit the data model you are probably used to.
 
-In the usual sharing model, some people can see and change a file, and others can only see it. Those who can only see it cannot contribute, which deprives the entire community of potential knowledge. Those who can also change the file might disagree, and those conflicts, too, lead to the loss of ideas and perspectives.
+In the usual sharing model, some people can see and change a document, and others can only see it. Those who can only see it cannot contribute, which deprives the entire community of potential knowledge. Those who can also change the document might disagree, and those conflicts, too, lead to the loss of ideas and perspectives.
 
-The data model presented here solves the problem of "media capture" (a.k.a. the "wikipedia dictator problem"). It permits alternate universes to coexist and cooperate, without getting in each others' way.
+By contrast, the data model presented here permits "competing" frameworks to coexist and cooperate, without getting in each others' way.
 
 # The Skg experience
 
@@ -63,13 +63,13 @@ The data model presented here solves the problem of "media capture" (a.k.a. the 
 
 Sorry, I have to do it. Fortunately these are common ideas.
 
-As mentioned earlier, each document is a `tree` with `hyperlinks`. Each spot in the tree is a `node`. Each tree has exactly one special node called the `root`. Each node in the tree has a `title`, which is ordinary text with `hyperlinks`. Some nodes have `branches`, which are other `nodes`. A `node` with no `branches` is called a `leaf` (because leaves are where branches end).
-
-Each branch is itself a tree. The simplest tree is a single leaf.
+As mentioned earlier, each document is a `tree` with `hyperlinks`. In more detail: Each spot in the tree is a `node`, and the relationship connects nodes in the tree is called `containment`. Each tree has exactly one special node called the `root`. The root might contain other nodes, but nothing contains the root. Each node in the tree has a `title`, which is ordinary text with hyperlinks. Some nodes contain other nodes (which is sometimes called "having branches"). A node with no contents is called a `leaf` (because leaves are where branches stop branching).
 
 A node's `descendents` include its branches, and its branches' branches, etc.
 
 Notice that "branch" and "node" are almost the same thing. A branch is just a node together with all its descendents. The difference can often be ignored.
+
+Each branch and each sub-branch of a tree is itself a tree -- even the leaves.
 
 ## Hyperlinks point to nodes (or equivalently, to branches)
 
@@ -91,6 +91,8 @@ The document branches into three parts: `health`, `recipes` and `mystical`. A hy
 
 When you read another's notes, you can choose to incorporate any branch from their data into any node of yours.
 
+### A detailed example
+
 Suppose, for instance, the `eggs` document above belongs to your friend Egg Man. And suppose this document, `mysticism`, is yours:
 ```
   * mysticism
@@ -109,17 +111,15 @@ You might choose to move the `mystical` branch from `eggs` into your `mysticism`
   ** common objects with mystical associations
   *** black cats
   *** the moon
-  *** eggs / mystical -- YOU CLONED THIS FROM EGG MAN
+  *** eggs / mystical -- CLONED from Egg Man's "eggs"
   **** Which came first, the chicken or the egg?
 ```
-(Notice that the title of the new node, `eggs / mystical`, joins two separate titles from `eggs`. That will be the default, but you can also choose some other title instead. The point is that `eggs / mystical` in your `mysticsm` comes from `mystical` in Egg Man's `eggs`.)
+(Notice that the title of the root of the new branch, `eggs / mystical`, joins two separate titles found in `eggs`. That might be the default, but you can also choose some other title instead. The point is that `eggs / mystical` in your `mysticsm` comes from `mystical` in Egg Man's `eggs`.)
 
 Suppose Egg Man then extends the original `eggs` note, so it looks like this:
 ```
   * eggs
   ** health
-  *** protein
-  *** cholesterol
   ** recipes
   ** mystical
   *** Which came first, the chicken or the egg?
@@ -135,7 +135,7 @@ Your clone in "mysticsm" of the original "eggs / mystical" is by default `subscr
   ** common objects with mystical associations
   *** black cats
   *** the moon
-  *** eggs / mystical -- THE CLONE FROM EGG MAN
+  *** eggs / mystical -- CLONED from Egg Man's "eggs"
   **** Which came first, the chicken or the egg?
   **** << unincorporated subscribed content from Egg Man's document "eggs" >>
   ***** Egg limpia (curanderismo)
@@ -146,6 +146,8 @@ The node `<< unincorporated subscribed content from Egg Man's document "eggs" >>
 Since [[branches can be folded](./docs/tree-folding-is-powerful.md)], even if Egg Man has added hundreds of new nodes, the automatically-generated branch titled `<< unincorporated subscribed content from Egg Man's document "eggs" >>` does not have to clutter your view of `mysticism`.
 
 You can of course unsubscribe from Egg Man's changes to that branch if you want, or even unsubscribe from Egg Man's writings entirely.
+
+### What the example demonstrates
 
 You and Egg Man can thus focus on exactly what you care about. Your "changes" to Egg Man's data don't have to affect Egg Man's experience at all. However, if you make public the fact that you incorporated Egg Man's note into yours, and Egg Man has chosen to see such information, then an indicator in Egg Man's view of `eggs` will show that his `mystical` branch is part of a document owned by you. If Egg Man is curious, he can follow that indicator to discover your `mysticism` document.
 
