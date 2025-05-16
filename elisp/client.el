@@ -7,10 +7,10 @@
 ;; (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
-;; data around the node with ID "4",
-;; build an s-expression representing an org-document
-;; based on the result, and send that to Emacs,
-;; and then causes Emacs to open an org-mode buffer
+;; the document containing the node with the specified ID,
+;; builds an s-expression representing an org-document
+;; based on the result, and sends that to Emacs,
+;; causing Emacs to open an org-mode buffer
 ;; displaying the results.
 
 (defvar skg-doc--proc nil

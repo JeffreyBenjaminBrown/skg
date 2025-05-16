@@ -27,7 +27,8 @@ pub enum HyperlinkParseError {
 
 #[derive(Debug, Clone)]
 pub struct OrgNode {
-  // A recursive representation of nodes, useful for communicating with Emacs. Omits things Emacs does not need to know, like `path`. To completely describe the data we would need a collection of FileNodes, which omit nothing.
+  // A recursive representation of nodes, useful for communicating with Emacs. Omits things Emacs does not need to know, like `path`. To completely describe the data we would need a collection of FileNodes, which omit nothing except ephemeral aspects of the view -- whether a branch is folded, focused and repeated.
+  // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs. (When Rust receives a node with no ID, it creates a random one and updates the database accordingly.)
   pub id       : Option<ID>,
   pub heading  : String, // a term fron org-mode
   pub body     : Option<String>, // a term fron org-mode
@@ -38,8 +39,8 @@ pub struct OrgNode {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct FileNode {
-  // Competes with OrgNode as a representation of nodes, but whereas OrgNode omits information Emacs does not need, FileNode omits nothing. There is a 1-to-1 correspondence between FileNodes and actual files. This is the representation used to initialize the TypeDB and Tantivy databases.
-  // Tantivy will receive some of this data, and TypeDB some other subset. And at least one field, `body`, is known to neither; it is instead read from files on disk when building a document for Emacs.
+  // There is a 1-to-1 correspondence between FileNodes and actual files -- a file can be read to a FileNode, and a FileNode can be written to a file. The files are the only permanent data; the rest are ephemeral aspects of views of those files. FileNode is the format used to initialize the TypeDB and Tantivy databases.
+  // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
 
   pub title: String,
 
