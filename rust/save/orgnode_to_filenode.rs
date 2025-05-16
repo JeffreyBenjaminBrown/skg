@@ -17,19 +17,20 @@ pub fn orgnode_to_filenodes (
   branch: &OrgNode)
   -> Vec<FileNode> {
   let mut nodes = Vec::new();
-  orgnode_to_filenodes_recursive(
+  orgnode_to_filenodes_internal(
     branch, &mut nodes);
   nodes }
 
-fn orgnode_to_filenodes_recursive (
+fn orgnode_to_filenodes_internal (
   branch: &OrgNode,
-  nodes: &mut Vec<FileNode>) {
+  nodes_acc: &mut Vec<FileNode> // accumulator
+) {
   // PITFALL: Mutates second argument, returns nothing.
   if branch.repeated { // skip nodes marked as repeated
     return; }
   if let Some(id) = &branch.id {
     // Skip repeated nodes, even if not marked as such.
-    if nodes.iter().any(|node| node.ids.contains(id)) {
+    if nodes_acc.iter().any(|node| node.ids.contains(id)) {
       return; } }
   let node = FileNode {
     title: branch.heading.clone(),
@@ -39,7 +40,7 @@ fn orgnode_to_filenodes_recursive (
         Uuid::new_v4() . to_string() ) } ],
     body: branch.body.clone(),
     contains: branch.branches.iter()
-    // Repeated nodes are not excluded here.
+      // Do not exclude repeated nodes here.
       .filter_map( |child| child.id.clone() )
       .collect(),
     subscribes_to          : Vec::new(),
@@ -47,8 +48,8 @@ fn orgnode_to_filenodes_recursive (
     replaces_view_of       : Vec::new(),
     path                   : "".into(),
   };
-  nodes.push(node);
+  nodes_acc.push(node);
 
   for child in &branch.branches { // recurse
-    orgnode_to_filenodes_recursive(
-      child, nodes); } }
+    orgnode_to_filenodes_internal(
+      child, nodes_acc); } }
