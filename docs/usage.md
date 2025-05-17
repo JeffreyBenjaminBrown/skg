@@ -1,6 +1,6 @@
 # Usage: How to run Skg
 
-Two alternatives:
+There are two alternatives:
 
 ## Install nothing. Run it in a tailor-made Docker container.
 

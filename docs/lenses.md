@@ -1,6 +1,6 @@
-## "lenses": subscription and overriding in detail
+# "Lenses": Subscription and overriding in detail
 
-### an example
+## An example
 Suppose this document, `mysticism`, is yours:
 ```
   * mysticism
