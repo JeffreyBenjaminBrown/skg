@@ -162,8 +162,8 @@ pub async fn create_relationships_from_node(
                     "hidden",
                     tx ).await?;
   insert_from_list( primary_id,
-                    &node.replaces_view_of,
-                    "replaces_view",
+                    &node.overrides_view_of_of,
+                    "overrides_view_of",
                     "replacement",
                     "replaced",
                     tx ).await?;

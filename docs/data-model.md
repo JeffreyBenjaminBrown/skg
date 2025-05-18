@@ -12,12 +12,12 @@ As is evident from the [[schema](../schema.tql)], there are a number of ways nod
 - Following a hyperlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 # Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[the sharing model](sharing-model.md)], and [[easy to understand changes](diffs-are-clearer-in-skg.md)].
-# The override relatinoship
-A file F can "override" the file O. This causes the user, when they open O, to see F instead. (Skg is not fooling the user -- they will also see something indicating that O was overridden by F, and if they choose, they can see O instead.)
+# The overrides_view_of relatinoship
+A file F can override the view of file O. If it does, then by default when the user opens a link to O, they will see F instead. (The override is not silent -- it will be visibly announced, and the user can still visit the overridden file if they like.)
 
 Overriding is useful for both sharing and privacy, as is explained below.
 
-Overriding is represented in the [[schema](../schema.tql)] with the `replaces_view` relationship.
+Overriding is represented in the [[schema](../schema.tql)] with the `overrides_view_of` relationship.
 # Sharing
 When you "edit" a note N that you don't own, what actually happens is you gain a new note N', which begins with all of the content from N plus a (deletable) subscription to N and a (deletable) overrides relationship to N.
 

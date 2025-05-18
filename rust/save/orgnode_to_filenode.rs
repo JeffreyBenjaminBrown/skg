@@ -43,10 +43,10 @@ fn orgnode_to_filenodes_internal (
       // Do not exclude repeated nodes here.
       .filter_map( |child| child.id.clone() )
       .collect(),
-    subscribes_to              : Vec::new(),
+    subscribes_to                : Vec::new(),
     hides_from_its_subscriptions : Vec::new(),
-    replaces_view_of           : Vec::new(),
-    path                       : "".into(),
+    overrides_view_of_of         : Vec::new(),
+    path                         : "".into(),
   };
   nodes_acc.push(node);
 

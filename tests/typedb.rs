@@ -154,8 +154,8 @@ fn test_typedb_integration(
       r#" match
             $replacement isa node, has id $from;
             $replaced isa node, has id $to;
-            $rel isa replaces_view (replacement: $replacement,
-                                    replaced:    $replaced);
+            $rel isa overrides_view_of (replacement: $replacement,
+                                        replaced:    $replaced);
           select $from, $to;"#,
       "from",
       "to"

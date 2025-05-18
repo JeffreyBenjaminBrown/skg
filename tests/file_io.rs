@@ -85,11 +85,11 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     contains               : reversed_contains,
     subscribes_to          : reversed_subscribes_to,
 
-    title                  : node.title            .clone(),
-    ids                    : node.ids              .clone(),
-    body                   : node.body             .clone(),
-    path                   : node.path             .clone(),
+    title                  : node.title                .clone(),
+    ids                    : node.ids                  .clone(),
+    body                   : node.body                 .clone(),
+    path                   : node.path                 .clone(),
     hides_from_its_subscriptions :
-      node.hides_from_its_subscriptions .                 clone(),
-    replaces_view_of       : node.replaces_view_of .clone(),
+      node.hides_from_its_subscriptions .               clone(),
+    overrides_view_of_of   : node.overrides_view_of_of .clone(),
   } }

@@ -60,7 +60,7 @@ mod tests {
       contains: vec![],
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
-      replaces_view_of: vec![],
+      overrides_view_of_of: vec![],
       path: file_path.clone(),
     };
 

@@ -28,17 +28,15 @@ define
   # To understand the relations
   #   subscribes,
   #   hides_from_its_subscriptions, and
-  #   replaces_view,
+  #   overrides_view_of,
   # see `docs/sharing-model.md`.
-  # In the documentation, `replaces_view`
-  #   is often called the "overrides" relationship.
   relation subscribes,
     relates subscriber,
     relates subscribee;
   relation hides_from_its_subscriptions,
     relates hider,
     relates hidden;
-  relation replaces_view,
+  relation overrides_view_of,
     relates replacement,
     relates replaced;
 
@@ -54,8 +52,8 @@ define
     plays subscribes:subscribee,
     plays hides_from_its_subscriptions:hider,
     plays hides_from_its_subscriptions:hidden,
-    plays replaces_view:replacement,
-    plays replaces_view:replaced,
+    plays overrides_view_of:replacement,
+    plays overrides_view_of:replaced,
     plays has_extra_id:node;
 
   entity extra_id,
