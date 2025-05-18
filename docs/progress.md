@@ -13,6 +13,8 @@ The client can:
 - Let the user edit it.
 
 ## What's left to do
-Most immediately, the client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headings without IDs.) This is sketched in a little more detail in [[TODO.org](../devel-handy/TODO.org)].
-
-For that plan and more in greater detail (plus architectural observations, conceptual problems, and more), see [[my org-roam notes on Skg](https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org)].
+### Save data
+    The client can request saved data and manipulate it.
+    The client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headings without IDs.) This is sketched in a little more detail in [[TODO.org](../devel-handy/TODO.org)].
+### Sharing
+The user experience for sharing has been documented, and the [[schema](../schema.tql)] includes the necessary relations -- subscription ("subscribes"), hiding from a subscription view ("hides_from_its_subscriptions"). Those relationships can be read into TypeDB. There is not yet code to modify them or query using them.
