@@ -156,8 +156,8 @@ pub async fn create_relationships_from_node(
                     "subscribee",
                     tx ).await?;
   insert_from_list( primary_id,
-                    &node.hides_in_subscriptions,
-                    "hides_in_subscriptions",
+                    &node.hides_from_its_subscriptions,
+                    "hides_from_its_subscriptions",
                     "hider",
                     "hidden",
                     tx ).await?;

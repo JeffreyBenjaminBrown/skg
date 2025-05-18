@@ -1,6 +1,3 @@
-* rename hide relatinoship
-  hides_in_subscriptions ->
-  hides_in_this_subscription
 * resume in rust/save/
   serial
 ** use the `folded` field in OrgNode

@@ -17,8 +17,8 @@ define
     plays hyperlinks_to:dest,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
-    plays hides_in_subscriptions:hider,
-    plays hides_in_subscriptions:hidden,
+    plays hides_from_its_subscriptions:hider,
+    plays hides_from_its_subscriptions:hidden,
     plays replaces_view:replacement,
     plays replaces_view:replaced,
     plays has_extra_id:node;
@@ -48,13 +48,13 @@ define
 
   # To understand the relations
   #   subscribes,
-  #   hides_in_subscriptions, and
+  #   hides_from_its_subscriptions, and
   #   replaces_view,
   # see `docs/sharing-model.md`.
   relation subscribes,
     relates subscriber,
     relates subscribee;
-  relation hides_in_subscriptions,
+  relation hides_from_its_subscriptions,
     relates hider,
     relates hidden;
   relation replaces_view,

@@ -134,19 +134,19 @@ fn test_typedb_integration(
       r#" match
             $hider isa node, has id $from;
             $hidden isa node, has id $to;
-            $rel isa hides_in_subscriptions
+            $rel isa hides_from_its_subscriptions
               ( hider:  $hider,
                 hidden: $hidden);
           select $from, $to;"#,
       "from",
       "to"
     ).await?;
-    let mut expected_hides_in_subscriptions = HashSet::new();
-    expected_hides_in_subscriptions.insert((
+    let mut expected_hides_from_its_subscriptions = HashSet::new();
+    expected_hides_from_its_subscriptions.insert((
       "1".to_string(), "4".to_string()));
-    expected_hides_in_subscriptions.insert((
+    expected_hides_from_its_subscriptions.insert((
       "1".to_string(), "5".to_string()));
-    assert_eq!(hides_pairs, expected_hides_in_subscriptions);
+    assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
     let replacement_pairs = collect_all_of_some_binary_rel(
       db_name,

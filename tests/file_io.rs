@@ -89,7 +89,7 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     ids                    : node.ids              .clone(),
     body                   : node.body             .clone(),
     path                   : node.path             .clone(),
-    hides_in_subscriptions :
-      node.hides_in_subscriptions .                 clone(),
+    hides_from_its_subscriptions :
+      node.hides_from_its_subscriptions .                 clone(),
     replaces_view_of       : node.replaces_view_of .clone(),
   } }

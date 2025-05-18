@@ -27,7 +27,7 @@ The overrides relationship causes Skg to show you N' when you follow links to N.
 
 When new content appears in N, it will appear in your N' as "unintegrated subscribed content" (which you can proceed to integrate if you like). If you delete the subscription, this stops being true. You can also subscribe N' to other nodes apart from N.
 
-If the original N contains C, and you delete C from your N', then N' gains a "hides_in_subscriptions" relationship to C, which prevents C from being shown as "unintegrated subscribed content" in N'.
+If the original N contains C, and you delete C from your N', then N' gains a "hides_from_its_subscriptions" relationship to C, which prevents C from being shown as "unintegrated subscribed content" in N'.
 # Privacy relies on overriding.
 The previous section describes how overriding is used to integrate foreign content into one's data. Overriding is also the mechanism by which private data is added to public data.
 

@@ -7,6 +7,6 @@ body: |-
 contains:
 - 2
 - 33
-hides_in_subscriptions:
+hides_from_its_subscriptions:
 - 4
 - 55
