@@ -22,10 +22,10 @@ In this way, when someone studies your writing, they can help you understand the
 ## Multidimensional trees
 Kind of technical but [[really cool](docs/multidimensional-trees.md)].
 # If you're still unconvinced
+- [[Preempting some common concerns](docs/preempt.md)] about ownership and privacy.
 - Some technical details
   - [[The data model](docs/data-model.md)].
   - [[The sharing model](docs/sharing-model.md)].
-- [[Preempting some common concerns](docs/preempt.md)] about ownership and privacy.
 - Some less obvious motivations
   - [[Traditional data ownership is awkward.](docs/ownership-has-been-awkward.md)]
   - [[Private writing is powerful.](docs/private-writing.md)]
@@ -48,5 +48,5 @@ I'd love some help. [[Skg uses cool technologies!](docs/cool-tech-in-skg.md)]
 - Some likely jumping-off points for understanding the code
   - [[The TypeDB schema](schema.tql)]
   - [[The Rust types](rust/types.rs)]
-  - [[The Rust server](rust/serve.rs)]
+  - [[The Rust server](rust/serve.rs)]. (The `main` module is just a wrapper for this module.)
   - [[The Emacs client](elisp/client.el)]
