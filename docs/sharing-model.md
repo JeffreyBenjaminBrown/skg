@@ -1,9 +1,11 @@
 # How sharing works in skg
 
-Your config file should list the sources (for instance, repos on GitHub) of notes you want to use. Each source should be downloaded to some local folder. Some of these notes will, presumably, be ones you wrote; others can be ones others wrote.
+Each author or source you want access to should be downloaded to some local folder. Some of these notes will, presumably, be ones you wrote; others can be ones others wrote.
 
-The weird thing is, you can navigate and edit them as if you owned them all. When you "modify" someone else's note N, you actually create a lens onto their note. You don't need to change N. In your view you can change the text content of N, and reorder the node content of N, and add to that node content, and discard some of it.
+You can navigate and edit them as if you owned them all. When you "modify" someone else's original note, you actually create a clone of it, in your data rather than theirs. The clone is implemented as an ordinary note just like the original, with the same text and branches, and with a subscription to the original. You can change the text of the clone, rearrange its branches, discard them, scatter them across your other files.
 
-As soon as you do any of those, you create a duplicate note N', with all of the content of N. The nodes that you remove from N become ones which your N' "hides_from_its_subscriptions", and N becomes a node to which N' is "subscribed". If, later, more content appears in N, this will be visible to you from N', as "unincorporated subscribed content", which you can if you wish proceed to incorporate into your own data.
+All of the original content is considered "integrated" into the clone. Branches you then delete from the clone or move elsewhere become branches which the clone "hides_from_its_subscriptions". These hiding relationships are recorded explicitly in the filesystem upon saving, but there is also an implicit "hides_from_its_subscriptions" relationship from the clone to all of its normal content. (That's because any branch that shows up as ordinary integrated content does not need to also show up in the subscriptions.)
 
-Because nodes in Skg are represented as flat files, this kind of lensing duplicates very little data. For instance, if N consisted of two big branches, then the file representing N would only contain two nodes. If you changed their order, you would have to duplicate N (with its text content and its two nodes), but you would not have to duplicate anything inside either branch.
+If, later, the other author adds content to their note, it will be visible from the clone, thanks to its subscription to the original, as "unintegrated subscribed content". You can if you wish proceed to incorporate that content into yours, too.
+
+Because nodes in Skg are represented as flat files, this way of lensing onto foreign data duplicates very little of it. For instance, if the original had two branches when the clone was made, the clone would only need to `contain` two IDs. None of the descendents of those IDs need to be mentioned, unless and until one of them is also modified.

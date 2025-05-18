@@ -1,11 +1,46 @@
 define
-
-  # A probably-unique identifier for a node.
-  # (Note that nodes can have multiple IDs -- see `extra_id` below.)
+  # Each id identifies exactly one node.
+  # Most nodes only have one id, but see `extra_id` below.
   attribute id, value string;
 
   # A place in the filesystem.
   attribute path, value string;
+
+  # Like the relationship
+  # from a document to a section thereof, or
+  # from a section to a subsection, or
+  # from an org heading to its subheadings.
+  # See `docs/vocabular.md` and  `docs/data-model.md`.
+  relation contains,
+    relates container,
+    relates contained @card(1..1);
+
+  # These are not stored to disk,
+  # but rather inferred by Rust from a node's text content
+  # and from there loaded into TypeDB.
+  # Hyperlinks are org-roam style plain text,
+  # which look like
+  #  [[id:id] [label:string]]
+  relation hyperlinks_to,
+    relates source,
+    relates dest;
+
+  # To understand the relations
+  #   subscribes,
+  #   hides_from_its_subscriptions, and
+  #   replaces_view,
+  # see `docs/sharing-model.md`.
+  # In the documentation, `replaces_view`
+  #   is often called the "overrides" relationship.
+  relation subscribes,
+    relates subscriber,
+    relates subscribee;
+  relation hides_from_its_subscriptions,
+    relates hider,
+    relates hidden;
+  relation replaces_view,
+    relates replacement,
+    relates replaced;
 
   # "The graph" is made of nodes, which resemble org-headings.
   entity node,
@@ -31,32 +66,3 @@ define
   relation has_extra_id,
     relates node,
     relates extra_id @card(1..1);
-
-  # Like the relationship from an org heading to its subheadings,
-  # or from an org file (title) to its headings.
-  # See `docs/content-model.md` for details.
-  relation contains,
-    relates container,
-    relates contained @card(1..1);
-
-  # Derived from the node's text content (of which TypeDB is unaware).
-  # Hyperlinks are org-roam style plain text. That is, they look like:
-  #  [[id:<id>][<label>]]
-  relation hyperlinks_to,
-    relates source,
-    relates dest;
-
-  # To understand the relations
-  #   subscribes,
-  #   hides_from_its_subscriptions, and
-  #   replaces_view,
-  # see `docs/sharing-model.md`.
-  relation subscribes,
-    relates subscriber,
-    relates subscribee;
-  relation hides_from_its_subscriptions,
-    relates hider,
-    relates hidden;
-  relation replaces_view,
-    relates replacement,
-    relates replaced;

@@ -27,6 +27,6 @@ The content relationship ought to be not "[host] contains [branch]", but "[host]
 More detail here:
 https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/node_contains_branch_in_view.org
 ### Sharing
-The user experience for sharing has been documented, and the [[schema](../schema.tql)] includes the necessary relations -- subscription ("subscribes"), hiding from a subscription view ("hides_from_its_subscriptions"). Those relationships can be read into TypeDB.
+The user experience for sharing, and the [[data model for sharing](sharing-model.md)], have been documented. The [[schema](../schema.tql)] includes the necessary relations. Rust can already read those relationships from disk and write them into TypeDB.
 
-There is not yet code to modify them or query using them.
+There is not yet code to modify or view them.
