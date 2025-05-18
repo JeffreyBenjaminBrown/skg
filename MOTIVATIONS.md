@@ -1,14 +1,14 @@
 # MOTIVATIONS
 
-- [[Preempting some common concerns](docs/preempt.md)] about ownership and privacy.
+- [Preempting some common concerns](docs/preempt.md) about ownership and privacy.
 - Some technical details
-  - [[The data model](docs/data-model.md)].
-  - [[The sharing model](docs/sharing-model.md)].
+  - [The data model](docs/data-model.md).
+  - [The sharing model](docs/sharing-model.md).
 - Some less obvious motivations
-  - [[Traditional data ownership is awkward.](docs/ownership-has-been-awkward.md)]
-  - [[Private writing is powerful.](docs/private-writing.md)]
-  - [[Integrating your public and private thinking only recently became possible.](docs/integrate-public-and-private.md)]
-  - [[Knowledge gardening is Zen.](docs/knowledge-gardening-is-zen.md)]
+  - [Traditional data ownership is awkward.](docs/ownership-has-been-awkward.md)
+  - [Private writing is powerful.](docs/private-writing.md)
+  - [Integrating your public and private thinking only recently became possible.](docs/integrate-public-and-private.md)
+  - [Knowledge gardening is Zen.](docs/knowledge-gardening-is-zen.md)
 - Some obvious motivations
-  - [[Public writing is powerful](docs/public-writing.md)]
-  - [[Sharing information is powerful.](docs/sharing-is-powerful.md)]
+  - [Public writing is powerful](docs/public-writing.md)
+  - [Sharing information is powerful.](docs/sharing-is-powerful.md)
