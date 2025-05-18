@@ -19,6 +19,8 @@ If another user shares data with you, you can navigate, edit and reshape it just
 Suppose someone has a lens onto one of your notes. They can make their lens public. You can configure your system to be aware of their public data. If both of those things happen, then when you visit your note, you will see their subscription. If you want to investigate, you can find their lens (which can also include private data visible only to them). This will let you see how your conception of the topic differs from theirs, what else they consider relevant, etc.
 
 In this way, when someone studies your writing, they can help you understand the topic you wrote about, without requiring any extra effort on their part.
+## Multidimensional trees
+Kind of technical but [[really cool](docs/multidimensional-trees.md)].
 # If you're still unconvinced
 - [[Preempting some common concerns](docs/preempt.md)] about ownership and privacy.
 - Some obvious motivations

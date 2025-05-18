@@ -1,3 +1,4 @@
+* see also [[../docs/progress.md][progress.md]]
 * resume in rust/save/
   serial
 ** use the `folded` field in OrgNode
