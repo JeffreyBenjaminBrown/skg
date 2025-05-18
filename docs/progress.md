@@ -1,5 +1,5 @@
 # What's done, and what's left to do
-
+For that plan and more in greater detail (plus architectural observations, conceptual problems, and more), see [[my org-roam notes on Skg](https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org)].
 ## What's done
 This code so far includes a Rust server and an Emacs client. The server can:
 
