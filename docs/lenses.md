@@ -62,7 +62,7 @@ Your clone in "mysticsm" of the original "eggs / mystical" is by default `subscr
 ```
 The node `<< unintegrated subscribed content from Egg Man's document "eggs" >>` was automatically generated, based on the subscription from your node titled `eggs / mystical` to the node titled `mystical` in Egg Man's document `eggs`.
 
-Since [[branches can be folded](./docs/tree-folding-is-powerful.md)], even if Egg Man has added hundreds of new nodes, the automatically-generated branch titled `<< unintegrated subscribed content from Egg Man's document "eggs" >>` does not have to clutter your view of `mysticism`.
+Since [[branches can be folded](tree-folding-is-powerful.md)], even if Egg Man has added hundreds of new nodes, the automatically-generated branch titled `<< unintegrated subscribed content from Egg Man's document "eggs" >>` does not have to clutter your view of `mysticism`.
 
 You can of course unsubscribe from Egg Man's changes to that branch if you want, or even unsubscribe from Egg Man's writings entirely.
 

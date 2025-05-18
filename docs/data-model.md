@@ -11,7 +11,7 @@ As is evident from the [[schema](../schema.tql)], there are a number of ways nod
 - Hyperlinks are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
 - Following a hyperlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 # Each node of a document is a separate file.
-This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[the sharing model](./docs/sharing-model.md)], and [[easy to understand changes](./docs/diffs-are-clearer-in-skg.md)].
+This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[the sharing model](sharing-model.md)], and [[easy to understand changes](diffs-are-clearer-in-skg.md)].
 # The override relatinoship
 A file F can "override" the file O. This causes the user, when they open O, to see F instead. (Skg is not fooling the user -- they will also see something indicating that O was overridden by F, and if they choose, they can see O instead.)
 
