@@ -1,23 +1,23 @@
-Skg grafts a novel sharing model onto a familiar data model.
+Skg grafts a novel sharing model onto a familiar data model older than Rome.
 # The familiar part: Trees with hyperlinks
-Ordinary books with citations use this model. So does the internet, as well as a large number of "personal knowledge management" apps like OneNote, Notion, Obsidian, Roam, org-roam and Semantic Synchrony.
+Ordinary books with citations use this model. So does the internet, and a large number of "personal knowledge management" apps like OneNote, Notion, Obsidian, Roam, org-roam and Semantic Synchrony.
 
-The model is this: Each document is a `tree` with `hyperlinks`. All that means is the document consists of ordinary text with hyperlinks, plus the ability (this is the "tree" part) to be divided into sections, subsections, sub-subsections, etc. The divisions don't have to be balanced -- some branches can be much deeper than others.
+The model is this: Each document is a `tree` with `hyperlinks`. That is, the document consists of ordinary text with hyperlinks, plus the ability (this is the "tree" part) to be divided into sections, subsections, sub-subsections, etc. The divisions don't have to be balanced -- some branches can be much deeper than others.
 ## What the `contains` relation means, and how it differs from hyperlinks
 Each document is a curated view of data defined by the `contains` relation. Any document that includes the node N also includes every node that descends from N via `contains`.
 
-As is evident from the [[schema](../schema.tql)], there are a number of ways nodes can be connected: `contains`, `hyperlinks_to`, and a few more. Containment and hyperlinks differ in two ways:
+As is evident from the [schema](../schema.tql), there are a number of ways nodes can be connected: `contains`, `hyperlinks_to`, and a few more. Containment and hyperlinks differ in two ways:
 
 - Hyperlinks are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
 - Following a hyperlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 # Each node of a document is a separate file.
-This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[the sharing model](sharing-model.md)], and [[easy to understand changes](diffs-are-clearer-in-skg.md)].
+This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [the sharing model](sharing-model.md), and [easy to understand changes](diffs-are-clearer-in-skg.md).
 # The overrides_view_of relatinoship
 A file F can override the view of file O. If it does, then by default when the user opens a link to O, they will see F instead. (The override is not silent -- it will be visibly announced, and the user can still visit the overridden file if they like.)
 
 Overriding is useful for both sharing and privacy, as is explained below.
 
-Overriding is represented in the [[schema](../schema.tql)] with the `overrides_view_of` relationship.
+Overriding is represented in the [schema](../schema.tql) with the `overrides_view_of` relationship.
 # Sharing
 When you "edit" a note N that you don't own, what actually happens is you gain a new note N', which begins with all of the content from N plus a (deletable) subscription to N and a (deletable) overrides relationship to N.
 

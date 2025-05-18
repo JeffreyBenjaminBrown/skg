@@ -1,7 +1,7 @@
 # Preempting some common concerns
 
 ## Skg is free and open-source.
-Extremely so -- see the [[license](../LICENSE.md)]. No tyrant in the cloud will control your data.
+Extremely so -- see the [license](../LICENSE.md). No tyrant in the cloud will control your data.
 
 ## Anonymity and lurking are both fine.
 A user may use anything others have shared while keeping their own information completely private. Nothing in the sharing model requires revealing an author's identity.

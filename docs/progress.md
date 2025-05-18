@@ -1,5 +1,5 @@
 # What's done, and what's left to do
-For that plan and more in greater detail (plus architectural observations, conceptual problems, and more), see [[my org-roam notes on Skg](https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org)].
+For that plan and more in greater detail (plus architectural observations, conceptual problems, and more), see [my org-roam notes on Skg](https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org).
 ## What's done
 This code so far includes a Rust server and an Emacs client. The server can:
 
@@ -14,7 +14,7 @@ The client can:
 ## What's partially done
 ### Save data
     The client can request saved data and manipulate it.
-    The client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headings without IDs.) This is sketched in a little more detail in [[TODO.org](../devel-handy/TODO.org)].
+    The client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headings without IDs.) This is sketched in a little more detail in [TODO.org](../devel-handy/TODO.org).
 ### Inhomogeneous, multidimensional trees
 The database is implemented in TypeDB. which should make the required queries easy. Otherwise this is completely unimplemented.
 
@@ -27,6 +27,6 @@ The content relationship ought to be not "[host] contains [branch]", but "[host]
 More detail here:
 https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/node_contains_branch_in_view.org
 ### Sharing
-The user experience for sharing, and the [[data model for sharing](sharing-model.md)], have been documented. The [[schema](../schema.tql)] includes the necessary relations. Rust can already read those relationships from disk and write them into TypeDB.
+The user experience for sharing, and the [data model for sharing](sharing-model.md), have been documented. The [schema](../schema.tql) includes the necessary relations. Rust can already read those relationships from disk and write them into TypeDB.
 
 There is not yet code to modify or view them.
