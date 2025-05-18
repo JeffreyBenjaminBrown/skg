@@ -1,6 +1,4 @@
 # Skg is built on cool technologies.
-(That said, I'm flexible -- if you want to write a non-Emacs client, or rewrite the server in Haskell, let's go!)
-
 Skg uses Rust for the server, TypeDB for the DB, and Emacs for the client.
 
 Rust surely needs no introduction, but I want to point out that it's actually not that hard, now that AI understands it.

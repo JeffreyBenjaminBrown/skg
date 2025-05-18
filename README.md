@@ -22,20 +22,9 @@ In this way, when someone studies your writing, they can help you understand the
 ## Multidimensional trees
 Kind of technical but [[really cool](docs/multidimensional-trees.md)].
 # If you're still unconvinced
-- Some technical details
-  - [[The data model](docs/data-model.md)].
-  - [[The sharing model](docs/sharing-model.md)].
-- [[Preempting some common concerns](docs/preempt.md)] about ownership and privacy.
-- Some less obvious motivations
-  - [[Traditional data ownership is awkward.](docs/ownership-has-been-awkward.md)]
-  - [[Private writing is powerful.](docs/private-writing.md)]
-  - [[Integrating your public and private thinking only recently became possible.](docs/integrate-public-and-private.md)]
-  - [[Knowledge gardening is Zen.](docs/knowledge-gardening-is-zen.md)]
-- Some obvious motivations
-  - [[Public writing is powerful](docs/public-writing.md)]
-  - [[Sharing information is powerful.](docs/sharing-is-powerful.md)]
+there are more [[motivations](MOTIVATIONS.md)].
 # If you're a programmer
-I'd love some help. [[Skg uses cool technologies!](docs/cool-tech-in-skg.md)]
+Please help.[[Skg uses cool technologies!](docs/cool-tech-in-skg.md)], including Rust, TypeDB and Emacs. (That said, I'm flexible -- if you want to write a non-Emacs client, or rewrite the server in Haskell, let's go!)
 
 - [[Usage: How to run Skg](docs/usage.md)
 - Skg's data model and user experience
@@ -45,8 +34,8 @@ I'd love some help. [[Skg uses cool technologies!](docs/cool-tech-in-skg.md)]
   - [[The data model](docs/data-model.md)].
   - [[The sharing model](docs/sharing-model.md)].
 - [[What's done, and what's left to do](docs/progress.md)]
-- Some likely jumping-off points for understanding the code
+- Some reasonable jumping-off points for understanding the code
   - [[The TypeDB schema](schema.tql)]
   - [[The Rust types](rust/types.rs)]
-  - [[The Rust server](rust/serve.rs)]
+  - [[The Rust server](rust/serve.rs)]. (The `main` module is just a wrapper for this module.)
   - [[The Emacs client](elisp/client.el)]
