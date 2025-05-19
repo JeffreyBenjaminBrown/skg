@@ -21,5 +21,6 @@
     If a file's text was modified, reload it.
 ** [[id:e707ded7-ff36-41cf-8ae1-672ab78e30d4][send new document from Rust]]
 * in docs
+** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
