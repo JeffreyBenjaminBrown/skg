@@ -10,8 +10,7 @@ use crate::file_io::read_filenode;
 use crate::types::ID;
 
 pub async fn path_to_root_container (
-  // Returns the path from the given node to the root container
-  // The first element is the original node, and the last is the root.
+  // Returns the path from the given node (first in vector) to the root container (last in vector).
   db_name: &str,
   driver: &TypeDBDriver,
   node: &ID
@@ -30,6 +29,7 @@ pub async fn path_to_root_container (
         break; } } }
   Ok (path) }
 
+// Consult TypeDB to find the containing node's ID.
 pub async fn find_container_of (
   db_name : &str,
   driver : &TypeDBDriver,
@@ -55,6 +55,7 @@ pub async fn find_container_of (
   Err(format!("No container found for node with ID '{}'",
               node).into()) }
 
+// Consult TypeDB to find the node's path.
 pub async fn get_filepath_from_node (
   db_name: &str,
   driver: &TypeDBDriver,
@@ -95,7 +96,7 @@ Properties (tags) in the resulting s-expression include:
     `focused` : absent almost everywhere, but `t` for the node which the document was summoned in order to view.
     `body` : possibly absent, the text just under the bullet.
     `content`: possibly absent, a list of nodes.
-  Thus the document is recursive. */
+  The `content` field enables recursion. */
   db_name: &str,
   driver: &TypeDBDriver,
   focus: &ID
@@ -119,7 +120,7 @@ async fn recursive_s_expression_from_node(
   driver: &TypeDBDriver,
   node_id: &ID,
   focus: &ID,
-  visited: &mut Vec<ID>
+  visited: &mut Vec<ID> // TODO: This should be a set, because it is frequently searched.
 ) -> Result<String, Box<dyn Error>> {
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
@@ -133,8 +134,8 @@ async fn recursive_s_expression_from_node(
                   node_id)
         ) ) ); }
   let heading = node.title.to_string();
-  if visited.iter().any(|id| id == node_id) {
-    // In this case it was already visited.
+  if visited.iter().any( |id| id == node_id) {
+    // In this case the node is a repeat.
     let node_sexpr = format!(
       "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
       node_id,

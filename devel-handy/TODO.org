@@ -1,6 +1,7 @@
 * see also [[../docs/progress.md][progress.md]]
 * resume in rust/save/
   serial
+** (OrgNode -> FileNode) -> (OrgNode -> (FileNode, ephemeral view data))
 ** use the `folded` field in OrgNode
    Rust will need this in order to restore state
    when it sends the document (with some new IDs)
@@ -24,3 +25,4 @@
 ** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
+* maybe rename `contains` -> `presents`

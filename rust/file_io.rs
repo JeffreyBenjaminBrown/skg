@@ -1,4 +1,5 @@
-// This code is tested by /tests/file_io.rs
+// PURPOSE:
+// Read and write the FileNode type on disk.
 
 use serde_yaml;
 use std::fs::{self};

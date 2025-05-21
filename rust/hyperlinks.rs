@@ -19,8 +19,9 @@ pub fn hyperlinks_from_filenode(
       hyperlinks_from_text ( text ) ); }
   hyperlinks }
 
-pub fn hyperlinks_from_text (text: &str)
-                      -> Vec<Hyperlink> {
+pub fn hyperlinks_from_text (
+  text: &str)
+  -> Vec<Hyperlink> {
   let hyperlink_pattern = Regex::new(
     // non-greedy .*? pattern avoids capturing too much.
     r"\[\[id:(.*?)\]\[(.*?)\]\]").unwrap();

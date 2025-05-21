@@ -1,7 +1,7 @@
 # Who cares?
 Skg is for thinking, individually and collectively. It is a simple, novel way to write, collect (from other writers), organize and share information. (Any of which can be ignored -- you don't have to share, for instance, to use the app productively.) In a world of abundant information, I hope Skg will let users direct their attention, process information and collaborate more effectively.
 
-Skg extends the data model explored by knowledge management apps like Notion, TheBrain, OneNote, LogSeq, Roam Research, org-roam, Tana and Obsidian. (You may have encountered knowledge management [under some other name](docs/synonyms-for-concept-mapping.md).)
+Skg extends the data model explored by knowledge management apps like Notion, TheBrain, OneNote, LogSeq, Roam Research, org-roam, Tana, Obsidian and others. (You may have encountered knowledge management [under some other name](docs/synonyms-for-concept-mapping.md).)
 
 You can skip all the hyperlinks and just read this README to see what the app does.
 # What's unique about Skg

@@ -1,4 +1,8 @@
+// HANDY
 // cargo test --lib save::sexp_to_orgnodes::tests 2>&1 | tee temp/output.log
+
+// PURPOSE
+// The filename says it all. This code turns an Emacs-style s-exp string representation of a node into an `OrgNode` type amenable to manipulation.
 
 use sexp::{Sexp::{self, Atom, List},
            Atom::S,

@@ -27,14 +27,18 @@ pub enum HyperlinkParseError {
 
 #[derive(Debug, Clone)]
 pub struct OrgNode {
-  // A recursive representation of nodes, useful for communicating with Emacs. Omits things Emacs does not need to know, like `path`. To completely describe the data we would need a collection of FileNodes, which omit nothing except ephemeral aspects of the view -- whether a branch is folded, focused and repeated.
-  // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs. (When Rust receives a node with no ID, it creates a random one and updates the database accordingly.)
+  // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
+  // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
   pub heading  : String, // a term fron org-mode
   pub body     : Option<String>, // a term fron org-mode
   pub folded   : bool, // folded in the org-roam sense
   pub focused  : bool, // where the Emacs cursor is
-  pub repeated : bool, // The second and later instances of anode are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
+  pub repeated : bool, /* The second and later instances of a node are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
+
+Emacs needs to know that the node is repeated, in order to display it differently.
+
+Rust needs to know if it was marked repeated for Emacs. Otherwise, if the user moved a repeat of the node to before the first instance of the node, Rust would treat that as the source of information to update the new node with, and probably delete the node's branches. */
   pub branches : Vec<OrgNode>, }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -43,12 +47,10 @@ pub struct FileNode {
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
 
   pub title: String,
-
   pub ids: Vec<ID>, // Must be nonempty. Can include more than 1 because nodes might be merged.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
-  Option<String>,
+  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>,
