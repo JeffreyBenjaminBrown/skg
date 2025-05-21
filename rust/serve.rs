@@ -33,7 +33,7 @@ fn handle_emacs(mut stream: TcpStream) {
     reader.read_line(&mut line) { // reads until a newline
       if n == 0 { break; } // emacs disconnected
       println!("Received request: {}", line.trim_end());
-      match extract_request_type(&line) {
+      match request_type_from_request( &line ) {
         Ok(request_type) => {
           if request_type == "single document" {
             handle_single_document_request(
@@ -57,17 +57,19 @@ fn handle_emacs(mut stream: TcpStream) {
 fn handle_single_document_request(
   stream: &mut TcpStream,
   request: &str) {
-  match extract_node_id_from_document_request(request) {
+  match node_id_from_document_request(request) {
     Ok(node_id) => {
-      let s_expression = generate_s_expression(&node_id);
-      send_response(stream, &s_expression); },
+      send_response(
+        stream,
+        & generate_s_expression(
+          &node_id)); },
     Err(err) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
       println!("{}", error_msg);
       send_response(stream, &error_msg); } } }
 
-fn extract_request_type(
+fn request_type_from_request(
   request: &str)
   -> Result<String, String> {
   let request_pattern = "(request . \"";
@@ -85,7 +87,7 @@ fn extract_request_type(
     return Err( "Could not find request type in request."
                  .to_string() ); } }
 
-fn extract_node_id_from_document_request (
+fn node_id_from_document_request (
   request: &str)
   -> Result<ID, String> {
   let id_pattern = "(id . \"";
@@ -101,7 +103,10 @@ fn extract_node_id_from_document_request (
     return Err("Could not find ID in request"
                .to_string()); } }
 
-fn generate_s_expression(node_id: &ID) -> String {
+fn generate_s_expression(
+  node_id: &ID)
+  -> String {
+
   let result = block_on ( async {
     let driver = match TypeDBDriver::new(
       "127.0.0.1:1729",
@@ -127,6 +132,7 @@ fn generate_s_expression(node_id: &ID) -> String {
 fn send_response(
   stream: &mut TcpStream,
   response: &str) {
+
   writeln! ( // appends a newline
     stream, "{}", response ) . unwrap();
   stream . flush() . unwrap() ; }

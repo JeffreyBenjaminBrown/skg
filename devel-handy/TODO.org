@@ -1,6 +1,20 @@
 * see also [[../docs/progress.md][progress.md]]
-* resume in rust/save/
-  serial
+* closing the read/save knot
+** Why is this so hard?
+** sketch
+*** Get data from Emacs.
+**** Permanent data.
+**** Ephemeral view properties.
+*** Update FS, DB, index (titles).
+*** Rebuild document
+    with the same folded and focused nodes.
+*** Send document.
+** Keep the `repeated` field.
+   When a document is created, `repeated` is sent to Emacs so that it knows to font the repeats differently from the original.
+   It should be sent back to Rust to know whether to disregard a node's data. The user might move a node marked `repeated` to before the first (reference) node with that ID. Retaining this field permits Rust to know which one is the reference node.
+** Rebuild the whole document when returning it.
+   Less efficient but way easier.
+** Retain a set of folded nodes, and the ID of the focused one.
 ** (OrgNode -> FileNode) -> (OrgNode -> (FileNode, ephemeral view data))
 ** use the `folded` field in OrgNode
    Rust will need this in order to restore state
@@ -26,3 +40,4 @@
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
 * maybe rename `contains` -> `presents`
+* the db_name "skg-test" should not be hardcoded

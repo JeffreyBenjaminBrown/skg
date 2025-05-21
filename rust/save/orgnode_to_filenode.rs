@@ -4,7 +4,7 @@
 // PITFALL:
 // The correspondence between those two types is imperfect, so it is as if the OrgNode is transformed before translation, in two respects:
 //   (1) Since the ID of an OrgNode is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random.
-//   (2) If an ID is repeated, the first node to contain it is processed normally, but all future nodes are ignored, except that each is counted as a branch under for the node that contains them.
+//   (2) If an ID is repeated, the first node to contain it is processed normally, but all future nodes are ignored, except that each is counted as a branch under the node that contains them.
 
 use std::vec::Vec;
 use uuid::Uuid;
@@ -30,11 +30,12 @@ pub fn orgnode_to_filenodes (
   nodes }
 
 fn orgnode_to_filenodes_internal (
-  branch: &OrgNode,
-  nodes_acc: &mut Vec<FileNode> // accumulator
-) {
   // PITFALL: Mutates second argument, returns nothing.
-  if branch.repeated { // skip nodes marked as repeated
+  branch: &OrgNode,
+  nodes_acc: &mut Vec<FileNode>
+) {
+  if branch.repeated { // Skip nodes marked as repeated.
+    // Do not modify nodes_acc.
     return; }
   if let Some(id) = &branch.id {
     // Skip repeated nodes, even if not marked as such.

@@ -13,7 +13,7 @@ find . -path ./target/ -prune -o -path ./.git/ -prune -o -path ./.temp/ -prune -
 find . -path ./target -prune -o -path ./.git -prune -o -type f -name "*~" -exec rm {} \;
 
 for f in $(cat temp/files-to-print.txt); do
-    echo "# " $f
+    echo "** " $f
     cat $f
     echo ""
 done > temp/code
