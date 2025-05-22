@@ -13,23 +13,28 @@ use crate::types::{ID,OrgNode,FileNode};
 
 pub fn orgnode_to_filenodes (
   branch: &OrgNode)
-  -> (HashSet<FileNode>, Option<ID>) {
+  -> ( HashSet<FileNode>,
+       Option<ID>, // the focused node
+       HashSet<ID>) { // the folded nodes
 
   let mut nodes = HashSet::new();
   let mut focused_id = None;
+  let mut folded_ids = HashSet::new();
   orgnode_to_filenodes_internal(
     &assign_id_where_missing_in_orgnode_recursive(
       // TRICKY: It might seem more natural to assign missing IDs only when creating the FileNode. That would not work because `orgnode_to_filenodes_internal` has to know the ID of a node's contents in order to create the FileNode, and those contents are not themselves FileNodes yet. (Alternatively, the contents could be processed before the container, but that would confuse the detection of repeated nodes.)
       branch),
     &mut nodes,
-    &mut focused_id);
-  (nodes, focused_id) }
+    &mut focused_id,
+    &mut folded_ids);
+  (nodes, focused_id, folded_ids) }
 
 fn orgnode_to_filenodes_internal (
-  // PITFALL: Mutates arguments 2 and 3, returns nothing.
+  // PITFALL: Returns nothing. Mutates all but first argument.
   branch: &OrgNode,
   nodes_acc: &mut HashSet<FileNode>,
-  focused_id: &mut Option<ID> ) {
+  focused_id: &mut Option<ID>,
+  folded_ids: &mut HashSet<ID> ) {
 
   if branch.repeated { // Skip nodes marked as repeated. Do not modify nodes_acc.
     // TRICKY: Even if this is the first appearance of that node in the s-exp, it can still be marked `repeated`, if the user moved it. The user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
@@ -59,10 +64,13 @@ fn orgnode_to_filenodes_internal (
     // This would clobber any earlier focused node, but that's fine, because there should be only one.
     *focused_id = Some(
       node . ids[0] . clone()); }
-  nodes_acc.insert(node);
+  if branch.folded {
+    folded_ids.insert(
+      node . ids[0] . clone()); }
+  nodes_acc.insert ( node);
   for child in &branch.branches { // recurse
     orgnode_to_filenodes_internal(
-      child, nodes_acc, focused_id); } }
+      child, nodes_acc, focused_id, folded_ids); } }
 
 pub fn assign_id_where_missing_in_orgnode_recursive(
   node: &OrgNode)
