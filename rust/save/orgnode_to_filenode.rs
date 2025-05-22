@@ -19,6 +19,7 @@ pub fn orgnode_to_filenodes (
   let mut focused_id = None;
   orgnode_to_filenodes_internal(
     &assign_id_where_missing_in_orgnode_recursive(
+      // TRICKY: It might seem more natural to assign missing IDs only when creating the FileNode. That would not work because `orgnode_to_filenodes_internal` has to know the ID of a node's contents in order to create the FileNode, and those contents are not themselves FileNodes yet. (Alternatively, the contents could be processed before the container, but that would confuse the detection of repeated nodes.)
       branch),
     &mut nodes,
     &mut focused_id);
@@ -46,8 +47,7 @@ fn orgnode_to_filenodes_internal (
     body: branch.body.clone(),
     contains: branch.branches.iter()
       // Do not exclude repeated nodes here. They are still valid contents.
-      .filter_map(
-        // TODO: Why is this a filter_map, not a map?
+      .filter_map( // filter_map is robust to receiving None values, but this should not receive any.
         |child| child.id.clone() )
       .collect(),
     subscribes_to                : Vec::new(),
