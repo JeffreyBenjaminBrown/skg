@@ -26,7 +26,8 @@ fn test_convert_sexp_to_filenode() {
 
   assert_eq!(file_nodes.len(), 1,
              "Expected exactly one FileNode");
-  let file_node = &file_nodes[0];
+  let file_node = file_nodes.iter().next()
+    .expect("Expected one FileNode in set");
   assert_eq!(file_node.title, "a title");
   assert_eq!(file_node.ids.len(), 1);
   assert_eq!(file_node.ids[0].as_str(), "1");
@@ -107,7 +108,7 @@ fn test_convert_circular_sexp_to_filenode() {
              "Node 2 should contain node 1");
   assert_eq!(node2.contains[0].as_str(), "1");
 
-  assert_eq!(focused_id, Some(ID(2.to_string())),
+  assert_eq!(focused_id, Some(ID::from("2")),
              "Node 2 should be focused." );
 }
 

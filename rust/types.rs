@@ -41,7 +41,7 @@ Emacs needs to know that the node is repeated, in order to display it differentl
 Rust needs to know if it was marked repeated for Emacs. Otherwise, if the user moved a repeat of the node to before the first instance of the node, Rust would treat that as the source of information to update the new node with, and probably delete the node's branches. */
   pub branches : Vec<OrgNode>, }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct FileNode {
   // There is a 1-to-1 correspondence between FileNodes and actual files -- a file can be read to a FileNode, and a FileNode can be written to a file. The files are the only permanent data; the rest are ephemeral aspects of views of those files. FileNode is the format used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.

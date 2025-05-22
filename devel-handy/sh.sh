@@ -15,7 +15,6 @@ find . -path ./target -prune -o -path ./.git -prune -o -type f -name "*~" -exec 
 for f in $(cat temp/files-to-print.txt); do
     echo "** " $f
     cat $f
-    echo ""
 done > temp/code
 
 # unique matches

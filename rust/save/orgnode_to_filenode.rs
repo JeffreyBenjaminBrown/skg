@@ -6,16 +6,16 @@
 //   (1) Since the ID of an OrgNode is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random.
 //   (2) If an ID is repeated, the first node to contain it is processed normally, but all future nodes are ignored, except that each is counted as a branch under the node that contains them.
 
-use std::vec::Vec;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::types::{ID,OrgNode,FileNode};
 
 pub fn orgnode_to_filenodes (
   branch: &OrgNode)
-  -> (Vec<FileNode>, Option<ID>) {
+  -> (HashSet<FileNode>, Option<ID>) {
 
-  let mut nodes = Vec::new();
+  let mut nodes = HashSet::new();
   let mut focused_id = None;
   orgnode_to_filenodes_internal(
     branch, &mut nodes, &mut focused_id);
@@ -24,7 +24,7 @@ pub fn orgnode_to_filenodes (
 fn orgnode_to_filenodes_internal (
   // PITFALL: Mutates arguments 2 and 3, returns nothing.
   branch: &OrgNode,
-  nodes_acc: &mut Vec<FileNode>,
+  nodes_acc: &mut HashSet<FileNode>,
   focused_id: &mut Option<ID>
 ) {
 
@@ -33,7 +33,6 @@ fn orgnode_to_filenodes_internal (
     return; }
   if let Some(id) = &branch.id {
     // Skip repeated nodes, even if not marked as such.
-    // TODO: This should use a set, not a vector, because it is frequently searched.
     if nodes_acc.iter().any(
       |node| node.ids.contains(id)) {
       return; } }
@@ -60,7 +59,7 @@ fn orgnode_to_filenodes_internal (
     // This would clobber any earlier focused node, but that's fine, because there should be only one.
     *focused_id = Some(
       node . ids[0] . clone()); }
-  nodes_acc.push(node);
+  nodes_acc.insert(node);
   for child in &branch.branches { // recurse
     orgnode_to_filenodes_internal(
       child, nodes_acc, focused_id); } }
