@@ -18,7 +18,10 @@ pub fn orgnode_to_filenodes (
   let mut nodes = HashSet::new();
   let mut focused_id = None;
   orgnode_to_filenodes_internal(
-    branch, &mut nodes, &mut focused_id);
+    &assign_id_where_missing_in_orgnode_recursive(
+      branch),
+    &mut nodes,
+    &mut focused_id);
   (nodes, focused_id) }
 
 fn orgnode_to_filenodes_internal (
@@ -38,10 +41,8 @@ fn orgnode_to_filenodes_internal (
   let node = FileNode {
     title: branch.heading.clone(),
     ids: vec![
-      match &branch.id {
-        Some(id) => id.clone(),
-        None => ID::new(
-          Uuid::new_v4() . to_string() ) } ],
+      branch.id.clone().expect(
+        "FileNode with no ID found in `orgnode_to_filenodes_internal`. It should have already had an ID assigned by `assign_id_where_missing_in_orgnode_recursive` in `orgnode_to_filenodes` (the non-internal version)." ) ],
     body: branch.body.clone(),
     contains: branch.branches.iter()
       // Do not exclude repeated nodes here. They are still valid contents.
