@@ -10,3 +10,9 @@ Even with that naive translation, though, the user experience need hardly be aff
 provides the side-benefit of making diffs much easier to understand (described in `docs/diffs-are-clearer-in-skg.md`).
 
 In Skg every node in a tree has an ID, whereas in org-mode, a node generally only has an ID if it is a top-level file node or if it is linked to from somewhere. Therefore, naively translating an org-file into skg and then back into org-mode will make it bigger. But don't worry! It will not be hard to strip extraneous IDs from the org data.
+
+# The `contains` relationship and nesting org-mode headings
+
+The Skg containment relationship is identical to the org-mode relationship from a heading to one of its subheadings. (I might rename it "shows" or "presents" or something, to make clear that it is the relationship that defines a "document" or a "view".)
+
+What's different is their representation on disk. Skg represents each node of a document with a separate file in order to  enable sharing. I can't link to one of your nodes unless every node has an ID. And creating a lens onto one of your nodes would have a prohibitive memory cost if the node has many descendents.
