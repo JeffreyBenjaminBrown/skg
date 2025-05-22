@@ -25,8 +25,7 @@ fn orgnode_to_filenodes_internal (
   // PITFALL: Mutates arguments 2 and 3, returns nothing.
   branch: &OrgNode,
   nodes_acc: &mut HashSet<FileNode>,
-  focused_id: &mut Option<ID>
-) {
+  focused_id: &mut Option<ID> ) {
 
   if branch.repeated { // Skip nodes marked as repeated. Do not modify nodes_acc.
     // TRICKY: Even if this is the first appearance of that node in the s-exp, it can still be marked `repeated`, if the user moved it. The user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
@@ -63,3 +62,80 @@ fn orgnode_to_filenodes_internal (
   for child in &branch.branches { // recurse
     orgnode_to_filenodes_internal(
       child, nodes_acc, focused_id); } }
+
+pub fn assign_id_where_missing_in_orgnode_recursive(
+  node: &OrgNode)
+  -> OrgNode {
+
+  OrgNode {
+    id: Some(
+      node.id.clone().unwrap_or_else(
+        || ID::new( Uuid::new_v4()
+                    . to_string())) ),
+    heading: node.heading.clone(),
+    body: node.body.clone(),
+    folded: node.folded,
+    focused: node.focused,
+    repeated: node.repeated,
+    branches: node.branches
+      .iter()
+      .map ( assign_id_where_missing_in_orgnode_recursive)
+      .collect()
+  } }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::{ID, OrgNode};
+
+  #[test]
+  fn test_assign_id_where_missing_in_orgnode_recursive() {
+    let node_c = OrgNode {
+      // Innermost node, with no ID
+      id: None,
+      heading: "c".to_string(),
+      body: None,
+      folded: false,
+      focused: false,
+      repeated: false,
+      branches: vec![],
+    };
+    let node_b = OrgNode {
+      // Intermediate node, with ID
+      id: Some(ID::from("b")),
+      heading: "b".to_string(),
+      body: None,
+      folded: false,
+      focused: false,
+      repeated: false,
+      branches: vec![node_c],
+    };
+    let node_a = OrgNode {
+      // Outermost node, with no ID
+      id: None,
+      heading: "a".to_string(),
+      body: None,
+      folded: false,
+      focused: false,
+      repeated: false,
+      branches: vec![node_b],
+    };
+    let result =
+      assign_id_where_missing_in_orgnode_recursive(
+        &node_a);
+    assert!(result.id.is_some(),
+            "Node A should have an ID after processing");
+    assert_eq!(result.branches.len(), 1,
+               "Node A should have one child");
+    let result_b = &result.branches[0];
+    assert_eq!(result_b.id, Some(ID::from("b")),
+               "Node B should keep its original ID 'b'");
+    assert_eq!(result_b.branches.len(), 1,
+               "Node B should have one child");
+    let result_c = &result_b.branches[0];
+    assert!(result_c.id.is_some(),
+            "Node C should have an ID after processing");
+    assert_eq!(result.heading, "a");
+    assert_eq!(result_b.heading, "b");
+    assert_eq!(result_c.heading, "c");
+  } }
