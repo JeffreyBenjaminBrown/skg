@@ -4,7 +4,6 @@ use sexp::parse;
 
 use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgnode_to_filenode::{
-  orgnodes_to_filenodes,
   orgnode_to_filenodes };
 use skg::save::sexp_to_orgnodes::{
   node_sexp_to_orgnode,

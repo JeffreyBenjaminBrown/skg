@@ -11,21 +11,6 @@ use uuid::Uuid;
 
 use crate::types::{ID,OrgNode,FileNode};
 
-pub fn orgnodes_to_filenodes (
-  branches: &[OrgNode]
-) -> (Vec<FileNode>, Option<ID>) {
-
-  let mut all_nodes = Vec::new();
-  let mut focused_id = None;
-  for branch in branches {
-    let (mut nodes, focused_node) =
-      orgnode_to_filenodes(branch);
-    all_nodes.extend(nodes);
-    if focused_node.is_some() {
-      focused_id = focused_node;
-    } }
-  (all_nodes, focused_id) }
-
 pub fn orgnode_to_filenodes (
   branch: &OrgNode)
   -> (Vec<FileNode>, Option<ID>) {
