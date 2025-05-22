@@ -6,6 +6,9 @@
 **** Permanent data.
 **** Ephemeral view properties.
 *** Update FS, DB, index (titles).
+**** Don't obliterate extra ids!
+     The FileNode created from an OrgNode will only have one ID.
+     But that might just be one of the OrgNode's IDs.
 *** Rebuild document
     with the same folded and focused nodes.
 *** Send document.

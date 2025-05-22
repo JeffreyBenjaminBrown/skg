@@ -22,7 +22,7 @@ fn test_convert_sexp_to_filenode() {
   let org_node = node_sexp_to_orgnode(
     sexp)
     .expect("Failed to convert S-expression to OrgNode");
-  let file_nodes = orgnode_to_filenodes(
+  let (file_nodes, focused_id) = orgnode_to_filenodes(
     &org_node);
 
   assert_eq!(file_nodes.len(), 1,
@@ -38,6 +38,10 @@ fn test_convert_sexp_to_filenode() {
   assert!(file_node.overrides_view_of_of.is_empty());
   assert!( hyperlinks_from_filenode ( &file_node )
            . is_empty() );
+
+  // No focused node in this test
+  assert_eq!(focused_id, None,
+             "Expected no focused node");
 }
 
 #[test]
@@ -48,6 +52,7 @@ fn test_convert_circular_sexp_to_filenode() {
   (content
    . ( ( ( id . "2" )
          ( heading . "2" )
+         ( focused . t )
          ( content
            . ( ( ( id . "1" )
                  ( heading . "irrelevant" )
@@ -81,7 +86,8 @@ fn test_convert_circular_sexp_to_filenode() {
              Some("1"));
   assert_eq!(nested.heading, "irrelevant");
 
-  let file_nodes = orgnode_to_filenodes(&org_node);
+  let (file_nodes, focused_id) =
+    orgnode_to_filenodes( &org_node );
   assert_eq!(file_nodes.len(), 2,
              "Expected exactly two FileNodes");
 
@@ -101,4 +107,73 @@ fn test_convert_circular_sexp_to_filenode() {
   assert_eq!(node2.contains.len(), 1,
              "Node 2 should contain node 1");
   assert_eq!(node2.contains[0].as_str(), "1");
+
+  assert_eq!(focused_id, Some(ID(2.to_string())),
+             "Node 2 should be focused." );
+}
+
+#[test]
+fn test_focused_node_extraction() {
+  let sexp_str = r#"
+( (id . "1")
+  (heading . "root")
+  (content
+   . ( ( ( id . "2" )
+         ( heading . "child 1" )
+         )
+       ( ( id . "3" )
+         ( heading . "child 2" )
+         ( focused . t )
+         )
+       ( ( id . "4" )
+         ( heading . "child 3" )
+         ) ) ) )"#;
+  let sexp = parse(sexp_str)
+    .expect("Failed to parse S-expression");
+  let org_node = node_sexp_to_orgnode(sexp)
+    .expect("Failed to convert S-expression to OrgNode");
+
+  let (file_nodes, focused_id) = orgnode_to_filenodes(&org_node);
+
+  assert_eq!(file_nodes.len(), 4,
+             "Expected exactly four FileNodes");
+
+  // Verify focused node was extracted correctly
+  assert_eq!(focused_id, Some(ID::from("3")),
+             "Expected node 3 to be focused");
+
+  // Verify the focused node exists in file_nodes
+  let focused_node = file_nodes.iter().find(
+    |n| n.ids[0].as_str() == "3")
+    . expect("Focused node with ID '3' not found");
+  assert_eq!(focused_node.title, "child 2");
+}
+
+#[test]
+fn test_multiple_focused_nodes_last_wins() {
+  let sexp_str = r#"
+( (id . "1")
+  (heading . "root")
+  (focused . t)
+  (content
+   . ( ( ( id . "2" )
+         ( heading . "child 1" )
+         ( focused . t )
+         )
+       ( ( id . "3" )
+         ( heading . "child 2" )
+         ) ) ) )"#;
+  let sexp = parse(sexp_str)
+    .expect("Failed to parse S-expression");
+  let org_node = node_sexp_to_orgnode(sexp)
+    .expect("Failed to convert S-expression to OrgNode");
+
+  let (file_nodes, focused_id) = orgnode_to_filenodes(&org_node);
+
+  assert_eq!(file_nodes.len(), 3,
+             "Expected exactly three FileNodes");
+
+  // The last focused node encountered should win (node 2, processed after node 1).
+  assert_eq!(focused_id, Some(ID::from("2")),
+             "Expected node 2 to be focused (last one wins)");
 }
