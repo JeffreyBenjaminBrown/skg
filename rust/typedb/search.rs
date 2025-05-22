@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use futures::StreamExt;
 use std::error::Error;
 use std::io;
@@ -111,7 +112,8 @@ Properties (tags) in the resulting s-expression include:
   let sexpr = format!(
     "((view . \"single document\")\n (content . ({})))",
     recursive_s_expression_from_node(
-      db_name, driver, root_id, focus, &mut Vec::new() )
+      db_name, driver, root_id, focus,
+      &mut HashSet::new() )
       . await?);
   Ok (sexpr) }
 
@@ -120,8 +122,9 @@ async fn recursive_s_expression_from_node(
   driver: &TypeDBDriver,
   node_id: &ID,
   focus: &ID,
-  visited: &mut Vec<ID> // TODO: This should be a set, because it is frequently searched.
+  visited: &mut HashSet<ID> // was Vec<ID>
 ) -> Result<String, Box<dyn Error>> {
+
   let path = get_filepath_from_node(
     db_name, driver, node_id).await?;
   let node = read_filenode ( path ) ?;
@@ -134,8 +137,8 @@ async fn recursive_s_expression_from_node(
                   node_id)
         ) ) ); }
   let heading = node.title.to_string();
-  if visited.iter().any( |id| id == node_id) {
-    // In this case the node is a repeat.
+  if visited.contains(node_id) {
+    // This node is a repeat of an earlier one in the same document.
     let node_sexpr = format!(
       "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
       node_id,
@@ -143,7 +146,7 @@ async fn recursive_s_expression_from_node(
     );
     return Ok(node_sexpr); }
 
-  visited.push ( node_id.clone() );
+  visited.insert ( node_id.clone());
   let mut node_sexpr = format!(
     "(id . \"{}\")\n  (heading . \"{}\")",
     node_id,

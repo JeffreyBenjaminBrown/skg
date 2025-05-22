@@ -29,7 +29,7 @@ fn test_single_document_view
       "tests/content_view/fixtures", db_name, &driver ) . await?;
 
     // Print the view from node "1".
-    // TODO: Automatize.
+    // TODO: Automate.
     println!("Building view from node with ID 2...");
     let view = single_document_view (
       db_name, &driver, &ID("2".to_string() )
@@ -38,7 +38,7 @@ fn test_single_document_view
     println!("{}", view);
 
     // Print the view from node "5".
-    // TODO: Automatize.
+    // TODO: Automate.
     println!("Building view from node with ID 5...");
     let view = single_document_view(
       db_name, &driver, &ID("5".to_string() )
