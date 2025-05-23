@@ -4,6 +4,8 @@ use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
+use tantivy::{Index, schema};
 
 
 //
@@ -66,6 +68,13 @@ pub struct FileNode {
 
   #[serde(skip)] // inferred from filepath
   pub path: PathBuf,
+}
+
+pub struct TantivyIndex {
+  // Associates titles to paths.
+  pub index: Arc<Index>,
+  pub path_field: schema::Field,
+  pub title_field: schema::Field,
 }
 
 

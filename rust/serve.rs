@@ -1,16 +1,20 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::sync::Arc;
 use std::thread;
+use tantivy::schema;
 use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
 use futures::executor::block_on;
 
+use crate::index_titles::{
+  get_or_create_index,update_index};
 use crate::typedb::create::make_db_destroying_earlier_one;
 use crate::typedb::search::single_document_view;
-use crate::types::ID;
+use crate::types::{ID,TantivyIndex};
 
-pub fn initialize_database(
+pub fn initialize_typedb(
 ) -> Arc<TypeDBDriver> {
 
   println!("Initializing TypeDB database...");
@@ -35,31 +39,81 @@ pub fn initialize_database(
       eprintln!("Failed to initialize database: {}", e);
       std::process::exit(1);
     } } );
-  println!("Database initialized successfully.");
+  println!("TypeDB database initialized successfully.");
   Arc::new(driver) }
 
-pub fn serve(
-) -> std::io::Result<()> {
+fn initialize_tantivy(
+) -> TantivyIndex {
+  println!("Initializing Tantivy index...");
 
-  let driver = initialize_database();
+  // Define the schema
+  let mut schema_builder = schema::Schema::builder();
+  let path_field = schema_builder.add_text_field(
+    "path", schema::STRING | schema::STORED);
+  let title_field = schema_builder.add_text_field(
+    "title", schema::TEXT | schema::STORED);
+  let schema = schema_builder.build();
+
+  // Create or open the index
+  let index_path =
+    "tests/index_titles/generated/index.tantivy";
+  let index = match get_or_create_index(
+    schema, index_path) {
+    Ok(idx) => idx,
+    Err(e) => {
+      eprintln!("Failed to create Tantivy index: {}", e);
+      std::process::exit(1);
+    }
+  };
+
+  // Update the index with current files
+  let data_dir = "tests/typedb/fixtures";
+  match update_index( &index,
+                       path_field,
+                       title_field,
+                       data_dir,
+                       Path::new(index_path) ) {
+    Ok(indexed_count) => {
+      println!("Tantivy index initialized successfully. Indexed {} files.", indexed_count); },
+    Err(e) => {
+      eprintln!("Failed to update Tantivy index: {}", e);
+      std::process::exit(1); } }
+
+  TantivyIndex {
+    index: Arc::new(index),
+    path_field,
+    title_field, } }
+
+pub fn serve() -> std::io::Result<()> {
+  let typedb_driver = initialize_typedb();
+  let tantivy_index = initialize_tantivy();
   let db_name = "skg-test";
   let listener = TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
   for stream in listener.incoming() {
     match stream {
       Ok(stream) => {
-        let driver_clone = Arc::clone(&driver);
+        let typedb_driver_clone = Arc::clone(&typedb_driver);
+        let tantivy_index_clone = TantivyIndex {
+          index: Arc::clone(&tantivy_index.index),
+          path_field: tantivy_index.path_field,
+          title_field: tantivy_index.title_field,
+        };
         thread::spawn(move || {
-          handle_emacs(stream, driver_clone, db_name)
-        }); }
+          handle_emacs(stream,
+                       typedb_driver_clone,
+                       db_name,
+                       tantivy_index_clone)
+        } ); }
       Err(e) => {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
 
 fn handle_emacs(
   mut stream: TcpStream,
-  driver: Arc<TypeDBDriver>,
-  db_name: &str) {
+  typedb_driver: Arc<TypeDBDriver>,
+  db_name: &str,
+  tantivy_index: TantivyIndex) {
 
   let peer = stream.peer_addr().unwrap();
   println!("Emacs connected: {peer}");
@@ -74,7 +128,11 @@ fn handle_emacs(
         Ok(request_type) => {
           if request_type == "single document" {
             handle_single_document_request(
-              &mut stream, &line, &driver, db_name);
+              &mut stream,
+              &line,
+              &typedb_driver,
+              db_name,
+              &tantivy_index);
           } else {
             let error_msg = format!(
               "Unsupported request type: {}",
@@ -94,15 +152,19 @@ fn handle_emacs(
 fn handle_single_document_request(
   stream: &mut TcpStream,
   request: &str,
-  driver: &TypeDBDriver,
-  db_name: &str) {
+  typedb_driver: &TypeDBDriver,
+  db_name: &str,
+  tantivy_index: &TantivyIndex) {
 
   match node_id_from_document_request(request) {
     Ok(node_id) => {
       send_response(
         stream,
         & generate_s_expression(
-          &node_id, driver, db_name) ); },
+          &node_id,
+          typedb_driver,
+          db_name,
+          tantivy_index) ); },
     Err(err) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
@@ -147,13 +209,15 @@ fn node_id_from_document_request (
 
 fn generate_s_expression(
   node_id: &ID,
-  driver: &TypeDBDriver,
-  db_name: &str)
+  typedb_driver: &TypeDBDriver,
+  db_name: &str,
+  _tantivy_index: &TantivyIndex)
   -> String {
 
   let result = block_on(async {
     match single_document_view(
-      db_name, driver, node_id).await {
+      db_name, typedb_driver, node_id
+    ).await {
       Ok(s_expr) => s_expr,
       Err(e) => format!(
         "Error generating s-expression: {}", e) } } );

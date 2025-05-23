@@ -48,3 +48,4 @@
    as documents.
 * maybe rename `contains` -> `presents`
 * the db_name "skg-test" should not be hardcoded
+* Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
