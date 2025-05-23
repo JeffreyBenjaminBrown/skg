@@ -2,10 +2,14 @@
 * closing the read/save knot
 ** Why is this so hard?
 ** sketch
-*** Get data from Emacs.
-**** Permanent data.
-**** Ephemeral view properties.
 *** Update FS, DB, index (titles).
+**** sketch
+***** If ID is found in TypeDB
+      Compare its text and its contents to the orgnode's.
+      If either is different, rewrite the file.
+      Keep info in the file not visible from the orgnode,
+      esp. extra IDs.
+***** otherwise
 **** Don't obliterate extra ids!
      The FileNode created from an OrgNode will only have one ID.
      But that might just be one of the OrgNode's IDs.

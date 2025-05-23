@@ -49,4 +49,4 @@ I've collected more arguments that it would be, [here](MOTIVATIONS.md).
   - [The TypeDB schema](schema.tql)
   - [The Rust types](rust/types.rs)
   - [The Rust server](rust/serve.rs). (The `main` module is just a wrapper for this module.)
-  - [The Emacs client](elisp/client.el)
+  - [The Emacs client](elisp/main.el)
