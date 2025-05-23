@@ -1,4 +1,6 @@
 ;; USAGE:
+;; This assumes the Rust server is running
+;; (evaluate `cargo run` from a shell).
 ;; First evaluate the whole buffer (`M-x eval-buffer`).
 ;; Then evaluate the following commands individually.
 ;;

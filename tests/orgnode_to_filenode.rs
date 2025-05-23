@@ -1,15 +1,14 @@
 // cargo test --test orgnode_to_filenode -- --nocapture
 
 use sexp::parse;
+use std::collections::HashSet;
 
 use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgnode_to_filenode::{
   orgnode_to_filenodes };
 use skg::save::sexp_to_orgnodes::{
-  node_sexp_to_orgnode,
-  content_sexp_to_orgnodes,
-  content_sexps_to_orgnodes };
-use skg::types::{ID,OrgNode,FileNode};
+  node_sexp_to_orgnode, };
+use skg::types::{ID};
 
 #[test]
 fn test_convert_sexp_to_filenode() {
@@ -21,8 +20,9 @@ fn test_convert_sexp_to_filenode() {
   let org_node = node_sexp_to_orgnode(
     sexp)
     .expect("Failed to convert S-expression to OrgNode");
-  let (file_nodes, focused_id, folded_ids) = orgnode_to_filenodes(
-    &org_node);
+  let (file_nodes, focused_id, folded_ids) =
+    orgnode_to_filenodes(
+      &org_node);
 
   assert_eq!(file_nodes.len(), 1,
              "Expected exactly one FileNode");
@@ -167,6 +167,7 @@ fn test_multiple_focused_nodes_last_wins() {
          ( focused . t )
          )
        ( ( id . "3" )
+         ( folded . t )
          ( heading . "child 2" )
          ) ) ) )"#;
   let sexp = parse(sexp_str)
@@ -183,6 +184,8 @@ fn test_multiple_focused_nodes_last_wins() {
   // The last focused node encountered should win (node 2, processed after node 1).
   assert_eq!(focused_id, Some(ID::from("2")),
              "Expected node 2 to be focused (last one wins)");
-  assert!(folded_ids.is_empty(),
-          "Expected no folded nodes");
+  assert_eq!( folded_ids,
+              HashSet::from(
+                [ID::from("3") ] ),
+              "Node 3 (and no others) should be folded.");
 }
