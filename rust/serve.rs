@@ -1,8 +1,6 @@
-// PITFALL | TODO: Deletes and rebuilds the TypeDB data
-// at every request.
-
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 use std::thread;
 use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
@@ -13,17 +11,50 @@ use crate::typedb::search::single_document_view;
 use crate::types::ID;
 
 pub fn serve() -> std::io::Result<()> {
+  println!("Initializing TypeDB database...");
+  let driver = block_on(async {
+    match TypeDBDriver::new(
+      "127.0.0.1:1729",
+      Credentials::new("admin", "password"),
+      DriverOptions::new(false, None).unwrap()
+    ).await {
+      Ok(d) => d,
+      Err(e) => {
+        eprintln!("Error connecting to TypeDB: {}", e);
+        std::process::exit(1);
+      } } } );
+  let db_name = "skg-test";
+  block_on(async {
+    if let Err(e) = make_db_destroying_earlier_one(
+      "tests/typedb/fixtures",
+      db_name,
+      &driver
+    ).await {
+      eprintln!("Failed to initialize database: {}", e);
+      std::process::exit(1);
+    } } );
+  println!("Database initialized successfully.");
+
+  let driver = // Use Arc to share driver across threads
+    Arc::new(driver);
   let listener = TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
   for stream in listener.incoming() {
     match stream {
       Ok(stream) => {
-        thread::spawn(move || handle_emacs(stream));
-      } Err(e) => {
+        let driver_clone = Arc::clone(&driver);
+        thread::spawn(move || {
+          handle_emacs(stream, driver_clone, db_name)
+        }); }
+      Err(e) => {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
 
-fn handle_emacs(mut stream: TcpStream) {
+fn handle_emacs(
+  mut stream: TcpStream,
+  driver: Arc<TypeDBDriver>,
+  db_name: &str) {
+
   let peer = stream.peer_addr().unwrap();
   println!("Emacs connected: {peer}");
   let mut reader = BufReader::new(
@@ -37,8 +68,8 @@ fn handle_emacs(mut stream: TcpStream) {
         Ok(request_type) => {
           if request_type == "single document" {
             handle_single_document_request(
-              &mut stream, &line); }
-          else {
+              &mut stream, &line, &driver, db_name);
+          } else {
             let error_msg = format!(
               "Unsupported request type: {}",
               request_type);
@@ -56,13 +87,16 @@ fn handle_emacs(mut stream: TcpStream) {
 
 fn handle_single_document_request(
   stream: &mut TcpStream,
-  request: &str) {
+  request: &str,
+  driver: &TypeDBDriver,
+  db_name: &str) {
+
   match node_id_from_document_request(request) {
     Ok(node_id) => {
       send_response(
         stream,
         & generate_s_expression(
-          &node_id)); },
+          &node_id, driver, db_name) ); },
     Err(err) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
@@ -72,6 +106,7 @@ fn handle_single_document_request(
 fn request_type_from_request(
   request: &str)
   -> Result<String, String> {
+
   let request_pattern = "(request . \"";
   if let Some(req_start) = request.find(request_pattern) {
     let req_start = req_start + request_pattern.len();
@@ -90,12 +125,13 @@ fn request_type_from_request(
 fn node_id_from_document_request (
   request: &str)
   -> Result<ID, String> {
+
   let id_pattern = "(id . \"";
   if let Some(id_start) = request.find(id_pattern) {
     let id_start = id_start + id_pattern.len();
     if let Some(id_end) = request[id_start..].find("\"") {
       return Ok(ID(request[id_start..(id_start + id_end)]
-                .to_string()));
+                   .to_string()));
     } else {
       return Err("Could not find end of ID in request"
                  .to_string()); }
@@ -104,26 +140,14 @@ fn node_id_from_document_request (
                .to_string()); } }
 
 fn generate_s_expression(
-  node_id: &ID)
+  node_id: &ID,
+  driver: &TypeDBDriver,
+  db_name: &str)
   -> String {
 
-  let result = block_on ( async {
-    let driver = match TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None).unwrap()
-    ).await {
-      Ok(d) => d,
-      Err(e) => return format!(
-        "Error connecting to TypeDB: {}", e) };
-    let db_name = "skg-test";
-    if let Err(e) = make_db_destroying_earlier_one (
-      "tests/typedb/fixtures", db_name, &driver )
-      . await {
-        return format!(
-          "Failed to initialize database: {}", e); }
+  let result = block_on(async {
     match single_document_view(
-      db_name, &driver, node_id).await {
+      db_name, driver, node_id).await {
       Ok(s_expr) => s_expr,
       Err(e) => format!(
         "Error generating s-expression: {}", e) } } );
