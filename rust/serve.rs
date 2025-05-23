@@ -10,7 +10,9 @@ use crate::typedb::create::make_db_destroying_earlier_one;
 use crate::typedb::search::single_document_view;
 use crate::types::ID;
 
-pub fn serve() -> std::io::Result<()> {
+pub fn initialize_database(
+) -> Arc<TypeDBDriver> {
+
   println!("Initializing TypeDB database...");
   let driver = block_on(async {
     match TypeDBDriver::new(
@@ -34,9 +36,13 @@ pub fn serve() -> std::io::Result<()> {
       std::process::exit(1);
     } } );
   println!("Database initialized successfully.");
+  Arc::new(driver) }
 
-  let driver = // Use Arc to share driver across threads
-    Arc::new(driver);
+pub fn serve(
+) -> std::io::Result<()> {
+
+  let driver = initialize_database();
+  let db_name = "skg-test";
   let listener = TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
   for stream in listener.incoming() {
