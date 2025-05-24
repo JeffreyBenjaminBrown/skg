@@ -6,6 +6,7 @@
 ;;
 ;; (skg-doc-connect)
 ;; (request-document-from-node "a")
+;; (request-title-matches "second")
 ;; (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
@@ -14,12 +15,22 @@
 ;; based on the result, and sends that to Emacs,
 ;; causing Emacs to open an org-mode buffer
 ;; displaying the results.
+;;
+;; The third asks Rust to search the Tantivy index
+;; for titles matching the search terms and displays
+;; the results in a buffer.
 
 (defvar skg-doc--proc nil
   "Persistent TCP connection to the Rust backend.")
 
 (defvar skg-doc-buffer-name "*skg-document*"
   "Buffer name for displaying s-expressions from the Rust server.")
+
+(defvar skg-search-buffer-name "*skg-search-results*"
+  "Buffer name for displaying title search results.")
+
+(defvar skg-doc--response-handler nil
+  "Current response handler function.")
 
 (defun skg-doc-connect ()
   "Connect, persistently, to the Rust TCP server."
@@ -32,10 +43,16 @@
            :host "127.0.0.1"
            :service 1730
            :filter ;; handles the response
-           #'skg-open-org-buffer-from-rust-s-exp
+           #'skg-handle-rust-response
            :coding 'utf-8
            :nowait nil)))
   skg-doc--proc)
+
+(defun skg-handle-rust-response (proc string)
+  "Route the response from Rust to the appropriate handler."
+  (if skg-doc--response-handler
+      (funcall skg-doc--response-handler proc string)
+    (error "skg-doc--response-handler is nil; no handler defined for incoming data")))
 
 (defun skg-open-org-buffer-from-rust-s-exp (proc string)
   "Interpret the s-expression from the Rust server and display as org-mode."
@@ -50,6 +67,22 @@
         (skg-doc-insert-node content 1)))
     (set-buffer-modified-p nil)
     (switch-to-buffer (current-buffer))))
+
+(defun skg-display-search-results (proc string)
+  "Display title search results from the Rust server."
+  (with-current-buffer
+      (get-buffer-create skg-search-buffer-name)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "Title Search Results:\n")
+      (insert "======================\n\n")
+      (insert (string-trim string))
+      (when (> (length (string-trim string)) 0)
+        (insert "\n"))
+      (goto-char (point-min)))
+    (set-buffer-modified-p nil)
+    (switch-to-buffer (current-buffer)))
+  )
 
 (defun skg-doc-get-property (node property-key)
   "Get PROPERTY from NODE."
@@ -94,6 +127,20 @@
   (let* ((proc (skg-doc-connect))
          (request-sexp
           (format "((request . \"single document\") (id . \"%s\"))\n" node-id)))
+    (setq skg-doc--response-handler
+          ;; Prepare for response.
+          #'skg-open-org-buffer-from-rust-s-exp)
+    (process-send-string proc request-sexp)))
+
+(defun request-title-matches (search-terms)
+  "Request title matches from the Rust server."
+  (interactive "sSearch terms: ")
+  (let* ((proc (skg-doc-connect))
+         (request-sexp
+          (format "((request . \"title matches\") (terms . \"%s\"))\n" search-terms)))
+    (setq skg-doc--response-handler
+          ;; Prepare for response.
+          #'skg-display-search-results)
     (process-send-string proc request-sexp)))
 
 (defun skg-doc-disconnect ()

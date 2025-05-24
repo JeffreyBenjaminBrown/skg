@@ -1,4 +1,9 @@
 * see also [[../docs/progress.md][progress.md]]
+* search for TODO items
+  in .rs and .el (and .md?) files
+* Deal with duplicated titles in search.
+  I think it might be because the DB is persisted.
+  Also, TypeDB and Tantivy should read from the same folder, but currently don't -- see serve.rs.
 * closing the read/save knot
 ** Why is this so hard?
 ** sketch

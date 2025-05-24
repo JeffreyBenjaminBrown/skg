@@ -9,7 +9,7 @@ use typedb_driver::{TypeDBDriver, Credentials,
 use futures::executor::block_on;
 
 use crate::index_titles::{
-  get_or_create_index,update_index};
+  get_or_create_index,update_index,search_index};
 use crate::typedb::create::make_db_destroying_earlier_one;
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
@@ -133,6 +133,11 @@ fn handle_emacs(
               &typedb_driver,
               db_name,
               &tantivy_index);
+          } else if request_type == "title matches" {
+            handle_title_matches_request(
+              &mut stream,
+              &line,
+              &tantivy_index);
           } else {
             let error_msg = format!(
               "Unsupported request type: {}",
@@ -171,6 +176,25 @@ fn handle_single_document_request(
       println!("{}", error_msg);
       send_response(stream, &error_msg); } } }
 
+fn handle_title_matches_request(
+  stream: &mut TcpStream,
+  request: &str,
+  tantivy_index: &TantivyIndex) {
+
+  match search_terms_from_request(request) {
+    Ok(search_terms) => {
+      send_response(
+        stream,
+        & generate_title_matches_response(
+          &search_terms,
+          tantivy_index) ); },
+    Err(err) => {
+      let error_msg = format!(
+        "Error extracting search terms: {}", err);
+      println!("{}", error_msg);
+      send_response(
+        stream, &error_msg ); } } }
+
 fn request_type_from_request(
   request: &str)
   -> Result<String, String> {
@@ -207,6 +231,24 @@ fn node_id_from_document_request (
     return Err("Could not find ID in request"
                .to_string()); } }
 
+fn search_terms_from_request(
+  // TODO: This reinvents the wheel. Use the s-exp parsing logic already found in `save/sexp_to_orgnodes.rs`.
+  request: &str)
+  -> Result<String, String> {
+
+  let terms_pattern = "(terms . \"";
+  if let Some(terms_start) = request.find(terms_pattern) {
+    let terms_start = terms_start + terms_pattern.len();
+    if let Some(terms_end) = request[terms_start..].find("\"") {
+      return Ok(request[terms_start..(terms_start + terms_end)]
+                .to_string());
+    } else {
+      return Err("Could not find end of search terms in request"
+                 .to_string()); }
+  } else {
+    return Err("Could not find search terms in request"
+               .to_string()); } }
+
 fn generate_s_expression(
   node_id: &ID,
   typedb_driver: &TypeDBDriver,
@@ -222,6 +264,40 @@ fn generate_s_expression(
       Err(e) => format!(
         "Error generating s-expression: {}", e) } } );
   result }
+
+fn generate_title_matches_response(
+  search_terms: &str,
+  tantivy_index: &TantivyIndex)
+  -> String {
+
+  match search_index(
+    &tantivy_index.index,
+    tantivy_index.title_field,
+    search_terms) {
+    Ok((best_matches, searcher)) => {
+      if best_matches.is_empty() {
+        "No matches found.".to_string()
+      } else {
+        let mut titles = Vec::new();
+        for (score, doc_address) in best_matches {
+          match searcher.doc(doc_address) {
+            Ok(retrieved_doc) => {
+              if let Some(title_value) = retrieved_doc
+                .get_first(tantivy_index.title_field) {
+                  if let Some(title_text) =
+                    title_value.as_text() {
+                  titles.push(format!("{:.2}: {}",
+                                      score, title_text));
+                } } },
+            Err(e) => {
+              eprintln!(
+                "Error retrieving document: {}", e);
+            } } }
+        titles.join("\n")
+      } },
+    Err(e) => {
+      format!("Error searching index: {}", e)
+    } } }
 
 fn send_response(
   stream: &mut TcpStream,
