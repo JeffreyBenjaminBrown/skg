@@ -12,7 +12,7 @@ In this solution you only fetch the individual files you need. A view of a topic
 
 Tis solution scales to any number of users, as could any individual user's ("social") network of subscriptions and links to other users' notes. If someone got really pepular, their fans might have to set up mirrors. (I say fans because time does not allow an internet-popular person to listen to everyone who listens to them -- although the Skg granular subscription model would allow them to listen better.)
 
-I don't know how GitHub would feel about it, but poking a server for each new node to read seems acceptable to me.
+I don't know how GitHub would feel about it, but poking a server for each new sentence to read (assuming people write with extreme atomicity) seems acceptable to me.
 
 # The infrequent sharing of whole collections of notes option
 
