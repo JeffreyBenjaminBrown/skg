@@ -49,8 +49,9 @@ pub fn update_index(
   for entry in WalkDir::new(data_dir)
     .into_iter().filter_map(Result::ok) {
       let path = entry.path();
-      if !needs_indexing(path, index_mtime) {
-        continue; } // skip this file
+      if ( not_a_skg_file_path(path) |
+           !needs_indexing(path, index_mtime) ) {
+        continue; }
       if let Some(title) = skg_title_from_file(path) {
         index_title_at_path(
           &mut index_writer,
@@ -150,18 +151,25 @@ pub fn needs_indexing( // based on modification time
   path: &Path,
   index_mtime: SystemTime
 ) -> bool {
-  if path.to_string_lossy().contains("index.tantivy") {
-    return false; } // Skip files in the index directory
-  if !path.extension().map_or( false, |ext| ext == "skg" ) {
-    return false; } // Skip non-skg files
   match get_modification_time(path) {
     Ok(file_mtime) => file_mtime > index_mtime,
     Err(_) => true // If its modification time is unknown,
                    // assume it needs indexing.
   } }
 
+pub fn not_a_skg_file_path (
+  path: &Path
+) -> bool {
+
+  !path.extension().map_or(
+    false, |ext| ext == "skg" ) ||
+  ( path.to_string_lossy()
+    . contains("index.tantivy") ) }
+
 pub fn get_modification_time(
   path: &Path)
-  -> Result<SystemTime, Box<dyn std::error::Error>> {
+  -> Result<SystemTime,
+            Box<dyn std::error::Error>> {
+
   let metadata = fs::metadata(path)?;
   Ok(metadata.modified()?) }
