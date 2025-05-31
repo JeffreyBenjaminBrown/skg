@@ -55,8 +55,8 @@ fn initialize_tantivy(
   let schema = schema_builder.build();
 
   // Create or open the index
-  let index_path =
-    "tests/index_titles/generated/index.tantivy";
+  let index_path = Path::new(
+    "tests/index_titles/generated/index.tantivy");
   let index = match get_or_create_index(
     schema, index_path) {
     Ok(idx) => idx,
@@ -71,7 +71,7 @@ fn initialize_tantivy(
                        path_field,
                        title_field,
                        data_dir,
-                       Path::new(index_path) ) {
+                       index_path ) {
     Ok(indexed_count) => {
       println!("Tantivy index initialized successfully. Indexed {} files.", indexed_count); },
     Err(e) => {

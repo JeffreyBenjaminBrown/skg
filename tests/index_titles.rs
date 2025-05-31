@@ -68,14 +68,17 @@ fn test_index (
         filetime::FileTime::from_system_time(now))?; } }
 
   // Build, or find and update, the index
-  let index_path = "tests/index_titles/generated/index.tantivy";
-  let index = get_or_create_index(schema.clone(), index_path)?;
+  let index_path = Path::new(
+    "tests/index_titles/generated/index.tantivy");
+  let index = get_or_create_index(
+    schema.clone(),
+    index_path)?;
   let indexed_count = update_index(
     &index,
     path_field,
     title_field,
     "tests/index_titles/fixtures",
-    Path::new(index_path))?;
+    index_path)?;
 
   assert!(indexed_count > 0,
           "Expected to index at least one title");

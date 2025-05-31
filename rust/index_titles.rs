@@ -15,16 +15,27 @@ use crate::hyperlinks::strip_org_hyperlinks;
 
 pub fn get_or_create_index(
   schema: schema::Schema,
-  index_path: &str
+  index_path: &Path
 ) -> Result<Index, Box<dyn std::error::Error>> {
-  let path = Path::new(index_path);
-  if path.exists() {
-    println!("Opening existing index at {:?}", path);
-    Ok(Index::open_in_dir(path)?)
-  } else {
-    println!("Creating new index at {:?}", path);
-    fs::create_dir_all(path)?;
-    Ok(Index::create_in_dir(path, schema)?) } }
+
+  if index_path.exists() {
+    println!("Attempting to open existing index at {:?}", index_path);
+    match Index::open_in_dir(index_path) {
+      Ok(index) => {
+        println!("Successfully opened existing index");
+        Ok(index) },
+      Err(e) => {
+        println!("Failed to open existing index: {:?}. Recreating...", e);
+        { // Remove the corrupted directory and recreate
+          fs::remove_dir_all(index_path)?;
+          fs::create_dir_all(index_path)?; };
+        println!("Creating new index at {:?}", index_path);
+        Ok(Index::create_in_dir(index_path, schema)?)
+      } } }
+  else {
+    println!("Creating new index at {:?}", index_path);
+    fs::create_dir_all(index_path)?;
+    Ok(Index::create_in_dir(index_path, schema)?) } }
 
 pub fn get_modification_time(
   path: &Path)
