@@ -51,7 +51,7 @@ pub fn update_index(
       let path = entry.path();
       if !needs_indexing(path, index_mtime) {
         continue; } // skip this file
-      if let Some(title) = extract_skg_title(path) {
+      if let Some(title) = skg_title_from_file(path) {
         index_title_at_path(
           &mut index_writer,
           path,
@@ -92,7 +92,7 @@ pub fn get_or_create_index(
     fs::create_dir_all(index_path)?;
     Ok(Index::create_in_dir(index_path, schema)?) } }
 
-pub fn extract_skg_title(
+pub fn skg_title_from_file(
   // Gets the title from the file at path,
   // runs strip_org_hyperlinks on it,
   // and returns it.
