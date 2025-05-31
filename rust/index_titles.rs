@@ -109,6 +109,19 @@ pub fn skg_title_from_file(
               title_str ) ); } } } }
   None }
 
+pub fn index_title_at_path (
+  writer: &mut tantivy::IndexWriter,
+  path: &Path,
+  title: &String,
+  tantivy_index: &TantivyIndex
+) -> Result < (),
+              Box < dyn std::error::Error > > {
+  delete_documents_with_path(
+    writer, path, tantivy_index.path_field)?;
+  add_document_and_title_to_index(
+    writer, path, title, tantivy_index)?;
+  Ok (( )) }
+
 pub fn delete_documents_with_path(
   writer: &mut tantivy::IndexWriter,
   path: &Path,
@@ -133,19 +146,6 @@ pub fn add_document_and_title_to_index(
     tantivy_index.title_field => title.to_string()
   ))?;
   Ok (()) }
-
-pub fn index_title_at_path (
-  writer: &mut tantivy::IndexWriter,
-  path: &Path,
-  title: &String,
-  tantivy_index: &TantivyIndex
-) -> Result < (),
-              Box < dyn std::error::Error > > {
-  delete_documents_with_path(
-    writer, path, tantivy_index.path_field)?;
-  add_document_and_title_to_index(
-    writer, path, title, tantivy_index)?;
-  Ok (( )) }
 
 pub fn needs_indexing( // based on modification time
   path: &Path,
