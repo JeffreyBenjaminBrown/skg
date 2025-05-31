@@ -34,6 +34,21 @@ pub fn search_index(
     &query, &TopDocs::with_limit(10))?;
   Ok((best_matches, searcher)) }
 
+pub fn create_index(
+  tantivy_index: &TantivyIndex,
+  data_dir: &str
+) -> Result<usize, Box<dyn std::error::Error>> {
+  println!("Creating index with all .skg files from {}.",
+           data_dir);
+  let mut index_writer =
+    tantivy_index.index.writer(50_000_000)?;
+  populate_index(
+    &mut index_writer,
+    data_dir,
+    tantivy_index,
+    |_path| true) // Accept all files
+}
+
 pub fn update_index(
   tantivy_index: &TantivyIndex,
   data_dir: &str,
@@ -43,29 +58,45 @@ pub fn update_index(
            data_dir);
   let mut index_writer =
     tantivy_index.index.writer(50_000_000)?;
-  let mut indexed_count = 0;
   let index_mtime = get_modification_time(index_path)
     .unwrap_or(SystemTime::UNIX_EPOCH);
+  populate_index(
+    &mut index_writer,
+    data_dir,
+    tantivy_index,
+    |path| needs_indexing(path, index_mtime))
+}
+
+fn populate_index<F>(
+  index_writer: &mut tantivy::IndexWriter,
+  data_dir: &str,
+  tantivy_index: &TantivyIndex,
+  should_index: F
+) -> Result<usize,
+            Box<dyn std::error::Error>>
+where
+  F: Fn(&Path) -> bool {
+
+  let mut indexed_count = 0;
   for entry in WalkDir::new(data_dir)
     .into_iter().filter_map(Result::ok) {
       let path = entry.path();
-      if ( not_a_skg_file_path(path) |
-           !needs_indexing(path, index_mtime) ) {
+      if ( not_a_skg_file_path(path) ||
+           !should_index(path) ) {
         continue; }
       if let Some(title) = skg_title_from_file(path) {
         index_title_at_path_after_scrubbing_path(
-          &mut index_writer,
+          index_writer,
           path,
           &title,
           tantivy_index)?;
-        indexed_count += 1;
-      } }
-
+        indexed_count += 1; } }
   if indexed_count > 0 {
-    println!("Indexed {} files. Committing changes...", indexed_count);
-    index_writer.commit()?;
-  } else {
-    println!("No new or modified files found."); }
+    println!("Indexed {} files. Committing changes...",
+             indexed_count);
+    index_writer.commit()?; }
+  else {
+    println!("No files to index found."); }
   Ok (indexed_count) }
 
 pub fn get_or_create_index(
@@ -171,8 +202,8 @@ pub fn not_a_skg_file_path (
     . contains("index.tantivy") ) }
 
 pub fn get_modification_time(
-  path: &Path)
-  -> Result<SystemTime,
+  path: &Path
+) -> Result<SystemTime,
             Box<dyn std::error::Error>> {
 
   let metadata = fs::metadata(path)?;
