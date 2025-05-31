@@ -65,11 +65,16 @@ fn initialize_tantivy(
       std::process::exit(1);
     } };
 
+  // Create TantivyIndex wrapper
+  let tantivy_index = TantivyIndex {
+    index: Arc::new(index),
+    path_field,
+    title_field,
+  };
+
   // Update the index with current files
   let data_dir = "tests/typedb/fixtures";
-  match update_index( &index,
-                       path_field,
-                       title_field,
+  match update_index( &tantivy_index,
                        data_dir,
                        index_path ) {
     Ok(indexed_count) => {
@@ -78,10 +83,7 @@ fn initialize_tantivy(
       eprintln!("Failed to update Tantivy index: {}", e);
       std::process::exit(1); } }
 
-  TantivyIndex {
-    index: Arc::new(index),
-    path_field,
-    title_field, } }
+  tantivy_index }
 
 pub fn serve() -> std::io::Result<()> {
   let typedb_driver = initialize_typedb();
@@ -270,8 +272,7 @@ fn generate_title_matches_response(
   -> String {
 
   match search_index(
-    &tantivy_index.index,
-    tantivy_index.title_field,
+    tantivy_index,
     search_terms) {
     Ok((best_matches, searcher)) => {
       if best_matches.is_empty() {

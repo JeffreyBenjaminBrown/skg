@@ -12,10 +12,10 @@ use std::time::SystemTime;
 use serde_yaml::from_str;
 
 use crate::hyperlinks::strip_org_hyperlinks;
+use crate::types::TantivyIndex;
 
 pub fn search_index(
-  index: &Index,
-  title_field: schema::Field,
+  tantivy_index: &TantivyIndex,
   query_text: &str
 ) -> Result< (Vec<(f32, tantivy::DocAddress)>,
               tantivy::Searcher),
@@ -23,26 +23,26 @@ pub fn search_index(
   println!(
     "\nFinding files with titles matching \"{}\".",
     query_text);
-  let reader = index.reader()?;
+  let reader = tantivy_index.index.reader()?;
   let searcher = reader.searcher();
   let query_parser =
     tantivy::query::QueryParser::for_index(
-      &index, vec![title_field]);
+      &tantivy_index.index,
+      vec![tantivy_index.title_field]);
   let query = query_parser.parse_query(query_text)?;
   let best_matches = searcher.search(
     &query, &TopDocs::with_limit(10))?;
   Ok((best_matches, searcher)) }
 
 pub fn update_index(
-  index: &Index,
-  path_field: schema::Field,
-  title_field: schema::Field,
+  tantivy_index: &TantivyIndex,
   data_dir: &str,
   index_path: &Path
 ) -> Result<usize, Box<dyn std::error::Error>> {
   println!("Updating index with .skg files from {}.",
            data_dir);
-  let mut index_writer = index.writer(50_000_000)?;
+  let mut index_writer =
+    tantivy_index.index.writer(50_000_000)?;
   let mut indexed_count = 0;
   let index_mtime = get_modification_time(index_path)
     .unwrap_or(SystemTime::UNIX_EPOCH);
@@ -56,8 +56,7 @@ pub fn update_index(
           &mut index_writer,
           path,
           &title,
-          path_field,
-          title_field)?;
+          tantivy_index)?;
         indexed_count += 1;
       } }
 
@@ -124,13 +123,13 @@ pub fn add_document_and_title_to_index(
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &str,
-  path_field: schema::Field,
-  title_field: schema::Field
+  tantivy_index: &TantivyIndex
 ) -> Result<(), Box<dyn std::error::Error>> {
   let path_str = path.to_string_lossy().to_string();
   writer.add_document(doc!(
-    path_field => path_str,
-    title_field => title.to_string()
+    // PITFALL: These `=>` symbols are a Tantivy macro.
+    tantivy_index.path_field => path_str,
+    tantivy_index.title_field => title.to_string()
   ))?;
   Ok (()) }
 
@@ -138,14 +137,13 @@ pub fn index_title_at_path (
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &String,
-  path_field: schema::Field,
-  title_field: schema::Field
+  tantivy_index: &TantivyIndex
 ) -> Result < (),
               Box < dyn std::error::Error > > {
   delete_documents_with_path(
-    writer, path, path_field)?;
+    writer, path, tantivy_index.path_field)?;
   add_document_and_title_to_index(
-    writer, path, title, path_field, title_field)?;
+    writer, path, title, tantivy_index)?;
   Ok (( )) }
 
 pub fn needs_indexing( // based on modification time
