@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tantivy::schema as schema;
 
 use skg::index_titles::{
-  get_or_create_index, update_index, search_index, };
+  get_extant_index_or_create_empty_one, create_index, search_index, };
 use skg::types::TantivyIndex;
 
 pub fn print_search_results(
@@ -71,17 +71,16 @@ fn test_index (
 
   let index_path = Path::new(
     "tests/index_titles/generated/index.tantivy");
-  let index = get_or_create_index(
+  let index = get_extant_index_or_create_empty_one(
     schema.clone(),
     index_path )?;
   let tantivy_index = TantivyIndex {
     index: Arc::new(index),
     path_field,
     title_field, };
-  let indexed_count = update_index(
+  let indexed_count = create_index(
     &tantivy_index,
-    "tests/index_titles/fixtures",
-    index_path )?;
+    "tests/index_titles/fixtures" )?;
 
   assert!(indexed_count > 0,
           "Expected to index at least one title");

@@ -9,7 +9,7 @@ use typedb_driver::{TypeDBDriver, Credentials,
 use futures::executor::block_on;
 
 use crate::index_titles::{
-  get_or_create_index,update_index,search_index};
+  get_extant_index_or_create_empty_one,update_index,search_index};
 use crate::typedb::create::make_db_destroying_earlier_one;
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
@@ -57,7 +57,7 @@ fn initialize_tantivy(
   // Create or open the index
   let index_path = Path::new(
     "tests/index_titles/generated/index.tantivy");
-  let index = match get_or_create_index(
+  let index = match get_extant_index_or_create_empty_one(
     schema, index_path) {
     Ok(idx) => idx,
     Err(e) => {

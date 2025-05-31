@@ -99,8 +99,9 @@ where
     println!("No files to index found."); }
   Ok (indexed_count) }
 
-pub fn get_or_create_index(
-  // Creates an EMPTY index.
+pub fn get_extant_index_or_create_empty_one(
+  // If it creates an index, the index is empty.
+  // But if it fetches an index, the index might not be.
   schema: schema::Schema,
   index_path: &Path
 ) -> Result<Index, Box<dyn std::error::Error>> {
