@@ -1,8 +1,10 @@
 ;; USAGE:
-;; This assumes the Rust server is running
-;; (evaluate `cargo run` from a shell).
-;; First evaluate the whole buffer (`M-x eval-buffer`).
-;; Then evaluate the following commands individually.
+;; First start the TYpeDB server
+;; (run `typedb server` from a shell)
+;; and after that start the Rust server
+;; (evaluate `cargo run` from a shell, from the root of this project).
+;; Next evaluate this buffer (`M-x eval-buffer`).
+;; Now you can evaluate these commands, individually:
 ;;
 ;; (skg-doc-connect)
 ;; (request-document-from-node "a")

@@ -2,9 +2,9 @@
 // Translates the OrgNode type to the FileNode type.
 
 // PITFALL:
-// The correspondence between those two types is imperfect, so it is as if the OrgNode is transformed before translation, in two respects:
+// The correspondence between those two types is imperfect in two respects:
 //   (1) Since the ID of an OrgNode is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random. But note that this is done by `assign_id_where_missing_in_orgnode_recursive` to the OrgNodes before transforming them into FileNodes. See the long comment at its call site for why.
-//   (2) If an ID is repeated, the first node to contain it is processed normally, but all future nodes are ignored, except that each is counted as a branch under the node that contains them.
+//   (2) If an ID is repeated, the first node to contain a branch with that ID is processed normally. All future such containers are ignored, except that each is counted as a branch under the node that contains them.
 
 use std::collections::HashSet;
 use uuid::Uuid;

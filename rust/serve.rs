@@ -63,8 +63,7 @@ fn initialize_tantivy(
     Err(e) => {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1);
-    }
-  };
+    } };
 
   // Update the index with current files
   let data_dir = "tests/typedb/fixtures";
