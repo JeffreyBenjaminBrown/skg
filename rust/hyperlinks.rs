@@ -33,6 +33,28 @@ pub fn hyperlinks_from_text (
       hyperlinks.push(Hyperlink::new(id, label)); } }
   hyperlinks }
 
+// Titles can include hyperlinks,
+// but can be searched for as if each hyperlink
+// was equal to its label.
+// That is, the ID and brackets of a hyperlink in a title are not indexed.
+pub fn strip_org_hyperlinks(text: &str) -> String {
+  let hyperlink_re = Regex::new(
+    r"\[\[.*?\]\[(.*?)\]\]").unwrap();
+  let mut result = String::from(text);
+  let mut in_offset = 0; // offset in the input string
+  for cap in hyperlink_re.captures_iter(text) {
+    let whole_match = cap.get(0).unwrap();
+    let hyperlink_label = cap.get(1).unwrap();
+    let start_pos = whole_match.start() - in_offset;
+    let end_pos = whole_match.end() - in_offset;
+    result.replace_range(
+      // Modify the range [start_pos .. end_pos].
+      start_pos .. end_pos,
+      hyperlink_label.as_str());
+    in_offset += whole_match.len()
+      - hyperlink_label.len(); }
+  result }
+
 #[cfg(test)]
 mod tests {
   use std::path::PathBuf;

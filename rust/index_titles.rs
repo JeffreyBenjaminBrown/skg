@@ -6,11 +6,12 @@ use tantivy::collector::TopDocs;
 use tantivy::schema as schema;
 use tantivy::{Index, doc};
 use walkdir::WalkDir;
-use regex::Regex;
 use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
 use serde_yaml::from_str;
+
+use crate::hyperlinks::strip_org_hyperlinks;
 
 pub fn get_or_create_index(
   schema: schema::Schema,
@@ -45,7 +46,13 @@ pub fn needs_indexing( // based on modification time
                    // assume it needs indexing.
   } }
 
-pub fn extract_skg_title(path: &Path) -> Option<String> {
+pub fn extract_skg_title(
+  // Gets the title from the file at path,
+  // runs strip_org_hyperlinks on it,
+  // and returns it.
+  path: &Path)
+  -> Option<String> {
+
   if let Ok(file_content) = fs::read_to_string(path) {
     if let Ok(yaml_value) = ( from_str::<serde_yaml::Value>
                               (&file_content) ) {
@@ -53,32 +60,8 @@ pub fn extract_skg_title(path: &Path) -> Option<String> {
         if let Some(title_str) = title_value.as_str() {
           return Some(
             strip_org_hyperlinks(
-              title_str));
-        } } } }
+              title_str ) ); } } } }
   None }
-
-// Titles can include hyperlinks,
-// but can be searched for as if each hyperlink
-// was equal to its label.
-// That is, the ID and brackets of a hyperlink in a title are not indexed.
-pub fn strip_org_hyperlinks(text: &str) -> String {
-  let hyperlink_re = Regex::new(
-    r"\[\[.*?\]\[(.*?)\]\]").unwrap();
-  let mut result = String::from(text);
-  let mut in_offset = 0; // offset in the input string
-  for cap in hyperlink_re.captures_iter(text) {
-    let whole_match = cap.get(0).unwrap();
-    let hyperlink_label = cap.get(1).unwrap();
-
-    // Define the range to modify
-    let start_pos = whole_match.start() - in_offset;
-    let end_pos = whole_match.end() - in_offset;
-
-    result.replace_range(
-      start_pos .. end_pos,
-      hyperlink_label.as_str());
-    in_offset += whole_match.len() - hyperlink_label.len(); }
-  result }
 
 pub fn delete_documents_with_path(
   writer: &mut tantivy::IndexWriter,
@@ -126,7 +109,7 @@ pub fn update_index(
   data_dir: &str,
   index_path: &Path
 ) -> Result<usize, Box<dyn std::error::Error>> {
-  println!("Updating index with .skg files in the {} directory...",
+  println!("Updating index with .skg files from {}.",
            data_dir);
   let mut index_writer = index.writer(50_000_000)?;
   let mut indexed_count = 0;
@@ -173,36 +156,3 @@ pub fn search_index(
   let best_matches = searcher.search(
     &query, &TopDocs::with_limit(10))?;
   Ok((best_matches, searcher)) }
-
-pub fn print_search_results(
-  best_matches: Vec<(f32, tantivy::DocAddress)>,
-  searcher: &tantivy::Searcher,
-  path_field: schema::Field,
-  title_field: schema::Field
-) -> Result<(), Box<dyn std::error::Error>> {
-  if best_matches.is_empty() {
-    println!("No matches found.");
-  } else {
-    let mut path_to_results: std::collections::HashMap
-      <String, Vec<(f32, String)>> =
-      std::collections::HashMap::new();
-    for (score, doc_address) in best_matches {
-      let retrieved_doc = searcher.doc(doc_address)?;
-      let path_value =
-        retrieved_doc.get_first(path_field)
-        .unwrap().as_text().unwrap();
-      let title_value =
-        retrieved_doc.get_first(title_field)
-        .unwrap().as_text().unwrap();
-      path_to_results
-        .entry(path_value.to_string())
-        .or_insert_with(Vec::new)
-        .push((score, title_value.to_string())); }
-
-    for (path, titles) in path_to_results {
-      println!("File: {}", path);
-      for (score, title) in titles {
-        println!("  - Score: {:.2} | Title: {}",
-                 score, title); }
-      println!(); } }
-  Ok(()) }
