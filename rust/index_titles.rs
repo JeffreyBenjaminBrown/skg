@@ -53,7 +53,7 @@ pub fn update_index(
            !needs_indexing(path, index_mtime) ) {
         continue; }
       if let Some(title) = skg_title_from_file(path) {
-        index_title_at_path(
+        index_title_at_path_after_scrubbing_path(
           &mut index_writer,
           path,
           &title,
@@ -69,6 +69,7 @@ pub fn update_index(
   Ok (indexed_count) }
 
 pub fn get_or_create_index(
+  // Creates an EMPTY index.
   schema: schema::Schema,
   index_path: &Path
 ) -> Result<Index, Box<dyn std::error::Error>> {
@@ -109,20 +110,22 @@ pub fn skg_title_from_file(
               title_str ) ); } } } }
   None }
 
-pub fn index_title_at_path (
+pub fn index_title_at_path_after_scrubbing_path (
+  // Add one (title,path) pair to the Tantivy index,
+  // obliterating preexisting content with the same path.
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &String,
   tantivy_index: &TantivyIndex
 ) -> Result < (),
               Box < dyn std::error::Error > > {
-  delete_documents_with_path(
+  delete_documents_with_path_from_index(
     writer, path, tantivy_index.path_field)?;
   add_document_and_title_to_index(
     writer, path, title, tantivy_index)?;
   Ok (( )) }
 
-pub fn delete_documents_with_path(
+pub fn delete_documents_with_path_from_index(
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   path_field: schema::Field
@@ -130,7 +133,8 @@ pub fn delete_documents_with_path(
   let path_str = path.to_string_lossy().to_string();
   let term = tantivy::Term::from_field_text(
     path_field, &path_str);
-  writer.delete_term(term); // Delete anything with this path
+  { // Delete anything with this path
+    writer.delete_term(term); }
   Ok(()) }
 
 pub fn add_document_and_title_to_index(
