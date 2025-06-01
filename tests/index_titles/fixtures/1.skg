@@ -1,13 +1,13 @@
-id: '123'
-context: '456'
+ids:
+- '1'
 is_comment: false
 title: This is one test file.
 body: this one string could span pages
 contains:
-  - '1'
-  - '2'
-  - '3'
+- '1'
+- '2'
+- '3'
 subscribes_to:
-  - '11'
-  - '12'
-  - '13'
+- '11'
+- '12'
+- '13'
