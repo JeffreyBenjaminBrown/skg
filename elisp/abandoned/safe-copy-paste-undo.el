@@ -6,7 +6,7 @@
 ;; following a hyperlink with multiple targets will
 ;; bring up a menu of options to the user.
 
-;; Define advice functions for all kill/copy/paste operations
+;; Define advice functions for all kill|copy|paste operations
 (defun skg-advice-for-kill (&rest _)
   (message "region moved with ID property into kill-ring"))
 
@@ -52,7 +52,7 @@ while preserving all other text properties."
     (unless has-id
       (message "Pasted text without ID property."))))
 
-;; Functions to add/remove all advice
+;; Functions to add|remove all advice
 (defun skg-enable-all-advice ()
   ;; Modify kill commands
   (advice-add 'kill-region :after #'skg-advice-for-kill)
@@ -72,7 +72,7 @@ while preserving all other text properties."
   (advice-add 'org-yank :after #'skg-advice-for-paste))
 
 (defun skg-disable-all-advice ()
-  "Disable advice for all kill/copy/paste commands."
+  "Disable advice for all kill|copy|paste commands."
   ;; Kill commands
   (advice-remove 'kill-region #'skg-advice-for-kill)
   (advice-remove 'kill-line #'skg-advice-for-kill)
@@ -92,7 +92,7 @@ while preserving all other text properties."
 
 (define-minor-mode skg-minor-mode
   "Toggle SKG minor mode.
-When enabled, copy/kill/paste operations handle ID properties specially."
+When enabled, copy|kill|paste operations handle ID properties specially."
   :init-value nil
   :lighter " SKG"
   :keymap skg-minor-mode-map

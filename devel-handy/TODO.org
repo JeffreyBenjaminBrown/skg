@@ -1,9 +1,4 @@
 * see also [[../docs/progress.md][progress.md]]
-* search for TODO items
-  in .rs and .el (and .md?) files
-* Deal with duplicated titles in search.
-  I think it might be because the DB is persisted.
-  Also, TypeDB and Tantivy should read from the same folder, but currently don't -- see serve.rs.
 * closing the read/save knot
 ** Why is this so hard?
 ** sketch
@@ -54,3 +49,4 @@
 * maybe rename `contains` -> `presents`
 * the db_name "skg-test" should not be hardcoded
 * Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
+* the TODO item in rust/serve.rs

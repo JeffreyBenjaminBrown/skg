@@ -233,7 +233,7 @@ fn node_id_from_document_request (
                .to_string()); } }
 
 fn search_terms_from_request(
-  // TODO: This reinvents the wheel. Use the s-exp parsing logic already found in `save/sexp_to_orgnodes.rs`.
+  // TODO: This reinvents the wheel. Use the s-exp parsing logic already found in `save::sexp_to_orgnodes.rs`.
   request: &str)
   -> Result<String, String> {
 

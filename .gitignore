@@ -6,4 +6,5 @@ temp/
 /devel-handy/temp.org
 /target
 /tests/*/generated/
-/tests/generated
+/tests/generated/
+/data/
