@@ -8,7 +8,7 @@
 ;;
 ;; (skg-doc-connect)
 ;; (request-document-from-node "a")
-;; (request-title-matches "second")
+;; (request-title-matches "match")
 ;; (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
