@@ -70,6 +70,7 @@ pub struct FileNode {
   pub path: PathBuf,
 }
 
+#[derive(Clone)]
 pub struct TantivyIndex {
   // Associates titles to paths.
   pub index: Arc<Index>,

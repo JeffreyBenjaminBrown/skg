@@ -8,9 +8,12 @@ use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
 use futures::executor::block_on;
 
+use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
+use crate::typedb::create::{
+  make_db_destroying_earlier_one};
 use crate::index_titles::{
-  get_extant_index_or_create_empty_one,update_index,search_index};
-use crate::typedb::create::make_db_destroying_earlier_one;
+  get_extant_index_or_create_empty_one,
+  search_index, create_index};
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
 
@@ -32,10 +35,8 @@ pub fn initialize_typedb(
   let db_name = "skg-test";
   block_on(async {
     if let Err(e) = make_db_destroying_earlier_one(
-      "tests/typedb/fixtures",
-      db_name,
-      &driver
-    ).await {
+      SKG_DATA_DIR, db_name, &driver
+    ) . await {
       eprintln!("Failed to initialize database: {}", e);
       std::process::exit(1);
     } } );
@@ -55,8 +56,7 @@ fn initialize_tantivy(
   let schema = schema_builder.build();
 
   // Create or open the index
-  let index_path = Path::new(
-    "tests/index_titles/generated/index.tantivy");
+  let index_path = Path::new( TANTIVY_INDEX_DIR );
   let index = match get_extant_index_or_create_empty_one(
     schema, index_path) {
     Ok(idx) => idx,
@@ -73,10 +73,8 @@ fn initialize_tantivy(
   };
 
   // Update the index with current files
-  let data_dir = "tests/typedb/fixtures";
-  match update_index( &tantivy_index,
-                       data_dir,
-                       index_path ) {
+  match create_index ( &tantivy_index,
+                        SKG_DATA_DIR ) {
     Ok(indexed_count) => {
       println!("Tantivy index initialized successfully. Indexed {} files.", indexed_count); },
     Err(e) => {
@@ -94,18 +92,15 @@ pub fn serve() -> std::io::Result<()> {
   for stream in listener.incoming() {
     match stream {
       Ok(stream) => {
-        let typedb_driver_clone = Arc::clone(&typedb_driver);
-        let tantivy_index_clone = TantivyIndex {
-          index: Arc::clone(&tantivy_index.index),
-          path_field: tantivy_index.path_field,
-          title_field: tantivy_index.title_field,
-        };
+        let typedb_driver_clone = Arc::clone(
+          &typedb_driver);
+        let tantivy_index_clone =
+          tantivy_index.clone();
         thread::spawn(move || {
-          handle_emacs(stream,
-                       typedb_driver_clone,
-                       db_name,
-                       tantivy_index_clone)
-        } ); }
+          handle_emacs ( stream,
+                         typedb_driver_clone,
+                         db_name,
+                         tantivy_index_clone ) } ); }
       Err(e) => {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
