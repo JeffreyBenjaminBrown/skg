@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::time::SystemTime;
 use std::sync::Arc;
 use tantivy::schema as schema;
 
@@ -58,16 +57,6 @@ fn test_index (
   let title_field = schema_builder.add_text_field(
     "title", schema::TEXT | schema::STORED);
   let schema = schema_builder.build();
-
-  // Touch all the .skg files that will be indexed,
-  // so that the index needs to be completely rebuilt.
-  for entry in fs::read_dir("tests/index_titles/fixtures")? {
-    let path = entry?.path();
-    if path.extension().map_or(false, |ext| ext == "skg") {
-      let now = SystemTime::now();
-      filetime::set_file_mtime(
-        &path,
-        filetime::FileTime::from_system_time(now))?; } }
 
   let index_path = Path::new(
     "tests/index_titles/generated/index.tantivy");
