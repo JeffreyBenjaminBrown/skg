@@ -1,4 +1,6 @@
 * see also [[../docs/progress.md][progress.md]]
+* Deal with duplicated titles in search.
+  I think it might be because the DB is persisted.
 * closing the read/save knot
 ** Why is this so hard?
 ** sketch

@@ -118,8 +118,8 @@ pub fn get_extant_index_or_create_empty_one(
           fs::remove_dir_all(index_path)?;
           fs::create_dir_all(index_path)?; };
         println!("Creating new index at {:?}", index_path);
-        Ok(Index::create_in_dir(index_path, schema)?)
-      } } }
+        Ok ( Index::create_in_dir (
+          index_path, schema )? ) } } }
   else {
     println!("Creating new index at {:?}", index_path);
     fs::create_dir_all(index_path)?;

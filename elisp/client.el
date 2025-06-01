@@ -7,8 +7,8 @@
 ;; Now you can evaluate these commands, individually:
 ;;
 ;; (skg-doc-connect)
-;; (request-document-from-node "a")
-;; (request-title-matches "match")
+;; (request-document-from-node "a") ;; try 1, 1a, or a
+;; (request-title-matches "match") ;; try match, title, second
 ;; (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
