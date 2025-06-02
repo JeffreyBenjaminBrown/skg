@@ -18,6 +18,20 @@
           #'skg-open-org-buffer-from-rust-s-exp)
     (process-send-string proc request-sexp)))
 
+(defun skg-open-org-buffer-from-rust-s-exp (proc string)
+  "Interpret the s-expression from the Rust server and display as org-mode."
+  (with-current-buffer
+      (get-buffer-create skg-doc-buffer-name)
+    (let ((inhibit-read-only t)
+          (s-expr (car (read-from-string string))))
+      (erase-buffer)
+      (org-mode)
+      (let ((content (cdr (assq 'content s-expr))))
+        ;; Ignore `view` key, focus on `content` key.
+        (skg-doc-insert-node content 1)))
+    (set-buffer-modified-p nil)
+    (switch-to-buffer (current-buffer))))
+
 (defun skg-doc-insert-node
     (node ;; see the DATA comment, top of this file
      level) ;; a positive integer
@@ -29,7 +43,6 @@
           (focused (cdr (assq 'focused node)))
           (repeated (cdr (assq 'repeated node)))
           (content (cdr (assq 'content node))) )
-
     (let ;; insert bullet with text properties
         ((bullet (make-string level ?*))
          (start (point)))
@@ -47,20 +60,6 @@
       (dolist (child content)
         (skg-doc-insert-node child
                              (1+ level))))))
-
-(defun skg-open-org-buffer-from-rust-s-exp (proc string)
-  "Interpret the s-expression from the Rust server and display as org-mode."
-  (with-current-buffer
-      (get-buffer-create skg-doc-buffer-name)
-    (let ((inhibit-read-only t)
-          (s-expr (car (read-from-string string))))
-      (erase-buffer)
-      (org-mode)
-      (let ((content (cdr (assq 'content s-expr))))
-        ;; Ignore `view` key, focus on `content` key.
-        (skg-doc-insert-node content 1)))
-    (set-buffer-modified-p nil)
-    (switch-to-buffer (current-buffer))))
 
 (defun skg-doc-get-property (node property-key)
   "Get PROPERTY from NODE."
