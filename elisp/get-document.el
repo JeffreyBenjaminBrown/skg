@@ -4,6 +4,7 @@
 ;;   'heading → string
 ;;   'body → string or absent.
 ;;   'focused → t or absent. See `rust/types.rs`.
+;;   'folded → t or absent. See `rust/types.rs`.
 ;;   'repeated → t or absent. See `rust/types.rs`.
 ;;   'content → list of child nodes (recursive)
 
