@@ -4,12 +4,12 @@
 ;; and after that start the Rust server
 ;; (evaluate `cargo run` from a shell, from the root of this project).
 ;; Next evaluate this buffer (`M-x eval-buffer`).
-;; Now you can evaluate these commands, individually:
+;; Now these commands can be run:
 ;;
-;; (skg-doc-connect)
-;; (request-document-from-node "a") ;; try 1, 1a, or a
-;; (request-title-matches "match") ;; try match, title, second
-;; (skg-doc-disconnect)
+;;   (skg-doc-connect) ;; surprisingly, does not need to be run separately, as the `request-*` functions call it
+;;   (request-document-from-node "a") ;; try 1, 1a, or a
+;;   (request-title-matches "match") ;; try match, title, second
+;;   (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
 ;; the document containing the node with the specified ID,
@@ -21,6 +21,9 @@
 ;; The third asks Rust to search the Tantivy index
 ;; for titles matching the search terms and displays
 ;; the results in a buffer.
+
+(load-file "title-search.el")
+(load-file "get-document.el")
 
 (defvar skg-doc--proc nil
   "Persistent TCP connection to the Rust backend.")
@@ -36,8 +39,9 @@
 
 (defun skg-doc-connect ()
   "Connect, persistently, to the Rust TCP server."
-  (unless (and skg-doc--proc
-               (process-live-p skg-doc--proc))
+  (unless ;; create a new connection only if one doesn't exist or the existing one is dead
+      (and skg-doc--proc
+           (process-live-p skg-doc--proc))
     (setq skg-doc--proc
           (make-network-process
            :name "skg-doc"
@@ -55,95 +59,6 @@
   (if skg-doc--response-handler
       (funcall skg-doc--response-handler proc string)
     (error "skg-doc--response-handler is nil; no handler defined for incoming data")))
-
-(defun skg-open-org-buffer-from-rust-s-exp (proc string)
-  "Interpret the s-expression from the Rust server and display as org-mode."
-  (with-current-buffer
-      (get-buffer-create skg-doc-buffer-name)
-    (let ((inhibit-read-only t)
-          (s-expr (car (read-from-string string))))
-      (erase-buffer)
-      (org-mode)
-      (let ((content (cdr (assq 'content s-expr))))
-        ;; Ignore `view` key, focus on `content` key.
-        (skg-doc-insert-node content 1)))
-    (set-buffer-modified-p nil)
-    (switch-to-buffer (current-buffer))))
-
-(defun skg-display-search-results (proc string)
-  "Display title search results from the Rust server."
-  (with-current-buffer
-      (get-buffer-create skg-search-buffer-name)
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (insert "Title Search Results:\n")
-      (insert "======================\n\n")
-      (insert (string-trim string))
-      (when (> (length (string-trim string)) 0)
-        (insert "\n"))
-      (goto-char (point-min)))
-    (set-buffer-modified-p nil)
-    (switch-to-buffer (current-buffer)))
-  )
-
-(defun skg-doc-get-property (node property-key)
-  "Get PROPERTY from NODE."
-  (message "skg-doc-get-property going.")
-  (when (and node (consp node))
-    (if (and (symbolp (car node))
-             (eq (car node) property-key))
-        (cdr node)
-      (cdr (assq property-key node)))))
-
-(defun skg-doc-insert-node (node level)
-  "The recursive workhorse for building up the org document. It inserts NODE at indentation LEVEL."
-  (let* ( (id (cdr (assq 'id node)))
-          (heading (cdr (assq 'heading node)))
-          (body
-           (cdr (assq 'body node)))
-          (focused (cdr (assq 'focused node)))
-          (repeated (cdr (assq 'repeated node)))
-          (content (cdr (assq 'content node))) )
-
-    (let ;; insert bullet with text properties
-        ((bullet (make-string level ?*))
-         (start (point)))
-      (insert bullet " ")
-      (add-text-properties
-       start (+ start level) ;; where the bullet is
-       (append (when focused (list 'focused t))
-               (when repeated (list 'repeated t))
-               (list 'id id)
-               )))
-    (insert heading "\n")
-    (when body
-      (insert body "\n"))
-    (when content
-      (dolist (child content)
-        (skg-doc-insert-node child
-                             (1+ level))))))
-
-(defun request-document-from-node (node-id)
-  "Request a document (as an s-expression)."
-  (interactive "sNode ID: ")
-  (let* ((proc (skg-doc-connect))
-         (request-sexp
-          (format "((request . \"single document\") (id . \"%s\"))\n" node-id)))
-    (setq skg-doc--response-handler
-          ;; Prepare for response.
-          #'skg-open-org-buffer-from-rust-s-exp)
-    (process-send-string proc request-sexp)))
-
-(defun request-title-matches (search-terms)
-  "Request title matches from the Rust server."
-  (interactive "sSearch terms: ")
-  (let* ((proc (skg-doc-connect))
-         (request-sexp
-          (format "((request . \"title matches\") (terms . \"%s\"))\n" search-terms)))
-    (setq skg-doc--response-handler
-          ;; Prepare for response.
-          #'skg-display-search-results)
-    (process-send-string proc request-sexp)))
 
 (defun skg-doc-disconnect ()
   "Manually close the connection to the Rust server."
