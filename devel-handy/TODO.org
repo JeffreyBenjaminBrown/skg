@@ -1,4 +1,8 @@
 * see also [[../docs/progress.md][progress.md]]
+* tests/org-to-sexp.el fails
+* in elisp/org-to-sexp.el
+* in the rust save code
+  make sure it uses the same spec as elisp/org-to-sexp.el
 * closing the read/save knot
 ** Why is this so hard?
 ** sketch

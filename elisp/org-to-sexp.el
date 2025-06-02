@@ -1,21 +1,24 @@
-(defun first-id-property-on-line ()
-  "RETURNS the value of the `id` property on this line
-(which can be of any type) or nil if there is none."
+(defun first-property-on-line
+    (property-name) ;; a symbol
+  "RETURNS the value (which can be of any type)
+of the PROPERTY-NAME property on this line,
+or nil if there is none."
   (save-excursion
     (let ( (found-pos nil) )
       (setq found-pos (text-property-not-all
                        (line-beginning-position)
                        (line-end-position)
-                       'id nil) )
+                       property-name nil) )
       (when found-pos
-        (get-text-property found-pos 'id)))))
+        (get-text-property found-pos property-name)))))
 
 (defun org-to-sexp-parse-heading-at-point ()
   "RETURNS an alist with heading and id (if present).
 Example: ((heading . STRING) (id . STRING))
 ASSUMES point is on a heading."
   (interactive)
-  (let* ( (id-value (first-id-property-on-line))
+  (let* ( (id-value       (first-property-on-line 'id))
+          (repeated-value (first-property-on-line 'repeated))
           (heading-value (substring-no-properties
                           (string-trim
                            (org-get-heading t t t t))))

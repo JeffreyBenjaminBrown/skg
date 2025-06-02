@@ -1,0 +1,13 @@
+* 1
+  1 body
+** 11
+   11 body
+** 12
+*** 121
+*** 1
+    1 is repeated here. Its text will be ignored,
+    but its id will still be a child of '12'.
+* 2
+  2 body
+** 21
+** 22
