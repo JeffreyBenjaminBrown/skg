@@ -24,6 +24,25 @@
       (insert (concat random-id " "))
       (goto-char (+ current-point (length random-id) 1)))))
 
+(defun add-id-properties-to-all-headings ()
+  "Add an 'id' text property to each heading line in the current buffer.
+The 'id' property value equals the heading text.
+The property is applied to the entire heading line (asterisks and text, even trailing whitespace).
+Preserves folding state by using save-excursion and save-restriction."
+
+  (interactive)
+  (save-excursion
+    (save-restriction
+      (widen)  ; Ensure we can see the whole buffer
+      (goto-char (point-min))
+      (while (re-search-forward "^\\*+ \\(.+\\)$" nil t)
+        (let ((heading-text (match-string-no-properties 1))
+              (line-start (line-beginning-position))
+              (line-end   (line-end-position)))
+          (put-text-property
+           line-start  line-end
+           'id  heading-text))))))
+
 (defun alist-diff (expected actual &optional path)
   "Compare two recursive alists and show differences, ignoring order."
   (let ((path (or path "root")))

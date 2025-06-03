@@ -15,6 +15,7 @@
 
 (require 'ert)
 (require 'org-to-sexp)
+(require 'skg-util)
 
 (ert-deftest test-org-to-sexp-parse-all-branches ()
   "PURPOSE: Test org-to-sexp-parse-all-branches.
@@ -70,15 +71,7 @@ will also be given the property `(repeated . t)`."
       (erase-buffer)  ; Clear any existing content
       (insert-file-contents test-file)
       (org-mode)
-      (progn ;; Add id properties to each heading
-        (goto-char (point-min))
-        (while (re-search-forward "^\\*+ \\(.+\\)$" nil t)
-          (let ((heading-text
-                 (match-string-no-properties 1))
-                (heading-start (match-beginning 1))
-                (heading-end (match-end 1)))
-            (put-text-property
-             heading-start heading-end 'id heading-text))))
+      (add-id-properties-to-all-headings)
       (progn ;; Add (repeated . t) to second heading equal to '1'
         (goto-char (point-min))
         (let ((first-one-found nil))
