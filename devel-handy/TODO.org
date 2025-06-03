@@ -1,5 +1,33 @@
 * see also [[../docs/progress.md][progress.md]]
 * tests/org-to-sexp.el fails
+Part of the problem is that search changes fold structure. The following replaces search with builtin org navigation functions, but I haven't got it to work yet.
+
+modified   elisp/org-to-sexp.el
+@@ -40,19 +40,15 @@ MOVES POINT to the first line after the body."
+   (beginning-of-line)
+   (let ((body-start (point))
+         (body-end
+-         ;; Find the next heading or end of buffer
+-         (if (re-search-forward "^\\*+ " nil t)
+-             (match-beginning 0)
+-           (point-max))))
++         (save-excursion
++           (if (org-next-visible-heading 1)
++               (point)
++             (point-max)))))
+     (when (< body-start body-end)
+       (let ((body-text (string-trim-right
+                         (buffer-substring-no-properties
+                          body-start body-end))))
+-        (if ;; Without this, if this body
+-            ;; were the last thing in the file,
+-            ;; point does not end up after it.
+-            (= body-end (point-max))
+-            (goto-char (point-max)))
++        (goto-char body-end)
+         `(body . ,body-text)))))
+
+ (defun org-to-sexp-parse-heading-at-point-and-maybe-body
 * in elisp/org-to-sexp.el
 * in the rust save code
   make sure it uses the same spec as elisp/org-to-sexp.el
