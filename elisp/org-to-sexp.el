@@ -17,17 +17,19 @@ or nil if there is none."
 Example: ((heading . STRING) (id . STRING))
 ASSUMES point is on a heading."
   (interactive)
-  (let* ( (id-value       (first-property-on-line 'id))
-          (repeated-value (first-property-on-line 'repeated))
-          (heading-value (substring-no-properties
+  (let* ( (heading-value (substring-no-properties
                           (string-trim
                            (org-get-heading t t t t))))
+          (id-value       (first-property-on-line 'id))
+          (repeated-value (first-property-on-line 'repeated))
           (is-folded (save-excursion
                        (beginning-of-line)
                        (org-fold-folded-p)))
           (result `((heading . ,heading-value))))
     (when id-value
       (setq result (append result `((id . ,id-value)))))
+    (when repeated-value
+      (setq result (append result '((repeated . t)))))
     (when is-folded
       (setq result (append result '((folded . t)))))
     result))
@@ -40,19 +42,15 @@ MOVES POINT to the first line after the body."
   (beginning-of-line)
   (let ((body-start (point))
         (body-end
-         ;; Find the next heading or end of buffer
-         (if (re-search-forward "^\\*+ " nil t)
-             (match-beginning 0)
-           (point-max))))
+         (save-excursion
+           (if (org-next-visible-heading 1)
+               (point)
+             (point-max)))))
     (when (< body-start body-end)
       (let ((body-text (string-trim-right
                         (buffer-substring-no-properties
                          body-start body-end))))
-        (if ;; Without this, if this body
-            ;; were the last thing in the file,
-            ;; point does not end up after it.
-            (= body-end (point-max))
-            (goto-char (point-max)))
+        (goto-char body-end)
         `(body . ,body-text)))))
 
 (defun org-to-sexp-parse-heading-at-point-and-maybe-body

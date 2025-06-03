@@ -102,7 +102,7 @@ will also be given the property `(repeated . t)`."
         (should (equal actual-result expected-result))))))
 
 (ert-deftest test-first-property-on-line ()
-  "Test the first-property-on-line function with various text properties."
+  "Tests the first-property-on-line function, by creating a temp buffer with three lines and various text properties attached to the words therein."
   (with-temp-buffer
     (org-mode)
 
