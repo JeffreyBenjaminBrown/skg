@@ -1,4 +1,4 @@
-;;; tests/org-to-sexp.el --- ERT tests for org-to-sexp module
+;;; PURPOSE: ERT tests for org-to-sexp module
 
 ;; USAGE
 ;; From command line:
@@ -36,7 +36,7 @@ will also be given the property `(repeated . t)`."
          (expand-file-name
           "org-to-sexp/fixtures/1.org"
           (file-name-directory
-           (or load-file-name buffer-file-name))))
+           (or load-file-name buffer-file-name default-directory))))
         (expected-result
          `(content
            . (((heading . "1")
