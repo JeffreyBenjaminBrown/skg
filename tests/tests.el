@@ -1,21 +1,23 @@
-;;; PURPOSE: Run all tests in this directory.
+;;; tests/tests.el --- Run all project tests
 
 ;; Load project configuration
-(load
- (expand-file-name
-  "../elisp/init.el"
-  (file-name-directory
-   (or load-file-name buffer-file-name))))
-
-;; Load and run all test files
 (let ((test-dir (file-name-directory
-                 (or load-file-name buffer-file-name)))
-      (current-file (or load-file-name buffer-file-name)))
-  (dolist (file (directory-files test-dir t "\\.el$"))
-    (unless ;; Load only *other* files.
-        (string= file current-file)
-      (message "Loading test file: %s" file)
-      (load-file file))))
+                 (or load-file-name buffer-file-name default-directory))))
+  (load (expand-file-name "../elisp/init.el" test-dir)))
 
-;; TODO: Can't assume they all passed.
-;; (message "All tests completed!")
+;; Auto-discover and load all test files
+(let ((test-dir (file-name-directory
+                 (or load-file-name buffer-file-name default-directory)))
+      (current-file (or load-file-name buffer-file-name)))
+  (dolist (file (directory-files test-dir t "^test-.*\\.el$"))
+    (when current-file  ; Only check if we have a current file
+      (unless (string= file current-file)
+        (message "Loading test file: %s" file)
+        (load-file file)))))
+
+;; Run all tests
+(if noninteractive
+    ;; Batch mode (command line)
+    (ert-run-tests-batch-and-exit)
+  ;; Interactive mode (within Emacs)
+  (ert-run-tests-interactively t))
