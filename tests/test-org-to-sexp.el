@@ -90,7 +90,7 @@ will also be given the property `(repeated . t)`."
                  (match-end 0)
                  'repeated t)
               (setq first-one-found t)))))
-      (progn ;; Navigate and unfold as described
+      (progn ;; Navigate and unfold as in docstring
         (org-overview)
         (goto-char (point-min)) ; The first heading is here.
         (org-flag-subtree nil)  ; Unfold it
