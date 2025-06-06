@@ -69,6 +69,52 @@
       (should (equal (first-property-on-line 'three)
                      "line")))))
 
+(ert-deftest test-org-to-sexp-parse-heading-at-point ()
+  "Test parsing headings at different positions on each line."
+  (with-temp-buffer
+    (org-mode)
+    (insert "Not a heading.
+* 1
+** 2
+Not a heading. TODO: What if this line is extant but empty?
+** 3
+* 4
+Not a heading.")
+    (dolist (test-case '((0 error)
+                         (1 "1")
+                         (2 "2")
+                         (3 error)
+                         (4 "3")
+                         (5 "4")
+                         (6 error)))
+      (let ((line-num (nth 0 test-case))
+            (expected (nth 1 test-case)))
+        (progn ;; Go to a line
+          (goto-char (point-min))
+          (forward-line line-num))
+        (let* ;; Get line boundaries for testing different positions
+            ((line-start (line-beginning-position))
+             (line-end (line-end-position))
+             (line-length (- line-end line-start))
+             (line-middle (+ line-start (/ line-length 2)))
+             (positions (list line-start line-middle line-end))
+             (results '()))
+          (dolist (pos positions)
+            (goto-char pos)
+            (message "Buffer contents:\n%s" (buffer-string))
+            (message "Point is at line %d, content: '%s'"
+                     (line-number-at-pos)
+                     (string-trim (thing-at-point 'line t)))
+            (if (eq expected 'error)
+                (should-error (org-to-sexp-parse-heading-at-point)
+                              :type 'error)
+              (let ((result (org-to-sexp-parse-heading-at-point)))
+                (push (alist-get 'heading result) results))))
+          (when (not (eq expected 'error))
+            (should (equal results
+                           (list expected expected expected))))
+          )))))
+
 (ert-deftest test-org-to-sexp-parse-all-branches ()
   "PURPOSE: Test org-to-sexp-parse-all-branches.
 HOW IT WORKS:

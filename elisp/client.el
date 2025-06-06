@@ -22,8 +22,8 @@
 ;; for titles matching the search terms and displays
 ;; the results in a buffer.
 
-(load-file "title-search.el")
-(load-file "get-document.el")
+(require 'title-search)
+(require 'get-document)
 
 (defvar skg-doc--proc nil
   "Persistent TCP connection to the Rust backend.")

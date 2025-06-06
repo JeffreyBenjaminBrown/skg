@@ -24,3 +24,5 @@
     (set-buffer-modified-p nil)
     (switch-to-buffer (current-buffer)))
   )
+
+(provide 'title-search)

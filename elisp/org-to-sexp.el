@@ -15,8 +15,11 @@ or nil if there is none."
 (defun org-to-sexp-parse-heading-at-point ()
   "RETURNS an alist with heading and id (if present).
 Example: ((heading . STRING) (id . STRING))
-ASSUMES point is on a heading."
+REQUIRES point to be on a heading; else throws an error."
+
   (interactive)
+  (unless (org-at-heading-p)
+    (error "Point is not on an org-mode heading"))
   (let* ( (heading-value (substring-no-properties
                           (string-trim
                            (org-get-heading t t t t))))

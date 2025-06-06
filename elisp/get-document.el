@@ -70,3 +70,5 @@
              (eq (car node) property-key))
         (cdr node)
       (cdr (assq property-key node)))))
+
+(provide 'get-document)
