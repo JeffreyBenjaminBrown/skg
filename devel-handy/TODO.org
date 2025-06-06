@@ -1,7 +1,7 @@
 * see also [[../docs/progress.md][progress.md]]
 * tests/org-to-sexp.el fails
 Part of the problem is that search changes fold structure. The following replaces search with builtin org navigation functions, but I haven't got it to work yet.
-** the diff
+** just the diff
 modified   elisp/org-to-sexp.el
 @@ -40,19 +40,15 @@ MOVES POINT to the first line after the body."
    (beginning-of-line)
@@ -28,7 +28,7 @@ modified   elisp/org-to-sexp.el
          `(body . ,body-text)))))
 
  (defun org-to-sexp-parse-heading-at-point-and-maybe-body
-** the whole function definition (new side of the diff)
+** the entire function definition (new side of the diff)
 (defun org-to-sexp-parse-body-at-point ()
   "RETURNS either nil or a string without properties,
 of the form (body . STRING).
