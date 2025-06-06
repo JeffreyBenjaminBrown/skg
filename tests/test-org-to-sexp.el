@@ -115,6 +115,65 @@ Not a heading.")
                            (list expected expected expected))))
           )))))
 
+(ert-deftest test-org-to-sexp-parse-heading-at-point-and-maybe-body ()
+  "Test parsing headings with their bodies."
+  (with-temp-buffer
+    (org-mode)
+    (insert "This line should err.
+* 1
+  1 has a body.
+** 2 has an empty body.
+
+** 3
+   3 has a
+   multi-line body.
+* 4 is followed by two empty lines, which collapse to \"\".
+
+
+")
+    (let ((focused-line 4)
+          (test-cases
+           '((0 . error)
+             (1 . (("heading" . "1")
+                   ("body" . "  1 has a body.")))
+             (3 . (("heading" . "2 has an empty body.")
+                   ("body" . "")
+                   ("focused" . t)))
+             (5 . (("heading" . "3")
+                   ("body" . "   3 has a\n   multi-line body.")))
+             (8 . (("heading" . "4 is followed by two empty lines, which collapse to \"\".")
+                   ("body" . ""))))))
+      (dolist (test-case test-cases)
+        (let ((line-num (car test-case))
+              (expected (cdr test-case))
+              (remaining-cases (cdr (member test-case test-cases))))
+          (save-excursion
+            (goto-char (point-min))
+            (forward-line line-num)
+            (if (eq expected 'error)
+                (should-error
+                 (org-to-sexp-parse-heading-at-point-and-maybe-body
+                  focused-line)
+                 :type 'error)
+              (let ((result
+                     (org-to-sexp-parse-heading-at-point-and-maybe-body
+                      focused-line)))
+                (should (equal (alist-get 'heading result)
+                               (cdr (assoc "heading" expected))))
+                (should (equal (alist-get 'body result)
+                               (cdr (assoc "body" expected))))
+                (if (assoc "focused" expected)
+                    (should (equal (alist-get 'focused result) t))
+                  (should (not (alist-get 'focused result))))
+                (should ;; Ensure no other fields are present.
+                 (equal (length result) (length expected)))
+                (if ;; verify cursor lands on the next heading
+                    remaining-cases
+                    (should (equal (line-number-at-pos)
+                                   (1+ (car (car remaining-cases)))))
+                  (should ;; or EOF if there are no more headings
+                   (eobp)))))))))))
+
 (ert-deftest test-org-to-sexp-parse-all-branches ()
   "PURPOSE: Test org-to-sexp-parse-all-branches.
 HOW IT WORKS:

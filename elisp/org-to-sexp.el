@@ -42,7 +42,14 @@ REQUIRES point to be on a heading; else throws an error."
   "RETURNS either nil or a string without properties,
 of the form (body . STRING).
 ASSUMES point is on the first line of a heading body.
-MOVES POINT to the first line after the body."
+  I could add tests to make this safer,
+  at the expense of speed and concision.
+  But the only function that calls it is
+    org-to-sexp-parse-heading-at-point-and-maybe-body,
+  and I think that logic is sound.
+MOVES POINT to the first line after the body.
+TODO | PITFALL: This reduces a body consisting of empty lines into a single empty line. Faithfulness would be better."
+
 
   (beginning-of-line)
   (let ((body-start (point))
@@ -60,13 +67,14 @@ MOVES POINT to the first line after the body."
 
 (defun org-to-sexp-parse-heading-at-point-and-maybe-body
     (&optional focused-line-number)
-  "PURPOSE: Parses the heading at point and its body text if any.
+  "PURPOSE: Parses the heading at point, and its body text if any.
 RETURNS an alist with these keys (some optional):
   heading  : string,
   ?id      : string,
   ?body    : string,
   ?focused : t or absent.
-ASSUMES point is on a heading.
+REQUIRES point to be on a heading,
+  because org-to-sexp-parse-body-at-point does.
 SIDE EFFECTS:
   - Moves point to the line just after the parsed content.
   - If `focused-line-number` is given and lies within the parsed region, the returned alist will include the pair (focused . t)."
