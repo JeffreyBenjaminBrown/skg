@@ -17,6 +17,57 @@
 (require 'org-to-sexp)
 (require 'skg-util)
 
+
+(ert-deftest test-first-property-on-line ()
+  "Tests the first-property-on-line function, by creating a temp buffer with three lines and various text properties attached to the words therein."
+  (with-temp-buffer
+    (org-mode)
+
+    ;; Insert the test data
+    (insert "line one\n")
+    (insert "line two\n")
+    (insert "line three\n")
+
+    ;; Set up properties on line 1
+    (goto-char (point-min))
+    ;; Find "line" in first line and attach property "one" with value "line"
+    (when (search-forward "line" (line-end-position) t)
+      (put-text-property (match-beginning 0) (match-end 0) 'one "line"))
+    ;; Find "one" in first line and attach property "one" with value "one"
+    (when (search-forward "one" (line-end-position) t)
+      (put-text-property (match-beginning 0) (match-end 0) 'one "one"))
+
+    ;; Set up properties on line 2
+    (goto-char (point-min))
+    (forward-line 1)
+    (when (search-forward "line" (line-end-position) t)
+      (put-text-property (match-beginning 0) (match-end 0) 'other t))
+
+    ;; Set up properties on line 3
+    (goto-char (point-min))
+    (forward-line 2)
+    (when (search-forward "line" (line-end-position) t)
+      (put-text-property (match-beginning 0) (match-end 0) 'three "line"))
+    (beginning-of-line)
+    (when (search-forward "three" (line-end-position) t)
+      (put-text-property (match-beginning 0) (match-end 0) 'three "three"))
+
+    ;; Test 1: Line 1, beginning, search for property "one"
+    (goto-char (point-min))
+    (should (equal (first-property-on-line 'one) "line"))
+
+    ;; Test 2: Line 2, middle (space), search for property "two"
+    (goto-char (point-min))
+    (forward-line 1)
+    (forward-char 4) ; Move to the space between "line" and "two"
+    (should (equal (first-property-on-line 'two) nil))
+
+    ;; Test 3: Line 3, middle (space), search for property "three"
+    (goto-char (point-min))
+    (forward-line 2)
+    (forward-char 4) ; Move to the space between "line" and "three"
+    (should (equal (first-property-on-line 'three) "line"))))
+
 (ert-deftest test-org-to-sexp-parse-all-branches ()
   "PURPOSE: Test org-to-sexp-parse-all-branches.
 HOW IT WORKS:
@@ -70,53 +121,3 @@ will also be given the property `(repeated . t)`."
       (let ;; Parse and test
           ((actual-result (org-to-sexp-parse-all-branches)))
         (should (equal actual-result expected-result))))))
-
-(ert-deftest test-first-property-on-line ()
-  "Tests the first-property-on-line function, by creating a temp buffer with three lines and various text properties attached to the words therein."
-  (with-temp-buffer
-    (org-mode)
-
-    ;; Insert the test data
-    (insert "line one\n")
-    (insert "line two\n")
-    (insert "line three\n")
-
-    ;; Set up properties on line 1
-    (goto-char (point-min))
-    ;; Find "line" in first line and attach property "one" with value "line"
-    (when (search-forward "line" (line-end-position) t)
-      (put-text-property (match-beginning 0) (match-end 0) 'one "line"))
-    ;; Find "one" in first line and attach property "one" with value "one"
-    (when (search-forward "one" (line-end-position) t)
-      (put-text-property (match-beginning 0) (match-end 0) 'one "one"))
-
-    ;; Set up properties on line 2
-    (goto-char (point-min))
-    (forward-line 1)
-    (when (search-forward "line" (line-end-position) t)
-      (put-text-property (match-beginning 0) (match-end 0) 'other t))
-
-    ;; Set up properties on line 3
-    (goto-char (point-min))
-    (forward-line 2)
-    (when (search-forward "line" (line-end-position) t)
-      (put-text-property (match-beginning 0) (match-end 0) 'three "line"))
-    (beginning-of-line)
-    (when (search-forward "three" (line-end-position) t)
-      (put-text-property (match-beginning 0) (match-end 0) 'three "three"))
-
-    ;; Test 1: Line 1, beginning, search for property "one"
-    (goto-char (point-min))
-    (should (equal (first-property-on-line 'one) "line"))
-
-    ;; Test 2: Line 2, middle (space), search for property "two"
-    (goto-char (point-min))
-    (forward-line 1)
-    (forward-char 4) ; Move to the space between "line" and "two"
-    (should (equal (first-property-on-line 'two) nil))
-
-    ;; Test 3: Line 3, middle (space), search for property "three"
-    (goto-char (point-min))
-    (forward-line 2)
-    (forward-char 4) ; Move to the space between "line" and "three"
-    (should (equal (first-property-on-line 'three) "line"))))
