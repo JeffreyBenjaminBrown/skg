@@ -39,33 +39,10 @@ will also be given the property `(repeated . t)`."
           (file-name-directory
            (or load-file-name buffer-file-name default-directory))))
         (expected-result
-         `(content
-           . (((heading . "1")
-               (id . "1")
-               (body . "  1 body")
-               (content
-                . (((heading . "11")
-                    (id . "11")
-                    (body . "   11 body")
-                    (focused . t))
-                   ((heading . "12")
-                    (id . "12")
-                    (folded . t)
-                    (content
-                     . (((heading . "121")
-                         (id . "121"))
-                        ((heading . "1")
-                         (id . "1")
-                         (repeated . t))))))))
-              ((heading . "2")
-               (id . "2")
-               (body . "  2 body")
-               (folded . t)
-               (content
-                . (((heading . "21")
-                    (id . "21"))
-                   ((heading . "22")
-                    (id . "22")))))))))
+         (with-temp-buffer
+           (insert-file-contents
+            "org-to-sexp/fixtures/1.el")
+           (buffer-string))))
     (with-current-buffer
         (get-buffer-create "*test-org-to-sexp*")
       (erase-buffer)  ; Clear any existing content
