@@ -50,7 +50,6 @@ ASSUMES point is on the first line of a heading body.
 MOVES POINT to the first line after the body.
 TODO | PITFALL: This reduces a body consisting of empty lines into a single empty line. Faithfulness would be better."
 
-
   (beginning-of-line)
   (let ((body-start (point))
         (body-end

@@ -1,4 +1,6 @@
+* change graph -> web
 * see also [[../docs/progress.md][progress.md]]
+* use [[~/hodal/emacs/property-dump.el][property-dump]] to send straight to Rust
 * tests/org-to-sexp.el fails
 Part of the problem is that search changes fold structure. The following replaces search with builtin org navigation functions, but I haven't got it to work yet.
 ** just the diff
@@ -47,7 +49,6 @@ MOVES POINT to the first line after the body."
                          body-start body-end))))
         (goto-char body-end)
         `(body . ,body-text)))))
-* in elisp/org-to-sexp.el
 * in the rust save code
   make sure it uses the same spec as elisp/org-to-sexp.el
 * closing the read/save knot

@@ -1,8 +1,7 @@
 Skg grafts a novel sharing model onto a familiar data model older than Rome.
 # The familiar part: Trees with hyperlinks
-Ordinary books with citations use this model. So does the internet, and a large number of "personal knowledge management" apps like OneNote, Notion, Obsidian, Roam, org-roam and Semantic Synchrony.
+This is [the data model that all serious knowledge mapping software seems to use](data-model-trees-with-links.md).
 
-The model is this: Each document is a `tree` with `hyperlinks`. That is, the document consists of ordinary text with hyperlinks, plus the ability (this is the "tree" part) to be divided into sections, subsections, sub-subsections, etc. The divisions don't have to be balanced -- some branches can be much deeper than others.
 ## What the `contains` relation means, and how it differs from hyperlinks
 Each document is a curated view of data defined by the `contains` relation. Any document that includes the node N also includes every node that descends from N via `contains`.
 
