@@ -17,5 +17,15 @@ for f in $(cat temp/files-to-print.txt); do
     cat $f
 done > temp/code
 
+separator="**** "
+{ echo "$separator" "Files are indented a few spaces in this printout, but not in reality."
+  for f in *.md \
+           */*.md; do
+      echo "$separator file: $f"
+      cat "$f" | sed 's/^/    /'
+      echo ""
+  done
+} > temp/docs-state.org
+
 # unique matches
 grep -rhoE '\bhide(s)?_[A-Za-z0-9_-]+' . | sort -u

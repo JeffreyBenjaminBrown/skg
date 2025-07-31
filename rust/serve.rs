@@ -84,8 +84,10 @@ fn initialize_tantivy(
   tantivy_index }
 
 pub fn serve() -> std::io::Result<()> {
-  let typedb_driver = initialize_typedb();
-  let tantivy_index = initialize_tantivy();
+  let typedb_driver : Arc<TypeDBDriver> =
+    initialize_typedb();
+  let tantivy_index : TantivyIndex =
+    initialize_tantivy();
   let db_name = "skg-test";
   let listener = TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");

@@ -9,7 +9,7 @@ This code so far includes a Rust server and an Emacs client. The server can:
 
 The client can:
 
-- Receive that document.
+- Receive that document, interpret it, and display it.
 - Let the user edit it.
 ## What's partially done
 ### Save data
