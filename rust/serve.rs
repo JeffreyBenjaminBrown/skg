@@ -17,6 +17,80 @@ use crate::index_titles::{
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
 
+pub fn serve() -> std::io::Result<()> {
+  let typedb_driver : Arc<TypeDBDriver> =
+    initialize_typedb();
+  let tantivy_index : TantivyIndex =
+    initialize_tantivy();
+  let db_name = "skg-test";
+  let listener : TcpListener =
+    TcpListener::bind("0.0.0.0:1730")?; // This is what Emacs sends on. TODO: The emacs and the rust code ought to both read this value from the same config file.
+  println!("Listening on port 1730...");
+  for stream in listener.incoming() {
+    match stream {
+      Ok(stream) => {
+        let typedb_driver_clone : Arc<TypeDBDriver> =
+          Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
+        let tantivy_index_clone =
+          tantivy_index.clone();
+        thread::spawn(move || {
+          handle_emacs (
+            stream,
+            typedb_driver_clone,
+            db_name, // static, so no cloning needed
+            tantivy_index_clone ) } ); }
+      Err(e) => {
+        eprintln!("Connection failed: {e}"); } } }
+  Ok (()) }
+
+fn handle_emacs(
+  mut stream: TcpStream,
+  typedb_driver: Arc<TypeDBDriver>,
+  db_name: &str,
+  tantivy_index: TantivyIndex
+) {
+  let peer : SocketAddr =
+    stream.peer_addr().unwrap();
+  println!("Emacs connected: {peer}");
+  let mut reader
+    : BufReader<TcpStream> // the underlying stream, but buffered
+    = BufReader::new (
+      stream . try_clone() . unwrap() );
+  let mut line = String::new();
+  while let Ok(n) =
+    reader.read_line(&mut line) { // reads until a newline
+      if n == 0 { break; } // emacs disconnected
+      println!("Received request: {}", line.trim_end());
+      match request_type_from_request( &line ) {
+        Ok(request_type) => {
+          if request_type == "single document" {
+            handle_single_document_request(
+              &mut stream,
+              &line,
+              &typedb_driver,
+              db_name,
+              &tantivy_index);
+          } else if request_type == "title matches" {
+            handle_title_matches_request(
+              &mut stream,
+              &line,
+              &tantivy_index);
+          } else {
+            let error_msg = format!(
+              "Unsupported request type: {}",
+              request_type);
+            println!("{}", error_msg);
+            send_response(&mut stream, &error_msg); } },
+        Err(err) => {
+          println!("Error determining request type: {}",
+                   err);
+          send_response(
+            &mut stream, &format!(
+              "Error determining request type: {}",
+              err)); } };
+      line.clear(); }
+  println!("Emacs disconnected: {peer}"); }
+
 pub fn initialize_typedb(
 ) -> Arc<TypeDBDriver> {
 
@@ -82,79 +156,6 @@ fn initialize_tantivy(
       std::process::exit(1); } }
 
   tantivy_index }
-
-pub fn serve() -> std::io::Result<()> {
-  let typedb_driver : Arc<TypeDBDriver> =
-    initialize_typedb();
-  let tantivy_index : TantivyIndex =
-    initialize_tantivy();
-  let db_name = "skg-test";
-  let listener : TcpListener =
-    TcpListener::bind("0.0.0.0:1730")?; // This is what Emacs sends on. TODO: The emacs and the rust code ought to both read this value from the same config file.
-  println!("Listening on port 1730...");
-  for stream in listener.incoming() {
-    match stream {
-      Ok(stream) => {
-        let typedb_driver_clone : Arc<TypeDBDriver> =
-          Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
-        let tantivy_index_clone =
-          tantivy_index.clone();
-        thread::spawn(move || {
-          handle_emacs (
-            stream,
-            typedb_driver_clone,
-            db_name, // static, so no cloning needed
-            tantivy_index_clone ) } ); }
-      Err(e) => {
-        eprintln!("Connection failed: {e}"); } } }
-  Ok (()) }
-
-fn handle_emacs(
-  mut stream: TcpStream,
-  typedb_driver: Arc<TypeDBDriver>,
-  db_name: &str,
-  tantivy_index: TantivyIndex
-) {
-  let peer : SocketAddr =
-    stream.peer_addr().unwrap();
-  println!("Emacs connected: {peer}");
-  let mut reader : BufReader<TcpStream> = // like the underlying stream, but buffered
-    BufReader::new (
-      stream . try_clone() . unwrap() );
-  let mut line = String::new();
-  while let Ok(n) =
-    reader.read_line(&mut line) { // reads until a newline
-      if n == 0 { break; } // emacs disconnected
-      println!("Received request: {}", line.trim_end());
-      match request_type_from_request( &line ) {
-        Ok(request_type) => {
-          if request_type == "single document" {
-            handle_single_document_request(
-              &mut stream,
-              &line,
-              &typedb_driver,
-              db_name,
-              &tantivy_index);
-          } else if request_type == "title matches" {
-            handle_title_matches_request(
-              &mut stream,
-              &line,
-              &tantivy_index);
-          } else {
-            let error_msg = format!(
-              "Unsupported request type: {}",
-              request_type);
-            println!("{}", error_msg);
-            send_response(&mut stream, &error_msg); } },
-        Err(err) => {
-          println!("Error determining request type: {}",
-                   err);
-          send_response(
-            &mut stream, &format!(
-              "Error determining request type: {}",
-              err)); } };
-      line.clear(); }
-  println!("Emacs disconnected: {peer}"); }
 
 fn handle_single_document_request(
   stream: &mut TcpStream,
