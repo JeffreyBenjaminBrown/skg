@@ -3,7 +3,8 @@
 ;; (run `typedb server` from a shell)
 ;; and after that start the Rust server
 ;; (evaluate `cargo run` from a shell, from the root of this project).
-;; Next evaluate this buffer (`M-x eval-buffer`).
+;; Next evaluate `elisp/init.el` (visit, then run `M-x eval-buffer`).
+;; Finally, evaluate this file.
 ;; Now these commands can be run:
 ;;
 ;;   (skg-doc-connect) ;; surprisingly, does not need to be run separately, as the `request-*` functions call it

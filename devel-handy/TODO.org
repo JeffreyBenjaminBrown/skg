@@ -1,3 +1,4 @@
+* Avoid uses of `unwrap` in Rust.
 * change graph -> web
 * see also [[../docs/progress.md][progress.md]]
 * use [[~/hodal/emacs/property-dump.el][property-dump]] to send straight to Rust
