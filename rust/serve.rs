@@ -49,31 +49,33 @@ fn handle_emacs(
   db_name: &str,
   tantivy_index: TantivyIndex
 ) {
+  // API: See /api.md
+  // TODO: For Emacs to send s-expressions that themselves contain newlines, this will need modification. The easiest way seems to be to send two messages: first a length, and then the s-exp of that length. Waiting for the s-exp to end by matching parentheses would be more natural, but requires parsing while reading in order to determine when to stop.
   let peer : SocketAddr =
-    stream.peer_addr().unwrap();
+    stream . peer_addr() . unwrap();
   println!("Emacs connected: {peer}");
   let mut reader
     : BufReader<TcpStream> // the underlying stream, but buffered
     = BufReader::new (
       stream . try_clone() . unwrap() );
-  let mut line = String::new();
+  let mut request = String::new();
   while let Ok(n) =
-    reader.read_line(&mut line) { // reads until a newline
+    reader.read_line( &mut request ) { // reads until a newline
       if n == 0 { break; } // emacs disconnected
-      println!("Received request: {}", line.trim_end());
-      match request_type_from_request( &line ) {
+      println!("Received request: {}", request.trim_end());
+      match request_type_from_request( &request ) {
         Ok(request_type) => {
           if request_type == "single document" {
             handle_single_document_request(
               &mut stream,
-              &line,
+              &request,
               &typedb_driver,
               db_name,
               &tantivy_index);
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,
-              &line,
+              &request,
               &tantivy_index);
           } else {
             let error_msg = format!(
@@ -88,7 +90,7 @@ fn handle_emacs(
             &mut stream, &format!(
               "Error determining request type: {}",
               err)); } };
-      line.clear(); }
+      request.clear(); }
   println!("Emacs disconnected: {peer}"); }
 
 pub fn initialize_typedb(
