@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 use std::thread;
-use tantivy::schema;
+use tantivy::{Index, schema};
 use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
 use futures::executor::block_on;
@@ -18,15 +18,18 @@ use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
 
 pub fn serve() -> std::io::Result<()> {
+  // Makes a typedb driver and a tantivy index.
+  // Then pipes TCP input from Emacs into handle_emacs.
+
   let typedb_driver : Arc<TypeDBDriver> =
     initialize_typedb();
   let tantivy_index : TantivyIndex =
     initialize_tantivy();
   let db_name = "skg-test";
-  let listener : TcpListener =
-    TcpListener::bind("0.0.0.0:1730")?; // This is what Emacs sends on. TODO: The emacs and the rust code ought to both read this value from the same config file.
+  let emacs_listener : TcpListener =
+    TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
-  for stream in listener.incoming() {
+  for stream in emacs_listener.incoming() {
     match stream {
       Ok(stream) => {
         let typedb_driver_clone : Arc<TypeDBDriver> =
@@ -49,8 +52,15 @@ fn handle_emacs(
   db_name: &str,
   tantivy_index: TantivyIndex
 ) {
+  // Directs requests from the stream to one of
+  //   handle_single_document_request
+  //   handle_title_matches_request
   // API: See /api.md
-  // TODO: For Emacs to send s-expressions that themselves contain newlines, this will need modification. The easiest way seems to be to send two messages: first a length, and then the s-exp of that length. Waiting for the s-exp to end by matching parentheses would be more natural, but requires parsing while reading in order to determine when to stop.
+
+  // TODO: Let Emacs send s-expressions with newlines.
+  //   The easiest way seems to be to send two messages: first a length, and then the s-exp of that length.
+  //   Waiting for the s-exp to end by matching parentheses would be more natural, but requires parsing while reading in order to determine when to stop.
+
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
   println!("Emacs connected: {peer}");
@@ -95,53 +105,61 @@ fn handle_emacs(
 
 pub fn initialize_typedb(
 ) -> Arc<TypeDBDriver> {
+  // Connects to the TypeDB server,
+  // then calls make_db_destroying_earlier_one.
 
   println!("Initializing TypeDB database...");
-  let driver = block_on(async {
-    match TypeDBDriver::new(
+  let driver = block_on( async {
+    TypeDBDriver::new(
       "127.0.0.1:1729",
       Credentials::new("admin", "password"),
-      DriverOptions::new(false, None).unwrap()
-    ).await {
-      Ok(d) => d,
-      Err(e) => {
+      DriverOptions::new(false, None).unwrap() )
+      .await
+      .unwrap_or_else(|e| {
         eprintln!("Error connecting to TypeDB: {}", e);
         std::process::exit(1);
-      } } } );
+      } )
+  } );
+
   let db_name = "skg-test";
-  block_on(async {
-    if let Err(e) = make_db_destroying_earlier_one(
+  block_on ( async {
+    if let Err(e) = make_db_destroying_earlier_one (
       SKG_DATA_DIR, db_name, &driver
     ) . await {
       eprintln!("Failed to initialize database: {}", e);
       std::process::exit(1);
     } } );
   println!("TypeDB database initialized successfully.");
-  Arc::new(driver) }
+  Arc::new( driver ) }
 
 fn initialize_tantivy(
 ) -> TantivyIndex {
+  // Build a schema.
+  // Fetch the old or start a new index, using
+  //   `get_extant_index_or_create_empty_one`.
+  // Update it with create_index.
+
   println!("Initializing Tantivy index...");
 
-  // Define the schema
+  // Define the schema.
   let mut schema_builder = schema::Schema::builder();
   let path_field = schema_builder.add_text_field(
     "path", schema::STRING | schema::STORED);
   let title_field = schema_builder.add_text_field(
     "title", schema::TEXT | schema::STORED);
-  let schema = schema_builder.build();
+  let schema : schema::Schema =
+    schema_builder.build();
 
-  // Create or open the index
+  // Create or open the index, and wrap it in my `TantivyIndex`.
   let index_path = Path::new( TANTIVY_INDEX_DIR );
-  let index = match get_extant_index_or_create_empty_one(
-    schema, index_path) {
-    Ok(idx) => idx,
-    Err(e) => {
+  let index : Index =
+    get_extant_index_or_create_empty_one (
+      schema,
+      index_path )
+    . unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1);
-    } };
-
-  // Create TantivyIndex wrapper
+    } );
   let tantivy_index = TantivyIndex {
     index: Arc::new(index),
     path_field,
@@ -151,8 +169,9 @@ fn initialize_tantivy(
   // Update the index with current files
   match create_index ( &tantivy_index,
                         SKG_DATA_DIR ) {
-    Ok(indexed_count) => {
-      println!("Tantivy index initialized successfully. Indexed {} files.", indexed_count); },
+    Ok(indexed_count) => { println!(
+      "Tantivy index initialized successfully. Indexed {} files.",
+      indexed_count); }
     Err(e) => {
       eprintln!("Failed to update Tantivy index: {}", e);
       std::process::exit(1); } }

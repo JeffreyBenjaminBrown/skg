@@ -1,4 +1,12 @@
 * Avoid uses of `unwrap` in Rust.
+* extract into a config file
+** let db_name = "skg-test";
+   in rust/serve.rs
+** "127.0.0.1:1729",
+   in rust/serve.rs
+   in elisp/, somewhere
+** TcpListener::bind("0.0.0.0:1730")?;
+   in rust/serve.rs
 * change graph -> web
 * see also [[../docs/progress.md][progress.md]]
 * use [[~/hodal/emacs/property-dump.el][property-dump]] to send straight to Rust
