@@ -13,7 +13,7 @@ use crate::typedb::create::{
   make_db_destroying_earlier_one};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
-  search_index, create_index};
+  search_index, update_index};
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
 
@@ -137,7 +137,7 @@ fn initialize_tantivy(
   // Build a schema.
   // Fetch the old or start a new index, using
   //   `get_extant_index_or_create_empty_one`.
-  // Update it with create_index.
+  // Update it with update_index.
 
   println!("Initializing Tantivy index...");
 
@@ -152,7 +152,7 @@ fn initialize_tantivy(
 
   // Create or open the index, and wrap it in my `TantivyIndex`.
   let index_path = Path::new( TANTIVY_INDEX_DIR );
-  let index : Index =
+  let (index, index_is_new) : (Index, bool) =
     get_extant_index_or_create_empty_one (
       schema,
       index_path )
@@ -167,8 +167,10 @@ fn initialize_tantivy(
   };
 
   // Update the index with current files
-  match create_index ( &tantivy_index,
-                        SKG_DATA_DIR ) {
+  match update_index ( &tantivy_index,
+                        SKG_DATA_DIR,
+                        index_path,
+                        index_is_new ) {
     Ok(indexed_count) => { println!(
       "Tantivy index initialized successfully. Indexed {} files.",
       indexed_count); }

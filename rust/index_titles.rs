@@ -34,37 +34,28 @@ pub fn search_index(
     &query, &TopDocs::with_limit(10))?;
   Ok((best_matches, searcher)) }
 
-pub fn create_index(
-  tantivy_index: &TantivyIndex,
-  data_dir: &str
+pub fn update_index (
+  tantivy_index : &TantivyIndex,
+  data_dir      : &str,
+  index_path    : &Path,
+  index_is_new  : bool
 ) -> Result<usize, Box<dyn std::error::Error>> {
-  println!("Creating index with all .skg files from {}.",
-           data_dir);
-  let mut index_writer =
-    tantivy_index.index.writer(50_000_000)?;
-  populate_index(
-    &mut index_writer,
-    data_dir,
-    tantivy_index,
-    |_path| true) // Accept all files
-}
+  // Define `index_mtime`, the presumed age of the index.
+  // Then calls `populate_index`.
 
-pub fn update_index(
-  tantivy_index: &TantivyIndex,
-  data_dir: &str,
-  index_path: &Path
-) -> Result<usize, Box<dyn std::error::Error>> {
   println!("Updating index with .skg files from {}.",
            data_dir);
-  let mut index_writer =
-    tantivy_index.index.writer(50_000_000)?;
-  let index_mtime = get_modification_time(index_path)
-    .unwrap_or(SystemTime::UNIX_EPOCH);
-  populate_index(
-    &mut index_writer,
+  let index_mtime =
+    // Using UNIX_EPOCH marks the index as older than any files `populate_index` will consider indexing, so they will all be indexed.
+    if index_is_new { SystemTime::UNIX_EPOCH }
+    else { get_modification_time( index_path )
+           . unwrap_or (SystemTime::UNIX_EPOCH) };
+  populate_index (
+    &mut tantivy_index.index.writer(50_000_000)?,
     data_dir,
     tantivy_index,
-    |path| needs_indexing(path, index_mtime))
+    |path| needs_indexing (
+      path, index_mtime) )
 }
 
 fn populate_index<F>(
@@ -104,26 +95,30 @@ pub fn get_extant_index_or_create_empty_one(
   // But if it fetches an index, the index might not be.
   schema: schema::Schema,
   index_path: &Path
-) -> Result<Index, Box<dyn std::error::Error>> {
+) -> Result< (Index,
+              bool), // True if the index is new.
+              Box<dyn std::error::Error>> {
 
   if index_path.exists() {
     println!("Attempting to open existing index at {:?}", index_path);
     match Index::open_in_dir(index_path) {
       Ok(index) => {
         println!("Successfully opened existing index");
-        Ok(index) },
+        Ok((index,false)) },
       Err(e) => {
-        println!("Failed to open existing index: {:?}. Recreating...", e);
-        { // Remove the corrupted directory and recreate
-          fs::remove_dir_all(index_path)?;
+        println!(
+          "Failed to open existing index: {:?}. Recreating...", e);
+        { fs::remove_dir_all(index_path)?;
           fs::create_dir_all(index_path)?; };
         println!("Creating new index at {:?}", index_path);
-        Ok ( Index::create_in_dir (
-          index_path, schema )? ) } } }
+        Ok ( (
+          Index::create_in_dir ( index_path, schema )?,
+          true ) ) } } }
   else {
     println!("Creating new index at {:?}", index_path);
     fs::create_dir_all(index_path)?;
-    Ok(Index::create_in_dir(index_path, schema)?) } }
+    Ok( (Index::create_in_dir(index_path, schema)?,
+         true ) ) } }
 
 pub fn skg_title_from_file(
   // Gets the title from the file at path,

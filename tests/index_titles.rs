@@ -3,8 +3,9 @@ use std::path::Path;
 use std::sync::Arc;
 use tantivy::schema as schema;
 
-use skg::index_titles::{
-  get_extant_index_or_create_empty_one, create_index, search_index, };
+use skg::index_titles::{ get_extant_index_or_create_empty_one,
+                         update_index,
+                         search_index, };
 use skg::types::TantivyIndex;
 
 pub fn print_search_results(
@@ -60,19 +61,22 @@ fn test_index (
 
   let index_path = Path::new(
     "tests/index_titles/generated/index.tantivy");
-  let index = get_extant_index_or_create_empty_one(
-    schema.clone(),
-    index_path )?;
+  let (index, index_is_new) =
+    get_extant_index_or_create_empty_one(
+      schema.clone(),
+      index_path )?;
   let tantivy_index = TantivyIndex {
     index: Arc::new(index),
     path_field,
     title_field, };
-  let indexed_count = create_index(
+  let indexed_count = update_index (
     &tantivy_index,
-    "tests/index_titles/fixtures" )?;
+    "tests/index_titles/fixtures",
+    index_path,
+    index_is_new )?;
 
-  assert!(indexed_count > 0,
-          "Expected to index at least one title");
+  assert!( indexed_count > 0,
+           "Expected to index at least one title" );
 
   let (best_matches, searcher) = search_index(
     &tantivy_index,
