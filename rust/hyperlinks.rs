@@ -2,16 +2,17 @@ use regex::Regex;
 
 use crate::types::{Hyperlink, FileNode};
 
-pub fn hyperlinks_from_filenode(
-  filenode: &FileNode)
+pub fn hyperlinks_from_filenode (
+  filenode : &FileNode )
   -> Vec<Hyperlink> {
-  let mut hyperlinks = Vec::new();
-  hyperlinks.extend (
-    hyperlinks_from_text ( &filenode.title ) );
-  if let Some(text) = &filenode.body {
-    hyperlinks.extend (
-      hyperlinks_from_text ( text ) ); }
-  hyperlinks }
+  // All hyperlinks in its title
+  // and (if present) its body.
+
+  let combined_text = format!(
+    "{}{}",
+    filenode.title,
+    filenode . body . as_deref () . unwrap_or ("") );
+  hyperlinks_from_text ( &combined_text ) }
 
 pub fn hyperlinks_from_text (
   text: &str)
