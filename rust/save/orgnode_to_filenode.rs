@@ -57,7 +57,7 @@ fn orgnode_to_filenodes_internal (
       .collect(),
     subscribes_to                : Vec::new(),
     hides_from_its_subscriptions : Vec::new(),
-    overrides_view_of_of         : Vec::new(),
+    overrides_view_of            : Vec::new(),
     path                         : "".into(),
   };
   if branch.focused {

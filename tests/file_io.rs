@@ -91,5 +91,5 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     path                   : node.path                 .clone(),
     hides_from_its_subscriptions :
       node.hides_from_its_subscriptions .               clone(),
-    overrides_view_of_of   : node.overrides_view_of_of .clone(),
+    overrides_view_of   : node.overrides_view_of .clone(),
   } }

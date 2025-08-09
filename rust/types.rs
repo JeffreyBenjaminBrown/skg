@@ -64,7 +64,7 @@ pub struct FileNode {
   pub hides_from_its_subscriptions: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub overrides_view_of_of: Vec<ID>,
+  pub overrides_view_of: Vec<ID>,
 
   #[serde(skip)] // inferred from filepath
   pub path: PathBuf,
@@ -171,7 +171,7 @@ It better be okay with newlines."# . to_string() ),
                         ID::new("12"),
                         ID::new("13")],
     hides_from_its_subscriptions: vec![],
-    overrides_view_of_of: vec![],
+    overrides_view_of: vec![],
     path: PathBuf::from(
       "tests/file_io/generated/example.skg"),
   } }

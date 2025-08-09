@@ -155,7 +155,7 @@ mod tests {
       contains: vec![],
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
-      overrides_view_of_of: vec![],
+      overrides_view_of: vec![],
       path: PathBuf::from("path"),
     };
     let hyperlinks = hyperlinks_from_filenode(&test_node);
