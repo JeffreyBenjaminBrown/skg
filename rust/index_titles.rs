@@ -11,7 +11,7 @@ use std::path::Path;
 use std::time::SystemTime;
 use serde_yaml::from_str;
 
-use crate::hyperlinks::strip_org_hyperlinks;
+use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::TantivyIndex;
 
 pub fn search_index(
@@ -123,7 +123,7 @@ pub fn get_extant_index_or_create_empty_one(
 
 pub fn skg_title_from_file(
   // Gets the title from the file at path,
-  // runs strip_org_hyperlinks on it,
+  // runs replace_each_link_with_its_label on it,
   // and returns it.
   path: &Path)
   -> Option<String> {
@@ -134,7 +134,7 @@ pub fn skg_title_from_file(
       if let Some(title_value) = yaml_value.get("title") {
         if let Some(title_str) = title_value.as_str() {
           return Some(
-            strip_org_hyperlinks(
+            replace_each_link_with_its_label (
               title_str ) ); } } } }
   None }
 

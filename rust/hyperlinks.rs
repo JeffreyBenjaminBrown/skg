@@ -15,39 +15,41 @@ pub fn hyperlinks_from_filenode (
   hyperlinks_from_text ( &combined_text ) }
 
 pub fn hyperlinks_from_text (
-  text: &str)
-  -> Vec<Hyperlink> {
-  let hyperlink_pattern = Regex::new(
+  text: &str )
+  -> Vec <Hyperlink> {
+
+  let hyperlink_pattern = Regex::new (
     // non-greedy .*? pattern avoids capturing too much.
     r"\[\[id:(.*?)\]\[(.*?)\]\]").unwrap();
-  let mut hyperlinks = Vec::new();
-  for capture in hyperlink_pattern.captures_iter(text) {
-    if capture.len() >= 3 {
-      let id = capture[1].to_string();
-      let label = capture[2].to_string();
-      hyperlinks.push(Hyperlink::new(id, label)); } }
+  let mut hyperlinks = Vec::new ();
+  for capture in hyperlink_pattern.captures_iter ( text ) {
+    if capture.len () >= 3 { // capture group 0 is the entire match
+      let id    = capture [1] . to_string ();
+      let label = capture [2] . to_string ();
+      hyperlinks.push (
+        Hyperlink::new ( id, label )); }}
   hyperlinks }
 
-// Titles can include hyperlinks,
-// but can be searched for as if each hyperlink
-// was equal to its label.
-// That is, the ID and brackets of a hyperlink in a title are not indexed.
-pub fn strip_org_hyperlinks(text: &str) -> String {
-  let hyperlink_re = Regex::new(
-    r"\[\[.*?\]\[(.*?)\]\]").unwrap();
-  let mut result = String::from(text);
-  let mut in_offset = 0; // offset in the input string
-  for cap in hyperlink_re.captures_iter(text) {
-    let whole_match = cap.get(0).unwrap();
-    let hyperlink_label = cap.get(1).unwrap();
-    let start_pos = whole_match.start() - in_offset;
-    let end_pos = whole_match.end() - in_offset;
-    result.replace_range(
-      // Modify the range [start_pos .. end_pos].
+pub fn replace_each_link_with_its_label (
+  text : &str )
+  -> String {
+  // Replaces each hyperlink with that hyperlink's label.
+  // Strips some text from each hyperlink while adding nothing.
+
+  let hyperlink_re = Regex::new (
+    r"\[\[.*?\]\[(.*?)\]\]") . unwrap (); // capture the label but not the ID
+  let mut result = String::from ( text );
+  let mut input_offset = 0; // offset in the input string
+  for cap in hyperlink_re.captures_iter ( text ) {
+    let whole_match     = cap . get (0) . unwrap ();
+    let hyperlink_label = cap . get (1) . unwrap ();
+    let start_pos = whole_match . start () - input_offset;
+    let end_pos   = whole_match . end ()   - input_offset;
+    result.replace_range ( // the replacement
       start_pos .. end_pos,
-      hyperlink_label.as_str());
-    in_offset += whole_match.len()
-      - hyperlink_label.len(); }
+      hyperlink_label.as_str () );
+    input_offset += whole_match.len ()
+      - hyperlink_label.len (); }
   result }
 
 #[cfg(test)]
@@ -168,4 +170,20 @@ mod tests {
             .any(|hyperlink| hyperlink.id == "hyperlink4".into() &&
                  hyperlink.label == "Fourth Hyperlink"));
   }
+
+  #[test]
+  fn test_replace_each_link_with_its_label() {
+    // Test cases: (input, expected_output)
+    let test_cases = vec![
+      ( ""                   , ""),
+      ( "hello"              , "hello"),
+      ( "[[id:yeah][label]]" , "label"),
+      ( "0 [[id:1][a]] b [[id:2][c]] d",
+        "0 a b c d"), ];
+    for (input, expected) in test_cases {
+      let result = replace_each_link_with_its_label ( input );
+      assert_eq! (
+        result, expected,
+        "Failed for input: '{}'. Expected: '{}', Got: '{}'",
+        input, expected, result ); }}
 }

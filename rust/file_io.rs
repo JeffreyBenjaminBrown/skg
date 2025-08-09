@@ -1,5 +1,8 @@
 // PURPOSE & SUMMARY:
-// Read and write the FileNode type on disk.
+// Reads and writes the FileNode type on disk.
+// As noted in types.rs, there is a 1-to-1 correspondence
+// between the FileNode type and each (path, file) pair,
+// which makes this pretty simple.
 
 use serde_yaml;
 use std::fs::{self};
