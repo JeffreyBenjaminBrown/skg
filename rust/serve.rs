@@ -83,8 +83,7 @@ fn handle_emacs (
               &mut stream,
               &request,
               &typedb_driver,
-              db_name,
-              &tantivy_index );
+              db_name );
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,
@@ -187,8 +186,7 @@ fn handle_single_document_request (
   stream: &mut TcpStream,
   request: &str,
   typedb_driver: &TypeDBDriver,
-  db_name: &str,
-  tantivy_index: &TantivyIndex) {
+  db_name: &str ) {
   // Gets a node id from the request,
   // generates an s-expression from the id,
   // and sends the s-expression to Emacs.
@@ -197,11 +195,10 @@ fn handle_single_document_request (
     Ok ( node_id ) => {
       send_response (
         stream,
-        & generate_s_expression (
+        & generate_document (
           &node_id,
           typedb_driver,
-          db_name,
-          tantivy_index) ); },
+          db_name ) ); },
     Err ( err ) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
@@ -274,11 +271,10 @@ fn search_terms_from_request ( request : &str )
                                    "(terms . \"",
                                    "search terms" ) }
 
-fn generate_s_expression(
+fn generate_document (
   node_id: &ID,
   typedb_driver: &TypeDBDriver,
-  db_name: &str,
-  _tantivy_index: &TantivyIndex)
+  db_name: &str )
   -> String {
 
   let result = block_on(async {
