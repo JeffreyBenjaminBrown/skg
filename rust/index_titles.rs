@@ -17,9 +17,10 @@ use crate::types::TantivyIndex;
 pub fn search_index(
   tantivy_index: &TantivyIndex,
   query_text: &str
-) -> Result< (Vec<(f32, tantivy::DocAddress)>,
-              tantivy::Searcher),
-              Box<dyn std::error::Error>> {
+) -> Result< ( Vec< ( f32, // relevance score
+                      tantivy::DocAddress )>,
+               tantivy::Searcher),
+               Box<dyn std::error::Error>> {
   println!(
     "\nFinding files with titles matching \"{}\".",
     query_text);
@@ -30,8 +31,8 @@ pub fn search_index(
       &tantivy_index.index,
       vec![tantivy_index.title_field]);
   let query = query_parser.parse_query(query_text)?;
-  let best_matches = searcher.search(
-    &query, &TopDocs::with_limit(10))?;
+  let best_matches = searcher.search (
+    &query, &TopDocs::with_limit (10) )?;
   Ok((best_matches, searcher)) }
 
 pub fn update_index (

@@ -5,7 +5,7 @@ use std::net::{TcpListener,
 use std::path::Path;
 use std::sync::Arc;
 use std::thread;
-use tantivy::{Index, schema};
+use tantivy::{ Document, Index, schema};
 use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
 use futures::executor::block_on;
@@ -272,57 +272,65 @@ fn search_terms_from_request ( request : &str )
                                    "search terms" ) }
 
 fn generate_document (
-  node_id: &ID,
-  typedb_driver: &TypeDBDriver,
-  db_name: &str )
+  node_id       : &ID,
+  typedb_driver : &TypeDBDriver,
+  db_name       : &str )
   -> String {
+  // Just runs
+  //   single_document_view
+  // with async and error handling.
 
-  let result = block_on(async {
-    match single_document_view(
+  let result = block_on ( async {
+    match single_document_view (
       db_name, typedb_driver, node_id
-    ).await {
-      Ok(s_expr) => s_expr,
-      Err(e) => format!(
+    ) . await {
+      Ok ( s_expr ) => s_expr,
+      Err (e) => format! (
         "Error generating s-expression: {}", e) } } );
   result }
 
-fn generate_title_matches_response(
-  search_terms: &str,
-  tantivy_index: &TantivyIndex)
+fn generate_title_matches_response (
+  search_terms  : &str,
+  tantivy_index : &TantivyIndex)
   -> String {
+  // Runs `search_index`.
+  // If matches are found, returns a String
+  // with a match score and a title on each line.
 
-  match search_index(
+  match search_index (
     tantivy_index,
-    search_terms) {
-    Ok((best_matches, searcher)) => {
-      if best_matches.is_empty() {
-        "No matches found.".to_string()
+    search_terms ) {
+    Ok (( best_matches, searcher )) => {
+      if best_matches.is_empty () {
+        "No matches found.".to_string ()
       } else {
         let mut titles = Vec::new();
         for (score, doc_address) in best_matches {
-          match searcher.doc(doc_address) {
-            Ok(retrieved_doc) => {
-              if let Some(title_value) = retrieved_doc
-                .get_first(tantivy_index.title_field) {
-                  if let Some(title_text) =
-                    title_value.as_text() {
-                  titles.push(format!("{:.2}: {}",
-                                      score, title_text));
-                } } },
-            Err(e) => {
-              eprintln!(
-                "Error retrieving document: {}", e);
-            } } }
-        titles.join("\n")
-      } },
-    Err(e) => {
-      format!("Error searching index: {}", e)
-    } } }
+          match searcher.doc (doc_address) {
+            // searcher.doc fetches a Document.
+            // (Document is an alias of the TantivyDocument type.)
+            // Each Document here is just two fields,
+            // "title" and "path" (as of <2025-08-08 Fri>).
+            Ok (retrieved_doc) => {
+              let retrieved_doc : Document = retrieved_doc;
+              if let Some (title_value) = retrieved_doc
+                . get_first ( tantivy_index.title_field )
+              { if let Some ( title_text ) =
+                title_value.as_text ()
+                { titles.push ( format! (
+                  "{:.2}: {}",
+                  score,
+                  title_text ) ); } } },
+            Err (e) => { eprintln! (
+              "Error retrieving document: {}", e ); } } }
+        titles.join("\n") } },
+    Err(e) => { format!("Error searching index: {}", e) } } }
 
 fn send_response(
-  stream: &mut TcpStream,
-  response: &str) {
+  stream   : &mut TcpStream,
+  response : &str) {
 
   writeln! ( // appends a newline
-    stream, "{}", response ) . unwrap();
-  stream . flush() . unwrap() ; }
+    stream, "{}", response )
+    . unwrap ();
+  stream . flush () . unwrap () ; }

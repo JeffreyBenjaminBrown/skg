@@ -85,7 +85,7 @@ pub async fn get_filepath_from_node (
   Err(format!("No path found for node with ID '{}'",
               node_id).into ()) }
 
-pub async fn single_document_view(
+pub async fn single_document_view (
   /*Given a node, this finds its root container, and returns
 an s-expression representing a document built from there.
 
