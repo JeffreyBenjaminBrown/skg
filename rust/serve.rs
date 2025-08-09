@@ -231,70 +231,48 @@ fn handle_title_matches_request (
       send_response (
         stream, &error_msg ); } } }
 
-fn request_type_from_request (
-  request :  &str )
-  -> Result<String, String> {
-  // Returns the string from `pattern_before_request` (defined below)
-  // to the next quotation mark.
+fn extract_quoted_value_from_sexp (
+  request    : &str,
+  pattern    : &str,
+  field_name : &str
+) -> Result < String, String > {
+  // Returns the string between the first appearance of `pattern`
+  // and the next quotation mark.
 
-  // TODO: Athough the API seems safe as it stands, this feels brittle.
+  // TODO: this is brittle to API changes
+  // (athough seems safe as the API stands today).
   // It would be better to do proper s-exp parsing.
 
-  let pattern_before_request = "(request . \"";
-  if let Some ( req_start ) =
-    request.find ( pattern_before_request )
-  { let req_start = req_start + pattern_before_request.len();
-    if let Some(req_end) =
-      request[req_start..].find("\"") {
-        return Ok(request[req_start..
-                          (req_start + req_end)]
-                  .to_string());
-      } else {
-        return Err( "Could not find quotation mark ending request type in request."
-                     .to_string()); }
-  } else {
-    return Err( "Could not find request type in request."
-                 .to_string() ); } }
+  if let Some ( start_pos ) = request.find ( pattern ) {
+    let value_start = start_pos + pattern.len ();
+    if let Some ( end_pos ) =
+      request [ value_start.. ].find("\"")
+    { Ok ( request [ value_start ..
+                     (value_start + end_pos) ]
+           . to_string () )
+    } else { Err ( format! (
+      "Could not find end quote for {} in request", field_name ) ) }
+  } else { Err ( format! (
+    "Could not find {} in request", field_name ) ) } }
 
-fn node_id_from_document_request (
-  request: &str)
-  -> Result<ID, String> {
-  // Returns the string from `pattern_before_request` (defined below)
-  // to the next quotation mark.
+fn request_type_from_request ( request : &str )
+                               -> Result<String, String> {
+  extract_quoted_value_from_sexp ( request,
+                                   "(request . \"",
+                                   "request type" ) }
 
-  // TODO: Athough the API seems safe as it stands, this feels brittle.
-  // It would be better to do proper s-exp parsing.
+fn node_id_from_document_request ( request : &str )
+                                   -> Result<ID, String> {
+  extract_quoted_value_from_sexp ( request,
+                                   "(id . \"",
+                                   "ID" )
+    . map(ID) }
 
-  let pattern_before_id = "(id . \"";
-  if let Some(id_start) = request.find(pattern_before_id) {
-    let id_start = id_start + pattern_before_id.len();
-    if let Some(id_end) = request[id_start..].find("\"") {
-      return Ok(ID(request[id_start..(id_start + id_end)]
-                   .to_string()));
-    } else {
-      return Err("Could not find end of ID in request"
-                 .to_string()); }
-  } else {
-    return Err("Could not find ID in request"
-               .to_string()); } }
-
-fn search_terms_from_request(
-  // TODO: This reinvents the wheel. Use the s-exp parsing logic already found in `save::sexp_to_orgnodes.rs`.
-  request: &str)
-  -> Result<String, String> {
-
-  let terms_pattern = "(terms . \"";
-  if let Some(terms_start) = request.find(terms_pattern) {
-    let terms_start = terms_start + terms_pattern.len();
-    if let Some(terms_end) = request[terms_start..].find("\"") {
-      return Ok(request[terms_start..(terms_start + terms_end)]
-                .to_string());
-    } else {
-      return Err("Could not find end of search terms in request"
-                 .to_string()); }
-  } else {
-    return Err("Could not find search terms in request"
-               .to_string()); } }
+fn search_terms_from_request ( request : &str )
+                               -> Result<String, String> {
+  extract_quoted_value_from_sexp ( request,
+                                   "(terms . \"",
+                                   "search terms" ) }
 
 fn generate_s_expression(
   node_id: &ID,
