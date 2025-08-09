@@ -19,7 +19,7 @@ use crate::index_titles::{
 use crate::typedb::search::single_document_view;
 use crate::types::{ID,TantivyIndex};
 
-pub fn serve() -> std::io::Result<()> {
+pub fn serve () -> std::io::Result<()> {
   // Makes a typedb driver and a tantivy index.
   // Then pipes TCP input from Emacs into handle_emacs.
 
@@ -105,7 +105,7 @@ fn handle_emacs (
       request.clear(); }
   println!("Emacs disconnected: {peer}"); }
 
-pub fn initialize_typedb(
+pub fn initialize_typedb (
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
   // then calls make_db_destroying_earlier_one.
@@ -134,7 +134,7 @@ pub fn initialize_typedb(
   println!("TypeDB database initialized successfully.");
   Arc::new( driver ) }
 
-fn initialize_tantivy(
+fn initialize_tantivy (
 ) -> TantivyIndex {
   // Build a schema.
   // Fetch the old or start a new index, using
@@ -326,7 +326,7 @@ fn generate_title_matches_response (
         titles.join("\n") } },
     Err(e) => { format!("Error searching index: {}", e) } } }
 
-fn send_response(
+fn send_response (
   stream   : &mut TcpStream,
   response : &str) {
 

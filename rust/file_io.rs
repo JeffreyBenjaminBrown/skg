@@ -1,4 +1,4 @@
-// PURPOSE:
+// PURPOSE & SUMMARY:
 // Read and write the FileNode type on disk.
 
 use serde_yaml;
@@ -9,34 +9,40 @@ use std::path::{Path};
 use crate::types::FileNode;
 
 pub fn read_filenode
-  <P: AsRef<Path>>
-  (file_path: P)
-   -> io::Result<FileNode> {
-    let file_path = file_path.as_ref();
-    let contents = fs::read_to_string(file_path)?;
-    let mut filenode: FileNode = serde_yaml::from_str(&contents)
-      .map_err(
-        |e| io::Error::new(
-          io::ErrorKind::InvalidData, e.to_string()))?;
+  <P : AsRef <Path>> // any type that can be converted to an &Path
+  (file_path : P)
+   -> io::Result <FileNode> {
+    let file_path    : &Path = file_path.as_ref ();
+    let contents     : String = fs::read_to_string ( file_path )?;
+    let mut filenode : FileNode =
+      serde_yaml::from_str ( &contents )
+      . map_err (
+        |e| io::Error::new (
+          io::ErrorKind::InvalidData,
+          e.to_string () )) ?;
 
-    // The rest of this information is not represented as a field
-    // in the .skg file.
+    filenode.path =
+      // Unlike the rest of the FileNode,
+      // this is not extracted from a field in the .skg file.
+      file_path.to_path_buf ();
+    Ok ( filenode ) }
 
-    filenode.path = file_path.to_path_buf();
-    Ok (filenode) }
-
-/// A line in the typedef of FileNode prevents the field `path`
-/// from being part of the .skg representation.
 pub fn write_filenode
-  <P: AsRef<Path>>
-  (filenode: &FileNode, file_path: P)
-   -> io::Result<()> {
-    let yaml_string = serde_yaml::to_string(filenode)
-      .map_err(
-        |e| io::Error::new(
-          io::ErrorKind::InvalidData, e.to_string()))?;
-    fs::write(file_path, yaml_string)?;
-    Ok (()) }
+  <P : AsRef<Path>>
+  ( filenode  : &FileNode,
+    file_path : P)
+    -> io::Result<()>
+{ // A skip directive in the FileNode typedef prevents the field `path`
+  // from being part of the .skg representation.
+
+  let yaml_string =
+    serde_yaml::to_string ( filenode )
+    . map_err (
+      |e| io::Error::new(
+        io::ErrorKind::InvalidData,
+        e.to_string () )) ?;
+  fs::write ( file_path, yaml_string )?;
+  Ok (( )) }
 
 #[cfg(test)]
 mod tests {

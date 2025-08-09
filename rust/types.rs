@@ -14,7 +14,7 @@ use tantivy::{Index, schema};
 //
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ID(pub String);
+pub struct ID ( pub String );
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hyperlink {
@@ -32,11 +32,11 @@ pub struct OrgNode {
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
-  pub heading  : String, // a term fron org-mode
-  pub body     : Option<String>, // a term fron org-mode
-  pub folded   : bool, // folded in the org-roam sense
-  pub focused  : bool, // where the Emacs cursor is
-  pub repeated : bool, /* The second and later instances of a node are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. THis permits handling infinite data.
+  pub heading  : String,         // "heading" is a term fron org-mode
+  pub body     : Option<String>, // "body" is a term fron org-mode
+  pub folded   : bool,           // folded in the org-mode sense
+  pub focused  : bool,           // where the Emacs cursor is
+  pub repeated : bool, /* The second and later instances of a node are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. This permits handling infinite (recursive) data.
 
 Emacs needs to know that the node is repeated, in order to display it differently.
 
@@ -45,14 +45,14 @@ Rust needs to know if it was marked repeated for Emacs. Otherwise, if the user m
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct FileNode {
-  // There is a 1-to-1 correspondence between FileNodes and actual files -- a file can be read to a FileNode, and a FileNode can be written to a file. The files are the only permanent data; the rest are ephemeral aspects of views of those files. FileNode is the format used to initialize the TypeDB and Tantivy databases.
-  // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
+  // There is a 1-to-1 correspondence between FileNodes and actual files -- a file can be read to a FileNode, and a FileNode can be written to a file. The files are the only permanent data. FileNode is the format used to initialize the TypeDB and Tantivy databases.
+  // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
 
   pub title: String,
-  pub ids: Vec<ID>, // Must be nonempty. Can include more than 1 because nodes might be merged.
+  pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding heading, to which it belongs, and the next (if any).
+  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org heading, to which it belongs, and the next (if there is a next).
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>,
@@ -84,81 +84,85 @@ pub struct TantivyIndex {
 //
 
 impl ID {
-  pub fn new<S: Into<String>>(s: S) -> Self {
-    ID(s.into()) }
-  pub fn as_str(&self) -> &str {
-    &self.0 } }
+  pub fn new <S : Into<String>> (s: S) -> Self {
+    ID ( s.into () ) }
+  pub fn as_str ( &self ) -> &str {
+    &self.0 } } // a reference to the first (and only) field
 
 impl Deref for ID {
-  // lets ID be used like a String in (more?) case
+  // lets ID be used like a String in (more?) cases
   type Target = String;
-  fn deref(&self) -> &Self::Target {
+  fn deref ( &self ) -> &Self::Target {
     &self.0 } }
 
 impl fmt::Display for ID {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>)
+  fn fmt ( &self,
+            f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
-    write!(f, "{}", self.0) } }
+    write! ( f, "{}", self.0 ) } }
 
 impl From<String> for ID {
-  fn from(s: String) -> Self {
-    ID(s) } }
+  fn from ( s : String ) -> Self {
+    ID (s) } }
 
-impl From<&str> for ID {
+impl From <&str> for ID {
   fn from(s: &str) -> Self {
-    ID(s.to_string()) } }
+    ID ( s.to_string () ) } }
 
 impl Hyperlink {
-  pub fn new(id: impl Into<String>,
-             label: impl Into<String>)
+  pub fn new ( id     : impl Into<String>,
+               label  : impl Into<String>)
              -> Self {
-    Hyperlink { id: ID(id.into()),
-           label: label.into(),
+    Hyperlink { id    : ID ( id.into () ),
+                label : label.into (),
     } } }
 
 impl fmt::Display for Hyperlink {
-  /// Format: [[id:HYPERLINK_ID][HYPERLINK_LABEL]]
-  fn fmt(&self,
-         f: &mut fmt::Formatter<'_>)
-         -> fmt::Result {
-    write!(f, "[[id:{}][{}]]", self.id, self.label)
-  } }
+  // Format: [[id:ID][LABEL]], where allcaps terms are variables.
+  // This is the same format org-roam uses.
+  fn fmt ( &self,
+            f : &mut fmt::Formatter <'_> )
+            -> fmt::Result {
+    write! ( f, "[[id:{}][{}]]", self.id, self.label ) } }
 
 impl FromStr for Hyperlink {
   type Err = HyperlinkParseError;
 
-  fn from_str(text: &str) -> Result<Self, Self::Err> {
+  fn from_str ( text: &str )
+                -> Result <Self, Self::Err> {
     if ( !text.starts_with("[[id:") ||
           !text.ends_with("]]") ) {
       return Err(HyperlinkParseError::InvalidFormat); }
 
-    let interior = &text[5..text.len()-2];
+    let interior = &text [5 .. text.len () - 2];
 
-    if let Some(idx) = interior.find("][") {
-      let id = &interior[0..idx];
-      let label = &interior[idx+2..];
+    if let Some ( idx ) = interior.find ( "][" ) {
+      let id    = &interior [0..idx];
+      let label = &interior [idx+2..];
       Ok ( Hyperlink {
-        id: ID(id.to_string()),
-        label: label.to_string(),
+        id    : ID ( id.to_string () ),
+        label : label.to_string (),
       } )
     } else {
-      Err(HyperlinkParseError::MissingDivider)
+      Err ( HyperlinkParseError::MissingDivider )
     } } }
 
 impl fmt::Display for HyperlinkParseError {
-  fn fmt( &self,
-          f: &mut fmt::Formatter<'_>)
-          -> fmt::Result {
+  fn fmt ( &self,
+            f: &mut fmt::Formatter <'_>)
+            -> fmt::Result {
     match self {
       HyperlinkParseError::InvalidFormat =>
-        write!(f, "Invalid hyperlink format. Expected [[id:HYPERLINK_ID][HYPERLINK_LABEL]]"),
+        write! (
+          f, "Invalid hyperlink format. Expected [[id:ID][LABEL]]" ),
       HyperlinkParseError::MissingDivider =>
-        write!(f, "Missing divider between ID and label. Expected ]["),
+        write! (
+          f, "Missing divider between ID and label. Expected ][" ),
     } } }
 
 impl Error for HyperlinkParseError {}
 
-pub fn filenode_example() -> FileNode {
+pub fn filenode_example () -> FileNode {
   FileNode {
     title: "This text gets indexed.".to_string(),
     ids: vec![ ID::new("123") ],
