@@ -1,5 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream, SocketAddr};
+use std::net::{TcpListener,
+               TcpStream, // handles two-way communication
+               SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 use std::thread;
@@ -29,9 +31,10 @@ pub fn serve() -> std::io::Result<()> {
   let emacs_listener : TcpListener =
     TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
-  for stream in emacs_listener.incoming() {
-    match stream {
+  for stream_res in emacs_listener.incoming() {
+    match stream_res {
       Ok(stream) => {
+        let stream : TcpStream = stream; // The least-ugly way to type-annotate `stream`.
         let typedb_driver_clone : Arc<TypeDBDriver> =
           Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
         let tantivy_index_clone =
@@ -46,13 +49,13 @@ pub fn serve() -> std::io::Result<()> {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
 
-fn handle_emacs(
+fn handle_emacs (
   mut stream: TcpStream,
   typedb_driver: Arc<TypeDBDriver>,
   db_name: &str,
   tantivy_index: TantivyIndex
 ) {
-  // Directs requests from the stream to one of
+  // This function directs requests from the stream to one of
   //   handle_single_document_request
   //   handle_title_matches_request
   // API: See /api.md
@@ -72,16 +75,16 @@ fn handle_emacs(
   while let Ok(n) =
     reader.read_line( &mut request ) { // reads until a newline
       if n == 0 { break; } // emacs disconnected
-      println!("Received request: {}", request.trim_end());
+      println! ( "Received request: {}", request.trim_end () );
       match request_type_from_request( &request ) {
         Ok(request_type) => {
           if request_type == "single document" {
-            handle_single_document_request(
+            handle_single_document_request (
               &mut stream,
               &request,
               &typedb_driver,
               db_name,
-              &tantivy_index);
+              &tantivy_index );
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,
@@ -180,54 +183,67 @@ fn initialize_tantivy(
 
   tantivy_index }
 
-fn handle_single_document_request(
+fn handle_single_document_request (
   stream: &mut TcpStream,
   request: &str,
   typedb_driver: &TypeDBDriver,
   db_name: &str,
   tantivy_index: &TantivyIndex) {
+  // Gets a node id from the request,
+  // generates an s-expression from the id,
+  // and sends the s-expression to Emacs.
 
-  match node_id_from_document_request(request) {
-    Ok(node_id) => {
-      send_response(
+  match node_id_from_document_request ( request ) {
+    Ok ( node_id ) => {
+      send_response (
         stream,
-        & generate_s_expression(
+        & generate_s_expression (
           &node_id,
           typedb_driver,
           db_name,
           tantivy_index) ); },
-    Err(err) => {
+    Err ( err ) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
-      println!("{}", error_msg);
-      send_response(stream, &error_msg); } } }
+      println! ( "{}", error_msg ) ;
+      send_response ( stream,
+                      &error_msg ); } } }
 
-fn handle_title_matches_request(
-  stream: &mut TcpStream,
-  request: &str,
-  tantivy_index: &TantivyIndex) {
+fn handle_title_matches_request (
+  stream        : &mut TcpStream,
+  request       : &str,
+  tantivy_index : &TantivyIndex ) {
+  // Extracts search terms from request,
+  // finds matching titles,
+  // and sends a corresponding document to Emacs.
 
-  match search_terms_from_request(request) {
-    Ok(search_terms) => {
-      send_response(
+  match search_terms_from_request ( request ) {
+    Ok ( search_terms ) => {
+      send_response (
         stream,
-        & generate_title_matches_response(
+        & generate_title_matches_response (
           &search_terms,
-          tantivy_index) ); },
-    Err(err) => {
-      let error_msg = format!(
-        "Error extracting search terms: {}", err);
-      println!("{}", error_msg);
-      send_response(
+          tantivy_index ) ); },
+    Err ( err ) => {
+      let error_msg = format! (
+        "Error extracting search terms: {}", err );
+      println! ( "{}", error_msg ) ;
+      send_response (
         stream, &error_msg ); } } }
 
-fn request_type_from_request(
-  request: &str)
+fn request_type_from_request (
+  request :  &str )
   -> Result<String, String> {
+  // Returns the string from `pattern_before_request` (defined below)
+  // to the next quotation mark.
 
-  let request_pattern = "(request . \"";
-  if let Some(req_start) = request.find(request_pattern) {
-    let req_start = req_start + request_pattern.len();
+  // TODO: Athough the API seems safe as it stands, this feels brittle.
+  // It would be better to do proper s-exp parsing.
+
+  let pattern_before_request = "(request . \"";
+  if let Some ( req_start ) =
+    request.find ( pattern_before_request )
+  { let req_start = req_start + pattern_before_request.len();
     if let Some(req_end) =
       request[req_start..].find("\"") {
         return Ok(request[req_start..
@@ -243,10 +259,15 @@ fn request_type_from_request(
 fn node_id_from_document_request (
   request: &str)
   -> Result<ID, String> {
+  // Returns the string from `pattern_before_request` (defined below)
+  // to the next quotation mark.
 
-  let id_pattern = "(id . \"";
-  if let Some(id_start) = request.find(id_pattern) {
-    let id_start = id_start + id_pattern.len();
+  // TODO: Athough the API seems safe as it stands, this feels brittle.
+  // It would be better to do proper s-exp parsing.
+
+  let pattern_before_id = "(id . \"";
+  if let Some(id_start) = request.find(pattern_before_id) {
+    let id_start = id_start + pattern_before_id.len();
     if let Some(id_end) = request[id_start..].find("\"") {
       return Ok(ID(request[id_start..(id_start + id_end)]
                    .to_string()));
