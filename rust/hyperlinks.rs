@@ -1,12 +1,6 @@
 use regex::Regex;
-use uuid::Uuid;
 
 use crate::types::{Hyperlink, FileNode};
-
-pub fn random_org_roam_id() -> String {
-  // Kind of silly --
-  // giving this another name isn't necessary.
-  Uuid::new_v4().to_string() }
 
 pub fn hyperlinks_from_filenode(
   filenode: &FileNode)
