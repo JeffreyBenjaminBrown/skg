@@ -3,7 +3,6 @@
 // Titles can include hyperlinks,
 // but can be searched for as if each hyperlink
 // was equal to its label, thanks to replace_each_link_with_its_label.
-
 * extract into a config file
 ** let db_name = "skg-test";
    in rust/serve.rs

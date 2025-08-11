@@ -2,81 +2,87 @@
 // associating titles to filenames,
 // potentially many to one.
 
-use tantivy::collector::TopDocs;
-use tantivy::schema as schema;
-use tantivy::{Index, doc};
+use tantivy::{ Index,
+               collector::TopDocs,
+               doc,
+               schema };
 use walkdir::WalkDir;
-use std::fs;
-use std::path::Path;
-use std::time::SystemTime;
+use std::{ fs,
+           path::Path,
+           time::SystemTime };
 use serde_yaml::from_str;
 
 use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::TantivyIndex;
 
-pub fn search_index(
-  tantivy_index: &TantivyIndex,
-  query_text: &str
-) -> Result< ( Vec< ( f32, // relevance score
-                      tantivy::DocAddress )>,
-               tantivy::Searcher),
-               Box<dyn std::error::Error>> {
-  println!(
+pub fn search_index (
+  tantivy_index : &TantivyIndex,
+  query_text    : &str
+) -> Result < ( Vec< ( f32, // relevance score
+                       tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
+                tantivy::Searcher ),
+              Box <dyn std::error::Error> > {
+  // Returns the top 10 matching (tantivy) "Documents".
+
+  println! (
     "\nFinding files with titles matching \"{}\".",
     query_text);
-  let reader = tantivy_index.index.reader()?;
+  let reader = tantivy_index.index.reader () ?;
   let searcher = reader.searcher();
-  let query_parser =
-    tantivy::query::QueryParser::for_index(
+  let query_parser : tantivy::query::QueryParser =
+    tantivy::query::QueryParser::for_index (
       &tantivy_index.index,
-      vec![tantivy_index.title_field]);
-  let query = query_parser.parse_query(query_text)?;
+      vec! [ tantivy_index.title_field ] );
+  let query = query_parser.parse_query ( query_text ) ?;
   let best_matches = searcher.search (
     &query, &TopDocs::with_limit (10) )?;
-  Ok((best_matches, searcher)) }
+  Ok (( best_matches, searcher )) }
 
 pub fn update_index (
   tantivy_index : &TantivyIndex,
   data_dir      : &str,
   index_path    : &Path,
   index_is_new  : bool
-) -> Result<usize, Box<dyn std::error::Error>> {
-  // Define `index_mtime`, the presumed age of the index.
+) -> Result < usize,
+              Box < dyn std::error::Error > > {
+  // Defines `index_mtime`, the presumed age of the index.
   // Then calls `populate_index`.
 
-  println!("Updating index with .skg files from {}.",
-           data_dir);
+  // TODO: Pull this logic into `populate_index`, maybe separating it into a function that `populate_index` calls.
+
+  println! ( "Updating index with .skg files from {}.",
+              data_dir );
   let index_mtime =
     // Using UNIX_EPOCH marks the index as older than any files `populate_index` will consider indexing, so they will all be indexed.
     if index_is_new { SystemTime::UNIX_EPOCH }
-    else { get_modification_time( index_path )
-           . unwrap_or (SystemTime::UNIX_EPOCH) };
+    else { get_modification_time ( index_path )
+           . unwrap_or ( SystemTime::UNIX_EPOCH ) };
   populate_index (
-    &mut tantivy_index.index.writer(50_000_000)?,
+    &mut tantivy_index.index.writer ( 50_000_000 )?,
     data_dir,
     tantivy_index,
     |path| needs_indexing (
       path, index_mtime) )
 }
 
-fn populate_index<F>(
-  index_writer: &mut tantivy::IndexWriter,
-  data_dir: &str,
-  tantivy_index: &TantivyIndex,
-  should_index: F
-) -> Result<usize,
-            Box<dyn std::error::Error>>
+fn populate_index <F> (
+  index_writer  : &mut tantivy::IndexWriter,
+  data_dir      : &str,
+  tantivy_index : &TantivyIndex,
+  should_index  : F
+) -> Result < usize,
+              Box < dyn std::error::Error > >
 where
-  F: Fn(&Path) -> bool {
+  F : Fn ( &Path ) -> bool {
 
   let mut indexed_count = 0;
-  for entry in WalkDir::new(data_dir)
-    .into_iter().filter_map(Result::ok) {
-      let path = entry.path();
-      if ( not_a_skg_file_path(path) ||
-           !should_index(path) ) {
+  for entry in WalkDir::new ( data_dir )
+    . into_iter () . filter_map ( Result::ok ) {
+      let path : &Path = entry.path ();
+      if ( not_a_skg_file_path ( path ) ||
+           !should_index ( path ) ) {
         continue; }
-      if let Some(title) = skg_title_from_file(path) {
+      if let Some (title) = skg_title_from_file (path) {
         index_title_at_path_after_scrubbing_path(
           index_writer,
           path,
@@ -91,7 +97,7 @@ where
     println!("No files to index found."); }
   Ok (indexed_count) }
 
-pub fn get_extant_index_or_create_empty_one(
+pub fn get_extant_index_or_create_empty_one (
   // If it creates an index, the index is empty.
   // But if it fetches an index, the index might not be.
   schema: schema::Schema,
@@ -121,7 +127,7 @@ pub fn get_extant_index_or_create_empty_one(
     Ok( (Index::create_in_dir(index_path, schema)?,
          true ) ) } }
 
-pub fn skg_title_from_file(
+pub fn skg_title_from_file (
   // Gets the title from the file at path,
   // runs replace_each_link_with_its_label on it,
   // and returns it.
@@ -153,7 +159,7 @@ pub fn index_title_at_path_after_scrubbing_path (
     writer, path, title, tantivy_index)?;
   Ok (( )) }
 
-pub fn delete_documents_with_path_from_index(
+pub fn delete_documents_with_path_from_index (
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   path_field: schema::Field
@@ -165,7 +171,7 @@ pub fn delete_documents_with_path_from_index(
     writer.delete_term(term); }
   Ok(()) }
 
-pub fn add_document_and_title_to_index(
+pub fn add_document_and_title_to_index (
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &str,
@@ -179,7 +185,7 @@ pub fn add_document_and_title_to_index(
   ))?;
   Ok (()) }
 
-pub fn needs_indexing( // based on modification time
+pub fn needs_indexing ( // based on modification time
   path: &Path,
   index_mtime: SystemTime
 ) -> bool {
@@ -198,7 +204,7 @@ pub fn not_a_skg_file_path (
   ( path.to_string_lossy()
     . contains("index.tantivy") ) }
 
-pub fn get_modification_time(
+pub fn get_modification_time (
   path: &Path
 ) -> Result<SystemTime,
             Box<dyn std::error::Error>> {
