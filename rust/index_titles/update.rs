@@ -1,10 +1,4 @@
-// This uses Tantivy to create an index
-// associating titles to filenames,
-// potentially many to one.
-
-use tantivy::{ Index,
-               collector::TopDocs,
-               doc,
+use tantivy::{ doc,
                schema };
 use walkdir::WalkDir;
 use std::{ fs,
@@ -14,29 +8,6 @@ use serde_yaml::from_str;
 
 use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::TantivyIndex;
-
-pub fn search_index (
-  tantivy_index : &TantivyIndex,
-  query_text    : &str
-) -> Result < ( Vec< ( f32, // relevance score
-                       tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
-                tantivy::Searcher ),
-              Box <dyn std::error::Error> > {
-  // Returns the top 10 matching (tantivy) "Documents".
-
-  println! (
-    "\nFinding files with titles matching \"{}\".",
-    query_text);
-  let reader = tantivy_index.index.reader () ?;
-  let searcher = reader.searcher();
-  let query_parser : tantivy::query::QueryParser =
-    tantivy::query::QueryParser::for_index (
-      &tantivy_index.index,
-      vec! [ tantivy_index.title_field ] );
-  let query = query_parser.parse_query ( query_text ) ?;
-  let best_matches = searcher.search (
-    &query, &TopDocs::with_limit (10) )?;
-  Ok (( best_matches, searcher )) }
 
 pub fn update_index (
   tantivy_index : &TantivyIndex,
@@ -83,56 +54,26 @@ where
            !should_index ( path ) ) {
         continue; }
       if let Some (title) = title_from_skg_file (path) {
-        index_title_at_path_after_scrubbing_path(
+        index_title_at_path_after_scrubbing_path (
           index_writer,
           path,
           &title,
-          tantivy_index)?;
+          tantivy_index ) ?;
         indexed_count += 1; } }
   if indexed_count > 0 {
-    println!("Indexed {} files. Committing changes...",
-             indexed_count);
-    index_writer.commit()?; }
+    println! ( "Indexed {} files. Committing changes...",
+                indexed_count );
+    index_writer.commit () ?; }
   else {
-    println!("No files to index found."); }
+    println! ("No files to index found."); }
   Ok (indexed_count) }
-
-pub fn get_extant_index_or_create_empty_one (
-  // If it creates an index, the index is empty.
-  // But if it fetches an index, the index might not be.
-  schema: schema::Schema,
-  index_path: &Path
-) -> Result< (Index,
-              bool), // True if the index is new.
-              Box<dyn std::error::Error>> {
-
-  if index_path.exists() {
-    println!("Attempting to open existing index at {:?}", index_path);
-    match Index::open_in_dir(index_path) {
-      Ok(index) => {
-        println!("Successfully opened existing index");
-        Ok((index,false)) },
-      Err(e) => {
-        println!(
-          "Failed to open existing index: {:?}. Recreating...", e);
-        { fs::remove_dir_all(index_path)?;
-          fs::create_dir_all(index_path)?; };
-        println!("Creating new index at {:?}", index_path);
-        Ok ( (
-          Index::create_in_dir ( index_path, schema )?,
-          true ) ) } } }
-  else {
-    println!("Creating new index at {:?}", index_path);
-    fs::create_dir_all(index_path)?;
-    Ok( (Index::create_in_dir(index_path, schema)?,
-         true ) ) } }
 
 pub fn title_from_skg_file (
   // Gets the title from the file at path,
   // runs replace_each_link_with_its_label on it,
   // and returns it.
-  path: &Path)
-  -> Option<String> {
+  path : &Path )
+  -> Option < String > {
 
   if let Ok(file_content) = fs::read_to_string(path) {
     if let Ok(yaml_value) = ( from_str::<serde_yaml::Value>
@@ -145,8 +86,8 @@ pub fn title_from_skg_file (
   None }
 
 pub fn index_title_at_path_after_scrubbing_path (
-  // Add one (title,path) pair to the Tantivy index,
-  // obliterating preexisting content with the same path.
+  // Add one (title, path) pair to the Tantivy index,
+  // obliterating ("srubbing") preexisting content at that path.
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &String,
@@ -160,10 +101,13 @@ pub fn index_title_at_path_after_scrubbing_path (
   Ok (( )) }
 
 pub fn delete_documents_with_path_from_index (
+  // Does nothing until `commit` is called,
+  // which happens outside this function, to permit batching.
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   path_field: schema::Field
 ) -> Result<(), Box<dyn std::error::Error>> {
+
   let path_str = path.to_string_lossy().to_string();
   let term = tantivy::Term::from_field_text(
     path_field, &path_str);
@@ -172,11 +116,14 @@ pub fn delete_documents_with_path_from_index (
   Ok(()) }
 
 pub fn add_document_and_title_to_index (
+  // Does nothing until `commit` is called,
+  // which happens outside this function, to permit batching.
   writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &str,
   tantivy_index: &TantivyIndex
 ) -> Result<(), Box<dyn std::error::Error>> {
+
   let path_str = path.to_string_lossy().to_string();
   writer.add_document(doc!(
     // PITFALL: These `=>` symbols are a Tantivy macro.
