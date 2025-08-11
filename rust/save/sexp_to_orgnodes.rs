@@ -61,6 +61,19 @@ pub fn node_sexp_to_orgnode (
   else { Err (
     "Branch must be a list".to_string () ) }}
 
+pub fn content_sexps_to_orgnodes (
+  items: Vec<Sexp>)
+  -> Result<Vec<OrgNode>, String> {
+
+  let mut branches = Vec::new();
+  for (index, item) in items.into_iter().enumerate() {
+    match node_sexp_to_orgnode(item) {
+      Ok(branch) => branches.push(branch),
+      Err(err) => return Err(format!(
+        "Failed to parse branch at index {}: {}",
+        index, err)) } }
+  Ok(branches) }
+
 pub fn content_sexp_to_orgnodes (
   sexp_str : &str ) // One element of the list associated with a `content` key in an orgnode sexp.
   -> Result < Vec<OrgNode>, String > {
@@ -86,19 +99,6 @@ pub fn content_sexp_to_orgnodes (
   else { return Err(
     "Could not parse input as an (s-expression) list."
       .to_string()) } }
-
-pub fn content_sexps_to_orgnodes (
-  items: Vec<Sexp>)
-  -> Result<Vec<OrgNode>, String> {
-
-  let mut branches = Vec::new();
-  for (index, item) in items.into_iter().enumerate() {
-    match node_sexp_to_orgnode(item) {
-      Ok(branch) => branches.push(branch),
-      Err(err) => return Err(format!(
-        "Failed to parse branch at index {}: {}",
-        index, err)) } }
-  Ok(branches) }
 
 fn pair_sexp_to_string_pair (
   item: &Sexp )
