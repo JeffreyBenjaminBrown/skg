@@ -82,7 +82,7 @@ where
       if ( not_a_skg_file_path ( path ) ||
            !should_index ( path ) ) {
         continue; }
-      if let Some (title) = skg_title_from_file (path) {
+      if let Some (title) = title_from_skg_file (path) {
         index_title_at_path_after_scrubbing_path(
           index_writer,
           path,
@@ -127,7 +127,7 @@ pub fn get_extant_index_or_create_empty_one (
     Ok( (Index::create_in_dir(index_path, schema)?,
          true ) ) } }
 
-pub fn skg_title_from_file (
+pub fn title_from_skg_file (
   // Gets the title from the file at path,
   // runs replace_each_link_with_its_label on it,
   // and returns it.
