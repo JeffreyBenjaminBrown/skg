@@ -1,51 +1,56 @@
+// PURPOSE
+// The filename says it all. This code turns an Emacs-style s-exp string representation of a node into an `OrgNode` type.
+
 // HANDY
 // cargo test --lib save::sexp_to_orgnodes::tests 2>&1 | tee temp/output.log
 
-// PURPOSE
-// The filename says it all. This code turns an Emacs-style s-exp string representation of a node into an `OrgNode` type amenable to manipulation.
-
-use sexp::{Sexp::{self, Atom, List},
-           Atom::S,
-           parse};
+use sexp:: { Sexp:: { self, Atom, List },
+             Atom::S, // String. Atom also offers I(nt) and F(loat).
+             parse };
 use std::collections::HashMap;
 use std::vec::Vec;
 
-use crate::types::{ID,OrgNode};
+use crate::types::{ID, OrgNode};
 
-pub fn node_sexp_to_orgnode(
-  sexp: Sexp)
-  -> Result<OrgNode, String> {
-  if let List(items) = sexp {
-    let mut props = HashMap::new();
+pub fn node_sexp_to_orgnode (
+  sexp: Sexp )
+  -> Result <OrgNode, String> {
+
+  if let List (items) = sexp { // an Sexp is either a List or an Atom
+    let mut props = HashMap::new ();
     for item in items {
+      // Defines `props`. Later references to it are reads.
       if let List(_) = item {
-        match pair_sexp_to_string_pair(&item) {
-          Ok((key, value)) => {
-            props.insert(key, value);
-          },
-          Err(e) => return Err(e), } } }
-    let heading = match props.get("heading") {
-      Some(Atom(S(h))) => h.clone(),
-      _ => return Err(
-        "Missing or invalid heading".to_string() ), };
-    let id = match props.get("id") {
-      Some(Atom(S(id_str)))
-        => Some(ID::new(id_str)),
-      _ => None, };
-    let body = match props.get("body") {
-      Some(Atom(S(b))) => Some(b.clone() ),
-      _ => None, };
-    let folded = // value not needed
-      props.contains_key("folded");
-    let focused = // value not needed
-      props.contains_key("focused");
-    let repeated = // value not needed
-      props.contains_key("repeated");
-    let branches = match props.get("content") {
-      Some(List(content_items)) => {
-        let content_vec = content_items.clone();
-        content_sexps_to_orgnodes(content_vec)? },
-      _ => Vec::new(), }; // No children
+        let (key, value) =
+          pair_sexp_to_string_pair (&item) ?;
+        props.insert (key, value ); }}
+    let heading : String =
+      match props.get ("heading") {
+        Some ( Atom ( S (h) )) => h.clone (),
+        _ => return Err(
+          "Missing or invalid heading".to_string () ), };
+    let id : Option<ID> =
+      match props.get("id") {
+        Some ( Atom ( S (id_str) ))
+          => Some ( ID::new (id_str) ),
+        _ => None, };
+    let body : Option<String> =
+      match props.get("body") {
+        Some ( Atom ( S (b) )) =>
+          Some ( b.clone () ),
+        _ => None, };
+    let folded : bool = // value not needed
+      props.contains_key ("folded");
+    let focused : bool = // value not needed
+      props.contains_key ("focused");
+    let repeated : bool = // value not needed
+      props.contains_key ("repeated");
+    let branches : Vec<OrgNode> =
+      match props.get ("content") {
+        Some ( List (content_items) ) => {
+          let content_vec = content_items.clone ();
+          content_sexps_to_orgnodes ( content_vec )? },
+        _ => Vec::new (), }; // no children
     Ok ( OrgNode { id       : id,
                    heading  : heading,
                    body     : body,
@@ -54,15 +59,16 @@ pub fn node_sexp_to_orgnode(
                    repeated : repeated,
                    branches : branches, } ) }
   else { Err (
-    "Branch must be a list".to_string()) } }
+    "Branch must be a list".to_string () ) }}
 
-pub fn content_sexp_to_orgnodes(
-  sexp_str: &str)
-  -> Result<Vec<OrgNode>, String> {
-  let sexp = parse(sexp_str)
+pub fn content_sexp_to_orgnodes (
+  sexp_str : &str ) // One element of the list associated with a `content` key in an orgnode sexp.
+  -> Result < Vec<OrgNode>, String > {
+
+  let sexp : Sexp = parse (sexp_str)
     .map_err( |e| format!(
       "Failed to parse s-expression: {}", e))?;
-  if let List(items) = sexp {
+  if let List (items) = sexp {
     if items.len() >= 1 {
       if let Atom(S(atom_str)) = &items[0] {
         if atom_str == "content" {
@@ -81,9 +87,10 @@ pub fn content_sexp_to_orgnodes(
     "Could not parse input as an (s-expression) list."
       .to_string()) } }
 
-pub fn content_sexps_to_orgnodes(
+pub fn content_sexps_to_orgnodes (
   items: Vec<Sexp>)
   -> Result<Vec<OrgNode>, String> {
+
   let mut branches = Vec::new();
   for (index, item) in items.into_iter().enumerate() {
     match node_sexp_to_orgnode(item) {
@@ -93,26 +100,31 @@ pub fn content_sexps_to_orgnodes(
         index, err)) } }
   Ok(branches) }
 
-fn pair_sexp_to_string_pair(
-  item: &Sexp)
-  -> Result<(String, Sexp), String> {
-  if let List(pair) = item {
-    // TODO: If only one of the branches below fires,
-    // determine which, and delete the other.
-    // (Wait until I'm getting real data from Emacs.)
+fn pair_sexp_to_string_pair (
+  item: &Sexp )
+  -> Result < ( String, // key
+                Sexp ), // value
+              String > {
 
-    if ( pair.len() == 3 &&
-         matches!( &pair[1],
-                    Atom(S(s)) if s == ".") ) {
+  if let List (pair) = item {
+    // TODO/AWAITS: If only one of the branches below fires,
+    // determine which, and delete the other.
+    // (Awaits until I'm getting real data from Emacs.)
+
+    if ( pair.len () == 3 &&
+         matches! ( &pair[1],
+                     Atom ( S(s) ) if s == "." )) {
       // Case 1: Three elements,
       // the middle one a dot: (key . value)
-      if let Atom(S(key)) = &pair[0] {
-        return Ok((key.clone(), pair[2].clone())); }
+      if let Atom ( S ( key )) = &pair [0] {
+        return Ok (( key.clone(),
+                     pair[2].clone () )); }
     } else if pair.len() == 2 {
       // Case 2: Two elements (key value)
       // Might be needed by the `content` field.
-      if let Atom(S(key)) = &pair[0] {
-        return Ok((key.clone(), pair[1].clone())); } }
+      if let Atom ( S ( key )) = &pair [0] {
+        return Ok (( key.clone(),
+                     pair[1].clone() )); } }
     return Err(format!(
       "Malformed property pair: {:?}", item));
   } else { return Err(

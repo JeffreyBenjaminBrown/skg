@@ -74,54 +74,57 @@ pub fn title_from_skg_file (
   path : &Path )
   -> Option < String > {
 
-  if let Ok(file_content) = fs::read_to_string(path) {
-    if let Ok(yaml_value) = ( from_str::<serde_yaml::Value>
-                              (&file_content) ) {
-      if let Some(title_value) = yaml_value.get("title") {
-        if let Some(title_str) = title_value.as_str() {
-          return Some(
+  if let Ok (file_content) = fs::read_to_string (path) {
+    if let Ok (yaml_value) = ( from_str::<serde_yaml::Value>
+                               (&file_content) ) {
+      if let Some (title_value) = yaml_value.get ("title") {
+        if let Some (title_str) = title_value.as_str () {
+          return Some (
             replace_each_link_with_its_label (
-              title_str ) ); } } } }
+              title_str )); }} }}
   None }
 
 pub fn delete_documents_with_path_from_index (
-  // Does nothing until `commit` is called,
+  // PITFALL: Does nothing until `commit` is called,
   // which happens outside this function, to permit batching.
-  writer: &mut tantivy::IndexWriter,
+  index_writer: &mut tantivy::IndexWriter,
   path: &Path,
   path_field: schema::Field
 ) -> Result<(), Box<dyn std::error::Error>> {
 
-  let path_str = path.to_string_lossy().to_string();
-  let term = tantivy::Term::from_field_text(
-    path_field, &path_str);
-  { // Delete anything with this path
-    writer.delete_term(term); }
-  Ok(()) }
+  let path_str : String = path
+    . to_string_lossy () // "non-UTF-8 sequences are replaced with U+FFFD REPLACEMENT CHARACTER"
+    . to_string ();
+  let term = schema::Term::from_field_text (
+    path_field, &path_str );
+  index_writer.delete_term (term); // Deletes anything with this path.
+  Ok (()) }
 
 pub fn add_document_and_title_to_index (
-  // Does nothing until `commit` is called,
+  // PITFALL: Does nothing until `commit` is called,
   // which happens outside this function, to permit batching.
-  writer: &mut tantivy::IndexWriter,
+  index_writer: &mut tantivy::IndexWriter,
   path: &Path,
   title: &str,
   tantivy_index: &TantivyIndex
 ) -> Result<(), Box<dyn std::error::Error>> {
 
-  let path_str = path.to_string_lossy().to_string();
-  writer.add_document(doc!(
-    // PITFALL: These `=>` symbols are a Tantivy macro.
+  let path_str = path . to_string_lossy () . to_string ();
+  index_writer.add_document ( doc! (
+    // These `=>` symbols are a Tantivy macro.
     tantivy_index.path_field => path_str,
-    tantivy_index.title_field => title.to_string()
-  ))?;
+    tantivy_index.title_field => title.to_string ()
+  )) ?;
   Ok (()) }
 
 pub fn needs_indexing ( // based on modification time
+  // If the path's mtime is more recent, the path needs indexing.
   path: &Path,
   index_mtime: SystemTime
 ) -> bool {
-  match get_modification_time(path) {
-    Ok(file_mtime) => file_mtime > index_mtime,
+
+  match get_modification_time (path) {
+    Ok (file_mtime) => file_mtime > index_mtime,
     Err(_) => true // If its modification time is unknown,
                    // assume it needs indexing.
   } }
@@ -130,15 +133,15 @@ pub fn not_a_skg_file_path (
   path: &Path
 ) -> bool {
 
-  !path.extension().map_or(
+  ! path . extension () . map_or (
     false, |ext| ext == "skg" ) ||
-  ( path.to_string_lossy()
-    . contains("index.tantivy") ) }
+  ( path.to_string_lossy ()
+    . contains ("index.tantivy") ) }
 
 pub fn get_modification_time (
   path: &Path
 ) -> Result<SystemTime,
             Box<dyn std::error::Error>> {
 
-  let metadata = fs::metadata(path)?;
-  Ok(metadata.modified()?) }
+  let metadata = fs::metadata (path)?;
+  Ok (metadata.modified()?) }
