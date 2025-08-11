@@ -5,7 +5,6 @@
 mod update;
 
 pub use update:: { update_index,
-                   index_title_at_path_after_scrubbing_path,
                    delete_documents_with_path_from_index,
                    add_document_and_title_to_index,
                    needs_indexing,

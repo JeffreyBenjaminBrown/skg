@@ -54,11 +54,10 @@ where
            !should_index ( path ) ) {
         continue; }
       if let Some (title) = title_from_skg_file (path) {
-        index_title_at_path_after_scrubbing_path (
-          index_writer,
-          path,
-          &title,
-          tantivy_index ) ?;
+        delete_documents_with_path_from_index(
+          index_writer, path, tantivy_index.path_field)?;
+        add_document_and_title_to_index(
+          index_writer, path, &title, tantivy_index)?;
         indexed_count += 1; } }
   if indexed_count > 0 {
     println! ( "Indexed {} files. Committing changes...",
@@ -84,21 +83,6 @@ pub fn title_from_skg_file (
             replace_each_link_with_its_label (
               title_str ) ); } } } }
   None }
-
-pub fn index_title_at_path_after_scrubbing_path (
-  // Add one (title, path) pair to the Tantivy index,
-  // obliterating ("srubbing") preexisting content at that path.
-  writer: &mut tantivy::IndexWriter,
-  path: &Path,
-  title: &String,
-  tantivy_index: &TantivyIndex
-) -> Result < (),
-              Box < dyn std::error::Error > > {
-  delete_documents_with_path_from_index(
-    writer, path, tantivy_index.path_field)?;
-  add_document_and_title_to_index(
-    writer, path, title, tantivy_index)?;
-  Ok (( )) }
 
 pub fn delete_documents_with_path_from_index (
   // Does nothing until `commit` is called,
