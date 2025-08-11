@@ -36,11 +36,13 @@ pub struct OrgNode {
   pub body     : Option<String>, // "body" is a term fron org-mode
   pub folded   : bool,           // folded in the org-mode sense
   pub focused  : bool,           // where the Emacs cursor is
-  pub repeated : bool, /* The second and later instances of a node are "repeated". Their body and children are not displayed in Emacs, and Rust should not update the node they refer to based on the repeated data. This permits handling infinite (recursive) data.
+  pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.
+
+Both Rust and Emacs need to know this:
 
 Emacs needs to know that the node is repeated, in order to display it differently.
 
-Rust needs to know if it was marked repeated for Emacs. Otherwise, if the user moved a repeat of the node to before the first instance of the node, Rust would treat that as the source of information to update the new node with, and probably delete the node's branches. */
+Rust needs to know if it was marked repeated when sent to Emacs. Otherwise, if the user moved a repeat of the node to before the first instance of the node, Rust would treat that as the source of truth for edits to the node, and as a result would probably delete the node's branches. */
   pub branches : Vec<OrgNode>, }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]

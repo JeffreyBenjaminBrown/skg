@@ -66,7 +66,7 @@ pub fn node_sexp_to_orgnode (
     "Branch must be a list".to_string () ) }}
 
 pub fn content_sexps_to_orgnodes (
-  items : Vec<Sexp> )
+  items : Vec<Sexp> ) // the value associated with a 'content' key
   -> Result< Vec<OrgNode>, String > {
 
   let mut branches : Vec<OrgNode> =

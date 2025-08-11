@@ -2,6 +2,8 @@
   If it does not exist, it ought to,
   and the files in rust/save/ ought to reference it.
 * Avoid uses of `unwrap` in Rust.
+* Explain the dangers of repeated nodes to the user.
+  The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
 * find where to put this comment
 // Titles can include hyperlinks,
 // but can be searched for as if each hyperlink
