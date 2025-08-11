@@ -12,6 +12,10 @@ use std::vec::Vec;
 
 use crate::types::{ID, OrgNode};
 
+// PITFALL: Mutual recursion between these functions:
+//   node_sexp_to_orgnode
+//   content_sexps_to_orgnodes
+
 pub fn node_sexp_to_orgnode (
   sexp: Sexp )
   -> Result <OrgNode, String> {
@@ -62,43 +66,44 @@ pub fn node_sexp_to_orgnode (
     "Branch must be a list".to_string () ) }}
 
 pub fn content_sexps_to_orgnodes (
-  items: Vec<Sexp>)
-  -> Result<Vec<OrgNode>, String> {
+  items : Vec<Sexp> )
+  -> Result< Vec<OrgNode>, String > {
 
-  let mut branches = Vec::new();
-  for (index, item) in items.into_iter().enumerate() {
-    match node_sexp_to_orgnode(item) {
-      Ok(branch) => branches.push(branch),
-      Err(err) => return Err(format!(
+  let mut branches : Vec<OrgNode> =
+    Vec::new ();
+  for (index, item) in items . into_iter() . enumerate() {
+    match node_sexp_to_orgnode (item) {
+      Ok (branch) => branches.push (branch),
+      Err (err) => return Err ( format! (
         "Failed to parse branch at index {}: {}",
-        index, err)) } }
-  Ok(branches) }
+        index, err )) }}
+  Ok (branches) }
 
 pub fn content_sexp_to_orgnodes (
   sexp_str : &str ) // One element of the list associated with a `content` key in an orgnode sexp.
   -> Result < Vec<OrgNode>, String > {
 
   let sexp : Sexp = parse (sexp_str)
-    .map_err( |e| format!(
-      "Failed to parse s-expression: {}", e))?;
+    . map_err ( |e| format!(
+      "Failed to parse s-expression: {}", e )) ?;
   if let List (items) = sexp {
-    if items.len() >= 1 {
-      if let Atom(S(atom_str)) = &items[0] {
+    if items.len () >= 1 {
+      if let Atom (S (atom_str) ) = &items [0] {
         if atom_str == "content" {
           let content_items = items.into_iter()
             .skip(1) // skip the 'content' atom
             .collect::<Vec<_>>();
-          return content_sexps_to_orgnodes(
-            content_items); } } }
-    return Err(
+          return content_sexps_to_orgnodes (
+            content_items ); }} }
+    return Err (
       // PITFALL: Don't wrap this in an `else` branch,
       // because that way it would not catch failures
       // of the nested conditions inside the first `if`.
       "Root element is not a 'content' list"
-        .to_string()); }
+        .to_string() ); }
   else { return Err(
     "Could not parse input as an (s-expression) list."
-      .to_string()) } }
+      .to_string () ) }}
 
 fn pair_sexp_to_string_pair (
   item: &Sexp )
