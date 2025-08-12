@@ -7,9 +7,9 @@
 ;; Finally, evaluate this file.
 ;; Now these commands can be run:
 ;;
-;;   (skg-doc-connect) ;; surprisingly, does not need to be run separately, as the `request-*` functions call it
+;;   (skg-tcp-connect-to-rust) ;; surprisingly, does not need to be run separately, as the `request-*` functions call it
 ;;   (request-document-from-node "a") ;; try 1, 1a, or a
-;;   (request-title-matches "match") ;; try match, title, second
+;;   (request-title-matches "second") ;; try match, title, second
 ;;   (skg-doc-disconnect)
 ;;
 ;; The second of those asks Rust to ask TypeDB for
@@ -23,27 +23,16 @@
 ;; for titles matching the search terms and displays
 ;; the results in a buffer.
 
-(require 'title-search)
 (require 'get-document)
+(require 'state)
+(require 'title-search)
 
-(defvar skg-doc--proc nil
-  "Persistent TCP connection to the Rust backend.")
-
-(defvar skg-doc-buffer-name "*skg-document*"
-  "Buffer name for displaying s-expressions from the Rust server.")
-
-(defvar skg-search-buffer-name "*skg-search-results*"
-  "Buffer name for displaying title search results.")
-
-(defvar skg-doc--response-handler nil
-  "Current response handler function.")
-
-(defun skg-doc-connect ()
+(defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
   (unless ;; create a new connection only if one doesn't exist or the existing one is dead
-      (and skg-doc--proc
-           (process-live-p skg-doc--proc))
-    (setq skg-doc--proc
+      (and                 skg-rust-tcp-proc
+           (process-live-p skg-rust-tcp-proc ))
+    (setq skg-rust-tcp-proc
           (make-network-process
            :name "skg-doc"
            :buffer "*skg-doc-raw*"
@@ -53,7 +42,7 @@
            #'skg-handle-rust-response
            :coding 'utf-8
            :nowait nil)))
-  skg-doc--proc)
+  skg-rust-tcp-proc)
 
 (defun skg-handle-rust-response (proc string)
   "Route the response from Rust to the appropriate handler."
@@ -64,6 +53,6 @@
 (defun skg-doc-disconnect ()
   "Manually close the connection to the Rust server."
   (interactive)
-  (when (process-live-p skg-doc--proc)
-    (delete-process skg-doc--proc)
-    (setq skg-doc--proc nil)))
+  (when (process-live-p skg-rust-tcp-proc)
+    (delete-process skg-rust-tcp-proc)
+    (setq skg-rust-tcp-proc nil)))

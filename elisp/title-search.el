@@ -1,7 +1,7 @@
 (defun request-title-matches (search-terms)
   "Request title matches from the Rust server."
   (interactive "sSearch terms: ")
-  (let* ((proc (skg-doc-connect))
+  (let* ((proc (skg-tcp-connect-to-rust))
          (request-sexp
           (format "((request . \"title matches\") (terms . \"%s\"))\n" search-terms)))
     (setq skg-doc--response-handler

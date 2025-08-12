@@ -11,7 +11,7 @@
 (defun request-document-from-node (node-id)
   "Request a document (as an s-expression)."
   (interactive "sNode ID: ")
-  (let* ((proc (skg-doc-connect))
+  (let* ((proc (skg-tcp-connect-to-rust))
          (request-sexp
           (format "((request . \"single document\") (id . \"%s\"))\n" node-id)))
     (setq skg-doc--response-handler
@@ -22,7 +22,7 @@
 (defun skg-open-org-buffer-from-rust-s-exp (proc string)
   "Interpret the s-expression from the Rust server and display as org-mode."
   (with-current-buffer
-      (get-buffer-create skg-doc-buffer-name)
+      (get-buffer-create skg-content-buffer-name)
     (let ((inhibit-read-only t)
           (s-expr (car (read-from-string string))))
       (erase-buffer)

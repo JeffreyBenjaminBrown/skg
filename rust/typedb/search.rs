@@ -143,61 +143,88 @@ Properties (tags) in the resulting s-expression include:
 async fn recursive_s_expression_from_node (
   db_name : &str,
   driver  : &TypeDBDriver,
-  root    : &ID, // the root of the s-expression
+  root    : &ID,
   focus   : &ID,
   visited : &mut HashSet<ID>
 ) -> Result < String, Box<dyn Error> > {
 
   let path : String = get_filepath_from_node (
     db_name, driver, root ). await ?;
-  let node : FileNode = read_filenode ( path ) ?;
-  if node . title . is_empty () {
+  let filenode : FileNode = read_filenode ( path ) ?;
+  if filenode . title . is_empty () {
     return Err (
       Box::new (
         io::Error::new (
           io::ErrorKind::InvalidData,
           format! ( "Node with ID {} has an empty title",
                      root )) )); }
-  let heading = node . title . to_string ();
-  if visited . contains (root) {
-    // This node is a repeat of an earlier one in the same document.
-    // Return an expression involving it.
-    // Don't recurse into it again.
-    let node_sexpr = format! (
-      "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
-      root,
-      escape_string_for_s_expression (&heading) );
-    return Ok (node_sexpr); }
-
-  visited.insert ( root.clone () );
-  let mut node_sexpr = format! (
-    "(id . \"{}\")\n  (heading . \"{}\")",
-    root,
-    escape_string_for_s_expression ( &heading ) );
-  if root == focus {
-    node_sexpr = format!(
-      "{}\n  (focused . t)",
-      node_sexpr ); } // recursive definition
-  if let Some(text) = &node.body {
-    node_sexpr = format! (
-      "{}\n  (body . \"{}\")",
-      node_sexpr, // recursive definition
-      escape_string_for_s_expression (text) ); }
-  if !node . contains . is_empty () { // recurse into contents
-    let mut contained_sexpr = Vec::new ();
-    for contained_id in &node.contains {
+  if visited.contains (root) {
+    return Ok (
+      format_repeated_node_sexpr (
+        root, &filenode.title )); }
+  visited . insert ( root.clone () );
+  { // Recursively process children, *before* finishing root s-exp.
+    let mut child_sexprs : Vec<String> = Vec::new();
+    for contained_id in &filenode.contains {
       let contained_node : String = Box::pin (
         recursive_s_expression_from_node (
           db_name, driver, contained_id, focus, visited
-        )) . await ?;
-      contained_sexpr.push ( format! ( "({})",
-                                       contained_node )); }
-    let content_str : String = contained_sexpr.join ("\n     ");
+        )). await ?;
+      child_sexprs . push ( format! ( "({})",
+                                      contained_node )); }
+    Ok ( format_node_sexpr (
+      root, &filenode, focus, child_sexprs )) }}
+
+fn format_node_sexpr (
+  /* Returns an sexp with:
+  - id,
+  - heading,
+  - focused, if applicable
+  - body, if applicable
+  - contents, if applicable, each of which looks the same
+  */
+  node_id      : &ID,
+  filenode         : &FileNode,
+  focus        : &ID,
+  child_sexprs : Vec<String>
+) -> String {
+
+  let heading : String =
+    escape_string_for_s_expression ( &filenode.title );
+  let mut node_sexpr = format!(
+    "(id . \"{}\")\n  (heading . \"{}\")",
+    node_id, heading );
+  if node_id == focus {
+    node_sexpr = format! (
+      "{}\n  (focused . t)",
+      node_sexpr); }
+  if let Some (text) = &filenode.body {
+    node_sexpr = format! (
+      "{}\n  (body . \"{}\")",
+      node_sexpr,
+      escape_string_for_s_expression (text) ); }
+  if !child_sexprs.is_empty () {
+    let content_str = child_sexprs.join("\n     ");
     node_sexpr = format!(
       "{}\n  (content . (\n     {}\n  ))",
-      node_sexpr, // recursive definition
+      node_sexpr,
       content_str ); }
-  Ok (node_sexpr) }
+  node_sexpr }
+
+fn format_repeated_node_sexpr (
+  node_id: &ID,
+  title: &str
+) -> String {
+  // If `node_id` appears earlier in the same document,
+  // then the document should repeat it,
+  // but should also indicate that it is a repeat,
+  // and should not recurse into it a second time.
+
+  format! (
+    "(id . \"{}\")\n  (heading . \"{}\")\n  (body . \"Repeated above. Edit there, not here.\")\n  (repeated . t)",
+    node_id,
+    escape_string_for_s_expression (title)
+  ) }
 
 fn escape_string_for_s_expression (
   // TODO: Why do I use this?
