@@ -10,5 +10,4 @@
    'load-path
    (expand-file-name "elisp" project-root)))
 
-;; Configurations can go here:
-;; (setq some-global-variable "value")
+(require 'client)
