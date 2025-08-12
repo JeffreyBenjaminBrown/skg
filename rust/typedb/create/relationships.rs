@@ -30,18 +30,19 @@ pub async fn create_all_relationships (
   Ok (()) }
 
 pub async fn create_relationships_from_node (
-  node: &FileNode,
-  tx: &typedb_driver::Transaction
-) -> Result<(), Box<dyn Error>> {
-  let primary_id = node.ids[0].as_str();
-  insert_from_list( primary_id,
-                    &node.contains,
-                    "contains",
-                    "container",
-                    "contained",
-                    tx ).await?;
+  node : &FileNode,
+  tx   : &typedb_driver::Transaction
+) -> Result < (), Box<dyn Error> > {
 
-  insert_from_list(
+  let primary_id = node . ids [0] . as_str ();
+  insert_relationship_from_list (
+    primary_id,
+    &node.contains,
+    "contains",
+    "container",
+    "contained",
+    tx ) . await ?;
+  insert_relationship_from_list (
     primary_id,
     & ( hyperlinks_from_filenode ( &node )
         . iter ()
@@ -51,30 +52,31 @@ pub async fn create_relationships_from_node (
     "hyperlinks_to",
     "source",
     "dest",
-    tx
-  ).await?;
-
-  insert_from_list( primary_id,
-                    &node.subscribes_to,
-                    "subscribes",
-                    "subscriber",
-                    "subscribee",
-                    tx ).await?;
-  insert_from_list( primary_id,
-                    &node.hides_from_its_subscriptions,
-                    "hides_from_its_subscriptions",
-                    "hider",
-                    "hidden",
-                    tx ).await?;
-  insert_from_list( primary_id,
-                    &node.overrides_view_of,
-                    "overrides_view_of",
-                    "replacement",
-                    "replaced",
-                    tx ).await?;
+    tx ). await ?;
+  insert_relationship_from_list (
+    primary_id,
+    &node.subscribes_to,
+    "subscribes",
+    "subscriber",
+    "subscribee",
+    tx ). await ?;
+  insert_relationship_from_list (
+    primary_id,
+    &node.hides_from_its_subscriptions,
+    "hides_from_its_subscriptions",
+    "hider",
+    "hidden",
+    tx ). await ?;
+  insert_relationship_from_list(
+    primary_id,
+    &node.overrides_view_of,
+    "overrides_view_of",
+    "replacement",
+    "replaced",
+    tx ). await ?;
   Ok (()) }
 
-pub async fn insert_from_list (
+pub async fn insert_relationship_from_list (
   primary_id: &str,
   id_list: &Vec<ID>,   // This would be node.contains, etc.
   relation_name: &str, // "contains", "subscribes", etc.
@@ -82,6 +84,7 @@ pub async fn insert_from_list (
   to_role: &str,       // "contained", "subscribee", etc.
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
+
   for target_id in id_list {
     tx.query (
       format! ( r#"
