@@ -15,7 +15,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-pub async fn make_db_destroying_earlier_one (
+pub async fn overwrite_and_populate_new_db (
   // Reads files.
   // Destroys earlier db, if any.
   // Makes new db.
@@ -32,7 +32,7 @@ pub async fn make_db_destroying_earlier_one (
   // If any of the following needs a transaction, it opens a new one.
   // Thus all nodes are created before any relationships,
   // ensuring that all members of the relationship to be made exist.
-  make_empty_db_destroying_earlier_one (
+  overwrite_new_empty_db (
     db_name, &driver             ) . await?;
   define_schema (
     db_name, &driver             ) . await?;
@@ -42,7 +42,7 @@ pub async fn make_db_destroying_earlier_one (
     db_name, &driver, &filenodes ) . await?;
   Ok (()) }
 
-pub async fn make_empty_db_destroying_earlier_one (
+async fn overwrite_new_empty_db (
   // Destroys the db named `db_name` if it exists,
   // then makes a new, empty one.
   db_name : &str,

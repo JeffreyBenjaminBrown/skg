@@ -16,7 +16,7 @@ use typedb_driver::{
   DriverOptions,
 };
 
-use skg::typedb::create::{make_db_destroying_earlier_one};
+use skg::typedb::create::{overwrite_and_populate_new_db};
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
@@ -37,7 +37,7 @@ fn test_typedb_integration(
     ).await?;
     let db_name = "skg-test";
 
-    make_db_destroying_earlier_one(
+    overwrite_and_populate_new_db (
       "tests/typedb/fixtures", db_name, &driver )
       . await?;
 

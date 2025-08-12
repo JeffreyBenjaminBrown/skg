@@ -8,7 +8,7 @@ use typedb_driver::{
   DriverOptions,
 };
 
-use skg::typedb::create::make_db_destroying_earlier_one;
+use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   single_document_view,
   path_to_root_container };
@@ -25,7 +25,7 @@ fn test_single_document_view
       DriverOptions::new(false, None)?
     ).await?;
     let db_name = "skg-test";
-    make_db_destroying_earlier_one(
+    overwrite_and_populate_new_db(
       "tests/content_view/fixtures", db_name, &driver ) . await?;
 
     // Print the view from node "1".

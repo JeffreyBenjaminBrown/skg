@@ -12,7 +12,7 @@ use futures::executor::block_on;
 
 use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
 use crate::typedb::create::{
-  make_db_destroying_earlier_one};
+  overwrite_and_populate_new_db};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
   search_index, update_index};
@@ -108,7 +108,7 @@ fn handle_emacs (
 pub fn initialize_typedb (
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
-  // then calls make_db_destroying_earlier_one.
+  // then calls overwrite_and_populate_new_db.
 
   println!("Initializing TypeDB database...");
   let driver = block_on( async {
@@ -125,7 +125,7 @@ pub fn initialize_typedb (
 
   let db_name = "skg-test";
   block_on ( async {
-    if let Err(e) = make_db_destroying_earlier_one (
+    if let Err(e) = overwrite_and_populate_new_db (
       SKG_DATA_DIR, db_name, &driver
     ) . await {
       eprintln!("Failed to initialize database: {}", e);
