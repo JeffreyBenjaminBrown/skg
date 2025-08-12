@@ -58,22 +58,23 @@ pub async fn create_node (
 pub async fn insert_extra_ids (
   node : &FileNode,
   tx   : &typedb_driver::Transaction
-) -> Result<(), Box<dyn Error>> {
+) -> Result < (), Box<dyn Error> > {
 
-  if node.ids.len() > 1 {
-    let primary_id = node.ids[0].as_str();
-    let extra_ids: Vec<&ID> =
-      node.ids.iter().skip(1).collect();
+  if node.ids.len () > 1 {
+    let primary_id = node . ids [0] . as_str ();
+    let extra_ids: Vec < &ID > =
+      node . ids . iter() . skip(1) . collect();
     for extra_id in extra_ids {
-      tx.query(
-        format!( r#"
+      tx.query (
+        format! ( r#"
                     match
                         $n isa node, has id "{}";
                     insert
                         $e isa extra_id, has id "{}";
                         $r isa has_extra_id
-                           (node: $n, extra_id: $e);"#,
+                           ( node: $n,
+                             extra_id: $e ); "#,
                     primary_id,
-                    extra_id.as_str() ) )
-        . await?; } }
+                    extra_id.as_str () ))
+        . await ?; }}
   Ok (()) }

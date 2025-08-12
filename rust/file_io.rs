@@ -14,29 +14,29 @@ use crate::types::FileNode;
 pub fn read_filenode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P)
-   -> io::Result <FileNode> {
-    let file_path    : &Path = file_path.as_ref ();
-    let contents     : String = fs::read_to_string ( file_path )?;
-    let mut filenode : FileNode =
-      serde_yaml::from_str ( &contents )
-      . map_err (
-        |e| io::Error::new (
-          io::ErrorKind::InvalidData,
-          e.to_string () )) ?;
+   -> io::Result <FileNode>
+{ // The type signature explains everything.
 
-    filenode.path =
-      // Unlike the rest of the FileNode,
-      // this is not extracted from a field in the .skg file.
-      file_path.to_path_buf ();
-    Ok ( filenode ) }
+  let file_path    : &Path = file_path.as_ref ();
+  let contents     : String = fs::read_to_string ( file_path )?;
+  let mut filenode : FileNode =
+    serde_yaml::from_str ( &contents )
+    . map_err (
+      |e| io::Error::new (
+        io::ErrorKind::InvalidData,
+        e.to_string () )) ?;
+  filenode.path = // Unlike the rest of the FileNode, this is not extracted from a field in the .skg file.
+    file_path.to_path_buf ();
+  Ok ( filenode ) }
 
 pub fn write_filenode
   <P : AsRef<Path>>
   ( filenode  : &FileNode,
     file_path : P)
     -> io::Result<()>
-{ // A skip directive in the FileNode typedef prevents the field `path`
-  // from being part of the .skg representation.
+{ /* Writes `filenode` to `path`.
+     A skip directive in the FileNode typedef
+     keeps the field `path` out of the .skg representation. */
 
   let yaml_string =
     serde_yaml::to_string ( filenode )

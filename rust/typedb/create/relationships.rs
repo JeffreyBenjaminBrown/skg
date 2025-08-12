@@ -22,7 +22,7 @@ pub async fn create_all_relationships (
     driver.transaction ( db_name,
                          TransactionType::Write )
     . await ?;
-  println!("Creating relationships ...");
+  println! ( "Creating relationships ..." );
   for node in filenodes {
     create_relationships_from_node (node, &tx)
       . await ?; }
@@ -76,9 +76,10 @@ pub async fn create_relationships_from_node (
     tx ). await ?;
   Ok (()) }
 
-pub async fn insert_relationship_from_list (
+async fn insert_relationship_from_list (
+  // Instantiates a relationship in the database. Does not commit.
   primary_id: &str,
-  id_list: &Vec<ID>,   // This would be node.contains, etc.
+  id_list: &Vec<ID>,   // Length = 2. Order matters. Might equal node.contains, node.subscribes_to, etc.
   relation_name: &str, // "contains", "subscribes", etc.
   from_role: &str,     // "container", "subscriber", etc.
   to_role: &str,       // "contained", "subscribee", etc.
@@ -93,8 +94,8 @@ pub async fn insert_relationship_from_list (
                   {{ $to isa node, has id "{}"; }} or
                   {{ $to isa node;
                      $e isa extra_id, has id "{}";
-                     $rel isa has_extra_id (node: $to,
-                                            extra_id: $e); }};
+                     $rel isa has_extra_id ( node:     $to,
+                                             extra_id: $e ); }};
                 insert
                   $r isa {}
                     ({}: $from,
