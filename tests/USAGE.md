@@ -1,20 +1,19 @@
 From the root of the project,
 some ways to run the Emacs tests include
 ```
-emacs -batch -l tests/tests.el
-emacs -batch -l tests/tests.el 2&> test-results-emacs.txt
+emacs -batch -l tests/emacs/test.el
+emacs -batch -l tests/emacs/test.el 2&> tests/results-emacs.txt
 ```
 
-and the Rust tests can be run via
+Similarly, some ways to run the Emacs tests include
 ```
 cargo test
-cargo test 2&> test-results-rust.txt
+cargo test 2&> tests/results-rust.txt
 ```
 
 If you use the Docker container,
-the Rust tests should be run from within that
-(from `/home/ubuntu`, which is the user's home folder)
-but the Emacs tests should be run from your host system,
-because the Docker container does not have Emacs,
-and even if it did it wouldn't have your configuration,
-the functionality of which you'll want to test.
+the Rust tests should be run inside it,
+from `/home/ubuntu`, which is the user's home folder.
+But the Emacs tests should be run from your host system,
+because that is where Emacs is run in production
+(and the Docker container does not include Emacs).

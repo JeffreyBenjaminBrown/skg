@@ -6,8 +6,8 @@
             buffer-file-name
             default-directory))))
   (load ;; Load project configuration
-   (expand-file-name "../elisp/init.el" test-dir))
-  (let* ((project-root (expand-file-name ".." test-dir))
+   (expand-file-name "../../elisp/init.el" test-dir))
+  (let* ((project-root (expand-file-name "../.." test-dir))
          (elisp-dir (expand-file-name "elisp" project-root)))
     (dolist ;; Reload non-abandoned files in elisp/
         ;; PITFALL: 'provide and 'require don't do this!

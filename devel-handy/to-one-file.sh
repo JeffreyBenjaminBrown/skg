@@ -1,14 +1,17 @@
-separator="**** "
-{ echo "$separator" "Files are indented a few spaces in this printout, but not in reality."
+# Announces that a line precedes a new kind of content (hence "separator").
+# Should come at the start of the line (hence "herald").
+separator_herald="****"
 
-  echo "$separator " "tree -I 'target|index.tantivy' ."
+{ echo "$separator_herald" "Files are indented a few spaces in this printout, but not in reality."
+
+  echo "$separator_herald tree -I 'target|index.tantivy' ."
   tree -I 'target|index.tantivy' .
 
   find  . -path ./target -prune -o \
         \( -name '*.md' -o -name '*.el' -o -name '*.rs' \) \
         -type f -print | while read -r f;
   do
-      echo "$separator file: $f"
+      echo "$separator_herald file: $f"
       cat "$f" | sed 's/^/    /'
       echo ""
   done
