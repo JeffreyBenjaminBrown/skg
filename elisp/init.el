@@ -5,9 +5,9 @@
        (file-name-directory
         (directory-file-name
          (file-name-directory
-          (or load-file-name buffer-file-name))))))
+          (or load-file-name buffer-file-name)) )) ))
   (add-to-list
    'load-path
-   (expand-file-name "elisp" project-root)))
+   (expand-file-name "elisp" project-root)) )
 
 (require 'client)
