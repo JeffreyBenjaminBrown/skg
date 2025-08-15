@@ -1,7 +1,7 @@
 (defun first-property-on-line
     (property-name) ;; a symbol
   "RETURNS the value (which can be of any type)
-of the PROPERTY-NAME property on this line,
+of the `property-name` property on this line,
 or nil if there is none."
 
   (save-excursion
@@ -11,7 +11,7 @@ or nil if there is none."
                        (line-end-position)
                        property-name nil) )
       (when found-pos
-        (get-text-property found-pos property-name)))))
+        (get-text-property found-pos property-name)) )) )
 
 (defun org-to-sexp-parse-heading-at-point ()
   "RETURNS an alist with heading and id (if present).
@@ -23,19 +23,19 @@ REQUIRES point to be on a heading; else throws an error."
     (error "Point is not on an org-mode heading"))
   (let* ( (heading-value (substring-no-properties
                           (string-trim
-                           (org-get-heading t t t t))))
+                           (org-get-heading t t t t)) ))
           (id-value       (first-property-on-line 'id))
           (repeated-value (first-property-on-line 'repeated))
           (is-folded (save-excursion
                        (beginning-of-line)
-                       (org-fold-folded-p)))
-          (result `((heading . ,heading-value))))
+                       (org-fold-folded-p)) )
+          (result `((heading . ,heading-value)) ))
     (when id-value
-      (setq result (append result `((id . ,id-value)))))
+      (setq result (append result `((id . ,id-value)) )) )
     (when repeated-value
-      (setq result (append result '((repeated . t)))))
+      (setq result (append result '((repeated . t)) )) )
     (when is-folded
-      (setq result (append result '((folded . t)))))
+      (setq result (append result '((folded . t)) )) )
     result))
 
 (defun org-to-sexp-parse-body-at-point ()
@@ -56,13 +56,13 @@ TODO | PITFALL: This reduces a body consisting of empty lines into a single empt
          (save-excursion
            (if (org-next-visible-heading 1)
                (point)
-             (point-max)))))
+             (point-max)) )) )
     (when (< body-start body-end)
       (let ((body-text (string-trim-right
                         (buffer-substring-no-properties
-                         body-start body-end))))
+                         body-start body-end)) ))
         (goto-char body-end)
-        `(body . ,body-text)))))
+        `(body . ,body-text)) )) )
 
 (defun org-to-sexp-parse-heading-at-point-and-maybe-body
     (&optional focused-line-number)
@@ -84,15 +84,15 @@ SIDE EFFECTS:
          (result heading-data))
     (forward-line)
     (unless (org-at-heading-p) ;; whether at a heading
-      (setq body-sexp (org-to-sexp-parse-body-at-point)))
+      (setq body-sexp (org-to-sexp-parse-body-at-point)) )
     (when body-sexp ;; there is a body
-      (setq result (append result (list body-sexp))))
-    (let ((end-line (line-number-at-pos)))
+      (setq result (append result (list body-sexp)) ))
+    (let ((end-line (line-number-at-pos)) )
       (when (and focused-line-number
                  (<= start-line focused-line-number)
                  (<             focused-line-number end-line))
-        (setq result (append result '((focused . t)))))
-      result)))
+        (setq result (append result '((focused . t)) )) )
+      result)) )
 
 (defun org-to-sexp-parse-branch
     (&optional focused-line-number)
@@ -125,11 +125,11 @@ ASSUMES point is on a heading."
       (while (and (org-at-heading-p)
                   (> (org-outline-level) initial-level))
         (push (org-to-sexp-parse-branch focused-line-number)
-              child-data)))
+              child-data)) )
     (when child-data
       (setq node-data
             (append node-data
-                    `((content . ,(nreverse child-data))))))
+                    `((content . ,(nreverse child-data)) )) ))
     node-data))
 
 (defun org-to-sexp-parse-all-branches ()
@@ -141,18 +141,18 @@ RETURNS: a single cons cell:
 PITFALL: The s-expression might look malformed, because there's no (.) shown between `content` and `results`. But that's just a quirk of how Emacs displays a cons cell when the cdr is a list."
 
   (save-excursion
-    (let ((focused-line-number (line-number-at-pos)))
+    (let ((focused-line-number (line-number-at-pos)) )
       (progn ;; go to the first heading
         (goto-char (point-min))
         (unless
             (org-at-heading-p)
           (condition-case nil
               (outline-next-heading)
-            (error nil))))
+            (error nil)) ))
       (let ((results nil)) ;; parse each branch
         (while (org-at-heading-p)
           (push (org-to-sexp-parse-branch focused-line-number)
                 results))
-        `(content . ,(nreverse results))))))
+        `(content . ,(nreverse results)) )) ))
 
 (provide 'org-to-sexp)

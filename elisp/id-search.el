@@ -2,6 +2,7 @@
 (defun copy-id-at-point ()
   "RETURNS: This line's ID, or nil.
 SIDE EFFECTS: Copies the ID, if found, to the kill-ring."
+
   (interactive)
   (let* ((line-beg (line-beginning-position))
          (line-end (line-end-position))
@@ -26,9 +27,10 @@ SIDE EFFECTS: Copies the ID, if found, to the kill-ring."
 
 (defun search-for-next-line-with-id (id)
   "Search for text with 'id property matching ID starting from point, ignoring the current line (because that's where the user probably just copied the ID from).
-
+.
 RETURNS: Nothing.
 SIDE EFFECTS: Moves point."
+
   (interactive "sEnter ID to search for: ")
   (let ((start-pos (point))
         (found nil))
@@ -45,9 +47,10 @@ SIDE EFFECTS: Moves point."
     (id start end &optional
         wrapped) ;; wrapped from buffer end to start
   "Search for text with 'id property matching ID from START to END.
-
+.
 RETURNS: t (found) or nil (not found).
 SIDE EFFECTS: Moves point."
+
   (let ((current-pos start)
         (found nil))
     (while (and (not found)
