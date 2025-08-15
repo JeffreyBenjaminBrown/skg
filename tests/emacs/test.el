@@ -12,7 +12,8 @@
     (dolist ;; Reload non-abandoned files in elisp/
         ;; PITFALL: 'provide and 'require don't do this!
         (file (directory-files-recursively elisp-dir "\\.el$"))
-      (unless (string-match-p "/abandoned/" file)
+      (unless (or (string-match-p "/abandoned/" file)
+                  (string-match-p "/experim/" file))
         (message "Reloading source file: %s" file)
         (load-file file)))))
 
@@ -23,10 +24,11 @@
                      default-directory)))
       (current-file (or load-file-name
                         buffer-file-name)))
-  (dolist (file (directory-files
-                 test-dir t "^test-.*\\.el$"))
+  (dolist (file (directory-files-recursively
+                 test-dir "\\.el$"))
     (when current-file ; Only check if we have a current file
-      (unless (string= file current-file)
+      (unless (or (string= file current-file)
+                  (string-match-p "/test\\.el$" file)) ; exclude this test runner itself
         (message "Loading test file: %s" file)
         (load-file file)))))
 

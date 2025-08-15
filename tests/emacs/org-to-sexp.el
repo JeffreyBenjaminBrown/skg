@@ -194,12 +194,15 @@ will also be given the property `(repeated . t)`."
          (expand-file-name
           "org-to-sexp/fixtures/1.org"
           (file-name-directory
-           (or load-file-name buffer-file-name default-directory))))
+           (or load-file-name buffer-file-name default-directory)) ))
         (expected-result
          (with-temp-buffer
-           (insert-file-contents
-            "org-to-sexp/fixtures/1.el")
-           (buffer-string))))
+         (insert-file-contents
+          (expand-file-name
+           "org-to-sexp/fixtures/1.el"
+           (file-name-directory (or load-file-name
+                                    buffer-file-name
+                                    default-directory)) )) )) )
     (with-current-buffer
         (get-buffer-create "*test-org-to-sexp*")
       (erase-buffer)  ; Clear any existing content
@@ -216,7 +219,7 @@ will also be given the property `(repeated . t)`."
                  (match-beginning 0)
                  (match-end 0)
                  'repeated t)
-              (setq first-one-found t)))))
+              (setq first-one-found t)) )) )
       (progn ;; Navigate and unfold as in docstring
         (org-overview)
         (goto-char (point-min)) ; The first heading is here.
