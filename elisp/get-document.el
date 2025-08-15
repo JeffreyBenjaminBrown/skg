@@ -74,13 +74,4 @@ ASSUMES nothing on the same line is left of point."
         (skg-doc-insert-node child
                              (1+ level))))))
 
-(defun skg-doc-get-property (node property-key)
-  "Get PROPERTY from NODE."
-  (message "skg-doc-get-property going.")
-  (when (and node (consp node))
-    (if (and (symbolp (car node))
-             (eq (car node) property-key))
-        (cdr node)
-      (cdr (assq property-key node)))))
-
 (provide 'get-document)

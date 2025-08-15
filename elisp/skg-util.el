@@ -85,4 +85,12 @@ Preserves folding state by using save-excursion and save-restriction."
       (message "Value mismatch at %s: expected %S, got %S"
                path expected actual)) )) )
 
+(defun skg-doc-get-property (node property-key)
+  "Get PROPERTY from NODE."
+  (when (and node (consp node))
+    (if (and (symbolp (car node))
+             (eq (car node) property-key))
+        (cdr node)
+      (cdr (assq property-key node)))))
+
 (provide 'skg-util)
