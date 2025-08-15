@@ -5,13 +5,15 @@
 - npm
 - vs codium
 
-## Setup
-- clone this repository
+## Install some things inside those things
 - install some npm libraries
 ```bash
 npm install
 npm install --save-dev @types/mocha @types/node
 ```
+- in VSC, install the "Jupyter" extension by "ms-toolsai"
+
+## Clone this repository
 
 ## Run it
 From the command line, from this folder (`vscodium`), run `codium skg`.
