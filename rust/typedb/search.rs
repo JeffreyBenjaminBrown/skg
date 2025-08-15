@@ -184,7 +184,7 @@ fn format_node_sexpr (
   - contents, if applicable, each of which looks the same
   */
   node_id      : &ID,
-  filenode         : &FileNode,
+  filenode     : &FileNode,
   focus        : &ID,
   child_sexprs : Vec<String>
 ) -> String {

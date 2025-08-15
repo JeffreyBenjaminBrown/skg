@@ -29,6 +29,7 @@ pub enum HyperlinkParseError {
 
 #[derive(Debug, Clone)]
 pub struct OrgNode {
+  // See also /api.md.
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
@@ -38,11 +39,11 @@ pub struct OrgNode {
   pub focused  : bool,           // where the Emacs cursor is
   pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.
 
-Both Rust and Emacs need to know this:
+Both Rust and Emacs need to know this, because:
 
-Emacs needs to know that the node is repeated, in order to display it differently.
+Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
 
-Rust needs to know if it was marked repeated when sent to Emacs. Otherwise, if the user moved a repeat of the node to before the first instance of the node, Rust would treat that as the source of truth for edits to the node, and as a result would probably delete the node's branches. */
+Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
   pub branches : Vec<OrgNode>, }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]

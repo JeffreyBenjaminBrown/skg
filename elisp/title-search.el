@@ -12,7 +12,7 @@
 (defun skg-display-search-results (proc string)
   "Display title search results from the Rust server."
   (with-current-buffer
-      (get-buffer-create skg-search-buffer-name)
+      (get-buffer-create "*skg-title-search*")
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert "Title Search Results:\n")

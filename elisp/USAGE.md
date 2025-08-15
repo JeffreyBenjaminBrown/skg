@@ -10,8 +10,10 @@ Finally within Emacs, evaluate `elisp/init.el`
 
 Now these commands can be run:
 ```
-  (request-document-from-node "a") ;; try 1, 1a, or a
-  (request-title-matches "second") ;; try match, title, second
+  (request-document-from-node "1")
+    ;; try 1, 1a, or a
+  (request-title-matches "second")
+    ;; try match, title, second
   (skg-doc-disconnect)
 ```
 
