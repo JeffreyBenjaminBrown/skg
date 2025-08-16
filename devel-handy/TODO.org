@@ -1,3 +1,81 @@
+* rewrite client entirely
+** Rust sends text including bullets, not sexps.
+*** Worry later about
+**** escaping quotes
+**** communicating fold state
+*** In each headline, after the bullet, appears <<skg: ...>>,
+    where the ... includes:
+**** id:ID
+**** "repeated", if applicable
+** How Emacs displays the received text
+*** the ID and "repeated" are fewer characters
+**** ID : a single "⅄" character, white text on black
+**** "repeated" : REP, white text on red
+*** other things are wysiwyg
+**** hyperlinks: normal (blue, underlined)
+**** other text: normal
+*** nothing is read-only
+** The user can delete important stuff.
+   Whatever. It's on them.
+** How Emacs returns text to Rust.
+   Exactly as it's stored in the buffer,
+   but not as it's displayed.
+** How Rust interprets the received text
+   straightforward
+** How it can be extended
+*** show heralds
+    number of backlinks
+    number of contents
+    multiple containers
+*** show backlinks
+**** what Rust sends : no danger
+***** each backlink's hidden text has "<<id:_,links to org-parent>>"
+**** how Emacs shows it
+***** they are immediate org-children
+***** their backlink-ness is indicated with a system "<"
+**** what Rust receives, it ignores
+     :PROPERTIES:
+     :ID:       1a782972-ebda-4f77-aa3e-934cea201409
+     :END:
+     Emacs sends them back to Rust on save, but Rust ignores them.
+     (Emacs could filter them out,
+     but I want to shift all processing possible to Rust from Emacs.)
+**** the user can only screw it up by editing the hidden text
+     :PROPERTIES:
+     :ID:       b4e7971e-7f7b-4989-bdd1-ce6cabccc710
+     :END:
+***** if they put the backlink somewhere else, no harm, because backlinks are ignored on save
+***** if they edit* the hidden text, who cares, that's on them
+      editing here includes deletion
+*** show ancestries
+**** what Rust sends : no danger
+***** each ancestry's hidden text has "<<id:_,contains org-parent>>"
+**** how Emacs shows it
+***** each* ancestry is an immediate org-child
+      hopefully there's only one, but nothing enforces that
+***** the `contains org-parent` tag translates to a "}" herald
+**** [[id:1a782972-ebda-4f77-aa3e-934cea201409][what Rust receives, it ignores]]
+**** [[id:b4e7971e-7f7b-4989-bdd1-ce6cabccc710][the user can only screw it up by editing the hidden text]]
+*** merge
+*** show when a link is bi-directional
+*** list which links are in its recursive contents
+*** hide content
+    should manifest as an H in the container's headline
+*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show cotargeters, coancestors]]
+* emacs ideas, meh
+** skg-doc-insert-node seems worth redoing.
+   I want to favor real (but hideable) text over text properties.
+   `repeated`, for instance, should be real text.
+** I don't need to salvage the test suite's structure.
+   The tests themselves could be worth saving,
+   but the structure can be scrapped.
+** Use AI to make the test harness reasonably-structured.
+** I don't need to use lots of properties.
+   Maybe hidden-ness alone would work.
+** Let the user be responsible for avoiding duplication.
+   Don't make it impossible -- too hard.
+   But do make it investigable, both in a view,
+   and in saved changes.
 * Where is the API for the orgnode sexp format?
   If it does not exist, it ought to,
   and the files in rust/save/ ought to reference it.
@@ -52,7 +130,7 @@ modified   elisp/org-to-sexp.el
 (defun org-to-sexp-parse-body-at-point ()
   "RETURNS either nil or a string without properties,
 of the form (body . STRING).
-ASSUMES point is on the first line of a heading body.
+ASSUMES point is on the first line of a headline body.
 MOVES POINT to the first line after the body."
   (beginning-of-line)
   (let ((body-start (point))

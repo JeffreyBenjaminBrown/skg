@@ -1,3 +1,6 @@
+;; PURPOSE: From the text of a skg content view buffer,
+;; create an s-exp that Rust will be able to interpret.
+
 (defun org-to-sexp-parse-all-branches ()
   "PURPOSE: Returns an s-exp of the form `(content . results)`, where `results` is a list containing the result of calling `org-to-sexp-parse-branch`.
 RETURNS: a single cons cell:
@@ -27,10 +30,10 @@ PITFALL: The s-expression might look malformed, because there's no (.) shown bet
   and (recursively) any child branches.
 RETURNS an alist with these keys (some optional):
   heading  : string,
-  ?id      : string,
-  ?body    : string,
-  ?focused : t or absent,
-  ?content : list of alists.
+  ?id      : absent or string
+  ?body    : absent or string
+  ?focused : absent or 't
+  ?content : absent or list of alists like this one
 ASSUMES point is on a heading."
 
   (let* ((initial-level (org-outline-level))
