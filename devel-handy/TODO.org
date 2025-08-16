@@ -1,3 +1,4 @@
+* Rerun herald-apply only on the changed line.
 * rewrite client entirely
 ** Rust sends text including bullets, not sexps.
 *** Worry later about
