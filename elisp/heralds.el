@@ -22,7 +22,7 @@ The metadata is otherwise not displayed."
   :lighter " ⟪Y⟫"
   (if heralds-mode
       (progn
-        (heralds-apply)
+        (heralds-apply-to-buffer)
         (add-hook 'after-change-functions #'heralds-after-change nil t))
     (remove-hook 'after-change-functions #'heralds-after-change t)
     (heralds-clear-overlays)))
@@ -30,27 +30,31 @@ The metadata is otherwise not displayed."
 (defvar-local heralds-overlays nil
   "List of overlays created by `heralds-mode'.")
 
-(defun heralds-apply ()
-  "Change how the first <<...>> on each line appears."
+(defun heralds-apply-to-buffer ()
+  "Do `heralds-apply-on-line` to each line."
   (save-excursion
     (goto-char (point-min))
     (while (< (point) (point-max))
-      (let ((bol (line-beginning-position))
-            (eol (line-end-position)))
-        ;; Search within the current line. Stop at the first match.
-        (goto-char bol)
-        (when (re-search-forward "<<\\([^<>]*\\)>>" eol t)
-          (let* ((beg (match-beginning 0))
-                 (end (match-end 0))
-                 (inner (match-string-no-properties 1))
-                 (glyphs (heralds-from-metadata inner)))
-            (when glyphs
-              (let ((ov (make-overlay beg end)))
-                (overlay-put ov 'display glyphs)
-                (overlay-put ov 'evaporate t)
-                (push ov heralds-overlays)))))
-        ;; Move to next line unconditionally.
-        (forward-line 1)))))
+      (heralds-apply-on-line)
+      (forward-line 1))))
+
+(defun heralds-apply-to-line ()
+  "On the current line, lens only the first <<...>> occurrence.
+Creates one overlay (at most) and pushes it onto `heralds-overlays`."
+  (save-excursion
+    (let ((bol (line-beginning-position))
+          (eol (line-end-position)))
+      (goto-char bol)
+      (when (re-search-forward "<<\\([^<>]*\\)>>" eol t)
+        (let* ((beg (match-beginning 0))
+               (end (match-end 0))
+               (inner (match-string-no-properties 1))
+               (glyphs (heralds-from-metadata inner)))
+          (when glyphs
+            (let ((ov (make-overlay beg end)))
+              (overlay-put ov 'display glyphs)
+              (overlay-put ov 'evaporate t)
+              (push ov heralds-overlays))))))))
 
 (defun heralds-from-metadata
     (metadata) ;; line's first text inside (not including) << and >>
@@ -93,7 +97,7 @@ Whitespace in METADATA is ignored."
   "Refresh overlays after any buffer change."
   (when heralds-mode
     (heralds-clear-overlays)
-    (heralds-apply)))
+    (heralds-apply-to-buffer)))
 
 (defface heralds-blue-face
   '((t :foreground "white" :background "blue"))
