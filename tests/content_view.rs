@@ -11,7 +11,7 @@ use typedb_driver::{
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   single_document_view,
-  path_to_root_container };
+  path_to_rootish_container };
 use skg::types::ID;
 
 #[test]
@@ -47,7 +47,7 @@ fn test_single_document_view
     println!("{}", view);
 
     // Test the path from node "4" to the root container
-    match path_to_root_container (
+    match path_to_rootish_container (
       db_name, &driver, &ID("4".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
@@ -62,7 +62,7 @@ fn test_single_document_view
 
     // Test the path "to root" from node "cycle-3".
     // (1 contains 2 contains 3 contains 1.)
-    match path_to_root_container (
+    match path_to_rootish_container (
       db_name, &driver, &ID("cycle-3".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
@@ -77,7 +77,7 @@ fn test_single_document_view
 
     // Test the path "to root" from node "cycle-1".
     // (1 contains 2 contains 3 contains 1.)
-    match path_to_root_container (
+    match path_to_rootish_container (
       db_name, &driver, &ID("cycle-1".to_string() )
     ).await {
       Ok(path) => { assert_eq!(

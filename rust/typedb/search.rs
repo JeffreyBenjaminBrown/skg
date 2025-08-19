@@ -12,11 +12,18 @@ use typedb_driver::{
 use crate::file_io::read_filenode;
 use crate::types::{ID, FileNode};
 
-pub async fn path_to_root_container (
-  // Runs a series of TypeDB queries.
-  // Returns a path through the graph,
-  // from the given node (first in returned vector)
-  // to the root container (last in returned vector).
+/* Runs a series of TypeDB queries.
+Returns a path through the graph, starting with the input,
+and hopefully ending with its root container.
+If it is a member of a cycle, then it has no root container,
+so the path ends just before repeating.
+If any member of the path is multiply contained,
+one branch is chosen in an undefined manner,
+as described in the comment for `find_container_of`.
+.
+TODO : The path ought to end at the first such multiplicity,
+reporting the full set of containers there. */
+pub async fn path_to_rootish_container (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
@@ -49,6 +56,8 @@ pub async fn path_to_root_container (
 pub async fn find_container_of (
   // Runs a single TypeDB query.
   // Returns the containing node's ID.
+  // TODO | PITFALL: If the node is multiply contained,
+  // this silently ignores all but the first container found.
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
@@ -128,7 +137,7 @@ Properties (tags) in the resulting s-expression include:
 ) -> Result < String, Box<dyn Error> > {
 
   let path : Vec<ID> =
-    path_to_root_container (
+    path_to_rootish_container (
       db_name, driver, focus
     ). await ?;
   let root_id : &ID = path . last () . ok_or_else (
