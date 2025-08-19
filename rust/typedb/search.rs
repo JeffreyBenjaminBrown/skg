@@ -134,13 +134,13 @@ Properties (tags) in the resulting s-expression include:
     )) ?;
   let sexpr = format! (
     "((view . \"single document\")\n (content . ({})))",
-    recursive_s_expression_from_node (
+    s_expression_from_node_recursive (
       db_name, driver, root_id, focus,
       &mut HashSet::new () )
       . await ?);
   Ok (sexpr) }
 
-async fn recursive_s_expression_from_node (
+async fn s_expression_from_node_recursive (
   db_name : &str,
   driver  : &TypeDBDriver,
   root    : &ID,
@@ -167,7 +167,7 @@ async fn recursive_s_expression_from_node (
     let mut child_sexprs : Vec<String> = Vec::new();
     for contained_id in &filenode.contains {
       let contained_node : String = Box::pin (
-        recursive_s_expression_from_node (
+        s_expression_from_node_recursive (
           db_name, driver, contained_id, focus, visited
         )). await ?;
       child_sexprs . push ( format! ( "({})",
