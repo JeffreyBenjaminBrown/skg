@@ -11,12 +11,12 @@ use typedb_driver::{TypeDBDriver, Credentials,
 use futures::executor::block_on;
 
 use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
-use crate::typedb::create::{
-  overwrite_and_populate_new_db};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
   search_index, update_index};
-use crate::typedb::search::single_document_view;
+use crate::render::sexp::single_document_view;
+use crate::typedb::create::{
+  overwrite_and_populate_new_db};
 use crate::types::{ID,TantivyIndex};
 
 pub fn serve () -> std::io::Result<()> {

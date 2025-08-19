@@ -10,19 +10,17 @@ use sexp::{ Sexp::{self},
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
-  TransactionType,
-  TypeDBDriver,
   Credentials,
   DriverOptions,
-};
+  TransactionType,
+  TypeDBDriver, };
 
-use skg::typedb::create::{overwrite_and_populate_new_db};
+use skg::render::sexp::single_document_view;
+use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
-  get_filepath_from_node,
-  single_document_view,
-};
+  get_filepath_from_node, };
 use skg::types::ID;
 
 #[test]

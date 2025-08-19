@@ -8,11 +8,11 @@ use typedb_driver::{
   DriverOptions,
 };
 
+use skg::render::sexp::single_document_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   find_rootish_container,
-  path_to_rootish_container,
-  single_document_view, };
+  path_to_rootish_container, };
 use skg::types::ID;
 
 #[test]
