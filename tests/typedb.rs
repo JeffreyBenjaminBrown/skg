@@ -20,7 +20,7 @@ use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
-  get_filepath_from_node, };
+  filepath_from_id, };
 use skg::types::ID;
 
 #[test]
@@ -39,9 +39,9 @@ fn test_typedb_integration(
       "tests/typedb/fixtures", db_name, &driver )
       . await?;
 
-    let path_to_4 = get_filepath_from_node (
+    let path_to_4 = filepath_from_id (
       db_name, &driver, &ID("4".to_string() ) ) . await?;
-    let path_to_44 = get_filepath_from_node (
+    let path_to_44 = filepath_from_id (
       db_name, &driver, &ID("44".to_string() ) ) . await?;
     assert_eq!(path_to_4,  "tests/typedb/fixtures/4.skg");
     assert_eq!(path_to_44, "tests/typedb/fixtures/4.skg");

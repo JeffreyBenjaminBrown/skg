@@ -6,7 +6,7 @@ use typedb_driver::TypeDBDriver;
 use crate::file_io::read_filenode;
 use crate::typedb::search::{
   find_rootish_container,
-  get_filepath_from_node, };
+  filepath_from_id, };
 use crate::types::{ID, FileNode};
 
 
@@ -48,7 +48,7 @@ async fn s_expression_from_node_recursive (
   visited : &mut HashSet<ID>
 ) -> Result < String, Box<dyn Error> > {
 
-  let path : String = get_filepath_from_node (
+  let path : String = filepath_from_id (
     db_name, driver, root ). await ?;
   let filenode : FileNode = read_filenode ( path ) ?;
   if filenode . title . is_empty () {
