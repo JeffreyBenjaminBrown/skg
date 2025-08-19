@@ -22,10 +22,11 @@ pub async fn path_to_root_container (
   node    : &ID
 ) -> Result < Vec<ID>,
               Box<dyn Error> > {
-  // TODO & DANGER: Recurses forever when it finds a cycle.
 
   let mut path : Vec<ID> =
     vec! [ node.clone () ];
+  let mut seen : HashSet<ID> =
+    HashSet::from ( [ node.clone() ] );
   let mut current_node : ID =
     node.clone ();
   loop {
@@ -33,10 +34,14 @@ pub async fn path_to_root_container (
     match find_container_of (
       db_name, driver, &current_node) . await {
       Ok (container_id) => {
-        // Found a container, so add it to the path.
-        path.push ( container_id.clone () );
-        current_node = container_id;
-      }, Err(_) => {
+        if seen.contains ( &container_id ) {
+          // It's a duplicate. Return without re-including duplicate.
+          break; }
+        else { // Found a container. Add it to `path` and `seen`.
+          path.push ( container_id.clone () );
+          seen.insert ( container_id.clone () );
+          current_node = container_id; } },
+      Err(_) => {
         // No container found, so this is the root.
         break; } } }
   Ok (path) }

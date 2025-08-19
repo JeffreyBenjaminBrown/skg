@@ -47,7 +47,7 @@ fn test_single_document_view
     println!("{}", view);
 
     // Test the path from node "4" to the root container
-    match path_to_root_container(
+    match path_to_root_container (
       db_name, &driver, &ID("4".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
@@ -57,6 +57,37 @@ fn test_single_document_view
           ID ( "2".to_string() ),
           ID ( "1".to_string() ) ],
         "Unexpected path to root container from node '4'.");
+      }, Err(e) => {
+        panic!("Error finding path to root container: {}", e); } }
+
+    // Test the path "to root" from node "cycle-3".
+    // (1 contains 2 contains 3 contains 1.)
+    match path_to_root_container (
+      db_name, &driver, &ID("cycle-3".to_string() )
+    ).await {
+      Ok(path) => { assert_eq!(
+        path,
+        vec![
+          ID ( "cycle-3".to_string() ),
+          ID ( "cycle-2".to_string() ),
+          ID ( "cycle-1".to_string() ) ],
+        "Unexpected path to \"root container\" from node 'cycle-3'.");
+      }, Err(e) => {
+        panic!("Error finding path to root container: {}", e); } }
+
+    // Test the path "to root" from node "cycle-1".
+    // (1 contains 2 contains 3 contains 1.)
+    match path_to_root_container (
+      db_name, &driver, &ID("cycle-1".to_string() )
+    ).await {
+      Ok(path) => { assert_eq!(
+        path,
+        vec![
+          ID ( "cycle-1".to_string() ),
+          ID ( "cycle-3".to_string() ),
+          ID ( "cycle-2".to_string() ),
+        ],
+        "Unexpected path to \"root container\" from node 'cycle-1'.");
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }
 

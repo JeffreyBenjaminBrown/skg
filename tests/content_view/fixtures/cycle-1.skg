@@ -1,0 +1,5 @@
+ids:
+- cycle-1
+title: this node, with id cycle-1, is part of a three-cycle
+contains:
+- cycle-2
