@@ -8,7 +8,7 @@ use typedb_driver::{
   DriverOptions,
 };
 
-use skg::render::sexp::single_document_view;
+use skg::render::sexp::single_document_sexp_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   find_rootish_container,
@@ -16,7 +16,7 @@ use skg::typedb::search::{
 use skg::types::ID;
 
 #[test]
-fn test_single_document_view
+fn test_single_document_sexp_view
   () -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
@@ -32,7 +32,7 @@ fn test_single_document_view
     // Print the view from node "1".
     // TODO: Automate.
     println!("Building view from node with ID 2...");
-    let view = single_document_view (
+    let view = single_document_sexp_view (
       db_name, &driver, &ID("2".to_string() )
       ) . await?;
     println!("Document View Output:");
@@ -41,7 +41,7 @@ fn test_single_document_view
     // Print the view from node "5".
     // TODO: Automate.
     println!("Building view from node with ID 5...");
-    let view = single_document_view(
+    let view = single_document_sexp_view(
       db_name, &driver, &ID("5".to_string() )
     ) . await?;
     println!("Document View Output:");

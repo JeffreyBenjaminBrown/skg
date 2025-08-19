@@ -24,7 +24,7 @@ Properties (tags) in the resulting s-expression include:
     `body`    : possibly absent, the text just under the bullet.
     `content` : possibly absent, a list of nodes.
   The `content` field enables recursion. */
-pub async fn single_document_view (
+pub async fn single_document_sexp_view (
   db_name : &str,
   driver  : &TypeDBDriver,
   focus   : &ID,

@@ -15,7 +15,7 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver, };
 
-use skg::render::sexp::single_document_view;
+use skg::render::sexp::single_document_sexp_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
@@ -179,7 +179,7 @@ async fn test_recursive_document (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let result_sexp_str = single_document_view (
+  let result_sexp_str = single_document_sexp_view (
     db_name,
     driver,
     &ID("a".to_string())
