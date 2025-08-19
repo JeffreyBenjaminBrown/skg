@@ -12,6 +12,30 @@ use typedb_driver::{
 use crate::file_io::read_filenode;
 use crate::types::{ID, FileNode};
 
+/* Returns the last container in the path from the input,
+to its container, to its container's container, etc.
+until either no container is found
+or one is found that repeats one earlier in the path.
+In the first case, the returned value is in fact the root.
+In the latter case the duplicate is not included. */
+pub async fn find_rootish_container (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < ID, Box<dyn Error> > {
+
+  path_to_rootish_container ( db_name, driver, node )
+    . await ?
+    . last ()
+    . ok_or_else ( || {
+      // Last can't actually fail, because the path always includes the starting node, but Rust doesn't know that.
+      io::Error::new (
+        io::ErrorKind::InvalidData,
+        format!( "Empty path returned for node '{}'", node )
+      ) . into ()
+    } )
+    . cloned () }
+
 /* Runs a series of TypeDB queries.
 Returns a path through the graph, starting with the input,
 and hopefully ending with its root container.
@@ -50,6 +74,7 @@ pub async fn path_to_rootish_container (
           current_node = container_id; } },
       Err(_) => {
         // No container found, so this is the root.
+        // TODO: Distinguish between no container found and query failed.
         break; } } }
   Ok (path) }
 
@@ -116,12 +141,11 @@ pub async fn get_filepath_from_node (
   Err ( format! ( "No path found for node with ID '{}'",
                    node_id).into ()) }
 
-pub async fn single_document_view (
-  /*Given a node (the `focus` argument),
+/*Given a node (the `focus` argument),
 this finds its root container (the `root` variable),
 and returns an s-expression representing a document
 with `root` as its root.
-
+.
 Properties (tags) in the resulting s-expression include:
     `view`    : `single document`
     `content` : a length-1 list of nodes.
@@ -131,25 +155,18 @@ Properties (tags) in the resulting s-expression include:
     `body`    : possibly absent, the text just under the bullet.
     `content` : possibly absent, a list of nodes.
   The `content` field enables recursion. */
+pub async fn single_document_view (
   db_name : &str,
   driver  : &TypeDBDriver,
   focus   : &ID,
 ) -> Result < String, Box<dyn Error> > {
 
-  let path : Vec<ID> =
-    path_to_rootish_container (
-      db_name, driver, focus
-    ). await ?;
-  let root_id : &ID = path . last () . ok_or_else (
-    || io::Error::new (
-      io::ErrorKind::InvalidData,
-      format! ( "Empty path returned for node '{}'",
-                 focus )
-    )) ?;
+  let root_id : ID = find_rootish_container (
+      db_name, driver, focus ) . await ?;
   let sexpr = format! (
     "((view . \"single document\")\n (content . ({})))",
     s_expression_from_node_recursive (
-      db_name, driver, root_id, focus,
+      db_name, driver, &root_id, focus,
       &mut HashSet::new () )
       . await ?);
   Ok (sexpr) }

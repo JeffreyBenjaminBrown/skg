@@ -10,8 +10,9 @@ use typedb_driver::{
 
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
-  single_document_view,
-  path_to_rootish_container };
+  find_rootish_container,
+  path_to_rootish_container,
+  single_document_view, };
 use skg::types::ID;
 
 #[test]
@@ -59,6 +60,16 @@ fn test_single_document_view
         "Unexpected path to root container from node '4'.");
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }
+
+    match find_rootish_container (
+      db_name, &driver, &ID("4".to_string() )
+    ).await {
+      Ok(root) => { assert_eq!(
+        root,
+        ID ( "1".to_string() ),
+        "Root of node '4' should be 1." ) },
+      Err(e) => { panic!(
+        "Error finding root container from id {}", e); } }
 
     // Test the path "to root" from node "cycle-3".
     // (1 contains 2 contains 3 contains 1.)
