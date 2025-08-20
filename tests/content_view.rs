@@ -9,7 +9,6 @@ use typedb_driver::{
 };
 
 use skg::render::org::single_document_org_view;
-use skg::render::sexp::single_document_sexp_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   find_rootish_container,
@@ -17,7 +16,7 @@ use skg::typedb::search::{
 use skg::types::ID;
 
 #[test]
-fn test_single_document_sexp_view
+fn test_a_mess_of_stuff
   () -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
@@ -30,41 +29,26 @@ fn test_single_document_sexp_view
     overwrite_and_populate_new_db(
       "tests/content_view/fixtures", db_name, &driver ) . await?;
 
-    { // Print sexp and org views.
+    { // Print org views.
       // TODO: Automate these "manual eyballing" tests.
       { // from the root of node "1".
-        { // sexp view
-          println!("Building sexp view from ID 2...");
-          let view = single_document_sexp_view (
-            db_name, &driver, &ID("2".to_string() )
-          ) . await?;
-          println!("{}", view); }
-        { // org view
-          println!("Building org view from ID 2...");
-          let view = single_document_org_view (
-            db_name, &driver, &ID("2".to_string() )
-          ) . await?;
-          println!("{}", view); } }
-{ // From the root of node "5".
-        { // sexp view
-          println!("Building sexp view from ID 5...");
-          let view = single_document_sexp_view (
-            db_name, &driver, &ID("5".to_string() )
-          ) . await?;
-          println!("{}", view); }
-        { // org view
+        println!("Building org view from ID 2...");
+        let view = single_document_org_view (
+          db_name, &driver, &ID("2".to_string() )
+        ) . await?;
+        println!("{}", view); }
+      { // From the root of node "5".
           println!("Building org view from ID 5...");
           let view = single_document_org_view (
             db_name, &driver, &ID("5".to_string() )
           ) . await?;
-          println!("{}", view); } }
+          println!("{}", view); }
       { // From the root of node "cycle-1".
-        { // org view
           println!("Building org view from ID cycle-1...");
           let view = single_document_org_view (
             db_name, &driver, &ID("cycle-1".to_string() )
           ) . await?;
-          println!("{}", view); } } }
+          println!("{}", view); } }
 
     // Test the path from node "4" to the root container
     match path_to_rootish_container (

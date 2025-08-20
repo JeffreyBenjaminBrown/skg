@@ -10,8 +10,6 @@ Finally within Emacs, evaluate `elisp/init.el`
 
 Now these commands can be run:
 ```
-  (request-sexp-doc-from-node "1")
-    ;; try 1, 1a, or a
   (request-org-doc-from-node "1")
     ;; try 1, 1a, or a
   (request-title-matches "second")

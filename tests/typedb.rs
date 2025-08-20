@@ -5,8 +5,6 @@
 
 use futures::executor::block_on;
 use futures::StreamExt;
-use sexp::{ Sexp::{self},
-            Atom::S, };
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
@@ -15,7 +13,6 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver, };
 
-use skg::render::sexp::single_document_sexp_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
@@ -170,80 +167,7 @@ fn test_typedb_integration(
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
-    test_recursive_document (
-      db_name, &driver ) . await?;
-
     Ok (()) } ) }
-
-async fn test_recursive_document (
-  db_name: &str,
-  driver: &TypeDBDriver
-) -> Result<(), Box<dyn Error>> {
-  let result_sexp_str = single_document_sexp_view (
-    db_name,
-    driver,
-    &ID("a".to_string())
-  ) . await?;
-  let result_sexp = sexp::parse(&result_sexp_str)
-    .map_err(|e| format!(
-      "Failed to parse result S-expression: {}", e))?;
-
-  let expected_sexp_str = r#"
-( (view . "single document")
-  ( content
-    . ( (id . "a")
-        (heading . "a")
-        (focused . t)
-        (content
-         . ( ((id . "b")
-              (heading . "b")
-              ("body" . "b has a body")
-              (content
-               . ( ((id . "c")
-                    (heading . "c")
-                    (content
-                     . ( ((id . "b")
-                          (heading . "b")
-                          (body . "Repeated above. Edit there, not here.")
-                          (repeated . t))
-                         ))))))))))) "#;
-  let expected_sexp = sexp::parse(expected_sexp_str)
-    .map_err(|e| format!(
-      "Failed to parse expected S-expression: {}", e))?;
-  assert_eq!(
-    result_sexp,
-    expected_sexp,
-    "Rsults (first sexp) does not match expected (second):\n{}\n\nExpected:\n{}",
-    print_sexp_pretty ( &result_sexp),
-    print_sexp_pretty ( &expected_sexp) );
-  Ok (() ) }
-
-fn print_sexp_pretty(sexp: &Sexp) -> String {
-  match sexp {
-    Sexp::Atom(S(s)) => format!("\"{}\"", s),
-    Sexp::List(items) => {
-      if items.is_empty() {
-        "()".to_string()
-      } else if items.len() == 3 && match_atom_s(&items[1], ".") {
-        // Special case for dotted pairs
-        format!("({} . {})",
-                print_sexp_pretty(&items[0]),
-                print_sexp_pretty(&items[2]))
-      } else {
-        let items_str = items.iter()
-          .map(|item| print_sexp_pretty(item))
-          .collect::<Vec<_>>()
-          .join(" ");
-        format!("({})", items_str) } }
-    _ => // Otherwise use standard debug formatting
-      format!("{:?}", sexp), } }
-
-fn match_atom_s(
-  sexp: &Sexp,
-  value: &str) -> bool {
-  if let Sexp::Atom(S(s)) = sexp {
-    s == value
-  } else { false } }
 
 async fn collect_all_of_some_binary_rel(
   db_name: &str,

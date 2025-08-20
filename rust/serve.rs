@@ -14,7 +14,6 @@ use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
   search_index, update_index};
-use crate::render::sexp:: single_document_sexp_view;
 use crate::render::org::  single_document_org_view;
 use crate::typedb::create::{
   overwrite_and_populate_new_db};
@@ -62,10 +61,6 @@ fn handle_emacs (
   //   handle_title_matches_request
   // API: See /api.md
 
-  // TODO: Let Emacs send s-expressions with newlines.
-  //   The easiest way seems to be to send two messages: first a length, and then the s-exp of that length.
-  //   Waiting for the s-exp to end by matching parentheses would be more natural, but requires parsing while reading in order to determine when to stop.
-
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
   println!("Emacs connected: {peer}");
@@ -80,13 +75,7 @@ fn handle_emacs (
       println! ( "Received request: {}", request.trim_end () );
       match request_type_from_request( &request ) {
         Ok(request_type) => {
-          if request_type == "single document" {
-            handle_sexp_document_request (
-              &mut stream,
-              &request,
-              &typedb_driver,
-              db_name );
-          } else if request_type == "org document" {
+          if request_type == "org document" {
             handle_org_document_request (
               &mut stream,
               &request,
@@ -189,33 +178,6 @@ fn initialize_tantivy (
       std::process::exit(1); } }
 
   tantivy_index }
-
-fn handle_sexp_document_request (
-  stream: &mut TcpStream,
-  request: &str,
-  typedb_driver: &TypeDBDriver,
-  db_name: &str ) {
-  // Gets a node id from the request,
-  // generates an s-expression from the id,
-  // and sends the s-expression to Emacs.
-
-  match node_id_from_document_request ( request ) {
-    Ok ( node_id ) => {
-      send_response (
-        stream,
-        & generate_document (
-          &node_id,
-          typedb_driver,
-          db_name,
-          |db, drv, id| Box::pin (
-            single_document_sexp_view ( db, drv, id )),
-        )); },
-    Err ( err ) => {
-      let error_msg = format!(
-        "Error extracting node ID: {}", err);
-      println! ( "{}", error_msg ) ;
-      send_response ( stream,
-                      &error_msg ); } } }
 
 fn handle_org_document_request (
   // Gets a node id from the request,
