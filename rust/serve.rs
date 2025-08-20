@@ -196,9 +196,7 @@ fn handle_org_document_request (
         & generate_document (
           &node_id,
           typedb_driver,
-          db_name,
-          |db, drv, id| Box::pin (
-            single_document_org_view ( db, drv, id )),
+          db_name
         )); },
     Err ( err ) => {
       let error_msg = format!(
@@ -271,26 +269,23 @@ fn search_terms_from_request ( request : &str )
                                    "(terms . \"",
                                    "search terms" ) }
 
-fn generate_document <R> (
+fn generate_document (
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str,
-  renderer      : R,
-) -> String
-where
-  R: for<'a> Fn ( &'a str,
-                  &'a TypeDBDriver,
-                  &'a ID
-) -> std::pin::Pin<Box<
-    dyn std::future::Future<
-        Output = Result<String, Box<dyn std::error::Error>>
-        > + 'a >> {
+  db_name       : &str
+) -> String {
+  // Just runs `single_document_org_view`,
+  // but with async and error handling.
 
-  futures::executor::block_on(async {
-    match renderer(db_name, typedb_driver, node_id).await {
-      Ok  (s) => s,
-      Err (e) => format!("Error generating document: {}", e),
-    }} ) }
+  futures::executor::block_on (
+    async {
+      match single_document_org_view (
+        db_name,
+        typedb_driver,
+        node_id ) . await
+      { Ok  (s) => s,
+        Err (e) => format!(
+          "Error generating document: {}", e), }} ) }
 
 fn generate_title_matches_response (
   search_terms  : &str,
