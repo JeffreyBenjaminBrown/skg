@@ -1,12 +1,9 @@
-;; DATA USED/ASSUMED
-;; In the following, a `node` is a particular kind of s-exp, specifically an association list with the following fields.
-;;   'id → string
-;;   'heading → string
-;;   'body → string or absent.
-;;   'focused → t or absent. See `rust/types.rs`.
-;;   'folded → t or absent. See `rust/types.rs`.
-;;   'repeated → t or absent. See `rust/types.rs`.
-;;   'content → list of child nodes (recursive)
+;; DATA USED/ASSUMED: See /api.md.
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Receiving sexp logic
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun request-document-from-node (node-id)
   "Sends a document request (as an s-expression).
@@ -73,5 +70,35 @@ ASSUMES nothing on the same line is left of point."
       (dolist (child content)
         (skg-doc-insert-node child
                              (1+ level))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Receiving org logic
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun request-org-document-from-node (node-id)
+  "Ask Rust for an Org document view of NODE-ID.
+Installs a length-prefixed response handler."
+  (interactive "sNode ID: ")
+  (let* ((proc (skg-tcp-connect-to-rust))
+         (request-sexp
+          (format "((request . \"org document\") (id . \"%s\"))\n"
+                  node-id )) )
+    (setq ;; Prepare LP state and handler
+     skg-lp--buf                (unibyte-string) ;; empty string
+     skg-lp--bytes-left         nil
+     skg-doc--response-handler  #'skg-handle-length-prefixed-org)
+    (process-send-string proc request-sexp)) )
+
+(defun skg-open-org-buffer-from-rust-org (_proc org-text)
+  "Open a new buffer and insert ORG-TEXT, enabling org-mode."
+  (with-current-buffer (get-buffer-create "*skg-content-view*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert org-text)
+      (org-mode))
+    (set-buffer-modified-p nil)
+    (goto-char (point-min))
+    (switch-to-buffer (current-buffer))))
 
 (provide 'get-document)

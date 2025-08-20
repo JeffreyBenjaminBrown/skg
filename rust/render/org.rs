@@ -17,7 +17,7 @@ pub async fn single_document_org_view (
   db_name : &str,
   driver  : &TypeDBDriver,
   focus   : &ID,
-) -> Result<String, Box<dyn Error>> {
+) -> Result < String, Box<dyn Error> > {
 
   let root_id : ID = find_rootish_container (
     db_name, driver, focus ) . await ?;

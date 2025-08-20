@@ -14,10 +14,12 @@ use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
   search_index, update_index};
-use crate::render::sexp::single_document_sexp_view;
+use crate::render::sexp:: single_document_sexp_view;
+use crate::render::org::  single_document_org_view;
 use crate::typedb::create::{
   overwrite_and_populate_new_db};
 use crate::types::{ID,TantivyIndex};
+
 
 pub fn serve () -> std::io::Result<()> {
   // Makes a typedb driver and a tantivy index.
@@ -80,6 +82,12 @@ fn handle_emacs (
         Ok(request_type) => {
           if request_type == "single document" {
             handle_single_document_request (
+              &mut stream,
+              &request,
+              &typedb_driver,
+              db_name );
+          } else if request_type == "org document" {
+            handle_org_document_request (
               &mut stream,
               &request,
               &typedb_driver,
@@ -198,13 +206,43 @@ fn handle_single_document_request (
         & generate_document (
           &node_id,
           typedb_driver,
-          db_name ) ); },
+          db_name,
+          |db, drv, id| Box::pin (
+            single_document_sexp_view ( db, drv, id )),
+        )); },
     Err ( err ) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
       println! ( "{}", error_msg ) ;
       send_response ( stream,
                       &error_msg ); } } }
+
+fn handle_org_document_request (
+  // Gets a node id from the request,
+  // generates an Org document from the id,
+  // and sends the Org to Emacs (length-prefixed).
+  stream        : &mut TcpStream,
+  request       : &str,
+  typedb_driver : &TypeDBDriver,
+  db_name       : &str
+) {
+
+  match node_id_from_document_request ( request ) {
+    Ok ( node_id ) => {
+      send_response_with_length_prefix (
+        stream,
+        & generate_document (
+          &node_id,
+          typedb_driver,
+          db_name,
+          |db, drv, id| Box::pin (
+            single_document_org_view ( db, drv, id )),
+        )); },
+    Err ( err ) => {
+      let error_msg = format!(
+        "Error extracting node ID: {}", err);
+      println! ( "{}", error_msg ) ;
+      send_response ( stream, &error_msg ); } } }
 
 fn handle_title_matches_request (
   stream        : &mut TcpStream,
@@ -271,23 +309,26 @@ fn search_terms_from_request ( request : &str )
                                    "(terms . \"",
                                    "search terms" ) }
 
-fn generate_document (
+fn generate_document <R> (
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str )
-  -> String {
-  // Just runs
-  //   single_document_sexp_view
-  // with async and error handling.
+  db_name       : &str,
+  renderer      : R,
+) -> String
+where
+  R: for<'a> Fn ( &'a str,
+                  &'a TypeDBDriver,
+                  &'a ID
+) -> std::pin::Pin<Box<
+    dyn std::future::Future<
+        Output = Result<String, Box<dyn std::error::Error>>
+        > + 'a >> {
 
-  let result = block_on ( async {
-    match single_document_sexp_view (
-      db_name, typedb_driver, node_id
-    ) . await {
-      Ok ( s_expr ) => s_expr,
-      Err (e) => format! (
-        "Error generating s-expression: {}", e) } } );
-  result }
+  futures::executor::block_on(async {
+    match renderer(db_name, typedb_driver, node_id).await {
+      Ok  (s) => s,
+      Err (e) => format!("Error generating document: {}", e),
+    }} ) }
 
 fn generate_title_matches_response (
   search_terms  : &str,
@@ -334,3 +375,17 @@ fn send_response (
     stream, "{}", response )
     . unwrap ();
   stream . flush () . unwrap () ; }
+
+fn send_response_with_length_prefix (
+  // Responds "Content-Length: <bytes>\r\n\r\n" + payload
+  stream   : &mut TcpStream,
+  response : &str) {
+
+  let payload = response.as_bytes ();
+  let header  = format! ( "Content-Length: {}\r\n\r\n",
+                           payload.len () );
+  use std::io::Write as _;
+  stream . write_all ( header.as_bytes () ) . unwrap ();
+  stream . write_all ( payload )            . unwrap ();
+  stream . flush ()                         . unwrap ();
+}

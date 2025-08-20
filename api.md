@@ -2,7 +2,11 @@
 
 ## From Rust to Emacs
 
-Rust sends the entire text document to Emacs, org-bullets and all.
+Rust first sends a "length prefix", which looks like
+`Content-Length: NUMBER\r\n\r\n`.
+That tells Emacs how many bytes are in the document to follow.
+
+Rust then sends the entire text document to Emacs, org-bullets and all.
 Each org-bullet is followed by a space and, some metadata, a space,
 and then headline text.
 

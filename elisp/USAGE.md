@@ -12,6 +12,8 @@ Now these commands can be run:
 ```
   (request-document-from-node "1")
     ;; try 1, 1a, or a
+  (request-org-document-from-node "1")
+    ;; try 1, 1a, or a
   (request-title-matches "second")
     ;; try match, title, second
   (skg-doc-disconnect)
