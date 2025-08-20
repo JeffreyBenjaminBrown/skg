@@ -58,7 +58,7 @@ fn handle_emacs (
   tantivy_index: TantivyIndex
 ) {
   // This function directs requests from the stream to one of
-  //   handle_single_document_request
+  //   handle_sexp_document_request
   //   handle_title_matches_request
   // API: See /api.md
 
@@ -81,7 +81,7 @@ fn handle_emacs (
       match request_type_from_request( &request ) {
         Ok(request_type) => {
           if request_type == "single document" {
-            handle_single_document_request (
+            handle_sexp_document_request (
               &mut stream,
               &request,
               &typedb_driver,
@@ -190,7 +190,7 @@ fn initialize_tantivy (
 
   tantivy_index }
 
-fn handle_single_document_request (
+fn handle_sexp_document_request (
   stream: &mut TcpStream,
   request: &str,
   typedb_driver: &TypeDBDriver,

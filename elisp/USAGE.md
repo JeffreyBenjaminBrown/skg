@@ -10,16 +10,16 @@ Finally within Emacs, evaluate `elisp/init.el`
 
 Now these commands can be run:
 ```
-  (request-document-from-node "1")
+  (request-sexp-doc-from-node "1")
     ;; try 1, 1a, or a
-  (request-org-document-from-node "1")
+  (request-org-doc-from-node "1")
     ;; try 1, 1a, or a
   (request-title-matches "second")
     ;; try match, title, second
   (skg-doc-disconnect)
 ```
 
-`(request-document-from-node)` causes Emacs to ask Rust to ask TypeDB
+`(request-sexp-doc-from-node)` causes Emacs to ask Rust to ask TypeDB
 for a content-view document containing the node with the specified ID.
 Rust builds an s-expression representing an org-document
 based on the result, and sends that to Emacs,

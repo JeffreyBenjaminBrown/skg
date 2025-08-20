@@ -5,7 +5,7 @@
 ;; Receiving sexp logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun request-document-from-node (node-id)
+(defun request-sexp-doc-from-node (node-id)
   "Sends a document request (as an s-expression).
 Sets `skg-doc--response-handler` to prepare for the response.
 Returns nil."
@@ -76,7 +76,7 @@ ASSUMES nothing on the same line is left of point."
 ;; Receiving org logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun request-org-document-from-node (node-id)
+(defun request-org-doc-from-node (node-id)
   "Ask Rust for an Org document view of NODE-ID.
 Installs a length-prefixed response handler."
   (interactive "sNode ID: ")
