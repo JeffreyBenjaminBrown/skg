@@ -1,11 +1,12 @@
 *~
-temp-*
-temp/
 .bash_history
+.emacs*
 /Cargo.lock
+/data/
 /devel-handy/temp.org
 /target
 /tests/*/generated/
 /tests/generated/
-/data/
 TAGS
+temp-*
+temp/
