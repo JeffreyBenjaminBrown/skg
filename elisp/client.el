@@ -23,6 +23,13 @@
            :nowait nil )) )
   skg-rust-tcp-proc)
 
+(defun skg-doc-disconnect ()
+  "Manually close the connection to the Rust server."
+  (interactive)
+  (when (process-live-p skg-rust-tcp-proc)
+    (delete-process skg-rust-tcp-proc)
+    (setq skg-rust-tcp-proc nil )) )
+
 (defun skg-handle-rust-response (proc string)
   "Route the response from Rust to the appropriate handler.
 .
@@ -78,11 +85,5 @@ Open the resulting org-mode buffer."
             (setq skg-doc--response-handler nil)
             (throw 'again nil)))))))
 
-(defun skg-doc-disconnect ()
-  "Manually close the connection to the Rust server."
-  (interactive)
-  (when (process-live-p skg-rust-tcp-proc)
-    (delete-process skg-rust-tcp-proc)
-    (setq skg-rust-tcp-proc nil )) )
 
 (provide 'client)
