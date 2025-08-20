@@ -87,7 +87,7 @@ Installs a length-prefixed response handler."
     (setq ;; Prepare LP state and handler
      skg-lp--buf                (unibyte-string) ;; empty string
      skg-lp--bytes-left         nil
-     skg-doc--response-handler  #'skg-handle-length-prefixed-org)
+     skg-doc--response-handler  #'skg-lp-handle-org-chunk)
     (process-send-string proc request-sexp)) )
 
 (defun skg-open-org-buffer-from-rust-org (_proc org-text)

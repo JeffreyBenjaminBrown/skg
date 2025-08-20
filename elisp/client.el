@@ -1,9 +1,12 @@
 ;; For instructions see USAGE.md, in this same folder.
 
+(require 'cl-lib)
+
 (require 'get-document)
 (require 'heralds)
 (require 'state)
 (require 'title-search)
+
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
@@ -43,59 +46,92 @@ and neither of them uses the `proc` argument. Unless it will be used by later ha
       (funcall skg-doc--response-handler proc string)
     (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )
 
-;; TODO: Rewrite this nightmare without throw-catch or flags.
-(defun skg-handle-length-prefixed-org (proc chunk)
-  "Accumulate CHUNK from PROC, parse a Content-Length frame, and open an org buffer containing it."
+(defun skg-lp-handle-org-chunk (_proc chunk)
+  "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message."
+  ;; Append bytes
+  (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk))
+  ;; Repeatedly advance the state machine; stop when it returns a terminal result.
+  (cl-loop
+   for step = (skg-lp-step skg-lp--buf skg-lp--bytes-left)
+   do (pcase step
 
-  (ignore proc)
-  (progn
-    ;; Encode CHUNK as UTF-8 bytes and append to our byte accumulator.
-    ;; Content-Length is in BYTES, so we must accumulate bytes, not chars.
-    (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk)))
-  (catch 'again
-    ;; Tiny state machine: keep parsing as long as we can.
-    ;; Exit the loop (and return from the filter) with (throw 'again nil)
-    ;; either when we need more bytes OR after we finish one full message.
-    (while t
-      (if (not skg-lp--bytes-left)
-          (let* ((res ;; (:incomplete) | (:error MSG) | (:ok LEN BODY)
-                  (skg-lp-try-parse-header skg-lp--buf))
-                 (parsed-label (nth 0 res)))
-            (progn
-              (cond
-               ((eq parsed-label :incomplete)
-                (progn ;; Header delimiter not found; await more bytes.
-                  (throw 'again nil)))
-               ((eq parsed-label :error)
-                (progn ;; Malformed header. Clear accumulator/state, drop handler to avoid misrouting, and signal error.
-                  (setq skg-lp--buf (unibyte-string)
-                        skg-lp--bytes-left nil
-                        skg-doc--response-handler nil)
-                  (error "%s" (nth 1 res))))
-               ((eq parsed-label :ok)
-                (progn
-                  (setq skg-lp--bytes-left (nth 1 res)
-                        skg-lp--buf        (nth 2 res)))))))
-        (let* ((res ;; (:incomplete) | (:done ORG-TEXT REMAINDER)
-                (skg-lp-try-consume-body
-                 skg-lp--buf skg-lp--bytes-left))
-               (consume-label (nth 0 res)))
-          (progn
-            (cond
-             ((eq consume-label :incomplete)
-              (progn ;; Await more bytes.
-                (throw 'again nil)))
-             ((eq consume-label :done)
-              (let ((org-text (nth 1 res))
-                    (remainder (nth 2 res)))
-                (progn ;; Completion.
-                  (setq skg-lp--buf        remainder
-                        skg-lp--bytes-left nil)
-                  (skg-open-org-buffer-from-rust-org nil org-text)
-                  (setq ;; One response per request: clear handler so stray bytes won't call us again for this request.
-                   skg-doc--response-handler nil)
-                  ;; Stop parsing now. Any leftover bytes (e.g., start of next message) stay in the accumulator.
-                  (throw 'again nil)) )) )) )) )) )
+        ;; Header parsed → install BYTES-LEFT, update buffer to the post-header remainder, and continue.
+        (`(:header ,len ,remainder)
+         (setq skg-lp--bytes-left len
+               skg-lp--buf        remainder))
+
+        ;; Need more bytes to proceed → just exit the loop (filter returns).
+        (`(:need-more ,buf ,left)
+         (setq skg-lp--buf        buf
+               skg-lp--bytes-left left)
+         (cl-return nil))
+
+        ;; Completed a full body → open buffer, clear handler, keep any remainder in the accumulator, and stop.
+        (`(:done ,org-text ,remainder)
+         (setq skg-lp--buf        remainder
+               skg-lp--bytes-left nil)
+         (skg-open-org-buffer-from-rust-org nil org-text)
+         ;; One response per request.
+         (setq skg-doc--response-handler nil)
+         (cl-return nil))
+
+        ;; Hard error → reset state and signal.
+        (`(:error ,msg)
+         (setq skg-lp--buf        (unibyte-string)
+               skg-lp--bytes-left nil
+               skg-doc--response-handler nil)
+         (error "%s" msg)))))
+
+(defun skg-lp-step (buf bytes-left)
+  "One pure(ish) step of the LP machine.
+Inputs: BUF (unibyte accumulator), BYTES-LEFT (nil → need header; N → need N bytes).
+Returns one of:
+  (:need-more BUF LEFT)
+  (:header LEN REMAINDER)
+  (:done ORG-TEXT REMAINDER)
+  (:error MESSAGE)"
+  (if (null bytes-left)
+      ;; Need a header
+      (pcase (skg-lp-try-parse-header buf)
+        (`(:incomplete)                `(:need-more ,buf nil))
+        (`(:error ,msg)                `(:error ,msg))
+        (`(:ok ,len ,remainder)        `(:header ,len ,remainder)))
+    ;; Need BYTES-LEFT bytes of body
+    (pcase (skg-lp-try-consume-body buf bytes-left)
+      (`(:incomplete)                  `(:need-more ,buf ,bytes-left))
+      (`(:done ,org-text ,remainder)   `(:done ,org-text ,remainder)))))
+
+(defun skg-lp-append-chunk (buf chunk)
+  "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
+  (let ((bytes (encode-coding-string chunk 'utf-8)))yes
+    (concat buf bytes)))
+
+(defun skg-lp-try-parse-header (response)
+  "Extract length and remainder from RESPONSE.
+Returns one of:
+  (:incomplete)
+  (:ok LEN BYTES-SO-FAR)
+  (:error MESSAGE)"
+  (let ((sep (string-match "\r\n\r\n" response)))
+    (if (not sep)
+        '(:incomplete)
+      (let* ((header       (substring response 0 (+ sep 4)))
+             (bytes-so-far (substring response (+ sep 4)))
+             (len (and (string-match "Content-Length: \\([0-9]+\\)" header)
+                       (string-to-number (match-string 1 header)))))
+        (if len
+            (list :ok len bytes-so-far)
+          (list :error "Malformed header in length-prefixed response"))))))
+
+(defun skg-lp-try-consume-body (byte-acc bytes-left)
+  "If BYTE-ACC contains BYTES-LEFT bytes, return (:done ORG-TEXT REMAINDER), else (:incomplete)."
+  (let ((have (length byte-acc)))
+    (if (< have bytes-left)
+        '(:incomplete)
+      (let* ((payload-bytes (substring byte-acc 0 bytes-left))
+             (remainder     (substring byte-acc bytes-left))
+             (org-text      (decode-coding-string payload-bytes 'utf-8 t)))
+        (list :done org-text remainder)))))
 
 (defun skg-lp-append-chunk (buf chunk)
   "Return BUF with CHUNK (UTF-8 encoded bytes) appended."

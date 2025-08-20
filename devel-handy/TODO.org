@@ -1,6 +1,7 @@
-* these are redundant
-  handle_single_document_request
-  handle_org_document_request
+* delete sexp logic
+  Once that's gone,
+    rust::serve::generate_document()
+  can be radically simplified.
 * [[id:324f020b-1145-4279-a87a-02c96dce7a30][omits-some-content herald: "{+"]]
 * Rust send and receive need fairly complete rewriting.
 ** Rust send will not be hard.
