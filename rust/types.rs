@@ -90,27 +90,30 @@ impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {
     ID ( s.into () ) }
   pub fn as_str ( &self ) -> &str {
-    &self.0 } } // a reference to the first (and only) field
+    &self.0 }} // a reference to the first (and only) field
 
 impl Deref for ID {
   // lets ID be used like a String in (more?) cases
   type Target = String;
   fn deref ( &self ) -> &Self::Target {
-    &self.0 } }
+    &self.0 }}
 
 impl fmt::Display for ID {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
-    write! ( f, "{}", self.0 ) } }
+    write! ( f, "{}", self.0 ) }}
 
 impl From<String> for ID {
   fn from ( s : String ) -> Self {
-    ID (s) } }
+    ID (s) }}
 
+impl From<&String> for ID {
+  fn from ( s : &String ) -> Self {
+    ID ( s.clone () ) }}
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
-    ID ( s.to_string () ) } }
+    ID ( s.to_string () ) }}
 
 impl Hyperlink {
   pub fn new ( id     : impl Into<String>,
@@ -118,7 +121,7 @@ impl Hyperlink {
              -> Self {
     Hyperlink { id    : ID ( id.into () ),
                 label : label.into (),
-    } } }
+    }} }
 
 impl fmt::Display for Hyperlink {
   // Format: [[id:ID][LABEL]], where allcaps terms are variables.
@@ -126,7 +129,7 @@ impl fmt::Display for Hyperlink {
   fn fmt ( &self,
             f : &mut fmt::Formatter <'_> )
             -> fmt::Result {
-    write! ( f, "[[id:{}][{}]]", self.id, self.label ) } }
+    write! ( f, "[[id:{}][{}]]", self.id, self.label ) }}
 
 impl FromStr for Hyperlink {
   type Err = HyperlinkParseError;
