@@ -1,6 +1,10 @@
 * replace tests removed with s-exp logic
-  see diff of commit b1a5d1ff59244de7ddc7868a43553574d694d223
-    git log -p b1a5d1ff5924
+** from this commit
+   git log -p b1a5d1ff59244de7ddc7868a43553574d694d223
+   git log -p b1a5d1ff5924
+** how to do it
+   Where s-exps were used, use the new org-file parser at
+     rust/save/orgfile_to_orgnodes.rs
 * [[id:324f020b-1145-4279-a87a-02c96dce7a30][omits-some-content herald: "{+"]]
 * Rust send and receive need fairly complete rewriting.
 ** Rust send will not be hard.

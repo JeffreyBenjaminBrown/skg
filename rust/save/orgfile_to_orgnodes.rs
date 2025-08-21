@@ -1,6 +1,14 @@
 // cargo test save::orgfile_to_orgnodes
 
-/* TODO: Handle text with super-indented initial headings, e.g.
+/* TODO ? Handle text with super-indented initial headings.
+(There is an example below.)
+.
+I'm not sure this would be worth permitting such data.
+I'll have to deal with it when ingesting data from, say,
+org-roam, where it is valid.
+But within skg there's no reason to super-indent.
+.
+Example of super-indented headings:
   * parent
   *** super-indented child
   ** normal child
@@ -13,23 +21,26 @@ or even
   * parent's brother
 */
 
-// GLOSSARY
-// ws = whitespace
+// PITFALL: Super-indented initial headings result in themselves and all of their siblings, and their descendents, to be entirely dropped. See "TODO: ... super-indented", above.
+
+// Glossary
+// ws      = whitespace
+// heading = heading in the Emacs org-mode sense
+// body    = body in the Emacs org-mode sense
 
 use std::collections::{HashMap, HashSet};
 use crate::types::{ID, OrgNode};
 
 
-/* This function parses a “skg org” document
-into a forest of `OrgNode`.
+/* This function parses a "skg org" document
+into a forest of `OrgNode`s.
 .
 - Lines before the first heading are ignored.
 - A heading is `*+ <space>? <content>` where `<content>` is not all whitespace.
 - If a heading begins with a metadata block `<<...>>`, it is parsed into (map, set).
   - `id` comes from the map's `"id"` key if present.
-  - `repeated` is true if `"repeated"` appears either as a bare value in the set
-    or as a key in the map (e.g., `repeated:true`).
-- For a `repeated` node, body and *entire subtree* are skipped.
+  - Each of `repeated`, `folded` and `focused` is true if a bare value of the same name appears in the metadata.
+- For a `repeated` node, the body and the *entire subtree* are skipped.
 - Body is the consecutive non-heading lines immediately after a heading.
 - Children are consecutive headings with level exactly `parent_level + 1`. */
 pub fn parse_skg_org_to_nodes(input: &str) -> Vec<OrgNode> {
@@ -142,23 +153,23 @@ fn parse_one_node_at_level (
   let heading_line: &str =
     cur . bump() . expect (
       "caller guarantees a heading is present" );
-  let (id_opt, is_repeated, title)
-    : ( Option<ID>, bool, String )
+  let (id_opt, is_repeated, is_folded, is_focused, title)
+    : ( Option<ID>, bool, bool, bool, String )
     = parse_separating_metadata_and_title ( heading_line );
   if is_repeated { // PITFALL: Ignore its text and children, but don't ignore it entirely. It must be recorded as its parent's child.
     skip_subtree ( cur, level );
     return OrgNode { id       : id_opt,
                      heading  : title,
                      body     : None,
-                     folded   : false,
-                     focused  : false,
+                     folded   : is_folded,
+                     focused  : is_focused,
                      repeated : true,
                      branches : Vec::new(), }; }
   OrgNode { id       : id_opt,
             heading  : title,
             body     : collect_body_lines(cur),
-            folded   : false, // TODO
-            focused  : false, // TODO
+            folded   : is_folded,
+            focused  : is_focused,
             repeated : false,
             branches : parse_children(cur, level),
   }}
@@ -205,7 +216,7 @@ fn skip_subtree ( cur: &mut LineCursor,
 
 /* ---------- Heading parsing ----------*/
 
-/// Parse the *heading line* into `(id, repeated, title)`.
+/// Parse the *heading line* into `(id, repeated, folded, focused, title)`.
 ///
 /// Steps:
 /// 1) Confirm the line is a heading and isolate the post-marker content.
@@ -214,7 +225,7 @@ fn skip_subtree ( cur: &mut LineCursor,
 /// 4) If no metadata block, the whole remainder is the trimmed title.
 fn parse_separating_metadata_and_title (
   line: &str
-) -> (Option<ID>, bool, String) {
+) -> (Option<ID>, bool, bool, bool, String) {
 
   let parsed: Option<(usize, &str)> =
     parse_metadata_plus_heading (line);
@@ -228,16 +239,18 @@ fn parse_separating_metadata_and_title (
       let (kv, bare): (HashMap<String, String>, HashSet<String>) =
         parse_metadata_block (inner);
       let id_opt: Option<ID> = kv.get("id").map(|s| s.into());
-      let repeated: bool = bare.contains("repeated");
+      let repeated : bool = bare.contains("repeated");
+      let folded   : bool = bare.contains("folded");
+      let focused  : bool = bare.contains("focused");
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
-      return (id_opt, repeated, title);
+      return (id_opt, repeated, folded, focused, title);
     }
     // If "<<" with no matching ">>", fall through to default case, treating it as a regular title.
   }
   { // Default case: no (well-formed) metadata block
     let title: String = after.trim().to_string();
-    (None, false, title) }}
+    (None, false, false, false, title) }}
 
 
 /* ---------- Metadata parser ----------*/
@@ -369,5 +382,37 @@ The body of a repeated node is just a warning that it was repeated. We can ignor
     assert_eq!(m3.get("foo").map(String::as_str), Some("bar"));
     assert_eq!(m3.get("qux").map(String::as_str), Some("zip"));
     assert!(s3.contains("baz"));
+  }
+
+  #[test]
+  fn parses_folded_and_focused() {
+    let sample: &str = r#"* <<id:1, folded>> Node 1 - folded
+** <<id:2, focused>> Node 2 - focused
+*** <<id:3, folded, focused>> Node 3 - both folded and focused
+** <<id:4>> Node 4 - neither
+"#;
+
+    let forest: Vec<OrgNode> = parse_skg_org_to_nodes(sample);
+    assert_eq!(forest.len(), 1);
+
+    let n1: &OrgNode = &forest[0];
+    assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
+    assert!(n1.folded);
+    assert!(!n1.focused);
+
+    let n2: &OrgNode = &n1.branches[0];
+    assert_eq!(n2.id.as_deref(), Some(&"2".to_string()));
+    assert!(!n2.folded);
+    assert!(n2.focused);
+
+    let n3: &OrgNode = &n2.branches[0];
+    assert_eq!(n3.id.as_deref(), Some(&"3".to_string()));
+    assert!(n3.folded);
+    assert!(n3.focused);
+
+    let n4: &OrgNode = &n1.branches[1];
+    assert_eq!(n4.id.as_deref(), Some(&"4".to_string()));
+    assert!(!n4.folded);
+    assert!(!n4.focused);
   }
 }
