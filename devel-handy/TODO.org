@@ -1,4 +1,7 @@
-* replace tests removed with s-exp logic
+* [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
+* Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
+  If this proves annoying I can just delete all the modification time logic, and just rebuild both entirely when starting the app. That won't cost much time, because I'll leave the app on for a long time. But it will be annoying if I make edits to files outside the app.
+* replace the tests I removed when I removed the s-exp logic
 ** from this commit
    git log -p b1a5d1ff59244de7ddc7868a43553574d694d223
    git log -p b1a5d1ff5924
@@ -100,68 +103,34 @@
      Similarly obviously true.
 **** represent edits to it to Rust (as plain text)
      There are two kinds of relationships that might be in the buffer: Ones that should bear on the graph, and ones that shouldn't. The one's that shouldn't need merely to be recognized as relationships that don't get saved. For relationships that do get saved, it must be clear what kind of relationship they are and who their members are. I can't see how that could ever be hard to represent.
-* be able to hide some content branches without deleting them
 * show binary relationship label with optional intermediating node
   esp. nice if you can filter on those labels,
   or on an ontology they belong to that groups them
-* rewrite client entirely
-** Rust sends text including bullets, not sexps.
-*** Worry later about
-**** escaping quotes
-**** communicating fold state
-*** In each headline, after the bullet, appears <<skg: ...>>,
-    where the ... includes:
-**** id:ID
-**** "repeated", if applicable
-** How Emacs displays the received text
-*** the ID and "repeated" are fewer characters
-**** ID : a single "⅄" character, white text on black
-**** "repeated" : REP, white text on red
-*** other things are wysiwyg
-**** hyperlinks: normal (blue, underlined)
-**** other text: normal
-*** nothing is read-only
-** The user can delete important stuff.
-   Whatever. It's on them.
+* extensions
+** show heralds
+   number of backlinks
+   number of contents
+   multiple containers
+** show ancestries
+*** what Rust sends : no danger
+**** each ancestry's hidden text has "<<id:_,contains-parent,omits-some-content>>"
+     "parent" meaning "org-parent"
+*** how Emacs shows it
+**** each* ancestry is an immediate org-child
+     hopefully there's only one, but nothing enforces that
+**** the `contains org-parent` tag translates to a "}" herald
+*** [[id:b4e7971e-7f7b-4989-bdd1-ce6cabccc710][the user can only screw it up by editing the hidden text]]
+** show when a link is bi-directional
+** list which links are in its recursive contents
+** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
+* some design choices
 ** How Emacs returns text to Rust.
    Exactly as it's stored in the buffer,
    but not as it's displayed.
-** How Rust interprets the received text
-   straightforward
-** How it can be extended
-*** show heralds
-    number of backlinks
-    number of contents
-    multiple containers
-*** show ancestries
-**** what Rust sends : no danger
-***** each ancestry's hidden text has "<<id:_,contains-parent,omits-some-content>>"
-      "parent" meaning "org-parent"
-**** how Emacs shows it
-***** each* ancestry is an immediate org-child
-      hopefully there's only one, but nothing enforces that
-***** the `contains org-parent` tag translates to a "}" herald
-**** [[id:b4e7971e-7f7b-4989-bdd1-ce6cabccc710][the user can only screw it up by editing the hidden text]]
-*** show when a link is bi-directional
-*** list which links are in its recursive contents
-*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
-* emacs ideas, meh
-** skg-doc-insert-node seems worth redoing.
-   I want to favor real (but hideable) text over text properties.
-   `repeated`, for instance, should be real text.
-** I don't need to salvage the test suite's structure.
-   The tests themselves could be worth saving,
-   but the structure can be scrapped.
-** Use AI to make the test harness reasonably-structured.
-** I don't need to use lots of properties.
-   Maybe hidden-ness alone would work.
 ** Let the user be responsible for avoiding duplication.
    Don't make it impossible -- too hard.
    But do make it investigable, both in a view,
    and in saved changes.
-* Where is the API for the orgnode sexp format?
-  If it does not exist, it ought to,
-  and the files in rust/save/ ought to reference it.
 * Avoid uses of `unwrap` in Rust.
 * Explain the dangers of repeated nodes to the user.
   The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
@@ -180,103 +149,9 @@
 * change graph -> web
 * see also [[../docs/progress.md][progress.md]]
 * use [[~/hodal/emacs/property-dump.el][property-dump]] to send straight to Rust
-* tests/org-to-sexp.el fails
-Part of the problem is that search changes fold structure. The following replaces search with builtin org navigation functions, but I haven't got it to work yet.
-** just the diff
-modified   elisp/org-to-sexp.el
-@@ -40,19 +40,15 @@ MOVES POINT to the first line after the body."
-   (beginning-of-line)
-   (let ((body-start (point))
-         (body-end
--         ;; Find the next heading or end of buffer
--         (if (re-search-forward "^\\*+ " nil t)
--             (match-beginning 0)
--           (point-max))))
-+         (save-excursion
-+           (if (org-next-visible-heading 1)
-+               (point)
-+             (point-max)))))
-     (when (< body-start body-end)
-       (let ((body-text (string-trim-right
-                         (buffer-substring-no-properties
-                          body-start body-end))))
--        (if ;; Without this, if this body
--            ;; were the last thing in the file,
--            ;; point does not end up after it.
--            (= body-end (point-max))
--            (goto-char (point-max)))
-+        (goto-char body-end)
-         `(body . ,body-text)))))
-
- (defun org-to-sexp-parse-heading-at-point-and-maybe-body
-** the entire function definition (new side of the diff)
-(defun org-to-sexp-parse-body-at-point ()
-  "RETURNS either nil or a string without properties,
-of the form (body . STRING).
-ASSUMES point is on the first line of a headline body.
-MOVES POINT to the first line after the body."
-  (beginning-of-line)
-  (let ((body-start (point))
-        (body-end
-         (save-excursion
-           (if (org-next-visible-heading 1)
-               (point)
-             (point-max)))))
-    (when (< body-start body-end)
-      (let ((body-text (string-trim-right
-                        (buffer-substring-no-properties
-                         body-start body-end))))
-        (goto-char body-end)
-        `(body . ,body-text)))))
-* in the rust save code
-  make sure it uses the same spec as elisp/org-to-sexp.el
-* closing the read/save knot
-** Why is this so hard?
-** sketch
-*** Update FS, DB, index (titles).
-**** sketch
-***** If ID is found in TypeDB
-      Compare its text and its contents to the orgnode's.
-      If either is different, rewrite the file.
-      Keep info in the file not visible from the orgnode,
-      esp. extra IDs.
-***** otherwise
-**** Don't obliterate extra ids!
-     The FileNode created from an OrgNode will only have one ID.
-     But that might just be one of the OrgNode's IDs.
-*** Rebuild document
-    with the same folded and focused nodes.
-*** Send document.
-** Keep the `repeated` field.
-   When a document is created, `repeated` is sent to Emacs so that it knows to font the repeats differently from the original.
-   It should be sent back to Rust to know whether to disregard a node's data. The user might move a node marked `repeated` to before the first (reference) node with that ID. Retaining this field permits Rust to know which one is the reference node.
-** Rebuild the whole document when returning it.
-   Less efficient but way easier.
-** Retain a set of folded nodes, and the ID of the focused one.
-** (OrgNode -> FileNode) -> (OrgNode -> (FileNode, ephemeral view data))
-** use the `folded` field in OrgNode
-   Rust will need this in order to restore state
-   when it sends the document (with some new IDs)
-   back to Emacs.
-** write to disk, then Tantivy and TypeDB
-*** update files
-    Compare each FileNode received (after interpretation) from Emacs to the file it corresponds to. Read the TypeDB db to see if an ID (which might not be the primary one) corresponds to something extant.
-    If the file is absent, create it.
-    If the file differs in any way from the FileNode, update it.
-    Keep a list of paths to all files modified or created. For files modified, track whether their text, content and/or hyperlinks have changed.
-    Orphaned content becomes uncontained, not deleted.
-*** update TypeDB
-    If a file is new, load it as normal.
-    Create relationships only after loading all entities (as is currently the case on initial load) so that all members of each relationship to create exist.
-    If a file was modified, delete and recreate all of its out-links (hyperlinks, content, subscriptions). Change none of its other ("incoming") links.
-*** to Tantivy
-    If a file is new, load it as normal.
-    If a file's text was modified, reload it.
-** [[id:e707ded7-ff36-41cf-8ae1-672ab78e30d4][send new document from Rust]]
 * in docs
 ** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
 * the db_name "skg-test" should not be hardcoded
-* Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
 * the TODO item in rust/serve.rs
