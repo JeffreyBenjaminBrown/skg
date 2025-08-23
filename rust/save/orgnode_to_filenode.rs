@@ -3,7 +3,7 @@
 
 // PITFALL:
 // The correspondence between those two types is imperfect in two respects:
-//   (1) Since the ID of an OrgNode is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random. Confusingly, this is done by `assign_id_where_missing_in_orgnode_recursive` to the OrgNodes before transforming them into FileNodes. See the long comment at its call site for why.
+//   (1) Since the ID of an OrgNode is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random. Confusingly, this is done to the OrgNodes before transforming them into FileNodes, by `assign_id_where_missing_in_orgnode_recursive`. See the long comment at its call site for why.
 //   (2) If an ID is repeated, the first node to contain a branch with that ID is processed normally. All future such containers are ignored, except that each is counted as a branch under the node that contains them.
 
 // TODO: There is still the problem that the user might copy a node not marked repeated, i.e. the one that's supposed to be the source of truth, and paste it somewhere else in the document. Rust won't know which one to treat as the source of truth. This could result in data loss.
