@@ -1,11 +1,15 @@
 // cargo test --test orgnode_to_filenode -- --nocapture
 
 use std::collections::HashSet;
-// use std::convert::Into;
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
+use skg::render::org::single_document_org_view;
 use skg::hyperlinks::hyperlinks_from_filenode;
+use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::save::orgnode_to_filenode::orgnode_to_filenodes;
 use skg::types::{ID, OrgNode};
+
 
 #[test]
 fn test_convert_orgnode_to_filenode() {
@@ -84,15 +88,15 @@ fn test_convert_circular_orgnode_to_filenode() {
     folded: false,
     focused: false,
     repeated: false,
-    branches: vec![child_2],
+    branches: vec![child_2.clone()],
   };
 
   // Sanity checks on the constructed org tree
-  assert_eq!(org_node.id.as_ref().map(|id| id.as_str()),
+  assert_eq!(root_1.id.as_ref().map(|id| id.as_str()),
              Some("1"));
   assert_eq!(root_1.heading, "1");
   assert_eq!(root_1.branches.len(), 1);
-  assert_eq!(child.id.as_ref().map(|id| id.as_str()),
+  assert_eq!(child_2.id.as_ref().map(|id| id.as_str()),
              Some("2"));
   assert_eq!(root_1.branches[0].branches.len(), 1);
   assert_eq!( ( root_1 . branches[0] . branches[0]

@@ -13,12 +13,14 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver, };
 
+use skg::render::org::single_document_org_view;
+use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
   filepath_from_id, };
-use skg::types::ID;
+use skg::types::{ID, OrgNode};
 
 #[test]
 fn test_typedb_integration(
@@ -168,6 +170,79 @@ fn test_typedb_integration(
     assert_eq!(container_node, ID("1".to_string() ) );
 
     Ok (()) } ) }
+
+async fn test_recursive_document (
+  db_name: &str,
+  driver: &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+
+  // Fetch raw Org text for the single-document view of ID "a".
+  let result_org_text : String =
+    single_document_org_view (
+      db_name,
+      driver,
+      &ID ( "a".to_string () )
+    ) . await ?;
+
+  // Parse Org text into OrgNodes (forest).
+  let result_forest : Vec<OrgNode> =
+    parse_skg_org_to_nodes (
+      &result_org_text );
+
+  // Expected OrgNode tree (mirrors the old s-exp structure).
+  //
+  // a [focused]
+  // └─ b (body "b has a body")
+  //    └─ c
+  //       └─ b [repeated]
+  //            (body "Repeated above. Edit there, not here.")
+  let expected_forest : Vec<OrgNode> =
+    vec! [
+      OrgNode {
+        id       : Some ( ID::from ("a") ),
+        heading  : "a" . to_string (),
+        body     : None,
+        folded   : false,
+        focused  : true,
+        repeated : false,
+        branches : vec! [
+          OrgNode {
+            id       : Some ( ID::from ("b") ),
+            heading  : "b" . to_string (),
+            body     : Some ( "b has a body" . to_string () ),
+            folded   : false,
+            focused  : false,
+            repeated : false,
+            branches : vec! [
+              OrgNode {
+                id       : Some ( ID::from ("c") ),
+                heading  : "c" . to_string (),
+                body     : None,
+                folded   : false,
+                focused  : false,
+                repeated : false,
+                branches : vec! [
+                  OrgNode {
+                    id       : Some ( ID::from ("b") ),
+                    heading  : "b" . to_string (),
+                    body     : Some (
+                      "Repeated above. Edit there, not here."
+                        . to_string () ),
+                    folded   : false,
+                    focused  : false,
+                    repeated : true,
+                    branches : vec! [ ],
+                  } ],
+              } ],
+          } ],
+      } ];
+
+  // With PartialEq derived on OrgNode, we can compare the full structures directly.
+  assert_eq! (
+    result_forest,
+    expected_forest,
+    "Rendered OrgNode forest does not match expected." );
+  Ok (( )) }
 
 async fn collect_all_of_some_binary_rel(
   db_name: &str,

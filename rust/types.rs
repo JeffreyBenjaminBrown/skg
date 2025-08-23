@@ -27,7 +27,7 @@ pub enum HyperlinkParseError {
   InvalidFormat,
   MissingDivider, }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OrgNode {
   // See also /api.md.
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
