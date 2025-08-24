@@ -108,7 +108,7 @@ pub async fn find_container_of (
   Err ( format! ( "No container found for node with ID '{}'",
                    node ). into() ) }
 
-pub async fn filepath_from_id (
+pub async fn filepath_from_id_via_typedb (
   // Runs a single TypeDB query.
   // Returns the node's filepath.
   db_name : &str,

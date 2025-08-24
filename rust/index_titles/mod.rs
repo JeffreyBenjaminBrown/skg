@@ -45,7 +45,7 @@ pub fn get_extant_index_or_create_empty_one (
   // If it creates an index, the index is empty.
   // But if it fetches an index, the index might not be.
   schema: schema::Schema,
-  index_path: &Path
+  index_path: &Path // path to the entire index, not a file
 ) -> Result< (Index,
               bool), // True if the index is new.
               Box<dyn std::error::Error>> {

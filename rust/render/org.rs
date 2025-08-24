@@ -1,7 +1,7 @@
 use crate::file_io::read_filenode;
 use crate::typedb::search::{
   find_rootish_container,
-  filepath_from_id, };
+  filepath_from_id_via_typedb, };
 use crate::types::{ID, FileNode};
 
 use std::collections::HashSet;
@@ -11,8 +11,10 @@ use typedb_driver::TypeDBDriver;
 use std::fmt::Write as _; // for the write! macro
 
 
-/// Build an Org document with `root` as the root node.
-/// Starts at level 1. Uses the same DB lookups as your s-exp path.
+/// Given the id `focus`,
+/// identifies its rootish container (`find_rootish_container()`),
+/// and builds a view from that `root`
+/// by recursively following the `content` relationship.
 pub async fn single_root_content_view (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -38,7 +40,7 @@ async fn org_from_node_recursive (
   visited : &mut HashSet<ID>,
   level   : usize,
 ) -> Result<String, Box<dyn Error>> {
-  let path : String = filepath_from_id (
+  let path : String = filepath_from_id_via_typedb (
       db_name, driver, node_id ). await ?;
   let filenode : FileNode = read_filenode ( path )?;
   if filenode.title.is_empty () {

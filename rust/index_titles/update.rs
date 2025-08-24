@@ -33,15 +33,15 @@ pub fn update_index (
     &mut tantivy_index.index.writer ( 50_000_000 )?,
     data_dir,
     tantivy_index,
-    |path| needs_indexing (
-      path, index_mtime) )
+    |skgfile_path| needs_indexing (
+      skgfile_path, index_mtime) )
 }
 
 fn populate_index <F> (
   index_writer  : &mut tantivy::IndexWriter,
   data_dir      : &str,
   tantivy_index : &TantivyIndex,
-  should_index  : F
+  should_index  : F // whether a skg file needs (re)-indexing
 ) -> Result < usize,
               Box < dyn std::error::Error > >
 where
@@ -55,10 +55,10 @@ where
            !should_index ( path ) ) {
         continue; }
       if let Some (title) = title_from_skg_file (path) {
-        delete_documents_with_path_from_index(
-          index_writer, path, tantivy_index.path_field)?;
-        add_document_and_title_to_index(
-          index_writer, path, &title, tantivy_index)?;
+        delete_documents_with_path_from_index (
+          index_writer, path, tantivy_index.path_field )?;
+        add_document_and_title_to_index (
+          index_writer, path, &title, tantivy_index )?;
         indexed_count += 1; } }
   if indexed_count > 0 {
     println! ( "Indexed {} files. Committing changes...",
@@ -69,13 +69,13 @@ where
   Ok (indexed_count) }
 
 pub fn title_from_skg_file (
-  // Gets the title from the file at path,
+  // Gets the title from the file at skgfile_path,
   // runs replace_each_link_with_its_label on it,
   // and returns it.
-  path : &Path )
+  skgfile_path : &Path )
   -> Option < String > {
 
-  if let Ok (file_content) = fs::read_to_string (path) {
+  if let Ok (file_content) = fs::read_to_string (skgfile_path) {
     if let Ok (yaml_value) = ( from_str::<serde_yaml::Value>
                                (&file_content) ) {
       if let Some (title_value) = yaml_value.get ("title") {
@@ -120,11 +120,10 @@ pub fn add_document_and_title_to_index (
 
 pub fn needs_indexing ( // based on modification time
   // If the path's mtime is more recent, the path needs indexing.
-  path: &Path,
+  skgfile_path: &Path,
   index_mtime: SystemTime
 ) -> bool {
-
-  match get_modification_time (path) {
+  match get_modification_time (skgfile_path) {
     Ok (file_mtime) => file_mtime > index_mtime,
     Err(_) => true // If its modification time is unknown,
                    // assume it needs indexing.
@@ -133,16 +132,14 @@ pub fn needs_indexing ( // based on modification time
 pub fn not_a_skg_file_path (
   path: &Path
 ) -> bool {
-
   ! path . extension () . map_or (
     false, |ext| ext == "skg" ) ||
   ( path.to_string_lossy ()
     . contains ("index.tantivy") ) }
 
 pub fn get_modification_time (
-  path: &Path
+  path: &Path // used both for skg files and index folders
 ) -> Result<SystemTime,
             Box<dyn std::error::Error>> {
-
   let metadata = fs::metadata (path)?;
   Ok (metadata.modified()?) }
