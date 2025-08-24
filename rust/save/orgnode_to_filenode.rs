@@ -62,7 +62,7 @@ fn orgnode_to_filenodes_internal (
     subscribes_to                : Vec::new (),
     hides_from_its_subscriptions : Vec::new (),
     overrides_view_of            : Vec::new (),
-    path                         : "".into (), };
+    nodepath                     : "".into (), };
   if branch.focused {
     // This would clobber any earlier focused node, but that's fine, because there should be only one.
     *focused_id = Some (

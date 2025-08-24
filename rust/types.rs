@@ -70,7 +70,7 @@ pub struct FileNode {
   pub overrides_view_of: Vec<ID>,
 
   #[serde(skip)] // inferred from filepath
-  pub path: PathBuf,
+  pub nodepath: PathBuf,
 }
 
 #[derive(Clone)]
@@ -182,6 +182,6 @@ It better be okay with newlines."# . to_string() ),
                         ID::new("13")],
     hides_from_its_subscriptions: vec![],
     overrides_view_of: vec![],
-    path: PathBuf::from(
+    nodepath: PathBuf::from(
       "tests/file_io/generated/example.skg"),
   } }

@@ -25,7 +25,7 @@ pub fn read_filenode
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
         e.to_string () )) ?;
-  filenode.path = // Unlike the rest of the FileNode, this is not extracted from a field in the .skg file.
+  filenode.nodepath = // Unlike the rest of the FileNode, this is not extracted from a field in the .skg file.
     file_path.to_path_buf ();
   Ok ( filenode ) }
 
@@ -71,7 +71,7 @@ mod tests {
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
       overrides_view_of: vec![],
-      path: file_path.clone(),
+      nodepath: file_path.clone(),
     };
 
     // Write the node to a file

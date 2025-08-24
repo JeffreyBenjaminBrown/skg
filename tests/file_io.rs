@@ -8,7 +8,7 @@ use skg::types::{FileNode, filenode_example};
 fn test_filenode_io() {
     // Write the example node to a file
     let example = filenode_example();
-    let out_filename = example.path.clone();
+    let out_filename = example.nodepath.clone();
     write_filenode( &example,
                      out_filename.to_str().expect(
                        "Invalid UTF-8 in path")
@@ -82,14 +82,14 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     reversed_subscribes_to.reverse();
 
   FileNode {
-    contains               : reversed_contains,
-    subscribes_to          : reversed_subscribes_to,
+    contains          : reversed_contains,
+    subscribes_to     : reversed_subscribes_to,
 
-    title                  : node.title                .clone(),
-    ids                    : node.ids                  .clone(),
-    body                   : node.body                 .clone(),
-    path                   : node.path                 .clone(),
+    title             : node.title             .clone(),
+    ids               : node.ids               .clone(),
+    body              : node.body              .clone(),
+    nodepath          : node.nodepath          .clone(),
     hides_from_its_subscriptions :
-      node.hides_from_its_subscriptions .               clone(),
-    overrides_view_of   : node.overrides_view_of .clone(),
+      node.hides_from_its_subscriptions        .clone(),
+    overrides_view_of : node.overrides_view_of .clone(),
   } }

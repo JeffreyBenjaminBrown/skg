@@ -153,7 +153,7 @@ mod tests {
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
       overrides_view_of: vec![],
-      path: PathBuf::from("path"),
+      nodepath: PathBuf::from("not important"),
     };
     let hyperlinks = hyperlinks_from_filenode(&test_node);
     assert_eq!(hyperlinks.len(), 4);
