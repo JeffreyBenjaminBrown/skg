@@ -1,3 +1,6 @@
+use crate::hyperlinks::replace_each_link_with_its_label;
+use crate::types::TantivyIndex;
+
 use tantivy::{ doc,
                schema };
 use walkdir::WalkDir;
@@ -6,8 +9,6 @@ use std::{ fs,
            time::SystemTime };
 use serde_yaml::from_str;
 
-use crate::hyperlinks::replace_each_link_with_its_label;
-use crate::types::TantivyIndex;
 
 pub fn update_index (
   tantivy_index : &TantivyIndex,

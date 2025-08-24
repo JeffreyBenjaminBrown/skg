@@ -22,7 +22,7 @@ pub fn orgnode_to_filenodes (
        Option  <ID>,    // the focused node
        HashSet <ID> ) { // the folded nodes
 
-  let mut filenodes      : HashSet<FileNode> = HashSet::new ();
+  let mut filenodes  : HashSet<FileNode> = HashSet::new ();
   let mut focused_id : Option<ID>        = None;
   let mut folded_ids : HashSet<ID>       = HashSet::new ();
   orgnode_to_filenodes_internal (
@@ -35,7 +35,6 @@ pub fn orgnode_to_filenodes (
   (filenodes, focused_id, folded_ids) }
 
 fn orgnode_to_filenodes_internal (
-  // PITFALL: Returns nothing, but mutates its mutable args.
   branch        : &    OrgNode,
   filenodes_acc : &mut HashSet <FileNode>,
   focused_id    : &mut Option  <ID>,

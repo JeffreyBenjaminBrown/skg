@@ -169,6 +169,8 @@ fn test_typedb_integration(
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
+    test_recursive_document(db_name, &driver).await?;
+
     Ok (()) } ) }
 
 async fn test_recursive_document (
@@ -197,45 +199,37 @@ async fn test_recursive_document (
   //       └─ b [repeated]
   //            (body "Repeated above. Edit there, not here.")
   let expected_forest : Vec<OrgNode> =
-    vec! [
-      OrgNode {
-        id       : Some ( ID::from ("a") ),
-        heading  : "a" . to_string (),
-        body     : None,
+    vec! [ OrgNode {
+      id       : Some ( ID::from ("a") ),
+      heading  : "a" . to_string (),
+      body     : None,
+      folded   : false,
+      focused  : true,
+      repeated : false,
+      branches : vec! [ OrgNode {
+        id       : Some ( ID::from ("b") ),
+        heading  : "b" . to_string (),
+        body     : Some ( "b has a body" . to_string () ),
         folded   : false,
-        focused  : true,
+        focused  : false,
         repeated : false,
-        branches : vec! [
-          OrgNode {
+        branches : vec! [ OrgNode {
+          id       : Some ( ID::from ("c") ),
+          heading  : "c" . to_string (),
+          body     : None,
+          folded   : false,
+          focused  : false,
+          repeated : false,
+          branches : vec! [ OrgNode {
             id       : Some ( ID::from ("b") ),
             heading  : "b" . to_string (),
-            body     : Some ( "b has a body" . to_string () ),
+            body     : Some (
+              "Repeated above. Edit there, not here."
+                . to_string () ),
             folded   : false,
             focused  : false,
-            repeated : false,
-            branches : vec! [
-              OrgNode {
-                id       : Some ( ID::from ("c") ),
-                heading  : "c" . to_string (),
-                body     : None,
-                folded   : false,
-                focused  : false,
-                repeated : false,
-                branches : vec! [
-                  OrgNode {
-                    id       : Some ( ID::from ("b") ),
-                    heading  : "b" . to_string (),
-                    body     : Some (
-                      "Repeated above. Edit there, not here."
-                        . to_string () ),
-                    folded   : false,
-                    focused  : false,
-                    repeated : true,
-                    branches : vec! [ ],
-                  } ],
-              } ],
-          } ],
-      } ];
+            repeated : true,
+            branches : vec! [], } ], } ], } ], } ];
 
   // With PartialEq derived on OrgNode, we can compare the full structures directly.
   assert_eq! (
