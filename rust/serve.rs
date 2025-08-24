@@ -14,7 +14,7 @@ use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
 use crate::index_titles::{
   get_extant_index_or_create_empty_one,
   search_index, update_index};
-use crate::render::org::  single_document_org_view;
+use crate::render::org::  single_root_content_view;
 use crate::typedb::create::{
   overwrite_and_populate_new_db};
 use crate::types::{ID,TantivyIndex};
@@ -274,12 +274,12 @@ fn generate_document (
   typedb_driver : &TypeDBDriver,
   db_name       : &str
 ) -> String {
-  // Just runs `single_document_org_view`,
+  // Just runs `single_root_content_view`,
   // but with async and error handling.
 
   futures::executor::block_on (
     async {
-      match single_document_org_view (
+      match single_root_content_view (
         db_name,
         typedb_driver,
         node_id ) . await

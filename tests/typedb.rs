@@ -13,7 +13,7 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver, };
 
-use skg::render::org::single_document_org_view;
+use skg::render::org::single_root_content_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
@@ -178,7 +178,7 @@ async fn test_recursive_document (
 
   // Fetch raw Org text for the single-document view of ID "a".
   let result_org_text : String =
-    single_document_org_view (
+    single_root_content_view (
       db_name,
       driver,
       &ID ( "a".to_string () )

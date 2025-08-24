@@ -8,7 +8,7 @@ use typedb_driver::{
   DriverOptions,
 };
 
-use skg::render::org::single_document_org_view;
+use skg::render::org::single_root_content_view;
 use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   find_rootish_container,
@@ -33,19 +33,19 @@ fn test_a_mess_of_stuff
       // TODO: Automate these "manual eyballing" tests.
       { // from the root of node "1".
         println!("Building org view from ID 2...");
-        let view = single_document_org_view (
+        let view = single_root_content_view (
           db_name, &driver, &ID("2".to_string() )
         ) . await?;
         println!("{}", view); }
       { // From the root of node "5".
           println!("Building org view from ID 5...");
-          let view = single_document_org_view (
+          let view = single_root_content_view (
             db_name, &driver, &ID("5".to_string() )
           ) . await?;
           println!("{}", view); }
       { // From the root of node "cycle-1".
           println!("Building org view from ID cycle-1...");
-          let view = single_document_org_view (
+          let view = single_root_content_view (
             db_name, &driver, &ID("cycle-1".to_string() )
           ) . await?;
           println!("{}", view); } }

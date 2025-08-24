@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-use skg::render::org::single_document_org_view;
+use skg::render::org::single_root_content_view;
 use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::save::orgnode_to_filenode::orgnode_to_filenodes;

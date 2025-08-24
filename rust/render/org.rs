@@ -13,7 +13,7 @@ use std::fmt::Write as _; // for the write! macro
 
 /// Build an Org document with `root` as the root node.
 /// Starts at level 1. Uses the same DB lookups as your s-exp path.
-pub async fn single_document_org_view (
+pub async fn single_root_content_view (
   db_name : &str,
   driver  : &TypeDBDriver,
   focus   : &ID,
