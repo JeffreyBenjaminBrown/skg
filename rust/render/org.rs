@@ -48,7 +48,6 @@ async fn org_from_node_recursive (
                  node_id ),
     )) ); }
   if visited.contains (node_id) {
-    // Do not re-traverse branches of a repeated node.
     return Ok ( format_repeated_node (
       node_id, level, & filenode.title )); }
   visited.insert ( node_id.clone () );

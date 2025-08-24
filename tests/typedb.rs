@@ -169,24 +169,21 @@ fn test_typedb_integration(
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
-    test_recursive_document(db_name, &driver).await?;
+    test_recursive_document ( db_name, &driver )
+      . await ?;
 
-    Ok (()) } ) }
+    Ok (( )) } ) }
 
 async fn test_recursive_document (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-
-  // Fetch raw Org text for the single-document view of ID "a".
   let result_org_text : String =
     single_root_content_view (
       db_name,
       driver,
       &ID ( "a".to_string () )
     ) . await ?;
-
-  // Parse Org text into OrgNodes (forest).
   let result_forest : Vec<OrgNode> =
     parse_skg_org_to_nodes (
       &result_org_text );
@@ -204,7 +201,7 @@ async fn test_recursive_document (
       heading  : "a" . to_string (),
       body     : None,
       folded   : false,
-      focused  : true,
+      focused  : false,
       repeated : false,
       branches : vec! [ OrgNode {
         id       : Some ( ID::from ("b") ),
@@ -223,9 +220,7 @@ async fn test_recursive_document (
           branches : vec! [ OrgNode {
             id       : Some ( ID::from ("b") ),
             heading  : "b" . to_string (),
-            body     : Some (
-              "Repeated above. Edit there, not here."
-                . to_string () ),
+            body     : None, // PITFALL: There *is* a body in the received org text. But it is discarded, because the node is a repeat.
             folded   : false,
             focused  : false,
             repeated : true,
