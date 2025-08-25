@@ -13,7 +13,7 @@ use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   find_rootish_container,
   path_to_rootish_container, };
-use skg::types::ID;
+use skg::types::{ID, SkgConfig};
 
 #[test]
 fn test_a_mess_of_stuff
@@ -26,27 +26,36 @@ fn test_a_mess_of_stuff
       DriverOptions::new(false, None)?
     ).await?;
     let db_name = "skg-test";
-    overwrite_and_populate_new_db(
-      "tests/content_view/fixtures", db_name, &driver ) . await?;
+    let config = SkgConfig {
+      skg_folder     : "irrelevant".into(),
+      tantivy_folder : "tests/typedb/fixtures".into() };
+    let skg_folder : &str =
+      config . skg_folder . to_str ()
+      . expect ("Invalid UTF-8 in tantivy index path");
+    overwrite_and_populate_new_db (
+      skg_folder, db_name, &driver ) . await?;
 
     { // Print org views.
       // TODO: Automate these "manual eyballing" tests.
       { // from the root of node "1".
         println!("Building org view from ID 2...");
         let view = single_root_content_view (
-          db_name, &driver, &ID("2".to_string() )
+          db_name, &driver, &config,
+          & ID ( "2" . to_string () )
         ) . await?;
         println!("{}", view); }
       { // From the root of node "5".
           println!("Building org view from ID 5...");
           let view = single_root_content_view (
-            db_name, &driver, &ID("5".to_string() )
+            db_name, & driver, & config,
+            & ID ( "5" . to_string () )
           ) . await?;
           println!("{}", view); }
       { // From the root of node "cycle-1".
           println!("Building org view from ID cycle-1...");
           let view = single_root_content_view (
-            db_name, &driver, &ID("cycle-1".to_string() )
+            db_name, & driver, & config,
+            & ID ( "cycle-1" . to_string () )
           ) . await?;
           println!("{}", view); } }
 

@@ -7,9 +7,22 @@
 use serde_yaml;
 use std::fs::{self};
 use std::io::{self};
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 
-use crate::types::FileNode;
+use crate::types::{ FileNode, ID, SkgConfig };
+
+
+pub fn path_from_pid (
+  config : &SkgConfig,
+  pid    : ID,
+) -> String {
+  let f : PathBuf = config . skg_folder . clone() ;
+  let s: String = pid.0;
+  f . join (s)
+    . with_extension ("skg")
+    . to_string_lossy ()
+    . into_owned ()
+}
 
 pub fn read_filenode
   <P : AsRef <Path>> // any type that can be converted to an &Path

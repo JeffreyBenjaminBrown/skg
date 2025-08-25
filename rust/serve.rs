@@ -1,3 +1,11 @@
+use crate::index_titles::{
+  get_extant_index_or_create_empty_one,
+  search_index, update_index};
+use crate::render::org::  single_root_content_view;
+use crate::typedb::create::{
+  overwrite_and_populate_new_db};
+use crate::types::{ID, SkgConfig, TantivyIndex};
+
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener,
                TcpStream, // handles two-way communication
@@ -10,24 +18,17 @@ use typedb_driver::{TypeDBDriver, Credentials,
                     DriverOptions};
 use futures::executor::block_on;
 
-use crate::config::{ SKG_DATA_DIR, TANTIVY_INDEX_DIR};
-use crate::index_titles::{
-  get_extant_index_or_create_empty_one,
-  search_index, update_index};
-use crate::render::org::  single_root_content_view;
-use crate::typedb::create::{
-  overwrite_and_populate_new_db};
-use crate::types::{ID,TantivyIndex};
 
-
-pub fn serve () -> std::io::Result<()> {
-  // Makes a typedb driver and a tantivy index.
-  // Then pipes TCP input from Emacs into handle_emacs.
+/// Makes a typedb driver and a tantivy index.
+/// Then pipes TCP input from Emacs into handle_emacs.
+pub fn serve (
+  config : SkgConfig
+) -> std::io::Result<()> {
 
   let typedb_driver : Arc<TypeDBDriver> =
-    initialize_typedb();
+    initialize_typedb ( &config );
   let tantivy_index : TantivyIndex =
-    initialize_tantivy();
+    initialize_tantivy ( &config );
   let db_name = "skg-test";
   let emacs_listener : TcpListener =
     TcpListener::bind("0.0.0.0:1730")?;
@@ -38,23 +39,25 @@ pub fn serve () -> std::io::Result<()> {
         let stream : TcpStream = stream; // The least-ugly way to type-annotate `stream`.
         let typedb_driver_clone : Arc<TypeDBDriver> =
           Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
-        let tantivy_index_clone =
-          tantivy_index.clone();
-        thread::spawn(move || {
+        let tantivy_index_clone = tantivy_index . clone ();
+        let config_clone        = config        . clone ();
+        thread::spawn ( move || {
           handle_emacs (
             stream,
             typedb_driver_clone,
             db_name, // static, so no cloning needed
-            tantivy_index_clone ) } ); }
+            tantivy_index_clone,
+            & config_clone, ) } ); }
       Err(e) => {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
 
 fn handle_emacs (
-  mut stream: TcpStream,
-  typedb_driver: Arc<TypeDBDriver>,
-  db_name: &str,
-  tantivy_index: TantivyIndex
+  mut stream    : TcpStream,
+  typedb_driver : Arc<TypeDBDriver>,
+  db_name       : &str,
+  tantivy_index : TantivyIndex,
+  config        : &SkgConfig,
 ) {
   // This function directs requests from the stream to one of
   //   handle_sexp_document_request
@@ -80,7 +83,8 @@ fn handle_emacs (
               &mut stream,
               &request,
               &typedb_driver,
-              db_name );
+              db_name,
+              config, );
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,
@@ -103,6 +107,7 @@ fn handle_emacs (
   println!("Emacs disconnected: {peer}"); }
 
 pub fn initialize_typedb (
+  config : & SkgConfig,
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
   // then calls overwrite_and_populate_new_db.
@@ -122,16 +127,19 @@ pub fn initialize_typedb (
 
   let db_name = "skg-test";
   block_on ( async {
-    if let Err(e) = overwrite_and_populate_new_db (
-      SKG_DATA_DIR, db_name, &driver
+    if let Err (e) = overwrite_and_populate_new_db (
+      ( & config . skg_folder
+          . to_str () . expect ("Invalid UTF-8 in skg folder path") ),
+      db_name,  & driver,
     ) . await {
-      eprintln!("Failed to initialize database: {}", e);
+      eprintln! ( "Failed to initialize database: {}", e );
       std::process::exit(1);
     } } );
   println!("TypeDB database initialized successfully.");
   Arc::new( driver ) }
 
 fn initialize_tantivy (
+  config : & SkgConfig,
 ) -> TantivyIndex {
   // Build a schema.
   // Fetch the old or start a new index, using
@@ -150,7 +158,8 @@ fn initialize_tantivy (
     schema_builder.build();
 
   // Create or open the index, and wrap it in my `TantivyIndex`.
-  let index_path = Path::new( TANTIVY_INDEX_DIR );
+  let index_path = Path::new (
+    & config . tantivy_folder );
   let (index, index_is_new) : (Index, bool) =
     get_extant_index_or_create_empty_one (
       schema,
@@ -166,10 +175,13 @@ fn initialize_tantivy (
   };
 
   // Update the index with current files
-  match update_index ( &tantivy_index,
-                        SKG_DATA_DIR,
-                        index_path,
-                        index_is_new ) {
+  match update_index (
+    & tantivy_index,
+    ( & config . skg_folder
+        . to_str () . expect ("Invalid UTF-8 in tantivy index path") ),
+    index_path,
+    index_is_new )
+  {
     Ok(indexed_count) => { println!(
       "Tantivy index initialized successfully. Indexed {} files.",
       indexed_count); }
@@ -186,7 +198,8 @@ fn handle_org_document_request (
   stream        : &mut TcpStream,
   request       : &str,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str
+  db_name       : &str,
+  config        : &SkgConfig,
 ) {
 
   match node_id_from_document_request ( request ) {
@@ -196,7 +209,8 @@ fn handle_org_document_request (
         & generate_document (
           &node_id,
           typedb_driver,
-          db_name
+          db_name,
+          & config,
         )); },
     Err ( err ) => {
       let error_msg = format!(
@@ -270,9 +284,12 @@ fn search_terms_from_request ( request : &str )
                                    "search terms" ) }
 
 fn generate_document (
+  // TODO: This needs a name reflecting that it just wraps
+  //   single_root_content_view
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str
+  db_name       : &str,
+  config        : &SkgConfig,
 ) -> String {
   // Just runs `single_root_content_view`,
   // but with async and error handling.
@@ -282,6 +299,7 @@ fn generate_document (
       match single_root_content_view (
         db_name,
         typedb_driver,
+        config,
         node_id ) . await
       { Ok  (s) => s,
         Err (e) => format!(

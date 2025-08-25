@@ -1,8 +1,8 @@
-use crate::file_io::read_filenode;
+use crate::file_io::{read_filenode,path_from_pid};
 use crate::typedb::search::{
   find_rootish_container,
-  filepath_from_id_via_typedb, };
-use crate::types::{ID, FileNode};
+  pid_from_id, };
+use crate::types::{FileNode, ID, SkgConfig};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -18,6 +18,7 @@ use std::fmt::Write as _; // for the write! macro
 pub async fn single_root_content_view (
   db_name : &str,
   driver  : &TypeDBDriver,
+  config  : &SkgConfig,
   focus   : &ID,
 ) -> Result < String, Box<dyn Error> > {
 
@@ -26,7 +27,8 @@ pub async fn single_root_content_view (
   let mut visited : HashSet<ID> = HashSet::new();
   let org : String =
     org_from_node_recursive (
-      db_name, driver, &root_id, focus, &mut visited, 1
+      db_name, driver, config,
+      &root_id, focus, &mut visited, 1
     ) . await ?;
   Ok (org) }
 
@@ -35,13 +37,18 @@ pub async fn single_root_content_view (
 async fn org_from_node_recursive (
   db_name : &str,
   driver  : &TypeDBDriver,
+  config  : &SkgConfig,
   node_id : &ID,
   focus   : &ID,
   visited : &mut HashSet<ID>,
   level   : usize,
 ) -> Result<String, Box<dyn Error>> {
-  let path : String = filepath_from_id_via_typedb (
-      db_name, driver, node_id ). await ?;
+
+  let path : String = path_from_pid (
+    &config,
+    pid_from_id (
+      db_name, driver, node_id
+    ). await ? );
   let filenode : FileNode = read_filenode ( path )?;
   if filenode.title.is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -68,7 +75,8 @@ async fn org_from_node_recursive (
   for child_id in &filenode.contains { // Recurse at next level.
     let child = Box::pin (
       org_from_node_recursive (
-        db_name, driver, child_id, focus, visited, level + 1
+        db_name, driver, config,
+        child_id, focus, visited, level + 1
       )) . await? ;
     out.push_str ( &child ); }
   Ok (out) }

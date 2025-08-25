@@ -16,7 +16,7 @@ fn test_filenode_io() {
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : Filenode = read_filenode (
+  let read_node : FileNode = read_filenode (
     & out_filename ). unwrap ();
   let reversed = reverse_some_of_filenode(&read_node);
   let reversed_filename = "tests/file_io/generated/reversed.skg";

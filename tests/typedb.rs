@@ -19,8 +19,9 @@ use skg::typedb::create::overwrite_and_populate_new_db;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
-  filepath_from_id_via_typedb, };
-use skg::types::{ID, OrgNode};
+  pid_from_id, };
+use skg::types::{ID, OrgNode, SkgConfig};
+
 
 #[test]
 fn test_typedb_integration(
@@ -34,16 +35,23 @@ fn test_typedb_integration(
     ).await?;
     let db_name = "skg-test";
 
-    overwrite_and_populate_new_db (
-      "tests/typedb/fixtures", db_name, &driver )
-      . await?;
+    let config = SkgConfig {
+      skg_folder     : "irrelevant"            . into(),
+      tantivy_folder : "tests/typedb/fixtures" . into() };
+    let index_folder : &str =
+      config . tantivy_folder . to_str ()
+      . expect ("Invalid UTF-8 in tantivy index path");
 
-    let path_to_4 = filepath_from_id_via_typedb (
+    overwrite_and_populate_new_db (
+      index_folder, db_name, &driver
+    ) . await?;
+
+    let path_to_4 = pid_from_id (
       db_name, &driver, &ID("4".to_string() ) ) . await?;
-    let path_to_44 = filepath_from_id_via_typedb (
+    let path_to_44 = pid_from_id (
       db_name, &driver, &ID("44".to_string() ) ) . await?;
-    assert_eq!(path_to_4,  "tests/typedb/fixtures/4.skg");
-    assert_eq!(path_to_44, "tests/typedb/fixtures/4.skg");
+    assert_eq!(path_to_4,  ID("4" . to_string () ));
+    assert_eq!(path_to_44, ID("4" . to_string () ));
 
     let has_extra_id_pairs = collect_all_of_some_binary_rel(
       db_name,
@@ -169,19 +177,22 @@ fn test_typedb_integration(
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
-    test_recursive_document ( db_name, &driver )
-      . await ?;
+    test_recursive_document (
+      db_name, &driver, &config
+    ) . await ?;
 
     Ok (( )) } ) }
 
 async fn test_recursive_document (
-  db_name: &str,
-  driver: &TypeDBDriver
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let result_org_text : String =
     single_root_content_view (
       db_name,
       driver,
+      config,
       &ID ( "a".to_string () )
     ) . await ?;
   let result_forest : Vec<OrgNode> =

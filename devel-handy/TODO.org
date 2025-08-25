@@ -1,3 +1,11 @@
+* improve the Config type
+** add db_name to it
+   db_name is an argument to
+     generate_document
+     overwrite_and_populate_new_db
+     single_root_content_view
+   many of which also take a SkgConfig
+** use its tantivy_folder field
 * failing test: path not found from id
 ** message
      Running tests/content_view.rs (target/debug/deps/content_view-0ce22be24d32e7f6)
@@ -30,14 +38,12 @@ error: test failed, to rerun pass `--test content_view`
    but they are not equal
 ** solution
    Rust, somewhere, must know the user's data directory.
-* filepath_from_id_via_typedb`
+* overhaul `pid_from_id`
 ** it's in rust/typedb/search.rs
 ** bear in mind that I edited it without testing the changes
-   right after commit cc94e920688ba693
+   in commit cf5c925111249168
 ** TODO rewrite it, and its uses
 ** TODO test it
-** TODO rename it pid_from_id_via_typedb
-   and it should return an ID, not a String
 * deleting the `nodepath` field in FileNode
 ** in all test files, make sure filenames correspond to primary ids
 *** where it doesn't

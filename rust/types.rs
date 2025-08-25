@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::{Index, schema};
@@ -11,6 +12,12 @@ use tantivy::{Index, schema};
 // Types
 // (functions come later)
 //
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SkgConfig {
+  pub skg_folder     : PathBuf,
+  pub tantivy_folder : PathBuf,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID ( pub String );

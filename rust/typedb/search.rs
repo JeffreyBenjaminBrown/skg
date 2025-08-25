@@ -110,11 +110,11 @@ pub async fn find_container_of (
 
 /// Runs a single TypeDB query.
 /// Returns the node's filepath.
-pub async fn filepath_from_id_via_typedb (
+pub async fn pid_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
   node_id : &ID
-) -> Result < String, Box<dyn Error> > {
+) -> Result < ID, Box<dyn Error> > {
 
   let tx : Transaction =
     driver.transaction (
@@ -136,8 +136,10 @@ pub async fn filepath_from_id_via_typedb (
   if let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
     if let Some (concept) = row.get ("primary_id") ? {
-      return Ok (extract_payload_from_typedb_string_rep (
-        &concept . to_string () )); }}
+      return Ok (
+        ID (
+          extract_payload_from_typedb_string_rep (
+            &concept . to_string () )) ); }}
   Err ( format! ( "No primary id found for ID '{}'",
                    node_id )
         . into () ) }
