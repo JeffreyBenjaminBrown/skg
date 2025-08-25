@@ -24,7 +24,7 @@ use skg::types::{ID, OrgNode, SkgConfig};
 
 
 #[test]
-fn test_typedb_integration(
+fn test_typedb_integration (
 ) -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
@@ -33,9 +33,8 @@ fn test_typedb_integration(
       Credentials::new("admin", "password"),
       DriverOptions::new(false, None)?
     ).await?;
-    let db_name = "skg-test";
-
     let config = SkgConfig {
+      db_name        : "skg-test"              . into(),
       skg_folder     : "tests/typedb/fixtures" . into(),
       tantivy_folder : "irrelevant"            . into() };
     let index_folder : &str =
@@ -43,19 +42,25 @@ fn test_typedb_integration(
       . expect ("Invalid UTF-8 in tantivy index path");
 
     overwrite_and_populate_new_db (
-      index_folder, db_name, &driver
-    ) . await?;
+      index_folder,
+      & config . db_name,
+      & driver
+    ) . await ?;
 
-    let path_to_4 = pid_from_id (
-      db_name, &driver, &ID("4".to_string() ) ) . await?;
-    let path_to_44 = pid_from_id (
-      db_name, &driver, &ID("44".to_string() ) ) . await?;
+    let path_to_4 = pid_from_id ( & config . db_name,
+                                    & driver,
+                                    & ID("4".to_string() ),
+    ) . await ?;
+    let path_to_44 = pid_from_id ( & config . db_name,
+                                     & driver,
+                                     & ID("44".to_string() )
+    ) . await ?;
     assert_eq!(path_to_4,  ID("4" . to_string () ));
     assert_eq!(path_to_44, ID("4" . to_string () ));
 
     let has_extra_id_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $n isa node, has id $ni;
             $e isa extra_id, has id $ei;
@@ -75,8 +80,8 @@ fn test_typedb_integration(
     assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
     let contains_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $container isa node, has id $container_id;
             $contained isa node, has id $contained_id;
@@ -95,8 +100,8 @@ fn test_typedb_integration(
     assert_eq!(contains_pairs, expected_contains);
 
     let hyperlink_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $source isa node, has id $source_id;
             $dest   isa node, has id $dest_id;
@@ -113,8 +118,8 @@ fn test_typedb_integration(
     assert_eq!(hyperlink_pairs, expected_contains);
 
     let subscribes_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $subscriber isa node, has id $from;
             $subscribee isa node, has id $to;
@@ -134,8 +139,8 @@ fn test_typedb_integration(
     assert_eq!(subscribes_pairs, expected_subscribes);
 
     let hides_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $hider isa node, has id $from;
             $hidden isa node, has id $to;
@@ -154,8 +159,8 @@ fn test_typedb_integration(
     assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
     let replacement_pairs = collect_all_of_some_binary_rel(
-      db_name,
-      &driver,
+      & config . db_name,
+      & driver,
       r#" match
             $replacement isa node, has id $from;
             $replaced isa node, has id $to;
@@ -173,24 +178,24 @@ fn test_typedb_integration(
     assert_eq!(replacement_pairs, expected_replacements);
 
     let container_node = find_container_of(
-      db_name, &driver, &ID("2".to_string() )
+      & config . db_name,
+      & driver,
+      & ID("2".to_string() )
     ).await?;
     assert_eq!(container_node, ID("1".to_string() ) );
 
     test_recursive_document (
-      db_name, &driver, &config
+      & driver, & config
     ) . await ?;
 
     Ok (( )) } ) }
 
 async fn test_recursive_document (
-  db_name : &str,
   driver  : &TypeDBDriver,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let result_org_text : String =
     single_root_content_view (
-      db_name,
       driver,
       config,
       &ID ( "a".to_string () )

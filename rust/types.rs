@@ -15,6 +15,7 @@ use tantivy::{Index, schema};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SkgConfig {
+  pub db_name        : String,
   pub skg_folder     : PathBuf,
   pub tantivy_folder : PathBuf,
 }

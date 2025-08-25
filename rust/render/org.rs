@@ -16,18 +16,19 @@ use std::fmt::Write as _; // for the write! macro
 /// and builds a view from that `root`
 /// by recursively following the `content` relationship.
 pub async fn single_root_content_view (
-  db_name : &str,
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
   focus   : &ID,
 ) -> Result < String, Box<dyn Error> > {
 
   let root_id : ID = find_rootish_container (
-    db_name, driver, focus ) . await ?;
+    & config . db_name,
+    driver , focus
+  ) . await ?;
   let mut visited : HashSet<ID> = HashSet::new();
   let org : String =
     org_from_node_recursive (
-      db_name, driver, config,
+      driver, config,
       &root_id, focus, &mut visited, 1
     ) . await ?;
   Ok (org) }
@@ -35,7 +36,6 @@ pub async fn single_root_content_view (
 /// Recursively render a node and its branches into Org.
 /// `level` controls the number of leading `*` on the heading line.
 async fn org_from_node_recursive (
-  db_name : &str,
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
   node_id : &ID,
@@ -46,8 +46,9 @@ async fn org_from_node_recursive (
 
   let path : String = path_from_pid (
     &config,
-    pid_from_id (
-      db_name, driver, node_id
+    pid_from_id ( & config . db_name,
+                  driver,
+                  node_id,
     ). await ? );
   let filenode : FileNode = read_filenode ( path )?;
   if filenode.title.is_empty () {
@@ -75,7 +76,7 @@ async fn org_from_node_recursive (
   for child_id in &filenode.contains { // Recurse at next level.
     let child = Box::pin (
       org_from_node_recursive (
-        db_name, driver, config,
+        driver, config,
         child_id, focus, visited, level + 1
       )) . await? ;
     out.push_str ( &child ); }

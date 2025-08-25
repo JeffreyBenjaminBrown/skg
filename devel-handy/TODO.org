@@ -1,17 +1,3 @@
-* improve the Config type
-** add db_name to it
-   db_name is an argument to
-     generate_document
-     overwrite_and_populate_new_db
-     single_root_content_view
-   many of which also take a SkgConfig
-** use its tantivy_folder field
-* overhaul `pid_from_id`
-** it's in rust/typedb/search.rs
-** bear in mind that I edited it without testing the changes
-   in commit cf5c925111249168
-** TODO rewrite it, and its uses
-** TODO test it
 * deleting the `nodepath` field in FileNode
 ** in all test files, make sure filenames correspond to primary ids
 *** where it doesn't

@@ -25,43 +25,48 @@ fn test_a_mess_of_stuff
       Credentials::new("admin", "password"),
       DriverOptions::new(false, None)?
     ).await?;
-    let db_name = "skg-test";
     let config = SkgConfig {
+      db_name        : "skg-test" . into(),
       skg_folder     : "tests/content_view/fixtures".into(),
       tantivy_folder : "irrelevant".into(), };
     let skg_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");
     overwrite_and_populate_new_db (
-      skg_folder, db_name, &driver ) . await?;
+      skg_folder,
+      & config . db_name,
+      & driver
+    ) . await?;
 
     { // Print org views.
       // TODO: Automate these "manual eyballing" tests.
       { // from the root of node "1".
         println!("Building org view from ID 2...");
         let view = single_root_content_view (
-          db_name, &driver, &config,
+          & driver, & config,
           & ID ( "2" . to_string () )
         ) . await?;
         println!("{}", view); }
       { // From the root of node "5".
         println!("Building org view from ID 5...");
         let view = single_root_content_view (
-          db_name, & driver, & config,
+          & driver, & config,
           & ID ( "5" . to_string () )
         ) . await?;
         println!("{}", view); }
       { // From the root of node "cycle-1".
         println!("Building org view from ID cycle-1...");
         let view = single_root_content_view (
-          db_name, & driver, & config,
+          & driver, & config,
           & ID ( "cycle-1" . to_string () )
         ) . await?;
         println!("{}", view); } }
 
     // Test the path from node "4" to the root container
     match path_to_rootish_container (
-      db_name, &driver, &ID("4".to_string() )
+      & config . db_name,
+      & driver,
+      & ID("4".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
         path,
@@ -74,7 +79,9 @@ fn test_a_mess_of_stuff
         panic!("Error finding path to root container: {}", e); } }
 
     match find_rootish_container (
-      db_name, &driver, &ID("4".to_string() )
+      & config . db_name,
+      & driver,
+      & ID("4".to_string() )
     ).await {
       Ok(root) => { assert_eq!(
         root,
@@ -86,7 +93,9 @@ fn test_a_mess_of_stuff
     // Test the path "to root" from node "cycle-3".
     // (1 contains 2 contains 3 contains 1.)
     match path_to_rootish_container (
-      db_name, &driver, &ID("cycle-3".to_string() )
+      & config . db_name,
+      & driver,
+      & ID("cycle-3".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
         path,
@@ -101,7 +110,9 @@ fn test_a_mess_of_stuff
     // Test the path "to root" from node "cycle-1".
     // (1 contains 2 contains 3 contains 1.)
     match path_to_rootish_container (
-      db_name, &driver, &ID("cycle-1".to_string() )
+      & config . db_name,
+      & driver,
+      & ID("cycle-1".to_string() )
     ).await {
       Ok(path) => { assert_eq!(
         path,

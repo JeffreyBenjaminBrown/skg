@@ -29,7 +29,6 @@ pub fn serve (
     initialize_typedb ( &config );
   let tantivy_index : TantivyIndex =
     initialize_tantivy ( &config );
-  let db_name = "skg-test";
   let emacs_listener : TcpListener =
     TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
@@ -45,7 +44,6 @@ pub fn serve (
           handle_emacs (
             stream,
             typedb_driver_clone,
-            db_name, // static, so no cloning needed
             tantivy_index_clone,
             & config_clone, ) } ); }
       Err(e) => {
@@ -55,7 +53,6 @@ pub fn serve (
 fn handle_emacs (
   mut stream    : TcpStream,
   typedb_driver : Arc<TypeDBDriver>,
-  db_name       : &str,
   tantivy_index : TantivyIndex,
   config        : &SkgConfig,
 ) {
@@ -83,7 +80,6 @@ fn handle_emacs (
               &mut stream,
               &request,
               &typedb_driver,
-              db_name,
               config, );
           } else if request_type == "title matches" {
             handle_title_matches_request(
@@ -125,12 +121,12 @@ pub fn initialize_typedb (
       } )
   } );
 
-  let db_name = "skg-test";
   block_on ( async {
     if let Err (e) = overwrite_and_populate_new_db (
       ( & config . skg_folder
           . to_str () . expect ("Invalid UTF-8 in skg folder path") ),
-      db_name,  & driver,
+      & config . db_name,
+      & driver,
     ) . await {
       eprintln! ( "Failed to initialize database: {}", e );
       std::process::exit(1);
@@ -198,7 +194,6 @@ fn handle_org_document_request (
   stream        : &mut TcpStream,
   request       : &str,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str,
   config        : &SkgConfig,
 ) {
 
@@ -209,7 +204,6 @@ fn handle_org_document_request (
         & generate_document (
           &node_id,
           typedb_driver,
-          db_name,
           & config,
         )); },
     Err ( err ) => {
@@ -288,7 +282,6 @@ fn generate_document (
   //   single_root_content_view
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
-  db_name       : &str,
   config        : &SkgConfig,
 ) -> String {
   // Just runs `single_root_content_view`,
@@ -297,7 +290,6 @@ fn generate_document (
   futures::executor::block_on (
     async {
       match single_root_content_view (
-        db_name,
         typedb_driver,
         config,
         node_id ) . await
