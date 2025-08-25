@@ -27,8 +27,8 @@ fn test_a_mess_of_stuff
     ).await?;
     let db_name = "skg-test";
     let config = SkgConfig {
-      skg_folder     : "irrelevant".into(),
-      tantivy_folder : "tests/typedb/fixtures".into() };
+      skg_folder     : "tests/typedb/fixtures".into(),
+      tantivy_folder : "irrelevant".into(), };
     let skg_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");
