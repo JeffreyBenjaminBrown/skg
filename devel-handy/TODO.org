@@ -6,38 +6,6 @@
      single_root_content_view
    many of which also take a SkgConfig
 ** use its tantivy_folder field
-* failing test: path not found from id
-** message
-     Running tests/content_view.rs (target/debug/deps/content_view-0ce22be24d32e7f6)
-
-running 1 test
-test test_a_mess_of_stuff ... FAILED
-
-failures:
-
----- test_a_mess_of_stuff stdout ----
-8 .skg files were read
-Deleting existing database 'skg-test'...
-Creating empty database 'skg-test'...
-Defining schema ...
-Creating nodes ...
-Creating relationships ...
-Building org view from ID 2...
-Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
-
-
-failures:
-    test_a_mess_of_stuff
-
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
-
-error: test failed, to rerun pass `--test content_view`
-** the problem
-   now that the nodepath field is eliminated from FileNode,
-   the path must be inferred from the ID,
-   but they are not equal
-** solution
-   Rust, somewhere, must know the user's data directory.
 * overhaul `pid_from_id`
 ** it's in rust/typedb/search.rs
 ** bear in mind that I edited it without testing the changes

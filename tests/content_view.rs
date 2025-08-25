@@ -27,7 +27,7 @@ fn test_a_mess_of_stuff
     ).await?;
     let db_name = "skg-test";
     let config = SkgConfig {
-      skg_folder     : "tests/typedb/fixtures".into(),
+      skg_folder     : "tests/content_view/fixtures".into(),
       tantivy_folder : "irrelevant".into(), };
     let skg_folder : &str =
       config . skg_folder . to_str ()

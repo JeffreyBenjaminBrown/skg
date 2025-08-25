@@ -47,8 +47,7 @@ fn test_index (
   let index_dir = "tests/index_titles/generated";
   if Path::new(index_dir).exists() {
     // Remove any existing test artifacts
-    fs::remove_dir_all(index_dir)?;
-  }
+    fs::remove_dir_all(index_dir)?; }
   fs::create_dir_all(index_dir)?;
 
   // Define the schema
@@ -62,11 +61,11 @@ fn test_index (
   let index_path = Path::new(
     "tests/index_titles/generated/index.tantivy");
   let (index, index_is_new) =
-    get_extant_index_or_create_empty_one(
-      schema.clone(),
+    get_extant_index_or_create_empty_one (
+      schema.clone (),
       index_path )?;
   let tantivy_index = TantivyIndex {
-    index: Arc::new(index),
+    index: Arc::new (index),
     path_field,
     title_field, };
   let indexed_count = update_index (

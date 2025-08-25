@@ -174,7 +174,7 @@ impl Error for HyperlinkParseError {}
 pub fn filenode_example () -> FileNode {
   FileNode {
     title: "This text gets indexed.".to_string(),
-    ids: vec![ ID::new("123") ],
+    ids: vec![ ID::new("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
     contains: vec![ ID::new("1"),

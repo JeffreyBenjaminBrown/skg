@@ -2,7 +2,7 @@ use std::fs;
 
 use skg::file_io::{
   read_filenode, write_filenode};
-use skg::types::{FileNode, filenode_example};
+use skg::types::{FileNode, ID, filenode_example};
 
 #[test]
 fn test_filenode_io() {
@@ -18,11 +18,13 @@ fn test_filenode_io() {
   // Read that file, reverse its lists, write to another file
   let read_node : FileNode = read_filenode (
     & out_filename ). unwrap ();
-  let reversed = reverse_some_of_filenode(&read_node);
+  let mut reversed = reverse_some_of_filenode(&read_node);
+  reversed . ids = // match pid to filename
+    vec![ ID::new("reversed") ];
+
   let reversed_filename = "tests/file_io/generated/reversed.skg";
   write_filenode(&reversed, reversed_filename).unwrap();
 
-  // Verify that the generated files match expected files
   let expected_example_path = "tests/file_io/fixtures/example.skg";
   let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
 
@@ -59,14 +61,26 @@ fn verify_body_not_needed() {
   let mut node = read_filenode (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
   node.body = None; // mutate it
+  node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
   write_filenode(
     &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
+  // Parse both files as YAML for semantic comparison
+  let generated_yaml: serde_yaml::Value =
+    serde_yaml::from_str (
+      &fs::read_to_string (
+        "tests/file_io/generated/no_unindexed.skg"
+      ) . unwrap () ). unwrap ();
+  let expected_yaml: serde_yaml::Value =
+    serde_yaml::from_str (
+      &fs::read_to_string (
+        "tests/file_io/fixtures/no_unindexed.skg"
+      ) . unwrap () ). unwrap ();
   assert_eq!(
-    fs::read_to_string(
-      "tests/file_io/generated/no_unindexed.skg").unwrap(),
-    fs::read_to_string(
-      "tests/file_io/fixtures/no_unindexed.skg").unwrap(),
-    "Deleting body did not have the intended effect."); }
+    generated_yaml,
+    expected_yaml,
+    "Deleting body did not have the intended effect."
+  );
+}
 
 pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     // Create a new FileNode reversing two of its lists,
