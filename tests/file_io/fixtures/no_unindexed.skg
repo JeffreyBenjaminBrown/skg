@@ -1,6 +1,6 @@
 title: This text gets indexed.
 ids:
-- '123'
+- 'no_unindexed'
 contains:
 - '1'
 - '2'

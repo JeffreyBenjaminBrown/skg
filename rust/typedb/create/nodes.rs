@@ -38,19 +38,13 @@ pub async fn create_node (
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let nodepath_str : String =
-    node . nodepath . to_string_lossy () . to_string () ;
   if node . ids . is_empty () {
-    return Err ( format! ( "Node at {} has no IDs.",
-                            nodepath_str )
-                 . into () ); }
+    return Err ( "Node with no IDs.".into() ); }
   let primary_id = node . ids [0] . as_str ();
   let insert_node_query = format! (
     r#"insert $n isa node,
-                 has id "{}",
-                 has path "{}";"#,
-    primary_id,
-    nodepath_str );
+                 has id "{}";"#,
+    primary_id );
   tx . query ( insert_node_query ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }

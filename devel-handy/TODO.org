@@ -1,3 +1,49 @@
+* failing test: path not found from id
+** message
+     Running tests/content_view.rs (target/debug/deps/content_view-0ce22be24d32e7f6)
+
+running 1 test
+test test_a_mess_of_stuff ... FAILED
+
+failures:
+
+---- test_a_mess_of_stuff stdout ----
+8 .skg files were read
+Deleting existing database 'skg-test'...
+Creating empty database 'skg-test'...
+Defining schema ...
+Creating nodes ...
+Creating relationships ...
+Building org view from ID 2...
+Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    test_a_mess_of_stuff
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+error: test failed, to rerun pass `--test content_view`
+** the problem
+   now that the nodepath field is eliminated from FileNode,
+   the path must be inferred from the ID,
+   but they are not equal
+** solution
+   Rust, somewhere, must know the user's data directory.
+* filepath_from_id_via_typedb`
+** it's in rust/typedb/search.rs
+** bear in mind that I edited it without testing the changes
+   right after commit cc94e920688ba693
+** TODO rewrite it, and its uses
+** TODO test it
+** TODO rename it pid_from_id_via_typedb
+   and it should return an ID, not a String
+* deleting the `nodepath` field in FileNode
+** in all test files, make sure filenames correspond to primary ids
+*** where it doesn't
+~/hodal/skg/tests/file_io/fixtures/example.skg
+~/hodal/skg/tests/file_io/fixtures/no_unindexed.skg
+~/hodal/skg/tests/file_io/fixtures/reversed.skg
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
 * At least one test for `single_root_content_view` is wrong.
   `org_from_node_recursive` should use its `focus` argument,

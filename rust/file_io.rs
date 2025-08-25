@@ -17,16 +17,14 @@ pub fn read_filenode
    -> io::Result <FileNode>
 { // The type signature explains everything.
 
-  let file_path    : &Path = file_path.as_ref ();
-  let contents     : String = fs::read_to_string ( file_path )?;
-  let mut filenode : FileNode =
+  let file_path : &Path = file_path.as_ref ();
+  let contents  : String = fs::read_to_string ( file_path )?;
+  let filenode  : FileNode =
     serde_yaml::from_str ( &contents )
     . map_err (
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
         e.to_string () )) ?;
-  filenode.nodepath = // Unlike the rest of the FileNode, this is not extracted from a field in the .skg file.
-    file_path.to_path_buf ();
   Ok ( filenode ) }
 
 pub fn write_filenode
@@ -71,7 +69,6 @@ mod tests {
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
       overrides_view_of: vec![],
-      nodepath: file_path.clone(),
     };
 
     // Write the node to a file

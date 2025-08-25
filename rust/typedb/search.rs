@@ -31,7 +31,7 @@ pub async fn find_rootish_container (
       // Last can't actually fail, because the path always includes the starting node, but Rust doesn't know that.
       io::Error::new (
         io::ErrorKind::InvalidData,
-        format!( "Empty path returned for node '{}'", node )
+        format!( "Empty path containerward from node '{}'", node )
       ) . into ()
     } )
     . cloned () }
@@ -108,9 +108,9 @@ pub async fn find_container_of (
   Err ( format! ( "No container found for node with ID '{}'",
                    node ). into() ) }
 
+/// Runs a single TypeDB query.
+/// Returns the node's filepath.
 pub async fn filepath_from_id_via_typedb (
-  // Runs a single TypeDB query.
-  // Returns the node's filepath.
   db_name : &str,
   driver  : &TypeDBDriver,
   node_id : &ID
@@ -123,23 +123,24 @@ pub async fn filepath_from_id_via_typedb (
   let query = format! (
     r#"match
       $node isa node,
-            has path $path;
+            has id $primary_id;
       {{ $node has id "{}"; }} or
-      {{ $e isa extra_id, has id "{}";
+      {{ $e   isa     extra_id, has id "{}";
          $rel isa has_extra_id ( node: $node,
                                  extra_id: $e ); }} ;
-      select $path;"#,
+      select $primary_id;"#,
     node_id,
     node_id );
   let answer : QueryAnswer = tx.query ( query ). await ?;
   let mut stream = answer.into_rows ();
   if let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
-    if let Some (concept) = row.get ("path") ? {
+    if let Some (concept) = row.get ("primary_id") ? {
       return Ok (extract_payload_from_typedb_string_rep (
         &concept . to_string () )); }}
-  Err ( format! ( "No path found for node with ID '{}'",
-                   node_id).into ()) }
+  Err ( format! ( "No primary id found for ID '{}'",
+                   node_id )
+        . into () ) }
 
 pub fn extract_payload_from_typedb_string_rep (
   // Returns the string it finds

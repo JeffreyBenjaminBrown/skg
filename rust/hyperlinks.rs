@@ -54,8 +54,6 @@ pub fn replace_each_link_with_its_label (
 
 #[cfg(test)]
 mod tests {
-  use std::path::PathBuf;
-
   use super::*;
   use crate::types::{HyperlinkParseError, ID};
 
@@ -153,7 +151,6 @@ mod tests {
       subscribes_to: vec![],
       hides_from_its_subscriptions: vec![],
       overrides_view_of: vec![],
-      nodepath: PathBuf::from("not important"),
     };
     let hyperlinks = hyperlinks_from_filenode(&test_node);
     assert_eq!(hyperlinks.len(), 4);

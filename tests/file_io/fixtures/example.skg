@@ -1,6 +1,6 @@
 title: This text gets indexed.
 ids:
-- '123'
+- 'example'
 body: |-
   This one string could span pages.
   It better be okay with newlines.

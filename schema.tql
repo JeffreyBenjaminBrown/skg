@@ -3,9 +3,6 @@ define
   # Most nodes only have one id, but see `extra_id` below.
   attribute id, value string;
 
-  # A place in the filesystem.
-  attribute path, value string;
-
   # Like the relationship
   # from a document to a section thereof, or
   # from a section to a subsection, or
@@ -43,7 +40,6 @@ define
   # "The graph" is made of nodes, which resemble org-headings.
   entity node,
     owns id @key,
-    owns path @unique,
     plays contains:container,
     plays contains:contained,
     plays hyperlinks_to:source,

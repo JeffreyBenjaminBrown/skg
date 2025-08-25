@@ -2,7 +2,6 @@ use serde::{Serialize, Deserialize};
 use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::{Index, schema};
@@ -68,9 +67,6 @@ pub struct FileNode {
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub overrides_view_of: Vec<ID>,
-
-  #[serde(skip)] // inferred from filepath
-  pub nodepath: PathBuf,
 }
 
 #[derive(Clone)]
@@ -182,6 +178,4 @@ It better be okay with newlines."# . to_string() ),
                         ID::new("13")],
     hides_from_its_subscriptions: vec![],
     overrides_view_of: vec![],
-    nodepath: PathBuf::from(
-      "tests/file_io/generated/example.skg"),
   } }
