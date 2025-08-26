@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 
 use skg::file_io::{
   read_filenode, write_filenode};
@@ -8,10 +9,12 @@ use skg::types::{FileNode, ID, filenode_example};
 fn test_filenode_io() {
   // Write the example node to a file
   let example : FileNode = filenode_example();
-  let out_filename : String = example
-    .ids[0] // the primary id
-    .0      // the string part of it
-    .clone();
+  let out_filename: PathBuf =
+    PathBuf::from("tests/file_io/generated")
+    . join ( example
+             .ids[0] // the primary id
+             .0      // the string part of it
+             .clone() );
   write_filenode ( &example, &out_filename )
     . unwrap ();
 
