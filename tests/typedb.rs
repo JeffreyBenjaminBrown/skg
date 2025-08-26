@@ -3,16 +3,6 @@
 // TODO | PITFALL:
 // Deletes any existing TypeDB database named `skg-test`,
 
-use futures::executor::block_on;
-use futures::StreamExt;
-use std::collections::HashSet;
-use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TransactionType,
-  TypeDBDriver, };
-
 use skg::render::org::single_root_content_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::create::overwrite_and_populate_new_db;
@@ -20,7 +10,20 @@ use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
   pid_from_id, };
-use skg::types::{ID, OrgNode, SkgConfig};
+use skg::typedb::update::create_unknown_nodes_only;
+use skg::types::{ID, FileNode, OrgNode, SkgConfig};
+
+use futures::StreamExt;
+use futures::executor::block_on;
+use std::collections::HashSet;
+use std::error::Error;
+use typedb_driver::{
+  answer::{ ConceptRow, QueryAnswer },
+  Credentials,
+  DriverOptions,
+  Transaction,
+  TransactionType,
+  TypeDBDriver, };
 
 
 #[test]
@@ -188,7 +191,121 @@ fn test_typedb_integration (
       & driver, & config
     ) . await ?;
 
+    test_create_unknown_nodes_only (
+      & config . db_name,
+      & driver,
+    ) . await ?;
+
     Ok (( )) } ) }
+
+/// Drop-in test you can call from your existing integration test
+/// once you have `db_name` and `driver` in scope.
+/// Example call:
+///   test_create_unknown_nodes_only ( db_name, &driver ) . await ?;
+pub async fn test_create_unknown_nodes_only (
+  db_name : &str,
+  driver  : &TypeDBDriver
+) -> Result < (), Box<dyn Error> > {
+
+  // Rebuild DB from fixtures and schema.
+  overwrite_and_populate_new_db (
+    "tests/typedb/fixtures/",
+    db_name,
+    driver
+  ) . await ?;
+
+  // Baseline node count.
+  let initial_number_of_nodes : usize =
+    count_nodes ( db_name, driver ) . await ?;
+
+  // Prepare two FileNodes: one existing ("a"), one new ("new").
+  // Keep other fields minimal/empty as requested.
+  let fn_a  : FileNode = FileNode {
+    title                    : "ignore this string" . to_string (),
+    ids                      : vec![ ID::from ( "a" ) ],
+    body                     : None,
+    contains                 : vec![],
+    subscribes_to            : vec![],
+    hides_from_its_subscriptions : vec![],
+    overrides_view_of        : vec![],
+  };
+  let fn_new : FileNode = FileNode {
+    title                    : "ignore this string" . to_string (),
+    ids                      : vec![ ID::from ( "new" ) ],
+    body                     : None,
+    contains                 : vec![],
+    subscribes_to            : vec![],
+    hides_from_its_subscriptions : vec![],
+    overrides_view_of        : vec![],
+  };
+
+  // Attempt to create only unknown nodes among { "a", "new" }.
+  // Expect exactly 1 creation (the id "new").
+  let created_count : usize =
+    create_unknown_nodes_only (
+      db_name,
+      driver,
+      &vec! [ fn_a.clone (), fn_new.clone () ]
+    ) . await ?;
+  assert_eq! (
+    created_count, 1,
+    "Exactly one node should be created (with id 'new')." );
+
+  // Lookups:
+  // - 'a' should exist (from fixtures)
+  // - 'new' should now exist (just created)
+  // - 'absent' should not exist
+  assert! (
+    pid_from_id ( db_name, driver, &ID::from ( "a" ) )
+      . await . is_ok (),
+    "Expected lookup of existing id 'a' to succeed." );
+
+  assert! (
+    pid_from_id ( db_name, driver, &ID::from ( "new" ) )
+      . await . is_ok (),
+    "Expected lookup of newly created id 'new' to succeed." );
+
+  assert! (
+    pid_from_id ( db_name, driver, &ID::from ( "absent" ) )
+      . await . is_err (),
+    "Expected lookup of missing id 'absent' to fail." );
+
+  // Final count should be +1 compared to initial.
+  let final_number_of_nodes : usize =
+    count_nodes ( db_name, driver ) . await ?;
+  assert_eq! (
+    final_number_of_nodes,
+    initial_number_of_nodes + 1,
+    "Node count should increase by exactly 1 (only 'new' was created)." );
+
+  Ok ( () ) }
+
+/// Helper: count all `node` entities in the DB by streaming rows.
+/// (Avoids reliance on `count;` semantics.)
+async fn count_nodes (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result < usize, Box<dyn Error> > {
+
+  let tx : Transaction =
+    driver . transaction (
+      db_name,
+      TransactionType::Read
+    ) . await ?;
+
+  let answer : QueryAnswer =
+    tx . query (
+      r#"match
+           $n isa node, has id $id;
+         select $id;"#
+    ) . await ?;
+
+  let mut rows = answer.into_rows ();
+  let mut n : usize = 0;
+  while let Some ( row_res ) = rows . next () . await {
+    let _row : ConceptRow = row_res ?;
+    n += 1; }
+  Ok ( n ) }
 
 async fn test_recursive_document (
   driver  : &TypeDBDriver,

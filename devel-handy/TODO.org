@@ -1,10 +1,6 @@
-* deleting the `nodepath` field in FileNode
-** in all test files, make sure filenames correspond to primary ids
-*** where it doesn't
-~/hodal/skg/tests/file_io/fixtures/example.skg
-~/hodal/skg/tests/file_io/fixtures/no_unindexed.skg
-~/hodal/skg/tests/file_io/fixtures/reversed.skg
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
+* How to delete nodes?
+* Document the fact that filenames must correspond to PIDs.
 * At least one test for `single_root_content_view` is wrong.
   `org_from_node_recursive` should use its `focus` argument,
   because it's easy.
