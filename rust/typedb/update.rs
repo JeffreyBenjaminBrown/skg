@@ -1,6 +1,6 @@
 use crate::typedb::create::nodes::create_node;
 use crate::typedb::search::extract_payload_from_typedb_string_rep;
-use crate::types::FileNode;
+use crate::types::{FileNode, ID};
 
 use futures::StreamExt;
 use std::collections::{ HashSet, BTreeSet };
@@ -97,3 +97,34 @@ async fn which_ids_exist (
             & concept . to_string () );
         found.insert ( payload ); }}
   Ok ( found ) }
+
+/// Delete every instance of `relation`
+/// where one of the ipnut IDs plays `role`.
+/// Returns the number of IDs processed
+/// (not the number of relations deleted,
+/// which would be more work).
+pub async fn delete_out_links (
+  db_name  : &str,
+  driver   : &TypeDBDriver,
+  ids      : &Vec<ID>,
+  relation : &str,   // e.g. "contains"
+  role     : &str,   // e.g. "container"
+) -> Result < usize, Box<dyn Error> > {
+
+  let tx : Transaction =
+    driver . transaction (
+      db_name,
+      TransactionType::Write
+    ) . await ?;
+  for id in ids {
+    let q : String = format! (
+      r#"match
+           $n   isa node, has id "{}";
+           $rel isa {} ( {}: $n );
+         delete $rel; "#,
+      id.as_str (),
+      relation,
+      role );
+    tx . query ( q ) . await ?; }
+  tx . commit () . await ?;
+  Ok ( ids.len () ) }

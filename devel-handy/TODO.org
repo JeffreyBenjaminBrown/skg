@@ -1,5 +1,6 @@
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
-* How to delete nodes?
+* How can a user delete nodes?
+* Move the definitions in typedb::mod to typedb::init.
 * Document the fact that filenames must correspond to PIDs.
 * At least one test for `single_root_content_view` is wrong.
   `org_from_node_recursive` should use its `focus` argument,

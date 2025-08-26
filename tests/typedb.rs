@@ -10,7 +10,9 @@ use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
   pid_from_id, };
-use skg::typedb::update::create_only_nodes_with_no_ids_present;
+use skg::typedb::update::{
+  create_only_nodes_with_no_ids_present,
+  delete_out_links, };
 use skg::types::{ID, FileNode, OrgNode, SkgConfig};
 
 use futures::StreamExt;
@@ -190,18 +192,80 @@ fn test_typedb_integration (
     test_recursive_document (
       & driver, & config
     ) . await ?;
-
     test_create_only_nodes_with_no_ids_present (
+      & config . db_name,
+      & driver,
+    ) . await ?;
+    test_delete_out_links_contains_container (
       & config . db_name,
       & driver,
     ) . await ?;
 
     Ok (( )) } ) }
 
-/// Drop-in test you can call from your existing integration test
-/// once you have `db_name` and `driver` in scope.
-/// Example call:
-///   test_create_only_nodes_with_no_ids_present ( db_name, &driver ) . await ?;
+pub async fn test_delete_out_links_contains_container (
+  db_name : &str,
+  driver  : &TypeDBDriver
+) -> Result < (), Box<dyn Error> > {
+  // The README at fixtures-2/ draws the initial contains tree.
+  overwrite_and_populate_new_db (
+    "tests/typedb/fixtures-2/",
+    db_name,
+    driver
+  ) . await ?;
+
+  // Sanity: initial contains edges include the full tree.
+  let before_pairs = collect_all_of_some_binary_rel(
+    db_name,
+    driver,
+    r#" match
+          $inner isa node, has id $inner_id;
+          $outer isa node, has id $outer_id;
+          $rel isa contains (container: $inner,
+                             contained: $outer);
+        select $inner_id, $outer_id;"#,
+    "inner_id",
+    "outer_id"
+  ).await?;
+  let mut expected_before = std::collections::HashSet::new();
+  expected_before.insert(("1".to_string(), "2".to_string()));
+  expected_before.insert(("1".to_string(), "3".to_string()));
+  expected_before.insert(("3".to_string(), "4".to_string()));
+  expected_before.insert(("3".to_string(), "5".to_string()));
+  assert_eq!(before_pairs, expected_before);
+
+  // Delete relationship to contents for nodes 3, 4, 5.
+  let deleted_for_ids : usize =
+    delete_out_links (
+      db_name,
+      driver,
+      &vec![ ID::from("3"),
+             ID::from("4"),
+             ID::from("5") ],
+      "contains",
+      "container"
+    ) . await ?;
+  assert_eq!(deleted_for_ids, 3);
+
+  // Only the relationships (1→2) and (1→3) should remain.
+  let after_pairs = collect_all_of_some_binary_rel (
+    db_name,
+    driver,
+    r#" match
+          $container isa node, has id $container_id;
+          $contained isa node, has id $contained_id;
+          $rel isa contains (container: $container,
+                             contained: $contained);
+        select $container_id, $contained_id;"#,
+    "container_id",
+    "contained_id"
+  ).await?;
+  let mut expected_after = std::collections::HashSet::new();
+  expected_after.insert(("1".to_string(), "2".to_string()));
+  expected_after.insert(("1".to_string(), "3".to_string()));
+  assert_eq!(after_pairs, expected_after);
+  Ok (( )) }
+
 pub async fn test_create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver
