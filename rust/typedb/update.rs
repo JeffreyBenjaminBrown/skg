@@ -16,7 +16,7 @@ use typedb_driver::{
 Returns the number of nodes created.
 .
 PITFALL: A node is only added if *all* of its IDs are absent from the DB. See the TODO comment in the code. */
-pub async fn create_unknown_nodes_only (
+pub async fn create_only_nodes_with_no_ids_present (
   db_name   : &str,
   driver    : &TypeDBDriver,
   filenodes : &Vec <FileNode>
@@ -30,7 +30,7 @@ pub async fn create_unknown_nodes_only (
       /* TODO ? Should I only include primary IDs here? It would be strange if a node's primary ID was unknown to the database but one of its extra IDs was known. */
       all_ids.insert ( id.to_string () ); }}
   let known_ids : HashSet < String > =
-    fetch_existing_ids_batch (
+    which_ids_exist (
       db_name,
       driver,
       &all_ids
@@ -59,7 +59,7 @@ pub async fn create_unknown_nodes_only (
 /// Batch existence check:
 /// Given a set of candidate ID *strings*,
 /// return the subset that already exist in the DB.
-async fn fetch_existing_ids_batch (
+async fn which_ids_exist (
   db_name : &str,
   driver  : &TypeDBDriver,
   ids     : &BTreeSet < String >

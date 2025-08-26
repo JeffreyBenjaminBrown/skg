@@ -10,7 +10,7 @@ use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
   pid_from_id, };
-use skg::typedb::update::create_unknown_nodes_only;
+use skg::typedb::update::create_only_nodes_with_no_ids_present;
 use skg::types::{ID, FileNode, OrgNode, SkgConfig};
 
 use futures::StreamExt;
@@ -191,7 +191,7 @@ fn test_typedb_integration (
       & driver, & config
     ) . await ?;
 
-    test_create_unknown_nodes_only (
+    test_create_only_nodes_with_no_ids_present (
       & config . db_name,
       & driver,
     ) . await ?;
@@ -201,8 +201,8 @@ fn test_typedb_integration (
 /// Drop-in test you can call from your existing integration test
 /// once you have `db_name` and `driver` in scope.
 /// Example call:
-///   test_create_unknown_nodes_only ( db_name, &driver ) . await ?;
-pub async fn test_create_unknown_nodes_only (
+///   test_create_only_nodes_with_no_ids_present ( db_name, &driver ) . await ?;
+pub async fn test_create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
@@ -242,7 +242,7 @@ pub async fn test_create_unknown_nodes_only (
   // Attempt to create only unknown nodes among { "a", "new" }.
   // Expect exactly 1 creation (the id "new").
   let created_count : usize =
-    create_unknown_nodes_only (
+    create_only_nodes_with_no_ids_present (
       db_name,
       driver,
       &vec! [ fn_a.clone (), fn_new.clone () ]
