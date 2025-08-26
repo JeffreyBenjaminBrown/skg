@@ -13,6 +13,7 @@ file_extensions=(
   "el"
   "md"
   "rs"
+  "tql"
 )
 
 # Build tree ignore string: "pattern1|pattern2|pattern3"

@@ -45,9 +45,7 @@ pub fn write_filenode
   ( filenode  : &FileNode,
     file_path : P)
     -> io::Result<()>
-{ /* Writes `filenode` to `path`.
-     A skip directive in the FileNode typedef
-     keeps the field `path` out of the .skg representation. */
+{ // Writes `filenode` to `path`.
 
   let yaml_string =
     serde_yaml::to_string ( filenode )
