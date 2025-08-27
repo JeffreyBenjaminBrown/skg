@@ -1,5 +1,6 @@
 pub mod file_io;
 pub mod hyperlinks;
+pub mod index2;
 pub mod index_titles;
 pub mod render;
 pub mod save;

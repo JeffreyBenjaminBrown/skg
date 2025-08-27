@@ -15,7 +15,7 @@ pub async fn create_all_nodes (
   // Then commits.
   db_name   : &str,
   driver    : &TypeDBDriver,
-  filenodes : &Vec <FileNode>
+  filenodes : &[FileNode]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =

@@ -1,3 +1,8 @@
+* update tests for new TypeDB loading structure
+  replace
+    overwrite_and_populate_new_db
+  with
+    initialize_typedb_from_filenodes
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
 * A node's ID should always be its primary one.
 * How can a user delete nodes?

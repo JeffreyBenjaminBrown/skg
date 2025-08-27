@@ -9,7 +9,7 @@ use typedb_driver::{
 };
 
 use skg::render::org::single_root_content_view;
-use skg::typedb::create::overwrite_and_populate_new_db;
+use skg::typedb::create::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   find_rootish_container,
   path_to_rootish_container, };
@@ -32,7 +32,7 @@ fn test_a_mess_of_stuff
     let skg_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");
-    overwrite_and_populate_new_db (
+    populate_test_db_from_fixtures (
       skg_folder,
       & config . db_name,
       & driver

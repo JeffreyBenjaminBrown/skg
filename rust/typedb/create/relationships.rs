@@ -15,7 +15,7 @@ pub async fn create_all_relationships (
   // PITFALL: Does not create `has_extra_id` relationships.
   db_name   : &str,
   driver    : &TypeDBDriver,
-  filenodes : &Vec<FileNode>
+  filenodes : &[FileNode]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =

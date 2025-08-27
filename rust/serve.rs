@@ -1,22 +1,19 @@
-use crate::index_titles::{
-  get_extant_index_or_create_empty_one,
-  search_index, update_index};
-use crate::render::org::  single_root_content_view;
-use crate::typedb::create::{
-  overwrite_and_populate_new_db};
-use crate::types::{ID, SkgConfig, TantivyIndex};
+use crate::file_io::read_skg_files;
+use crate::index2::initialize_tantivy_from_filenodes;
+use crate::index_titles::search_index;
+use crate::render::org::single_root_content_view;
+use crate::typedb::create::initialize_typedb_from_filenodes;
+use crate::types::{ID, SkgConfig, TantivyIndex, FileNode};
 
+use futures::executor::block_on;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener,
                TcpStream, // handles two-way communication
                SocketAddr};
-use std::path::Path;
 use std::sync::Arc;
 use std::thread;
-use tantivy::{ Document, Index, schema};
-use typedb_driver::{TypeDBDriver, Credentials,
-                    DriverOptions};
-use futures::executor::block_on;
+use tantivy::{Document};
+use typedb_driver::TypeDBDriver;
 
 
 /// Populates the tantivy db ("the index") and the typedb db
@@ -26,10 +23,9 @@ pub fn serve (
   config : SkgConfig
 ) -> std::io::Result<()> {
 
-  let typedb_driver : Arc<TypeDBDriver> =
-    initialize_typedb ( &config );
-  let tantivy_index : TantivyIndex =
-    initialize_tantivy ( &config );
+  let (typedb_driver, tantivy_index)
+    : (Arc<TypeDBDriver>, TantivyIndex)
+    = initialize_dbs ( &config );
   let emacs_listener : TcpListener =
     TcpListener::bind("0.0.0.0:1730")?;
   println!("Listening on port 1730...");
@@ -50,6 +46,31 @@ pub fn serve (
       Err(e) => {
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
+
+fn initialize_dbs (
+  config : & SkgConfig,
+) -> (Arc<TypeDBDriver>, TantivyIndex) {
+  // First reads all FileNodes from disk,
+  // then initializes both databases using the same data.
+
+  println!("Reading .skg files...");
+  let skg_folder_str: &str =
+    config . skg_folder
+    . to_str () . expect ("Invalid UTF-8 in skg folder path");
+  let filenodes: Vec<FileNode> =
+    read_skg_files ( skg_folder_str )
+    . unwrap_or_else(|e| {
+      eprintln!("Failed to read .skg files: {}", e);
+      std::process::exit(1);
+    });
+  println!("{} .skg files were read", filenodes.len());
+
+  let typedb_driver: Arc<TypeDBDriver> =
+    initialize_typedb_from_filenodes ( config, &filenodes );
+  let tantivy_index: TantivyIndex =
+    initialize_tantivy_from_filenodes ( config, &filenodes );
+
+  (typedb_driver, tantivy_index) }
 
 fn handle_emacs (
   mut stream    : TcpStream,
@@ -102,91 +123,6 @@ fn handle_emacs (
               err)); } };
       request.clear(); }
   println!("Emacs disconnected: {peer}"); }
-
-pub fn initialize_typedb (
-  config : & SkgConfig,
-) -> Arc<TypeDBDriver> {
-  // Connects to the TypeDB server,
-  // then calls overwrite_and_populate_new_db.
-
-  println!("Initializing TypeDB database...");
-  let driver = block_on( async {
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None).unwrap() )
-      .await
-      .unwrap_or_else(|e| {
-        eprintln!("Error connecting to TypeDB: {}", e);
-        std::process::exit(1);
-      } )
-  } );
-
-  block_on ( async {
-    if let Err (e) = overwrite_and_populate_new_db (
-      ( & config . skg_folder
-          . to_str () . expect ("Invalid UTF-8 in skg folder path") ),
-      & config . db_name,
-      & driver,
-    ) . await {
-      eprintln! ( "Failed to initialize database: {}", e );
-      std::process::exit(1);
-    } } );
-  println!("TypeDB database initialized successfully.");
-  Arc::new( driver ) }
-
-fn initialize_tantivy (
-  config : & SkgConfig,
-) -> TantivyIndex {
-  // Build a schema.
-  // Fetch the old or start a new index, using
-  //   `get_extant_index_or_create_empty_one`.
-  // Update it with update_index.
-
-  println!("Initializing Tantivy index...");
-
-  // Define the schema.
-  let mut schema_builder = schema::Schema::builder();
-  let path_field = schema_builder.add_text_field(
-    "path", schema::STRING | schema::STORED);
-  let title_field = schema_builder.add_text_field(
-    "title", schema::TEXT | schema::STORED);
-  let schema : schema::Schema =
-    schema_builder.build();
-
-  // Create or open the index, and wrap it in my `TantivyIndex`.
-  let index_path = Path::new (
-    & config . tantivy_folder );
-  let (index, index_is_new) : (Index, bool) =
-    get_extant_index_or_create_empty_one (
-      schema,
-      index_path )
-    . unwrap_or_else(|e| {
-      eprintln!("Failed to create Tantivy index: {}", e);
-      std::process::exit(1);
-    } );
-  let tantivy_index = TantivyIndex {
-    index: Arc::new(index),
-    path_field,
-    title_field,
-  };
-
-  // Update the index with current files
-  match update_index (
-    & tantivy_index,
-    ( & config . skg_folder
-        . to_str () . expect ("Invalid UTF-8 in tantivy index path") ),
-    index_path,
-    index_is_new )
-  {
-    Ok(indexed_count) => { println!(
-      "Tantivy index initialized successfully. Indexed {} files.",
-      indexed_count); }
-    Err(e) => {
-      eprintln!("Failed to update Tantivy index: {}", e);
-      std::process::exit(1); } }
-
-  tantivy_index }
 
 fn handle_org_document_request (
   // Gets a node id from the request,
@@ -288,7 +224,7 @@ fn generate_document (
   // Just runs `single_root_content_view`,
   // but with async and error handling.
 
-  futures::executor::block_on (
+  block_on (
     async {
       match single_root_content_view (
         typedb_driver,

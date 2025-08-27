@@ -5,7 +5,7 @@
 
 use skg::render::org::single_root_content_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::typedb::create::overwrite_and_populate_new_db;
+use skg::typedb::create::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,
@@ -46,7 +46,7 @@ fn test_typedb_integration (
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");
 
-    overwrite_and_populate_new_db (
+    populate_test_db_from_fixtures (
       index_folder,
       & config . db_name,
       & driver
@@ -208,7 +208,7 @@ pub async fn test_delete_out_links_contains_container (
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
   // The README at fixtures-2/ draws the initial contains tree.
-  overwrite_and_populate_new_db (
+  populate_test_db_from_fixtures (
     "tests/typedb/fixtures-2/",
     db_name,
     driver
@@ -272,7 +272,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
 ) -> Result < (), Box<dyn Error> > {
 
   // Rebuild DB from fixtures and schema.
-  overwrite_and_populate_new_db (
+  populate_test_db_from_fixtures (
     "tests/typedb/fixtures/",
     db_name,
     driver
