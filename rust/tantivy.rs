@@ -82,16 +82,15 @@ pub fn empty_then_populate_index (
   filenodes     : &[FileNode],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
-
-  let mut writer: IndexWriter =
-    tantivy_index.index.writer (50_000_000) ?;
-  writer.delete_all_documents () ?;
-  let indexed_count: usize =
-    add_documents_to_writer (
-      filenodes, &mut writer, tantivy_index )?;
-  commit_with_status (
-    &mut writer, indexed_count, "Indexed" )?;
-  Ok (indexed_count) }
+  { // Empty the index.
+    let mut writer: IndexWriter =
+      tantivy_index.index.writer(50_000_000)?;
+    writer.delete_all_documents()?;
+    writer.commit () ?; }
+  // Outside the above block, the writer it created is dropped,
+  // which permits this next command to use a different one.
+  update_index_with_filenodes (
+    filenodes, tantivy_index ) }
 
 /// Updates the index with the provided FileNodes.
 ///   For existing IDs, updates the title.
