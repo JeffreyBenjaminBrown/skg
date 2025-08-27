@@ -5,10 +5,34 @@ use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::{FileNode, ID, SkgConfig, TantivyIndex};
 
 use tantivy::{Index, IndexWriter, doc, schema};
+use tantivy::collector::TopDocs;
 use std::path::Path;
 use std::sync::Arc;
 use std::error::Error;
 
+
+pub fn search_index (
+  tantivy_index : &TantivyIndex,
+  query_text    : &str
+) -> Result < ( Vec< ( f32, // relevance score
+                       tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
+                tantivy::Searcher ),
+              Box <dyn std::error::Error> > {
+  // Returns the top 10 matching (tantivy) "Documents".
+
+  println! (
+    "\nFinding files with titles matching \"{}\".",
+    query_text);
+  let reader = tantivy_index.index.reader () ?;
+  let searcher = reader.searcher();
+  let query_parser : tantivy::query::QueryParser =
+    tantivy::query::QueryParser::for_index (
+      &tantivy_index.index,
+      vec! [ tantivy_index.title_field ] );
+  let query = query_parser.parse_query ( query_text ) ?;
+  let best_matches = searcher.search (
+    &query, &TopDocs::with_limit (10) )?;
+  Ok (( best_matches, searcher )) }
 
 pub fn initialize_tantivy_from_filenodes (
   config : & SkgConfig,

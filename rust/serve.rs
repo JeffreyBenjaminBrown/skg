@@ -1,6 +1,6 @@
 use crate::file_io::read_skg_files;
-use crate::index2::initialize_tantivy_from_filenodes;
-use crate::index_titles::search_index;
+use crate::tantivy::initialize_tantivy_from_filenodes;
+use crate::tantivy::search_index;
 use crate::render::org::single_root_content_view;
 use crate::typedb::create::initialize_typedb_from_filenodes;
 use crate::types::{ID, SkgConfig, TantivyIndex, FileNode};
