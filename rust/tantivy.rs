@@ -58,7 +58,7 @@ pub fn initialize_tantivy_from_filenodes (
     Path::new ( & config . tantivy_folder );
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
-    create_fresh_index (
+    wipe_then_create_index_from_filenodes (
       filenodes,
       index_path,
       schema,
@@ -121,7 +121,7 @@ pub fn update_index_with_filenodes (
 /// Creates a new index at the given path,
 /// then populates it.
 /// Removes any existing index first.
-pub fn create_fresh_index (
+pub fn wipe_then_create_index_from_filenodes (
   filenodes   : &[FileNode],
   index_path  : &Path,
   schema      : tantivy::schema::Schema,
@@ -130,6 +130,7 @@ pub fn create_fresh_index (
 ) -> Result<(TantivyIndex,
              usize), // number of documents indexed
             Box<dyn Error>> {
+
   if index_path.exists() {
     std::fs::remove_dir_all(index_path)?; }
   std::fs::create_dir_all ( index_path )?;
