@@ -80,9 +80,9 @@ pub struct FileNode {
 #[derive(Clone)]
 pub struct TantivyIndex {
   // Associates titles to paths.
-  pub index: Arc<Index>,
-  pub path_field: schema::Field,
-  pub title_field: schema::Field,
+  pub index       : Arc<Index>,
+  pub id_field    : schema::Field,
+  pub title_field : schema::Field,
 }
 
 
