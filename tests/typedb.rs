@@ -5,7 +5,7 @@
 
 use skg::render::org::single_root_content_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::typedb::create::populate_test_db_from_fixtures;
+use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   extract_payload_from_typedb_string_rep,
   find_container_of,

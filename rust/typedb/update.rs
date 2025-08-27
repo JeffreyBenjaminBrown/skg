@@ -1,4 +1,4 @@
-use crate::typedb::create::nodes::create_node;
+use crate::typedb::nodes::create_node;
 use crate::typedb::search::extract_payload_from_typedb_string_rep;
 use crate::types::{FileNode, ID};
 

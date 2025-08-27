@@ -9,7 +9,7 @@ use typedb_driver::{
 };
 
 use skg::render::org::single_root_content_view;
-use skg::typedb::create::populate_test_db_from_fixtures;
+use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   find_rootish_container,
   path_to_rootish_container, };

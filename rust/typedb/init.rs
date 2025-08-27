@@ -1,9 +1,5 @@
-pub mod nodes;
-pub mod relationships;
-
-pub use nodes::create_all_nodes;
-pub use relationships::create_all_relationships;
-
+use crate::typedb::nodes::create_all_nodes;
+use crate::typedb::relationships::create_all_relationships;
 use crate::types::{FileNode, SkgConfig};
 use crate::file_io::read_skg_files;
 
