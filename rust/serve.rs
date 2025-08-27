@@ -19,7 +19,8 @@ use typedb_driver::{TypeDBDriver, Credentials,
 use futures::executor::block_on;
 
 
-/// Makes a typedb driver and a tantivy index.
+/// Populates the tantivy db ("the index") and the typedb db
+/// (sometimes called "the db", as if there were only one).
 /// Then pipes TCP input from Emacs into handle_emacs.
 pub fn serve (
   config : SkgConfig

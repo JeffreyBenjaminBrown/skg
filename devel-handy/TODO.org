@@ -1,4 +1,5 @@
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
+* A node's ID should always be its primary one.
 * How can a user delete nodes?
 * Move the definitions in typedb::mod to typedb::init.
 * Document the fact that filenames must correspond to PIDs.

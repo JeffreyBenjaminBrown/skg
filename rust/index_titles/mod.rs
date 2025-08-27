@@ -45,28 +45,31 @@ pub fn get_extant_index_or_create_empty_one (
   // If it creates an index, the index is empty.
   // But if it fetches an index, the index might not be.
   schema: schema::Schema,
-  index_path: &Path // path to the entire index, not a file
+  index_folder: &Path, // The index is an entire folder.
 ) -> Result< (Index,
               bool), // True if the index is new.
               Box<dyn std::error::Error>> {
 
-  if index_path.exists() {
-    println!("Attempting to open existing index at {:?}", index_path);
-    match Index::open_in_dir(index_path) {
+  if index_folder.exists() {
+    println!("Attempting to open existing index at {:?}",
+             index_folder);
+    match Index::open_in_dir(index_folder) {
       Ok(index) => {
         println!("Successfully opened existing index");
         Ok((index,false)) },
       Err(e) => {
         println!(
           "Failed to open existing index: {:?}. Recreating...", e);
-        { fs::remove_dir_all(index_path)?;
-          fs::create_dir_all(index_path)?; };
-        println!("Creating new index at {:?}", index_path);
-        Ok ( (
-          Index::create_in_dir ( index_path, schema )?,
-          true ) ) } } }
+        { fs::remove_dir_all(index_folder)?;
+          fs::create_dir_all(index_folder)?; };
+        println! ( "Creating new index at {:?}",
+                    index_folder );
+        Ok ((
+          Index::create_in_dir ( index_folder, schema )?,
+          true )) }} }
   else {
-    println!("Creating new index at {:?}", index_path);
-    fs::create_dir_all(index_path)?;
-    Ok( (Index::create_in_dir(index_path, schema)?,
-         true ) ) } }
+    println!( "Creating new index at {:?}",
+               index_folder);
+    fs::create_dir_all ( index_folder )?;
+    Ok (( Index::create_in_dir(index_folder, schema)?,
+          true )) }}
