@@ -5,10 +5,10 @@ pub use nodes::create_all_nodes;
 pub use relationships::create_all_relationships;
 
 use crate::types::{FileNode};
-use crate::file_io::read_filenode;
+use crate::file_io::read_skg_files;
 
 use std::error::Error;
-use std::{io, fs, path::Path};
+use std::fs;
 use typedb_driver::{
   Transaction,
   TransactionType,
@@ -75,23 +75,3 @@ pub async fn define_schema (
   tx.query (schema) . await ?;
   tx.commit () . await ?;
   Ok (()) }
-
-pub fn read_skg_files
-  <P : AsRef<Path> > (
-    dir_path : P )
-  -> io::Result < Vec<FileNode> >
-{ // Reads all relevant files from the path.
-
-  let mut filenodes = Vec::new ();
-  let entries : std::fs::ReadDir = // an iterator
-    fs::read_dir (dir_path) ?;
-  for entry in entries {
-    let entry : std::fs::DirEntry = entry ?;
-    let path = entry.path () ;
-    if ( path.is_file () &&
-         path . extension () . map_or (
-           false,                // None => no extension found
-           |ext| ext == "skg") ) // Some
-    { let node = read_filenode (&path) ?;
-      filenodes.push (node); }}
-  Ok (filenodes) }

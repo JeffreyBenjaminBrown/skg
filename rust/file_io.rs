@@ -40,6 +40,26 @@ pub fn read_filenode
         e.to_string () )) ?;
   Ok ( filenode ) }
 
+pub fn read_skg_files
+  <P : AsRef<Path> > (
+    dir_path : P )
+  -> io::Result < Vec<FileNode> >
+{ // Reads all relevant files from the path.
+
+  let mut filenodes = Vec::new ();
+  let entries : std::fs::ReadDir = // an iterator
+    fs::read_dir (dir_path) ?;
+  for entry in entries {
+    let entry : std::fs::DirEntry = entry ?;
+    let path = entry.path () ;
+    if ( path.is_file () &&
+         path . extension () . map_or (
+           false,                // None => no extension found
+           |ext| ext == "skg") ) // Some
+    { let node = read_filenode (&path) ?;
+      filenodes.push (node); }}
+  Ok (filenodes) }
+
 pub fn write_filenode
   <P : AsRef<Path>>
   ( filenode  : &FileNode,
