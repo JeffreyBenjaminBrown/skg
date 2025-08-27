@@ -35,12 +35,12 @@ pub fn search_index (
     &query, &TopDocs::with_limit (10) )?;
   Ok (( best_matches, searcher )) }
 
+/// Build a schema,
+/// then run `wipe_then_create_index_from_filenodes`.
 pub fn initialize_tantivy_from_filenodes (
-  config : & SkgConfig,
-  filenodes: &[FileNode],
+  config    : & SkgConfig,
+  filenodes : & [FileNode],
 ) -> TantivyIndex {
-  // Build a schema and create a fresh index from the provided FileNodes.
-
   println!("Initializing Tantivy index...");
 
   // Define the schema.
@@ -56,7 +56,6 @@ pub fn initialize_tantivy_from_filenodes (
 
   let index_path: &Path =
     Path::new ( & config . tantivy_folder );
-
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     wipe_then_create_index_from_filenodes (
       filenodes,
@@ -68,11 +67,9 @@ pub fn initialize_tantivy_from_filenodes (
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1);
     } );
-
   println!(
     "Tantivy index initialized successfully. Indexed {} files.",
     indexed_count);
-
   tantivy_index }
 
 /// Creates a fresh index from the provided FileNodes.
