@@ -76,6 +76,36 @@ pub fn initialize_tantivy_from_filenodes (
     indexed_count);
   tantivy_index }
 
+/// Removes any existing index at given path.
+/// creates a new one there,
+/// and populates it.
+///
+/// PITFALL: The index is not the data it indexes.
+/// This only deletes the former.
+pub fn wipe_fs_then_create_index_there (
+  filenodes   : &[FileNode],
+  index_path  : &Path,
+  schema      : tantivy::schema::Schema,
+  id_field    : tantivy::schema::Field,
+  title_field : tantivy::schema::Field,
+) -> Result<(TantivyIndex,
+             usize), // number of documents indexed
+            Box<dyn Error>> {
+
+  if index_path.exists() {
+    std::fs::remove_dir_all (index_path) ?; }
+  std::fs::create_dir_all ( index_path )?;
+  let index: Index =
+    Index::create_in_dir ( index_path, schema )?;
+  let tantivy_index = TantivyIndex {
+    index: Arc::new(index),
+    id_field: id_field,
+    title_field, };
+  let indexed_count: usize = // populate it
+    empty_then_populate_index (
+      filenodes, &tantivy_index )?;
+  Ok (( tantivy_index, indexed_count )) }
+
 /// Creates a fresh index from the provided FileNodes.
 /// Returns the number of documents indexed.
 pub fn empty_then_populate_index (
@@ -117,33 +147,6 @@ pub fn update_index_with_filenodes (
   commit_with_status(
     &mut writer, processed_count, "Updated")?;
   Ok(processed_count) }
-
-/// Removes any existing index at given path.
-/// creates a new one there,
-/// and populates it.
-pub fn wipe_fs_then_create_index_there (
-  filenodes   : &[FileNode],
-  index_path  : &Path,
-  schema      : tantivy::schema::Schema,
-  id_field    : tantivy::schema::Field,
-  title_field : tantivy::schema::Field,
-) -> Result<(TantivyIndex,
-             usize), // number of documents indexed
-            Box<dyn Error>> {
-
-  if index_path.exists() {
-    std::fs::remove_dir_all (index_path) ?; }
-  std::fs::create_dir_all ( index_path )?;
-  let index: Index =
-    Index::create_in_dir ( index_path, schema )?;
-  let tantivy_index = TantivyIndex {
-    index: Arc::new(index),
-    id_field: id_field,
-    title_field, };
-  let indexed_count: usize = // populate it
-    empty_then_populate_index (
-      filenodes, &tantivy_index )?;
-  Ok (( tantivy_index, indexed_count )) }
 
 
 /* -------------------- Private helpers -------------------- */
