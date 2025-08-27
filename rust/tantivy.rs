@@ -1,6 +1,9 @@
 // PURPOSE: Creates a Tantivy index from FileNodes,
 // associating each node's primary ID with its processed title.
 
+// GLOSSARY:
+// document = a Tantivy association, in my case from ID to title
+
 use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::{FileNode, ID, SkgConfig, TantivyIndex};
 
@@ -11,7 +14,8 @@ use std::sync::Arc;
 use std::error::Error;
 
 
-/// Returns the top 10 matching (tantivy) "Documents".
+/// Returns the top 10 matching Tantivy "Documents"
+/// (see glossary, above).
 pub fn search_index (
   tantivy_index : &TantivyIndex,
   query_text    : &str
@@ -36,7 +40,7 @@ pub fn search_index (
   Ok (( best_matches, searcher )) }
 
 /// Build a schema,
-/// then run `wipe_then_create_index_from_filenodes`.
+/// then run `wipe_fs_then_create_index_there`.
 pub fn initialize_tantivy_from_filenodes (
   config    : & SkgConfig,
   filenodes : & [FileNode],
@@ -57,7 +61,7 @@ pub fn initialize_tantivy_from_filenodes (
   let index_path: &Path =
     Path::new ( & config . tantivy_folder );
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
-    wipe_then_create_index_from_filenodes (
+    wipe_fs_then_create_index_there (
       filenodes,
       index_path,
       schema,
@@ -74,7 +78,7 @@ pub fn initialize_tantivy_from_filenodes (
 
 /// Creates a fresh index from the provided FileNodes.
 /// Returns the number of documents indexed.
-pub fn create_index_from_filenodes (
+pub fn empty_then_populate_index (
   filenodes     : &[FileNode],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
@@ -115,10 +119,10 @@ pub fn update_index_with_filenodes (
     &mut writer, processed_count, "Updated")?;
   Ok(processed_count) }
 
-/// Creates a new index at the given path,
-/// then populates it.
-/// Removes any existing index first.
-pub fn wipe_then_create_index_from_filenodes (
+/// Removes any existing index at given path.
+/// creates a new one there,
+/// and populates it.
+pub fn wipe_fs_then_create_index_there (
   filenodes   : &[FileNode],
   index_path  : &Path,
   schema      : tantivy::schema::Schema,
@@ -129,7 +133,7 @@ pub fn wipe_then_create_index_from_filenodes (
             Box<dyn Error>> {
 
   if index_path.exists() {
-    std::fs::remove_dir_all(index_path)?; }
+    std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all ( index_path )?;
   let index: Index =
     Index::create_in_dir ( index_path, schema )?;
@@ -138,72 +142,58 @@ pub fn wipe_then_create_index_from_filenodes (
     id_field: id_field,
     title_field, };
   let indexed_count: usize = // populate it
-    create_index_from_filenodes (
+    empty_then_populate_index (
       filenodes, &tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
-/// Helper: Creates a document from a FileNode
-fn create_document_from_filenode(
+
+/* -------------------- Private helpers -------------------- */
+
+fn create_document_from_filenode (
   filenode: &FileNode,
   tantivy_index: &TantivyIndex,
 ) -> Result<(String, tantivy::Document), Box<dyn Error>> {
 
   if filenode.ids.is_empty() {
-    return Err("FileNode has no IDs".into());
-  }
-
+    return Err("FileNode has no IDs" . into () ); }
   let primary_id: &ID =
     &filenode.ids[0];
   let processed_title: String =
-    replace_each_link_with_its_label(&filenode.title);
+    replace_each_link_with_its_label (
+      &filenode.title );
+  let document: tantivy::Document =
+    doc!( tantivy_index . id_field  => primary_id.as_str (),
+          tantivy_index.title_field => processed_title );
+  Ok (( primary_id.as_str().to_string(),
+        document )) }
 
-  let document: tantivy::Document = doc!(
-    tantivy_index.id_field  => primary_id.as_str(),
-    tantivy_index.title_field => processed_title
-  );
-
-  Ok((primary_id.as_str().to_string(), document))
-}
-
-/// Helper: Adds multiple documents to a writer
-fn add_documents_to_writer(
-  filenodes: &[FileNode],
-  writer: &mut IndexWriter,
-  tantivy_index: &TantivyIndex,
+fn add_documents_to_writer (
+  filenodes     : &[FileNode],
+  writer        : &mut IndexWriter,
+  tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut indexed_count: usize = 0;
-
   for filenode in filenodes {
     if filenode.ids.is_empty() {
       // Skip nodes without IDs.
-      continue;
-    }
-
+      // TODO: Throw an error here?
+      continue; }
     let (_id, document): (String, tantivy::Document) =
       create_document_from_filenode(filenode, tantivy_index)?;
-
     writer.add_document(document)?;
-    indexed_count += 1;
-  }
+    indexed_count += 1; }
+  Ok (indexed_count) }
 
-  Ok(indexed_count)
-}
-
-/// Helper: Commits changes and prints status
-fn commit_with_status(
+fn commit_with_status (
   writer: &mut IndexWriter,
   indexed_count: usize,
   operation: &str,
 ) -> Result<(), Box<dyn Error>> {
-
   if indexed_count > 0 {
-    println!("{} {} documents. Committing changes...",
-             operation, indexed_count);
-    writer.commit()?;
+    println!( "{} {} documents. Committing changes...",
+              operation, indexed_count );
+    writer.commit () ?;
   } else {
-    println!("No documents to process found.");
-  }
-
-  Ok(())
-}
+    println!("No documents to process found."); }
+  Ok (( )) }

@@ -3,7 +3,7 @@ use std::path::Path;
 use tantivy::schema as schema;
 use skg::file_io::read_skg_files;
 use skg::tantivy::{
-  wipe_then_create_index_from_filenodes,
+  wipe_fs_then_create_index_there,
   search_index,
   update_index_with_filenodes};
 use skg::types::{TantivyIndex, FileNode, ID};
@@ -36,7 +36,7 @@ fn test_tantivy (
     read_skg_files("tests/tantivy/fixtures")?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
-    wipe_then_create_index_from_filenodes (
+    wipe_fs_then_create_index_there (
       &filenodes,
       index_path,
       schema,
