@@ -100,32 +100,23 @@ pub fn update_index_with_filenodes (
   filenodes: &[FileNode],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
-
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-  let mut processed_count: usize = 0;
-  for filenode in filenodes {
-    if filenode.ids.is_empty() {
-      // Skip nodes without IDs.
-      // TODO: Should this throw an error?
-      continue; }
-    let primary_id: &ID = &filenode.ids[0];
-    { // Delete any existing document with this ID
-      let term: Term = Term::from_field_text(
-        tantivy_index.id_field,
-        primary_id.as_str() );
-      writer.delete_term(term); }
 
-    // Add the new/updated document
-    let (_id, document)
-      : (String, tantivy::Document)
-      = create_document_from_filenode (
-        filenode, tantivy_index )?;
-    writer.add_document(document)?;
-    processed_count += 1; }
-  commit_with_status (
-    &mut writer, processed_count, "Updated" )?;
-  Ok (processed_count) }
+  { // Delete those IDs from the index.
+    for filenode in filenodes {
+      if !filenode.ids.is_empty() {
+        let primary_id: &ID = &filenode.ids[0];
+        let term: Term = Term::from_field_text(
+          tantivy_index.id_field,
+          primary_id.as_str() );
+        writer.delete_term(term); } } }
+  let processed_count: usize = // Add new associations.
+    add_documents_to_writer (
+      filenodes, &mut writer, tantivy_index)?;
+  commit_with_status(
+    &mut writer, processed_count, "Updated")?;
+  Ok(processed_count) }
 
 /// Creates a new index at the given path,
 /// then populates it.
