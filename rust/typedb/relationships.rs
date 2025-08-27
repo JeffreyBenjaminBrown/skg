@@ -107,3 +107,34 @@ async fn insert_relationship_from_list (
                 from_role,
                 to_role ) ).await?; }
   Ok (()) }
+
+/// Delete every instance of `relation`
+/// where one of the ipnut IDs plays `role`.
+/// Returns the number of IDs processed
+/// (not the number of relations deleted,
+/// which would be more work).
+pub async fn delete_out_links (
+  db_name  : &str,
+  driver   : &TypeDBDriver,
+  ids      : &Vec<ID>,
+  relation : &str,   // e.g. "contains"
+  role     : &str,   // e.g. "container"
+) -> Result < usize, Box<dyn Error> > {
+
+  let tx : Transaction =
+    driver . transaction (
+      db_name,
+      TransactionType::Write
+    ) . await ?;
+  for id in ids {
+    let q : String = format! (
+      r#"match
+           $n   isa node, has id "{}";
+           $rel isa {} ( {}: $n );
+         delete $rel; "#,
+      id.as_str (),
+      relation,
+      role );
+    tx . query ( q ) . await ?; }
+  tx . commit () . await ?;
+  Ok ( ids.len () ) }

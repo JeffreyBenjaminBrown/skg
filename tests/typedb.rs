@@ -6,13 +6,11 @@
 use skg::render::org::single_root_content_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::typedb::search::{
-  extract_payload_from_typedb_string_rep,
-  find_container_of,
-  pid_from_id, };
-use skg::typedb::update::{
-  create_only_nodes_with_no_ids_present,
-  delete_out_links, };
+use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
+use skg::typedb::relationships::delete_out_links;
+use skg::typedb::search::extract_payload_from_typedb_string_rep;
+use skg::typedb::search::find_container_of;
+use skg::typedb::search::pid_from_id;
 use skg::types::{ID, FileNode, OrgNode, SkgConfig};
 
 use futures::StreamExt;
