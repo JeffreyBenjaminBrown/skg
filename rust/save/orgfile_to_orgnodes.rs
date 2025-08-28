@@ -34,6 +34,7 @@ use crate::types::{ID, OrgNode};
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
 use std::collections::{HashMap, HashSet};
 
+
 /* This function parses a "skg org" document
 into a forest of `OrgNode`s.
 .
@@ -45,7 +46,10 @@ into a forest of `OrgNode`s.
 - For a `repeated` node, the body and the *entire subtree* are skipped.
 - Body is the consecutive non-heading lines immediately after a heading.
 - Children are consecutive headings with level exactly `parent_level + 1`. */
-pub fn parse_skg_org_to_nodes(input: &str) -> Vec<OrgNode> {
+pub fn parse_skg_org_to_nodes (
+  input : &str
+) -> Vec<OrgNode> {
+
   let mut cursor = LineCursor::new(input);
   skip_until_first_heading ( &mut cursor );
   let start_level: usize =

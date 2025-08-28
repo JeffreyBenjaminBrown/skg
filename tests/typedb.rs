@@ -381,9 +381,9 @@ async fn test_recursive_document (
     ) . await ?;
   let result_forest : Vec<OrgNode> =
     parse_skg_org_to_nodes (
-      &result_org_text );
+      & result_org_text );
 
-  // Expected OrgNode tree (mirrors the old s-exp structure).
+  // Expected OrgNode tree
   //
   // a [focused]
   // └─ b (body "b has a body")
