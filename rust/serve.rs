@@ -1,15 +1,19 @@
 use crate::file_io::read_skg_files;
+use crate::file_io::write_all_filenodes;
+use crate::render::org::single_root_content_view;
 use crate::tantivy::initialize_tantivy_from_filenodes;
 use crate::tantivy::search_index;
-use crate::render::org::single_root_content_view;
+use crate::tantivy::update_index_with_filenodes;
 use crate::typedb::init::initialize_typedb_from_filenodes;
+use crate::typedb::update::update_nodes_and_relationships;
 use crate::types::{ID, SkgConfig, TantivyIndex, FileNode};
 
 use futures::executor::block_on;
+use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener,
-               TcpStream, // handles two-way communication
-               SocketAddr};
+use std::net::SocketAddr;
+use std::net::TcpListener;
+use std::net::TcpStream; // handles two-way communication
 use std::sync::Arc;
 use std::thread;
 use tantivy::{Document};
@@ -71,6 +75,50 @@ fn initialize_dbs (
     initialize_tantivy_from_filenodes ( config, &filenodes );
 
   (typedb_driver, tantivy_index) }
+
+/// Updates **everything** from the given `FileNode`s, in order:
+///   1) TypeDB
+///   2) Filesystem
+///   3) Tantivy
+/// PITFALL: If any but the first step fails,
+///   the resulting system state is invalid.
+pub async fn update_fs_and_dbs (
+  filenodes     : Vec<FileNode>,
+  config        : SkgConfig,
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+
+  println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
+
+  let db_name : &str = &config.db_name;
+  println!( "1) Updating TypeDB database '{}' ...", db_name );
+  update_nodes_and_relationships (
+    db_name,
+    driver,
+    &filenodes, ). await ?;
+  println!( "   TypeDB update complete." );
+
+  let total_input : usize =
+    filenodes.len ();
+  let target_dir  : &std::path::Path =
+    &config.skg_folder;
+  println!( "2) Writing {} file(s) to disk at {:?} ...",
+            total_input, target_dir );
+  let written_count : usize =
+    write_all_filenodes (
+      filenodes.clone (), config.clone () ) ?;
+  println!( "   Wrote {} file(s).", written_count );
+
+  println!( "3) Updating Tantivy index ..." );
+  let indexed_count : usize =
+    update_index_with_filenodes (
+      &filenodes, tantivy_index )?;
+  println!( "   Tantivy updated for {} document(s).",
+                indexed_count );
+
+  println!( "All updates finished successfully." );
+  Ok (( )) }
 
 fn handle_emacs (
   mut stream    : TcpStream,

@@ -130,10 +130,10 @@ pub fn update_index_with_filenodes (
   filenodes: &[FileNode],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
+
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-
-  { // Delete those IDs from the index.
+  { // Delete those IDs from the index. (They'll come back.)
     for filenode in filenodes {
       if !filenode.ids.is_empty() {
         let primary_id: &ID = &filenode.ids[0];
@@ -146,7 +146,7 @@ pub fn update_index_with_filenodes (
       filenodes, &mut writer, tantivy_index)?;
   commit_with_status(
     &mut writer, processed_count, "Updated")?;
-  Ok(processed_count) }
+  Ok (processed_count) }
 
 
 /* -------------------- Private helpers -------------------- */

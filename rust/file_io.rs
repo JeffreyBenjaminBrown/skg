@@ -6,7 +6,7 @@
 
 use serde_yaml;
 use std::fs::{self};
-use std::io::{self};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::types::{ FileNode, ID, SkgConfig };
@@ -59,6 +59,34 @@ pub fn read_skg_files
     { let node = read_filenode (&path) ?;
       filenodes.push (node); }}
   Ok (filenodes) }
+
+/// Writes all given `FileNode`s to disk, at `config.skg_folder`,
+/// using the primary ID as the filename, followed by `.skg`.
+pub fn write_all_filenodes (
+  filenodes : Vec<FileNode>,
+  config    : SkgConfig,
+) -> io::Result<usize> { // number of files written
+
+  fs::create_dir_all ( // Ensure folder exists
+    &config.skg_folder )?;
+  let mut written : usize = 0;
+  for node in filenodes {
+    let pid : ID = node . ids . get(0)
+      . ok_or_else (
+         || io::Error::new (
+           io::ErrorKind::InvalidInput,
+           "FileNode has no IDs" ))?
+      . clone ();
+    let path_str : String =
+      path_from_pid ( &config, pid );
+    let path : &Path =
+      Path::new ( &path_str );
+    if let Some (parent) = path.parent () {
+      // TODO: Move this out of the loop.
+      fs::create_dir_all (parent) ?; }
+    write_filenode ( &node, &path ) ?;
+    written += 1; }
+  Ok (written) }
 
 pub fn write_filenode
   <P : AsRef<Path>>
