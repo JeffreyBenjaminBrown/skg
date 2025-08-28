@@ -4,8 +4,8 @@
 
 (require 'heralds-minor-mode)
 (require 'skg-request-single-root-content-view)
-(require 'skg-state)
 (require 'skg-request-title-matches)
+(require 'skg-state)
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."

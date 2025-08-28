@@ -9,7 +9,7 @@ use std::net::TcpStream; // handles two-way communication
 use typedb_driver::TypeDBDriver;
 
 /// Gets a node id from the request,
-/// generates an Org document from the id,
+/// generates an org view of that id's content (recursively),
 /// and sends the Org to Emacs (length-prefixed).
 pub fn handle_single_root_view_request (
   stream        : &mut TcpStream,

@@ -8,7 +8,7 @@ So far there are only two endpoints:
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
   - Response: Plain text with newline termination.
 - Single root content tree view
-  - Request: ((request . "single document") (id . "NODE_ID"))
+  - Request: ((request . "single root content view") (id . "NODE_ID"))
   - Response: length-prefixed content, formatted 'Content-Length: N\r\n\r\nPAYLOAD', where PAYLOAD constitutes N bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
 
 Error responses are sent as simple text.

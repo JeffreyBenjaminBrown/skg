@@ -101,7 +101,7 @@ fn handle_emacs (
       println! ( "Received request: {}", request.trim_end () );
       match request_type_from_request( &request ) {
         Ok(request_type) => {
-          if request_type == "org document" {
+          if request_type == "single root content view" {
             handle_single_root_view_request (
               &mut stream,
               &request,

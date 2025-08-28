@@ -3,12 +3,12 @@
 (require 'skg-length-prefix)
 
 (defun skg-request-single-root-content-view-from-node (node-id)
-  "Ask Rust for an Org document view of NODE-ID.
+  "Ask Rust for an single root content view view of NODE-ID.
 Installs a length-prefixed response handler."
   (interactive "sNode ID: ")
   (let* ((proc (skg-tcp-connect-to-rust))
          (request-sexp
-          (format "((request . \"org document\") (id . \"%s\"))\n"
+          (format "((request . \"single root content view\") (id . \"%s\"))\n"
                   node-id )) )
     (setq ;; Prepare LP state and handler
      skg-lp--buf               (unibyte-string) ;; empty string
