@@ -5,7 +5,7 @@
 Rust will prepend a line and send the modified content back,
 which will replace the current buffer contents."
   (interactive)
-  (let* ((proc (skg-tcp-connect-to-rust))
+  (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (buffer-contents (buffer-string))
          (request-sexp (format "((request . \"save buffer\"))\n"))
          (content-bytes (encode-coding-string buffer-contents 'utf-8))
@@ -16,18 +16,18 @@ which will replace the current buffer contents."
     (setq skg-lp--buf (unibyte-string)
           skg-lp--bytes-left nil
           skg-doc--response-handler
-          (lambda (proc chunk)
+          (lambda (tcp-proc chunk)
             (skg-lp-handle-generic-chunk
-             #'skg-replace-buffer-with-processed-content proc chunk)))
+             #'skg-replace-buffer-with-processed-content tcp-proc chunk)))
 
     ;; Send the request line first
-    (process-send-string proc request-sexp)
+    (process-send-string tcp-proc request-sexp)
 
     ;; Send the length-prefixed buffer contents
-    (process-send-string proc header)
-    (process-send-string proc buffer-contents)))
+    (process-send-string tcp-proc header)
+    (process-send-string tcp-proc buffer-contents)))
 
-(defun skg-replace-buffer-with-processed-content (_proc processed-content)
+(defun skg-replace-buffer-with-processed-content (_tcp-proc processed-content)
   "Replace the current buffer contents with PROCESSED-CONTENT from Rust."
   (let ((inhibit-read-only t))
     (erase-buffer)

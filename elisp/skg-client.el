@@ -33,7 +33,7 @@
     (delete-process skg-rust-tcp-proc)
     (setq skg-rust-tcp-proc nil )) )
 
-(defun skg-handle-rust-response (proc string)
+(defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the appropriate handler.
 .
 PITFALL: The handler is already determined before the client receives a response to handle. The client only ever receives something from Rust because the client asked for it. The client sets the handler when it asks.
@@ -41,9 +41,9 @@ PITFALL: The handler is already determined before the client receives a response
 TODO: So far the only response handlers are these:
   skg-display-search-results
   skg-open-org-buffer-from-rust-s-exp
-and neither of them uses the `proc` argument. Unless it will be used by later handlers, it should be deleted."
+and neither of them uses the `tcp-proc` argument. Unless it will be used by later handlers, it should be deleted."
   (if skg-doc--response-handler
-      (funcall skg-doc--response-handler proc string)
+      (funcall skg-doc--response-handler tcp-proc string)
     (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )
 
 (provide 'skg-client)

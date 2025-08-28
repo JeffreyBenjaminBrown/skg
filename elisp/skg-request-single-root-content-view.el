@@ -6,7 +6,7 @@
   "Ask Rust for an single root content view view of NODE-ID.
 Installs a length-prefixed response handler."
   (interactive "sNode ID: ")
-  (let* ((proc (skg-tcp-connect-to-rust))
+  (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (request-sexp
           (format "((request . \"single root content view\") (id . \"%s\"))\n"
                   node-id )) )
@@ -14,15 +14,15 @@ Installs a length-prefixed response handler."
      skg-lp--buf               (unibyte-string) ;; empty string
      skg-lp--bytes-left        nil
      skg-doc--response-handler
-     (lambda (proc chunk)
+     (lambda (tcp-proc chunk)
        (skg-lp-handle-generic-chunk
-        (lambda (proc payload)
+        (lambda (tcp-proc payload)
           (skg-open-org-buffer-from-text
-           proc payload "*skg-content-view*"))
-       proc chunk)))
-    (process-send-string proc request-sexp)) )
+           tcp-proc payload "*skg-content-view*"))
+       tcp-proc chunk)))
+    (process-send-string tcp-proc request-sexp)) )
 
-(defun skg-open-org-buffer-from-text (_proc org-text buffer-name)
+(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode."
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
