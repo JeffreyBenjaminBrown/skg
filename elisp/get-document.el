@@ -1,6 +1,8 @@
 ;; DATA USED/ASSUMED: See /api.md.
 
-(defun request-org-doc-from-node (node-id)
+(require 'length-prefix)
+
+(defun request-single-root-content-view-from-node (node-id)
   "Ask Rust for an Org document view of NODE-ID.
 Installs a length-prefixed response handler."
   (interactive "sNode ID: ")
@@ -9,9 +11,12 @@ Installs a length-prefixed response handler."
           (format "((request . \"org document\") (id . \"%s\"))\n"
                   node-id )) )
     (setq ;; Prepare LP state and handler
-     skg-lp--buf                (unibyte-string) ;; empty string
-     skg-lp--bytes-left         nil
-     skg-doc--response-handler  #'skg-lp-handle-org-chunk)
+     skg-lp--buf               (unibyte-string) ;; empty string
+     skg-lp--bytes-left        nil
+     skg-doc--response-handler
+     (lambda (proc chunk)
+       (skg-lp-handle-generic-chunk
+        #'skg-open-org-buffer-from-rust-org proc chunk)))
     (process-send-string proc request-sexp)) )
 
 (defun skg-open-org-buffer-from-rust-org (_proc org-text)

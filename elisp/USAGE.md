@@ -10,7 +10,7 @@ Finally within Emacs, evaluate `elisp/init.el`
 
 Now these commands can be run:
 ```
-  (request-org-doc-from-node "1")
+  (request-single-root-content-view-from-node "1")
     ;; try 1, 1a, or a
   (request-title-matches "second")
     ;; try match, title, second
