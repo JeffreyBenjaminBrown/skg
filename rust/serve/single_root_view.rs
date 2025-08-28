@@ -1,4 +1,4 @@
-use crate::render::org::single_root_view;
+use crate::render::single_root_view;
 use crate::serve::util::node_id_from_single_root_view_request;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;

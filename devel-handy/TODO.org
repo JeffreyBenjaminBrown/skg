@@ -1,3 +1,6 @@
+* Title search should yield an org-buffer with headings.
+  Each hit should be a root.
+  The text above the first root can indicate what the buffer is.
 * the multiple roots problem
 ** bigger fix: consider multiple roots
    Rather passing around only a single list of FileNodes,
