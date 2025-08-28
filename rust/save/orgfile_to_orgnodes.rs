@@ -55,7 +55,8 @@ pub fn parse_skg_org_to_nodes (
   let start_level: usize =
     peek_heading_level ( &cursor )
     . unwrap_or (1); // default to 1 if absent
-  return parse_nodes_at_level ( &mut cursor, start_level ); }
+  return parse_nodes_at_level (
+    &mut cursor, start_level ); }
 
 
 /* ---------- Cursor ----------*/

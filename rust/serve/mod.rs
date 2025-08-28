@@ -121,11 +121,11 @@ fn handle_emacs (
               &request,
               &tantivy_index);
           } else {
-            let error_msg = format!(
-              "Unsupported request type: {}",
-              request_type);
+            let error_msg : String =
+              format! ( "Unsupported request type: {}",
+                         request_type );
             println!("{}", error_msg);
-            send_response(&mut stream, &error_msg); } },
+            send_response ( &mut stream, &error_msg ); }}
         Err(err) => {
           println!("Error determining request type: {}",
                    err);
