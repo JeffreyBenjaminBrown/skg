@@ -3,7 +3,7 @@
 // TODO | PITFALL:
 // Deletes any existing TypeDB database named `skg-test`,
 
-use skg::render::org::single_root_content_view;
+use skg::render::org::single_root_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -374,7 +374,7 @@ async fn test_recursive_document (
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let result_org_text : String =
-    single_root_content_view (
+    single_root_view (
       driver,
       config,
       &ID ( "a".to_string () )

@@ -1,6 +1,6 @@
 use crate::file_io::read_skg_files;
 use crate::file_io::write_all_filenodes;
-use crate::render::org::single_root_content_view;
+use crate::render::org::single_root_view;
 use crate::tantivy::initialize_tantivy_from_filenodes;
 use crate::tantivy::search_index;
 use crate::tantivy::update_index_with_filenodes;
@@ -146,7 +146,7 @@ fn handle_emacs (
       match request_type_from_request( &request ) {
         Ok(request_type) => {
           if request_type == "org document" {
-            handle_org_document_request (
+            handle_single_root_view_request (
               &mut stream,
               &request,
               &typedb_driver,
@@ -172,7 +172,7 @@ fn handle_emacs (
       request.clear(); }
   println!("Emacs disconnected: {peer}"); }
 
-fn handle_org_document_request (
+fn handle_single_root_view_request (
   // Gets a node id from the request,
   // generates an Org document from the id,
   // and sends the Org to Emacs (length-prefixed).
@@ -264,17 +264,17 @@ fn search_terms_from_request ( request : &str )
 
 fn generate_document (
   // TODO: This needs a name reflecting that it just wraps
-  //   single_root_content_view
+  //   single_root_view
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
 ) -> String {
-  // Just runs `single_root_content_view`,
+  // Just runs `single_root_view`,
   // but with async and error handling.
 
   block_on (
     async {
-      match single_root_content_view (
+      match single_root_view (
         typedb_driver,
         config,
         node_id ) . await

@@ -15,7 +15,7 @@ use std::fmt::Write as _; // for the write! macro
 /// identifies its rootish container (`find_rootish_container()`),
 /// and builds a view from that `root`
 /// by recursively following the `content` relationship.
-pub async fn single_root_content_view (
+pub async fn single_root_view (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
   focus   : &ID,

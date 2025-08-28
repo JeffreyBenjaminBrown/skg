@@ -3,7 +3,7 @@
 * How can a user delete nodes?
 * Move the definitions in typedb::mod to typedb::init.
 * Document the fact that filenames must correspond to PIDs.
-* At least one test for `single_root_content_view` is wrong.
+* At least one test for `single_root_view` is wrong.
   `org_from_node_recursive` should use its `focus` argument,
   because it's easy.
 * Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
