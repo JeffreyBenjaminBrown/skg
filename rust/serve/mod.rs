@@ -1,9 +1,11 @@
+pub mod save_buffer;
 pub mod single_root_view;
 pub mod title_matches;
 pub mod update;
 pub mod util;
 
 use crate::file_io::read_skg_files;
+use crate::serve::save_buffer::handle_save_buffer_request;
 use crate::serve::single_root_view::handle_single_root_view_request;
 use crate::serve::title_matches::handle_title_matches_request;
 use crate::serve::util::request_type_from_request;
@@ -107,6 +109,10 @@ fn handle_emacs (
               &request,
               &typedb_driver,
               config, );
+          } else if request_type == "save buffer" {
+            handle_save_buffer_request(
+              &mut stream,
+              &request);
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,

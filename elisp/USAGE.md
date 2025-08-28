@@ -8,13 +8,17 @@ and after that start the Rust server
 Finally within Emacs, evaluate `elisp/skg-init.el`
   (visit it, then run `M-x eval-buffer`).
 
-Now these commands can be run:
+Now these commands can be run by evaluating them from here:
 ```
   (skg-request-single-root-content-view-from-node "1")
     ;; try 1, 1a, or a
   (skg-request-title-matches "second")
     ;; try match, title, second
   (skg-doc-disconnect)
+```
+and this can be run interactively from the skg content view buffer:
+```
+  (skg-request-save-buffer) ;; `M-x skg-save`
 ```
 
 `(request-sexp-doc-from-node)` causes Emacs to ask Rust to ask TypeDB
