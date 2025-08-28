@@ -6,7 +6,6 @@ use std::net::TcpStream; // handles two-way communication
 pub fn send_response (
   stream   : &mut TcpStream,
   response : &str) {
-
   writeln! ( // appends a newline
     stream, "{}", response )
     . unwrap ();
@@ -15,9 +14,8 @@ pub fn send_response (
 pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
   stream   : &mut TcpStream,
-  response : &str) {
-
-  let payload = response.as_bytes ();
+  response : &str)
+{ let payload = response.as_bytes ();
   let header  = format! ( "Content-Length: {}\r\n\r\n",
                            payload.len () );
   use std::io::Write as _;
@@ -26,21 +24,24 @@ pub fn send_response_with_length_prefix (
   stream . flush ()                         . unwrap ();
 }
 
-pub fn request_type_from_request ( request : &str )
-                               -> Result<String, String> {
+pub fn request_type_from_request (
+  request : &str
+) -> Result<String, String> {
   extract_quoted_value_from_sexp ( request,
                                    "(request . \"",
                                    "request type" ) }
 
-pub fn node_id_from_single_root_view_request ( request : &str )
-                                   -> Result<ID, String> {
+pub fn node_id_from_single_root_view_request (
+  request : &str
+) -> Result<ID, String> {
   extract_quoted_value_from_sexp ( request,
                                    "(id . \"",
                                    "ID" )
     . map(ID) }
 
-pub fn search_terms_from_request ( request : &str )
-                               -> Result<String, String> {
+pub fn search_terms_from_request (
+  request : &str
+) -> Result<String, String> {
   extract_quoted_value_from_sexp ( request,
                                    "(terms . \"",
                                    "search terms" ) }
