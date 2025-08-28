@@ -16,12 +16,15 @@ Installs a length-prefixed response handler."
      skg-doc--response-handler
      (lambda (proc chunk)
        (skg-lp-handle-generic-chunk
-        #'skg-open-org-buffer-from-rust-org proc chunk)))
+        (lambda (proc payload)
+          (skg-open-org-buffer-from-text
+           proc payload "*skg-content-view*"))
+       proc chunk)))
     (process-send-string proc request-sexp)) )
 
-(defun skg-open-org-buffer-from-rust-org (_proc org-text)
+(defun skg-open-org-buffer-from-text (_proc org-text buffer-name)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode."
-  (with-current-buffer (get-buffer-create "*skg-content-view*")
+  (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert org-text)
