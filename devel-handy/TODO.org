@@ -1,3 +1,8 @@
+* the multiple roots problem
+** bigger fix: consider multiple roots
+   Rather passing around only a single list of FileNodes,
+   pair that with a list of root IDs.
+** immediate fix: track the root, re-request it
 * [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
 * A node's ID should probably always be its primary one.
   In the medatata?

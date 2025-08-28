@@ -32,7 +32,7 @@ pub fn request_type_from_request ( request : &str )
                                    "(request . \"",
                                    "request type" ) }
 
-pub fn node_id_from_document_request ( request : &str )
+pub fn node_id_from_single_root_view_request ( request : &str )
                                    -> Result<ID, String> {
   extract_quoted_value_from_sexp ( request,
                                    "(id . \"",

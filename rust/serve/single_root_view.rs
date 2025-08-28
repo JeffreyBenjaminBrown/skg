@@ -1,5 +1,5 @@
 use crate::render::org::single_root_view;
-use crate::serve::util::node_id_from_document_request;
+use crate::serve::util::node_id_from_single_root_view_request;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::types::{ID, SkgConfig};
@@ -18,7 +18,7 @@ pub fn handle_single_root_view_request (
   config        : &SkgConfig,
 ) {
 
-  match node_id_from_document_request ( request ) {
+  match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
       send_response_with_length_prefix (
         stream,
