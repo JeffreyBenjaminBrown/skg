@@ -19,10 +19,11 @@ use typedb_driver::TypeDBDriver;
 /// What it should do is run `update_fs_and_dbs`,
 /// regenerate the buffer, and send it back to Emacs.
 pub fn handle_save_buffer_request (
+  reader   : &mut BufReader <TcpStream>,
   stream   : &mut TcpStream,
   _request : &str ) {
 
-  match read_length_prefixed_content (stream) {
+  match read_length_prefixed_content (reader) {
     Ok (content) => {
       let processed_content : String =
         process_buffer_content ( &content );
@@ -39,17 +40,20 @@ pub fn handle_save_buffer_request (
 /// Expected format:
 ///   "Content-Length: N\r\n\r\n" followed by N bytes of content.
 fn read_length_prefixed_content (
-  stream: &mut TcpStream
+  reader : &mut BufReader <TcpStream>
 ) -> Result<String, Box<dyn std::error::Error>> {
 
-  let mut reader = BufReader::new(stream);
-  let mut header_lines = Vec::new();
+  // Consume header lines already in this reader's buffer,
+  // then read exactly Content-Length bytes from the same reader.
+  let mut header_lines : Vec <String> =
+    Vec::new ();
   loop { // Read header lines until reaching the empty line.
     let mut line : String = String::new();
     reader.read_line ( &mut line )?;
     if line == "\r\n" { break; }
     header_lines.push (line); }
-  let content_length = header_lines
+  let content_length : usize =
+    header_lines
     .iter()
     .find_map ( |line| {
       if line.starts_with("Content-Length: ")

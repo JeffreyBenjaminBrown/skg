@@ -109,7 +109,10 @@ fn handle_emacs (
               &typedb_driver,
               config, );
           } else if request_type == "save buffer" {
-            handle_save_buffer_request(
+            // PITFALL: Uses the same BufReader that read the request,
+            // so that any already-buffered header/payload are visible.
+            handle_save_buffer_request (
+              &mut reader,
               &mut stream,
               &request);
           } else if request_type == "title matches" {
