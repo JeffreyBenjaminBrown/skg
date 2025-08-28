@@ -5,14 +5,14 @@
 
 ;; `M-x pp-28` pretty-prints a highlighted s-exp.
 
-(defun props ()
+(defun skg-props ()
   "Print the properties at point to the minibuffer."
   (interactive)
   (let (( props ( text-properties-at ( point )) ))
     (message "Properties at point %d: %S" (point) props)
     props ))
 
-(defun 2id-insert ()
+(defun skg-2id-insert ()
   "If at a heading, add a random 3-digit ID to it, both visibly and as a property of the bullet."
   (interactive)
   (when (org-at-heading-p)
@@ -30,7 +30,7 @@
       (insert (concat random-id " "))
       (goto-char (+ current-point (length random-id) 1 )) )) )
 
-(defun add-id-properties-to-all-headings ()
+(defun skg-add-id-properties-to-all-headings ()
   "Add an 'id' text property to each heading in the current buffer.
 The 'id' property value equals the heading text.
 The property is applied to the entire heading line (asterisks and text, even trailing whitespace).
@@ -49,7 +49,7 @@ Preserves folding state by using save-excursion and save-restriction."
            line-start  line-end
            'id  heading-text )) )) ))
 
-(defun alist-diff (expected actual &optional path)
+(defun skg-alist-diff (expected actual &optional path)
   "Compare two recursive alists and show differences, ignoring order."
   (let ((path (or path "root")) )
     (cond
@@ -78,7 +78,7 @@ Preserves folding state by using save-excursion and save-restriction."
                    (current-key (car pair))
                    (exp-val (cdr pair))
                    (act-val (cdr (assoc current-key actual)) ))
-              (alist-diff exp-val act-val
+              (skg-alist-diff exp-val act-val
                           (format "%s.%s" path current-key))
               (setq pairs (cdr pairs)) )) )) )
      ((not (equal expected actual))

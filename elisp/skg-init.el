@@ -10,4 +10,4 @@
    'load-path
    (expand-file-name "elisp" project-root)) )
 
-(require 'client)
+(require 'skg-client)

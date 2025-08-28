@@ -1,11 +1,11 @@
 ;; PURPOSE
-;; See the comment for 'heralds-mode' below.
+;; See the comment for 'heralds-minor-mode' below.
 ;;
 ;; TESTING
 ;; Try it on the sample text at the end of the file.
 
 ;;;###autoload
-(define-minor-mode heralds-mode
+(define-minor-mode heralds-minor-mode
   "When Rust sends a view of the graph to Emacs,
 each line (after the org-bullet) begins with some metadata.
 The API is in flux -- see api.md -- but might look something like
@@ -20,7 +20,7 @@ on a red background. Those displayed symbols are called 'heralds'.
 Whitespace separates each herald from the next.
 The metadata is otherwise not displayed."
   :lighter " ⟪Y⟫"
-  (if heralds-mode
+  (if heralds-minor-mode
       (progn
         (heralds-apply-to-buffer)
         (add-hook ;; When a user edits some lines, redisplay heralds only for those lines.
@@ -34,7 +34,7 @@ The metadata is otherwise not displayed."
     (heralds-clear-overlays)))
 
 (defvar-local heralds-overlays nil
-  "List of overlays created by `heralds-mode'.")
+  "List of overlays created by `heralds-minor-mode'.")
 
 (defun heralds-apply-to-buffer ()
   "Do `heralds-apply-to-line` to each line."
@@ -111,7 +111,7 @@ Whitespace in METADATA is ignored."
 
 (defun heralds-after-change (beg end _len)
   "Refresh overlays only on lines touched by the edit from BEG to END."
-  (when heralds-mode
+  (when heralds-minor-mode
     (save-excursion
       (let* ((lbeg (progn (goto-char beg) (line-beginning-position)) )
              (lend (progn (goto-char end) (line-end-position)) )
@@ -136,7 +136,7 @@ Whitespace in METADATA is ignored."
   "White-on-red for REP (repeated).")
 
 ;; TESTING, interactive:
-;; `M-x heralds-mode` should change how the text below looks.
+;; `M-x heralds-minor-mode` should change how the text below looks.
 ;;
 ;; Here is some example text <<id:123,blue:Hello,green:World,repeated,other:ignored>> and more text.
 ;; Another example: <<green:Success,id:456,repeated,blue:Test>> end of line.
@@ -144,4 +144,4 @@ Whitespace in METADATA is ignored."
 ;; Colors only: <<blue:Azure,green:Forest>>
 ;; <<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
 
-(provide 'heralds)
+(provide 'heralds-minor-mode)

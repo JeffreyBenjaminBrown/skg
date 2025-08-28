@@ -2,10 +2,10 @@
 
 (require 'cl-lib)
 
-(require 'get-document)
-(require 'heralds)
-(require 'state)
-(require 'title-search)
+(require 'heralds-minor-mode)
+(require 'skg-request-single-root-content-view)
+(require 'skg-state)
+(require 'skg-request-title-matches)
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
@@ -45,4 +45,4 @@ and neither of them uses the `proc` argument. Unless it will be used by later ha
       (funcall skg-doc--response-handler proc string)
     (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )
 
-(provide 'client)
+(provide 'skg-client)

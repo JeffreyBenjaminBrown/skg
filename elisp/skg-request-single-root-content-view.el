@@ -1,8 +1,8 @@
 ;; DATA USED/ASSUMED: See /api.md.
 
-(require 'length-prefix)
+(require 'skg-length-prefix)
 
-(defun request-single-root-content-view-from-node (node-id)
+(defun skg-request-single-root-content-view-from-node (node-id)
   "Ask Rust for an Org document view of NODE-ID.
 Installs a length-prefixed response handler."
   (interactive "sNode ID: ")
@@ -30,4 +30,4 @@ Installs a length-prefixed response handler."
     (goto-char (point-min))
     (switch-to-buffer (current-buffer))))
 
-(provide 'get-document)
+(provide 'skg-request-single-root-content-view)

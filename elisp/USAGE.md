@@ -5,14 +5,14 @@ First start the TYpeDB server
 and after that start the Rust server
   (evaluate `cargo run` from a shell,
    from the root of this project).
-Finally within Emacs, evaluate `elisp/init.el`
+Finally within Emacs, evaluate `elisp/skg-init.el`
   (visit it, then run `M-x eval-buffer`).
 
 Now these commands can be run:
 ```
-  (request-single-root-content-view-from-node "1")
+  (skg-request-single-root-content-view-from-node "1")
     ;; try 1, 1a, or a
-  (request-title-matches "second")
+  (skg-request-title-matches "second")
     ;; try match, title, second
   (skg-doc-disconnect)
 ```

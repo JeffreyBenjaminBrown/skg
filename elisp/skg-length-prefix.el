@@ -56,7 +56,7 @@ Returns one of:
 
 (defun skg-lp-append-chunk (buf chunk)
   "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
-  (let ((bytes (encode-coding-string chunk 'utf-8)))yes
+  (let ((bytes (encode-coding-string chunk 'utf-8)))
     (concat buf bytes)))
 
 (defun skg-lp-try-parse-header (response)
@@ -126,4 +126,4 @@ else return (:incomplete)."
                                                   'utf-8 t)) )
         (list :done org-text remainder)) )) )
 
-(provide 'length-prefix)
+(provide 'skg-length-prefix)
