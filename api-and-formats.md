@@ -56,3 +56,5 @@ It is a specialization of YAML -- that is, every .skg file is valid YAML, althou
 - subscribes_to: A list of UUIDs. Can be omitted if empty.
 - hides_from_its_subscriptions: A list of UUIDs. Can be omitted if empty.
 - overrides_view_of: A list of UUIDs. Can be omitted if empty.
+
+Each node's filename is just its primary ID followed by ".skg".

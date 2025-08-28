@@ -1,7 +1,6 @@
 pub mod save_buffer;
 pub mod single_root_view;
 pub mod title_matches;
-pub mod update;
 pub mod util;
 
 use crate::file_io::read_skg_files;
