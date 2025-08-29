@@ -1,47 +1,60 @@
 use crate::file_io::write_all_filenodes;
+use crate::render::single_root_view;
+use crate::save::assign_ids::assign_ids_recursive;
+use crate::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
+use crate::save::orgnode_to_filenode::orgnode_to_filenodes;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::tantivy::update_index_with_filenodes;
 use crate::typedb::update::update_nodes_and_relationships;
-use crate::types::{SkgConfig, TantivyIndex, FileNode};
+use crate::types::{FileNode, ID, OrgNode, SkgConfig, TantivyIndex};
 
+use futures::executor::block_on;
+use std::collections::HashSet;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
 use std::net::TcpStream;
+use std::path::Path;
 use typedb_driver::TypeDBDriver;
 
-/// Handles save buffer requests from Emacs.
-/// Reads the buffer content with length prefix,
-/// processes it by prepending a line,
-/// and sends it back with length prefix.
-///
-/// TODO: The "processes" step above is a placeholder.
-/// What it should do is run `update_fs_and_dbs`,
-/// regenerate the buffer, and send it back to Emacs.
+/* Handles save buffer requests from Emacs.
+.
+- Reads the buffer content with length prefix.
+- Puts that text through `update_from_and_rerender_buffer`.
+- Sends that back to Emacs (with a length prefix). */
 pub fn handle_save_buffer_request (
-  reader   : &mut BufReader <TcpStream>,
-  stream   : &mut TcpStream,
-  _request : &str ) {
+  reader        : &mut BufReader <TcpStream>,
+  stream        : &mut TcpStream,
+  _request      : &str,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
+  tantivy_index : &TantivyIndex ) {
 
   match read_length_prefixed_content (reader) {
     Ok (content) => {
-      let processed_content : String =
-        process_buffer_content ( &content );
-      send_response_with_length_prefix (
-        stream, &processed_content ); }
+      match update_from_and_rerender_buffer (
+        // Most of the work happens here.
+        &content, typedb_driver, config, tantivy_index ) {
+        Ok (processed_content) => {
+          send_response_with_length_prefix (
+            stream, &processed_content ); }
+        Err (err) => {
+          let error_msg : String =
+            format! ("Error processing buffer content: {}", err );
+          println! ( "{}", error_msg );
+          send_response ( stream, &error_msg ); }} }
     Err(err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
       println! ( "{}", error_msg );
-      send_response ( stream, &error_msg );
-    }} }
+      send_response ( stream, &error_msg ); }} }
 
 /// Reads length-prefixed content from the stream.
 /// Expected format:
 ///   "Content-Length: N\r\n\r\n" followed by N bytes of content.
 fn read_length_prefixed_content (
   reader : &mut BufReader <TcpStream>
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn Error>> {
 
   // Consume header lines already in this reader's buffer,
   // then read exactly Content-Length bytes from the same reader.
@@ -68,12 +81,54 @@ fn read_length_prefixed_content (
   let content = String::from_utf8 (buffer) ?;
   Ok (content) }
 
-/// Prepends a line.
-/// This is where the actual "save" logic will go.
-fn process_buffer_content (
-  content: &str
-) -> String {
-  format!("Rust added this line.\n{}", content) }
+/* Updates dbs and filesystem, and generates text for a new org-buffer.
+Steps:
+- Put the text through `parse_skg_org_to_nodes` to get some OrgNodes.
+- To those OrgNodes:
+  - Assigns IDs where needed (`assign_ids_recursive`).
+  - Stores as `document_root` the root ID.
+- Puts the result through `orgnode_to_filenodes` to get FileNodes.
+- Runs `update_fs_and_dbs` on those FileNodes.
+- Builds a single root content view from `document_root`. */
+fn update_from_and_rerender_buffer (
+  content       : &str,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
+  tantivy_index : &TantivyIndex
+) -> Result<String, Box<dyn Error>> {
+
+  let orgnodes : Vec<OrgNode> =
+    parse_skg_org_to_nodes (content);
+  if orgnodes.is_empty() {
+    return Err ("No valid org nodes found in content".into()); }
+  let orgnodes_with_ids : Vec<OrgNode> =
+    orgnodes.into_iter()
+    .map ( |node|
+            assign_ids_recursive (&node) )
+    .collect();
+  let document_root : ID =
+    orgnodes_with_ids [0] . id . clone()
+    . ok_or ( // assign_ids_recursive => this should not happen
+      "Root node has no ID") ?;
+  let mut all_filenodes : HashSet<FileNode> =
+    HashSet::new ();
+  for orgnode in &orgnodes_with_ids {
+    let (filenodes, _focused_id, _folded_ids) :
+      (HashSet<FileNode>, Option<ID>, HashSet<ID>) =
+      orgnode_to_filenodes (orgnode);
+    all_filenodes.extend (filenodes); }
+  block_on(update_fs_and_dbs(
+    all_filenodes.into_iter().collect::<Vec<FileNode>>(),
+    config.clone(),
+    tantivy_index,
+    typedb_driver )) ?;
+  let regenerated_document : String =
+    block_on (
+      single_root_view(
+        typedb_driver,
+        config,
+        &document_root ))?;
+  Ok (regenerated_document) }
 
 /// Updates **everything** from the given `FileNode`s, in order:
 ///   1) TypeDB
@@ -87,7 +142,6 @@ pub async fn update_fs_and_dbs (
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-
   println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
 
   let db_name : &str = &config.db_name;
@@ -100,7 +154,7 @@ pub async fn update_fs_and_dbs (
 
   let total_input : usize =
     filenodes.len ();
-  let target_dir  : &std::path::Path =
+  let target_dir  : &Path =
     &config.skg_folder;
   println!( "2) Writing {} file(s) to disk at {:?} ...",
             total_input, target_dir );

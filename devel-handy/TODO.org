@@ -1,5 +1,5 @@
-* remove assign_ids_recursive from orgnode_to_filenodes
-** I'll just have to remember to use it the former before calling the latter.
+* Saving should not obliterate non-content relationships.
+* Moving a heading undoes heralds-mode on it.
 * the multiple roots problem
 ** immediate fix: track the root, re-request it
 ** bigger fix: consider multiple roots

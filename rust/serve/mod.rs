@@ -114,7 +114,10 @@ fn handle_emacs (
             handle_save_buffer_request (
               &mut reader,
               &mut stream,
-              &request);
+              &request,
+              &typedb_driver,
+              config,
+              &tantivy_index);
           } else if request_type == "title matches" {
             handle_title_matches_request(
               &mut stream,
