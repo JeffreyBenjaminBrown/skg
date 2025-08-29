@@ -324,7 +324,7 @@ fn skip_until_first_heading (
   }}
 
 
-/* ----------Tests (optional) ----------*/
+/* ---------- Tests ----------*/
 
 #[cfg(test)]
 mod tests {
