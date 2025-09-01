@@ -40,36 +40,47 @@ fn orgnode_to_filenodes_internal (
   focused_id    : &mut Option  <ID>,
   folded_ids    : &mut HashSet <ID> ) {
 
-  if branch.repeated { // Skip nodes marked as repeated.
-    // TRICKY: Even if this is the first appearance of that node in the s-exp, it might still be marked `repeated`, because the user might have moved it. If so, the user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
+  // Extract ContentNode or error if this is an AliasNode
+  let content_node = match branch {
+    OrgNode::Content(content_node) => content_node,
+    OrgNode::Aliases(_) => {
+      panic!("Found AliasNode in orgnode_to_filenodes_internal. All AliasNodes should have been filtered out by this point.");
+    }};
+  if content_node.repeated { // Skip nodes marked as repeated.
+    // TRICKY: Even if this is the first appearance of that node in the org text, it might still be marked `repeated`, because the user might have moved it. If so, the user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
     return; }
-  if let Some (id) = &branch.id {
+  if let Some (id) = &content_node.id {
     // Skip repeated nodes, even if not marked as such.
     if filenodes_acc . iter() . any (
       |node| node.ids.contains (id) ) {
       return; }}
   let filenode = FileNode {
-    title: branch.heading.clone (),
+    title: content_node.heading.clone (),
     ids: vec! [ // FileNodes can have multiple IDs, but OrgNodes can't.
-      branch . id . clone () . expect (
+      content_node . id . clone () . expect (
         "FileNode with no ID found in `orgnode_to_filenodes_internal`. It should have already had an ID assigned by `assign_ids_recursive` in `orgnode_to_filenodes` (the non-internal version)." ) ],
-    body: branch.body.clone (),
-    contains: branch.branches.iter ()
+    body: content_node.body.clone (),
+    contains: content_node.branches.iter ()
       // Do not exclude repeated nodes here. They are still valid contents.
       . filter_map ( // `filter_map` is robust to receiving `None` values, but this should not receive any, thanks to `assign_ids_recursive`.
-        |child| child.id.clone () )
+        |child| { match child {
+          OrgNode::Content(child_content) =>
+            child_content.id.clone (),
+          OrgNode::Aliases(_) => {
+            panic!("Found AliasNode when extracting child IDs. All AliasNodes should have been filtered out by this point.");
+          }} })
       . collect (),
     subscribes_to                : Vec::new (),
     hides_from_its_subscriptions : Vec::new (),
     overrides_view_of            : Vec::new (), };
-  if branch.focused {
+  if content_node.focused {
     // This would clobber any earlier focused node, but that's fine, because there should be only one.
     *focused_id = Some (
       filenode . ids [0] . clone () ); }
-  if branch.folded {
+  if content_node.folded {
     folded_ids.insert (
       filenode . ids [0] . clone () ); }
   filenodes_acc.insert (filenode);
-  for child in &branch.branches { // recurse
+  for child in &content_node.branches { // recurse
     orgnode_to_filenodes_internal (
       child, filenodes_acc, focused_id, folded_ids ); } }

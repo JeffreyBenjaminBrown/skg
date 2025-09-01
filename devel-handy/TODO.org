@@ -1,4 +1,7 @@
 * [[id:c7c81ed5-20f6-4b6b-a147-edd8175d3cca][skg : tree API, toward a more expressive]]
+* different kinds of trees
+A ContentNodeTree and an OrgNodeTree.
+This way I wouldn't have to write OrgNode code to handle AliasNodes where none should be possible.
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
 * bugs
 ** Moving a heading undoes heralds-mode on it.

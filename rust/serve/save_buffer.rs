@@ -107,9 +107,15 @@ fn update_from_and_rerender_buffer (
             assign_ids_recursive (&node) )
     .collect();
   let document_root : ID =
-    orgnodes_with_ids [0] . id . clone()
-    . ok_or ( // assign_ids_recursive => this should not happen
-      "Root node has no ID") ?;
+    match &orgnodes_with_ids[0] {
+      OrgNode::Content(content_node) => {
+        content_node.id.clone()
+          . ok_or("Root node has no ID")?  // assign_ids_recursive => this should not happen
+      },
+      OrgNode::Aliases(_) => {
+        return Err("Root node cannot be an AliasNode".into());
+      }};
+
   let mut all_filenodes : HashSet<FileNode> =
     HashSet::new ();
   for orgnode in &orgnodes_with_ids {

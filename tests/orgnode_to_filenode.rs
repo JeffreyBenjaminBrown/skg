@@ -4,12 +4,11 @@ use std::collections::HashSet;
 
 use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgnode_to_filenode::orgnode_to_filenodes;
-use skg::types::{ID, OrgNode};
-
+use skg::types::{ID, OrgNode, ContentNode};
 
 #[test]
 fn test_convert_orgnode_to_filenode() {
-  let org_node: OrgNode = OrgNode {
+  let org_node: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
     heading: "a title".to_string(),
     aliases: None,
@@ -18,7 +17,7 @@ fn test_convert_orgnode_to_filenode() {
     focused: false,
     repeated: false,
     branches: vec![],
-  };
+  });
   let (file_nodes, focused_id, folded_ids) =
     orgnode_to_filenodes(
       &org_node);
@@ -51,7 +50,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   // └── 2 (focused)
   //     └── 1 (nested; heading "irrelevant")
   //         └── 3 ("also irrelevant")
-  let nested_3: OrgNode = OrgNode {
+  let nested_3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
     heading: "also irrelevant".to_string(),
     aliases: None,
@@ -60,8 +59,8 @@ fn test_convert_circular_orgnode_to_filenode() {
     focused: false,
     repeated: false,
     branches: vec![],
-  };
-  let nested_dup_1: OrgNode = OrgNode {
+  });
+  let nested_dup_1: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
     heading: "irrelevant".to_string(),
     aliases: None,
@@ -70,8 +69,8 @@ fn test_convert_circular_orgnode_to_filenode() {
     focused: false,
     repeated: false, // not marked repeated; dedup happens in converter
     branches: vec![nested_3],
-  };
-  let child_2: OrgNode = OrgNode {
+  });
+  let child_2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
     heading: "2".to_string(),
     aliases: None,
@@ -80,8 +79,8 @@ fn test_convert_circular_orgnode_to_filenode() {
     focused: true, // focused node
     repeated: false,
     branches: vec![nested_dup_1],
-  };
-  let root_1: OrgNode = OrgNode {
+  });
+  let root_1: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
     heading: "1".to_string(),
     aliases: None,
@@ -90,19 +89,32 @@ fn test_convert_circular_orgnode_to_filenode() {
     focused: false,
     repeated: false,
     branches: vec![child_2.clone()],
-  };
+  });
 
   // Sanity checks on the constructed org tree
-  assert_eq!(root_1.id.as_ref().map(|id| id.as_str()),
+  let root_content = match &root_1 {
+    OrgNode::Content(content) => content,
+    OrgNode::Aliases(_) => panic!("Expected ContentNode"),
+  };
+  assert_eq!(root_content.id.as_ref().map(|id| id.as_str()),
              Some("1"));
-  assert_eq!(root_1.heading, "1");
-  assert_eq!(root_1.branches.len(), 1);
-  assert_eq!(child_2.id.as_ref().map(|id| id.as_str()),
+  assert_eq!(root_content.heading, "1");
+  assert_eq!(root_content.branches.len(), 1);
+
+  let child_2_content = match &root_content.branches[0] {
+    OrgNode::Content(content) => content,
+    OrgNode::Aliases(_) => panic!("Expected ContentNode"),
+  };
+  assert_eq!(child_2_content.id.as_ref().map(|id| id.as_str()),
              Some("2"));
-  assert_eq!(root_1.branches[0].branches.len(), 1);
-  assert_eq!( ( root_1 . branches[0] . branches[0]
-                . id.as_deref() . map(String::as_str) ),
-              Some("1"));
+  assert_eq!(child_2_content.branches.len(), 1);
+
+  let nested_content = match &child_2_content.branches[0] {
+    OrgNode::Content(content) => content,
+    OrgNode::Aliases(_) => panic!("Expected ContentNode"),
+  };
+  assert_eq!(nested_content.id.as_deref().map(String::as_str),
+             Some("1"));
 
   let (file_nodes, focused_id, folded_ids) =
     orgnode_to_filenodes(&root_1);
@@ -138,7 +150,7 @@ fn test_focused_node_extraction() {
   // ├── 2
   // ├── 3 [focused]
   // └── 4
-  let child2: OrgNode = OrgNode {
+  let child2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
     heading: "child 1".to_string(),
     aliases: None,
@@ -147,8 +159,8 @@ fn test_focused_node_extraction() {
     focused: false,
     repeated: false,
     branches: vec![],
-  };
-  let child3: OrgNode = OrgNode {
+  });
+  let child3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
     heading: "child 2".to_string(),
     aliases: None,
@@ -157,8 +169,8 @@ fn test_focused_node_extraction() {
     focused: true, // focused
     repeated: false,
     branches: vec![],
-  };
-  let child4: OrgNode = OrgNode {
+  });
+  let child4: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("4")),
     heading: "child 3".to_string(),
     aliases: None,
@@ -167,8 +179,8 @@ fn test_focused_node_extraction() {
     focused: false,
     repeated: false,
     branches: vec![],
-  };
-  let root: OrgNode = OrgNode {
+  });
+  let root: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
     heading: "root".to_string(),
     aliases: None,
@@ -177,7 +189,7 @@ fn test_focused_node_extraction() {
     focused: false,
     repeated: false,
     branches: vec![child2, child3, child4],
-  };
+  });
 
   let (file_nodes, focused_id, folded_ids) =
     orgnode_to_filenodes(&root);
@@ -203,7 +215,7 @@ fn test_multiple_focused_nodes_last_wins() {
   // root(1) [focused]
   // ├── 2 [focused]
   // └── 3 [folded]
-  let child2: OrgNode = OrgNode {
+  let child2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
     heading: "child 1".to_string(),
     aliases: None,
@@ -212,8 +224,8 @@ fn test_multiple_focused_nodes_last_wins() {
     focused: true, // later focused
     repeated: false,
     branches: vec![],
-  };
-  let child3: OrgNode = OrgNode {
+  });
+  let child3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
     heading: "child 2".to_string(),
     aliases: None,
@@ -222,8 +234,8 @@ fn test_multiple_focused_nodes_last_wins() {
     focused: false,
     repeated: false,
     branches: vec![],
-  };
-  let root: OrgNode = OrgNode {
+  });
+  let root: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
     heading: "root".to_string(),
     aliases: None,
@@ -232,7 +244,7 @@ fn test_multiple_focused_nodes_last_wins() {
     focused: true, // earlier focused; should be overridden by child2
     repeated: false,
     branches: vec![child2, child3],
-  };
+  });
 
   let (file_nodes, focused_id, folded_ids) =
     orgnode_to_filenodes(&root);

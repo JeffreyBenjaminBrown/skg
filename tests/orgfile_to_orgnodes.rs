@@ -1,7 +1,6 @@
 use skg::save::orgfile_to_orgnodes::interpreted::parse_metadata_block;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::types::{OrgNode};
-
+use skg::types::{OrgNode, ContentNode};
 
 #[allow(unused_imports)]
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
@@ -10,6 +9,14 @@ use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  // Helper function to extract ContentNode from OrgNode for cleaner test code
+  fn extract_content_node(org_node: &OrgNode) -> &ContentNode {
+    match org_node {
+      OrgNode::Content(content_node) => content_node,
+      OrgNode::Aliases(_) => panic!("Expected ContentNode, found AliasNode"),
+    }
+  }
 
   #[test]
   fn parses_sample() {
@@ -28,29 +35,36 @@ mod tests {
     let forest: Vec<OrgNode> = parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
-    let n1: &OrgNode = &forest[0];
+    let n1 : &ContentNode =
+      extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
     assert_eq!(n1.heading, "1");
     assert_eq!(n1.branches.len(), 4);
 
-    let n2: &OrgNode = &n1.branches[0];
+    let n2 : &ContentNode =
+      extract_content_node (&n1.branches[0]);
     assert_eq!(n2.id.as_deref(), Some(&"2".to_string()));
     assert!(n2.body.as_ref().unwrap().contains("The body of 2."));
     assert_eq!(n2.branches.len(), 1);
-    assert_eq!(n2.branches[0].id.as_deref(), Some(&"3".to_string()));
+    let n2_child : &ContentNode =
+      extract_content_node(&n2.branches[0]);
+    assert_eq!(n2_child.id.as_deref(), Some(&"3".to_string()));
 
-    let n4: &OrgNode = &n1.branches[1];
+    let n4 : &ContentNode =
+      extract_content_node(&n1.branches[1]);
     assert_eq!(n4.id.as_deref(), Some(&"4".to_string()));
     assert!(n4.body.is_none());
     assert!(n4.branches.is_empty());
 
-    let repeated: &OrgNode = &n1.branches[2];
+    let repeated : &ContentNode =
+      extract_content_node(&n1.branches[2]);
     assert_eq!(repeated.id.as_deref(), Some(&"1".to_string()));
     assert!(repeated.repeated);
     assert!(repeated.body.is_none());
     assert!(repeated.branches.is_empty());
 
-    let n_no_id: &OrgNode = &n1.branches[3];
+    let n_no_id : &ContentNode =
+      extract_content_node(&n1.branches[3]);
     assert_eq!(n_no_id.id, None);
     assert_eq!(n_no_id.heading,
                "A heading with no id, the fourth child of 1.");
@@ -79,33 +93,37 @@ mod tests {
   #[test]
   fn parses_folded_and_focused() {
     let sample: &str = indoc! { r#"
-  * <<id:1, folded>> Node 1 - folded
-  ** <<id:2, focused>> Node 2 - focused
-  *** <<id:3, folded, focused>> Node 3 - both folded and focused
-  ** <<id:4>> Node 4 - neither
-"# };
+      * <<id:1, folded>> Node 1 - folded
+      ** <<id:2, focused>> Node 2 - focused
+      *** <<id:3, folded, focused>> Node 3 - both folded and focused
+      ** <<id:4>> Node 4 - neither
+      "# };
 
-    let forest: Vec<OrgNode> = parse_skg_org_to_nodes(sample);
+    let forest: Vec<OrgNode> =
+      parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
-    let n1: &OrgNode = &forest[0];
+    let n1: &ContentNode =
+      extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
     assert!(n1.folded);
     assert!(!n1.focused);
 
-    let n2: &OrgNode = &n1.branches[0];
+    let n2: &ContentNode =
+      extract_content_node(&n1.branches[0]);
     assert_eq!(n2.id.as_deref(), Some(&"2".to_string()));
     assert!(!n2.folded);
     assert!(n2.focused);
 
-    let n3: &OrgNode = &n2.branches[0];
+    let n3: &ContentNode =
+      extract_content_node(&n2.branches[0]);
     assert_eq!(n3.id.as_deref(), Some(&"3".to_string()));
     assert!(n3.folded);
     assert!(n3.focused);
 
-    let n4: &OrgNode = &n1.branches[1];
+    let n4: &ContentNode =
+      extract_content_node(&n1.branches[1]);
     assert_eq!(n4.id.as_deref(), Some(&"4".to_string()));
     assert!(!n4.folded);
     assert!(!n4.focused);
-  }
-}
+  }}

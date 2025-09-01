@@ -41,21 +41,21 @@ pub struct OrgNodeUninterpreted {
   pub body     : Option<String>, // "body" is a term fron org-mode
   pub branches : Vec<OrgNodeUninterpreted>, }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrgNode {
   Content(ContentNode),
-  Aliases(AliasList),
+  Aliases(AliasNode),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContentNode {
   // See also /api.md.
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
   pub heading  : String,         // "heading" is a term fron org-mode
-  pub aliases  : Option<Vec<String>>, // aliases in the org-roam sense
-  pub body     : Option<String>, // "body" is a term fron org-mode
+  pub aliases  : Option<AliasNode>, // aliases in the org-roam sense
+  pub body     : Option<String>, // "body" in the org-mode sense
   pub folded   : bool,           // folded in the org-mode sense
   pub focused  : bool,           // where the Emacs cursor is
   pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.
@@ -65,11 +65,12 @@ Both Rust and Emacs need to know this, because:
 Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
 
 Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
-  pub branches : Vec<ContentNode>, }
+  pub branches : Vec<OrgNode>, }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct AliasList (
-  pub Vec<String> );
+pub struct AliasNode {
+  pub aliases : Vec<String>,
+  pub branches : Vec<OrgNode>, }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct FileNode {
@@ -149,31 +150,34 @@ impl Hyperlink {
 impl OrgNode {
   pub fn content (content_node: ContentNode) -> Self {
     OrgNode::Content (content_node) }
-  pub fn aliases (alias_list: AliasList) -> Self {
+  pub fn aliases (alias_list: AliasNode) -> Self {
     OrgNode::Aliases (alias_list) }
   pub fn is_content (&self) -> bool {
     matches! (self, OrgNode::Content(_)) }
   pub fn is_aliases (&self) -> bool {
     matches! (self, OrgNode::Aliases(_)) }}
 
-impl AliasList {
+impl AliasNode {
   pub fn new (aliases: Vec<String>) -> Self {
-    AliasList (aliases) }
+    AliasNode { aliases,
+                branches: Vec::new() }}
   pub fn from_vec (aliases: Vec<String>) -> Self {
-    AliasList (aliases) }
+    AliasNode { aliases,
+                branches: Vec::new() }}
   pub fn is_empty (&self) -> bool {
-    self.0.is_empty () }
+    self.aliases.is_empty() }
   pub fn len(&self) -> usize {
-    self.0.len () }}
+    self.aliases.len() }}
 
-impl Deref for AliasList {
+impl Deref for AliasNode {
   type Target = Vec<String>;
   fn deref (&self) -> &Self::Target {
-    &self.0 }}
+    &self.aliases }}
 
-impl From<Vec<String>> for AliasList {
+impl From<Vec<String>> for AliasNode {
   fn from (aliases: Vec<String>) -> Self {
-    AliasList (aliases) }}
+    AliasNode { aliases,
+                branches: Vec::new() }} }
 
 impl fmt::Display for Hyperlink {
   // Format: [[id:ID][LABEL]], where allcaps terms are variables.
