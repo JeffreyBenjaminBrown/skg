@@ -35,7 +35,13 @@ pub enum HyperlinkParseError {
   MissingDivider, }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct OrgNode {
+pub enum OrgNode {
+  Content(ContentNode),
+  Aliases(AliasList),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContentNode {
   // See also /api.md.
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
@@ -51,7 +57,11 @@ Both Rust and Emacs need to know this, because:
 Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
 
 Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
-  pub branches : Vec<OrgNode>, }
+  pub branches : Vec<ContentNode>, }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct AliasList (
+  pub Vec<String> );
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct FileNode {
@@ -115,6 +125,7 @@ impl From<String> for ID {
 impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
     ID ( s.clone () ) }}
+
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s.to_string () ) }}
@@ -126,6 +137,35 @@ impl Hyperlink {
     Hyperlink { id    : ID ( id.into () ),
                 label : label.into (),
     }} }
+
+impl OrgNode {
+  pub fn content (content_node: ContentNode) -> Self {
+    OrgNode::Content (content_node) }
+  pub fn aliases (alias_list: AliasList) -> Self {
+    OrgNode::Aliases (alias_list) }
+  pub fn is_content (&self) -> bool {
+    matches! (self, OrgNode::Content(_)) }
+  pub fn is_aliases (&self) -> bool {
+    matches! (self, OrgNode::Aliases(_)) }}
+
+impl AliasList {
+  pub fn new (aliases: Vec<String>) -> Self {
+    AliasList (aliases) }
+  pub fn from_vec (aliases: Vec<String>) -> Self {
+    AliasList (aliases) }
+  pub fn is_empty (&self) -> bool {
+    self.0.is_empty () }
+  pub fn len(&self) -> usize {
+    self.0.len () }}
+
+impl Deref for AliasList {
+  type Target = Vec<String>;
+  fn deref (&self) -> &Self::Target {
+    &self.0 }}
+
+impl From<Vec<String>> for AliasList {
+  fn from (aliases: Vec<String>) -> Self {
+    AliasList (aliases) }}
 
 impl fmt::Display for Hyperlink {
   // Format: [[id:ID][LABEL]], where allcaps terms are variables.
