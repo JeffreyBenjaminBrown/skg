@@ -96,18 +96,31 @@ Whitespace in METADATA is ignored."
 
 (defun heralds-clear-overlays ()
   "Remove all overlays from buffer."
-  (mapc #'delete-overlay heralds-overlays)
+  (dolist (ov heralds-overlays)
+    (when ;; Exclude invalid overlays.
+        (and (overlayp ov) (overlay-buffer ov))
+      (delete-overlay ov)))
   (setq heralds-overlays nil))
 
 (defun heralds-clear-overlays-in-region (start end)
   "Delete overlays we manage that overlap [START, END)."
   (let (keep)
     (dolist (ov heralds-overlays)
-      (if (and (< (overlay-start ov) end)
-               (> (overlay-end   ov) start))
-          (delete-overlay ov)
-        (push ov keep)))
-    (setq heralds-overlays (nreverse keep)) ))
+      (let ((valid (heralds-overlay-valid-and-useable-p ov)))
+        (if (and valid
+                 (< (overlay-start ov) end)
+                 (> (overlay-end ov) start))
+            (delete-overlay ov)
+          (when valid
+            (push ov keep)))))
+    (setq heralds-overlays (nreverse keep))))
+
+(defun heralds-overlay-valid-and-useable-p (ov)
+  "Check if overlay OV is valid and usable."
+  (and (overlayp ov)
+       (overlay-buffer ov)
+       (overlay-start ov)
+       (overlay-end ov)))
 
 (defun heralds-after-change (beg end _len)
   "Refresh overlays only on lines touched by the edit from BEG to END."
