@@ -34,6 +34,13 @@ pub enum HyperlinkParseError {
   InvalidFormat,
   MissingDivider, }
 
+/// Raw text from Emacs is first loaded as a forest of these.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrgNodeUninterpreted {
+  pub heading  : String,         // "heading" is a term fron org-mode
+  pub body     : Option<String>, // "body" is a term fron org-mode
+  pub branches : Vec<OrgNodeUninterpreted>, }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrgNode {
   // See also /api.md.

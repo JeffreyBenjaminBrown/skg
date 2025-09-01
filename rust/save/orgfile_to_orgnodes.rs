@@ -28,7 +28,7 @@ or even
 // heading = heading in the Emacs org-mode sense
 // body    = body in the Emacs org-mode sense
 
-use crate::types::{ID, OrgNode};
+use crate::types::{ID, OrgNode, OrgNodeUninterpreted};
 
 #[allow(unused_imports)]
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
@@ -50,14 +50,42 @@ pub fn parse_skg_org_to_nodes (
   input : &str
 ) -> Vec<OrgNode> {
 
-  let mut cursor = LineCursor::new(input);
+  let uninterpreted_nodes : Vec<OrgNodeUninterpreted> =
+    parse_skg_org_to_uninterpreted_nodes (input);
+  uninterpreted_nodes.into_iter ()
+    .map (interpret_org_node)
+    .collect () }
+
+pub fn parse_skg_org_to_uninterpreted_nodes (
+  input : &str
+) -> Vec<OrgNodeUninterpreted> {
+  let mut cursor = LineCursor::new (input);
   skip_until_first_heading ( &mut cursor );
   let start_level: usize =
     peek_heading_level ( &cursor )
     . unwrap_or (1); // default to 1 if absent
-  return parse_nodes_at_level (
+  return parse_uninterpreted_nodes_at_level (
     &mut cursor, start_level ); }
 
+pub fn interpret_org_node (
+  uninterpreted : OrgNodeUninterpreted
+) -> OrgNode {
+  let (id_opt, is_repeated, is_folded, is_focused, title) =
+    parse_separating_metadata_and_title (
+      & uninterpreted.heading );
+  OrgNode {
+    id       : id_opt,
+    heading  : title,
+    body     : ( if is_repeated { None }
+                 else { uninterpreted.body } ),
+    folded   : is_folded,
+    focused  : is_focused,
+    repeated : is_repeated,
+    branches : ( if is_repeated { Vec::new() }
+                 else { uninterpreted.branches
+                        .into_iter()
+                        .map(interpret_org_node)
+                        .collect() } ) } )
 
 /* ---------- Cursor ----------*/
 
@@ -129,76 +157,61 @@ fn peek_heading_level (
 
 /* ---------- Forest/Tree ----------*/
 
-/// Parse a *sequence* of sibling nodes at `level` until
-///   (a) a heading with lower level (caller boundary), or
-///   (b) EOF.
-/// Non-heading lines are ignored.
-fn parse_nodes_at_level (
+/// Parse a *sequence* of sibling uninterpreted nodes at `level`
+fn parse_uninterpreted_nodes_at_level (
   cur   : &mut LineCursor,
   level : usize
-) -> Vec<OrgNode> {
-
-  let mut nodes_acc: Vec<OrgNode> = Vec::new();
+) -> Vec<OrgNodeUninterpreted> {
+  let mut nodes_acc : Vec<OrgNodeUninterpreted> =
+    Vec::new();
   while let Some(line) = cur.peek () {
     match parse_metadata_plus_heading (line) {
       Some((lvl, _)) if lvl == level => {
         // Expected sibling: parse one full node (header + body + subtree)
-        let node: OrgNode = parse_one_node_at_level(cur, level);
-        nodes_acc.push(node); },
+        let node: OrgNodeUninterpreted =
+          parse_one_uninterpreted_node_at_level
+          (cur, level);
+        nodes_acc.push (node); },
       Some((lvl, _)) if lvl < level => break,
       _ => { // ignore anything else
-        let _ignored: Option<&str> = cur.bump(); }}}
+        let _ignored: Option<&str> = cur.bump(); }} }
   nodes_acc }
 
-/// Parse exactly one node at `level` at the cursor.
+/// Parse exactly one uninterpreted node at `level` at the cursor.
 /// ASSUMES the current line is a valid heading of exactly this level.
-fn parse_one_node_at_level (
+fn parse_one_uninterpreted_node_at_level (
   cur   : &mut LineCursor,
   level : usize
-) -> OrgNode {
+) -> OrgNodeUninterpreted {
 
   let heading_line: &str =
     cur . bump() . expect (
       "caller guarantees a heading is present" );
-  let (id_opt, is_repeated, is_folded, is_focused, title)
-    : ( Option<ID>, bool, bool, bool, String )
-    = parse_separating_metadata_and_title ( heading_line );
-  if is_repeated { // PITFALL: Ignore its text and children, but don't ignore it entirely. It must be recorded as its parent's child.
-    skip_subtree ( cur, level );
-    return OrgNode { id       : id_opt,
-                     heading  : title,
-                     body     : None,
-                     folded   : is_folded,
-                     focused  : is_focused,
-                     repeated : true,
-                     branches : Vec::new(), }; }
-  OrgNode { id       : id_opt,
-            heading  : title,
-            body     : collect_body_lines(cur),
-            folded   : is_folded,
-            focused  : is_focused,
-            repeated : false,
-            branches : parse_children(cur, level),
+  let (_level, heading_content): (usize, &str) =
+    parse_metadata_plus_heading (heading_line)
+    . expect("caller guarantees a heading is present");
+  OrgNodeUninterpreted {
+    heading  : heading_content.to_string (),
+    body     : collect_body_lines (cur),
+    branches : parse_uninterpreted_children ( cur, level ),
   }}
 
-/// Children are headings with level exactly `parent_level + 1`,
-/// contiguous in the document.
-/// Non-heading lines between siblings are ignored.
-fn parse_children (
+/// Parse children as uninterpreted nodes
+fn parse_uninterpreted_children (
   cur          : &mut LineCursor,
   parent_level : usize
-) -> Vec<OrgNode> {
+) -> Vec<OrgNodeUninterpreted> {
 
   let child_level : usize =
     parent_level + 1;
-  let mut children_acc : Vec<OrgNode> =
+  let mut children_acc : Vec<OrgNodeUninterpreted> =
     Vec::new();
   while let Some(next) = cur.peek() {
     match parse_metadata_plus_heading (next) {
       Some ((lvl, _))
         if lvl == child_level => {
-          let child: OrgNode =
-            parse_one_node_at_level ( cur, child_level );
+          let child: OrgNodeUninterpreted =
+            parse_one_uninterpreted_node_at_level ( cur, child_level );
           children_acc.push ( child ); }
       Some((lvl, _))
         if lvl <= parent_level
@@ -231,33 +244,29 @@ fn skip_subtree ( cur: &mut LineCursor,
 /// 3) Remaining text (after `>>`) is the trimmed title.
 /// 4) If no metadata block, the whole remainder is the trimmed title.
 fn parse_separating_metadata_and_title (
-  line: &str
+  line_after_bullet: &str
 ) -> (Option<ID>, bool, bool, bool, String) {
 
-  let parsed: Option<(usize, &str)> =
-    parse_metadata_plus_heading (line);
-  let (_level, after): (usize, &str) =
-    parsed . expect ("Caller verified heading.");
-  let after_ws: &str = after.trim_start();
-
-  if let Some(meta_start) = after_ws.strip_prefix("<<") {
+  let heading_with_metadata: &str = line_after_bullet.trim_start();
+  if let Some(meta_start) = heading_with_metadata.strip_prefix("<<") {
     if let Some(end) = meta_start.find(">>") {
-      let inner: &str = &meta_start[..end]; // betweeen "<<" and ">>"
+      let inner: &str = &meta_start[..end]; // between "<<" and ">>"
       let (kv, bare): (HashMap<String, String>, HashSet<String>) =
-        parse_metadata_block (inner);
+        parse_metadata_block(inner);
       let id_opt: Option<ID> = kv.get("id").map(|s| s.into());
-      let repeated : bool = bare.contains("repeated");
-      let folded   : bool = bare.contains("folded");
-      let focused  : bool = bare.contains("focused");
+      let repeated: bool = bare.contains("repeated");
+      let folded: bool = bare.contains("folded");
+      let focused: bool = bare.contains("focused");
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
       return (id_opt, repeated, folded, focused, title);
     }
-    // If "<<" with no matching ">>", fall through to default case, treating it as a regular title.
+    // If "<<" with no matching ">>", fall through to default case
   }
-  { // Default case: no (well-formed) metadata block
-    let title: String = after.trim().to_string();
-    (None, false, false, false, title) }}
+  // Default case: no (well-formed) metadata block
+  let title: String = line_after_bullet.trim().to_string();
+  (None, false, false, false, title)
+}
 
 
 /* ---------- Metadata parser ----------*/
