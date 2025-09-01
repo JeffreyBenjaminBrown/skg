@@ -1,19 +1,10 @@
-* Saving should not obliterate non-content relationships.
-* Moving a heading undoes heralds-mode on it.
-* the multiple roots problem
-** immediate fix: track the root, re-request it
-** bigger fix: consider multiple roots
-   Rather passing around only a single list of FileNodes,
-   pair that with a list of root IDs.
-* Title search should yield an org-buffer with headings.
-  Each hit should be a root.
-  The text above the first root can indicate what the buffer is.
-* [[id:1d7ec80b-16fa-4ba9-8fe3-6a31e6f9f364][<2025-08-28 Thu> ChatGPT suggests changes to Hode]]
-* [[id:f63948c8-684d-451e-9ad5-ded80b523083][skg : closing the read/save knot]]
+* [[id:c7c81ed5-20f6-4b6b-a147-edd8175d3cca][skg : tree API, toward a more expressive]]
+* [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
+* bugs
+** Moving a heading undoes heralds-mode on it.
 * A node's ID should probably always be its primary one.
   In the medatata?
   As its name in the filesystem?
-* How can a user delete nodes?
 * Document the fact that filenames must correspond to PIDs.
 * `org_from_node_recursive` should use its `focus` argument.
   This seems easy.
