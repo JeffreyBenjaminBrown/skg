@@ -394,6 +394,7 @@ async fn test_recursive_document (
     vec! [ OrgNode {
       id       : Some ( ID::from ("a") ),
       heading  : "a" . to_string (),
+      aliases  : None,
       body     : None,
       folded   : false,
       focused  : false,
@@ -401,12 +402,14 @@ async fn test_recursive_document (
       branches : vec! [ OrgNode {
         id       : Some ( ID::from ("b") ),
         heading  : "b" . to_string (),
+        aliases  : None,
         body     : Some ( "b has a body" . to_string () ),
         folded   : false,
         focused  : false,
         repeated : false,
         branches : vec! [ OrgNode {
           id       : Some ( ID::from ("c") ),
+          aliases  : None,
           heading  : "c" . to_string (),
           body     : None,
           folded   : false,
@@ -415,6 +418,7 @@ async fn test_recursive_document (
           branches : vec! [ OrgNode {
             id       : Some ( ID::from ("b") ),
             heading  : "b" . to_string (),
+            aliases  : None,
             body     : None, // PITFALL: There *is* a body in the received org text. But it is discarded, because the node is a repeat.
             folded   : false,
             focused  : false,

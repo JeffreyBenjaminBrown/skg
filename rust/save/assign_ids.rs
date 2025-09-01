@@ -14,6 +14,7 @@ pub fn assign_ids_recursive (
         || ID::new ( Uuid::new_v4 ()
                      . to_string () )) ),
     heading  : orgnode.heading.clone(),
+    aliases  : orgnode.aliases.clone(),
     body     : orgnode.body.clone(),
     folded   : orgnode.folded,
     focused  : orgnode.focused,
@@ -35,6 +36,7 @@ mod tests {
       // Innermost node, with no ID
       id: None,
       heading: "c".to_string(),
+      aliases: None,
       body: None,
       folded: false,
       focused: false,
@@ -45,6 +47,7 @@ mod tests {
       // Intermediate node, with ID
       id: Some(ID::from("b")),
       heading: "b".to_string(),
+      aliases: None,
       body: None,
       folded: false,
       focused: false,
@@ -55,6 +58,7 @@ mod tests {
       // Outermost node, with no ID
       id: None,
       heading: "a".to_string(),
+      aliases: None,
       body: None,
       folded: false,
       focused: false,
