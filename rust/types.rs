@@ -54,6 +54,7 @@ pub struct ContentNode {
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
   pub heading  : String,         // "heading" is a term fron org-mode
+  pub aliases  : Option<Vec<String>>, // aliases in the org-roam sense
   pub body     : Option<String>, // "body" is a term fron org-mode
   pub folded   : bool,           // folded in the org-mode sense
   pub focused  : bool,           // where the Emacs cursor is

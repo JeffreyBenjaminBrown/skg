@@ -12,6 +12,7 @@ fn test_convert_orgnode_to_filenode() {
   let org_node: OrgNode = OrgNode {
     id: Some(ID::from("1")),
     heading: "a title".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -53,6 +54,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   let nested_3: OrgNode = OrgNode {
     id: Some(ID::from("3")),
     heading: "also irrelevant".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -62,6 +64,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   let nested_dup_1: OrgNode = OrgNode {
     id: Some(ID::from("1")),
     heading: "irrelevant".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -71,6 +74,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   let child_2: OrgNode = OrgNode {
     id: Some(ID::from("2")),
     heading: "2".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: true, // focused node
@@ -80,6 +84,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   let root_1: OrgNode = OrgNode {
     id: Some(ID::from("1")),
     heading: "1".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -136,6 +141,7 @@ fn test_focused_node_extraction() {
   let child2: OrgNode = OrgNode {
     id: Some(ID::from("2")),
     heading: "child 1".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -145,6 +151,7 @@ fn test_focused_node_extraction() {
   let child3: OrgNode = OrgNode {
     id: Some(ID::from("3")),
     heading: "child 2".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: true, // focused
@@ -154,6 +161,7 @@ fn test_focused_node_extraction() {
   let child4: OrgNode = OrgNode {
     id: Some(ID::from("4")),
     heading: "child 3".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -163,6 +171,7 @@ fn test_focused_node_extraction() {
   let root: OrgNode = OrgNode {
     id: Some(ID::from("1")),
     heading: "root".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: false,
@@ -197,6 +206,7 @@ fn test_multiple_focused_nodes_last_wins() {
   let child2: OrgNode = OrgNode {
     id: Some(ID::from("2")),
     heading: "child 1".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: true, // later focused
@@ -206,6 +216,7 @@ fn test_multiple_focused_nodes_last_wins() {
   let child3: OrgNode = OrgNode {
     id: Some(ID::from("3")),
     heading: "child 2".to_string(),
+    aliases: None,
     body: None,
     folded: true, // folded
     focused: false,
@@ -215,6 +226,7 @@ fn test_multiple_focused_nodes_last_wins() {
   let root: OrgNode = OrgNode {
     id: Some(ID::from("1")),
     heading: "root".to_string(),
+    aliases: None,
     body: None,
     folded: false,
     focused: true, // earlier focused; should be overridden by child2

@@ -12,6 +12,7 @@ pub fn interpret_org_node (
   OrgNode {
     id       : id_opt,
     heading  : title,
+    aliases  : None,
     body     : ( if is_repeated { None }
                  else { uninterpreted.body } ),
     folded   : is_folded,
