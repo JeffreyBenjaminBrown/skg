@@ -1,9 +1,7 @@
-use skg::save::orgfile_to_orgnodes::{
-  // functions tested
-  parse_metadata_block,
-  parse_skg_org_to_nodes,
-};
+use skg::save::orgfile_to_orgnodes::interpreted::parse_metadata_block;
+use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::types::{OrgNode};
+
 
 #[allow(unused_imports)]
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
