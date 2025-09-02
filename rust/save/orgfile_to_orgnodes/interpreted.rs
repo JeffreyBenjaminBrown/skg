@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 pub fn interpret_org_node (
   uninterpreted : OrgNodeUninterpreted
-) -> OrgNode {
+) -> OrgNode { // TODO: Currently this returns a tree of OrgNodes. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
   let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
     parse_separating_metadata_and_title (
@@ -21,19 +21,21 @@ pub fn interpret_org_node (
         if is_repeated { Vec::new()
         } else { uninterpreted.branches
                  . into_iter()
-                 . map (interpret_org_node)
+                 . map (interpret_org_node) // recurse
                  . collect()
         };
       let aliases: Option<AliasNode> =
+      // Uses aliases from the first AliasNode.
+      // PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more. If they do, all but the first are ignored. */
         interpreted_branches
         . iter()
-        . find_map ( /* Finds the first value for which the lambda returns Some. PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more; if they do, all but the first are ignored. */
+        . find_map ( // Returns the first Some.
           |child| {
             if let OrgNode::Aliases (alias_node) = child {
               Some (alias_node.clone())
             } else { None
             }} );
-      OrgNode::Content(ContentNode {
+      OrgNode::Content ( ContentNode {
         id       : id_opt,
         heading  : title,
         aliases  : aliases,
@@ -50,28 +52,27 @@ pub fn interpret_org_node (
             }} )
           . collect(), }) },
     Some (ref type_str) if type_str == "aliases" => {
+      // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headings of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
       let branches: Vec<OrgNode> =
       { uninterpreted.branches
         . into_iter()
-        . map (interpret_org_node)
+        . map (interpret_org_node) // recurse
         . collect() };
       let aliases: Vec<String> = branches
         . iter()
         . filter_map ( |child| {
           // collect aliases only from ContentNodes
           if let OrgNode::Content (content_node) = child {
+            // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
             Some (content_node.heading.clone() )
           } else { None }} )
       . collect();
       OrgNode::Aliases(AliasNode {
         aliases,
-        branches,
-      })
-    },
+        branches, }) },
     Some(type_str) => {
       panic! ( "unrecognized 'type' field in OrgNode: {}",
                 type_str ); }} }
-
 
 /// Parse the *heading line* into `(id, repeated, folded, focused, title, type)`.
 /// .
@@ -83,7 +84,13 @@ pub fn interpret_org_node (
 /// 5) Extract the `type` field from metadata if present.
 fn parse_separating_metadata_and_title (
   line_after_bullet: &str
-) -> (Option<ID>, bool, bool, bool, String, Option<String>) {
+) -> ( // TODO: Define and use a type instead.
+  Option<ID>,       // ID
+  bool,             // repeated
+  bool,             // folded
+  bool,             // focused
+  String,           // title
+  Option<String>) { // type. TODO: THis should not be an Option, but instead default to 'ContentNode'.
 
   let heading_with_metadata: &str = line_after_bullet.trim_start();
   if let Some(meta_start) = heading_with_metadata.strip_prefix("<<") {

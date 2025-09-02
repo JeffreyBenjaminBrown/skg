@@ -1,7 +1,18 @@
 * [[id:b72d4277-eced-48b9-85da-b917d9a4aad4][aliases in skg]]
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
-* bugs
-** Moving a heading undoes heralds-mode on it.
+* rename
+  heading     -> headline
+  ContentNode -> ContentOrgNode
+  AliasNode   -> AliasOrgNode
+* Use anyhow or eyre crates for better error handling
+** Cargo.toml
+anyhow = "1.0"
+** usage
+use anyhow::Context;
+
+let driver = TypeDBDriver::new(...)
+    .await
+    .context("Failed to connect to TypeDB server")?;
 * A node's ID should probably always be its primary one.
   In the medatata?
   As its name in the filesystem?

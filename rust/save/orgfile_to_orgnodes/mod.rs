@@ -18,7 +18,7 @@ into a forest of `OrgNode`s.
 - Children are consecutive headings with level exactly `parent_level + 1`. */
 pub fn parse_skg_org_to_nodes (
   input : &str
-) -> Vec<OrgNode> {
+) -> Vec<OrgNode> { // TODO: As noted in a TODO comment in the definition of `interpret_org_node`, this return type could be better.
 
   let uninterpreted_nodes : Vec<OrgNodeUninterpreted> =
     parse_skg_org_to_uninterpreted_nodes (input);

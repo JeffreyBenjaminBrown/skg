@@ -10,11 +10,13 @@ use super::cursor::skip_until_first_heading;
 pub fn parse_skg_org_to_uninterpreted_nodes (
   input : &str
 ) -> Vec<OrgNodeUninterpreted> {
+  // TODO: Test.
+
   let mut cursor = LineCursor::new (input);
   skip_until_first_heading ( &mut cursor );
   let start_level: usize =
     peek_heading_level ( &cursor )
-    . unwrap_or (1); // default to 1 if absent
+    . unwrap_or (1); // default to 1 if absent. TODO: Maybe this should throw an error.
   return parse_uninterpreted_nodes_at_level (
     &mut cursor, start_level ); }
 
@@ -23,6 +25,8 @@ fn parse_uninterpreted_nodes_at_level (
   cur   : &mut LineCursor,
   level : usize
 ) -> Vec<OrgNodeUninterpreted> {
+  // TODO: This is currently not robust to initial super-indented headlines. In my knowledge graph, see `parsing initial super-indented org-children in org-roam data`.
+
   let mut nodes_acc : Vec<OrgNodeUninterpreted> =
     Vec::new();
   while let Some(line) = cur.peek () {

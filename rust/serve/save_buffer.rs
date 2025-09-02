@@ -109,9 +109,9 @@ fn update_from_and_rerender_buffer (
   let document_root : ID =
     match &orgnodes_with_ids[0] {
       OrgNode::Content(content_node) => {
-        content_node.id.clone()
-          . ok_or("Root node has no ID")?  // assign_ids_recursive => this should not happen
-      },
+        content_node.id.clone() . ok_or(
+          // assign_ids_recursive => should be 'ok'
+          "Root node has no ID")? },
       OrgNode::Aliases(_) => {
         return Err("Root node cannot be an AliasNode".into());
       }};

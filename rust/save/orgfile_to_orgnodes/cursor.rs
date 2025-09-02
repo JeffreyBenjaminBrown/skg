@@ -31,9 +31,10 @@ impl<'a> LineCursor<'a> {
 
 /// Strips the bullet and leading whitespace,
 /// leaving the rest as a single string.
-pub fn parse_metadata_plus_heading ( line: &str
-) -> Option<( usize,   // level
-              &str)> { // metadata + heading
+pub fn parse_metadata_plus_heading (
+  line: &str
+) -> Option<( usize,    // level
+              &str )> { // metadata + heading
 
   // Scan asterisks to count level.
   let mut i: usize = 0; // index into the byte slice
@@ -63,6 +64,8 @@ pub fn peek_heading_level (
         . map ( |(lvl, _)| lvl ));
   level_opt }
 
+/// Collects the body lines that follow some (already consumed)
+/// org headline. Advances the cursor to the next org headline.
 pub fn collect_body_lines (
   cur: &mut LineCursor
 ) -> Option<String> {
@@ -78,6 +81,7 @@ pub fn collect_body_lines (
       acc.join("\n");
     Some(joined) }}
 
+/// Any text preceding the buffer's first headline is ignored.
 pub fn skip_until_first_heading (
   cur: &mut LineCursor
 ) {
