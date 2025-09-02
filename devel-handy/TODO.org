@@ -1,7 +1,4 @@
-* [[id:c7c81ed5-20f6-4b6b-a147-edd8175d3cca][skg : tree API, toward a more expressive]]
-* different kinds of trees
-A ContentNodeTree and an OrgNodeTree.
-This way I wouldn't have to write OrgNode code to handle AliasNodes where none should be possible.
+* [[id:b72d4277-eced-48b9-85da-b917d9a4aad4][aliases in skg]]
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
 * bugs
 ** Moving a heading undoes heralds-mode on it.
@@ -11,9 +8,6 @@ This way I wouldn't have to write OrgNode code to handle AliasNodes where none s
 * Document the fact that filenames must correspond to PIDs.
 * `org_from_node_recursive` should use its `focus` argument.
   This seems easy.
-* Tantivy checks if a file needs indexing (based on modification time) but TypeDB doesn't.
-  If this proves annoying I can just delete all the modification time logic, and just rebuild both entirely when starting the app. That won't cost much time, because I'll leave the app on for a long time. But it will be annoying if I make edits to files outside the app.
-* [[id:324f020b-1145-4279-a87a-02c96dce7a30][omits-some-content herald: "{+"]]
 * Rust send and receive need fairly complete rewriting.
 ** Rust send will not be hard.
    add bullets, nesting

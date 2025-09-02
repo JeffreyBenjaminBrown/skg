@@ -43,6 +43,7 @@ pub struct OrgNodeUninterpreted {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrgNode {
+  // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
   Content(ContentNode),
   Aliases(AliasNode),
 }
