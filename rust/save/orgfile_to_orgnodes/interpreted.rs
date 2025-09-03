@@ -1,23 +1,23 @@
-// Transform 'OrgNode's to 'OrgNodeInterpretation's
+// Transform 'OrgNode's to 'OrgNodeInterp's
 
 use crate::types::ContentNode;
 use crate::types::ID;
-use crate::types::OrgNodeInterpretation;
-use crate::types::{OrgNodeType,OrgNode};
+use crate::types::OrgNodeInterp;
+use crate::types::{OrgNodeInterpEnum,OrgNode};
 use super::types::{OrgNodeMetadata};
 
 use std::collections::{HashMap, HashSet};
 
 pub fn interpret_org_node (
   uninterpreted : OrgNode
-) -> OrgNodeInterpretation { // TODO ? Currently this returns a tree of OrgNodeInterpretations. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
+) -> OrgNodeInterp { // TODO ? Currently this returns a tree of OrgNodeInterps. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
   let metadata : OrgNodeMetadata =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
   match metadata.node_type {
-    OrgNodeType::ContentNode => {
-      let interpreted_branches: Vec<OrgNodeInterpretation> =
+    OrgNodeInterpEnum::ContentNode => {
+      let interpreted_branches: Vec<OrgNodeInterp> =
         if metadata.repeated { Vec::new()
         } else { uninterpreted.branches
                  . into_iter()
@@ -25,16 +25,16 @@ pub fn interpret_org_node (
                  . collect()
         };
       let aliases: Option<Vec<String>> =
-      // Uses aliases from the first OrgNodeInterpretation::AliasNode.
+      // Uses aliases from the first OrgNodeInterp::AliasNode.
       // PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more. If they do, all but the first are ignored. */
         interpreted_branches
         . iter()
         . find_map ( // Returns the first Some.
           |child| {
-            if let OrgNodeInterpretation::Aliases (alias_list) = child {
+            if let OrgNodeInterp::Aliases (alias_list) = child {
               Some (alias_list.clone())
             } else { None }} );
-      OrgNodeInterpretation::Content ( ContentNode {
+      OrgNodeInterp::Content ( ContentNode {
         id       : metadata.id,
         title    : metadata.title,
         aliases  : aliases,
@@ -46,16 +46,16 @@ pub fn interpret_org_node (
         branches : interpreted_branches
           . iter()
           . filter_map ( |child| {
-            if let OrgNodeInterpretation::Content(content_node)
+            if let OrgNodeInterp::Content(content_node)
               = child
-            { Some ( OrgNodeInterpretation::Content (
+            { Some ( OrgNodeInterp::Content (
               content_node.clone() ))
             } else { None // Filter out AliasNode values
             }} )
           . collect(), }) },
-    OrgNodeType::Aliases => {
+    OrgNodeInterpEnum::Aliases => {
       // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
-      let branches: Vec<OrgNodeInterpretation> =
+      let branches: Vec<OrgNodeInterp> =
       { uninterpreted.branches
         . into_iter()
         . map (interpret_org_node) // recurse
@@ -64,12 +64,12 @@ pub fn interpret_org_node (
         . iter()
         . filter_map ( |child| {
           // collect aliases only from ContentNodes
-          if let OrgNodeInterpretation::Content (content_node) =
+          if let OrgNodeInterp::Content (content_node) =
           // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
             child { Some ( content_node . title . clone() )
             } else { None }} )
         . collect();
-      OrgNodeInterpretation::Aliases (aliases) }} }
+      OrgNodeInterp::Aliases (aliases) }} }
 
 /// Parse a headline into structured metadata.
 /// .
@@ -94,9 +94,9 @@ fn parse_separating_metadata_and_title (
       let folded: bool = bare.contains("folded");
       let focused: bool = bare.contains("focused");
       let node_type = match kv.get("type").map(|s| s.as_str()) {
-        Some("aliases") => OrgNodeType::Aliases,
+        Some("aliases") => OrgNodeInterpEnum::Aliases,
         Some(other) => panic!("unrecognized 'type' field: {}", other),
-        None => OrgNodeType::ContentNode,
+        None => OrgNodeInterpEnum::ContentNode,
       };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
@@ -117,7 +117,7 @@ fn parse_separating_metadata_and_title (
     folded: false,
     focused: false,
     title,
-    node_type: OrgNodeType::ContentNode,
+    node_type: OrgNodeInterpEnum::ContentNode,
   }
 }
 

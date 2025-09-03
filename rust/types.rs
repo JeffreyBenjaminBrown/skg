@@ -42,21 +42,23 @@ pub struct OrgNode {
   pub branches : Vec<OrgNode>, }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum OrgNodeInterpretation {
+pub enum OrgNodeInterp {
+  // Tells Rust how to interpret -- what to do with -- an OrgNode.
   // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
   Content(ContentNode),
   Aliases(Vec<String>),
 }
 
-/// Enums (safer than strings) corresponding to OrgNodeInterpretation.
+/// Enums (safer than strings) corresponding to
+/// the constructors of OrgNodeInterp.
 #[derive(Debug, Clone, PartialEq)]
-pub enum OrgNodeType {
+pub enum OrgNodeInterpEnum {
   ContentNode,
   Aliases, }
 
-impl Default for OrgNodeType {
+impl Default for OrgNodeInterpEnum {
   fn default() -> Self {
-    OrgNodeType::ContentNode }}
+    OrgNodeInterpEnum::ContentNode }}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContentNode {
@@ -76,7 +78,7 @@ Both Rust and Emacs need to know this, because:
 Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
 
 Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
-  pub branches : Vec<OrgNodeInterpretation>, }
+  pub branches : Vec<OrgNodeInterp>, }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct FileNode {
@@ -153,15 +155,15 @@ impl Hyperlink {
                 label : label.into (),
     }} }
 
-impl OrgNodeInterpretation {
+impl OrgNodeInterp {
   pub fn content (content_node: ContentNode) -> Self {
-    OrgNodeInterpretation::Content (content_node) }
+    OrgNodeInterp::Content (content_node) }
   pub fn aliases (alias_list: Vec<String>) -> Self {
-    OrgNodeInterpretation::Aliases (alias_list) }
+    OrgNodeInterp::Aliases (alias_list) }
   pub fn is_content (&self) -> bool {
-    matches! (self, OrgNodeInterpretation::Content(_)) }
+    matches! (self, OrgNodeInterp::Content(_)) }
   pub fn is_aliases (&self) -> bool {
-    matches! (self, OrgNodeInterpretation::Aliases(_)) }}
+    matches! (self, OrgNodeInterp::Aliases(_)) }}
 
 
 impl fmt::Display for Hyperlink {

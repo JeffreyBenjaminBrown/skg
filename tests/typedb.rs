@@ -11,7 +11,7 @@ use skg::typedb::relationships::delete_out_links;
 use skg::typedb::search::extract_payload_from_typedb_string_rep;
 use skg::typedb::search::find_container_of;
 use skg::typedb::search::pid_from_id;
-use skg::types::{ID, FileNode, OrgNodeInterpretation, ContentNode, SkgConfig};
+use skg::types::{ID, FileNode, OrgNodeInterp, ContentNode, SkgConfig};
 
 use futures::StreamExt;
 use futures::executor::block_on;
@@ -378,19 +378,19 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Vec<OrgNodeInterpretation> =
+  let result_forest : Vec<OrgNodeInterp> =
     parse_skg_org_to_nodes (
       & result_org_text );
 
-  // Expected OrgNodeInterpretation tree
+  // Expected OrgNodeInterp tree
   //
   // a [focused]
   // └─ b (body "b has a body")
   //    └─ c
   //       └─ b [repeated]
   //            (body "Repeated above. Edit there, not here.")
-  let expected_forest : Vec<OrgNodeInterpretation> =
-    vec! [ OrgNodeInterpretation::Content(ContentNode {
+  let expected_forest : Vec<OrgNodeInterp> =
+    vec! [ OrgNodeInterp::Content(ContentNode {
       id       : Some ( ID::from ("a") ),
       title    : "a" . to_string (),
       aliases  : None,
@@ -398,7 +398,7 @@ async fn test_recursive_document (
       folded   : false,
       focused  : false,
       repeated : false,
-      branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
+      branches : vec! [ OrgNodeInterp::Content(ContentNode {
         id       : Some ( ID::from ("b") ),
         title    : "b" . to_string (),
         aliases  : None,
@@ -406,7 +406,7 @@ async fn test_recursive_document (
         folded   : false,
         focused  : false,
         repeated : false,
-        branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
+        branches : vec! [ OrgNodeInterp::Content(ContentNode {
           id       : Some ( ID::from ("c") ),
           aliases  : None,
           title    : "c" . to_string (),
@@ -414,7 +414,7 @@ async fn test_recursive_document (
           folded   : false,
           focused  : false,
           repeated : false,
-          branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
+          branches : vec! [ OrgNodeInterp::Content(ContentNode {
             id       : Some ( ID::from ("b") ),
             title    : "b" . to_string (),
             aliases  : None,
@@ -424,11 +424,11 @@ async fn test_recursive_document (
             repeated : true,
             branches : vec! [], }) ], }) ], }) ], }) ];
 
-  // With PartialEq derived on OrgNodeInterpretation, we can compare the full structures directly.
+  // With PartialEq derived on OrgNodeInterp, we can compare the full structures directly.
   assert_eq! (
     result_forest,
     expected_forest,
-    "Rendered OrgNodeInterpretation forest does not match expected." );
+    "Rendered OrgNodeInterp forest does not match expected." );
   Ok (( )) }
 
 async fn collect_all_of_some_binary_rel(

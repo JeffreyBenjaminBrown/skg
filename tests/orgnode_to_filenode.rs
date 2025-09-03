@@ -4,11 +4,11 @@ use std::collections::HashSet;
 
 use skg::hyperlinks::hyperlinks_from_filenode;
 use skg::save::orgnode_to_filenode::orgNodeInterpretation_to_filenodes;
-use skg::types::{ID, OrgNodeInterpretation, ContentNode};
+use skg::types::{ID, OrgNodeInterp, ContentNode};
 
 #[test]
 fn test_convert_orgnode_to_filenode() {
-  let org_node: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let org_node: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("1")),
     title: "a title".to_string(),
     aliases: None,
@@ -50,7 +50,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   // └── 2 (focused)
   //     └── 1 (nested; headline "irrelevant")
   //         └── 3 ("also irrelevant")
-  let nested_3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let nested_3: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("3")),
     title: "also irrelevant".to_string(),
     aliases: None,
@@ -60,7 +60,7 @@ fn test_convert_circular_orgnode_to_filenode() {
     repeated: false,
     branches: vec![],
   });
-  let nested_dup_1: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let nested_dup_1: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("1")),
     title: "irrelevant".to_string(),
     aliases: None,
@@ -70,7 +70,7 @@ fn test_convert_circular_orgnode_to_filenode() {
     repeated: false, // not marked repeated; dedup happens in converter
     branches: vec![nested_3],
   });
-  let child_2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child_2: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("2")),
     title: "2".to_string(),
     aliases: None,
@@ -80,7 +80,7 @@ fn test_convert_circular_orgnode_to_filenode() {
     repeated: false,
     branches: vec![nested_dup_1],
   });
-  let root_1: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let root_1: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("1")),
     title: "1".to_string(),
     aliases: None,
@@ -93,8 +93,8 @@ fn test_convert_circular_orgnode_to_filenode() {
 
   // Sanity checks on the constructed org tree
   let root_content = match &root_1 {
-    OrgNodeInterpretation::Content(content) => content,
-    OrgNodeInterpretation::Aliases(_) => panic!("Expected ContentNode"),
+    OrgNodeInterp::Content(content) => content,
+    OrgNodeInterp::Aliases(_) => panic!("Expected ContentNode"),
   };
   assert_eq!(root_content.id.as_ref().map(|id| id.as_str()),
              Some("1"));
@@ -102,16 +102,16 @@ fn test_convert_circular_orgnode_to_filenode() {
   assert_eq!(root_content.branches.len(), 1);
 
   let child_2_content = match &root_content.branches[0] {
-    OrgNodeInterpretation::Content(content) => content,
-    OrgNodeInterpretation::Aliases(_) => panic!("Expected ContentNode"),
+    OrgNodeInterp::Content(content) => content,
+    OrgNodeInterp::Aliases(_) => panic!("Expected ContentNode"),
   };
   assert_eq!(child_2_content.id.as_ref().map(|id| id.as_str()),
              Some("2"));
   assert_eq!(child_2_content.branches.len(), 1);
 
   let nested_content = match &child_2_content.branches[0] {
-    OrgNodeInterpretation::Content(content) => content,
-    OrgNodeInterpretation::Aliases(_) => panic!("Expected ContentNode"),
+    OrgNodeInterp::Content(content) => content,
+    OrgNodeInterp::Aliases(_) => panic!("Expected ContentNode"),
   };
   assert_eq!(nested_content.id.as_deref().map(String::as_str),
              Some("1"));
@@ -150,7 +150,7 @@ fn test_focused_node_extraction() {
   // ├── 2
   // ├── 3 [focused]
   // └── 4
-  let child2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child2: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("2")),
     title: "child 1".to_string(),
     aliases: None,
@@ -160,7 +160,7 @@ fn test_focused_node_extraction() {
     repeated: false,
     branches: vec![],
   });
-  let child3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child3: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("3")),
     title: "child 2".to_string(),
     aliases: None,
@@ -170,7 +170,7 @@ fn test_focused_node_extraction() {
     repeated: false,
     branches: vec![],
   });
-  let child4: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child4: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("4")),
     title: "child 3".to_string(),
     aliases: None,
@@ -180,7 +180,7 @@ fn test_focused_node_extraction() {
     repeated: false,
     branches: vec![],
   });
-  let root: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let root: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("1")),
     title: "root".to_string(),
     aliases: None,
@@ -215,7 +215,7 @@ fn test_multiple_focused_nodes_last_wins() {
   // root(1) [focused]
   // ├── 2 [focused]
   // └── 3 [folded]
-  let child2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child2: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("2")),
     title: "child 1".to_string(),
     aliases: None,
@@ -225,7 +225,7 @@ fn test_multiple_focused_nodes_last_wins() {
     repeated: false,
     branches: vec![],
   });
-  let child3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let child3: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("3")),
     title: "child 2".to_string(),
     aliases: None,
@@ -235,7 +235,7 @@ fn test_multiple_focused_nodes_last_wins() {
     repeated: false,
     branches: vec![],
   });
-  let root: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
+  let root: OrgNodeInterp = OrgNodeInterp::Content(ContentNode {
     id: Some(ID::from("1")),
     title: "root".to_string(),
     aliases: None,

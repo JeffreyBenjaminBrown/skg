@@ -1,6 +1,6 @@
 use indoc::indoc;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::types::{OrgNodeInterpretation, ID};
+use skg::types::{OrgNodeInterp, ID};
 
 
 #[test]
@@ -20,7 +20,7 @@ fn test_parse_skg_org_to_nodes() {
             ** <<id:b>> b
         "};
 
-  let parsed_nodes : Vec<OrgNodeInterpretation> =
+  let parsed_nodes : Vec<OrgNodeInterp> =
     parse_skg_org_to_nodes (input);
 
   println! ("Parsed {} nodes", parsed_nodes.len ());
@@ -29,7 +29,7 @@ fn test_parse_skg_org_to_nodes() {
   assert_eq! (parsed_nodes.len (), 1, "Should have exactly one root node");
 
   let root = &parsed_nodes[0];
-  if let OrgNodeInterpretation::Content (root_content) = root {
+  if let OrgNodeInterp::Content (root_content) = root {
     assert_eq! (root_content.title, "root");
     assert_eq! (root_content.id, Some (ID::from ("root")));
     assert_eq! (root_content.aliases, None);
@@ -40,7 +40,7 @@ fn test_parse_skg_org_to_nodes() {
     assert_eq! (root_content.branches.len (), 2, "Root should have 2 children");
 
     // Check first child (node 'a')
-    if let OrgNodeInterpretation::Content (node_a) = &root_content.branches[0] {
+    if let OrgNodeInterp::Content (node_a) = &root_content.branches[0] {
       assert_eq! (node_a.title, "a");
       println! ("node_a.title: {}", node_a.title);
       assert_eq! (node_a.id, Some (ID::from ("a")));
@@ -52,7 +52,7 @@ fn test_parse_skg_org_to_nodes() {
       assert_eq! (node_a.branches.len (), 2, "Node 'a' should have 2 children");
 
       // Check first grandchild (node 'aa')
-      if let OrgNodeInterpretation::Content (node_aa) = &node_a.branches[0] {
+      if let OrgNodeInterp::Content (node_aa) = &node_a.branches[0] {
         assert_eq! (node_aa.title, "aa");
         assert_eq! (node_aa.id, None, "Node 'aa' should have no ID (None)");
         assert_eq! (node_aa.aliases, None);
@@ -66,7 +66,7 @@ fn test_parse_skg_org_to_nodes() {
       }
 
       // Check second grandchild (node 'ab')
-      if let OrgNodeInterpretation::Content (node_ab) = &node_a.branches[1] {
+      if let OrgNodeInterp::Content (node_ab) = &node_a.branches[1] {
         assert_eq! (node_ab.title, "ab");
         assert_eq! (node_ab.id, Some (ID::from ("ab")));
         assert_eq! (node_ab.aliases, None);
@@ -83,7 +83,7 @@ fn test_parse_skg_org_to_nodes() {
     }
 
     // Check second child (node 'b')
-    if let OrgNodeInterpretation::Content (node_b) = &root_content.branches[1] {
+    if let OrgNodeInterp::Content (node_b) = &root_content.branches[1] {
       assert_eq! (node_b.title, "b");
       assert_eq! (node_b.id, Some (ID::from ("b")));
       assert_eq! (node_b.aliases, None);

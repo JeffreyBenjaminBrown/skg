@@ -7,7 +7,7 @@ use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::tantivy::update_index_with_filenodes;
 use crate::typedb::update::update_nodes_and_relationships;
-use crate::types::{FileNode, ID, OrgNodeInterpretation, SkgConfig, TantivyIndex};
+use crate::types::{FileNode, ID, OrgNodeInterp, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -83,8 +83,8 @@ fn read_length_prefixed_content (
 
 /* Updates dbs and filesystem, and generates text for a new org-buffer.
 Steps:
-- Put the text through `parse_skg_org_to_nodes` to get some OrgNodeInterpretations.
-- To those OrgNodeInterpretations:
+- Put the text through `parse_skg_org_to_nodes` to get some OrgNodeInterps.
+- To those OrgNodeInterps:
   - Assigns IDs where needed (`assign_ids_recursive`).
   - Stores as `document_root` the root ID.
 - Puts the result through `orgNodeInterpretation_to_filenodes` to get FileNodes.
@@ -97,22 +97,22 @@ fn update_from_and_rerender_buffer (
   tantivy_index : &TantivyIndex
 ) -> Result<String, Box<dyn Error>> {
 
-  let orgnodes : Vec<OrgNodeInterpretation> =
+  let orgnodes : Vec<OrgNodeInterp> =
     parse_skg_org_to_nodes (content);
   if orgnodes.is_empty() {
     return Err ("No valid org nodes found in content".into()); }
-  let orgnodes_with_ids : Vec<OrgNodeInterpretation> =
+  let orgnodes_with_ids : Vec<OrgNodeInterp> =
     orgnodes.into_iter()
     .map ( |node|
             assign_ids_recursive (&node) )
     .collect();
   let document_root : ID =
     match &orgnodes_with_ids[0] {
-      OrgNodeInterpretation::Content(content_node) => {
+      OrgNodeInterp::Content(content_node) => {
         content_node.id.clone() . ok_or(
           // earlier 'assign_ids_recursive' => should be 'ok'
           "Root node has no ID")? },
-      OrgNodeInterpretation::Aliases(_) => {
+      OrgNodeInterp::Aliases(_) => {
         return Err("Root node cannot be an Aliases node".into());
       }};
 

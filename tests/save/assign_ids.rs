@@ -1,9 +1,9 @@
 use skg::save::assign_ids::assign_ids_recursive;
-use skg::types::{ID, ContentNode, OrgNodeInterpretation};
+use skg::types::{ID, ContentNode, OrgNodeInterp};
 
 #[test]
 fn test_assign_ids_recursive() {
-  // Build from the leaves upward, wrapping each ContentNode as OrgNodeInterpretation::Content
+  // Build from the leaves upward, wrapping each ContentNode as OrgNodeInterp::Content
   let c_content = ContentNode {
     id: None,
     title: "c".to_string(),
@@ -14,7 +14,7 @@ fn test_assign_ids_recursive() {
     repeated: false,
     branches: vec![], // leaf
   };
-  let c = OrgNodeInterpretation::content(c_content);
+  let c = OrgNodeInterp::content(c_content);
 
   let b_content = ContentNode {
     id: Some(ID::from("b")),
@@ -24,11 +24,11 @@ fn test_assign_ids_recursive() {
     folded: false,
     focused: false,
     repeated: false,
-    branches: vec![c], // Vec<OrgNodeInterpretation>
+    branches: vec![c], // Vec<OrgNodeInterp>
   };
-  let b = OrgNodeInterpretation::content(b_content);
+  let b = OrgNodeInterp::content(b_content);
 
-  let a = OrgNodeInterpretation::content(ContentNode {
+  let a = OrgNodeInterp::content(ContentNode {
     id: None,
     title: "a".to_string(),
     aliases: None,
@@ -36,14 +36,14 @@ fn test_assign_ids_recursive() {
     folded: false,
     focused: false,
     repeated: false,
-    branches: vec![b], // Vec<OrgNodeInterpretation>
+    branches: vec![b], // Vec<OrgNodeInterp>
   });
 
   let result = assign_ids_recursive(&a);
 
-  // Unpack OrgNodeInterpretation -> ContentNode to assert on fields
+  // Unpack OrgNodeInterp -> ContentNode to assert on fields
   let result = match result {
-    OrgNodeInterpretation::Content(cn) => cn,
+    OrgNodeInterp::Content(cn) => cn,
     _ => panic!("expected Content node at root"),
   };
   assert!(result.id.is_some(),
@@ -52,7 +52,7 @@ fn test_assign_ids_recursive() {
              "Node A should have one child");
 
   let result_b = match &result.branches[0] {
-    OrgNodeInterpretation::Content(cn) => cn,
+    OrgNodeInterp::Content(cn) => cn,
     _ => panic!("expected Content node at B"),
   };
   assert_eq!(result_b.id, Some(ID::from("b")),
@@ -61,7 +61,7 @@ fn test_assign_ids_recursive() {
              "Node B should have one child");
 
   let result_c = match &result_b.branches[0] {
-    OrgNodeInterpretation::Content(cn) => cn,
+    OrgNodeInterp::Content(cn) => cn,
     _ => panic!("expected Content node at C"),
   };
   assert!(result_c.id.is_some(),

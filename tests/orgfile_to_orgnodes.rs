@@ -1,6 +1,6 @@
 use skg::save::orgfile_to_orgnodes::interpreted::metadata_inner_string_to_map_and_set;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::types::{OrgNodeInterpretation, ContentNode};
+use skg::types::{OrgNodeInterp, ContentNode};
 
 #[allow(unused_imports)]
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
@@ -10,11 +10,11 @@ use std::collections::{HashMap, HashSet};
 mod tests {
   use super::*;
 
-  // Helper function to extract ContentNode from OrgNodeInterpretation for cleaner test code
-  fn extract_content_node(org_node: &OrgNodeInterpretation) -> &ContentNode {
+  // Helper function to extract ContentNode from OrgNodeInterp for cleaner test code
+  fn extract_content_node(org_node: &OrgNodeInterp) -> &ContentNode {
     match org_node {
-      OrgNodeInterpretation::Content(content_node) => content_node,
-      OrgNodeInterpretation::Aliases(_) => panic!("Expected ContentNode, found AliasNode"),
+      OrgNodeInterp::Content(content_node) => content_node,
+      OrgNodeInterp::Aliases(_) => panic!("Expected ContentNode, found AliasNode"),
     }
   }
 
@@ -32,7 +32,7 @@ mod tests {
   ** A headline with no id, the fourth child of 1.
 "# };
 
-    let forest: Vec<OrgNodeInterpretation> = parse_skg_org_to_nodes(sample);
+    let forest: Vec<OrgNodeInterp> = parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
     let n1 : &ContentNode =
@@ -99,7 +99,7 @@ mod tests {
       ** <<id:4>> Node 4 - neither
       "# };
 
-    let forest: Vec<OrgNodeInterpretation> =
+    let forest: Vec<OrgNodeInterp> =
       parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
