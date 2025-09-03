@@ -1,6 +1,7 @@
 use indoc::indoc;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::types::{OrgNodeInterp, ID};
+use skg::save::orgfile_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
+use skg::types::{OrgNodeInterp, ID, OrgNode};
 
 
 #[test]
@@ -98,4 +99,74 @@ fn test_parse_skg_org_to_nodes() {
   } else {
     panic! ("Expected ContentNode for root");
   }
+}
+
+#[test]
+fn test_parse_skg_org_to_uninterpreted_nodes() {
+  let input: &str =
+    indoc! {"
+            Ignored text.
+            Ignored text.
+            * a
+            ** aa
+               body of aa
+            ** ab
+            * b
+              body of b
+            ** ba
+            *** baa
+                body of aaa
+            ** bb
+        "};
+
+  let parsed_nodes: Vec<OrgNode> =
+    parse_skg_org_to_uninterpreted_nodes ( input );
+
+  assert_eq! ( parsed_nodes.len (), 2,
+               "Should have exactly 2 root nodes" );
+
+  let node_a: &OrgNode =
+    &parsed_nodes[0];
+  assert_eq! ( node_a.title, "a" );
+  assert_eq! ( node_a.body, None );
+  assert_eq! ( node_a.branches.len (), 2 );
+
+  let node_aa: &OrgNode =
+    &node_a.branches[0];
+  assert_eq! ( node_aa.title, "aa" );
+  assert_eq! ( node_aa.body,
+               Some ( "   body of aa".to_string () ) );
+  assert_eq! ( node_aa.branches.len (), 0 );
+
+  let node_ab: &OrgNode =
+    &node_a.branches[1];
+  assert_eq! ( node_ab.title, "ab" );
+  assert_eq! ( node_ab.body, None );
+  assert_eq! ( node_ab.branches.len (), 0 );
+
+  let node_b: &OrgNode =
+    &parsed_nodes[1];
+  assert_eq! ( node_b.title, "b" );
+  assert_eq! ( node_b.body,
+               Some ( "  body of b".to_string () ) );
+  assert_eq! ( node_b.branches.len (), 2 );
+
+  let node_ba: &OrgNode =
+    &node_b.branches[0];
+  assert_eq! ( node_ba.title, "ba" );
+  assert_eq! ( node_ba.body, None );
+  assert_eq! ( node_ba.branches.len (), 1 );
+
+  let node_baa: &OrgNode =
+    &node_ba.branches[0];
+  assert_eq! ( node_baa.title, "baa" );
+  assert_eq! ( node_baa.body,
+               Some ( "    body of aaa".to_string () ) );
+  assert_eq! ( node_baa.branches.len (), 0 );
+
+  let node_bb: &OrgNode =
+    &node_b.branches[1];
+  assert_eq! ( node_bb.title, "bb" );
+  assert_eq! ( node_bb.body, None );
+  assert_eq! ( node_bb.branches.len (), 0 );
 }
