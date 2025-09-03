@@ -1,8 +1,8 @@
-See also `api.md`, `schema.md`, and `glossary.md`.
+See also the [API](../api.md), the [schema](../schema.tql), and the [glossary](../glossary.md).
 
 Note that the above documents, this document, and any other documentation might be obsolete. The definitive source of truth is the code, not the docs.
 
-* What this program does.
+# What this program does.
 
 Skg is for manipulating a knowledge graph. The bulk of the logic is performed by the server, written in Rust, found in rust/. The client is written in Emacs, found in elisp/. The user's data is stored on disk, in a collection of '.skg' files, which are all valid YAML (but not vice-versa). When the program stops, those files are the only record of the user's data.
 
