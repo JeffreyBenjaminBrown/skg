@@ -10,7 +10,7 @@ use skg::types::{ID, OrgNodeInterpretation, ContentNode};
 fn test_convert_orgnode_to_filenode() {
   let org_node: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("1")),
-    headline: "a title".to_string(),
+    title: "a title".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -52,7 +52,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   //         └── 3 ("also irrelevant")
   let nested_3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("3")),
-    headline: "also irrelevant".to_string(),
+    title: "also irrelevant".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -62,7 +62,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let nested_dup_1: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("1")),
-    headline: "irrelevant".to_string(),
+    title: "irrelevant".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -72,7 +72,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let child_2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("2")),
-    headline: "2".to_string(),
+    title: "2".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -82,7 +82,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let root_1: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("1")),
-    headline: "1".to_string(),
+    title: "1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -98,7 +98,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   };
   assert_eq!(root_content.id.as_ref().map(|id| id.as_str()),
              Some("1"));
-  assert_eq!(root_content.headline, "1");
+  assert_eq!(root_content.title, "1");
   assert_eq!(root_content.branches.len(), 1);
 
   let child_2_content = match &root_content.branches[0] {
@@ -152,7 +152,7 @@ fn test_focused_node_extraction() {
   // └── 4
   let child2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("2")),
-    headline: "child 1".to_string(),
+    title: "child 1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -162,7 +162,7 @@ fn test_focused_node_extraction() {
   });
   let child3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("3")),
-    headline: "child 2".to_string(),
+    title: "child 2".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -172,7 +172,7 @@ fn test_focused_node_extraction() {
   });
   let child4: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("4")),
-    headline: "child 3".to_string(),
+    title: "child 3".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -182,7 +182,7 @@ fn test_focused_node_extraction() {
   });
   let root: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("1")),
-    headline: "root".to_string(),
+    title: "root".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -217,7 +217,7 @@ fn test_multiple_focused_nodes_last_wins() {
   // └── 3 [folded]
   let child2: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("2")),
-    headline: "child 1".to_string(),
+    title: "child 1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -227,7 +227,7 @@ fn test_multiple_focused_nodes_last_wins() {
   });
   let child3: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("3")),
-    headline: "child 2".to_string(),
+    title: "child 2".to_string(),
     aliases: None,
     body: None,
     folded: true, // folded
@@ -237,7 +237,7 @@ fn test_multiple_focused_nodes_last_wins() {
   });
   let root: OrgNodeInterpretation = OrgNodeInterpretation::Content(ContentNode {
     id: Some(ID::from("1")),
-    headline: "root".to_string(),
+    title: "root".to_string(),
     aliases: None,
     body: None,
     folded: false,

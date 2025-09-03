@@ -392,7 +392,7 @@ async fn test_recursive_document (
   let expected_forest : Vec<OrgNodeInterpretation> =
     vec! [ OrgNodeInterpretation::Content(ContentNode {
       id       : Some ( ID::from ("a") ),
-      headline : "a" . to_string (),
+      title    : "a" . to_string (),
       aliases  : None,
       body     : None,
       folded   : false,
@@ -400,7 +400,7 @@ async fn test_recursive_document (
       repeated : false,
       branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
         id       : Some ( ID::from ("b") ),
-        headline : "b" . to_string (),
+        title    : "b" . to_string (),
         aliases  : None,
         body     : Some ( "b has a body" . to_string () ),
         folded   : false,
@@ -409,14 +409,14 @@ async fn test_recursive_document (
         branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
           id       : Some ( ID::from ("c") ),
           aliases  : None,
-          headline : "c" . to_string (),
+          title    : "c" . to_string (),
           body     : None,
           folded   : false,
           focused  : false,
           repeated : false,
           branches : vec! [ OrgNodeInterpretation::Content(ContentNode {
             id       : Some ( ID::from ("b") ),
-            headline : "b" . to_string (),
+            title    : "b" . to_string (),
             aliases  : None,
             body     : None, // PITFALL: There *is* a body in the received org text. But it is discarded, because the node is a repeat.
             folded   : false,

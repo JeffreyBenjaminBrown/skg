@@ -38,7 +38,7 @@ mod tests {
     let n1 : &ContentNode =
       extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
-    assert_eq!(n1.headline, "1");
+    assert_eq!(n1.title, "1");
     assert_eq!(n1.branches.len(), 4);
 
     let n2 : &ContentNode =
@@ -66,7 +66,7 @@ mod tests {
     let n_no_id : &ContentNode =
       extract_content_node(&n1.branches[3]);
     assert_eq!(n_no_id.id, None);
-    assert_eq!(n_no_id.headline,
+    assert_eq!(n_no_id.title,
                "A headline with no id, the fourth child of 1.");
   }
 

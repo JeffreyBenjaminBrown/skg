@@ -13,7 +13,7 @@ pub fn interpret_org_node (
 
   let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
     parse_separating_metadata_and_title (
-      & uninterpreted.headline );
+      & uninterpreted.title );
   match node_type {
     None => { // Default case: ContentNode.
       let interpreted_branches: Vec<OrgNodeInterpretation> =
@@ -35,7 +35,7 @@ pub fn interpret_org_node (
             } else { None }} );
       OrgNodeInterpretation::Content ( ContentNode {
         id       : id_opt,
-        headline : title,
+        title    : title,
         aliases  : aliases,
         body     : if is_repeated { None } else { uninterpreted.body },
         folded   : is_folded,
@@ -44,8 +44,10 @@ pub fn interpret_org_node (
         branches : interpreted_branches
           . iter()
           . filter_map ( |child| {
-            if let OrgNodeInterpretation::Content(content_node) = child {
-              Some(OrgNodeInterpretation::Content(content_node.clone()))
+            if let OrgNodeInterpretation::Content(content_node)
+              = child
+            { Some ( OrgNodeInterpretation::Content (
+              content_node.clone() ))
             } else { None // Filter out AliasNode values
             }} )
           . collect(), }) },
@@ -60,15 +62,15 @@ pub fn interpret_org_node (
         . iter()
         . filter_map ( |child| {
           // collect aliases only from ContentNodes
-          if let OrgNodeInterpretation::Content (content_node) = child {
+          if let OrgNodeInterpretation::Content (content_node) =
             // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
-            Some (content_node.headline.clone() )
-          } else { None }} )
+            child { Some ( content_node . title . clone() )
+            } else { None }} )
       . collect();
       OrgNodeInterpretation::Aliases(aliases) },
-    Some(type_str) => {
-      panic! ( "unrecognized 'type' field in OrgNodeInterpretation: {}",
-                type_str ); }} }
+    Some (type_str) => { panic! (
+      "unrecognized 'type' field in OrgNodeInterpretation: {}",
+      type_str ); }} }
 
 /// Parse the *headline* into `(id, repeated, folded, focused, title, type)`.
 /// .

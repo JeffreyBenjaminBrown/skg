@@ -37,7 +37,7 @@ pub enum HyperlinkParseError {
 /// Raw text from Emacs is first loaded as a forest of these.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrgNode {
-  pub headline : String,         // "headline" is a term fron org-mode
+  pub title    : String,         // The title part of the headline (after asterisks and metadata). 'Headline' is a term from org-mode.
   pub body     : Option<String>, // "body" is a term fron org-mode
   pub branches : Vec<OrgNode>, }
 
@@ -54,9 +54,9 @@ pub struct ContentNode {
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
-  pub headline : String,         // "headline" is a term fron org-mode
+  pub title    : String,         // See comment in the type `OrgNode`
   pub aliases  : Option<Vec<String>>, // aliases in the org-roam sense
-  pub body     : Option<String>, // "body" in the org-mode sense
+  pub body     : Option<String>, // See comment in the type `OrgNode`
   pub folded   : bool,           // folded in the org-mode sense
   pub focused  : bool,           // where the Emacs cursor is
   pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.

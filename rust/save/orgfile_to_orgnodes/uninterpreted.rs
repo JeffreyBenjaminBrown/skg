@@ -53,11 +53,11 @@ fn parse_one_uninterpreted_node_at_level (
   let input: &str =
     cur . bump() . expect (
       "caller guarantees a headline is present" );
-  let (_level, headline_content): (usize, &str) =
+  let (_level, title): (usize, &str) =
     parse_metadata_plus_headline (input)
     . expect("caller guarantees a headline is present");
   OrgNode {
-    headline : headline_content.to_string (),
+    title    : title.to_string (),
     body     : collect_body_lines (cur),
     branches : parse_uninterpreted_children ( cur, level ),
   }}

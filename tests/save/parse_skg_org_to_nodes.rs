@@ -30,7 +30,7 @@ fn test_parse_skg_org_to_nodes() {
 
   let root = &parsed_nodes[0];
   if let OrgNodeInterpretation::Content (root_content) = root {
-    assert_eq! (root_content.headline, "root");
+    assert_eq! (root_content.title, "root");
     assert_eq! (root_content.id, Some (ID::from ("root")));
     assert_eq! (root_content.aliases, None);
     assert_eq! (root_content.body, None);
@@ -41,8 +41,8 @@ fn test_parse_skg_org_to_nodes() {
 
     // Check first child (node 'a')
     if let OrgNodeInterpretation::Content (node_a) = &root_content.branches[0] {
-      assert_eq! (node_a.headline, "a");
-      println! ("node_a.headline: {}", node_a.headline);
+      assert_eq! (node_a.title, "a");
+      println! ("node_a.title: {}", node_a.title);
       assert_eq! (node_a.id, Some (ID::from ("a")));
       assert_eq! (node_a.aliases, Some (vec!["alias 1".to_string (), "alias 2".to_string ()]));
       assert_eq! (node_a.body, None);
@@ -53,7 +53,7 @@ fn test_parse_skg_org_to_nodes() {
 
       // Check first grandchild (node 'aa')
       if let OrgNodeInterpretation::Content (node_aa) = &node_a.branches[0] {
-        assert_eq! (node_aa.headline, "aa");
+        assert_eq! (node_aa.title, "aa");
         assert_eq! (node_aa.id, None, "Node 'aa' should have no ID (None)");
         assert_eq! (node_aa.aliases, None);
         assert_eq! (node_aa.body, None);
@@ -67,7 +67,7 @@ fn test_parse_skg_org_to_nodes() {
 
       // Check second grandchild (node 'ab')
       if let OrgNodeInterpretation::Content (node_ab) = &node_a.branches[1] {
-        assert_eq! (node_ab.headline, "ab");
+        assert_eq! (node_ab.title, "ab");
         assert_eq! (node_ab.id, Some (ID::from ("ab")));
         assert_eq! (node_ab.aliases, None);
         assert_eq! (node_ab.body, None);
@@ -84,7 +84,7 @@ fn test_parse_skg_org_to_nodes() {
 
     // Check second child (node 'b')
     if let OrgNodeInterpretation::Content (node_b) = &root_content.branches[1] {
-      assert_eq! (node_b.headline, "b");
+      assert_eq! (node_b.title, "b");
       assert_eq! (node_b.id, Some (ID::from ("b")));
       assert_eq! (node_b.aliases, None);
       assert_eq! (node_b.body, None);

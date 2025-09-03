@@ -8,7 +8,6 @@
 
 // TODO: There is still the problem that the user might copy a node not marked repeated, i.e. the one that's supposed to be the source of truth, and paste it somewhere else in the document. Rust won't know which one to treat as the source of truth. This could result in data loss.
 
-use crate::save::assign_ids::assign_ids_recursive;
 use crate::types::{ID, FileNode, OrgNodeInterpretation};
 
 use std::collections::HashSet;
@@ -52,7 +51,7 @@ fn orgNodeInterpretation_to_filenodes_internal (
       |node| node.ids.contains (id) ) {
       return; }}
   let filenode = FileNode {
-    title: content_node.headline.clone (),
+    title: content_node.title.clone (),
     ids: vec! [ // FileNodes can have multiple IDs, but OrgNodeInterpretations can't.
       content_node . id . clone () . expect (
         "FileNode with no ID found in `orgNodeInterpretation_to_filenodes_internal`. It should have already had an ID assigned by `assign_ids_recursive` in `orgNodeInterpretation_to_filenodes` (the non-internal version)." ) ],
