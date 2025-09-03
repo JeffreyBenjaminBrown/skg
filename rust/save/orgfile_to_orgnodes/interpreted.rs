@@ -12,7 +12,7 @@ pub fn interpret_org_node (
   uninterpreted : OrgNode
 ) -> OrgNodeInterp { // TODO ? Currently this returns a tree of OrgNodeInterps. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
-  let metadata : OrgNodeMetadata =
+  let (metadata, title): (OrgNodeMetadata, String) =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
   match metadata.node_type {
@@ -36,7 +36,7 @@ pub fn interpret_org_node (
             } else { None }} );
       OrgNodeInterp::Content ( ContentNode {
         id       : metadata.id,
-        title    : metadata.title,
+        title    : title,
         aliases  : aliases,
         body     : ( if metadata.repeated { None }
                      else { uninterpreted.body } ),
@@ -71,7 +71,7 @@ pub fn interpret_org_node (
         . collect();
       OrgNodeInterp::Aliases (aliases) }} }
 
-/// Parse a headline into structured metadata.
+/// Parse a headline into structured metadata and title.
 /// .
 /// Steps:
 /// 1) Confirm the line is a headline and isolate the post-marker content.
@@ -81,7 +81,8 @@ pub fn interpret_org_node (
 /// 5) Extract the `type` field from metadata if present.
 fn parse_separating_metadata_and_title (
   line_after_bullet: &str
-) -> OrgNodeMetadata {
+) -> (OrgNodeMetadata,
+      String) { // the title
 
   let headline_with_metadata: &str = line_after_bullet.trim_start();
   if let Some(meta_start) = headline_with_metadata.strip_prefix("<skg<") {
@@ -102,26 +103,23 @@ fn parse_separating_metadata_and_title (
                                  other), };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
-      return OrgNodeMetadata {
-        id: id_opt,
-        repeated,
-        folded,
-        focused,
-        title,
-        node_type, }; }
+      return ( OrgNodeMetadata { id: id_opt,
+                                 repeated,
+                                 folded,
+                                 focused,
+                                 node_type, },
+               title ); }
     // If "<skg<" with no matching ">>", fall through to default case
   }
-  // Default case: no (well-formed) metadata block
-  let title: String = line_after_bullet.trim().to_string();
-  OrgNodeMetadata {
-    id: None,
-    repeated: false,
-    folded: false,
-    focused: false,
-    title,
-    node_type: OrgNodeInterpEnum::ContentNode,
-  }
-}
+  { // Default case: no (well-formed) metadata block
+    let title: String = line_after_bullet.trim().to_string();
+    ( OrgNodeMetadata
+      { id: None,
+        repeated: false,
+        folded: false,
+        focused: false,
+        node_type: OrgNodeInterpEnum::ContentNode, },
+      title ) }}
 
 /// Parse the content inside a `<skg< ... >>` metadata block.
 /// Each token is either a key-value pair or a bare value.
