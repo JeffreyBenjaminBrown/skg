@@ -1,6 +1,20 @@
-// Line cursor and headline parsing utilities.
-
-// TODO: This still isn't as efficient as I would like. `count_headline_level` and `parse_metadata_plus_headline` are called multiple times for the same line.
+/* Line cursor and headline parsing utilities.
+.
+TODO: This still isn't as efficient as I would like. `count_headline_level` and `parse_metadata_plus_headline` are called multiple times for the same line.
+.
+Better would be to cache the results of the former in the cursor type. The new type would be:
+.
+  #[derive(Debug)]
+  pub struct LineCursor<'a> { /// Line iterator with lookahead.
+    lines: Vec<&'a str>, // Source text, without trailing newlines.
+    idx: usize, // An index into `lines`.
+    cached_parse: Opt< usize,  // level (number of asterisks
+                       &str >, // optional metadata + mandatory title
+    cache_is_next : bool, // If false, cache applies to the current line; otherwise, it applies to the next line.
+  }
+.
+and it would require modification of the `bump` function, and maybe others.
+*/
 
 #[derive(Debug)]
 pub struct LineCursor<'a> { /// Line iterator with lookahead.
