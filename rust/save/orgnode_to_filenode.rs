@@ -54,7 +54,7 @@ fn orgnode_to_filenodes_internal (
       |node| node.ids.contains (id) ) {
       return; }}
   let filenode = FileNode {
-    title: content_node.heading.clone (),
+    title: content_node.headline.clone (),
     ids: vec! [ // FileNodes can have multiple IDs, but OrgNodes can't.
       content_node . id . clone () . expect (
         "FileNode with no ID found in `orgnode_to_filenodes_internal`. It should have already had an ID assigned by `assign_ids_recursive` in `orgnode_to_filenodes` (the non-internal version)." ) ],

@@ -29,7 +29,7 @@ mod tests {
   ** <<id:1,repeated>> 1
   The body of a repeated node is just a warning that it was repeated. We can ignore it.
   *** <<id:5>> Since this is a child of a repeated node, it is ignored!
-  ** A heading with no id, the fourth child of 1.
+  ** A headline with no id, the fourth child of 1.
 "# };
 
     let forest: Vec<OrgNode> = parse_skg_org_to_nodes(sample);
@@ -38,7 +38,7 @@ mod tests {
     let n1 : &ContentNode =
       extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
-    assert_eq!(n1.heading, "1");
+    assert_eq!(n1.headline, "1");
     assert_eq!(n1.branches.len(), 4);
 
     let n2 : &ContentNode =
@@ -66,8 +66,8 @@ mod tests {
     let n_no_id : &ContentNode =
       extract_content_node(&n1.branches[3]);
     assert_eq!(n_no_id.id, None);
-    assert_eq!(n_no_id.heading,
-               "A heading with no id, the fourth child of 1.");
+    assert_eq!(n_no_id.headline,
+               "A headline with no id, the fourth child of 1.");
   }
 
   #[test]

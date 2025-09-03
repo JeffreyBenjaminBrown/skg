@@ -13,7 +13,7 @@ pub fn interpret_org_node (
 
   let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
     parse_separating_metadata_and_title (
-      & uninterpreted.heading );
+      & uninterpreted.headline );
   match node_type {
     None => { // Default case: ContentNode.
       let interpreted_branches: Vec<OrgNode> =
@@ -35,7 +35,7 @@ pub fn interpret_org_node (
             } else { None }} );
       OrgNode::Content ( ContentNode {
         id       : id_opt,
-        heading  : title,
+        headline : title,
         aliases  : aliases,
         body     : if is_repeated { None } else { uninterpreted.body },
         folded   : is_folded,
@@ -50,7 +50,7 @@ pub fn interpret_org_node (
             }} )
           . collect(), }) },
     Some (ref type_str) if type_str == "aliases" => {
-      // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headings of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
+      // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
       let branches: Vec<OrgNode> =
       { uninterpreted.branches
         . into_iter()
@@ -62,7 +62,7 @@ pub fn interpret_org_node (
           // collect aliases only from ContentNodes
           if let OrgNode::Content (content_node) = child {
             // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
-            Some (content_node.heading.clone() )
+            Some (content_node.headline.clone() )
           } else { None }} )
       . collect();
       OrgNode::Aliases(aliases) },
@@ -70,10 +70,10 @@ pub fn interpret_org_node (
       panic! ( "unrecognized 'type' field in OrgNode: {}",
                 type_str ); }} }
 
-/// Parse the *heading line* into `(id, repeated, folded, focused, title, type)`.
+/// Parse the *headline* into `(id, repeated, folded, focused, title, type)`.
 /// .
 /// Steps:
-/// 1) Confirm the line is a heading and isolate the post-marker content.
+/// 1) Confirm the line is a headline and isolate the post-marker content.
 /// 2) If a leading `<<...>>` block exists, parse as metadata (order-agnostic).
 /// 3) Remaining text (after `>>`) is the trimmed title.
 /// 4) If no metadata block, the whole remainder is the trimmed title.
@@ -88,8 +88,8 @@ fn parse_separating_metadata_and_title (
   String,           // title
   Option<String>) { // type. TODO: THis should not be an Option, but instead default to 'ContentNode'.
 
-  let heading_with_metadata: &str = line_after_bullet.trim_start();
-  if let Some(meta_start) = heading_with_metadata.strip_prefix("<<") {
+  let headline_with_metadata: &str = line_after_bullet.trim_start();
+  if let Some(meta_start) = headline_with_metadata.strip_prefix("<<") {
     if let Some(end) = meta_start.find(">>") {
       let inner: &str = &meta_start[..end]; // between "<<" and ">>"
       let (kv, bare): (HashMap<String, String>, HashSet<String>) =

@@ -37,7 +37,7 @@ pub enum HyperlinkParseError {
 /// Raw text from Emacs is first loaded as a forest of these.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrgNodeUninterpreted {
-  pub heading  : String,         // "heading" is a term fron org-mode
+  pub headline : String,         // "headline" is a term fron org-mode
   pub body     : Option<String>, // "body" is a term fron org-mode
   pub branches : Vec<OrgNodeUninterpreted>, }
 
@@ -54,7 +54,7 @@ pub struct ContentNode {
   // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
-  pub heading  : String,         // "heading" is a term fron org-mode
+  pub headline : String,         // "headline" is a term fron org-mode
   pub aliases  : Option<Vec<String>>, // aliases in the org-roam sense
   pub body     : Option<String>, // "body" in the org-mode sense
   pub folded   : bool,           // folded in the org-mode sense
@@ -78,7 +78,7 @@ pub struct FileNode {
   pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org heading, to which it belongs, and the next (if there is a next).
+  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>,

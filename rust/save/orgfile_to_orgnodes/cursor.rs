@@ -1,4 +1,4 @@
-// Line cursor and heading parsing utilities.
+// Line cursor and headline parsing utilities.
 
 #[derive(Debug)]
 pub struct LineCursor<'a> { /// Line iterator with lookahead.
@@ -31,16 +31,16 @@ impl<'a> LineCursor<'a> {
 
 /// Strips the bullet and leading whitespace,
 /// leaving the rest as a single string.
-pub fn parse_metadata_plus_heading (
+pub fn parse_metadata_plus_headline (
   line: &str
 ) -> Option<( usize,    // level
-              &str )> { // metadata + heading
+              &str )> { // metadata + headline
 
   // Scan asterisks to count level.
   let mut i: usize = 0; // index into the byte slice
   let bytes: &[u8] = line.as_bytes(); // raw bytes for cheap `*` checks
   while i < bytes.len() && bytes[i] == b'*' { i += 1; }
-  if i == 0 { return None; } // no stars => not a heading
+  if i == 0 { return None; } // no stars => not a headline
 
   // Allow optional spaces/tabs between stars and content.
   let rest0: &str = &line[i..]; // slice after leading stars
@@ -49,18 +49,18 @@ pub fn parse_metadata_plus_heading (
     c == ' ' || c == '\t' );
 
   if rest.trim().is_empty() {
-    // Not a true heading, just asterisks and whitespace.
+    // Not a true headline, just asterisks and whitespace.
     return None; }
   Some ((i, rest)) }
 
-/// Look ahead and return the level of the next heading, if any.
-pub fn peek_heading_level (
+/// Look ahead and return the level of the next headline, if any.
+pub fn peek_headline_level (
   cur : &LineCursor
 ) -> Option <usize> {
   let level_opt: Option<usize> =
     cur . peek() . and_then (
       |l: &str|
-      parse_metadata_plus_heading (l) // TODO: Inefficient. `parse_metadata_plus_heading` ought to be run only once per heading.
+      parse_metadata_plus_headline (l) // TODO: Inefficient. `parse_metadata_plus_headline` ought to be run only once per headline.
         . map ( |(lvl, _)| lvl ));
   level_opt }
 
@@ -71,8 +71,8 @@ pub fn collect_body_lines (
 ) -> Option<String> {
   let mut acc: Vec<&str> = Vec::new();
   while let Some (line) = cur.peek () {
-    if parse_metadata_plus_heading (line) . is_some () {
-      break; } // body ends, next heading starts
+    if parse_metadata_plus_headline (line) . is_some () {
+      break; } // body ends, next headline starts
     let taken: &str = cur . bump() . unwrap();
     acc.push (taken); }
   if acc.is_empty() { None
@@ -82,12 +82,12 @@ pub fn collect_body_lines (
     Some(joined) }}
 
 /// Any text preceding the buffer's first headline is ignored.
-pub fn skip_until_first_heading (
+pub fn skip_until_first_headline (
   cur: &mut LineCursor
 ) {
 
   while let Some(line) = cur.peek() {
-    if parse_metadata_plus_heading(line).is_some() {
+    if parse_metadata_plus_headline(line).is_some() {
       break; }
     let _ignored: Option<&str> = cur.bump();
   }}

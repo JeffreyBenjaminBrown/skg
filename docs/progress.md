@@ -15,7 +15,7 @@ The client can:
 ### Save data
 The client can request saved data and manipulate it.
 
-The client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headings without IDs.) This is sketched in a little more detail in [TODO.org](../devel-handy/TODO.org).
+The client can't send anything back to Rust. And if it could, Rust wouldn't know what to do with it. (It should save the data to disk, update TypeDB and Tantivy, and silently replace the Emacs document with a new one with IDs where the user had created new headlines without IDs.) This is sketched in a little more detail in [TODO.org](../devel-handy/TODO.org).
 ### Inhomogeneous, multidimensional trees
 The database is implemented in TypeDB. which should make the required queries easy. Otherwise this is completely unimplemented.
 

@@ -6,7 +6,7 @@ fn test_assign_ids_recursive() {
   // Build from the leaves upward, wrapping each ContentNode as OrgNode::Content
   let c_content = ContentNode {
     id: None,
-    heading: "c".to_string(),
+    headline: "c".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -18,7 +18,7 @@ fn test_assign_ids_recursive() {
 
   let b_content = ContentNode {
     id: Some(ID::from("b")),
-    heading: "b".to_string(),
+    headline: "b".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -30,7 +30,7 @@ fn test_assign_ids_recursive() {
 
   let a = OrgNode::content(ContentNode {
     id: None,
-    heading: "a".to_string(),
+    headline: "a".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -67,7 +67,7 @@ fn test_assign_ids_recursive() {
   assert!(result_c.id.is_some(),
           "Node C should have an ID after processing");
 
-  assert_eq!(result.heading, "a");
-  assert_eq!(result_b.heading, "b");
-  assert_eq!(result_c.heading, "c");
+  assert_eq!(result.headline, "a");
+  assert_eq!(result_b.headline, "b");
+  assert_eq!(result_c.headline, "c");
 }

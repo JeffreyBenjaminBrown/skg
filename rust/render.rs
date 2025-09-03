@@ -34,7 +34,7 @@ pub async fn single_root_view (
   Ok (org) }
 
 /// Recursively render a node and its branches into Org.
-/// `level` controls the number of leading `*` on the heading line.
+/// `level` controls the number of leading `*` on the headline.
 async fn org_from_node_recursive (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
@@ -69,7 +69,7 @@ async fn org_from_node_recursive (
             newline_to_space ( // Over-cautious, because the title should contain no newlines, but probably cheap.
               & filenode.title )) ?;
   if let Some (text) = & filenode.body {
-    // Ensure a newline separates the body from the next heading.
+    // Ensure a newline separates the body from the next headline.
     out.push_str ( text );
     if !text.ends_with ( '\n' ) {
       out.push('\n'); }}
@@ -83,7 +83,7 @@ async fn org_from_node_recursive (
   Ok (out) }
 
 /// When a node is encountered again in the same document:
-/// Produce a heading with a `repeated` herald and a short body.
+/// Produce a headline with a `repeated` herald and a short body.
 /// Do not recurse into children.
 fn format_repeated_node (
   node_id: &ID,

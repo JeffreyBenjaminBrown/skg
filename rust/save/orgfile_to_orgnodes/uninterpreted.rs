@@ -3,9 +3,9 @@
 use crate::types::OrgNodeUninterpreted;
 use super::cursor::LineCursor;
 use super::cursor::collect_body_lines;
-use super::cursor::parse_metadata_plus_heading;
-use super::cursor::peek_heading_level;
-use super::cursor::skip_until_first_heading;
+use super::cursor::parse_metadata_plus_headline;
+use super::cursor::peek_headline_level;
+use super::cursor::skip_until_first_headline;
 
 pub fn parse_skg_org_to_uninterpreted_nodes (
   input : &str
@@ -13,9 +13,9 @@ pub fn parse_skg_org_to_uninterpreted_nodes (
   // TODO: Test.
 
   let mut cursor = LineCursor::new (input);
-  skip_until_first_heading ( &mut cursor );
+  skip_until_first_headline ( &mut cursor );
   let start_level: usize =
-    peek_heading_level ( &cursor )
+    peek_headline_level ( &cursor )
     . unwrap_or (1); // default to 1 if absent. TODO: Maybe this should throw an error.
   return parse_uninterpreted_nodes_at_level (
     &mut cursor, start_level ); }
@@ -30,7 +30,7 @@ fn parse_uninterpreted_nodes_at_level (
   let mut nodes_acc : Vec<OrgNodeUninterpreted> =
     Vec::new();
   while let Some(line) = cur.peek () {
-    match parse_metadata_plus_heading (line) {
+    match parse_metadata_plus_headline (line) {
       Some((lvl, _)) if lvl == level => {
         // Expected sibling: parse one full node (header + body + subtree)
         let node: OrgNodeUninterpreted =
@@ -43,20 +43,20 @@ fn parse_uninterpreted_nodes_at_level (
   nodes_acc }
 
 /// Parse exactly one uninterpreted node at `level` at the cursor.
-/// ASSUMES the current line is a valid heading of exactly this level.
+/// ASSUMES the current line is a valid headline of exactly this level.
 fn parse_one_uninterpreted_node_at_level (
   cur   : &mut LineCursor,
   level : usize
 ) -> OrgNodeUninterpreted {
 
-  let heading_line: &str =
+  let input: &str =
     cur . bump() . expect (
-      "caller guarantees a heading is present" );
-  let (_level, heading_content): (usize, &str) =
-    parse_metadata_plus_heading (heading_line)
-    . expect("caller guarantees a heading is present");
+      "caller guarantees a headline is present" );
+  let (_level, headline_content): (usize, &str) =
+    parse_metadata_plus_headline (input)
+    . expect("caller guarantees a headline is present");
   OrgNodeUninterpreted {
-    heading  : heading_content.to_string (),
+    headline : headline_content.to_string (),
     body     : collect_body_lines (cur),
     branches : parse_uninterpreted_children ( cur, level ),
   }}
@@ -72,7 +72,7 @@ fn parse_uninterpreted_children (
   let mut children_acc : Vec<OrgNodeUninterpreted> =
     Vec::new();
   while let Some(next) = cur.peek() {
-    match parse_metadata_plus_heading (next) {
+    match parse_metadata_plus_headline (next) {
       Some ((lvl, _))
         if lvl == child_level => {
           let child: OrgNodeUninterpreted =

@@ -10,7 +10,7 @@ use skg::types::{ID, OrgNode, ContentNode};
 fn test_convert_orgnode_to_filenode() {
   let org_node: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
-    heading: "a title".to_string(),
+    headline: "a title".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -48,11 +48,11 @@ fn test_convert_circular_orgnode_to_filenode() {
   //
   // 1
   // └── 2 (focused)
-  //     └── 1 (nested; heading "irrelevant")
+  //     └── 1 (nested; headline "irrelevant")
   //         └── 3 ("also irrelevant")
   let nested_3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
-    heading: "also irrelevant".to_string(),
+    headline: "also irrelevant".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -62,7 +62,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let nested_dup_1: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
-    heading: "irrelevant".to_string(),
+    headline: "irrelevant".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -72,7 +72,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let child_2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
-    heading: "2".to_string(),
+    headline: "2".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -82,7 +82,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   });
   let root_1: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
-    heading: "1".to_string(),
+    headline: "1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -98,7 +98,7 @@ fn test_convert_circular_orgnode_to_filenode() {
   };
   assert_eq!(root_content.id.as_ref().map(|id| id.as_str()),
              Some("1"));
-  assert_eq!(root_content.heading, "1");
+  assert_eq!(root_content.headline, "1");
   assert_eq!(root_content.branches.len(), 1);
 
   let child_2_content = match &root_content.branches[0] {
@@ -152,7 +152,7 @@ fn test_focused_node_extraction() {
   // └── 4
   let child2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
-    heading: "child 1".to_string(),
+    headline: "child 1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -162,7 +162,7 @@ fn test_focused_node_extraction() {
   });
   let child3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
-    heading: "child 2".to_string(),
+    headline: "child 2".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -172,7 +172,7 @@ fn test_focused_node_extraction() {
   });
   let child4: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("4")),
-    heading: "child 3".to_string(),
+    headline: "child 3".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -182,7 +182,7 @@ fn test_focused_node_extraction() {
   });
   let root: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
-    heading: "root".to_string(),
+    headline: "root".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -217,7 +217,7 @@ fn test_multiple_focused_nodes_last_wins() {
   // └── 3 [folded]
   let child2: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("2")),
-    heading: "child 1".to_string(),
+    headline: "child 1".to_string(),
     aliases: None,
     body: None,
     folded: false,
@@ -227,7 +227,7 @@ fn test_multiple_focused_nodes_last_wins() {
   });
   let child3: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("3")),
-    heading: "child 2".to_string(),
+    headline: "child 2".to_string(),
     aliases: None,
     body: None,
     folded: true, // folded
@@ -237,7 +237,7 @@ fn test_multiple_focused_nodes_last_wins() {
   });
   let root: OrgNode = OrgNode::Content(ContentNode {
     id: Some(ID::from("1")),
-    heading: "root".to_string(),
+    headline: "root".to_string(),
     aliases: None,
     body: None,
     folded: false,

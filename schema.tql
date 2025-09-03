@@ -6,7 +6,7 @@ define
   # Like the relationship
   # from a document to a section thereof, or
   # from a section to a subsection, or
-  # from an org heading to its subheadings.
+  # from an org headline to its subheadlines.
   # See `docs/vocabular.md` and  `docs/data-model.md`.
   relation contains,
     relates container,
@@ -37,7 +37,7 @@ define
     relates replacement,
     relates replaced;
 
-  # "The graph" is made of nodes, which resemble org-headings.
+  # "The graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
     plays contains:container,
