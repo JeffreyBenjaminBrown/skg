@@ -9,6 +9,6 @@ pub struct OrgNodeMetadata {
   pub repeated: bool,
   pub folded: bool,
   pub focused: bool,
-  pub title: String,
+  pub title: String, // TODO: This is not metadata! Functions using it should pass it alongside an OrgNodeMetadata, rather than within one.
   pub node_type: OrgNodeInterpEnum,
 }
