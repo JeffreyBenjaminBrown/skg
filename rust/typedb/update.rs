@@ -26,15 +26,14 @@ pub async fn update_nodes_and_relationships (
     filenodes . iter ()
     . filter_map ( |n|
                     n . ids
-                    . get(0) // TODO: Consider other IDs too?
+                    . get(0)
                     . cloned() )
     . collect ();
-  if !primary_ids.is_empty () {
-    delete_out_links (
-      db_name, driver,
-      &primary_ids,
-      "contains",
-      "container" ). await ?; }
+  delete_out_links (
+    db_name, driver,
+    & primary_ids, // Will barf if nonempty, which is good.
+    "contains",
+    "container" ). await ?;
   create_all_relationships (
     db_name, driver, filenodes ). await ?;
   Ok (( )) }
