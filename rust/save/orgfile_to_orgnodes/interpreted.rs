@@ -1,6 +1,5 @@
 // Transform 'OrgNodeUninterpreted's to 'OrgNode's
 
-use crate::types::AliasNode;
 use crate::types::ContentNode;
 use crate::types::ID;
 use crate::types::OrgNode;
@@ -24,17 +23,16 @@ pub fn interpret_org_node (
                  . map (interpret_org_node) // recurse
                  . collect()
         };
-      let aliases: Option<AliasNode> =
-      // Uses aliases from the first AliasNode.
+      let aliases: Option<Vec<String>> =
+      // Uses aliases from the first OrgNode::AliasNode.
       // PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more. If they do, all but the first are ignored. */
         interpreted_branches
         . iter()
         . find_map ( // Returns the first Some.
           |child| {
-            if let OrgNode::Aliases (alias_node) = child {
-              Some (alias_node.clone())
-            } else { None
-            }} );
+            if let OrgNode::Aliases (alias_list) = child {
+              Some (alias_list.clone())
+            } else { None }} );
       OrgNode::Content ( ContentNode {
         id       : id_opt,
         heading  : title,
@@ -67,9 +65,7 @@ pub fn interpret_org_node (
             Some (content_node.heading.clone() )
           } else { None }} )
       . collect();
-      OrgNode::Aliases(AliasNode {
-        aliases,
-        branches, }) },
+      OrgNode::Aliases(aliases) },
     Some(type_str) => {
       panic! ( "unrecognized 'type' field in OrgNode: {}",
                 type_str ); }} }

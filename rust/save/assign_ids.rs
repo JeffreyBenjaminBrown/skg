@@ -26,9 +26,6 @@ pub fn assign_ids_recursive (
         recurse_in_branches ( &content_node.branches );
       OrgNode::Content (new_content)
     },
-    OrgNode::Aliases (alias_node) => {
-      let mut new_aliases = alias_node.clone();
-      new_aliases.branches =
-        recurse_in_branches ( &alias_node.branches );
-      OrgNode::Aliases (new_aliases)
+    OrgNode::Aliases (alias_list) => {
+      OrgNode::Aliases (alias_list.clone())
     }} }

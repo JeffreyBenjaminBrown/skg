@@ -113,7 +113,7 @@ fn update_from_and_rerender_buffer (
           // assign_ids_recursive => should be 'ok'
           "Root node has no ID")? },
       OrgNode::Aliases(_) => {
-        return Err("Root node cannot be an AliasNode".into());
+        return Err("Root node cannot be an Aliases node".into());
       }};
 
   let mut all_filenodes : HashSet<FileNode> =

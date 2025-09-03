@@ -40,11 +40,10 @@ fn orgnode_to_filenodes_internal (
   focused_id    : &mut Option  <ID>,
   folded_ids    : &mut HashSet <ID> ) {
 
-  // Extract ContentNode or error if this is an AliasNode
   let content_node = match branch {
     OrgNode::Content(content_node) => content_node,
     OrgNode::Aliases(_) => {
-      panic!("Found AliasNode in orgnode_to_filenodes_internal. All AliasNodes should have been filtered out by this point.");
+      panic!("Found Aliases node in orgnode_to_filenodes_internal. All Aliases nodes should have been filtered out by this point.");
     }};
   if content_node.repeated { // Skip nodes marked as repeated.
     // TRICKY: Even if this is the first appearance of that node in the org text, it might still be marked `repeated`, because the user might have moved it. If so, the user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
@@ -67,7 +66,7 @@ fn orgnode_to_filenodes_internal (
           OrgNode::Content(child_content) =>
             child_content.id.clone (),
           OrgNode::Aliases(_) => {
-            panic!("Found AliasNode when extracting child IDs. All AliasNodes should have been filtered out by this point.");
+            panic!("Found Aliases node when extracting child IDs. All Aliases nodes should have been filtered out by this point.");
           }} })
       . collect (),
     subscribes_to                : Vec::new (),

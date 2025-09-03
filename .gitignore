@@ -1,6 +1,9 @@
 *~
 .bash_history
+.claude*
+.config
 .emacs*
+.npm
 /Cargo.lock
 /data/
 /devel-handy/temp.org
