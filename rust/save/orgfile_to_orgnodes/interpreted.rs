@@ -93,11 +93,13 @@ fn parse_separating_metadata_and_title (
       let repeated: bool = bare.contains("repeated");
       let folded: bool = bare.contains("folded");
       let focused: bool = bare.contains("focused");
-      let node_type = match kv.get("type").map(|s| s.as_str()) {
-        Some("aliases") => OrgNodeInterpEnum::Aliases,
-        Some(other) => panic!("unrecognized 'type' field: {}", other),
+      let node_type: OrgNodeInterpEnum
+        = match kv . get ("type") . map ( |s|
+                                           s.as_str() )
+      { Some("aliases") => OrgNodeInterpEnum::Aliases,
         None => OrgNodeInterpEnum::ContentNode,
-      };
+        Some (other) => panic!( "unrecognized 'type' field: {}",
+                                 other), };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
       return OrgNodeMetadata {
