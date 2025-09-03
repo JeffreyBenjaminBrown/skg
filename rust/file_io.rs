@@ -67,7 +67,8 @@ pub fn write_all_filenodes (
   config    : SkgConfig,
 ) -> io::Result<usize> { // number of files written
 
-  fs::create_dir_all ( // Ensure folder exists
+  fs::create_dir_all (
+    // Ensure entire path to folder exists
     &config.skg_folder )?;
   let mut written : usize = 0;
   for node in filenodes {
@@ -77,14 +78,11 @@ pub fn write_all_filenodes (
            io::ErrorKind::InvalidInput,
            "FileNode has no IDs" ))?
       . clone ();
-    let path_str : String =
-      path_from_pid ( &config, pid );
-    let path : &Path =
-      Path::new ( &path_str );
-    if let Some (parent) = path.parent () {
-      // TODO: Move this out of the loop.
-      fs::create_dir_all (parent) ?; }
-    write_filenode ( &node, &path ) ?;
+    write_filenode (
+      & node,
+      & Path::new (
+        & path_from_pid (
+          & config, pid )) ) ?;
     written += 1; }
   Ok (written) }
 
