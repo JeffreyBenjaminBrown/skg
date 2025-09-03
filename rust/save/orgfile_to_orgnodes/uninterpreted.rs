@@ -6,6 +6,7 @@ use super::cursor::collect_body_lines;
 use super::cursor::parse_metadata_plus_headline;
 use super::cursor::peek_headline_level;
 use super::cursor::skip_until_first_headline;
+use super::cursor::count_headline_level;
 
 pub fn parse_skg_org_to_uninterpreted_nodes (
   input : &str
@@ -30,14 +31,14 @@ fn parse_uninterpreted_nodes_at_level (
   let mut nodes_acc : Vec<OrgNode> =
     Vec::new();
   while let Some(line) = cur.peek () {
-    match parse_metadata_plus_headline (line) {
-      Some((lvl, _)) if lvl == level => {
+    match count_headline_level (line) {
+      Some(lvl) if lvl == level => {
         // Expected sibling: parse one full node (header + body + subtree)
         let node: OrgNode =
           parse_one_uninterpreted_node_at_level
           (cur, level);
         nodes_acc.push (node); },
-      Some((lvl, _)) if lvl < level => break,
+      Some(lvl) if lvl < level => break,
       _ => { // ignore anything else
         let _ignored: Option<&str> = cur.bump(); }} }
   nodes_acc }
@@ -72,13 +73,14 @@ fn parse_uninterpreted_children (
   let mut children_acc : Vec<OrgNode> =
     Vec::new();
   while let Some(next) = cur.peek() {
-    match parse_metadata_plus_headline (next) {
-      Some ((lvl, _))
+    match count_headline_level (next) {
+      Some (lvl)
         if lvl == child_level => {
           let child: OrgNode =
-            parse_one_uninterpreted_node_at_level ( cur, child_level );
+            parse_one_uninterpreted_node_at_level (
+              cur, child_level );
           children_acc.push ( child ); }
-      Some((lvl, _))
+      Some(lvl)
         if lvl <= parent_level
         => break,
       _ => {

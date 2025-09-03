@@ -1,5 +1,7 @@
 // Line cursor and headline parsing utilities.
 
+// TODO: This still isn't as efficient as I would like. `count_headline_level` and `parse_metadata_plus_headline` are called multiple times for the same line.
+
 #[derive(Debug)]
 pub struct LineCursor<'a> { /// Line iterator with lookahead.
   lines: Vec<&'a str>, // Source text, without trailing newlines.
@@ -35,34 +37,45 @@ pub fn parse_metadata_plus_headline (
   line: &str
 ) -> Option<( usize,    // level
               &str )> { // metadata + headline
-
-  // Scan asterisks to count level.
-  let mut i: usize = 0; // index into the byte slice
-  let bytes: &[u8] = line.as_bytes(); // raw bytes for cheap `*` checks
-  while i < bytes.len() && bytes[i] == b'*' { i += 1; }
-  if i == 0 { return None; } // no stars => not a headline
-
-  // Allow optional spaces/tabs between stars and content.
-  let rest0: &str = &line[i..]; // slice after leading stars
-  let rest: &str = rest0.trim_start_matches(
+  let level: usize =
+    count_headline_level (line)?;
+  let rest0: &str = // drop leading stars
+    &line[level..];
+  let rest: &str = rest0.trim_start_matches (
+    // drop leading space
     |c: char|
     c == ' ' || c == '\t' );
+  Some ((level, rest)) }
 
+/// Counts leading asterisks and verifies headline format.
+/// Returns the headline level (number of asterisks),
+/// or None if it's not a headline.
+pub fn count_headline_level (
+  line: &str
+) -> Option<usize> {
+
+  let mut i: usize = 0;
+  let bytes: &[u8] = line.as_bytes();
+  while i < bytes.len() && bytes[i] == b'*' {
+    i += 1; } // count asterisks
+  if i == 0 { return None; } // no stars => not a headline
+  if i >= bytes.len() || (bytes[i] != b' ' && bytes[i] != b'\t') {
+    return None; } // At least one whitespace must follow asterisks.
+  let rest0: &str = &line[i..];
+  let rest: &str = // Skip any remaining leading spaces/tabs
+    rest0.trim_start_matches(
+      |c: char| c == ' ' || c == '\t' );
   if rest.trim().is_empty() {
     // Not a true headline, just asterisks and whitespace.
     return None; }
-  Some ((i, rest)) }
+  Some (i) }
 
 /// Look ahead and return the level of the next headline, if any.
 pub fn peek_headline_level (
   cur : &LineCursor
 ) -> Option <usize> {
-  let level_opt: Option<usize> =
-    cur . peek() . and_then (
-      |l: &str|
-      parse_metadata_plus_headline (l) // TODO: Inefficient. `parse_metadata_plus_headline` ought to be run only once per headline.
-        . map ( |(lvl, _)| lvl ));
-  level_opt }
+  cur . peek() . and_then ( count_headline_level )
+}
 
 /// Collects the body lines that follow some (already consumed)
 /// org headline. Advances the cursor to the next org headline.
@@ -71,7 +84,7 @@ pub fn collect_body_lines (
 ) -> Option<String> {
   let mut acc: Vec<&str> = Vec::new();
   while let Some (line) = cur.peek () {
-    if parse_metadata_plus_headline (line) . is_some () {
+    if count_headline_level (line) . is_some () {
       break; } // body ends, next headline starts
     let taken: &str = cur . bump() . unwrap();
     acc.push (taken); }
@@ -87,7 +100,7 @@ pub fn skip_until_first_headline (
 ) {
 
   while let Some(line) = cur.peek() {
-    if parse_metadata_plus_headline(line).is_some() {
+    if count_headline_level(line).is_some() {
       break; }
     let _ignored: Option<&str> = cur.bump();
   }}
