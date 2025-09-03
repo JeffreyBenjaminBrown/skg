@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 pub fn interpret_org_node (
   uninterpreted : OrgNode
-) -> OrgNodeInterpretation { // TODO: Currently this returns a tree of OrgNodeInterpretations. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
+) -> OrgNodeInterpretation { // TODO ? Currently this returns a tree of OrgNodeInterpretations. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
   let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
     parse_separating_metadata_and_title (
@@ -93,7 +93,7 @@ fn parse_separating_metadata_and_title (
     if let Some(end) = meta_start.find(">>") {
       let inner: &str = &meta_start[..end]; // between "<<" and ">>"
       let (kv, bare): (HashMap<String, String>, HashSet<String>) =
-        parse_metadata_block(inner);
+        metadata_inner_string_to_map_and_set(inner);
       let id_opt: Option<ID> = kv.get("id").map(|s| s.into());
       let repeated: bool = bare.contains("repeated");
       let folded: bool = bare.contains("folded");
@@ -115,7 +115,7 @@ fn parse_separating_metadata_and_title (
 /// Tokens are separated by commas.
 /// Keys and values are separated by the first colon.
 /// Whitespace is stripped.
-pub fn parse_metadata_block (
+pub fn metadata_inner_string_to_map_and_set (
   inner: &str
 ) -> (HashMap<String, String>, HashSet<String>) {
 

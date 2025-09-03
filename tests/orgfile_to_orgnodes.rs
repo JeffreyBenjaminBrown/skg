@@ -1,4 +1,4 @@
-use skg::save::orgfile_to_orgnodes::interpreted::parse_metadata_block;
+use skg::save::orgfile_to_orgnodes::interpreted::metadata_inner_string_to_map_and_set;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::types::{OrgNodeInterpretation, ContentNode};
 
@@ -73,18 +73,18 @@ mod tests {
   #[test]
   fn metadata_parser_examples() {
     let (m1, s1): (HashMap<String, String>, HashSet<String>) =
-      parse_metadata_block("id:1, repeated");
+      metadata_inner_string_to_map_and_set("id:1, repeated");
     assert_eq!(m1.get("id").map(String::as_str), Some("1"));
     assert!(s1.contains("repeated"));
 
     let (m2, s2): (HashMap<String, String>, HashSet<String>) =
-      parse_metadata_block("repeated:true, id:abc123");
+      metadata_inner_string_to_map_and_set("repeated:true, id:abc123");
     assert_eq!(m2.get("id").map(String::as_str), Some("abc123"));
     assert!(m2.contains_key("repeated"));
     assert!(s2.is_empty());
 
     let (m3, s3): (HashMap<String, String>, HashSet<String>) =
-      parse_metadata_block("foo:bar, baz , qux: zip ");
+      metadata_inner_string_to_map_and_set("foo:bar, baz , qux: zip ");
     assert_eq!(m3.get("foo").map(String::as_str), Some("bar"));
     assert_eq!(m3.get("qux").map(String::as_str), Some("zip"));
     assert!(s3.contains("baz"));
