@@ -11,13 +11,14 @@ use super::cursor::count_headline_level;
 pub fn parse_skg_org_to_uninterpreted_nodes (
   input : &str
 ) -> Vec<OrgNode> {
-  // TODO: Test.
-
   let mut cursor = LineCursor::new (input);
   skip_until_first_headline ( &mut cursor );
   let start_level: usize =
     peek_headline_level ( &cursor )
-    . unwrap_or (1); // default to 1 if absent. TODO: Maybe this should throw an error.
+    . unwrap_or (
+      // Default to 1 if absent.
+      // TODO ? Maybe throw an error instead.
+      1 );
   return parse_uninterpreted_nodes_at_level (
     &mut cursor, start_level ); }
 

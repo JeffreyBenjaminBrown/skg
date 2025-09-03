@@ -6,7 +6,7 @@
 //   (1) Since the ID of an OrgNodeInterp is optional and the ID of a FileNode is mandatory, anything without an ID is assigned one, at random.
 //   (2) If an ID is repeated, the first node to contain a branch with that ID is processed normally. All future such containers are ignored, except that each is counted as a branch under the node that contains them.
 
-// TODO: There is still the problem that the user might copy a node not marked repeated, i.e. the one that's supposed to be the source of truth, and paste it somewhere else in the document. Rust won't know which one to treat as the source of truth. This could result in data loss.
+// TODO ? There is still the problem that the user might copy a node not marked repeated, i.e. the one that's supposed to be the source of truth, and paste it somewhere else in the document. Rust won't know which one to treat as the source of truth. This could result in data loss.
 
 use crate::types::{ID, FileNode, OrgNodeInterp};
 

@@ -22,7 +22,7 @@ pub fn handle_single_root_view_request (
     Ok ( node_id ) => {
       send_response_with_length_prefix (
         stream,
-        & generate_document (
+        & single_root_view_wrapped (
           &node_id,
           typedb_driver,
           & config,
@@ -33,16 +33,13 @@ pub fn handle_single_root_view_request (
       println! ( "{}", error_msg ) ;
       send_response ( stream, &error_msg ); } } }
 
-fn generate_document (
-  // TODO: This needs a name reflecting that it just wraps
-  //   single_root_view
+/// It's just `single_root_view`,
+/// plus async and error handling.
+fn single_root_view_wrapped (
   node_id       : &ID,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
 ) -> String {
-  // Just runs `single_root_view`,
-  // but with async and error handling.
-
   block_on (
     async {
       match single_root_view (
