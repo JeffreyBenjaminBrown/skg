@@ -178,9 +178,7 @@ fn add_documents_to_writer (
   let mut indexed_count: usize = 0;
   for filenode in filenodes {
     if filenode.ids.is_empty() {
-      // Skip nodes without IDs.
-      // TODO: Throw an error here?
-      continue; }
+      return Err ( "FileNode has no IDs".into () ); }
     let (_id, document): (String, tantivy::Document) =
       create_document_from_filenode(filenode, tantivy_index)?;
     writer.add_document(document)?;
