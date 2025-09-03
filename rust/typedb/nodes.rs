@@ -32,37 +32,34 @@ pub async fn create_all_nodes (
   tx . commit () . await ?;
   Ok (()) }
 
-/* Creates FileNodes whose IDs are not present in the DB.
-Returns the number of nodes created.
-.
-PITFALL: A node is only added if *all* of its IDs are absent from the DB. See the TODO comment in the code. */
+/// Creates (in TypeDB) nodes whose primary IDs are not in the DB.
+/// Returns the number of nodes created.
 pub async fn create_only_nodes_with_no_ids_present (
   db_name   : &str,
   driver    : &TypeDBDriver,
   filenodes : &Vec <FileNode>
 ) -> Result < usize, Box<dyn Error> > {
 
-  let mut all_ids // all the input IDs
+  let mut all_pids // All the primary IDs.
     : BTreeSet < String >
     = BTreeSet::new ();
   for filenode in filenodes {
-    for id in &filenode.ids {
-      /* TODO ? Should I only include primary IDs here? It would be strange if a node's primary ID was unknown to the database but one of its extra IDs was known. */
-      all_ids.insert ( id.to_string () ); }}
+    // Don't check that the list is nonempty, because that should bork.
+    let pid: &ID = &filenode.ids[0];
+    all_pids.insert ( pid.to_string () ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
       db_name,
       driver,
-      &all_ids
+      &all_pids
     ) . await ?;
   let mut to_create : Vec < &FileNode > =
     Vec::new ();
   for filenode in filenodes {
-    let any_known : bool =
-      filenode . ids . iter ()
-      . any ( |id| known_ids.contains ( id.as_str () ) );
-    if ! any_known {
-      to_create.push ( filenode ); }}
+    let pid: &ID = &filenode.ids[0];
+    if ! known_ids.contains (
+      pid.as_str () )
+    { to_create.push ( filenode ); }}
   { // Create them.
     let tx : Transaction =
       driver . transaction (
