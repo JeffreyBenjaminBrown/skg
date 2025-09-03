@@ -4,7 +4,6 @@
 ** where to look
 *** comments in code
 *** mindmap on [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skxg]]
-* Why is assign_ids called so many times?
 * Add an "overview" file in ai/?
   and rename ai/ -> guidance/,
   and relabel formatting.org -> my-weird-formatting-preferences.org

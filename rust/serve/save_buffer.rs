@@ -110,7 +110,7 @@ fn update_from_and_rerender_buffer (
     match &orgnodes_with_ids[0] {
       OrgNodeInterpretation::Content(content_node) => {
         content_node.id.clone() . ok_or(
-          // assign_ids_recursive => should be 'ok'
+          // earlier 'assign_ids_recursive' => should be 'ok'
           "Root node has no ID")? },
       OrgNodeInterpretation::Aliases(_) => {
         return Err("Root node cannot be an Aliases node".into());

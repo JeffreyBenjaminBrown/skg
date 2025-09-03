@@ -26,9 +26,7 @@ pub fn orgNodeInterpretation_to_filenodes (
   let mut focused_id : Option<ID>        = None;
   let mut folded_ids : HashSet<ID>       = HashSet::new ();
   orgNodeInterpretation_to_filenodes_internal (
-    & assign_ids_recursive (
-      // TRICKY: It might seem more natural to assign missing IDs only when creating the FileNode. That would not work because `orgNodeInterpretation_to_filenodes_internal` has to know the ID of a node's contents in order to create the FileNode, and those contents are not themselves FileNodes yet. (Alternatively, the contents could be processed before the container, but that would confuse the detection of repeated nodes.)
-      branch ),
+    branch,
     &mut filenodes,
     &mut focused_id,
     &mut folded_ids );
