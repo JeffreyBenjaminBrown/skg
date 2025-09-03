@@ -1,6 +1,7 @@
 pub mod cursor;
 pub mod uninterpreted;
 pub mod interpreted;
+pub mod types;
 
 use crate::save::orgfile_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
 use crate::save::orgfile_to_orgnodes::interpreted::interpret_org_node;use crate::types::{OrgNodeInterpretation, OrgNode};

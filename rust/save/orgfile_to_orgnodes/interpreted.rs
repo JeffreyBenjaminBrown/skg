@@ -4,6 +4,7 @@ use crate::types::ContentNode;
 use crate::types::ID;
 use crate::types::OrgNodeInterpretation;
 use crate::types::OrgNode;
+use super::types::OrgNodeMetadata;
 
 use std::collections::{HashMap, HashSet};
 
@@ -11,13 +12,13 @@ pub fn interpret_org_node (
   uninterpreted : OrgNode
 ) -> OrgNodeInterpretation { // TODO ? Currently this returns a tree of OrgNodeInterpretations. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
-  let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
+  let metadata : OrgNodeMetadata =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
-  match node_type {
+  match metadata.node_type {
     None => { // Default case: ContentNode.
       let interpreted_branches: Vec<OrgNodeInterpretation> =
-        if is_repeated { Vec::new()
+        if metadata.repeated { Vec::new()
         } else { uninterpreted.branches
                  . into_iter()
                  . map (interpret_org_node) // recurse
@@ -34,13 +35,14 @@ pub fn interpret_org_node (
               Some (alias_list.clone())
             } else { None }} );
       OrgNodeInterpretation::Content ( ContentNode {
-        id       : id_opt,
-        title    : title,
+        id       : metadata.id,
+        title    : metadata.title,
         aliases  : aliases,
-        body     : if is_repeated { None } else { uninterpreted.body },
-        folded   : is_folded,
-        focused  : is_focused,
-        repeated : is_repeated,
+        body     : ( if metadata.repeated { None }
+                     else { uninterpreted.body } ),
+        folded   : metadata.folded,
+        focused  : metadata.focused,
+        repeated : metadata.repeated,
         branches : interpreted_branches
           . iter()
           . filter_map ( |child| {
@@ -63,16 +65,16 @@ pub fn interpret_org_node (
         . filter_map ( |child| {
           // collect aliases only from ContentNodes
           if let OrgNodeInterpretation::Content (content_node) =
-            // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
+          // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
             child { Some ( content_node . title . clone() )
             } else { None }} )
-      . collect();
+        . collect();
       OrgNodeInterpretation::Aliases(aliases) },
     Some (type_str) => { panic! (
       "unrecognized 'type' field in OrgNodeInterpretation: {}",
       type_str ); }} }
 
-/// Parse the *headline* into `(id, repeated, folded, focused, title, type)`.
+/// Parse a headline into structured metadata.
 /// .
 /// Steps:
 /// 1) Confirm the line is a headline and isolate the post-marker content.
@@ -82,13 +84,7 @@ pub fn interpret_org_node (
 /// 5) Extract the `type` field from metadata if present.
 fn parse_separating_metadata_and_title (
   line_after_bullet: &str
-) -> ( // TODO: Define and use a type instead.
-  Option<ID>,       // ID
-  bool,             // repeated
-  bool,             // folded
-  bool,             // focused
-  String,           // title
-  Option<String>) { // type. TODO: THis should not be an Option, but instead default to 'ContentNode'.
+) -> OrgNodeMetadata {
 
   let headline_with_metadata: &str = line_after_bullet.trim_start();
   if let Some(meta_start) = headline_with_metadata.strip_prefix("<<") {
@@ -103,13 +99,25 @@ fn parse_separating_metadata_and_title (
       let node_type: Option<String> = kv.get("type").cloned();
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
-      return (id_opt, repeated, folded, focused, title, node_type);
-    }
+      return OrgNodeMetadata {
+        id: id_opt,
+        repeated,
+        folded,
+        focused,
+        title,
+        node_type, }; }
     // If "<<" with no matching ">>", fall through to default case
   }
   // Default case: no (well-formed) metadata block
   let title: String = line_after_bullet.trim().to_string();
-  (None, false, false, false, title, None)
+  OrgNodeMetadata {
+    id: None,
+    repeated: false,
+    folded: false,
+    focused: false,
+    title,
+    node_type: None,
+  }
 }
 
 /// Parse the content inside a `<< ... >>` metadata block.
