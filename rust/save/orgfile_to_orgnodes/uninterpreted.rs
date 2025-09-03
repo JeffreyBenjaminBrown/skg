@@ -1,6 +1,6 @@
-// Parse org text to 'OrgNodeUninterpreted's.
+// Parse org text to 'OrgNode's.
 
-use crate::types::OrgNodeUninterpreted;
+use crate::types::OrgNode;
 use super::cursor::LineCursor;
 use super::cursor::collect_body_lines;
 use super::cursor::parse_metadata_plus_headline;
@@ -9,7 +9,7 @@ use super::cursor::skip_until_first_headline;
 
 pub fn parse_skg_org_to_uninterpreted_nodes (
   input : &str
-) -> Vec<OrgNodeUninterpreted> {
+) -> Vec<OrgNode> {
   // TODO: Test.
 
   let mut cursor = LineCursor::new (input);
@@ -24,16 +24,16 @@ pub fn parse_skg_org_to_uninterpreted_nodes (
 fn parse_uninterpreted_nodes_at_level (
   cur   : &mut LineCursor,
   level : usize
-) -> Vec<OrgNodeUninterpreted> {
+) -> Vec<OrgNode> {
   // TODO: This is currently not robust to initial super-indented headlines. In my knowledge graph, see `parsing initial super-indented org-children in org-roam data`.
 
-  let mut nodes_acc : Vec<OrgNodeUninterpreted> =
+  let mut nodes_acc : Vec<OrgNode> =
     Vec::new();
   while let Some(line) = cur.peek () {
     match parse_metadata_plus_headline (line) {
       Some((lvl, _)) if lvl == level => {
         // Expected sibling: parse one full node (header + body + subtree)
-        let node: OrgNodeUninterpreted =
+        let node: OrgNode =
           parse_one_uninterpreted_node_at_level
           (cur, level);
         nodes_acc.push (node); },
@@ -47,7 +47,7 @@ fn parse_uninterpreted_nodes_at_level (
 fn parse_one_uninterpreted_node_at_level (
   cur   : &mut LineCursor,
   level : usize
-) -> OrgNodeUninterpreted {
+) -> OrgNode {
 
   let input: &str =
     cur . bump() . expect (
@@ -55,7 +55,7 @@ fn parse_one_uninterpreted_node_at_level (
   let (_level, headline_content): (usize, &str) =
     parse_metadata_plus_headline (input)
     . expect("caller guarantees a headline is present");
-  OrgNodeUninterpreted {
+  OrgNode {
     headline : headline_content.to_string (),
     body     : collect_body_lines (cur),
     branches : parse_uninterpreted_children ( cur, level ),
@@ -65,17 +65,17 @@ fn parse_one_uninterpreted_node_at_level (
 fn parse_uninterpreted_children (
   cur          : &mut LineCursor,
   parent_level : usize
-) -> Vec<OrgNodeUninterpreted> {
+) -> Vec<OrgNode> {
 
   let child_level : usize =
     parent_level + 1;
-  let mut children_acc : Vec<OrgNodeUninterpreted> =
+  let mut children_acc : Vec<OrgNode> =
     Vec::new();
   while let Some(next) = cur.peek() {
     match parse_metadata_plus_headline (next) {
       Some ((lvl, _))
         if lvl == child_level => {
-          let child: OrgNodeUninterpreted =
+          let child: OrgNode =
             parse_one_uninterpreted_node_at_level ( cur, child_level );
           children_acc.push ( child ); }
       Some((lvl, _))

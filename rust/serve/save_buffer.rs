@@ -2,12 +2,12 @@ use crate::file_io::write_all_filenodes;
 use crate::render::single_root_view;
 use crate::save::assign_ids::assign_ids_recursive;
 use crate::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use crate::save::orgnode_to_filenode::orgnode_to_filenodes;
+use crate::save::orgnode_to_filenode::orgNodeInterpretation_to_filenodes;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::tantivy::update_index_with_filenodes;
 use crate::typedb::update::update_nodes_and_relationships;
-use crate::types::{FileNode, ID, OrgNode, SkgConfig, TantivyIndex};
+use crate::types::{FileNode, ID, OrgNodeInterpretation, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -83,11 +83,11 @@ fn read_length_prefixed_content (
 
 /* Updates dbs and filesystem, and generates text for a new org-buffer.
 Steps:
-- Put the text through `parse_skg_org_to_nodes` to get some OrgNodes.
-- To those OrgNodes:
+- Put the text through `parse_skg_org_to_nodes` to get some OrgNodeInterpretations.
+- To those OrgNodeInterpretations:
   - Assigns IDs where needed (`assign_ids_recursive`).
   - Stores as `document_root` the root ID.
-- Puts the result through `orgnode_to_filenodes` to get FileNodes.
+- Puts the result through `orgNodeInterpretation_to_filenodes` to get FileNodes.
 - Runs `update_fs_and_dbs` on those FileNodes.
 - Builds a single root content view from `document_root`. */
 fn update_from_and_rerender_buffer (
@@ -97,22 +97,22 @@ fn update_from_and_rerender_buffer (
   tantivy_index : &TantivyIndex
 ) -> Result<String, Box<dyn Error>> {
 
-  let orgnodes : Vec<OrgNode> =
+  let orgnodes : Vec<OrgNodeInterpretation> =
     parse_skg_org_to_nodes (content);
   if orgnodes.is_empty() {
     return Err ("No valid org nodes found in content".into()); }
-  let orgnodes_with_ids : Vec<OrgNode> =
+  let orgnodes_with_ids : Vec<OrgNodeInterpretation> =
     orgnodes.into_iter()
     .map ( |node|
             assign_ids_recursive (&node) )
     .collect();
   let document_root : ID =
     match &orgnodes_with_ids[0] {
-      OrgNode::Content(content_node) => {
+      OrgNodeInterpretation::Content(content_node) => {
         content_node.id.clone() . ok_or(
           // assign_ids_recursive => should be 'ok'
           "Root node has no ID")? },
-      OrgNode::Aliases(_) => {
+      OrgNodeInterpretation::Aliases(_) => {
         return Err("Root node cannot be an Aliases node".into());
       }};
 
@@ -121,7 +121,7 @@ fn update_from_and_rerender_buffer (
   for orgnode in &orgnodes_with_ids {
     let (filenodes, _focused_id, _folded_ids) :
       (HashSet<FileNode>, Option<ID>, HashSet<ID>) =
-      orgnode_to_filenodes (orgnode);
+      orgNodeInterpretation_to_filenodes (orgnode);
     all_filenodes.extend (filenodes); }
   block_on(update_fs_and_dbs(
     all_filenodes.into_iter().collect::<Vec<FileNode>>(),

@@ -3,10 +3,10 @@ pub mod uninterpreted;
 pub mod interpreted;
 
 use crate::save::orgfile_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
-use crate::save::orgfile_to_orgnodes::interpreted::interpret_org_node;use crate::types::{OrgNode, OrgNodeUninterpreted};
+use crate::save::orgfile_to_orgnodes::interpreted::interpret_org_node;use crate::types::{OrgNodeInterpretation, OrgNode};
 
 /* This function parses a "skg org" document
-into a forest of `OrgNode`s.
+into a forest of `OrgNodeInterpretation`s.
 .
 - Lines before the first headline are ignored.
 - A headline is `*+ <space>? <content>` where `<content>` is not all whitespace.
@@ -18,9 +18,9 @@ into a forest of `OrgNode`s.
 - Children are consecutive headlines with level exactly `parent_level + 1`. */
 pub fn parse_skg_org_to_nodes (
   input : &str
-) -> Vec<OrgNode> { // TODO: As noted in a TODO comment in the definition of `interpret_org_node`, this return type could be better.
+) -> Vec<OrgNodeInterpretation> { // TODO: As noted in a TODO comment in the definition of `interpret_org_node`, this return type could be better.
 
-  let uninterpreted_nodes : Vec<OrgNodeUninterpreted> =
+  let uninterpreted_nodes : Vec<OrgNode> =
     parse_skg_org_to_uninterpreted_nodes (input);
   uninterpreted_nodes.into_iter ()
     .map (interpret_org_node)

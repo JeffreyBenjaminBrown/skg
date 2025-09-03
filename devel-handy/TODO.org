@@ -1,10 +1,3 @@
-* rename
-** in any order
-   ContentNode -> ContentOrgNode
-   AliasNode   -> AliasOrgNode
-   OrgNode -> OrgNodeInterpretation
-** after that
-   OrgNodeUninterpreted -> OrgNode
 * Do all the little refactors now.
 ** why now <2025-09-02 Tue>
    Before I start adding tons of code, now that it's even easier.

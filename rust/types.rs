@@ -36,13 +36,13 @@ pub enum HyperlinkParseError {
 
 /// Raw text from Emacs is first loaded as a forest of these.
 #[derive(Clone, Debug, PartialEq)]
-pub struct OrgNodeUninterpreted {
+pub struct OrgNode {
   pub headline : String,         // "headline" is a term fron org-mode
   pub body     : Option<String>, // "body" is a term fron org-mode
-  pub branches : Vec<OrgNodeUninterpreted>, }
+  pub branches : Vec<OrgNode>, }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum OrgNode {
+pub enum OrgNodeInterpretation {
   // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
   Content(ContentNode),
   Aliases(Vec<String>),
@@ -66,8 +66,7 @@ Both Rust and Emacs need to know this, because:
 Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
 
 Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
-  pub branches : Vec<OrgNode>, }
-
+  pub branches : Vec<OrgNodeInterpretation>, }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct FileNode {
@@ -144,15 +143,15 @@ impl Hyperlink {
                 label : label.into (),
     }} }
 
-impl OrgNode {
+impl OrgNodeInterpretation {
   pub fn content (content_node: ContentNode) -> Self {
-    OrgNode::Content (content_node) }
+    OrgNodeInterpretation::Content (content_node) }
   pub fn aliases (alias_list: Vec<String>) -> Self {
-    OrgNode::Aliases (alias_list) }
+    OrgNodeInterpretation::Aliases (alias_list) }
   pub fn is_content (&self) -> bool {
-    matches! (self, OrgNode::Content(_)) }
+    matches! (self, OrgNodeInterpretation::Content(_)) }
   pub fn is_aliases (&self) -> bool {
-    matches! (self, OrgNode::Aliases(_)) }}
+    matches! (self, OrgNodeInterpretation::Aliases(_)) }}
 
 
 impl fmt::Display for Hyperlink {

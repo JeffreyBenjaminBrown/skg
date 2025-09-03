@@ -1,22 +1,22 @@
-// Transform 'OrgNodeUninterpreted's to 'OrgNode's
+// Transform 'OrgNode's to 'OrgNodeInterpretation's
 
 use crate::types::ContentNode;
 use crate::types::ID;
+use crate::types::OrgNodeInterpretation;
 use crate::types::OrgNode;
-use crate::types::OrgNodeUninterpreted;
 
 use std::collections::{HashMap, HashSet};
 
 pub fn interpret_org_node (
-  uninterpreted : OrgNodeUninterpreted
-) -> OrgNode { // TODO: Currently this returns a tree of OrgNodes. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
+  uninterpreted : OrgNode
+) -> OrgNodeInterpretation { // TODO: Currently this returns a tree of OrgNodeInterpretations. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
 
   let (id_opt, is_repeated, is_folded, is_focused, title, node_type) =
     parse_separating_metadata_and_title (
       & uninterpreted.headline );
   match node_type {
     None => { // Default case: ContentNode.
-      let interpreted_branches: Vec<OrgNode> =
+      let interpreted_branches: Vec<OrgNodeInterpretation> =
         if is_repeated { Vec::new()
         } else { uninterpreted.branches
                  . into_iter()
@@ -24,16 +24,16 @@ pub fn interpret_org_node (
                  . collect()
         };
       let aliases: Option<Vec<String>> =
-      // Uses aliases from the first OrgNode::AliasNode.
+      // Uses aliases from the first OrgNodeInterpretation::AliasNode.
       // PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more. If they do, all but the first are ignored. */
         interpreted_branches
         . iter()
         . find_map ( // Returns the first Some.
           |child| {
-            if let OrgNode::Aliases (alias_list) = child {
+            if let OrgNodeInterpretation::Aliases (alias_list) = child {
               Some (alias_list.clone())
             } else { None }} );
-      OrgNode::Content ( ContentNode {
+      OrgNodeInterpretation::Content ( ContentNode {
         id       : id_opt,
         headline : title,
         aliases  : aliases,
@@ -44,14 +44,14 @@ pub fn interpret_org_node (
         branches : interpreted_branches
           . iter()
           . filter_map ( |child| {
-            if let OrgNode::Content(content_node) = child {
-              Some(OrgNode::Content(content_node.clone()))
+            if let OrgNodeInterpretation::Content(content_node) = child {
+              Some(OrgNodeInterpretation::Content(content_node.clone()))
             } else { None // Filter out AliasNode values
             }} )
           . collect(), }) },
     Some (ref type_str) if type_str == "aliases" => {
       // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
-      let branches: Vec<OrgNode> =
+      let branches: Vec<OrgNodeInterpretation> =
       { uninterpreted.branches
         . into_iter()
         . map (interpret_org_node) // recurse
@@ -60,14 +60,14 @@ pub fn interpret_org_node (
         . iter()
         . filter_map ( |child| {
           // collect aliases only from ContentNodes
-          if let OrgNode::Content (content_node) = child {
+          if let OrgNodeInterpretation::Content (content_node) = child {
             // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
             Some (content_node.headline.clone() )
           } else { None }} )
       . collect();
-      OrgNode::Aliases(aliases) },
+      OrgNodeInterpretation::Aliases(aliases) },
     Some(type_str) => {
-      panic! ( "unrecognized 'type' field in OrgNode: {}",
+      panic! ( "unrecognized 'type' field in OrgNodeInterpretation: {}",
                 type_str ); }} }
 
 /// Parse the *headline* into `(id, repeated, folded, focused, title, type)`.

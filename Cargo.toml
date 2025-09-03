@@ -32,3 +32,4 @@ zstd = "0.13"
 
 [lints.rust]
 unused_parens = "allow"
+non_snake_case = "allow"
