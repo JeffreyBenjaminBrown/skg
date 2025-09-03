@@ -48,6 +48,16 @@ pub enum OrgNodeInterpretation {
   Aliases(Vec<String>),
 }
 
+/// Enums (safer than strings) corresponding to OrgNodeInterpretation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum OrgNodeType {
+  ContentNode,
+  Aliases, }
+
+impl Default for OrgNodeType {
+  fn default() -> Self {
+    OrgNodeType::ContentNode }}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContentNode {
   // See also /api.md.

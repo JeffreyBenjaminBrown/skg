@@ -3,8 +3,8 @@
 use crate::types::ContentNode;
 use crate::types::ID;
 use crate::types::OrgNodeInterpretation;
-use crate::types::OrgNode;
-use super::types::OrgNodeMetadata;
+use crate::types::{OrgNodeType,OrgNode};
+use super::types::{OrgNodeMetadata};
 
 use std::collections::{HashMap, HashSet};
 
@@ -16,7 +16,7 @@ pub fn interpret_org_node (
     parse_separating_metadata_and_title (
       & uninterpreted.title );
   match metadata.node_type {
-    None => { // Default case: ContentNode.
+    OrgNodeType::ContentNode => {
       let interpreted_branches: Vec<OrgNodeInterpretation> =
         if metadata.repeated { Vec::new()
         } else { uninterpreted.branches
@@ -53,7 +53,7 @@ pub fn interpret_org_node (
             } else { None // Filter out AliasNode values
             }} )
           . collect(), }) },
-    Some (ref type_str) if type_str == "aliases" => {
+    OrgNodeType::Aliases => {
       // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
       let branches: Vec<OrgNodeInterpretation> =
       { uninterpreted.branches
@@ -69,10 +69,7 @@ pub fn interpret_org_node (
             child { Some ( content_node . title . clone() )
             } else { None }} )
         . collect();
-      OrgNodeInterpretation::Aliases(aliases) },
-    Some (type_str) => { panic! (
-      "unrecognized 'type' field in OrgNodeInterpretation: {}",
-      type_str ); }} }
+      OrgNodeInterpretation::Aliases (aliases) }} }
 
 /// Parse a headline into structured metadata.
 /// .
@@ -96,7 +93,11 @@ fn parse_separating_metadata_and_title (
       let repeated: bool = bare.contains("repeated");
       let folded: bool = bare.contains("folded");
       let focused: bool = bare.contains("focused");
-      let node_type: Option<String> = kv.get("type").cloned();
+      let node_type = match kv.get("type").map(|s| s.as_str()) {
+        Some("aliases") => OrgNodeType::Aliases,
+        Some(other) => panic!("unrecognized 'type' field: {}", other),
+        None => OrgNodeType::ContentNode,
+      };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
       return OrgNodeMetadata {
@@ -116,7 +117,7 @@ fn parse_separating_metadata_and_title (
     folded: false,
     focused: false,
     title,
-    node_type: None,
+    node_type: OrgNodeType::ContentNode,
   }
 }
 
