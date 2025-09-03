@@ -21,14 +21,14 @@ mod tests {
   #[test]
   fn parses_sample() {
     let sample: &str = indoc! { r#"
-  * <<id:1>> 1
-  ** <<id:2>> 2, the first child of node 1, which has a body.
+  * <skg<id:1>> 1
+  ** <skg<id:2>> 2, the first child of node 1, which has a body.
   The body of 2.
-  *** <<id:3>> 3, the child of node 2, with no body.
-  ** <<id:4>> 4, the second child of node 1, with no body.
-  ** <<id:1,repeated>> 1
+  *** <skg<id:3>> 3, the child of node 2, with no body.
+  ** <skg<id:4>> 4, the second child of node 1, with no body.
+  ** <skg<id:1,repeated>> 1
   The body of a repeated node is just a warning that it was repeated. We can ignore it.
-  *** <<id:5>> Since this is a child of a repeated node, it is ignored!
+  *** <skg<id:5>> Since this is a child of a repeated node, it is ignored!
   ** A headline with no id, the fourth child of 1.
 "# };
 
@@ -93,10 +93,10 @@ mod tests {
   #[test]
   fn parses_folded_and_focused() {
     let sample: &str = indoc! { r#"
-      * <<id:1, folded>> Node 1 - folded
-      ** <<id:2, focused>> Node 2 - focused
-      *** <<id:3, folded, focused>> Node 3 - both folded and focused
-      ** <<id:4>> Node 4 - neither
+      * <skg<id:1, folded>> Node 1 - folded
+      ** <skg<id:2, focused>> Node 2 - focused
+      *** <skg<id:3, folded, focused>> Node 3 - both folded and focused
+      ** <skg<id:4>> Node 4 - neither
       "# };
 
     let forest: Vec<OrgNodeInterp> =

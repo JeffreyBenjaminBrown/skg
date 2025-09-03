@@ -63,7 +63,7 @@ async fn org_from_node_recursive (
   visited.insert ( node_id.clone () );
   let mut out = String::new();
   write! ( &mut out,
-            "{} <<id:{}>> {}\n",
+            "{} <skg<id:{}>> {}\n",
             org_bullet (level),
             node_id,
             newline_to_space ( // Over-cautious, because the title should contain no newlines, but probably cheap.
@@ -93,7 +93,7 @@ fn format_repeated_node (
 
   let mut s = String::new ();
   write! ( &mut s,
-            "{} <<id:{},repeated>> {}\nRepeated, probably above. Edit there, not here.\n",
+            "{} <skg<id:{},repeated>> {}\nRepeated, probably above. Edit there, not here.\n",
             org_bullet (level),
             node_id,
             newline_to_space ( title ))

@@ -7,17 +7,17 @@ use skg::types::{OrgNodeInterp, ID};
 fn test_parse_skg_org_to_nodes() {
   let input : &str =
     indoc! {"
-            * <<id:root>> root
-            ** <<id:a>> a
+            * <skg<id:root>> root
+            ** <skg<id:a>> a
             *** aa
-            *** <<type:aliases>> This headline is ignored.
+            *** <skg<type:aliases>> This headline is ignored.
                 This body text should be ignored.
             **** alias 1
                  This body text should be ignored.
-            ***** <<id:ignored>> This headline should be ignored.
+            ***** <skg<id:ignored>> This headline should be ignored.
             **** alias 2
-            *** <<id:ab>> ab
-            ** <<id:b>> b
+            *** <skg<id:ab>> ab
+            ** <skg<id:b>> b
         "};
 
   let parsed_nodes : Vec<OrgNodeInterp> =

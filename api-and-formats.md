@@ -23,9 +23,9 @@ Each org-bullet is followed by a space, some metadata, a space,
 and then headline text.
 
 The metadata is a comma-separated list of values and key-value pairs,
-bracketed by "<<" and ">>" -- something like
+bracketed by "<skg<" and ">>" -- something like
 ```
- <<id:long-string, repeated, key:value, another-value>>
+ <skg<id:long-string, repeated, key:value, another-value>>
 ```
 
 Any such string is valid metadata
@@ -42,7 +42,7 @@ if and only if it adheres to the following:
   - Whitespace in the raw metadata is ignored.
   - Keys and values should contain no whitespace.
 - < and > characters
-  - The metadata should start with << and wend with >>.
+  - The metadata should start with <skg< and wend with >>.
   - There should be no other < or > characters.
 
 # The .skg file format

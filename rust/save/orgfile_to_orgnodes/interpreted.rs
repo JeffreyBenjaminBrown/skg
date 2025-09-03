@@ -75,7 +75,7 @@ pub fn interpret_org_node (
 /// .
 /// Steps:
 /// 1) Confirm the line is a headline and isolate the post-marker content.
-/// 2) If a leading `<<...>>` block exists, parse as metadata (order-agnostic).
+/// 2) If a leading `<skg<...>>` block exists, parse as metadata (order-agnostic).
 /// 3) Remaining text (after `>>`) is the trimmed title.
 /// 4) If no metadata block, the whole remainder is the trimmed title.
 /// 5) Extract the `type` field from metadata if present.
@@ -84,9 +84,9 @@ fn parse_separating_metadata_and_title (
 ) -> OrgNodeMetadata {
 
   let headline_with_metadata: &str = line_after_bullet.trim_start();
-  if let Some(meta_start) = headline_with_metadata.strip_prefix("<<") {
+  if let Some(meta_start) = headline_with_metadata.strip_prefix("<skg<") {
     if let Some(end) = meta_start.find(">>") {
-      let inner: &str = &meta_start[..end]; // between "<<" and ">>"
+      let inner: &str = &meta_start[..end]; // between "<skg<" and ">>"
       let (kv, bare): (HashMap<String, String>, HashSet<String>) =
         metadata_inner_string_to_map_and_set(inner);
       let id_opt: Option<ID> = kv.get("id").map(|s| s.into());
@@ -109,7 +109,7 @@ fn parse_separating_metadata_and_title (
         focused,
         title,
         node_type, }; }
-    // If "<<" with no matching ">>", fall through to default case
+    // If "<skg<" with no matching ">>", fall through to default case
   }
   // Default case: no (well-formed) metadata block
   let title: String = line_after_bullet.trim().to_string();
@@ -123,7 +123,7 @@ fn parse_separating_metadata_and_title (
   }
 }
 
-/// Parse the content inside a `<< ... >>` metadata block.
+/// Parse the content inside a `<skg< ... >>` metadata block.
 /// Each token is either a key-value pair or a bare value.
 /// Tokens are separated by commas.
 /// Keys and values are separated by the first colon.

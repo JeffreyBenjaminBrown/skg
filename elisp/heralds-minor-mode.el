@@ -9,7 +9,7 @@
   "When Rust sends a view of the graph to Emacs,
 each line (after the org-bullet) begins with some metadata.
 The API is in flux -- see api.md -- but might look something like
-<<id:long-string, repeated, key:value, another-value>>
+<skg<id:long-string, repeated, key:value, another-value>>
 This minor mode changes how such things are displayed:
 .
 The id becomes a single '⅄' character. (It looks graphy to me.)
@@ -45,13 +45,13 @@ The metadata is otherwise not displayed."
       (forward-line 1))))
 
 (defun heralds-apply-to-line ()
-  "On the current line, lens only the first <<...>> occurrence.
+  "On the current line, lens only the first <skg<...>> occurrence.
 Creates one overlay (at most) and pushes it onto `heralds-overlays`."
   (save-excursion
     (let ((bol (line-beginning-position))
           (eol (line-end-position)) )
       (goto-char bol)
-      (when (re-search-forward "<<\\([^<>]*\\)>>" eol t)
+      (when (re-search-forward "<skg<\\([^<>]*\\)>>" eol t)
         (let* ((beg (match-beginning 0))
                (end (match-end 0))
                (inner (match-string-no-properties 1))
@@ -63,7 +63,7 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
               (push ov heralds-overlays)) )) )) ))
 
 (defun heralds-from-metadata
-    (metadata) ;; line's first text inside (not including) << and >>
+    (metadata) ;; line's first text inside (not including) <skg< and >>
   "Returns a propertized space-separated string of heralds.
 Whitespace in METADATA is ignored."
   (let* ( (s ;; discard whitespace
@@ -151,10 +151,10 @@ Whitespace in METADATA is ignored."
 ;; TESTING, interactive:
 ;; `M-x heralds-minor-mode` should change how the text below looks.
 ;;
-;; Here is some example text <<id:123,blue:Hello,green:World,repeated,other:ignored>> and more text.
-;; Another example: <<green:Success,id:456,repeated,blue:Test>> end of line.
-;; <<id:789>> A second batch of similarly-formatted data should render normally: <<id:yeah,repeated,aw yeah>>
-;; Colors only: <<blue:Azure,green:Forest>>
-;; <<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
+;; Here is some example text <skg<id:123,blue:Hello,green:World,repeated,other:ignored>> and more text.
+;; Another example: <skg<green:Success,id:456,repeated,blue:Test>> end of line.
+;; <skg<id:789>> A second batch of similarly-formatted data should render normally: <skg<id:yeah,repeated,aw yeah>>
+;; Colors only: <skg<blue:Azure,green:Forest>>
+;; <skg<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
 
 (provide 'heralds-minor-mode)
