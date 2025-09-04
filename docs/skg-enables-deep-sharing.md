@@ -4,7 +4,7 @@ There is already [lots of good software](who-maps-knowledge.md) for [*personal* 
 ## Learn from how others use your ideas.
 When someone integrates your (public) notes into their (public) notes, they reveal potentially new context to you.
 
-For instance, suppose you had a node titled "irresponsibility", a branch of which was called "living like there's no tomorrow". Someone might link to your "living like there's no tomorrow" from their note "peace, presesnce and mindfulness". They might also link to it from "sexiness". Their new links to your note could reveal two positive spins on a phenomenon, "living like there's no tomorrow", which you had previously framed entirely in the negative.
+For instance, suppose you had a node titled "irresponsibility", a branch of which was called "living like there's no tomorrow". Someone might link to your "living like there's no tomorrow" from their note "peace, presence and mindfulness". They might also link to it from "sexiness". Their new links to your note could reveal two positive spins on a phenomenon, "living like there's no tomorrow", which you had previously framed entirely in the negative.
 
 In this way the other user, by trying to understand your idea, can help you understand it yourself.
 

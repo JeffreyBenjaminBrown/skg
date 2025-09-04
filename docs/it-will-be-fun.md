@@ -1,5 +1,5 @@
 # We're trapped in time!
-The world of ideas is a web, not a line. Thinking and communicating in long strings of words is a straightjacket -- one we strangely learn to ignore. Skg aims to free us from it, allowing us to share the web of connections in our heads.
+The world of ideas is a web, not a line. Thinking and communicating in long strings of words is a straitjacket -- one we strangely learn to ignore. Skg aims to free us from it, allowing us to share the web of connections in our heads.
 
 # The solution is easy!
 Writing essays is hard, and reading them can be tedious if the author guesses wrong about what the reader will want to know when. Webs of thought suffer neither problem.

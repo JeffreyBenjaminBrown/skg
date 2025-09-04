@@ -4,15 +4,6 @@
 ** where to look
 *** comments in code
 *** mindmap on [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skxg]]
-* Add an "overview" file in ai/?
-  and rename ai/ -> guidance/,
-  and relabel formatting.org -> my-weird-formatting-preferences.org
-** overview
-*** refs: the schema, the api
-*** Tantivy
-*** TypeDB
-*** .skg format
-*** Translating org nodes into graph instructions
 * [[id:b72d4277-eced-48b9-85da-b917d9a4aad4][aliases in skg]]
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
 * Use anyhow or eyre crates for better error handling

@@ -11,7 +11,7 @@ As is evident from the [schema](../schema.tql), there are a number of ways nodes
 - Following a hyperlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 # Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [the sharing model](sharing-model.md), and [easy to understand changes](diffs-are-clearer-in-skg.md).
-# The overrides_view_of relatinoship
+# The overrides_view_of relationship
 A file F can override the view of file O. If it does, then by default when the user opens a link to O, they will see F instead. (The override is not silent -- it will be visibly announced, and the user can still visit the overridden file if they like.)
 
 Overriding is useful for both sharing and privacy, as is explained below.
