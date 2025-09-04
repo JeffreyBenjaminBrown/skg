@@ -219,7 +219,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index
-  let index_dir = "tests/tantivy/generated/aliases_test";
+  let index_dir = "tests/tantivy/generated";
   if Path::new(index_dir).exists() {
     fs::remove_dir_all(index_dir)?; }
   fs::create_dir_all(index_dir)?;
@@ -301,5 +301,5 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   println!("✓ Test 3 passed: 'throw banana' returned {:?}", ids3);
 
   println!("All alias tests passed!");
-  Ok(())
+  Ok (())
 }
