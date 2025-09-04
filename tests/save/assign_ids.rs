@@ -1,10 +1,10 @@
 use skg::save::assign_ids::assign_ids_recursive;
-use skg::types::{ID, ContentNode, OrgNodeInterp};
+use skg::types::{ID, NodeWithEphem, OrgNodeInterp};
 
 #[test]
 fn test_assign_ids_recursive() {
-  // Build from the leaves upward, wrapping each ContentNode as OrgNodeInterp::Content
-  let c_content = ContentNode {
+  // Build from the leaves upward, wrapping each NodeWithEphem as OrgNodeInterp::Content
+  let c_content = NodeWithEphem {
     id: None,
     title: "c".to_string(),
     aliases: None,
@@ -16,7 +16,7 @@ fn test_assign_ids_recursive() {
   };
   let c = OrgNodeInterp::content(c_content);
 
-  let b_content = ContentNode {
+  let b_content = NodeWithEphem {
     id: Some(ID::from("b")),
     title: "b".to_string(),
     aliases: None,
@@ -28,7 +28,7 @@ fn test_assign_ids_recursive() {
   };
   let b = OrgNodeInterp::content(b_content);
 
-  let a = OrgNodeInterp::content(ContentNode {
+  let a = OrgNodeInterp::content(NodeWithEphem {
     id: None,
     title: "a".to_string(),
     aliases: None,
@@ -41,7 +41,7 @@ fn test_assign_ids_recursive() {
 
   let result = assign_ids_recursive(&a);
 
-  // Unpack OrgNodeInterp -> ContentNode to assert on fields
+  // Unpack OrgNodeInterp -> NodeWithEphem to assert on fields
   let result = match result {
     OrgNodeInterp::Content(cn) => cn,
     _ => panic!("expected Content node at root"),

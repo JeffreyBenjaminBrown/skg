@@ -4,26 +4,26 @@ use typedb_driver::TypeDBDriver;
 use crate::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::typedb::relationships::create_all_relationships;
 use crate::typedb::relationships::delete_out_links;
-use crate::types::{FileNode, ID};
+use crate::types::{Node, ID};
 
-/// Update the DB from a batch of `FileNode`s:
+/// Update the DB from a batch of `Node`s:
 /// 1) Create only nodes whose IDs are not present, via
 ///      create_only_nodes_with_no_ids_present
 /// 2) Delete all outbound `contains` from those nodes, via
 ///      delete_out_links
-///    PITFALL: Only the primary ID from each FileNode is used.
+///    PITFALL: Only the primary ID from each Node is used.
 /// 3) Recreate all relationships for those nodes, via
 ///      create_all_relationships
 pub async fn update_nodes_and_relationships (
-    db_name: &str,
-    driver: &TypeDBDriver,
-    filenodes: &Vec<FileNode>,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  nodes   : &Vec<Node>,
 ) -> Result<(), Box<dyn Error>> {
 
   create_only_nodes_with_no_ids_present (
-    db_name, driver, filenodes ). await ?;
+    db_name, driver, nodes ). await ?;
   let primary_ids : Vec<ID> =
-    filenodes . iter ()
+    nodes . iter ()
     . filter_map ( |n|
                     n . ids
                     . get(0)
@@ -35,5 +35,5 @@ pub async fn update_nodes_and_relationships (
     "contains",
     "container" ). await ?;
   create_all_relationships (
-    db_name, driver, filenodes ). await ?;
+    db_name, driver, nodes ). await ?;
   Ok (( )) }

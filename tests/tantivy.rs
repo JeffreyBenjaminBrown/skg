@@ -5,8 +5,8 @@ use skg::file_io::read_skg_files;
 use skg::tantivy::{
   wipe_fs_then_create_index_there,
   search_index,
-  update_index_with_filenodes};
-use skg::types::{TantivyIndex, FileNode, ID};
+  update_index_with_nodes};
+use skg::types::{TantivyIndex, Node, ID};
 
 #[test]
 fn test_many_tantivy_things (
@@ -32,12 +32,12 @@ fn test_many_tantivy_things (
 
   let index_path: &Path =
     Path::new("tests/tantivy/generated/index.tantivy");
-  let filenodes: Vec<skg::types::FileNode> =
+  let nodes: Vec<skg::types::Node> =
     read_skg_files("tests/tantivy/fixtures")?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     wipe_fs_then_create_index_there (
-      &filenodes,
+      &nodes,
       index_path,
       schema,
       id_field,
@@ -93,8 +93,8 @@ fn test_many_tantivy_things (
             initial_top_id);
   println!("✓ Initial search correctly found node 1 as top result");
 
-  // Create a new FileNode with ID 6 and title "This is one big tuna."
-  let new_filenode: FileNode = FileNode {
+  // Create a new Node with ID 6 and title "This is one big tuna."
+  let new_node: Node = Node {
     title: "This is one big tuna.".to_string(),
     aliases: vec![],
     ids: vec![ID::new("6")],
@@ -107,7 +107,7 @@ fn test_many_tantivy_things (
 
   // Update the index with the new node
   let update_count: usize =
-    update_index_with_filenodes(&[new_filenode], &tantivy_index)?;
+    update_index_with_nodes(&[new_node], &tantivy_index)?;
   assert_eq!(update_count, 1,
             "Expected to update exactly 1 document, but updated: {}",
             update_count);
@@ -188,7 +188,7 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_filenode = FileNode {
+  let empty_node = Node {
     title: String::new(),
     aliases: vec![],
     ids: vec![],
@@ -199,24 +199,24 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     overrides_view_of: vec![],
   };
 
-  let mut apple  = empty_filenode.clone();
+  let mut apple  = empty_node.clone();
   apple.ids      = vec![ID::new( "apple")];
   apple.title    =               "eat apple".to_string();
   apple.aliases  = vec![         "munch apple".to_string(),
                                  "chomp apple".to_string() ];
 
-  let mut banana = empty_filenode.clone();
+  let mut banana = empty_node.clone();
   banana.ids     = vec![ID::new( "banana")];
   banana.title   =               "eat banana".to_string();
   banana.aliases = vec![         "chomp banana".to_string(),
                                  "throw banana".to_string()];
 
-  let mut kiwi   = empty_filenode.clone();
+  let mut kiwi   = empty_node.clone();
   kiwi.ids       = vec![ID::new( "kiwi")];
   kiwi.title     =               "eat kiwi".to_string();
   kiwi.aliases   = vec![         "munch kiwi".to_string()];
 
-  let filenodes = vec![apple, banana, kiwi];
+  let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index
   let index_dir = "tests/tantivy/generated/aliases_test";
@@ -235,7 +235,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
 
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
     wipe_fs_then_create_index_there(
-      &filenodes,
+      &nodes,
       Path::new(index_dir),
       schema,
       id_field,

@@ -1,17 +1,17 @@
 use regex::Regex;
 
-use crate::types::{Hyperlink, FileNode};
+use crate::types::{Hyperlink, Node};
 
-pub fn hyperlinks_from_filenode (
-  filenode : &FileNode )
+pub fn hyperlinks_from_node (
+  node : &Node )
   -> Vec<Hyperlink> {
   // All hyperlinks in its title
   // and (if present) its body.
 
   let combined_text = format!(
     "{}{}",
-    filenode.title,
-    filenode . body . as_deref () . unwrap_or ("") );
+    node.title,
+    node . body . as_deref () . unwrap_or ("") );
   hyperlinks_from_text ( &combined_text ) }
 
 pub fn hyperlinks_from_text (
@@ -142,8 +142,8 @@ mod tests {
   }
 
   #[test]
-  fn test_hyperlinks_from_filenode() {
-    let test_node = FileNode {
+  fn test_hyperlinks_from_node() {
+    let test_node = Node {
       title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string(),
       aliases: vec![],
       ids: vec![ID::new("id")],
@@ -153,7 +153,7 @@ mod tests {
       hides_from_its_subscriptions: vec![],
       overrides_view_of: vec![],
     };
-    let hyperlinks = hyperlinks_from_filenode(&test_node);
+    let hyperlinks = hyperlinks_from_node(&test_node);
     assert_eq!(hyperlinks.len(), 4);
     assert!(hyperlinks.iter()
             .any(|hyperlink| hyperlink.id == "hyperlink1".into() &&

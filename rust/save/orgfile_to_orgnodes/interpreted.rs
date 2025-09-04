@@ -1,6 +1,6 @@
 // Transform 'OrgNode's to 'OrgNodeInterp's
 
-use crate::types::ContentNode;
+use crate::types::NodeWithEphem;
 use crate::types::ID;
 use crate::types::OrgNodeInterp;
 use crate::types::{OrgNodeInterpEnum,OrgNode};
@@ -10,13 +10,13 @@ use std::collections::{HashMap, HashSet};
 
 pub fn interpret_org_node (
   uninterpreted : OrgNode
-) -> OrgNodeInterp { // TODO ? Currently this returns a tree of OrgNodeInterps. But since AliasNodes are filtered out, it ought to return instead a tree of ContentNodes. This requires using generic trees, and redefining ContentNode and AliasNode to not include their branches.
+) -> OrgNodeInterp { // TODO ? Currently this returns a tree of OrgNodeInterps. But since AliasNodes are filtered out, it ought to return instead a tree of NodeWithEphems. This requires using generic trees, and redefining NodeWithEphem and AliasNode to not include their branches.
 
   let (metadata, title): (OrgNodeMetadata, String) =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
   match metadata.node_type {
-    OrgNodeInterpEnum::ContentNode => {
+    OrgNodeInterpEnum::NodeWithEphem => {
       let interpreted_branches: Vec<OrgNodeInterp> =
         if metadata.repeated { Vec::new()
         } else { uninterpreted.branches
@@ -34,7 +34,7 @@ pub fn interpret_org_node (
             if let OrgNodeInterp::Aliases (alias_list) = child {
               Some (alias_list.clone())
             } else { None }} );
-      OrgNodeInterp::Content ( ContentNode {
+      OrgNodeInterp::Content ( NodeWithEphem {
         id       : metadata.id,
         title    : title,
         aliases  : aliases,
@@ -63,9 +63,9 @@ pub fn interpret_org_node (
       let aliases: Vec<String> = branches
         . iter()
         . filter_map ( |child| {
-          // collect aliases only from ContentNodes
+          // collect aliases only from NodeWithEphems
           if let OrgNodeInterp::Content (content_node) =
-          // PITFALL: You could argue this is an abuse of the ContentNode type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
+          // PITFALL: You could argue this is an abuse of the NodeWithEphem type, which is intended to correspond to a node in the graph, whereas this corresponds to an alias of its grandparent in the org file.
             child { Some ( content_node . title . clone() )
             } else { None }} )
         . collect();
@@ -98,7 +98,7 @@ fn parse_separating_metadata_and_title (
         = match kv . get ("type") . map ( |s|
                                            s.as_str() )
       { Some("aliases") => OrgNodeInterpEnum::Aliases,
-        None => OrgNodeInterpEnum::ContentNode,
+        None => OrgNodeInterpEnum::NodeWithEphem,
         Some (other) => panic!( "unrecognized 'type' field: {}",
                                  other), };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
@@ -118,7 +118,7 @@ fn parse_separating_metadata_and_title (
         repeated: false,
         folded: false,
         focused: false,
-        node_type: OrgNodeInterpEnum::ContentNode, },
+        node_type: OrgNodeInterpEnum::NodeWithEphem, },
       title ) }}
 
 /// Parse the content inside a `<skg< ... >>` metadata block.

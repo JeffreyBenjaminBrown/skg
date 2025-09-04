@@ -1,6 +1,6 @@
 use skg::save::orgfile_to_orgnodes::interpreted::metadata_inner_string_to_map_and_set;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::types::{OrgNodeInterp, ContentNode};
+use skg::types::{OrgNodeInterp, NodeWithEphem};
 
 #[allow(unused_imports)]
 use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
@@ -10,11 +10,11 @@ use std::collections::{HashMap, HashSet};
 mod tests {
   use super::*;
 
-  // Helper function to extract ContentNode from OrgNodeInterp for cleaner test code
-  fn extract_content_node(org_node: &OrgNodeInterp) -> &ContentNode {
+  // Helper function to extract NodeWithEphem from OrgNodeInterp for cleaner test code
+  fn extract_content_node(org_node: &OrgNodeInterp) -> &NodeWithEphem {
     match org_node {
       OrgNodeInterp::Content(content_node) => content_node,
-      OrgNodeInterp::Aliases(_) => panic!("Expected ContentNode, found AliasNode"),
+      OrgNodeInterp::Aliases(_) => panic!("Expected NodeWithEphem, found AliasNode"),
     }
   }
 
@@ -35,35 +35,35 @@ mod tests {
     let forest: Vec<OrgNodeInterp> = parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
-    let n1 : &ContentNode =
+    let n1 : &NodeWithEphem =
       extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
     assert_eq!(n1.title, "1");
     assert_eq!(n1.branches.len(), 4);
 
-    let n2 : &ContentNode =
+    let n2 : &NodeWithEphem =
       extract_content_node (&n1.branches[0]);
     assert_eq!(n2.id.as_deref(), Some(&"2".to_string()));
     assert!(n2.body.as_ref().unwrap().contains("The body of 2."));
     assert_eq!(n2.branches.len(), 1);
-    let n2_child : &ContentNode =
+    let n2_child : &NodeWithEphem =
       extract_content_node(&n2.branches[0]);
     assert_eq!(n2_child.id.as_deref(), Some(&"3".to_string()));
 
-    let n4 : &ContentNode =
+    let n4 : &NodeWithEphem =
       extract_content_node(&n1.branches[1]);
     assert_eq!(n4.id.as_deref(), Some(&"4".to_string()));
     assert!(n4.body.is_none());
     assert!(n4.branches.is_empty());
 
-    let repeated : &ContentNode =
+    let repeated : &NodeWithEphem =
       extract_content_node(&n1.branches[2]);
     assert_eq!(repeated.id.as_deref(), Some(&"1".to_string()));
     assert!(repeated.repeated);
     assert!(repeated.body.is_none());
     assert!(repeated.branches.is_empty());
 
-    let n_no_id : &ContentNode =
+    let n_no_id : &NodeWithEphem =
       extract_content_node(&n1.branches[3]);
     assert_eq!(n_no_id.id, None);
     assert_eq!(n_no_id.title,
@@ -103,25 +103,25 @@ mod tests {
       parse_skg_org_to_nodes(sample);
     assert_eq!(forest.len(), 1);
 
-    let n1: &ContentNode =
+    let n1: &NodeWithEphem =
       extract_content_node(&forest[0]);
     assert_eq!(n1.id.as_deref(), Some(&"1".to_string()));
     assert!(n1.folded);
     assert!(!n1.focused);
 
-    let n2: &ContentNode =
+    let n2: &NodeWithEphem =
       extract_content_node(&n1.branches[0]);
     assert_eq!(n2.id.as_deref(), Some(&"2".to_string()));
     assert!(!n2.folded);
     assert!(n2.focused);
 
-    let n3: &ContentNode =
+    let n3: &NodeWithEphem =
       extract_content_node(&n2.branches[0]);
     assert_eq!(n3.id.as_deref(), Some(&"3".to_string()));
     assert!(n3.folded);
     assert!(n3.focused);
 
-    let n4: &ContentNode =
+    let n4: &NodeWithEphem =
       extract_content_node(&n1.branches[1]);
     assert_eq!(n4.id.as_deref(), Some(&"4".to_string()));
     assert!(!n4.folded);

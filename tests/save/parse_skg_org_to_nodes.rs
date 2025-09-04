@@ -63,7 +63,7 @@ fn test_parse_skg_org_to_nodes() {
         assert_eq! (node_aa.repeated, false);
         assert_eq! (node_aa.branches.len (), 0);
       } else {
-        panic! ("Expected ContentNode for 'aa'");
+        panic! ("Expected NodeWithEphem for 'aa'");
       }
 
       // Check second grandchild (node 'ab')
@@ -77,10 +77,10 @@ fn test_parse_skg_org_to_nodes() {
         assert_eq! (node_ab.repeated, false);
         assert_eq! (node_ab.branches.len (), 0);
       } else {
-        panic! ("Expected ContentNode for 'ab'");
+        panic! ("Expected NodeWithEphem for 'ab'");
       }
     } else {
-      panic! ("Expected ContentNode for node 'a'");
+      panic! ("Expected NodeWithEphem for node 'a'");
     }
 
     // Check second child (node 'b')
@@ -94,10 +94,10 @@ fn test_parse_skg_org_to_nodes() {
       assert_eq! (node_b.repeated, false);
       assert_eq! (node_b.branches.len (), 0);
     } else {
-      panic! ("Expected ContentNode for node 'b'");
+      panic! ("Expected NodeWithEphem for node 'b'");
     }
   } else {
-    panic! ("Expected ContentNode for root");
+    panic! ("Expected NodeWithEphem for root");
   }
 }
 

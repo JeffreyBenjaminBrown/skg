@@ -8,7 +8,7 @@ use skg::typedb::relationships::delete_out_links;
 use skg::typedb::search::extract_payload_from_typedb_string_rep;
 use skg::typedb::search::find_container_of;
 use skg::typedb::search::pid_from_id;
-use skg::types::{ID, FileNode, OrgNodeInterp, ContentNode, SkgConfig};
+use skg::types::{ID, Node, OrgNodeInterp, NodeWithEphem, SkgConfig};
 
 use futures::StreamExt;
 use futures::executor::block_on;
@@ -276,9 +276,9 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   let initial_number_of_nodes : usize =
     count_nodes ( db_name, driver ) . await ?;
 
-  // Prepare two FileNodes: one existing ("a"), one new ("new").
+  // Prepare two Nodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
-  let fn_a  : FileNode = FileNode {
+  let fn_a  : Node = Node {
     title                    : "ignore this string" . to_string (),
     aliases                  : vec![],
     ids                      : vec![ ID::from ( "a" ) ],
@@ -288,7 +288,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
     hides_from_its_subscriptions : vec![],
     overrides_view_of        : vec![],
   };
-  let fn_new : FileNode = FileNode {
+  let fn_new : Node = Node {
     title                    : "ignore this string" . to_string (),
     aliases                  : vec![],
     ids                      : vec![ ID::from ( "new" ) ],
@@ -389,7 +389,7 @@ async fn test_recursive_document (
   //       └─ b [repeated]
   //            (body "Repeated above. Edit there, not here.")
   let expected_forest : Vec<OrgNodeInterp> =
-    vec! [ OrgNodeInterp::Content(ContentNode {
+    vec! [ OrgNodeInterp::Content(NodeWithEphem {
       id       : Some ( ID::from ("a") ),
       title    : "a" . to_string (),
       aliases  : None,
@@ -397,7 +397,7 @@ async fn test_recursive_document (
       folded   : false,
       focused  : false,
       repeated : false,
-      branches : vec! [ OrgNodeInterp::Content(ContentNode {
+      branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
         id       : Some ( ID::from ("b") ),
         title    : "b" . to_string (),
         aliases  : None,
@@ -405,7 +405,7 @@ async fn test_recursive_document (
         folded   : false,
         focused  : false,
         repeated : false,
-        branches : vec! [ OrgNodeInterp::Content(ContentNode {
+        branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
           id       : Some ( ID::from ("c") ),
           aliases  : None,
           title    : "c" . to_string (),
@@ -413,7 +413,7 @@ async fn test_recursive_document (
           folded   : false,
           focused  : false,
           repeated : false,
-          branches : vec! [ OrgNodeInterp::Content(ContentNode {
+          branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
             id       : Some ( ID::from ("b") ),
             title    : "b" . to_string (),
             aliases  : None,
