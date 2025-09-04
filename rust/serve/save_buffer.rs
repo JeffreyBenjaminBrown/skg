@@ -1,13 +1,13 @@
-use crate::file_io::write_all_filenodes;
+use crate::file_io::write_all_nodes;
 use crate::render::single_root_view;
 use crate::save::assign_ids::assign_ids_recursive;
 use crate::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use crate::save::orgnode_to_filenode::orgNodeInterpretation_to_filenodes;
+use crate::save::orgnode_to_node::orgNodeInterpretation_to_nodes;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::tantivy::update_index_with_filenodes;
+use crate::tantivy::update_index_with_nodes;
 use crate::typedb::update::update_nodes_and_relationships;
-use crate::types::{FileNode, ID, OrgNodeInterp, SkgConfig, TantivyIndex};
+use crate::types::{ID, Node, OrgNodeInterp, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -87,8 +87,8 @@ Steps:
 - To those OrgNodeInterps:
   - Assigns IDs where needed (`assign_ids_recursive`).
   - Stores as `document_root` the root ID.
-- Puts the result through `orgNodeInterpretation_to_filenodes` to get FileNodes.
-- Runs `update_fs_and_dbs` on those FileNodes.
+- Puts the result through `orgNodeInterpretation_to_nodes` to get Nodes.
+- Runs `update_fs_and_dbs` on those Nodes.
 - Builds a single root content view from `document_root`. */
 fn update_from_and_rerender_buffer (
   content       : &str,
@@ -116,15 +116,15 @@ fn update_from_and_rerender_buffer (
         return Err("Root node cannot be an Aliases node".into());
       }};
 
-  let mut all_filenodes : HashSet<FileNode> =
+  let mut all_nodes : HashSet<Node> =
     HashSet::new ();
   for orgnode in &orgnodes_with_ids {
-    let (filenodes, _focused_id, _folded_ids) :
-      (HashSet<FileNode>, Option<ID>, HashSet<ID>) =
-      orgNodeInterpretation_to_filenodes (orgnode);
-    all_filenodes.extend (filenodes); }
+    let (nodes, _focused_id, _folded_ids) :
+      (HashSet<Node>, Option<ID>, HashSet<ID>) =
+      orgNodeInterpretation_to_nodes (orgnode);
+    all_nodes.extend (nodes); }
   block_on(update_fs_and_dbs(
-    all_filenodes.into_iter().collect::<Vec<FileNode>>(),
+    all_nodes.into_iter().collect::<Vec<Node>>(),
     config.clone(),
     tantivy_index,
     typedb_driver )) ?;
@@ -136,14 +136,14 @@ fn update_from_and_rerender_buffer (
         &document_root ))?;
   Ok (regenerated_document) }
 
-/// Updates **everything** from the given `FileNode`s, in order:
+/// Updates **everything** from the given `Node`s, in order:
 ///   1) TypeDB
 ///   2) Filesystem
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn update_fs_and_dbs (
-  filenodes     : Vec<FileNode>,
+  nodes         : Vec<Node>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
@@ -155,24 +155,24 @@ pub async fn update_fs_and_dbs (
   update_nodes_and_relationships (
     db_name,
     driver,
-    &filenodes, ). await ?;
+    &nodes, ). await ?;
   println!( "   TypeDB update complete." );
 
   let total_input : usize =
-    filenodes.len ();
+    nodes.len ();
   let target_dir  : &Path =
     &config.skg_folder;
   println!( "2) Writing {} file(s) to disk at {:?} ...",
             total_input, target_dir );
   let written_count : usize =
-    write_all_filenodes (
-      filenodes.clone (), config.clone () ) ?;
+    write_all_nodes (
+      nodes.clone (), config.clone () ) ?;
   println!( "   Wrote {} file(s).", written_count );
 
   println!( "3) Updating Tantivy index ..." );
   let indexed_count : usize =
-    update_index_with_filenodes (
-      &filenodes, tantivy_index )?;
+    update_index_with_nodes (
+      &nodes, tantivy_index )?;
   println!( "   Tantivy updated for {} document(s).",
                 indexed_count );
 

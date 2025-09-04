@@ -9,9 +9,9 @@ use crate::serve::single_root_view::handle_single_root_view_request;
 use crate::serve::title_matches::handle_title_matches_request;
 use crate::serve::util::request_type_from_request;
 use crate::serve::util::send_response;
-use crate::tantivy::initialize_tantivy_from_filenodes;
-use crate::typedb::init::initialize_typedb_from_filenodes;
-use crate::types::{SkgConfig, TantivyIndex, FileNode};
+use crate::tantivy::initialize_tantivy_from_nodes;
+use crate::typedb::init::initialize_typedb_from_nodes;
+use crate::types::{SkgConfig, TantivyIndex, Node};
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
@@ -52,7 +52,7 @@ pub fn serve (
         eprintln!("Connection failed: {e}"); } } }
   Ok (()) }
 
-/// Reads all FileNodes from disk, then uses that data
+/// Reads all Nodes from disk, then uses that data
 /// to initialize both databases (TypeDB and Tantivy).
 fn initialize_dbs (
   config : & SkgConfig,
@@ -62,18 +62,18 @@ fn initialize_dbs (
   let skg_folder_str: &str =
     config . skg_folder
     . to_str () . expect ("Invalid UTF-8 in skg folder path");
-  let filenodes: Vec<FileNode> =
+  let nodes: Vec<Node> =
     read_skg_files ( skg_folder_str )
     . unwrap_or_else(|e| {
       eprintln!("Failed to read .skg files: {}", e);
       std::process::exit(1);
     });
-  println!("{} .skg files were read", filenodes.len());
+  println!("{} .skg files were read", nodes.len());
 
   let typedb_driver: Arc<TypeDBDriver> =
-    initialize_typedb_from_filenodes ( config, &filenodes );
+    initialize_typedb_from_nodes ( config, &nodes );
   let tantivy_index: TantivyIndex =
-    initialize_tantivy_from_filenodes ( config, &filenodes );
+    initialize_tantivy_from_nodes ( config, &nodes );
 
   (typedb_driver, tantivy_index) }
 

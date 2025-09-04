@@ -4,7 +4,7 @@ Yes and yes.
 
 I hope to create an isomorphism from Skg into [Dragon](https://github.com/CategoricalData/hydra/tree/main), whereupon it can easily be converted back and forth into anything else for which such an isomorphism has been written. Anything expressible in Skg and not the other system, or vice-versa, can (but needn't be) preserved as comments -- that is part of Hydra's magic.
 
-Skg data is stored as plain, human-readable text, but not as org-mode text. Skg uses org-mode to manipulate the data, but the data is stored on disk as a dialect of YAML. (Skg files are valid YAML, but most YAML is not valid Skg.) Any of the `.skg` files in the `tests/` folder should give the idea for the syntax, or see its complete definition in the FileNode type in [../rust/types.rs](../rust/types.rs).
+Skg data is stored as plain, human-readable text, but not as org-mode text. Skg uses org-mode to manipulate the data, but the data is stored on disk as a dialect of YAML. (Skg files are valid YAML, but most YAML is not valid Skg.) Any of the `.skg` files in the `tests/` folder should give the idea for the syntax, or see its complete definition in the Node type in [../rust/types.rs](../rust/types.rs).
 
 It will be possible to translate org-roam data into Skg, and vice-versa, but they aren't the same format. In Skg each node from a tree is its own file. This enables the sharing model ("Manipulate others' data as if it were your own" in the README), and
 

@@ -1,7 +1,7 @@
 use std::error::Error;
 
-use crate::types::{ID, FileNode};
-use crate::hyperlinks::hyperlinks_from_filenode;
+use crate::types::{ID, Node};
+use crate::hyperlinks::hyperlinks_from_node;
 
 use typedb_driver::{
   Transaction,
@@ -10,12 +10,12 @@ use typedb_driver::{
 };
 
 pub async fn create_all_relationships (
-  // Maps `create_relationships_from_node` over `filenodes`,
+  // Maps `create_relationships_from_node` over `nodes`,
   // then commits.
-  // PITFALL: Does not create `has_extra_id` relationships.
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  filenodes : &[FileNode]
+  // PITFALL : Does not create `has_extra_id` relationships.
+  db_name    : &str,
+  driver     : &TypeDBDriver,
+  nodes      : &[Node]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
@@ -23,14 +23,14 @@ pub async fn create_all_relationships (
                          TransactionType::Write )
     . await ?;
   println! ( "Creating relationships ..." );
-  for node in filenodes {
+  for node in nodes {
     create_relationships_from_node (node, &tx)
       . await ?; }
   tx . commit () . await ?;
   Ok (()) }
 
 pub async fn create_relationships_from_node (
-  node : &FileNode,
+  node : &Node,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
@@ -44,7 +44,7 @@ pub async fn create_relationships_from_node (
     tx ) . await ?;
   insert_relationship_from_list (
     primary_id,
-    & ( hyperlinks_from_filenode ( &node )
+    & ( hyperlinks_from_node ( &node )
         . iter ()
         . map ( |hyperlink|
                  ID::from ( hyperlink.id.clone() ) )

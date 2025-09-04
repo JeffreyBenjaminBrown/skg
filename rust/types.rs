@@ -45,7 +45,7 @@ pub struct OrgNode {
 pub enum OrgNodeInterp {
   // Tells Rust how to interpret -- what to do with -- an OrgNode.
   // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
-  Content(ContentNode),
+  Content(NodeWithEphem),
   Aliases(Vec<String>),
 }
 
@@ -53,17 +53,17 @@ pub enum OrgNodeInterp {
 /// the constructors of OrgNodeInterp.
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrgNodeInterpEnum {
-  ContentNode,
+  NodeWithEphem,
   Aliases, }
 
 impl Default for OrgNodeInterpEnum {
   fn default() -> Self {
-    OrgNodeInterpEnum::ContentNode }}
+    OrgNodeInterpEnum::NodeWithEphem }}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ContentNode {
+pub struct NodeWithEphem {
   // See also /api.md.
-  // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a FileNode would include.
+  // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated"), and omits long-term data that a Node would include.
   // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
   pub id       : Option<ID>,
   pub title    : String,         // See comment in the type `OrgNode`
@@ -81,8 +81,8 @@ Rust needs to save repeated nodes differently. It should ignore their content an
   pub branches : Vec<OrgNodeInterp>, }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct FileNode {
-  // There is a 1-to-1 correspondence between FileNodes and actual files -- a file can be read to a FileNode, and a FileNode can be written to a file. The files are the only permanent data. FileNode is the format used to initialize the TypeDB and Tantivy databases.
+pub struct Node {
+  // There is a 1-to-1 correspondence between Nodes and actual files -- a file can be read to a Node, and a Node can be written to a file. The files are the only permanent data. Node is the format used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
 
   pub title: String,
@@ -161,7 +161,7 @@ impl Hyperlink {
     }} }
 
 impl OrgNodeInterp {
-  pub fn content (content_node: ContentNode) -> Self {
+  pub fn content (content_node: NodeWithEphem) -> Self {
     OrgNodeInterp::Content (content_node) }
   pub fn aliases (alias_list: Vec<String>) -> Self {
     OrgNodeInterp::Aliases (alias_list) }
@@ -216,8 +216,8 @@ impl fmt::Display for HyperlinkParseError {
 
 impl Error for HyperlinkParseError {}
 
-pub fn filenode_example () -> FileNode {
-  FileNode {
+pub fn node_example () -> Node {
+  Node {
     title: "This text gets indexed.".to_string(),
     aliases: vec![],
     ids: vec![ ID::new("example") ],

@@ -1,4 +1,4 @@
-use crate::types::{ID, FileNode};
+use crate::types::{ID, Node};
 use crate::typedb::search::extract_payload_from_typedb_string_rep;
 
 use futures::StreamExt;
@@ -11,14 +11,14 @@ use typedb_driver::{
 };
 
 pub async fn create_all_nodes (
-  // Maps `create_node` over `filenodes`, creating:
+  // Maps `create_node` over `nodes`, creating:
   //   all `node`         entities
   //   all `extra_id`     entities
   //   all `has_extra_id` relationships
   // Then commits.
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  filenodes : &[FileNode]
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  nodes   : &[Node]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
@@ -26,7 +26,7 @@ pub async fn create_all_nodes (
                          TransactionType::Write )
     . await ?;
   println!("Creating nodes ...");
-  for node in filenodes {
+  for node in nodes {
     create_node ( node, &tx )
       . await ?; }
   tx . commit () . await ?;
@@ -35,17 +35,17 @@ pub async fn create_all_nodes (
 /// Creates (in TypeDB) nodes whose primary IDs are not in the DB.
 /// Returns the number of nodes created.
 pub async fn create_only_nodes_with_no_ids_present (
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  filenodes : &Vec <FileNode>
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  nodes   : &Vec <Node>
 ) -> Result < usize, Box<dyn Error> > {
 
   let mut all_pids // All the primary IDs.
     : BTreeSet < String >
     = BTreeSet::new ();
-  for filenode in filenodes {
+  for node in nodes {
     // Don't check that the list is nonempty, because that should bork.
-    let pid: &ID = &filenode.ids[0];
+    let pid: &ID = &node.ids[0];
     all_pids.insert ( pid.to_string () ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
@@ -53,13 +53,13 @@ pub async fn create_only_nodes_with_no_ids_present (
       driver,
       &all_pids
     ) . await ?;
-  let mut to_create : Vec < &FileNode > =
+  let mut to_create : Vec < &Node > =
     Vec::new ();
-  for filenode in filenodes {
-    let pid: &ID = &filenode.ids[0];
+  for node in nodes {
+    let pid: &ID = &node.ids[0];
     if ! known_ids.contains (
       pid.as_str () )
-    { to_create.push ( filenode ); }}
+    { to_create.push ( node ); }}
   { // Create them.
     let tx : Transaction =
       driver . transaction (
@@ -78,7 +78,7 @@ pub async fn create_node (
   //          any `extra_id` entities it needs.
   //          any `has_extra_id` relationships it needs.
   // Does *not* commit.
-  node: &FileNode,
+  node: &Node,
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
@@ -94,7 +94,7 @@ pub async fn create_node (
   Ok (()) }
 
 pub async fn insert_extra_ids (
-  node : &FileNode,
+  node : &Node,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 

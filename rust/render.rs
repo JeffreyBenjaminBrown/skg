@@ -1,8 +1,8 @@
-use crate::file_io::{read_filenode,path_from_pid};
+use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   find_rootish_container,
   pid_from_id, };
-use crate::types::{FileNode, ID, SkgConfig};
+use crate::types::{Node, ID, SkgConfig};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -50,8 +50,8 @@ async fn org_from_node_recursive (
                   driver,
                   node_id,
     ). await ? );
-  let filenode : FileNode = read_filenode ( path )?;
-  if filenode.title.is_empty () {
+  let node : Node = read_node ( path )?;
+  if node.title.is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
       format! ( "Node with ID {} has an empty title",
@@ -59,7 +59,7 @@ async fn org_from_node_recursive (
     )) ); }
   if visited.contains (node_id) {
     return Ok ( format_repeated_node (
-      node_id, level, & filenode.title )); }
+      node_id, level, & node.title )); }
   visited.insert ( node_id.clone () );
   let mut out = String::new();
   write! ( &mut out,
@@ -67,13 +67,13 @@ async fn org_from_node_recursive (
             org_bullet (level),
             node_id,
             newline_to_space ( // Over-cautious, because the title should contain no newlines, but probably cheap.
-              & filenode.title )) ?;
-  if let Some (text) = & filenode.body {
+              & node.title )) ?;
+  if let Some (text) = & node.body {
     // Ensure a newline separates the body from the next headline.
     out.push_str ( text );
     if !text.ends_with ( '\n' ) {
       out.push('\n'); }}
-  for child_id in &filenode.contains { // Recurse at next level.
+  for child_id in &node.contains { // Recurse at next level.
     let child = Box::pin (
       org_from_node_recursive (
         driver, config,

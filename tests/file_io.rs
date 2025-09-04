@@ -2,31 +2,31 @@ use std::fs;
 use std::path::PathBuf;
 
 use skg::file_io::{
-  read_filenode, write_filenode};
-use skg::types::{FileNode, ID, filenode_example};
+  read_node, write_node};
+use skg::types::{Node, ID, node_example};
 
 #[test]
-fn test_filenode_io() {
+fn test_node_io() {
   // Write the example node to a file
-  let example : FileNode = filenode_example();
+  let example : Node = node_example();
   let out_filename: PathBuf =
     PathBuf::from("tests/file_io/generated")
     . join ( example
              .ids[0] // the primary id
              .0      // the string part of it
              .clone() );
-  write_filenode ( &example, &out_filename )
+  write_node ( &example, &out_filename )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : FileNode = read_filenode (
+  let read_node : Node = read_node (
     & out_filename ). unwrap ();
-  let mut reversed = reverse_some_of_filenode(&read_node);
+  let mut reversed = reverse_some_of_node(&read_node);
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
 
   let reversed_filename = "tests/file_io/generated/reversed.skg";
-  write_filenode(&reversed, reversed_filename).unwrap();
+  write_node(&reversed, reversed_filename).unwrap();
 
   let expected_example_path = "tests/file_io/fixtures/example.skg";
   let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
@@ -58,14 +58,14 @@ fn test_filenode_io() {
 }
 
 fn verify_body_not_needed() {
-  // If a FileNode's `body` is the empty string,
+  // If a Node's `body` is the empty string,
   // then that field need not be written to disk.
 
-  let mut node = read_filenode (
+  let mut node = read_node (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
-  write_filenode(
+  write_node(
     &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
@@ -85,8 +85,8 @@ fn verify_body_not_needed() {
   );
 }
 
-pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
-    // Create a new FileNode reversing two of its lists,
+pub fn reverse_some_of_node(node: &Node) -> Node {
+    // Create a new Node reversing two of its lists,
     // `contains` and `subscribes_to`.
     // This is only for testing purposes,
     // to show reading from and writing to disk work;
@@ -98,7 +98,7 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
         node.subscribes_to.clone();
     reversed_subscribes_to.reverse();
 
-  FileNode {
+  Node {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
 

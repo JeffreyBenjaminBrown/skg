@@ -1,6 +1,6 @@
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
-use crate::types::{FileNode, SkgConfig};
+use crate::types::{Node, SkgConfig};
 use crate::file_io::read_skg_files;
 
 use futures::executor::block_on;
@@ -22,24 +22,24 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let filenodes: Vec<FileNode> =
+  let nodes: Vec<Node> =
     read_skg_files(data_folder)?;
   overwrite_new_empty_db (
     db_name, driver ). await ?;
   define_schema (
     db_name, driver ). await?;
   create_all_nodes (
-    db_name, driver, &filenodes ). await ?;
+    db_name, driver, &nodes ). await ?;
   create_all_relationships (
-    db_name, driver, &filenodes ). await ?;
+    db_name, driver, &nodes ). await ?;
   Ok (( )) }
 
-pub fn initialize_typedb_from_filenodes (
+pub fn initialize_typedb_from_nodes (
   config : & SkgConfig,
-  filenodes: &[FileNode],
+  nodes: &[Node],
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
-  // then populates it with the provided FileNodes.
+  // then populates it with the provided Nodes.
 
   println!("Initializing TypeDB database...");
   let driver: TypeDBDriver = block_on ( async {
@@ -75,7 +75,7 @@ pub fn initialize_typedb_from_filenodes (
     if let Err (e) = create_all_nodes (
       & config . db_name,
       & driver,
-      filenodes,
+      nodes,
     ) . await {
       eprintln! ( "Failed to create nodes: {}", e );
       std::process::exit(1);
@@ -84,7 +84,7 @@ pub fn initialize_typedb_from_filenodes (
     if let Err (e) = create_all_relationships (
       & config . db_name,
       & driver,
-      filenodes,
+      nodes,
     ) . await {
       eprintln! ( "Failed to create relationships: {}", e );
       std::process::exit(1);
