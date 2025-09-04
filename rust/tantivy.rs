@@ -1,11 +1,11 @@
-// PURPOSE: Creates a Tantivy index from Nodes,
+// PURPOSE: Creates a Tantivy index from SkgNodes,
 // associating each node's primary ID with its processed title and aliases.
 
 // GLOSSARY:
 // See the Tantivy section in glossary.md.
 
 use crate::hyperlinks::replace_each_link_with_its_label;
-use crate::types::{ID, Node, SkgConfig, TantivyIndex};
+use crate::types::{ID, SkgNode, SkgConfig, TantivyIndex};
 
 use tantivy::{Index, IndexWriter, doc, schema, Term};
 use tantivy::collector::TopDocs;
@@ -43,7 +43,7 @@ pub fn search_index (
 /// then run `wipe_fs_then_create_index_there`.
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
-  nodes  : & [Node],
+  nodes  : & [SkgNode],
 ) -> TantivyIndex {
   println!("Initializing Tantivy index...");
 
@@ -83,7 +83,7 @@ pub fn initialize_tantivy_from_nodes (
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
 pub fn wipe_fs_then_create_index_there (
-  nodes                : &[Node],
+  nodes                : &[SkgNode],
   index_path           : &Path,
   schema               : tantivy::schema::Schema,
   id_field             : tantivy::schema::Field,
@@ -106,10 +106,10 @@ pub fn wipe_fs_then_create_index_there (
       nodes, &tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
-/// Creates a fresh index from the provided Nodes.
+/// Creates a fresh index from the provided SkgNodes.
 /// Returns the number of documents indexed.
 pub fn empty_then_populate_index (
-  nodes         : &[Node],
+  nodes         : &[SkgNode],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
   { // Empty the index.
@@ -122,12 +122,12 @@ pub fn empty_then_populate_index (
   update_index_with_nodes (
     nodes, tantivy_index ) }
 
-/// Updates the index with the provided Nodes.
+/// Updates the index with the provided SkgNodes.
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
 pub fn update_index_with_nodes (
-  nodes: &[Node],
+  nodes: &[SkgNode],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
@@ -152,13 +152,13 @@ pub fn update_index_with_nodes (
 /* -------------------- Private helpers -------------------- */
 
 fn create_documents_from_node (
-  node: &Node,
+  node: &SkgNode,
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < tantivy::Document >,
               Box < dyn Error >> {
 
   if node.ids.is_empty() {
-    return Err("Node has no IDs" . into () ); }
+    return Err("SkgNode has no IDs" . into () ); }
   let primary_id: &ID = &node.ids[0];
   let mut documents_acc: Vec<tantivy::Document> =
     Vec::new();
@@ -177,7 +177,7 @@ fn create_documents_from_node (
   Ok ( documents_acc ) }
 
 fn add_documents_to_writer (
-  nodes         : &[Node],
+  nodes         : &[SkgNode],
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
@@ -185,7 +185,7 @@ fn add_documents_to_writer (
   let mut indexed_count: usize = 0;
   for node in nodes {
     if node.ids.is_empty() {
-      return Err ( "Node has no IDs".into () ); }
+      return Err ( "SkgNode has no IDs".into () ); }
     let documents: Vec<tantivy::Document> =
       create_documents_from_node(
         node, tantivy_index )?;

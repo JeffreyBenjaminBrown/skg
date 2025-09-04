@@ -6,7 +6,7 @@ use skg::tantivy::{
   wipe_fs_then_create_index_there,
   search_index,
   update_index_with_nodes};
-use skg::types::{TantivyIndex, Node, ID};
+use skg::types::{TantivyIndex, SkgNode, ID};
 
 #[test]
 fn test_many_tantivy_things (
@@ -32,7 +32,7 @@ fn test_many_tantivy_things (
 
   let index_path: &Path =
     Path::new("tests/tantivy/generated/index.tantivy");
-  let nodes: Vec<skg::types::Node> =
+  let nodes: Vec<skg::types::SkgNode> =
     read_skg_files("tests/tantivy/fixtures")?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
@@ -93,8 +93,8 @@ fn test_many_tantivy_things (
             initial_top_id);
   println!("✓ Initial search correctly found node 1 as top result");
 
-  // Create a new Node with ID 6 and title "This is one big tuna."
-  let new_node: Node = Node {
+  // Create a new SkgNode with ID 6 and title "This is one big tuna."
+  let new_node: SkgNode = SkgNode {
     title: "This is one big tuna.".to_string(),
     aliases: vec![],
     ids: vec![ID::new("6")],
@@ -188,7 +188,7 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node = Node {
+  let empty_node = SkgNode {
     title: String::new(),
     aliases: vec![],
     ids: vec![],

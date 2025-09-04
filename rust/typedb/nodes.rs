@@ -1,4 +1,4 @@
-use crate::types::{ID, Node};
+use crate::types::{ID, SkgNode};
 use crate::typedb::search::extract_payload_from_typedb_string_rep;
 
 use futures::StreamExt;
@@ -18,7 +18,7 @@ pub async fn create_all_nodes (
   // Then commits.
   db_name : &str,
   driver  : &TypeDBDriver,
-  nodes   : &[Node]
+  nodes   : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
@@ -37,7 +37,7 @@ pub async fn create_all_nodes (
 pub async fn create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver,
-  nodes   : &Vec <Node>
+  nodes   : &Vec <SkgNode>
 ) -> Result < usize, Box<dyn Error> > {
 
   let mut all_pids // All the primary IDs.
@@ -53,7 +53,7 @@ pub async fn create_only_nodes_with_no_ids_present (
       driver,
       &all_pids
     ) . await ?;
-  let mut to_create : Vec < &Node > =
+  let mut to_create : Vec < &SkgNode > =
     Vec::new ();
   for node in nodes {
     let pid: &ID = &node.ids[0];
@@ -78,12 +78,12 @@ pub async fn create_node (
   //          any `extra_id` entities it needs.
   //          any `has_extra_id` relationships it needs.
   // Does *not* commit.
-  node: &Node,
+  node: &SkgNode,
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
   if node . ids . is_empty () {
-    return Err ( "Node with no IDs.".into() ); }
+    return Err ( "SkgNode with no IDs.".into() ); }
   let primary_id = node . ids [0] . as_str ();
   let insert_node_query = format! (
     r#"insert $n isa node,
@@ -94,7 +94,7 @@ pub async fn create_node (
   Ok (()) }
 
 pub async fn insert_extra_ids (
-  node : &Node,
+  node : &SkgNode,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 

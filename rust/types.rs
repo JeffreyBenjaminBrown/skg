@@ -1,6 +1,6 @@
 mod misc;
 mod orgnode;
-mod node;
+mod skgnode;
 
 pub use misc::{ ID,
                 SkgConfig,
@@ -12,6 +12,6 @@ pub use orgnode::{ OrgNode,
                    OrgNodeInterp,
                    OrgNodeInterpEnum, };
 
-pub use node::{ Node,
-                NodeWithEphem,
-                node_example, };
+pub use skgnode::{ SkgNode,
+                   NodeWithEphem,
+                   skgnode_example, };

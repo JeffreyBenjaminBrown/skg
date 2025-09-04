@@ -1,9 +1,9 @@
 use regex::Regex;
 
-use crate::types::{Hyperlink, Node};
+use crate::types::{Hyperlink, SkgNode};
 
 pub fn hyperlinks_from_node (
-  node : &Node )
+  node : &SkgNode )
   -> Vec<Hyperlink> {
   // All hyperlinks in its title
   // and (if present) its body.
@@ -143,7 +143,7 @@ mod tests {
 
   #[test]
   fn test_hyperlinks_from_node() {
-    let test_node = Node {
+    let test_node = SkgNode {
       title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string(),
       aliases: vec![],
       ids: vec![ID::new("id")],

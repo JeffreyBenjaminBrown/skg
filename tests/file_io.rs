@@ -3,12 +3,12 @@ use std::path::PathBuf;
 
 use skg::file_io::{
   read_node, write_node};
-use skg::types::{Node, ID, node_example};
+use skg::types::{SkgNode, ID, skgnode_example};
 
 #[test]
 fn test_node_io() {
   // Write the example node to a file
-  let example : Node = node_example();
+  let example : SkgNode = skgnode_example();
   let out_filename: PathBuf =
     PathBuf::from("tests/file_io/generated")
     . join ( example
@@ -19,7 +19,7 @@ fn test_node_io() {
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : Node = read_node (
+  let read_node : SkgNode = read_node (
     & out_filename ). unwrap ();
   let mut reversed = reverse_some_of_node(&read_node);
   reversed . ids = // match pid to filename
@@ -58,7 +58,7 @@ fn test_node_io() {
 }
 
 fn verify_body_not_needed() {
-  // If a Node's `body` is the empty string,
+  // If a SkgNode's `body` is the empty string,
   // then that field need not be written to disk.
 
   let mut node = read_node (
@@ -85,8 +85,8 @@ fn verify_body_not_needed() {
   );
 }
 
-pub fn reverse_some_of_node(node: &Node) -> Node {
-    // Create a new Node reversing two of its lists,
+pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
+    // Create a new SkgNode reversing two of its lists,
     // `contains` and `subscribes_to`.
     // This is only for testing purposes,
     // to show reading from and writing to disk work;
@@ -98,7 +98,7 @@ pub fn reverse_some_of_node(node: &Node) -> Node {
         node.subscribes_to.clone();
     reversed_subscribes_to.reverse();
 
-  Node {
+  SkgNode {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
 

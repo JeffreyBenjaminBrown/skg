@@ -2,7 +2,7 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   find_rootish_container,
   pid_from_id, };
-use crate::types::{Node, ID, SkgConfig};
+use crate::types::{SkgNode, ID, SkgConfig};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -50,11 +50,11 @@ async fn org_from_node_recursive (
                   driver,
                   node_id,
     ). await ? );
-  let node : Node = read_node ( path )?;
+  let node : SkgNode = read_node ( path )?;
   if node.title.is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ( "Node with ID {} has an empty title",
+      format! ( "SkgNode with ID {} has an empty title",
                  node_id ),
     )) ); }
   if visited.contains (node_id) {

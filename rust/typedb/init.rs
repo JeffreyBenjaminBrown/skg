@@ -1,6 +1,6 @@
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
-use crate::types::{Node, SkgConfig};
+use crate::types::{SkgNode, SkgConfig};
 use crate::file_io::read_skg_files;
 
 use futures::executor::block_on;
@@ -22,7 +22,7 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let nodes: Vec<Node> =
+  let nodes: Vec<SkgNode> =
     read_skg_files(data_folder)?;
   overwrite_new_empty_db (
     db_name, driver ). await ?;
@@ -36,10 +36,10 @@ pub async fn populate_test_db_from_fixtures (
 
 pub fn initialize_typedb_from_nodes (
   config : & SkgConfig,
-  nodes: &[Node],
+  nodes: &[SkgNode],
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
-  // then populates it with the provided Nodes.
+  // then populates it with the provided SkgNodes.
 
   println!("Initializing TypeDB database...");
   let driver: TypeDBDriver = block_on ( async {

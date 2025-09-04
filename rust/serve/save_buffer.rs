@@ -7,7 +7,7 @@ use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::tantivy::update_index_with_nodes;
 use crate::typedb::update::update_nodes_and_relationships;
-use crate::types::{ID, Node, OrgNodeInterp, SkgConfig, TantivyIndex};
+use crate::types::{ID, SkgNode, OrgNodeInterp, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -116,15 +116,15 @@ fn update_from_and_rerender_buffer (
         return Err("Root node cannot be an Aliases node".into());
       }};
 
-  let mut all_nodes : HashSet<Node> =
+  let mut all_nodes : HashSet<SkgNode> =
     HashSet::new ();
   for orgnode in &orgnodes_with_ids {
     let (nodes, _focused_id, _folded_ids) :
-      (HashSet<Node>, Option<ID>, HashSet<ID>) =
+      (HashSet<SkgNode>, Option<ID>, HashSet<ID>) =
       orgNodeInterpretation_to_nodes (orgnode);
     all_nodes.extend (nodes); }
   block_on(update_fs_and_dbs(
-    all_nodes.into_iter().collect::<Vec<Node>>(),
+    all_nodes.into_iter().collect::<Vec<SkgNode>>(),
     config.clone(),
     tantivy_index,
     typedb_driver )) ?;
@@ -136,14 +136,14 @@ fn update_from_and_rerender_buffer (
         &document_root ))?;
   Ok (regenerated_document) }
 
-/// Updates **everything** from the given `Node`s, in order:
+/// Updates **everything** from the given `SkgNode`s, in order:
 ///   1) TypeDB
 ///   2) Filesystem
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn update_fs_and_dbs (
-  nodes         : Vec<Node>,
+  nodes         : Vec<SkgNode>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,

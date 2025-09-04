@@ -1,7 +1,7 @@
 // PURPOSE & SUMMARY:
-// Reads and writes the Node type on disk.
+// Reads and writes the SkgNode type on disk.
 // As noted in types.rs, there is a 1-to-1 correspondence
-// between the Node type and each (path, file) pair,
+// between the SkgNode type and each (path, file) pair,
 // which makes this pretty simple.
 
 use serde_yaml;
@@ -9,7 +9,7 @@ use std::fs::{self};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::types::{ ID, Node, SkgConfig };
+use crate::types::{ ID, SkgNode, SkgConfig };
 
 
 pub fn path_from_pid (
@@ -27,12 +27,12 @@ pub fn path_from_pid (
 pub fn read_node
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P)
-   -> io::Result <Node>
+   -> io::Result <SkgNode>
 { // The type signature explains everything.
 
  let file_path : &Path = file_path.as_ref ();
  let contents  : String = fs::read_to_string ( file_path )?;
- let node      : Node =
+ let node      : SkgNode =
     serde_yaml::from_str ( &contents )
     . map_err (
       |e| io::Error::new (
@@ -43,10 +43,10 @@ pub fn read_node
 pub fn read_skg_files
   <P : AsRef<Path> > (
     dir_path : P )
-  -> io::Result < Vec<Node> >
+  -> io::Result < Vec<SkgNode> >
 { // Reads all relevant files from the path.
 
-  let mut nodes : Vec<Node> = Vec::new ();
+  let mut nodes : Vec<SkgNode> = Vec::new ();
   let entries : std::fs::ReadDir = // an iterator
     fs::read_dir (dir_path) ?;
   for entry in entries {
@@ -60,10 +60,10 @@ pub fn read_skg_files
       nodes.push (node); }}
   Ok (nodes) }
 
-/// Writes all given `Node`s to disk, at `config.skg_folder`,
+/// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.
 pub fn write_all_nodes (
-  nodes : Vec<Node>,
+  nodes : Vec<SkgNode>,
   config    : SkgConfig,
 ) -> io::Result<usize> { // number of files written
 
@@ -76,7 +76,7 @@ pub fn write_all_nodes (
       . ok_or_else (
          || io::Error::new (
            io::ErrorKind::InvalidInput,
-           "Node has no IDs" ))?
+           "SkgNode has no IDs" ))?
       . clone ();
     write_node (
       & node,
@@ -88,7 +88,7 @@ pub fn write_all_nodes (
 
 pub fn write_node
   <P : AsRef<Path>>
-  ( node      : &Node,
+  ( node      : &SkgNode,
     file_path : P
   ) -> io::Result<()>
 { // Writes `node` to `path`.
@@ -108,7 +108,7 @@ mod tests {
   use std::fs::File;
   use std::io::Write;
   use tempfile::tempdir;
-  use crate::types::{ID, Node};
+  use crate::types::{ID, SkgNode};
 
   #[test]
   fn test_hyperlinks_extracted_during_read() -> io::Result<()> {
@@ -117,7 +117,7 @@ mod tests {
     let file_path = dir.path().join("test_node.skg");
 
     // Create a test node with hyperlinks in titles and body
-    let test_node = Node {
+    let test_node = SkgNode {
       title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
         .to_string(),
       aliases: vec![ "alias 1" . to_string(),

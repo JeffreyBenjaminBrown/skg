@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use super::node::NodeWithEphem;
+use super::skgnode::NodeWithEphem;
 
 /// Raw text from Emacs is first loaded as a forest of these.
 #[derive(Clone, Debug, PartialEq)]

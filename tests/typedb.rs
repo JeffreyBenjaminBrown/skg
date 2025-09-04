@@ -8,7 +8,7 @@ use skg::typedb::relationships::delete_out_links;
 use skg::typedb::search::extract_payload_from_typedb_string_rep;
 use skg::typedb::search::find_container_of;
 use skg::typedb::search::pid_from_id;
-use skg::types::{ID, Node, OrgNodeInterp, NodeWithEphem, SkgConfig};
+use skg::types::{ID, SkgNode, OrgNodeInterp, NodeWithEphem, SkgConfig};
 
 use futures::StreamExt;
 use futures::executor::block_on;
@@ -276,9 +276,9 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   let initial_number_of_nodes : usize =
     count_nodes ( db_name, driver ) . await ?;
 
-  // Prepare two Nodes: one existing ("a"), one new ("new").
+  // Prepare two SkgNodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
-  let fn_a  : Node = Node {
+  let fn_a  : SkgNode = SkgNode {
     title                    : "ignore this string" . to_string (),
     aliases                  : vec![],
     ids                      : vec![ ID::from ( "a" ) ],
@@ -288,7 +288,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
     hides_from_its_subscriptions : vec![],
     overrides_view_of        : vec![],
   };
-  let fn_new : Node = Node {
+  let fn_new : SkgNode = SkgNode {
     title                    : "ignore this string" . to_string (),
     aliases                  : vec![],
     ids                      : vec![ ID::from ( "new" ) ],
@@ -336,7 +336,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   assert_eq! (
     final_number_of_nodes,
     initial_number_of_nodes + 1,
-    "Node count should increase by exactly 1 (only 'new' was created)." );
+    "SkgNode count should increase by exactly 1 (only 'new' was created)." );
 
   Ok ( () ) }
 

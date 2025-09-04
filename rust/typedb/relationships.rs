@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::types::{ID, Node};
+use crate::types::{ID, SkgNode};
 use crate::hyperlinks::hyperlinks_from_node;
 
 use typedb_driver::{
@@ -15,7 +15,7 @@ pub async fn create_all_relationships (
   // PITFALL : Does not create `has_extra_id` relationships.
   db_name    : &str,
   driver     : &TypeDBDriver,
-  nodes      : &[Node]
+  nodes      : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
@@ -30,7 +30,7 @@ pub async fn create_all_relationships (
   Ok (()) }
 
 pub async fn create_relationships_from_node (
-  node : &Node,
+  node : &SkgNode,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
