@@ -103,6 +103,7 @@ pub fn reverse_some_of_filenode(node: &FileNode) -> FileNode {
     subscribes_to     : reversed_subscribes_to,
 
     title             : node.title             .clone(),
+    aliases           : node.aliases           .clone(),
     ids               : node.ids               .clone(),
     body              : node.body              .clone(),
     hides_from_its_subscriptions :

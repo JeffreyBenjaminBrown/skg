@@ -54,7 +54,7 @@ fn generate_title_matches_response (
             Ok (retrieved_doc) => {
               let retrieved_doc : Document = retrieved_doc;
               if let Some (title_value) = retrieved_doc
-                . get_first ( tantivy_index.title_field )
+                . get_first ( tantivy_index.title_or_alias_field )
               { if let Some ( title_text ) =
                 title_value.as_text ()
                 { titles.push ( format! (

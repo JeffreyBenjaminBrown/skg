@@ -145,6 +145,7 @@ mod tests {
   fn test_hyperlinks_from_filenode() {
     let test_node = FileNode {
       title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string(),
+      aliases: vec![],
       ids: vec![ID::new("id")],
       body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]" . to_string()),
       contains: vec![],

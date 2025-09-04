@@ -52,6 +52,7 @@ fn orgNodeInterpretation_to_filenodes_internal (
       return; }}
   let filenode = FileNode {
     title: content_node.title.clone (),
+    aliases: content_node.aliases.clone ().unwrap_or ( Vec::new () ),
     ids: vec! [ // FileNodes can have multiple IDs, but OrgNodeInterps can't.
       content_node . id . clone () . expect (
         "FileNode with no ID found in `orgNodeInterpretation_to_filenodes_internal`. It should have already had an ID assigned by `assign_ids_recursive` in `orgNodeInterpretation_to_filenodes` (the non-internal version)." ) ],

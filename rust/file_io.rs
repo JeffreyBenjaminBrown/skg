@@ -120,6 +120,8 @@ mod tests {
     let test_node = FileNode {
       title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
         .to_string(),
+      aliases: vec![ "alias 1" . to_string(),
+                     "alias 2" . to_string() ],
       ids: vec![ID::new("test123")],
       body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
       contains: vec![],

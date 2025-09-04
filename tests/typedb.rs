@@ -280,6 +280,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   // Keep other fields minimal/empty as requested.
   let fn_a  : FileNode = FileNode {
     title                    : "ignore this string" . to_string (),
+    aliases                  : vec![],
     ids                      : vec![ ID::from ( "a" ) ],
     body                     : None,
     contains                 : vec![],
@@ -289,6 +290,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   };
   let fn_new : FileNode = FileNode {
     title                    : "ignore this string" . to_string (),
+    aliases                  : vec![],
     ids                      : vec![ ID::from ( "new" ) ],
     body                     : None,
     contains                 : vec![],

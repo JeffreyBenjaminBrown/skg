@@ -1,8 +1,8 @@
 // PURPOSE: Creates a Tantivy index from FileNodes,
-// associating each node's primary ID with its processed title.
+// associating each node's primary ID with its processed title and aliases.
 
 // GLOSSARY:
-// document = a Tantivy association, in my case from ID to title
+// See the Tantivy section in glossary.md.
 
 use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::{FileNode, ID, SkgConfig, TantivyIndex};
@@ -26,14 +26,14 @@ pub fn search_index (
     Box <dyn std::error::Error> > {
 
   println! (
-    "\nFinding files with titles matching \"{}\".",
+    "\nFinding files with titles or aliases matching \"{}\".",
     query_text);
   let reader = tantivy_index.index.reader () ?;
   let searcher = reader.searcher();
   let query_parser : tantivy::query::QueryParser =
     tantivy::query::QueryParser::for_index (
       &tantivy_index.index,
-      vec! [ tantivy_index.title_field ] );
+      vec! [ tantivy_index.title_or_alias_field ] );
   let query = query_parser.parse_query ( query_text ) ?;
   let best_matches = searcher.search (
     &query, &TopDocs::with_limit (10) )?;
@@ -52,9 +52,9 @@ pub fn initialize_tantivy_from_filenodes (
   let id_field: schema::Field =
     schema_builder.add_text_field(
       "id", schema::STRING | schema::STORED);
-  let title_field: schema::Field =
+  let title_or_alias_field: schema::Field =
     schema_builder.add_text_field(
-      "title", schema::TEXT | schema::STORED);
+      "title_or_alias", schema::TEXT | schema::STORED);
   let schema: schema::Schema =
     schema_builder.build();
 
@@ -66,7 +66,7 @@ pub fn initialize_tantivy_from_filenodes (
       index_path,
       schema,
       id_field,
-      title_field )
+      title_or_alias_field )
     . unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1);
@@ -83,11 +83,11 @@ pub fn initialize_tantivy_from_filenodes (
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
 pub fn wipe_fs_then_create_index_there (
-  filenodes   : &[FileNode],
-  index_path  : &Path,
-  schema      : tantivy::schema::Schema,
-  id_field    : tantivy::schema::Field,
-  title_field : tantivy::schema::Field,
+  filenodes            : &[FileNode],
+  index_path           : &Path,
+  schema               : tantivy::schema::Schema,
+  id_field             : tantivy::schema::Field,
+  title_or_alias_field : tantivy::schema::Field,
 ) -> Result<(TantivyIndex,
              usize), // number of documents indexed
             Box<dyn Error>> {
@@ -100,7 +100,7 @@ pub fn wipe_fs_then_create_index_there (
   let tantivy_index = TantivyIndex {
     index: Arc::new(index),
     id_field: id_field,
-    title_field, };
+    title_or_alias_field, };
   let indexed_count: usize = // populate it
     empty_then_populate_index (
       filenodes, &tantivy_index )?;
@@ -151,23 +151,30 @@ pub fn update_index_with_filenodes (
 
 /* -------------------- Private helpers -------------------- */
 
-fn create_document_from_filenode (
+fn create_documents_from_filenode (
   filenode: &FileNode,
   tantivy_index: &TantivyIndex,
-) -> Result<(String, tantivy::Document), Box<dyn Error>> {
+) -> Result < Vec < tantivy::Document >,
+              Box < dyn Error >> {
 
   if filenode.ids.is_empty() {
     return Err("FileNode has no IDs" . into () ); }
-  let primary_id: &ID =
-    &filenode.ids[0];
-  let processed_title: String =
-    replace_each_link_with_its_label (
-      &filenode.title );
-  let document: tantivy::Document =
-    doc!( tantivy_index . id_field  => primary_id.as_str (),
-          tantivy_index.title_field => processed_title );
-  Ok (( primary_id.as_str().to_string(),
-        document )) }
+  let primary_id: &ID = &filenode.ids[0];
+  let mut documents_acc: Vec<tantivy::Document> =
+    Vec::new();
+  let mut titles_and_aliases: Vec<String> = // what to index
+    vec![filenode.title.clone()];
+  titles_and_aliases.extend(
+    filenode.aliases.clone());
+  for title_or_alias in titles_and_aliases { // index them
+    let doc: tantivy::Document = doc!(
+      tantivy_index . id_field =>
+        primary_id.as_str (),
+      tantivy_index . title_or_alias_field =>
+        replace_each_link_with_its_label (
+          & title_or_alias ));
+    documents_acc.push (doc); }
+  Ok ( documents_acc ) }
 
 fn add_documents_to_writer (
   filenodes     : &[FileNode],
@@ -179,10 +186,12 @@ fn add_documents_to_writer (
   for filenode in filenodes {
     if filenode.ids.is_empty() {
       return Err ( "FileNode has no IDs".into () ); }
-    let (_id, document): (String, tantivy::Document) =
-      create_document_from_filenode(filenode, tantivy_index)?;
-    writer.add_document(document)?;
-    indexed_count += 1; }
+    let documents: Vec<tantivy::Document> =
+      create_documents_from_filenode(
+        filenode, tantivy_index )?;
+    for document in documents {
+      writer.add_document (document)?;
+      indexed_count += 1; }}
   Ok (indexed_count) }
 
 fn commit_with_status (

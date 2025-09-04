@@ -86,6 +86,10 @@ pub struct FileNode {
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes. At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
 
   pub title: String,
+
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub aliases: Vec<String>,
+
   pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
   // TODO: Use a nonempty list type (e.g. the "nonempty" crate), or else separate fields pid : String and extra_ids : Vec<String>. I'm leaning toward the latter, as the pid is special among those ids.
 
@@ -107,10 +111,10 @@ pub struct FileNode {
 
 #[derive(Clone)]
 pub struct TantivyIndex {
-  // Associates titles to paths.
-  pub index       : Arc<Index>,
-  pub id_field    : schema::Field,
-  pub title_field : schema::Field,
+  // Associates titles and aliases to paths.
+  pub index                  : Arc<Index>,
+  pub id_field               : schema::Field,
+  pub title_or_alias_field   : schema::Field,
 }
 
 
@@ -215,6 +219,7 @@ impl Error for HyperlinkParseError {}
 pub fn filenode_example () -> FileNode {
   FileNode {
     title: "This text gets indexed.".to_string(),
+    aliases: vec![],
     ids: vec![ ID::new("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
