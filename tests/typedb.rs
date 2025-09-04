@@ -280,7 +280,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   // Keep other fields minimal/empty as requested.
   let fn_a  : SkgNode = SkgNode {
     title                    : "ignore this string" . to_string (),
-    aliases                  : vec![],
+    aliases                  : None,
     ids                      : vec![ ID::from ( "a" ) ],
     body                     : None,
     contains                 : vec![],
@@ -290,7 +290,7 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   };
   let fn_new : SkgNode = SkgNode {
     title                    : "ignore this string" . to_string (),
-    aliases                  : vec![],
+    aliases                  : None,
     ids                      : vec![ ID::from ( "new" ) ],
     body                     : None,
     contains                 : vec![],

@@ -52,7 +52,7 @@ fn orgNodeInterpretation_to_nodes_internal (
       return; }}
   let node = SkgNode {
     title: content_node.title.clone (),
-    aliases: content_node.aliases.clone ().unwrap_or ( Vec::new () ),
+    aliases: content_node.aliases.clone(),
     ids: vec! [ // Nodes can have multiple IDs, but OrgNodeInterps can't.
       content_node . id . clone () . expect (
         "SkgNode with no ID found in `orgNodeInterpretation_to_nodes_internal`. It should have already had an ID assigned by `assign_ids_recursive` in `orgNodeInterpretation_to_nodes` (the non-internal version)." ) ],

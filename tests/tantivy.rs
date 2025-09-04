@@ -96,7 +96,7 @@ fn test_many_tantivy_things (
   // Create a new SkgNode with ID 6 and title "This is one big tuna."
   let new_node: SkgNode = SkgNode {
     title: "This is one big tuna.".to_string(),
-    aliases: vec![],
+    aliases: None,
     ids: vec![ID::new("6")],
     body: None,
     contains: vec![],
@@ -190,7 +190,7 @@ pub fn print_search_results(
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let empty_node = SkgNode {
     title: String::new(),
-    aliases: vec![],
+    aliases: None,
     ids: vec![],
     body: None,
     contains: vec![],
@@ -202,19 +202,19 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let mut apple  = empty_node.clone();
   apple.ids      = vec![ID::new( "apple")];
   apple.title    =               "eat apple".to_string();
-  apple.aliases  = vec![         "munch apple".to_string(),
-                                 "chomp apple".to_string() ];
+  apple.aliases  = Some(vec![    "munch apple".to_string(),
+                                 "chomp apple".to_string() ]);
 
   let mut banana = empty_node.clone();
   banana.ids     = vec![ID::new( "banana")];
   banana.title   =               "eat banana".to_string();
-  banana.aliases = vec![         "chomp banana".to_string(),
-                                 "throw banana".to_string()];
+  banana.aliases = Some(vec![    "chomp banana".to_string(),
+                                 "throw banana".to_string()]);
 
   let mut kiwi   = empty_node.clone();
   kiwi.ids       = vec![ID::new( "kiwi")];
   kiwi.title     =               "eat kiwi".to_string();
-  kiwi.aliases   = vec![         "munch kiwi".to_string()];
+  kiwi.aliases   = Some(vec![    "munch kiwi".to_string()]);
 
   let nodes = vec![apple, banana, kiwi];
 

@@ -10,8 +10,8 @@ pub struct SkgNode {
 
   pub title: String,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub aliases: Vec<String>,
+  #[serde(default, skip_serializing_if = "aliases_is_empty_or_none")]
+  pub aliases: Option<Vec<String>>,
 
   pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
   // TODO: Use a nonempty list type (e.g. the "nonempty" crate), or else separate fields pid : String and extra_ids : Vec<String>. I'm leaning toward the latter, as the pid is special among those ids.
@@ -54,13 +54,24 @@ Rust needs to save repeated nodes differently. It should ignore their content an
 }
 
 //
+// Helper functions
+//
+
+fn aliases_is_empty_or_none (
+  aliases: &Option<Vec<String>>
+) -> bool {
+  match aliases {
+    None => true,
+    Some(vec) => vec.is_empty(), }}
+
+//
 // Functions
 //
 
 pub fn skgnode_example () -> SkgNode {
   SkgNode {
     title: "This text gets indexed.".to_string(),
-    aliases: vec![],
+    aliases: None,
     ids: vec![ ID::new("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),

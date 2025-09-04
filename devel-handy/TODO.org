@@ -1,5 +1,7 @@
 * [[id:b72d4277-eced-48b9-85da-b917d9a4aad4][aliases in skg]]
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
+* move empty_skgnode from tests into skgnode.rs
+  and then use it for lots of tests
 * Use anyhow or eyre crates for better error handling
 ** Cargo.toml
 anyhow = "1.0"

@@ -164,8 +164,9 @@ fn create_documents_from_node (
     Vec::new();
   let mut titles_and_aliases: Vec<String> = // what to index
     vec![node.title.clone()];
-  titles_and_aliases.extend(
-    node.aliases.clone());
+  if let Some(aliases) = &node.aliases {
+    titles_and_aliases . extend(
+      aliases.clone () ); }
   for title_or_alias in titles_and_aliases { // index them
     let doc: tantivy::Document = doc!(
       tantivy_index . id_field =>
