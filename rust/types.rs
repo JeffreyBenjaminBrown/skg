@@ -72,11 +72,11 @@ pub struct ContentNode {
   pub folded   : bool,           // folded in the org-mode sense
   pub focused  : bool,           // where the Emacs cursor is
   pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.
-
+.
 Both Rust and Emacs need to know this, because:
-
+.
 Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
-
+.
 Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
   pub branches : Vec<OrgNodeInterp>, }
 
