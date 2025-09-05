@@ -8,7 +8,7 @@ use skg::typedb::relationships::delete_out_links;
 use skg::typedb::search::extract_payload_from_typedb_string_rep;
 use skg::typedb::search::find_container_of;
 use skg::typedb::search::pid_from_id;
-use skg::types::{ID, SkgNode, OrgNodeInterp, NodeWithEphem, SkgConfig};
+use skg::types::{ID, SkgNode, OrgNodeInterp, NodeWithEphem, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
 use futures::executor::block_on;
@@ -278,26 +278,13 @@ pub async fn test_create_only_nodes_with_no_ids_present (
 
   // Prepare two SkgNodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
-  let fn_a  : SkgNode = SkgNode {
-    title                    : "ignore this string" . to_string (),
-    aliases                  : None,
-    ids                      : vec![ ID::from ( "a" ) ],
-    body                     : None,
-    contains                 : vec![],
-    subscribes_to            : vec![],
-    hides_from_its_subscriptions : vec![],
-    overrides_view_of        : vec![],
-  };
-  let fn_new : SkgNode = SkgNode {
-    title                    : "ignore this string" . to_string (),
-    aliases                  : None,
-    ids                      : vec![ ID::from ( "new" ) ],
-    body                     : None,
-    contains                 : vec![],
-    subscribes_to            : vec![],
-    hides_from_its_subscriptions : vec![],
-    overrides_view_of        : vec![],
-  };
+  let mut fn_a : SkgNode = empty_skgnode ();
+  { fn_a.title = "ignore this string" . to_string ();
+    fn_a.ids   = vec![ ID::from ( "a" ) ]; }
+
+  let mut fn_new : SkgNode = empty_skgnode ();
+  { fn_new.title = "ignore this string" . to_string ();
+    fn_new.ids   = vec![ ID::from ( "new" ) ]; }
 
   // Attempt to create only unknown nodes among { "a", "new" }.
   // Expect exactly 1 creation (the id "new").

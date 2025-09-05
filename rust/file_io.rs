@@ -108,7 +108,7 @@ mod tests {
   use std::fs::File;
   use std::io::Write;
   use tempfile::tempdir;
-  use crate::types::{ID, SkgNode};
+  use crate::types::{ID, SkgNode, empty_skgnode};
 
   #[test]
   fn test_hyperlinks_extracted_during_read() -> io::Result<()> {
@@ -116,32 +116,24 @@ mod tests {
     let dir = tempdir()?;
     let file_path = dir.path().join("test_node.skg");
 
-    // Create a test node with hyperlinks in titles and body
-    let test_node = SkgNode {
-      title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
-        .to_string(),
-      aliases: Some(vec![ "alias 1" . to_string(),
-                          "alias 2" . to_string() ]),
-      ids: vec![ID::new("test123")],
-      body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()),
-      contains: vec![],
-      subscribes_to: vec![],
-      hides_from_its_subscriptions: vec![],
-      overrides_view_of: vec![],
-    };
+    let mut test_node : SkgNode = empty_skgnode ();
+    { test_node.title = "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
+        .to_string();
+      test_node.aliases = Some(vec![ "alias 1" . to_string(),
+                                      "alias 2" . to_string() ]);
+      test_node.ids = vec![ID::new("test123")];
+      test_node.body = Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()); }
 
-    // Write the node to a file
-    let yaml = serde_yaml::to_string(&test_node)
-      .map_err (
-        |e| io::Error::new(
-          io::ErrorKind::InvalidData,
-          e.to_string()))?;
-    let mut file = File::create( &file_path )?;
-    file.write_all(yaml.as_bytes())?;
-
-    // Read the node back from the file
-    let read_node = read_node(&file_path)?;
-
+    { // Write the node to a file
+      let yaml = serde_yaml::to_string(&test_node)
+        .map_err (
+          |e| io::Error::new(
+            io::ErrorKind::InvalidData,
+            e.to_string()))?;
+      let mut file = File::create( &file_path )?;
+      file.write_all(yaml.as_bytes())?; }
+    let read_node = // Read it back from the file.
+      read_node(&file_path)?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." );
     Ok (( )) }}

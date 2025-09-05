@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use crate::types::{Hyperlink, SkgNode};
+use crate::types::{Hyperlink, SkgNode, ID, empty_skgnode};
 
 pub fn hyperlinks_from_node (
   node : &SkgNode )
@@ -143,16 +143,11 @@ mod tests {
 
   #[test]
   fn test_hyperlinks_from_node() {
-    let test_node = SkgNode {
-      title: "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string(),
-      aliases: None,
-      ids: vec![ID::new("id")],
-      body: Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]" . to_string()),
-      contains: vec![],
-      subscribes_to: vec![],
-      hides_from_its_subscriptions: vec![],
-      overrides_view_of: vec![],
-    };
+    let mut test_node : SkgNode =
+      empty_skgnode ();
+    { test_node.title = "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]" . to_string();
+      test_node.ids = vec![ID::new("id")];
+      test_node.body = Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]" . to_string()); }
     let hyperlinks = hyperlinks_from_node(&test_node);
     assert_eq!(hyperlinks.len(), 4);
     assert!(hyperlinks.iter()

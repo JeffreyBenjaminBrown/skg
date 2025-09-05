@@ -14,4 +14,5 @@ pub use orgnode::{ OrgNode,
 
 pub use skgnode::{ SkgNode,
                    NodeWithEphem,
-                   skgnode_example, };
+                   skgnode_example,
+                   empty_skgnode, };

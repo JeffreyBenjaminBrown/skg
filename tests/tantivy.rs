@@ -6,7 +6,7 @@ use skg::tantivy::{
   wipe_fs_then_create_index_there,
   search_index,
   update_index_with_nodes};
-use skg::types::{TantivyIndex, SkgNode, ID};
+use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
 
 #[test]
 fn test_many_tantivy_things (
@@ -94,16 +94,10 @@ fn test_many_tantivy_things (
   println!("✓ Initial search correctly found node 1 as top result");
 
   // Create a new SkgNode with ID 6 and title "This is one big tuna."
-  let new_node: SkgNode = SkgNode {
-    title: "This is one big tuna.".to_string(),
-    aliases: None,
-    ids: vec![ID::new("6")],
-    body: None,
-    contains: vec![],
-    subscribes_to: vec![],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![],
-  };
+  let mut new_node : SkgNode =
+    empty_skgnode ();
+  { new_node.title = "This is one big tuna.".to_string();
+    new_node.ids = vec![ID::new("6")]; }
 
   // Update the index with the new node
   let update_count: usize =
@@ -188,34 +182,21 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node = SkgNode {
-    title: String::new(),
-    aliases: None,
-    ids: vec![],
-    body: None,
-    contains: vec![],
-    subscribes_to: vec![],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![],
-  };
-
+  let empty_node : SkgNode = empty_skgnode ();
   let mut apple  = empty_node.clone();
-  apple.ids      = vec![ID::new( "apple")];
-  apple.title    =               "eat apple".to_string();
-  apple.aliases  = Some(vec![    "munch apple".to_string(),
-                                 "chomp apple".to_string() ]);
-
+  { apple.ids      = vec![ID::new( "apple")];
+    apple.title    =               "eat apple".to_string();
+    apple.aliases  = Some(vec![    "munch apple".to_string(),
+                                    "chomp apple".to_string() ]); }
   let mut banana = empty_node.clone();
-  banana.ids     = vec![ID::new( "banana")];
-  banana.title   =               "eat banana".to_string();
-  banana.aliases = Some(vec![    "chomp banana".to_string(),
-                                 "throw banana".to_string()]);
-
+  { banana.ids     = vec![ID::new( "banana")];
+    banana.title   =               "eat banana".to_string();
+    banana.aliases = Some(vec![    "chomp banana".to_string(),
+                                    "throw banana".to_string()]); }
   let mut kiwi   = empty_node.clone();
-  kiwi.ids       = vec![ID::new( "kiwi")];
-  kiwi.title     =               "eat kiwi".to_string();
-  kiwi.aliases   = Some(vec![    "munch kiwi".to_string()]);
-
+  { kiwi.ids       = vec![ID::new( "kiwi")];
+    kiwi.title     =               "eat kiwi".to_string();
+    kiwi.aliases   = Some(vec![    "munch kiwi".to_string()]); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index

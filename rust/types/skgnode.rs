@@ -83,3 +83,16 @@ It better be okay with newlines."# . to_string() ),
                         ID::new("13")],
     hides_from_its_subscriptions: vec![],
     overrides_view_of: vec![], }}
+
+/// Useful for making tests more readable.
+pub fn empty_skgnode () -> SkgNode {
+  SkgNode {
+    title                        : String::new (),
+    aliases                      : None,
+    ids                          : vec![],
+    body                         : None,
+    contains                     : vec![],
+    subscribes_to                : vec![],
+    hides_from_its_subscriptions : vec![],
+    overrides_view_of            : vec![],
+  }}
