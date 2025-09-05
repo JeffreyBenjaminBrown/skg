@@ -1,8 +1,11 @@
+#[allow(unused_imports)]
+use indoc::indoc; // A macro, which acts like an unused import.
 use std::fs;
 use std::path::PathBuf;
 
 use skg::file_io::{
   read_node, write_node, fetch_aliases_from_file};
+use skg::render::aliases_to_org;
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 
 #[test]
@@ -168,3 +171,23 @@ fn test_fetch_aliases_from_file() -> std::io::Result<()> {
 
   Ok (())
 }
+
+#[test]
+fn test_aliases_to_org() -> std::io::Result<()> {
+  assert_eq! ( // a node without aliases
+    aliases_to_org ( vec![], 3 ),
+    "**** <skg<type:aliases>>\n",
+    "Should return just header for node without aliases" );
+
+  assert_eq! ( // a node with aliases
+    aliases_to_org (
+      vec![ "first alias".to_string(),
+             "second alias".to_string() ], 1 ),
+    indoc! { r#"
+      ** <skg<type:aliases>>
+      *** first alias
+      *** second alias
+      "# }, // trailing newline matters
+    "Should return header + alias lines for node with aliases" );
+
+  Ok (( )) }

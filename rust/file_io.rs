@@ -101,6 +101,7 @@ pub fn fetch_aliases_from_file (
       Err ( _ )   => Vec::new(),
     }}
 
+
 pub fn write_node
   <P : AsRef<Path>>
   ( node      : &SkgNode,

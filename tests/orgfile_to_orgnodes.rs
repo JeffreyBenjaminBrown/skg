@@ -3,7 +3,7 @@ use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::types::{OrgNodeInterp, NodeWithEphem};
 
 #[allow(unused_imports)]
-use indoc::indoc; // For a macro. The unused import checker ignores macro usage; hence the preceding `allow` directive.
+use indoc::indoc; // A macro, which acts like an unused import.
 use std::collections::{HashMap, HashSet};
 
 #[cfg(test)]
