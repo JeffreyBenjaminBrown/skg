@@ -1,12 +1,49 @@
-pub fun clobber_none_fields_with_data_from_disk (
-  config    : SkgConfig,
-  from_user : SkgNode, // instructions from the user
-) -> Result<SkgNode, Whatever> {
-  id : ID = _; // get the pid from 'from_user'
-  from_disk : Optional<SkgNode> = _; // try to read a file named "<pid>.skg" from the folder as indicated by 'config'
+/*
+PURPOSE:
+When a SkgNode is created from user input,
+it might not have all information relevant to the node.
+This supplements the information from the user (from Emacs)
+with information from disk.
+.
+For instance, the node might have some aliases stored on disk,
+but the information the user sent about that node from Emacs
+does not mention the aliases at all.
+In that case the 'aliases' field should be whatever is on disk,
+rather than the None value that the user's input would suggest.
+*/
 
-  // If no such file was found, return 'from_user' unchanged.
+use std::io;
+use std::path::Path;
 
-  // If 'from_disk' was found:
-    // If 'aliases' in 'from_user' is None, replace it with 'aliases' from 'from_disk'. Otherwise keep it unchanged.
-}
+use crate::types::{ ID, SkgConfig, SkgNode };
+use crate::file_io::{ path_from_pid, read_node };
+
+pub fn clobber_none_fields_with_data_from_disk (
+  config    : &SkgConfig,
+  from_user : SkgNode,
+) -> io::Result<SkgNode> {
+
+  let pid : ID =
+    from_user . ids . first ()
+    . ok_or_else (
+      || io::Error::new (
+        io::ErrorKind::InvalidInput,
+        "SkgNode has no IDs" ))?
+    . clone ();
+  let from_disk : Result<SkgNode, io::Error> =
+    read_node (
+      & Path::new (
+        & path_from_pid (
+          config, pid )) );
+  match from_disk {
+    Err (_) => { // No such file => return input unchanged.
+      Ok ( from_user ) },
+    Ok ( disk_node ) => {
+      let mut result : SkgNode =
+        from_user;
+      if result.aliases.is_none () {
+        // TODO: Include subscription and override relationships.
+        result.aliases = disk_node.aliases;
+      }
+      Ok (result)
+    }} }

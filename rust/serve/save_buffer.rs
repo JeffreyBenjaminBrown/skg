@@ -1,6 +1,7 @@
 use crate::file_io::write_all_nodes;
 use crate::render::single_root_view;
 use crate::save::assign_ids::assign_ids_recursive;
+use crate::save::none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 use crate::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use crate::save::orgnode_to_node::orgNodeInterpretation_to_nodes;
 use crate::serve::util::send_response;
@@ -123,11 +124,12 @@ fn update_from_and_rerender_buffer (
       (HashSet<SkgNode>, Option<ID>, HashSet<ID>) =
       orgNodeInterpretation_to_nodes (orgnode);
     all_nodes.extend (nodes); }
-  block_on(update_fs_and_dbs(
-    all_nodes.into_iter().collect::<Vec<SkgNode>>(),
-    config.clone(),
-    tantivy_index,
-    typedb_driver )) ?;
+  block_on (
+    update_fs_and_dbs (
+      all_nodes.into_iter().collect::<Vec<SkgNode>>(),
+      config.clone(),
+      tantivy_index,
+      typedb_driver )) ?;
   let regenerated_document : String =
     block_on (
       single_root_view(
@@ -152,6 +154,14 @@ pub async fn update_fs_and_dbs (
 
   let db_name : &str = &config.db_name;
   println!( "1) Updating TypeDB database '{}' ...", db_name );
+
+  let nodes: Vec<SkgNode> =
+    nodes . into_iter ()
+    . map ( |node|
+      clobber_none_fields_with_data_from_disk (
+        & config, node ))
+    . collect :: <Result <_, _>> () ?;
+
   update_nodes_and_relationships (
     db_name,
     driver,
