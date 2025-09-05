@@ -1,0 +1,6 @@
+ids:
+- test_node
+title: Title from disk
+aliases:
+- alias 1 on disk
+- alias 2 on disk
