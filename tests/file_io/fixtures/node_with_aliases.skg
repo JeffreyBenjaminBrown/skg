@@ -1,0 +1,6 @@
+ids:
+- node_with_aliases
+title: Node with aliases
+aliases:
+- first alias
+- second alias

@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use skg::file_io::{
-  read_node, write_node};
-use skg::types::{SkgNode, ID, skgnode_example};
+  read_node, write_node, fetch_aliases_from_file};
+use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 
 #[test]
 fn test_node_io() {
@@ -110,3 +110,61 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
       node.hides_from_its_subscriptions        .clone(),
     overrides_view_of : node.overrides_view_of .clone(),
   } }
+
+#[test]
+fn test_hyperlinks_extracted_during_read() -> std::io::Result<()> {
+  use std::fs::File;
+  use std::io::Write;
+  use tempfile::tempdir;
+
+  // Create a temporary directory
+  let dir = tempdir()?;
+  let file_path = dir.path().join("test_node.skg");
+
+  let mut test_node : SkgNode = empty_skgnode ();
+  { test_node.title = "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
+      .to_string();
+    test_node.aliases = Some(vec![ "alias 1" . to_string(),
+                                    "alias 2" . to_string() ]);
+    test_node.ids = vec![ID::new("test123")];
+    test_node.body = Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()); }
+
+  { // Write the node to a file
+    let yaml = serde_yaml::to_string(&test_node)
+      .map_err (
+        |e| std::io::Error::new(
+          std::io::ErrorKind::InvalidData,
+          e.to_string()))?;
+    let mut file = File::create( &file_path )?;
+    file.write_all(yaml.as_bytes())?; }
+  let read_node = // Read it back from the file.
+    read_node(&file_path)?;
+  assert_eq!( test_node, read_node,
+              "Nodes should have matched." );
+  Ok (( ))
+}
+
+#[test]
+fn test_fetch_aliases_from_file() -> std::io::Result<()> {
+  let config = SkgConfig {
+    db_name        : "test_db".to_string (),
+    skg_folder     : PathBuf::from ("tests/file_io/fixtures"),
+    tantivy_folder : PathBuf::from ("/tmp/tantivy"),
+  };
+
+  let aliases_result : Vec<String> =
+    fetch_aliases_from_file (
+      &config, ID::new ("node_with_aliases") );
+  assert_eq! ( aliases_result,
+               vec![ "first alias".to_string (),
+                     "second alias".to_string () ],
+               "Should return aliases when present" );
+
+  let no_aliases_result =
+    fetch_aliases_from_file (
+      &config, ID::new ("node_without_aliases") );
+  assert_eq! ( no_aliases_result, Vec::<String>::new(),
+               "Should return empty Vec when no aliases" );
+
+  Ok (())
+}

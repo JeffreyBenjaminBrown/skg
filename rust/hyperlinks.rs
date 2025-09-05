@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use crate::types::{Hyperlink, SkgNode, ID, empty_skgnode};
+use crate::types::{Hyperlink, SkgNode};
 
 pub fn hyperlinks_from_node (
   node : &SkgNode )
@@ -55,7 +55,7 @@ pub fn replace_each_link_with_its_label (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::{HyperlinkParseError, ID};
+  use crate::types::{HyperlinkParseError, ID, empty_skgnode};
 
   #[test]
   fn test_hyperlink_to_string() {
