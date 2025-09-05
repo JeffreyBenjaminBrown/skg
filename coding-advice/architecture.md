@@ -1,4 +1,4 @@
-See also the [API](../api.md), the [schema](../schema.tql), and the [glossary](../glossary.md).
+See also the [API](../api-and-formats.md), the [schema](../schema.tql), and the [glossary](../glossary.md).
 
 Note that the above documents, this document, and any other documentation might be obsolete. The definitive source of truth is the code, not the docs.
 
