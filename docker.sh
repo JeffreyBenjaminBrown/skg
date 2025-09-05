@@ -16,6 +16,7 @@ docker run --name $CONTAINER_NAME -it -d \
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
 
 
+
 ## duplicated on purpose, for ease of copying
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
 

@@ -3,6 +3,8 @@
 (require 'cl-lib)
 
 (require 'heralds-minor-mode)
+(require 'skg-metadata)
+(require 'skg-request-node-aliases)
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-title-matches)

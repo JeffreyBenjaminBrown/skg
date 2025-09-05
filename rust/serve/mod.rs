@@ -1,9 +1,11 @@
+pub mod node_aliases;
 pub mod save_buffer;
 pub mod single_root_view;
 pub mod title_matches;
 pub mod util;
 
 use crate::file_io::read_skg_files;
+use crate::serve::node_aliases::handle_node_aliases_request;
 use crate::serve::save_buffer::handle_save_buffer_request;
 use crate::serve::single_root_view::handle_single_root_view_request;
 use crate::serve::title_matches::handle_title_matches_request;
@@ -123,6 +125,11 @@ fn handle_emacs (
               &mut stream,
               &request,
               &tantivy_index);
+          } else if request_type == "node aliases" {
+            handle_node_aliases_request(
+              &mut stream,
+              &request,
+              config);
           } else {
             let error_msg : String =
               format! ( "Unsupported request type: {}",
