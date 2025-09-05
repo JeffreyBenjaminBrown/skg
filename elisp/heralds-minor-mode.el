@@ -69,28 +69,30 @@ Whitespace in METADATA is ignored."
   (let* ( (s ;; discard whitespace
            (replace-regexp-in-string "[ \t\n]+" "" metadata))
           (parts (split-string s "," t))
-          (out '())) ;; accumulates the output
+          (out '() )) ;; accumulates the output
     (dolist (part parts)
       (if (string-match ":" part)
+          ;; If so, it's a key-value pair.
           (let* ((kv (split-string part ":" t))
                  (k (car kv))
                  (v (cadr kv)))
             (cond
-             ((string-equal k "id")
-              (push (propertize "⅄" 'face
-                                'heralds-green-face)
-                    out))
-             ((string-equal k "blue")
-              (push (propertize (or v "") 'face
-                                'heralds-blue-face)
-                    out))
-             ((string-equal k "green")
-              (push (propertize (or v "") 'face
-                                'heralds-green-face)
-                    out)) ))
+             ( (and (string-equal k "type")
+                   (string-equal v "aliases"))
+               (push (propertize "aliases" 'face
+                                 'heralds-blue-face)
+                     out))
+             (( string-equal k "id")
+              ( push (propertize "⅄" 'face
+                                 'heralds-green-face)
+                out)) ))
+        ;; Otherwise it's just a value.
+        ;; Currently only the value 'repeated' is treated specially.
+        ;; When more are added this else-branch will need a 'cond',
+        ;; like the if-branch above.
         (when (string-equal part "repeated")
           (push (propertize "REP" 'face 'heralds-red-face)
-                out))))
+                out)) ))
     (when out
       (mapconcat #'identity (nreverse out) " ")) ))
 
@@ -155,6 +157,7 @@ Whitespace in METADATA is ignored."
 ;; Another example: <skg<green:Success,id:456,repeated,blue:Test>> end of line.
 ;; <skg<id:789>> A second batch of similarly-formatted data should render normally: <skg<id:yeah,repeated,aw yeah>>
 ;; Colors only: <skg<blue:Azure,green:Forest>>
+;; Type aliases test: <skg<id:test,type:aliases,other:ignored>> should show blue "aliases".
 ;; <skg<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
 
 (provide 'heralds-minor-mode)
