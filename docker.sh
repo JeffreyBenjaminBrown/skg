@@ -1,6 +1,9 @@
 exit # This is not a script, just snippets.
 
 CONTAINER_NAME=skg
+docker start $CONTAINER_NAME
+docker exec -it $CONTAINER_NAME bash
+
 NATIVE=/home/jeff/hodal/skg
 docker run --name $CONTAINER_NAME -it -d \
   -v $NATIVE:/home/ubuntu                \
@@ -12,8 +15,6 @@ docker run --name $CONTAINER_NAME -it -d \
 
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
 
-docker start $CONTAINER_NAME
-docker exec -it $CONTAINER_NAME bash
 
 ## duplicated on purpose, for ease of copying
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
