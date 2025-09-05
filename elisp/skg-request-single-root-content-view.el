@@ -2,11 +2,12 @@
 
 (require 'skg-length-prefix)
 
-(defun skg-request-single-root-content-view-from-node (node-id)
+(defun skg-request-single-root-content-view-from-node (node-id &optional tcp-proc)
   "Ask Rust for an single root content view view of NODE-ID.
-Installs a length-prefixed response handler."
+Installs a length-prefixed response handler.
+Optional TCP-PROC allows reusing an existing connection."
   (interactive "sNode ID: ")
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
+  (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
          (request-sexp
           (format "((request . \"single root content view\") (id . \"%s\"))\n"
                   node-id )) )
