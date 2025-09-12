@@ -3,6 +3,7 @@
 .claude*
 .config
 .emacs*
+.lesshst
 .npm
 /Cargo.lock
 /data/
