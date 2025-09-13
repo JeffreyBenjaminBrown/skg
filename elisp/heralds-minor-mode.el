@@ -29,9 +29,10 @@ The metadata is otherwise not displayed."
         (add-hook ;; In this case, re-render the entire file. (This might never happen, since a skg view corresponds to no file on disk.)
          'after-revert-hook
          #'heralds-apply-to-buffer nil t))
-    (remove-hook 'after-change-functions #'heralds-after-change t)
-    (remove-hook 'after-revert-hook #'heralds-apply-to-buffer t)
-    (heralds-clear-overlays)))
+    (progn
+      (remove-hook 'after-change-functions #'heralds-after-change t)
+      (remove-hook 'after-revert-hook #'heralds-apply-to-buffer t)
+      (heralds-clear-overlays))))
 
 (defvar-local heralds-overlays nil
   "List of overlays created by `heralds-minor-mode'.")
