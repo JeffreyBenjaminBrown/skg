@@ -79,7 +79,12 @@ Whitespace in METADATA is ignored."
                  (v (cadr kv)))
             (cond
              ( (and (string-equal k "type")
-                   (string-equal v "aliases"))
+                    (string-equal v "title-search"))
+               (push (propertize "title matches" 'face
+                                 'heralds-blue-face)
+                     out))
+             ( (and (string-equal k "type")
+                    (string-equal v "aliases"))
                (push (propertize "aliases" 'face
                                  'heralds-blue-face)
                      out))

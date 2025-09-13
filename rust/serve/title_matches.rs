@@ -3,9 +3,14 @@ use crate::serve::util::send_response;
 use crate::tantivy::search_index;
 use crate::types::TantivyIndex;
 
+use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
 use tantivy::{Document};
 
+type MatchGroups =
+  HashMap < String,              // ID
+            Vec < ( f32,         // score
+                    String ) >>; // title or alias
 
 /// Extracts search terms from request,
 /// finds matching titles,
@@ -23,45 +28,117 @@ pub fn handle_title_matches_request (
           &search_terms,
           tantivy_index ) ); },
     Err ( err ) => {
-      let error_msg = format! (
-        "Error extracting search terms: {}", err );
+      let error_msg : String =
+        format! (
+          "Error extracting search terms: {}", err );
       println! ( "{}", error_msg ) ;
       send_response (
         stream, &error_msg ); } } }
 
 /// Runs `search_index`.
-/// If matches are found, returns a String
-/// with a match score and a title on each line.
-fn generate_title_matches_response (
+/// Returns an org-mode formatted string with grouped results by ID.
+/// The resulting buffer looks something like this:
+///   * <skg<type:title-search>> second
+///   ** score: 1.29, [[id:5a][imperfect test second]]
+///   *** score: 1.17, [[id:5a][perfect match test second]]
+///   ** score: 0.98, [[id:2a][This is a second test file.]]
+///   ** score: 0.98, [[id:7f2d15e3-2d6e-4670-9700-fb6baabd6062][I am adding a second child.]]
+/// That is, the root says what was searched for,
+/// each level-2 headline is a distinct matching node,
+/// and each level-3 headline is a distinct matching alias
+/// for its parent, if any exist.
+pub fn generate_title_matches_response (
   search_terms  : &str,
   tantivy_index : &TantivyIndex)
   -> String {
 
-  match search_index (
-    tantivy_index,
-    search_terms ) {
+  match search_index ( tantivy_index,
+                       search_terms ) {
     Ok (( best_matches, searcher )) => {
       if best_matches.is_empty () {
         "No matches found.".to_string ()
       } else {
-        let mut titles = Vec::new();
-        for (score, doc_address) in best_matches {
-          match searcher.doc (doc_address) {
-            // searcher.doc fetches a Document.
-            // (Document is an alias of the TantivyDocument type.)
-            // Each Document here is just two fields,
-            // "title" and "path" (as of <2025-08-08 Fri>).
-            Ok (retrieved_doc) => {
-              let retrieved_doc : Document = retrieved_doc;
-              if let Some (title_value) = retrieved_doc
-                . get_first ( tantivy_index.title_or_alias_field )
-              { if let Some ( title_text ) =
-                title_value.as_text ()
-                { titles.push ( format! (
-                  "{:.2}: {}",
-                  score,
-                  title_text ) ); } } },
-            Err (e) => { eprintln! (
-              "Error retrieving document: {}", e ); } } }
-        titles.join("\n") } },
-    Err(e) => { format!("Error searching index: {}", e) } } }
+        format_matches_as_org_mode (
+          search_terms,
+          group_matches_by_id (
+            best_matches,
+            searcher,
+            tantivy_index )) }},
+    Err(e) => {
+      format!("Error searching index: {}", e) }} }
+
+fn group_matches_by_id (
+  best_matches  : Vec < (f32, tantivy::DocAddress) >,
+  searcher      : tantivy::Searcher,
+  tantivy_index : &TantivyIndex )
+  -> MatchGroups {
+
+  let mut result_acc : MatchGroups =
+    HashMap::new();
+  for (score, doc_address) in best_matches {
+    match searcher.doc (doc_address) {
+      Ok (retrieved_doc) => {
+        let retrieved_doc : Document = retrieved_doc;
+        let id_opt : Option < String > =
+          retrieved_doc
+            . get_first ( tantivy_index.id_field )
+            . and_then ( |v| v.as_text() )
+            . map ( |s| s.to_string() );
+        let title_opt : Option < String > =
+          retrieved_doc
+            . get_first ( tantivy_index.title_or_alias_field )
+            . and_then ( |v| v.as_text() )
+            . map ( |s| s.to_string() );
+        if let (Some(id), Some(title)) = (id_opt, title_opt) {
+          result_acc
+            . entry ( id )
+            . or_insert_with ( Vec::new )
+            . push (( score, title )); }},
+      Err (e) => { eprintln! (
+        "Error retrieving document: {}", e ); }} }
+  result_acc }
+
+/// Formats grouped matches as an org-mode document.
+/// Sorts IDs by best score, and matches within each ID by score.
+fn format_matches_as_org_mode (
+  search_terms  : &str,
+  matches_by_id : MatchGroups )
+  -> String {
+
+  let mut result : String =
+    String::new();
+  result.push_str ( &format! (
+    // The unique level-1 headline states the search terms.
+    "* <skg<type:title-search>> {}\n",
+    search_terms ) );
+  let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
+    : Vec < ( String,               // ID
+              Vec < ( f32,          // score
+                      String ) >) > // title or alias
+    = ( matches_by_id.into_iter()
+        . map(|(id, mut matches)| {
+          // Sort matches within each ID by score
+          // (descending, os the first is the best).
+          matches . sort_by( |a, b|
+                              b.0.partial_cmp (&a.0) . unwrap() );
+          (id, matches) } )
+        . collect() );
+  id_entries.sort_by ( |a, b| {
+    // Sort IDs by each one's best (and now first) match score.
+    let score_a : f32 =
+      a.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
+    let score_b : f32 =
+      b.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
+    score_b . partial_cmp (&score_a) . unwrap () } );
+  for (id, matches) in id_entries {
+    if let Some((score, title)) = matches.first() {
+      result.push_str ( &format! (
+        // First (best) match becomes level-2 headline
+        "** score: {:.2}, [[id:{}][{}]]\n",
+        score, id, title ) );
+      for (score, title) in matches . iter() . skip(1) {
+        // Rest, if any, become level-3 headlines
+        result.push_str ( &format! (
+          "*** score: {:.2}, [[id:{}][{}]]\n",
+          score, id, title )); }} }
+  result }
