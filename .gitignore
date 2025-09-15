@@ -1,10 +1,11 @@
 *~
-.bash_history
-.claude*
-.config
-.emacs*
-.lesshst
-.npm
+/.claude*
+/.config
+/.emacs*
+/.lesshst
+/.npm
+/.ssh/
+/.bash_history
 /Cargo.lock
 /data/
 /devel-handy/temp.org

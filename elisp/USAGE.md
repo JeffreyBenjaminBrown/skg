@@ -1,4 +1,4 @@
-# Using the Emacs client
+# Initializing
 
 First start the TYpeDB server
   (run `typedb server` from a shell)
@@ -8,18 +8,30 @@ and after that start the Rust server
 Finally within Emacs, evaluate `elisp/skg-init.el`
   (visit it, then run `M-x eval-buffer`).
 
+# Commands you can run
+
+(See a later section for what each command does.)
+
 Now these commands can be run by evaluating them from here:
 ```
   (skg-request-single-root-content-view-from-node "1")
     ;; try 1, 1a, or a
   (skg-request-title-matches "second")
-    ;; try match, title, second
+    ;; try match, title, or second
   (skg-doc-disconnect)
 ```
-and this can be run interactively from the skg content view buffer:
+
+From the skg content view buffer, this can be run:
 ```
-  (skg-request-save-buffer) ;; `M-x skg-save`
+skg-request-save-buffer
 ```
+
+From any link in a search results buffer, this can be run:
+```
+skg-visit-link
+```
+
+# What those commands do
 
 `(request-sexp-doc-from-node)` causes Emacs to ask Rust to ask TypeDB
 for a content-view document containing the node with the specified ID.
