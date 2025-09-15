@@ -26,7 +26,7 @@ fn test_a_mess_of_stuff
       DriverOptions::new(false, None)?
     ).await?;
     let config = SkgConfig {
-      db_name        : "skg-test" . into(),
+      db_name        : "skg-test-content-view" . into(),
       skg_folder     : "tests/content_view/fixtures".into(),
       tantivy_folder : "irrelevant".into(), };
     let skg_folder : &str =

@@ -1,13 +1,16 @@
 // cargo test --test typedb -- --nocapture
 
+mod typedb {
+  pub mod search;
+}
+
 use skg::render::single_root_view;
 use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
-use skg::typedb::search::extract_payload_from_typedb_string_rep;
-use skg::typedb::search::find_container_of;
-use skg::typedb::search::pid_from_id;
+use skg::typedb::search::util::extract_payload_from_typedb_string_rep;
+use skg::typedb::search::util::pid_from_id;
 use skg::types::{ID, SkgNode, OrgNodeInterp, NodeWithEphem, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
@@ -33,7 +36,7 @@ fn test_typedb_integration (
       DriverOptions::new(false, None)?
     ).await?;
     let config = SkgConfig {
-      db_name        : "skg-test"              . into(),
+      db_name        : "skg-test-typedb"       . into(),
       skg_folder     : "tests/typedb/fixtures" . into(),
       tantivy_folder : "irrelevant"            . into() };
     let index_folder : &str =
@@ -45,17 +48,6 @@ fn test_typedb_integration (
       & config . db_name,
       & driver
     ) . await ?;
-
-    let path_to_4 = pid_from_id ( & config . db_name,
-                                    & driver,
-                                    & ID("4".to_string() ),
-    ) . await ?;
-    let path_to_44 = pid_from_id ( & config . db_name,
-                                     & driver,
-                                     & ID("44".to_string() )
-    ) . await ?;
-    assert_eq!(path_to_4,  ID("4" . to_string () ));
-    assert_eq!(path_to_44, ID("4" . to_string () ));
 
     let has_extra_id_pairs = collect_all_of_some_binary_rel(
       & config . db_name,
@@ -175,13 +167,6 @@ fn test_typedb_integration (
     expected_replacements.insert((
       "5".to_string(), "4".to_string()));
     assert_eq!(replacement_pairs, expected_replacements);
-
-    let container_node = find_container_of(
-      & config . db_name,
-      & driver,
-      & ID("2".to_string() )
-    ).await?;
-    assert_eq!(container_node, ID("1".to_string() ) );
 
     test_recursive_document (
       & driver, & config
