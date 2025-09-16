@@ -11,8 +11,8 @@ use typedb_driver::{
 use skg::render::single_root_view;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::{
-  find_rootish_container,
-  path_to_rootish_container, };
+  climb_containerward_to_context,
+  containerward_path_robust, };
 use skg::types::{ID, SkgConfig};
 
 #[test]
@@ -63,12 +63,12 @@ fn test_a_mess_of_stuff
         println!("{}", view); } }
 
     // Test the path from node "4" to the root container
-    match path_to_rootish_container (
+    match containerward_path_robust (
       & config . db_name,
       & driver,
       & ID("4".to_string() )
     ).await {
-      Ok(path) => { assert_eq!(
+      Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
         path,
         vec![
           ID ( "4".to_string() ),
@@ -78,7 +78,7 @@ fn test_a_mess_of_stuff
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }
 
-    match find_rootish_container (
+    match climb_containerward_to_context (
       & config . db_name,
       & driver,
       & ID("4".to_string() )
@@ -92,12 +92,12 @@ fn test_a_mess_of_stuff
 
     // Test the path "to root" from node "cycle-3".
     // (1 contains 2 contains 3 contains 1.)
-    match path_to_rootish_container (
+    match containerward_path_robust (
       & config . db_name,
       & driver,
       & ID("cycle-3".to_string() )
     ).await {
-      Ok(path) => { assert_eq!(
+      Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
         path,
         vec![
           ID ( "cycle-3".to_string() ),
@@ -109,12 +109,12 @@ fn test_a_mess_of_stuff
 
     // Test the path "to root" from node "cycle-1".
     // (1 contains 2 contains 3 contains 1.)
-    match path_to_rootish_container (
+    match containerward_path_robust (
       & config . db_name,
       & driver,
       & ID("cycle-1".to_string() )
     ).await {
-      Ok(path) => { assert_eq!(
+      Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
         path,
         vec![
           ID ( "cycle-1".to_string() ),

@@ -12,6 +12,34 @@ use crate::types::ID;
 use super::util::extract_payload_from_typedb_string_rep;
 
 
+/* Searches containerward recursively until reaching the first node
+which is either uncontained or multiply contained. Returns that node's ID.
+So for instance, if the input is uncontained, it just returns the input.
+.
+PITFALL: This just takes the last element of the path
+returned by `containerward_path_robust`,
+throwing away the rest of the information.
+*/
+pub async fn climb_containerward_to_context (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < ID, Box<dyn Error> > {
+  let ( path, _cycle_node, _multi_containers )
+    : ( Vec<ID>, Option<ID>, HashSet<ID> )
+    = containerward_path_robust (
+      db_name, driver, node ). await ?;
+  path . last () . ok_or_else ( || {
+      // This should never happen,
+      // since the path always includes at least the input node.
+      std::io::Error::new (
+        std::io::ErrorKind::InvalidData,
+        format!(
+          "Empty path from containerward_path_robust for node '{}'",
+          node )) . into ()
+    } ) . cloned ()
+}
+
 /* Returns (path, cycle_node, multi_containers).
 The path begins with the input node.
 Searching containerward, each time we find a single container,
