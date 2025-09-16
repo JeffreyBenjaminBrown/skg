@@ -1,5 +1,7 @@
-I format code unusually. If you are a human I won't force you to adhere to these conventions, but if you are an AI, it won't cost you much time, so please do.
+I format code unusually. If you are a human I won't force you to adhere to these conventions, but if you are an AI, please do.
 
+* across functions
+  If they are in the same module, put callers before callees.
 * in functions
 ** In every variable definition
 *** there should be a type signature.
