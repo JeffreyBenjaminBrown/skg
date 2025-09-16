@@ -117,72 +117,80 @@ async fn test_containerward_path_robust (
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
 
-  // The containerward path from 11, and from 11_extra_id,
-  // is just [1], with no option and no set.
+  // The containerward paths from 11 and from 11_extra_id
+  // (which are two distinct IDs for the same node)
+  // are [11, 1] and [11-extra-id, 1] respectively,
+  // with no option and no set.
   let result_11 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("11".to_string() )) . await ?;
-  assert_eq! ( result_11.0, vec![ID("1".to_string())] );
+  assert_eq! ( result_11.0, vec![ID("11".to_string()),
+                                 ID("1".to_string())] );
   assert_eq! ( result_11.1, None );
   assert_eq! ( result_11.2, HashSet::new() );
-
   let result_11_extra : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("11-extra-id".to_string() )) . await ?;
-  assert_eq! ( result_11_extra.0, vec![ID("1".to_string())] );
+  assert_eq! ( result_11_extra.0, vec![ID("11-extra-id".to_string()),
+                                       ID("1".to_string())] );
   assert_eq! ( result_11_extra.1, None );
   assert_eq! ( result_11_extra.2, HashSet::new() );
 
-  // The containerward path from 111 is [11, 1]. No option, no set.
+  // The containerward path from 111 is [111, 11, 1].
+  // No option, no set.
   let result_111 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("111".to_string() )) . await ?;
-  assert_eq! ( result_111.0, vec![ID("11".to_string()),
+  assert_eq! ( result_111.0, vec![ID("111".to_string()),
+                                  ID("11".to_string()),
                                   ID("1".to_string())] );
   assert_eq! ( result_111.1, None );
   assert_eq! ( result_111.2, HashSet::new() );
 
-  // The result from 211 is Vec([21, 2]), Some(211), {}.
+  // The result from 211 is Vec([211, 21, 2]), Some(211), {}.
   // That is, it comes back to 211.
   let result_211 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("211".to_string() )) . await ?;
-  assert_eq! ( result_211.0, vec![ID("21".to_string()),
+  assert_eq! ( result_211.0, vec![ID("211".to_string()),
+                                  ID("21".to_string()),
                                   ID("2".to_string())] );
   assert_eq! ( result_211.1, Some(ID("211".to_string())) );
   assert_eq! ( result_211.2, HashSet::new() );
 
-  // The result from 21 is Vec([2, 211]), Some(21), {}.
+  // The result from 21 is Vec([21, 2, 211]), Some(21), {}.
   // That is, it comes back to 21.
   let result_21 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("21".to_string() )) . await ?;
-  assert_eq! ( result_21.0, vec![ID("2".to_string()),
+  assert_eq! ( result_21.0, vec![ID("21".to_string()),
+                                 ID("2".to_string()),
                                  ID("211".to_string())] );
   assert_eq! ( result_21.1, Some(ID("21".to_string())) );
   assert_eq! ( result_21.2, HashSet::new() );
 
-  // The result from shared is [], None, {1,2}.
+  // The result from shared is [shared], None, {1,2}.
   let result_shared : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("shared".to_string() )) . await ?;
-  assert_eq! ( result_shared.0, vec![] );
+  assert_eq! ( result_shared.0, vec![ID("shared".to_string())] );
   assert_eq! ( result_shared.1, None );
   assert_eq! ( result_shared.2, HashSet::from([ID("1".to_string()),
                                                ID("2".to_string())]) );
 
-  // The result from shared-1 is [shared], None, {1,2}.
+  // The result from shared_1 is [shared_1, shared], None, {1,2}.
   let result_shared_1 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     containerward_path_robust (
       & config . db_name, & driver,
       & ID("shared_1".to_string() )) . await ?;
-  assert_eq! ( result_shared_1.0, vec![ID("shared".to_string())] );
+  assert_eq! ( result_shared_1.0, vec![ID("shared_1".to_string()),
+                                       ID("shared".to_string())] );
   assert_eq! ( result_shared_1.1, None );
   assert_eq! ( result_shared_1.2,
                HashSet::from([ID("1".to_string()),
