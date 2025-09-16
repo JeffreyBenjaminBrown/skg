@@ -1,6 +1,6 @@
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::robust::find_containers_of;
-use skg::typedb::search::robust::containerward_path_robust;
+use skg::typedb::search::robust::containerward_path;
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
@@ -19,7 +19,7 @@ fn the_tests (
       setup_test_database () . await ?;
     test_find_containers_of (
       &config, &driver ) . await ?;
-    test_containerward_path_robust (
+    test_containerward_path (
       &config, &driver ) . await ?;
     Ok (( )) } ) }
 
@@ -112,7 +112,7 @@ async fn test_find_containers_of (
 
   Ok (( )) }
 
-async fn test_containerward_path_robust (
+async fn test_containerward_path (
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
@@ -122,7 +122,7 @@ async fn test_containerward_path_robust (
   // are [11, 1] and [11-extra-id, 1] respectively,
   // with no option and no set.
   let result_11 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("11".to_string() )) . await ?;
   assert_eq! ( result_11.0, vec![ID("11".to_string()),
@@ -130,7 +130,7 @@ async fn test_containerward_path_robust (
   assert_eq! ( result_11.1, None );
   assert_eq! ( result_11.2, HashSet::new() );
   let result_11_extra : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("11-extra-id".to_string() )) . await ?;
   assert_eq! ( result_11_extra.0, vec![ID("11-extra-id".to_string()),
@@ -141,7 +141,7 @@ async fn test_containerward_path_robust (
   // The containerward path from 111 is [111, 11, 1].
   // No option, no set.
   let result_111 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("111".to_string() )) . await ?;
   assert_eq! ( result_111.0, vec![ID("111".to_string()),
@@ -153,7 +153,7 @@ async fn test_containerward_path_robust (
   // The result from 211 is Vec([211, 21, 2]), Some(211), {}.
   // That is, it comes back to 211.
   let result_211 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("211".to_string() )) . await ?;
   assert_eq! ( result_211.0, vec![ID("211".to_string()),
@@ -165,7 +165,7 @@ async fn test_containerward_path_robust (
   // The result from 21 is Vec([21, 2, 211]), Some(21), {}.
   // That is, it comes back to 21.
   let result_21 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("21".to_string() )) . await ?;
   assert_eq! ( result_21.0, vec![ID("21".to_string()),
@@ -176,7 +176,7 @@ async fn test_containerward_path_robust (
 
   // The result from shared is [shared], None, {1,2}.
   let result_shared : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("shared".to_string() )) . await ?;
   assert_eq! ( result_shared.0, vec![ID("shared".to_string())] );
@@ -186,7 +186,7 @@ async fn test_containerward_path_robust (
 
   // The result from shared_1 is [shared_1, shared], None, {1,2}.
   let result_shared_1 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    containerward_path_robust (
+    containerward_path (
       & config . db_name, & driver,
       & ID("shared_1".to_string() )) . await ?;
   assert_eq! ( result_shared_1.0, vec![ID("shared_1".to_string()),

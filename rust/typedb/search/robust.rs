@@ -17,17 +17,17 @@ which is either uncontained or multiply contained. Returns that node's ID.
 So for instance, if the input is uncontained, it just returns the input.
 .
 PITFALL: This just takes the last element of the path
-returned by `containerward_path_robust`,
+returned by `containerward_path`,
 throwing away the rest of the information.
 */
-pub async fn climb_containerward_to_context (
+pub async fn climb_containerward_and_fetch_rootish_context (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
 ) -> Result < ID, Box<dyn Error> > {
   let ( path, _cycle_node, _multi_containers )
     : ( Vec<ID>, Option<ID>, HashSet<ID> )
-    = containerward_path_robust (
+    = containerward_path (
       db_name, driver, node ). await ?;
   path . last () . ok_or_else ( || {
       // This should never happen,
@@ -35,7 +35,7 @@ pub async fn climb_containerward_to_context (
       std::io::Error::new (
         std::io::ErrorKind::InvalidData,
         format!(
-          "Empty path from containerward_path_robust for node '{}'",
+          "Empty path from containerward_path for node '{}'",
           node )) . into ()
     } ) . cloned ()
 }
@@ -54,7 +54,7 @@ The process can end in three ways:
 .
 Note that 2 and 3 can coincide.
 Then and only then are all three outputs non-null. */
-pub async fn containerward_path_robust (
+pub async fn containerward_path (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID

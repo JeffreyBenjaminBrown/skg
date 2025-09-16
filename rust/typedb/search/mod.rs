@@ -7,7 +7,7 @@ pub use util::{
   extract_payload_from_typedb_string_rep,
 };
 pub use robust::{
-  climb_containerward_to_context,
-  containerward_path_robust,
+  climb_containerward_and_fetch_rootish_context,
+  containerward_path,
   find_containers_of,
 };

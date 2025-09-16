@@ -11,8 +11,8 @@ use typedb_driver::{
 use skg::render::single_root_view;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::{
-  climb_containerward_to_context,
-  containerward_path_robust, };
+  climb_containerward_and_fetch_rootish_context,
+  containerward_path, };
 use skg::types::{ID, SkgConfig};
 
 #[test]
@@ -63,7 +63,7 @@ fn test_a_mess_of_stuff
         println!("{}", view); } }
 
     // Test the path from node "4" to the root container
-    match containerward_path_robust (
+    match containerward_path (
       & config . db_name,
       & driver,
       & ID("4".to_string() )
@@ -78,7 +78,7 @@ fn test_a_mess_of_stuff
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }
 
-    match climb_containerward_to_context (
+    match climb_containerward_and_fetch_rootish_context (
       & config . db_name,
       & driver,
       & ID("4".to_string() )
@@ -92,7 +92,7 @@ fn test_a_mess_of_stuff
 
     // Test the path "to root" from node "cycle-3".
     // (1 contains 2 contains 3 contains 1.)
-    match containerward_path_robust (
+    match containerward_path (
       & config . db_name,
       & driver,
       & ID("cycle-3".to_string() )
@@ -109,7 +109,7 @@ fn test_a_mess_of_stuff
 
     // Test the path "to root" from node "cycle-1".
     // (1 contains 2 contains 3 contains 1.)
-    match containerward_path_robust (
+    match containerward_path (
       & config . db_name,
       & driver,
       & ID("cycle-1".to_string() )

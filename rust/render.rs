@@ -1,6 +1,6 @@
 use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
-  climb_containerward_to_context,
+  climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
 use crate::types::{SkgNode, ID, SkgConfig};
 
@@ -12,7 +12,7 @@ use std::fmt::Write as _; // for the write! macro
 
 
 /// Given the id `focus`,
-/// identifies its context (`climb_containerward_to_context()`),
+/// identifies its context (`climb_containerward_and_fetch_rootish_context()`),
 /// and builds a view from that root,
 /// by recursively following the `content` relationship.
 pub async fn single_root_view (
@@ -21,7 +21,7 @@ pub async fn single_root_view (
   focus   : &ID,
 ) -> Result < String, Box<dyn Error> > {
 
-  let root_id : ID = climb_containerward_to_context (
+  let root_id : ID = climb_containerward_and_fetch_rootish_context (
     & config . db_name,
     driver , focus
   ) . await ?;
