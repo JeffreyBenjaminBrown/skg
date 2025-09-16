@@ -47,3 +47,57 @@ pub async fn find_containers_of (
         extract_payload_from_typedb_string_rep (
           &concept . to_string () )) ); }}
   Ok (containers) }
+
+/* Returns (path, cycle_node, multi_containers).
+Searching containerward, each time we find a single container, we add it to the path.
+It can end in three ways:
+1 - If at any point no container is found, we return the path and exit. The option and the set are both null.
+2 - If at any point multiple containers are found, they are added to the set, nothing is added to the path, and the function returns.
+3 - If at any point a container is equal to one already in the path, that ID becomes the option, and the function returns.
+.
+Note that 2 and 3 can coincide. Then and only then are all three outputs non-null. */
+pub async fn containerward_path_robust (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < ( Vec<ID>, // The path. Starts near and ends (usually) far from input.
+                Option<ID>, // If the path cycles, this is the first repeated node.
+                HashSet<ID> // If the path "blooms", this is the set it blooms into.
+), Box<dyn Error> > {
+
+  let mut path : Vec<ID> = Vec::new ();
+  let mut path_set : HashSet<ID> =
+    // path and path_set have the same nodes,
+    // except path_set also has the root.
+    HashSet::from ( [ node.clone() ] );
+  let mut current_node : ID = node.clone ();
+  loop {
+    let containers : HashSet<ID> =
+      find_containers_of (
+        db_name, driver, &current_node ). await ?;
+    if containers.is_empty () {
+      // No container found, so this is the root.
+      return Ok (( path, None, HashSet::new () ));
+    } else {
+      let cycle_node : Option<ID> =
+        // Check if a container is already in the path.
+        containers.iter ()
+          .find ( |&c| path_set.contains ( c ) )
+          .cloned ();
+      if ( containers.len () == 1
+           && cycle_node.is_none () ) {
+        // Add container to path and continue.
+        let container : ID =
+          containers . into_iter() . next() . unwrap();
+        path.push ( container.clone () );
+        path_set.insert ( container.clone () );
+        current_node = container;
+      } else {
+        // Either multiple containers or cycle (or both).
+        return Ok ((
+          path,
+          cycle_node,
+          ( if containers.len () == 1 {
+            HashSet::new () }
+            else {containers} ) ));
+        }} }}
