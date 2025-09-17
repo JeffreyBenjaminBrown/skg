@@ -13,7 +13,6 @@ pub fn assign_ids_recursive (
                       . iter ()
                       . map (assign_ids_recursive)
                       . collect () }
-
   match orgnode {
     OrgNodeInterp::Content (content_node) => {
       let mut new_content =
@@ -24,8 +23,8 @@ pub fn assign_ids_recursive (
             Uuid::new_v4() . to_string() )) );
       new_content.branches =
         recurse_in_branches ( &content_node.branches );
-      OrgNodeInterp::Content (new_content)
-    },
+      OrgNodeInterp::Content (new_content) },
     OrgNodeInterp::Aliases (alias_list) => {
-      OrgNodeInterp::Aliases (alias_list.clone())
-    }} }
+      OrgNodeInterp::Aliases (alias_list.clone() ) },
+    OrgNodeInterp::Ignored => {
+      OrgNodeInterp::Ignored }} }

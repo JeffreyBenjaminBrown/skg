@@ -1,7 +1,7 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::TantivyIndex;
+use crate::types::{TantivyIndex, MetadataItem, OrgNodeType};
 
 use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
@@ -38,7 +38,7 @@ pub fn handle_title_matches_request (
 /// Runs `search_index`.
 /// Returns an org-mode formatted string with grouped results by ID.
 /// The resulting buffer looks something like this:
-///   * <skg<type:title-search>> second
+///   * <skg<type:searchResult>> second
 ///   ** score: 1.29, [[id:5a][imperfect test second]]
 ///   *** score: 1.17, [[id:5a][perfect match test second]]
 ///   ** score: 0.98, [[id:2a][This is a second test file.]]
@@ -107,10 +107,12 @@ fn format_matches_as_org_mode (
 
   let mut result : String =
     String::new();
+  let title_search_metadata =
+    MetadataItem::Type(OrgNodeType::SearchResult);
   result.push_str ( &format! (
     // The unique level-1 headline states the search terms.
-    "* <skg<type:title-search>> {}\n",
-    search_terms ) );
+    "* <skg<{}>> {}\n",
+    title_search_metadata, search_terms ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score

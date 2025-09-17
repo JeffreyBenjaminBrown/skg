@@ -10,7 +10,9 @@ pub use misc::{ ID,
 
 pub use orgnode::{ OrgNode,
                    OrgNodeInterp,
-                   OrgNodeInterpEnum, };
+                   OrgNodeType,
+                   MetadataItem,
+                   parse_metadata_from_string, };
 
 pub use skgnode::{ SkgNode,
                    NodeWithEphem,

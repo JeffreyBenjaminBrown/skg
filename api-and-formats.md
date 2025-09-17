@@ -58,3 +58,16 @@ It is a specialization of YAML -- that is, every .skg file is valid YAML, althou
 - overrides_view_of: A list of UUIDs. Can be omitted if empty.
 
 Each node's filename is just its primary ID followed by ".skg".
+
+# The metadata headers
+
+Most org headlines in the client will have a 'metadata header',
+consisting of some bare values and some key-value pairs
+separated by commas. Each kv pair is separated by a colon.
+The whole collection is wrapped in <skg<...>>.
+This metadata appears right after the org bullet and a whitespace,
+and right before another whitespace and the node's title.
+
+The possible metadata is specified in `rust/types/orgnode.rs`.
+Metadata is not WYSIWYG; its appearance in the client
+is determined by `elisp/heralds-minor-mode`.

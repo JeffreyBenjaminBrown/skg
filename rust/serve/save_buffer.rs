@@ -114,7 +114,9 @@ fn update_from_and_rerender_buffer (
           // earlier 'assign_ids_recursive' => should be 'ok'
           "Root node has no ID")? },
       OrgNodeInterp::Aliases(_) => {
-        return Err("Root node cannot be an Aliases node".into());
+        return Err("Root node cannot be an Aliases node".into()); },
+      OrgNodeInterp::Ignored => {
+        return Err("Root node cannot be an Ignored node".into());
       }};
 
   let mut all_nodes : HashSet<SkgNode> =

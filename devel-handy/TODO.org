@@ -1,4 +1,6 @@
 * [[id:7b2499c4-4c93-44dc-83b1-0a4b9175d6a8][containerward view]]
+* [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
+  particularly, rootness and multiple containment
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
 * move empty_skgnode from tests into skgnode.rs
   and then use it for lots of tests

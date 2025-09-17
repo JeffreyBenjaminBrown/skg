@@ -2,6 +2,7 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
+use crate::types::{MetadataItem, OrgNodeType};
 use crate::types::{SkgNode, ID, SkgConfig};
 
 use std::collections::HashSet;
@@ -112,9 +113,12 @@ pub fn aliases_to_org (
 ) -> String {
   let header_level : usize = level + 1;
   let alias_level  : usize = level + 2;
+  let aliases_metadata = MetadataItem::Type(
+    OrgNodeType::Aliases);
   let mut result : String =
-    format! ( "{} <skg<type:aliases>>\n",
-              "*".repeat ( header_level ));
+    format! ( "{} <skg<{}>>\n",
+              "*".repeat ( header_level ),
+              aliases_metadata );
   for alias in aliases {
     result.push_str (
       & format! ( "{} {}",

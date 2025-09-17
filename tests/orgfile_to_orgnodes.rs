@@ -14,9 +14,10 @@ mod tests {
   fn extract_content_node(org_node: &OrgNodeInterp) -> &NodeWithEphem {
     match org_node {
       OrgNodeInterp::Content(content_node) => content_node,
-      OrgNodeInterp::Aliases(_) => panic!("Expected NodeWithEphem, found AliasNode"),
-    }
-  }
+      OrgNodeInterp::Aliases(_) =>
+        panic!("Expected NodeWithEphem, found AliasNode"),
+      OrgNodeInterp::Ignored =>
+        panic!("Expected NodeWithEphem, found Ignored"), }}
 
   #[test]
   fn parses_sample() {

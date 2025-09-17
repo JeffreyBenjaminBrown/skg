@@ -13,9 +13,9 @@ The API is in flux -- see api.md -- but might look something like
 This minor mode changes how such things are displayed:
 .
 The id becomes a single '⅄' character. (It looks graphy to me.)
-Keyed values with the keys 'blue' or 'green' are displayed
-on a background of that color,
-and the unkeyed value 'repeated' displayes as a white 'REP'
+The 'type' key with values 'aliases' or 'searchResult' are displayed
+on a blue background, the 'id' key is displayed as '⅄' on a green background,
+and the unkeyed value 'repeated' displays as a white 'REP'
 on a red background. Those displayed symbols are called 'heralds'.
 Whitespace separates each herald from the next.
 The metadata is otherwise not displayed."
@@ -79,7 +79,7 @@ Whitespace in METADATA is ignored."
                  (v (cadr kv)))
             (cond
              ( (and (string-equal k "type")
-                    (string-equal v "title-search"))
+                    (string-equal v "searchResult"))
                (push (propertize "title matches" 'face
                                  'heralds-blue-face)
                      out))
@@ -159,10 +159,9 @@ Whitespace in METADATA is ignored."
 ;; TESTING, interactive:
 ;; `M-x heralds-minor-mode` should change how the text below looks.
 ;;
-;; Here is some example text <skg<id:123,blue:Hello,green:World,repeated,other:ignored>> and more text.
-;; Another example: <skg<green:Success,id:456,repeated,blue:Test>> end of line.
-;; <skg<id:789>> A second batch of similarly-formatted data should render normally: <skg<id:yeah,repeated,aw yeah>>
-;; Colors only: <skg<blue:Azure,green:Forest>>
+;; Here is some example text <skg<id:123,repeated,other:ignored>> and more text.
+;; Another example: <skg<id:456,repeated,type:searchResult>> end of line.
+;; <skg<id:789>> A second batch of similarly-formatted data should render normally: <skg<id:yeah,repeated>>
 ;; Type aliases test: <skg<id:test,type:aliases,other:ignored>> should show blue "aliases".
 ;; <skg<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
 

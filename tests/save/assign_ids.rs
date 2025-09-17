@@ -14,7 +14,7 @@ fn test_assign_ids_recursive() {
     repeated: false,
     branches: vec![], // leaf
   };
-  let c = OrgNodeInterp::content(c_content);
+  let c = OrgNodeInterp::Content(c_content);
 
   let b_content = NodeWithEphem {
     id: Some(ID::from("b")),
@@ -26,9 +26,9 @@ fn test_assign_ids_recursive() {
     repeated: false,
     branches: vec![c], // Vec<OrgNodeInterp>
   };
-  let b = OrgNodeInterp::content(b_content);
+  let b = OrgNodeInterp::Content(b_content);
 
-  let a = OrgNodeInterp::content(NodeWithEphem {
+  let a = OrgNodeInterp::Content(NodeWithEphem {
     id: None,
     title: "a".to_string(),
     aliases: None,

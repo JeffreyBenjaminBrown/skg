@@ -94,7 +94,10 @@ fn test_convert_circular_orgnode_to_node() {
   // Sanity checks on the constructed org tree
   let root_content = match &root_1 {
     OrgNodeInterp::Content(content) => content,
-    OrgNodeInterp::Aliases(_) => panic!("Expected NodeWithEphem"),
+    OrgNodeInterp::Aliases(_) =>
+      panic!("Expected NodeWithEphem, found Aliases"),
+    OrgNodeInterp::Ignored =>
+      panic!("Expected NodeWithEphem, found Ignored"),
   };
   assert_eq!(root_content.id.as_ref().map(|id| id.as_str()),
              Some("1"));
@@ -103,15 +106,20 @@ fn test_convert_circular_orgnode_to_node() {
 
   let child_2_content = match &root_content.branches[0] {
     OrgNodeInterp::Content(content) => content,
-    OrgNodeInterp::Aliases(_) => panic!("Expected NodeWithEphem"),
-  };
+    OrgNodeInterp::Aliases(_) =>
+      panic!("Expected NodeWithEphem, found Aliases"),
+    OrgNodeInterp::Ignored =>
+      panic!("Expected NodeWithEphem, found Ignored"), };
   assert_eq!(child_2_content.id.as_ref().map(|id| id.as_str()),
              Some("2"));
   assert_eq!(child_2_content.branches.len(), 1);
 
   let nested_content = match &child_2_content.branches[0] {
     OrgNodeInterp::Content(content) => content,
-    OrgNodeInterp::Aliases(_) => panic!("Expected NodeWithEphem"),
+    OrgNodeInterp::Aliases(_) =>
+      panic!("Expected NodeWithEphem, found Aliases"),
+    OrgNodeInterp::Ignored =>
+      panic!("Expected NodeWithEphem, found Ignored"),
   };
   assert_eq!(nested_content.id.as_deref().map(String::as_str),
              Some("1"));

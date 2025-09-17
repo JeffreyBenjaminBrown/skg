@@ -40,8 +40,8 @@ fn orgNodeInterpretation_to_nodes_internal (
   let content_node = match branch {
     OrgNodeInterp::Content(content_node) => content_node,
     OrgNodeInterp::Aliases(_) => {
-      panic!("Found Aliases node in orgNodeInterpretation_to_nodes_internal. All Aliases nodes should have been filtered out by this point.");
-    }};
+      panic!("Found Aliases node in orgNodeInterpretation_to_nodes_internal. All Aliases nodes should have been filtered out by this point."); },
+    OrgNodeInterp::Ignored => { return; }};
   if content_node.repeated { // Skip nodes marked as repeated.
     // TRICKY: Even if this is the first appearance of that node in the org text, it might still be marked `repeated`, because the user might have moved it. If so, the user has done no harm -- it can belong to the new parent. But whatever edits the user made to or under it should be ignored.
     return; }
@@ -64,8 +64,8 @@ fn orgNodeInterpretation_to_nodes_internal (
           OrgNodeInterp::Content(child_content) =>
             child_content.id.clone (),
           OrgNodeInterp::Aliases(_) => {
-            panic!("Found Aliases node when extracting child IDs. All Aliases nodes should have been filtered out by this point.");
-          }} })
+            panic!("Found Aliases node when extracting child IDs. All Aliases nodes should have been filtered out by this point."); },
+          OrgNodeInterp::Ignored => { None }} })
       . collect (),
     subscribes_to                : Vec::new (),
     hides_from_its_subscriptions : Vec::new (),
