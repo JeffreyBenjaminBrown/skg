@@ -11,3 +11,4 @@
    (expand-file-name "elisp" project-root)) )
 
 (require 'skg-client)
+(require 'skg-id-search)
