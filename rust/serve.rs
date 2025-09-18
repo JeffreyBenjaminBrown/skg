@@ -1,6 +1,7 @@
 pub mod node_aliases;
 pub mod save_buffer;
 pub mod single_root_view;
+pub use title_matches::generate_title_matches_response;
 pub mod title_matches;
 pub mod util;
 
