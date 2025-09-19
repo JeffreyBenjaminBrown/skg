@@ -25,6 +25,7 @@ pub enum MetadataItem {
   Repeated,
   Folded,
   Focused,
+  Cycle,
   ID(String),
   Type(OrgNodeType), }
 
@@ -71,6 +72,7 @@ impl fmt::Display for MetadataItem {
       MetadataItem::Repeated => write!(f, "repeated"),
       MetadataItem::Folded => write!(f, "folded"),
       MetadataItem::Focused => write!(f, "focused"),
+      MetadataItem::Cycle => write!(f, "cycle"),
       MetadataItem::ID(id) => write!(f, "id:{}", id),
       MetadataItem::Type(typ) => write!(f, "type:{}", typ), }} }
 
@@ -82,6 +84,7 @@ impl FromStr for MetadataItem {
       "repeated" => Ok(MetadataItem::Repeated),
       "folded" => Ok(MetadataItem::Folded),
       "focused" => Ok(MetadataItem::Focused),
+      "cycle" => Ok(MetadataItem::Cycle),
       _ => {
         if let Some((key_str, value_str)) = s.split_once(':') {
           match key_str.trim() {
@@ -110,6 +113,10 @@ impl MetadataItem {
 
   pub fn is_focused(&self) -> bool {
     matches!(self, MetadataItem::Focused) }
+
+  pub fn is_cycle(&self) -> bool {
+    matches!(self, MetadataItem::Cycle)
+  }
 
   pub fn get_id(&self) -> Option<&str> {
     match self {

@@ -6,6 +6,7 @@ pub use single_root_content_view::{
     org_from_node_recursive,
     format_repeated_node,
     aliases_to_org,
+    containerward_org_view,
 };
 pub use util::{
     newline_to_space,
