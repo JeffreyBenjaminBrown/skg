@@ -93,12 +93,14 @@ Whitespace in METADATA is ignored."
                                  'heralds-green-face)
                 out)) ))
         ;; Otherwise it's just a value.
-        ;; Currently only the value 'repeated' is treated specially.
-        ;; When more are added this else-branch will need a 'cond',
-        ;; like the if-branch above.
-        (when (string-equal part "repeated")
+        ;; Handle bare values with a cond for multiple cases.
+        (cond
+         ((string-equal part "repeated")
           (push (propertize "REP" 'face 'heralds-red-face)
-                out)) ))
+                out))
+         ((string-equal part "cycle")
+          (push (propertize "CYCLE" 'face 'heralds-yellow-face)
+                out))) ))
     (when out
       (mapconcat #'identity (nreverse out) " ")) ))
 
@@ -155,6 +157,10 @@ Whitespace in METADATA is ignored."
 (defface heralds-red-face
   '((t :foreground "white" :background "red"))
   "White-on-red for REP (repeated).")
+
+(defface heralds-yellow-face
+  '((t :foreground "black" :background "yellow"))
+  "Black-on-yellow for CYCLE.")
 
 ;; TESTING, interactive:
 ;; `M-x heralds-minor-mode` should change how the text below looks.

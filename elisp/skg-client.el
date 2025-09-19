@@ -4,6 +4,7 @@
 
 (require 'heralds-minor-mode)
 (require 'skg-metadata)
+(require 'skg-request-containerward-view)
 (require 'skg-request-node-aliases)
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)

@@ -2,7 +2,7 @@
 
 Communication between Rust and Emacs is via TCP on port 1730. The connection is persistent.
 
-So far there are three endpoints:
+So far there are four endpoints:
 
 - Search in titles
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
@@ -10,6 +10,12 @@ So far there are three endpoints:
 - Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
+- Node aliases
+  - Request: ((request . "node aliases") (id . "NODE_ID") (level . "LEVEL"))
+  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains org-mode formatted aliases.
+- Containerward view
+  - Request: ((request . "containerward view") (id . "NODE_ID") (level . "LEVEL"))
+  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains org-mode formatted containerward view starting from the specified node.
 - Save buffer
   - Request: First `((request . \"save buffer\"))\n"`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` has length `LENGTH`.
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains the processed buffer content.
