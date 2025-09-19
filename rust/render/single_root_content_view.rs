@@ -122,6 +122,12 @@ pub fn aliases_to_org (
     result.push ( '\n' ); }
   result }
 
+/// Unlike single-root content view, which generates an entire buffer,
+/// this generates some new text that gets inserted into the buffer.
+/// It is intended to replace the headline (and body if present)
+/// from which it is called, but not that headline's children.
+/// That's because the replacement might include a 'cycle' tag,
+/// whereas the original probably did not have one.
 pub async fn containerward_org_view (
   driver         : &TypeDBDriver,
   config         : &SkgConfig,

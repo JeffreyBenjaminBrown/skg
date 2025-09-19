@@ -88,8 +88,10 @@ async fn test_containerward_org_view (
     **** <skg<id:2>> 2
     **** <skg<id:1>> 1
     "};
-  assert!(result4 == expected4a || result4 == expected4b,
-          "Expected one of {:?} or {:?}, got {:?}", expected4a, expected4b, result4);
+  assert!(result4 == expected4a ||
+          result4 == expected4b,
+          "Expected one of {:?} or {:?}, got {:?}",
+          expected4a, expected4b, result4);
 
   // An eventually-forking path, with body text at its terminus.
   let result5 = containerward_org_view(
@@ -110,8 +112,10 @@ async fn test_containerward_org_view (
     *** <skg<id:2>> 2
     *** <skg<id:1>> 1
     "};
-  assert!(result5 == expected5a || result5 == expected5b,
-          "Expected one of {:?} or {:?}, got {:?}", expected5a, expected5b, result5);
+  assert!(result5 == expected5a ||
+          result5 == expected5b,
+          "Expected one of {:?} or {:?}, got {:?}",
+          expected5a, expected5b, result5);
 
   // A fork and a cycle, but the cycle lies after the fork,
   // so it is not discovered.
@@ -127,8 +131,10 @@ async fn test_containerward_org_view (
     ** <skg<id:uncyclic_container>> uncyclic_container
     ** <skg<id:shared_cyclic_1>> shared_cyclic_1
     "};
-  assert!(result6 == expected6a || result6 == expected6b,
-          "Expected one of {:?} or {:?}, got {:?}", expected6a, expected6b, result6);
+  assert!(result6 == expected6a ||
+          result6 == expected6b,
+          "Expected one of {:?} or {:?}, got {:?}",
+          expected6a, expected6b, result6);
 
   // Starting at a different point,
   // both the fork and the cycle are discovered.
@@ -146,7 +152,9 @@ async fn test_containerward_org_view (
     *** <skg<id:uncyclic_container>> uncyclic_container
     *** <skg<id:shared_cyclic_1,cycle>> shared_cyclic_1
     "};
-  assert!(result7 == expected7a || result7 == expected7b,
-          "Expected one of {:?} or {:?}, got {:?}", expected7a, expected7b, result7);
+  assert!(result7 == expected7a ||
+          result7 == expected7b,
+          "Expected one of {:?} or {:?}, got {:?}",
+          expected7a, expected7b, result7);
 
   Ok (( )) }
