@@ -16,7 +16,8 @@ pub struct OrgNode {
 pub enum OrgNodeType {
   Content, // most nodes are this
   Aliases,
-  SearchResult, }
+  SearchResult,
+  ContainsOrgParent, }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetadataItem {
@@ -53,6 +54,7 @@ impl fmt::Display for OrgNodeType {
       OrgNodeType::Content => "content",
       OrgNodeType::Aliases => "aliases",
       OrgNodeType::SearchResult => "searchResult",
+      OrgNodeType::ContainsOrgParent => "containsOrgParent",
     };
     write!(f, "{}", s) }}
 
@@ -64,6 +66,7 @@ impl FromStr for OrgNodeType {
       "content" => Ok(OrgNodeType::Content),
       "aliases" => Ok(OrgNodeType::Aliases),
       "searchResult" => Ok(OrgNodeType::SearchResult),
+      "containsOrgParent" => Ok(OrgNodeType::ContainsOrgParent),
       _ => Err(format!("Unknown type value: {}", s)), }} }
 
 impl fmt::Display for MetadataItem {

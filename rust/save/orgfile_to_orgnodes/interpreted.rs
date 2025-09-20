@@ -71,6 +71,8 @@ pub fn interpret_org_node (
       OrgNodeInterp::Aliases (aliases) },
     OrgNodeType::SearchResult => {
       // It would be weird if these were ever present in the org data sent from Emacs -- they only appear in search result buffers, not content view buffers.
+      OrgNodeInterp::Ignored },
+    OrgNodeType::ContainsOrgParent => {
       OrgNodeInterp::Ignored }} }
 
 /// Parse a headline into structured metadata and title.
@@ -98,10 +100,12 @@ fn parse_separating_metadata_and_title (
           "Failed to parse metadata '{}': {}", inner, e));
       let node_type: OrgNodeType =
         match metadata_values.iter().find_map(|v| v.get_type()) {
-          Some(OrgNodeType::Content)      => OrgNodeType::Content,
-          Some(OrgNodeType::Aliases)      => OrgNodeType::Aliases,
-          Some(OrgNodeType::SearchResult) => OrgNodeType::SearchResult,
-          None                            => OrgNodeType::Content, };
+          // TODO: This can be simplified.
+          Some(OrgNodeType::Content)           => OrgNodeType::Content,
+          Some(OrgNodeType::Aliases)           => OrgNodeType::Aliases,
+          Some(OrgNodeType::SearchResult)      => OrgNodeType::SearchResult,
+          Some(OrgNodeType::ContainsOrgParent) => OrgNodeType::ContainsOrgParent,
+          None                                 => OrgNodeType::Content, };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
       return (

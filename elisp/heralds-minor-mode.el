@@ -88,6 +88,11 @@ Whitespace in METADATA is ignored."
                (push (propertize "aliases" 'face
                                  'heralds-blue-face)
                      out))
+             ( (and (string-equal k "type")
+                    (string-equal v "containsOrgParent"))
+               (push (propertize "}" 'face
+                                 'heralds-blue-face)
+                     out))
              (( string-equal k "id")
               ( push (propertize "⅄" 'face
                                  'heralds-green-face)
