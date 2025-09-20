@@ -10,6 +10,10 @@ path = "rust/lib.rs"
 name = "skg"
 path = "rust/main.rs"
 
+[[bin]]
+name = "skg_filenames_match_pids"
+path = "introspect/skg_filenames_match_pids.rs"
+
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }
 filetime = "0.2"

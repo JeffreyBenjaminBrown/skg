@@ -1,4 +1,36 @@
 * [[id:7b2499c4-4c93-44dc-83b1-0a4b9175d6a8][containerward view]]
+** merge this stuff into main
+** test the containerward "}" herald
+Just prompt Claude:
+
+Can you extend the test at tests/elisp/ for heralds-minor-mode to test the new-ish containerward herald which should be rendering as a blue "}"?
+** automate integration tests
+** eliminate redundancy
+*** generalize containerward_path
+    call the generalization
+      path_to_end_cycle_and_or_branches
+    Takes the relationship, including direction, as args.
+*** generalize the Rust rendering function
+    Takes a lambda involving (probably)
+      path_to_end_cycle_and_or_branches,
+    and a starting level.
+    The lambda can drop the first member of the path, or not.
+*** generalize the Emacs insertion function
+    It should take as an argument
+    a function to calculate the region to delete and insert into.
+    The deletion might be null.
+*** (more?) places with potential redundancy
+**** elisp requests
+     elisp/skg-request-containerward-view.el
+     elisp/skg-request-*.el
+**** rust rendering
+     rust/render/*.rs (except util.rs)
+**** in rust/serve
+     rust/serve/containerward_view.rs
+     and the others
+** If there is a containerward "}" herald, the "ID exists" herald can be omitted.
+** link sourceward view
+*** then eliminate further redundancy, if any
 * [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
   particularly, rootness and multiple containment
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
