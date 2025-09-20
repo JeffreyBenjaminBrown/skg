@@ -8,16 +8,17 @@ use super::skgnode::NodeWithEphem;
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrgNode {
   pub title    : String,         // The title part of the headline (after asterisks and metadata). 'Headline' is a term from org-mode.
-  pub body     : Option<String>, // "body" is a term fron org-mode
+  pub body     : Option<String>, // "Body" is a term fron org-mode.
   pub branches : Vec<OrgNode>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrgNodeType {
-  Content, // most nodes are this
-  Aliases,
-  SearchResult,
-  ContainsOrgParent, }
+  Content, // Most nodes are this. Upon requesting a new content view, they all are. It means the org node's relationship to its org parent (if said parent exists) is that the parent 'contains' (in the sense defined in schema.tql) the child.
+  ContainsOrgParent, // This is the reverse of 'content'. If a node has this property, the node 'contains' (in the sense defined in schema.tql) its org-parent.
+  Aliases, // If an alias node A has org-parent P and org-children C0, C1 .. Cn, then the headline of each of the Ci is an alias of P. Any other recursive content (bodies, grandchildren, etc.) of A is ignored.
+  SearchResult, // When the user searches for title/alias text, each hit is one of these. If, somehow, Rust finds a SearchResult in a saved org buffer, it ignores it, including all of its recursive content.
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetadataItem {
@@ -27,15 +28,15 @@ pub enum MetadataItem {
   Folded,
   Focused,
   Cycle,
-  ID(String),
-  Type(OrgNodeType), }
+  ID (String),
+  Type (OrgNodeType), }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrgNodeInterp {
-  // Tells Rust how to interpret -- what to do with -- an OrgNode.
+  // Tells Rust how to interpret -- what to do with -- an OrgNode it receives from Emacs when the user runs `skg-request-save-buffer` (defined in the elisp code).
   // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
-  Content(NodeWithEphem),
-  Aliases(Vec<String>),
+  Content (NodeWithEphem), // See the definition of OrgNodeType.
+  Aliases (Vec<String>),   // See the definition of OrgNodeType.
   Ignored, }
 
 //

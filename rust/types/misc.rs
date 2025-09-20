@@ -7,35 +7,42 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::{Index, schema};
 
+/* Each node has a random ID. Skg does not check for collisions.
+So far the IDs are Version 4 UUIDs.
+.
+Collisions are astronomically unlikely but not impossible.
+If there are fewer than 3.3e15 v4 UUIDs --
+equivalent to 9 billion people with 415,000 nodes each --
+the collision probability is less than 1 in 1e6. */
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID ( pub String );
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SkgConfig {
   pub db_name        : String,
-  pub skg_folder     : PathBuf,
+  pub skg_folder     : PathBuf, // The user's .skg files go here.
   pub tantivy_folder : PathBuf,
 }
 
 #[derive(Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
-  pub index                  : Arc<Index>,
-  pub id_field               : schema::Field,
-  pub title_or_alias_field   : schema::Field,
+  pub index                : Arc<Index>,
+  pub id_field             : schema::Field,
+  pub title_or_alias_field : schema::Field,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hyperlink {
   // Hyperlinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
   pub id: ID,
-  pub label: String, 
+  pub label: String,
 }
 
 #[derive(Debug)]
 pub enum HyperlinkParseError {
   InvalidFormat,
-  MissingDivider, 
+  MissingDivider,
 }
 
 //
