@@ -1,36 +1,64 @@
-* [[id:7b2499c4-4c93-44dc-83b1-0a4b9175d6a8][containerward view]]
-** merge this stuff into main
-** test the containerward "}" herald
-Just prompt Claude:
-
-Can you extend the test at tests/elisp/ for heralds-minor-mode to test the new-ish containerward herald which should be rendering as a blue "}"?
-** automate integration tests
-** eliminate redundancy
-*** generalize containerward_path
-    call the generalization
-      path_to_end_cycle_and_or_branches
-    Takes the relationship, including direction, as args.
-*** generalize the Rust rendering function
-    Takes a lambda involving (probably)
-      path_to_end_cycle_and_or_branches,
-    and a starting level.
-    The lambda can drop the first member of the path, or not.
-*** generalize the Emacs insertion function
+* merge [[id:7b2499c4-4c93-44dc-83b1-0a4b9175d6a8][containerward view]] into main
+* integration tests
+** updating `cargo run --bin skg` script
+   Keep it running in the background.
+   Restart it when source code changes.
+** Add a config argument to `cargo run --bin skg`.
+** add "verify connection" to the API
+** integration test for "verify connection"
+*** Verify that the updating `cargo run` script is running.
+*** Have Emacs send the request.
+*** Test for a certain expected result.
+** more integration tests
+*** Each element of the API.
+    Don't test the many cases -- rust/ and tests/ already test those.
+    Just verify the total behavior.
+*** Fetch a node, using a test config
+    It can be one of the existing configs.
+    Delete the 'tantivy index' folder it creates if it passes.
+*** Search for a title and visit a link in it.
+* add new data without fetching preexisting data
+  and add an integration test.
+  Use a temp config, and delete it if the test passes.
+* divide fn containerward_org_view
+from rust/render/containerward_view.rs
+* eliminate redundancies
+** generalize containerward_path
+   call the generalization
+     path_to_end_cycle_and_or_branches
+   Takes the relationship, including direction, as args.
+** generalize the Rust rendering function
+   Takes a lambda involving (probably)
+     path_to_end_cycle_and_or_branches,
+   and a starting level.
+   The lambda can drop the first member of the path, or not.
+** generalize the Emacs insertion function
+*** the idea
     It should take as an argument
     a function to calculate the region to delete and insert into.
     The deletion might be null.
-*** (more?) places with potential redundancy
-**** elisp requests
-     elisp/skg-request-containerward-view.el
-     elisp/skg-request-*.el
-**** rust rendering
-     rust/render/*.rs (except util.rs)
-**** in rust/serve
-     rust/serve/containerward_view.rs
-     and the others
-** If there is a containerward "}" herald, the "ID exists" herald can be omitted.
-** link sourceward view
-*** then eliminate further redundancy, if any
+*** where
+    elisp/skg-request-node-aliases.el
+    elisp/skg-request-containerward-view.el
+** generalize the Emacs buffer replacers
+in elisp/skg-request-single-root-content-view.el:
+  defun skg-open-org-buffer-from-text
+in elisp/skg-request-save.el:
+  defun skg-replace-buffer-with-new-content
+** (more?) places with potential redundancy
+*** rust rendering
+    rust/render/*.rs (except util.rs)
+*** in rust/serve
+    rust/serve/containerward_view.rs
+    and the others
+* override ordinary save command
+* link-sourceward view
+** then eliminate further redundancy, if any
+* test the containerward "}" herald
+Just prompt Claude:
+
+Can you extend the test at tests/elisp/ for heralds-minor-mode to test the new-ish containerward herald which should be rendering as a blue "}"?
+* If there is a containerward "}" herald, the "ID exists" herald can be omitted.
 * [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
   particularly, rootness and multiple containment
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]

@@ -12,7 +12,6 @@ pub fn newline_to_space ( s: &str ) -> String {
 pub fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }
 
-/// Helper function to get a node's title from its ID.
 pub async fn get_node_title (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
