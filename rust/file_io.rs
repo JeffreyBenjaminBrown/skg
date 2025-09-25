@@ -10,6 +10,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::types::{ ID, SkgNode, SkgConfig };
+use crate::typedb::search::pid_from_id;
+
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
 
 pub fn path_from_pid (
@@ -101,6 +105,35 @@ pub fn fetch_aliases_from_file (
       Err ( _ )   => Vec::new(),
     }}
 
+
+pub async fn load_node_from_id(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  node_id: &ID
+) -> Result<SkgNode, Box<dyn Error>> {
+  let node_file_path = path_from_pid (
+    config,
+    pid_from_id (
+      & config.db_name, driver, node_id
+    ). await ? );
+  let node : SkgNode = read_node (node_file_path) ?;
+
+  if node.title.is_empty() {
+    return Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      format!("SkgNode with ID {} has an empty title", node_id),
+    )));
+  }
+
+  if node.ids.is_empty() {
+    return Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      format!("SkgNode with ID {} has no IDs", node_id),
+    )));
+  }
+
+  Ok(node)
+}
 
 pub fn write_node
   <P : AsRef<Path>>

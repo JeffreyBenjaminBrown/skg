@@ -1,5 +1,6 @@
 pub mod aliases;
 pub mod containerward_view;
+pub mod orgnode;
 pub mod single_root_content_view;
 pub mod util;
 
@@ -11,11 +12,11 @@ pub use containerward_view::{
 };
 pub use single_root_content_view::{
     single_root_view,
-    org_from_node_recursive,
-    format_repeated_node,
+};
+pub use orgnode::{
+    render_org_node,
+    render_org_node_from_text,
 };
 pub use util::{
     newline_to_space,
-    org_bullet,
-    get_node_title,
 };

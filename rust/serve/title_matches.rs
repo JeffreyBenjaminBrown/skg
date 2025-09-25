@@ -2,8 +2,9 @@ use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
 use crate::types::{TantivyIndex, MetadataItem, OrgNodeType};
+use crate::render::orgnode::render_org_node_from_text;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::TcpStream; // handles two-way communication
 use tantivy::{Document};
 
@@ -107,18 +108,22 @@ fn format_matches_as_org_mode (
 
   let mut result : String =
     String::new();
-  let title_search_metadata =
-    MetadataItem::Type(OrgNodeType::SearchResult);
-  result.push_str ( &format! (
-    // The unique level-1 headline states the search terms.
-    "* <skg<{}>> {}\n",
-    title_search_metadata, search_terms ));
+
+  let mut title_search_metadata = HashSet::new();
+  title_search_metadata.insert (
+    MetadataItem::Type (
+      OrgNodeType::SearchResult ));
+
+  result.push_str(
+    & render_org_node_from_text (
+      // The unique level-1 headline states the search terms.
+      1, search_terms, None, &title_search_metadata ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
                       String ) >) > // title or alias
     = ( matches_by_id.into_iter()
-        . map(|(id, mut matches)| {
+        . map ( | (id, mut matches) | {
           // Sort matches within each ID by score
           // (descending, os the first is the best).
           matches . sort_by( |a, b|
@@ -133,14 +138,21 @@ fn format_matches_as_org_mode (
       b.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
     score_b . partial_cmp (&score_a) . unwrap () } );
   for (id, matches) in id_entries {
-    if let Some((score, title)) = matches.first() {
-      result.push_str ( &format! (
-        // First (best) match becomes level-2 headline
-        "** score: {:.2}, [[id:{}][{}]]\n",
-        score, id, title ) );
-      for (score, title) in matches . iter() . skip(1) {
-        // Rest, if any, become level-3 headlines
-        result.push_str ( &format! (
-          "*** score: {:.2}, [[id:{}][{}]]\n",
-          score, id, title )); }} }
+    // First (best) match becomes level-2 headline
+    let (score, title) = &matches[0];
+    result.push_str(&render_org_node_from_text(
+      2,
+      & format!("score: {:.2}, [[id:{}][{}]]",
+                score, id, title),
+      None,
+      &HashSet::new() ));
+    for (score, title) in matches.iter().skip(1) {
+      // The rest, if any, become level-3 headlines.
+      result.push_str(&render_org_node_from_text(
+        3,
+        & format!("score: {:.2}, [[id:{}][{}]]",
+                  score, id, title),
+        None,
+        &HashSet::new()
+      )); }}
   result }

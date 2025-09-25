@@ -1,16 +1,11 @@
-use crate::file_io::{read_node, path_from_pid};
-use crate::render::util::{
-  newline_to_space,
-  org_bullet,
-  get_node_title};
-use crate::typedb::search::{
-  containerward_path,
-  pid_from_id, };
-use crate::types::{ID, SkgConfig, SkgNode};
+use crate::file_io::load_node_from_id;
+use crate::render::util::newline_to_space;
+use crate::render::orgnode::render_org_node_from_text;
+use crate::typedb::search::containerward_path;
+use crate::types::{ID, SkgConfig, MetadataItem, OrgNodeType};
 
 use std::collections::HashSet;
 use std::error::Error;
-use std::fmt::Write as _; // for the write! macro
 use typedb_driver::TypeDBDriver;
 
 /// Unlike single-root content view, which generates an entire buffer,
@@ -22,7 +17,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn containerward_org_view (
   driver         : &TypeDBDriver,
   config         : &SkgConfig,
-  terminus       : &ID,
+  terminus       : &ID, // you could think of it as the origin, but everything else contains it, so I thought terminus was clearer
   terminus_level : usize,
 ) -> Result<String, Box<dyn Error>> {
 
@@ -32,77 +27,114 @@ pub async fn containerward_org_view (
       &config.db_name,
       driver,
       terminus ). await ?;
-  let mut result_acc : String = String::new();
-  for (i, node_id) in path.iter().enumerate() { // Render the path.
-    let current_level = terminus_level + i;
-    let node_title: String = get_node_title (
-      // PITFALL This might look inefficient, because didn't containerward_path already fetch the node? No, it didn't. It queried TypeDB for connectivity, without reading the full node from disk.
-      driver, config, node_id ). await ?;
-    let metadata: String = {
-      let mut parts = vec![format!("id:{}", node_id)];
-      if cycle_node.as_ref() == Some(node_id) {
-        // The cycle node needs extra metadata.
-        parts . push ("cycle" . to_string () ); }
-      if i > 0 { // The 'containsOrgParent' type.
-        // All nodes except the terminus (first in path) get this type.
-        // PITFALL: If there is a second appearance of the terminus,
-        // later in the containerward path,
-        // that appearance *should* (and does) get this type.
-        parts . push ("type:containsOrgParent" . to_string () ); }
-      parts . join (",") };
-    write! (
-      & mut result_acc,
-      "{} <skg<{}>> {}\n",
-      org_bullet (current_level),
-      metadata,
-      newline_to_space (& node_title) )?;
-    if i == 0 {
-      // If it exists, render the body of *only*
-      // the terminus (first in path) node.
-      let path = path_from_pid (
-        config,
-        pid_from_id (
-          & config.db_name, driver, node_id
-        ). await ? );
-      let terminus_node : SkgNode = read_node (path) ?;
-      if let Some (ref body) = terminus_node . body {
-        result_acc . push_str (body);
-        if ! body.ends_with ('\n') {
-          result_acc.push ('\n'); }} }}
-  let branch_or_cycle_level : usize = // The last level, if there are branches and/or a cycle. Otherwise it is unused (and the last level is one less than this).
-    terminus_level + path.len();
-  if ! branches.is_empty () {
+  let mut result_acc = String::new();
+
+  result_acc.push_str(
+    & render_linear_portion_of_path(
+      config, driver, &path, &cycle_node, terminus_level
+    ). await ?);
+  let branch_or_cycle_level = terminus_level + path.len();
+  if ! branches.is_empty() {
     // There are branches, one of which might be a cycle.
-    for branch_id in & branches {
-      let node_title: String = get_node_title (
-        driver, config, branch_id ). await ?;
-      let metadata: String = {
-        let mut parts = vec![format!("id:{}", branch_id)];
-        if cycle_node . as_ref () == Some (branch_id) {
-          parts . push ("cycle" . to_string () ); }
-        parts . push ("type:containsOrgParent" . to_string() );
-        parts . join(",") };
-      write! (
-        &mut result_acc,
-        "{} <skg<{}>> {}\n",
-        org_bullet (branch_or_cycle_level),
-        metadata,
-        newline_to_space (&node_title)
-      )?; }}
-  else if let Some (ref cycle_id) = cycle_node {
+    result_acc.push_str (
+      & render_branches (
+        config, driver, &branches, &cycle_node, branch_or_cycle_level
+      ). await ?);
+  } else if let Some(ref cycle_id) = cycle_node {
     // There's a cycle and no branches.
-    let node_title: String = get_node_title (
-      driver, config, cycle_id ). await ?;
-    let metadata : String = {
-      let mut parts = vec![
-        format!("id:{}", cycle_id), "cycle".to_string() ];
-      parts.push("type:containsOrgParent".to_string());
-      parts.join(",") };
-    write! (
-      &mut result_acc,
-      "{} <skg<{}>> {}\n",
-      org_bullet (branch_or_cycle_level),
-      metadata,
-      newline_to_space (&node_title)
-    ) ?; }
+    result_acc.push_str (
+      & render_terminating_cycle_when_no_branches (
+        config, driver, cycle_id, &cycle_node, branch_or_cycle_level
+      ). await ?); }
   Ok (result_acc) }
+
+async fn render_linear_portion_of_path (
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  path: &[ID],
+  cycle_node: &Option<ID>,
+  terminus_level: usize,
+) -> Result<String, Box<dyn Error>> {
+
+  if path.is_empty() {
+    return Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::InvalidInput,
+      "render_linear_portion_of_path called with empty path",
+    )) ); }
+  let mut result = String::new();
+  for (i, node_id) in path.iter().enumerate() {
+    let node = load_node_from_id (
+      config, driver, node_id ). await ?;
+    result.push_str (
+      & render_org_node_from_text (
+        terminus_level + i,
+        & newline_to_space ( & node.title ),
+        { // Render body only for origin of path.
+          if i == 0 { node.body.as_deref() }
+          else { None } },
+        & build_path_metadata_set (
+          node_id, cycle_node, i != 0), )); }
+  Ok (result) }
+
+async fn render_branches (
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  branches: &HashSet<ID>,
+  cycle_node: &Option<ID>,
+  branch_level: usize,
+) -> Result<String, Box<dyn Error>> {
+  let mut result = String::new();
+
+  for branch_id in branches {
+    let node = load_node_from_id (
+      config, driver, branch_id ). await ?;
+    result.push_str (
+      & render_org_node_from_text (
+        branch_level,
+        & newline_to_space ( & node.title ),
+        None,
+        & build_path_metadata_set (
+          branch_id, cycle_node, true)
+      )); }
+  Ok (result) }
+
+async fn render_terminating_cycle_when_no_branches(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  cycle_id: &ID,
+  cycle_node: &Option<ID>,
+  cycle_level: usize,
+) -> Result<String, Box<dyn Error>> {
+  let node = load_node_from_id (
+    config, driver, cycle_id ). await ?;
+  Ok ( render_org_node_from_text (
+    cycle_level,
+    & newline_to_space (& node.title),
+    None,
+    & build_path_metadata_set (
+      cycle_id, cycle_node, true )) ) }
+
+fn build_path_metadata_set (
+  node_id: &ID,
+  cycle_node: &Option<ID>,
+  containsOrgParent: bool
+) -> HashSet<MetadataItem> {
+
+  let mut metadata_set = HashSet::new();
+  metadata_set.insert (
+    MetadataItem::ID (
+      node_id.to_string () ));
+  if cycle_node.as_ref() == Some(node_id) {
+    // The cycle node needs extra metadata.
+    metadata_set.insert(
+      MetadataItem::Cycle); }
+  if containsOrgParent {
+    // The 'containsOrgParent' type.
+    // All nodes except the terminus (first in path) get this type.
+    // PITFALL: If there is a second appearance of the terminus,
+    // later in the containerward path,
+    // that appearance *should* (and does) get this type.
+    metadata_set.insert (
+      MetadataItem::Type (
+        OrgNodeType::ContainsOrgParent)); }
+  metadata_set }

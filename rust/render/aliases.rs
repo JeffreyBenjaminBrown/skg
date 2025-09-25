@@ -1,4 +1,6 @@
 use crate::types::{MetadataItem, OrgNodeType};
+use crate::render::orgnode::render_org_node_from_text;
+use std::collections::HashSet;
 
 /// Returns not an entire org buffer,
 /// but rather just a passage,
@@ -17,18 +19,22 @@ pub fn aliases_to_org (
   level   : usize,
 ) -> String {
 
+  // build inputs
   let header_level : usize = level + 1;
   let alias_level  : usize = level + 2;
-  let aliases_metadata = MetadataItem::Type(
-    OrgNodeType::Aliases);
-  let mut result : String =
-    format! ( "{} <skg<{}>>\n",
-              "*".repeat ( header_level ),
-              aliases_metadata );
-  for alias in aliases {
+  let mut aliases_metadata = HashSet::new();
+  aliases_metadata.insert (
+    MetadataItem::Type (
+      OrgNodeType::Aliases ));
+
+  // build result
+  let mut result = render_org_node_from_text(
+    // The only child node, the 'aliases' headline, has no title.
+    header_level, "", None, &aliases_metadata);
+  for alias in aliases { // Each each alias grandchild, if any.
     result.push_str (
-      & format! ( "{} {}",
-                  "*".repeat ( alias_level ),
-                  alias )) ;
-    result.push ( '\n' ); }
+      & render_org_node_from_text(
+        alias_level, & alias, None, & HashSet::new()
+      ) ); }
+
   result }

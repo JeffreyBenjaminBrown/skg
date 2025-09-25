@@ -12,7 +12,7 @@ pub struct OrgNode {
   pub branches : Vec<OrgNode>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OrgNodeType {
   Content, // Most nodes are this. Upon requesting a new content view, they all are. It means the org node's relationship to its org parent (if said parent exists) is that the parent 'contains' (in the sense defined in schema.tql) the child.
   ContainsOrgParent, // This is the reverse of 'content'. If a node has this property, the node 'contains' (in the sense defined in schema.tql) its org-parent.
@@ -20,7 +20,7 @@ pub enum OrgNodeType {
   SearchResult, // When the user searches for title/alias text, each hit is one of these. If, somehow, Rust finds a SearchResult in a saved org buffer, it ignores it, including all of its recursive content.
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MetadataItem {
   // In metadata headers, some of these are bare values,
   // and some of them are key-value pairs.

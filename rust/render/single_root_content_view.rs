@@ -2,14 +2,14 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
-use crate::types::{SkgNode, ID, SkgConfig};
-use crate::render::util::{newline_to_space, org_bullet};
+use crate::types::{SkgNode, ID, SkgConfig, MetadataItem};
+use crate::render::util::newline_to_space;
+use crate::render::orgnode::render_org_node_from_text;
 
 use std::collections::HashSet;
 use std::error::Error;
 use std::io;
 use typedb_driver::TypeDBDriver;
-use std::fmt::Write as _; // for the write! macro
 
 /// Given the id `focus`,
 /// identifies its context (`climb_containerward_and_fetch_rootish_context()`),
@@ -61,13 +61,16 @@ pub async fn org_from_node_recursive (
     return Ok ( format_repeated_node (
       node_id, level, & node.title )); }
   visited.insert ( node_id.clone () );
-  let mut out = String::new();
-  write! ( &mut out,
-            "{} <skg<id:{}>> {}\n",
-            org_bullet (level),
-            node_id,
-            newline_to_space ( // Over-cautious, because the title should contain no newlines, but probably cheap.
-              & node.title )) ?;
+  // Create metadata set with ID
+  let mut metadata_set = HashSet::new();
+  metadata_set.insert(MetadataItem::ID(node_id.to_string()));
+
+  let mut out = render_org_node_from_text(
+    level,
+    &newline_to_space(&node.title), // Over-cautious, because the title should contain no newlines, but probably cheap.
+    None,
+    &metadata_set
+  );
   if let Some (text) = & node.body {
     // Ensure a newline separates the body from the next headline.
     out.push_str ( text );
@@ -90,12 +93,11 @@ pub fn format_repeated_node (
   level: usize,
   title: &String
 ) -> String {
-
-  let mut s = String::new ();
-  write! ( & mut s,
-             "{} <skg<id:{},repeated>> {}\nRepeated, probably above. Edit there, not here.\n",
-             org_bullet (level),
-             node_id,
-             newline_to_space ( title ))
-    . unwrap ();
-  s }
+  let mut metadata_set = HashSet::new();
+  metadata_set.insert(MetadataItem::ID(node_id.to_string()));
+  metadata_set.insert(MetadataItem::Repeated);
+  render_org_node_from_text(
+    level,
+    & newline_to_space (title),
+    Some("Repeated, probably above. Edit there, not here."),
+    &metadata_set ) }
