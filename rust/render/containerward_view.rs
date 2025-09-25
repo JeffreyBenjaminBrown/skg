@@ -1,4 +1,4 @@
-use crate::file_io::load_node_from_id;
+use crate::file_io::read_node_from_id;
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 use crate::typedb::search::containerward_path;
@@ -63,7 +63,7 @@ async fn render_linear_portion_of_path (
     )) ); }
   let mut result = String::new();
   for (i, node_id) in path.iter().enumerate() {
-    let node = load_node_from_id (
+    let node = read_node_from_id (
       config, driver, node_id ). await ?;
     result.push_str (
       & render_org_node_from_text (
@@ -72,7 +72,7 @@ async fn render_linear_portion_of_path (
         { // Render body only for origin of path.
           if i == 0 { node.body.as_deref() }
           else { None } },
-        & build_path_metadata_set (
+        & metadata_for_element_of_path (
           node_id, cycle_node, i != 0), )); }
   Ok (result) }
 
@@ -86,14 +86,14 @@ async fn render_branches (
   let mut result = String::new();
 
   for branch_id in branches {
-    let node = load_node_from_id (
+    let node = read_node_from_id (
       config, driver, branch_id ). await ?;
     result.push_str (
       & render_org_node_from_text (
         branch_level,
         & newline_to_space ( & node.title ),
         None,
-        & build_path_metadata_set (
+        & metadata_for_element_of_path (
           branch_id, cycle_node, true)
       )); }
   Ok (result) }
@@ -105,16 +105,16 @@ async fn render_terminating_cycle_when_no_branches(
   cycle_node: &Option<ID>,
   cycle_level: usize,
 ) -> Result<String, Box<dyn Error>> {
-  let node = load_node_from_id (
+  let node = read_node_from_id (
     config, driver, cycle_id ). await ?;
   Ok ( render_org_node_from_text (
     cycle_level,
     & newline_to_space (& node.title),
     None,
-    & build_path_metadata_set (
+    & metadata_for_element_of_path (
       cycle_id, cycle_node, true )) ) }
 
-fn build_path_metadata_set (
+fn metadata_for_element_of_path (
   node_id: &ID,
   cycle_node: &Option<ID>,
   containsOrgParent: bool

@@ -44,6 +44,30 @@ pub fn read_node
         e.to_string () )) ?;
   Ok ( node ) }
 
+pub async fn read_node_from_id (
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+  node_id : &ID
+) -> Result<SkgNode, Box<dyn Error>> {
+
+  let node_file_path = path_from_pid (
+    config,
+    pid_from_id (
+      & config.db_name, driver, node_id
+    ). await ? );
+  let node : SkgNode = read_node (node_file_path) ?;
+  if node.title.is_empty() {
+    return Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      format!("SkgNode with ID {} has an empty title", node_id),
+    )) ); }
+  if node.ids.is_empty() {
+    return Err(Box::new(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      format!("SkgNode with ID {} has no IDs", node_id),
+    )) ); }
+  Ok (node) }
+
 pub fn read_skg_files
   <P : AsRef<Path> > (
     dir_path : P )
@@ -104,36 +128,6 @@ pub fn fetch_aliases_from_file (
         . unwrap_or_default (), // extract from Option
       Err ( _ )   => Vec::new(),
     }}
-
-
-pub async fn load_node_from_id(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
-  node_id: &ID
-) -> Result<SkgNode, Box<dyn Error>> {
-  let node_file_path = path_from_pid (
-    config,
-    pid_from_id (
-      & config.db_name, driver, node_id
-    ). await ? );
-  let node : SkgNode = read_node (node_file_path) ?;
-
-  if node.title.is_empty() {
-    return Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::InvalidData,
-      format!("SkgNode with ID {} has an empty title", node_id),
-    )));
-  }
-
-  if node.ids.is_empty() {
-    return Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::InvalidData,
-      format!("SkgNode with ID {} has no IDs", node_id),
-    )));
-  }
-
-  Ok(node)
-}
 
 pub fn write_node
   <P : AsRef<Path>>

@@ -1,6 +1,3 @@
-* render/ could be renamed graph_to_org
-  and deserves distinction from rendering title matches,
-  which is done in rust/serve/title_matches.rs
 * integration tests
 ** Add a config argument to `cargo run --bin skg`.
 *** prompt

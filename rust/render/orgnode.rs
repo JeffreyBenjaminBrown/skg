@@ -13,9 +13,7 @@ pub fn render_org_node (
     level,
     &node.title,
     if render_body { node.body.as_deref() } else { None },
-    metadata
-  )
-}
+    metadata ) }
 
 pub fn render_org_node_from_text (
   level: usize,
@@ -44,15 +42,13 @@ pub fn render_org_node_from_text (
       result.push_str(body_text);
       if !body_text.ends_with('\n') {
         result.push('\n'); }} }
-  result
-}
+  result }
 
 pub fn render_metadata_header(
   metadata: &HashSet<MetadataItem>
 ) -> String {
   if metadata.is_empty() {
-    panic!("render_metadata_header called with empty metadata - caller should check first");
-  }
+    panic!("render_metadata_header called with empty metadata - caller should check first"); }
   let mut metadata_vec: Vec<&MetadataItem> =
     metadata.iter().collect();
   metadata_vec.sort_by(|a, b| {
@@ -63,7 +59,6 @@ pub fn render_metadata_header(
       (MetadataItem::ID(_), _) => std::cmp::Ordering::Less,
       (_, MetadataItem::ID(_)) => std::cmp::Ordering::Greater,
       _ => a.to_string().cmp(&b.to_string()), } });
-
   let mut result = String::new();
   result.push_str("<skg<");
   for (i, item) in metadata_vec.iter().enumerate() {
