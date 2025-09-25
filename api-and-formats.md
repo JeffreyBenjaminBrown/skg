@@ -2,8 +2,11 @@
 
 Communication between Rust and Emacs is via TCP on port 1730. The connection is persistent.
 
-So far there are four endpoints:
+So far there are five endpoints:
 
+- Verify connection
+  - Request: ((request . "verify connection"))
+  - Response: Plain text with newline termination: "This is the skg server verifying the connection."
 - Search in titles
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
   - Response: Plain text with newline termination.

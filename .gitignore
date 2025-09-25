@@ -7,7 +7,8 @@
 /.npm
 /.ssh/
 /Cargo.lock
-/data/
+/data/index.tantivy
+/data/skg
 /devel-handy/temp.org
 /kill-servers.sh
 /logs/*.log
@@ -17,3 +18,5 @@
 TAGS
 temp-*
 temp/
+/tests/integration/verify-connection/server.log
+/tests/integration/verify-connection/data/index.tantivy/

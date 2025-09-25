@@ -1,0 +1,5 @@
+title: "Integration Test Node"
+ids:
+  - "test"
+body: "This is a test node for integration testing."
+contains: []

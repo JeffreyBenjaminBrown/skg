@@ -153,6 +153,7 @@ fn test_fetch_aliases_from_file() -> std::io::Result<()> {
     db_name        : "test_db".to_string (),
     skg_folder     : PathBuf::from ("tests/file_io/fixtures"),
     tantivy_folder : PathBuf::from ("/tmp/tantivy"),
+    port           : 1730,
   };
 
   let aliases_result : Vec<String> =

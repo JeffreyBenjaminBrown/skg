@@ -1,29 +1,11 @@
-* integration tests
-** Add a config argument to `cargo run --bin skg`.
-*** prompt
-   I would like `cargo run --bin skg` to accept a command-line argument pointing it at a skg config file. It should be toml, and should use obvious field names corresponding to the SkgConfig type in `rust/types/misc.rs`. Please then change main.py so that instead of handing a fixed SkgConfig to 'serve', it reads the config from disk. Move that SkgConfig data currently in main.rs to a file called data/skgconfig.toml.
-** updating `typedb server && cargo run --bin skg` script
-*** reqs
-   Keep both running in the background.
-   Restart the cargo run when source code changes.
-*** prompt
-Can you create a script that will keep `cargo run` going in the background, but restart it any time it detects a change in rust/?
-** add "verify connection" to the API
-Let's add a new element to the API. This will require changing both elisp/ and rust/, and documentation in api-and-formats.md.
-
-The new API request, which Emacs can send via an interactive function to Rust, is called 'verify connection'. When Rust receives that, it should send the response 'This is the skg server verifying the connection.\n' (plus whatever other API gobbledygook is necessary for this API call to fit in with the others). Emacs should, upon receiving the response, print it and return its value.
-** integration test for "verify connection"
-*** Verify that the updating `cargo run` script is running.
-*** Have Emacs send the request.
-*** Test for a certain expected result.
-** more integration tests
-*** Each element of the API.
-    Don't test the many cases -- rust/ and tests/ already test those.
-    Just verify the total behavior.
-*** Fetch a node, using a test config
-    It can be one of the existing configs.
-    Delete the 'tantivy index' folder it creates if it passes.
-*** Search for a title and visit a link in it.
+* more integration tests
+** Each element of the API.
+   Don't test the many cases -- rust/ and tests/ already test those.
+   Just verify the total behavior.
+** Fetch a node, using a test config
+   It can be one of the existing configs.
+   Delete the 'tantivy index' folder it creates if it passes.
+** Search for a title and visit a link in it.
 * extract the test that the metadata renders title unnecessary
   Aliases are like that right now.
   Arguably not good. I should give them a title instead.

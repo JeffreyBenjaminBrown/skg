@@ -1,0 +1,4 @@
+db_name = "skg-test"
+skg_folder = "data/skg"
+tantivy_folder = "data/index.tantivy"
+port = 1730

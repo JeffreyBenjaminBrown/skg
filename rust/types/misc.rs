@@ -17,11 +17,17 @@ the collision probability is less than 1 in 1e6. */
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID ( pub String );
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgConfig {
   pub db_name        : String,
   pub skg_folder     : PathBuf, // The user's .skg files go here.
   pub tantivy_folder : PathBuf,
+  #[serde(default = "default_port")]
+  pub port           : u16,     // Server port (default: 1730)
+}
+
+fn default_port() -> u16 {
+  1730
 }
 
 #[derive(Clone)]

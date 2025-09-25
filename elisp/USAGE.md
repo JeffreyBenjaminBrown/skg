@@ -1,32 +1,37 @@
 # Initializing
 
-First start the TYpeDB server
-  (run `typedb server` from a shell)
-and after that start the Rust server
-  (evaluate `cargo run` from a shell,
-   from the root of this project).
-Finally within Emacs, evaluate `elisp/skg-init.el`
-  (visit it, then run `M-x eval-buffer`).
+First start the TYpeDB and Rust servers,
+by running `run-servers.sh` (from the shell).
+
+Then load the Emacs client,
+by evaluating the following (here, in Emacs):
+```elisp
+(progn
+  (load-file "skg-init.el")
+  (skg-client-init "../data/skgconfig.toml"))
+```
 
 # Commands you can run
 
 (See a later section for what each command does.)
 
-Now these commands can be run by evaluating them from here:
+Now these commands can be evaluated (here, in Emacs):
 ```
   (skg-request-single-root-content-view-from-node "1")
     ;; try 1, 1a, or a
   (skg-request-title-matches "second")
     ;; try match, title, or second
+  (skg-verify-connection)
+    ;; test connection to server
   (skg-doc-disconnect)
 ```
 
-From the skg content view buffer, this can be run:
+From a skg content view buffer, edited content can be saved:
 ```
 skg-request-save-buffer
 ```
 
-From any link in a search results buffer, this can be run:
+From any link in a search results buffer, links can be visited:
 ```
 skg-visit-link
 ```
@@ -42,6 +47,10 @@ causing Emacs to open an org-mode buffer displaying the results.
 `(request-title-matches)` asks Rust to search the Tantivy index
 for titles matching the search terms,
 and displays the results in a buffer.
+
+`(skg-verify-connection)` sends a simple ping to the Rust server
+to verify the connection is working. The server responds with a
+confirmation message that is displayed in the minibuffer.
 
 Surprisingly, the TCP connection
 does not need to be explicitly launched,

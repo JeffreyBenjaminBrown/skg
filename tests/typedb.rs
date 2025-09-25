@@ -38,7 +38,8 @@ fn test_typedb_integration (
     let config = SkgConfig {
       db_name        : "skg-test-typedb"       . into(),
       skg_folder     : "tests/typedb/fixtures" . into(),
-      tantivy_folder : "irrelevant"            . into() };
+      tantivy_folder : "irrelevant"            . into(),
+      port           : 1730 };
     let index_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");

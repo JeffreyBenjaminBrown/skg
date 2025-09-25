@@ -12,8 +12,7 @@ use crate::serve::node_aliases::handle_node_aliases_request;
 use crate::serve::save_buffer::handle_save_buffer_request;
 use crate::serve::single_root_view::handle_single_root_view_request;
 use crate::serve::title_matches::handle_title_matches_request;
-use crate::serve::util::request_type_from_request;
-use crate::serve::util::send_response;
+use crate::serve::util::{request_type_from_request, send_response};
 use crate::tantivy::initialize_tantivy_from_nodes;
 use crate::typedb::init::initialize_typedb_from_nodes;
 use crate::types::{SkgConfig, TantivyIndex, SkgNode};
@@ -36,9 +35,10 @@ pub fn serve (
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
     = initialize_dbs ( &config );
+  let bind_addr = format!("0.0.0.0:{}", config.port);
   let emacs_listener : TcpListener =
-    TcpListener::bind("0.0.0.0:1730")?;
-  println!("Listening on port 1730...");
+    TcpListener::bind(&bind_addr)?;
+  println!("Listening on port {}...", config.port);
   for stream_res in emacs_listener.incoming() {
     match stream_res {
       Ok(stream) => {
@@ -139,6 +139,9 @@ fn handle_emacs (
               &request,
               &typedb_driver,
               config);
+          } else if request_type == "verify connection" {
+            handle_verify_connection_request(
+              &mut stream);
           } else {
             let error_msg : String =
               format! ( "Unsupported request type: {}",
@@ -154,3 +157,9 @@ fn handle_emacs (
               err)); } };
       request.clear(); }
   println!("Emacs disconnected: {peer}"); }
+
+fn handle_verify_connection_request (
+  stream: &mut std::net::TcpStream) {
+  send_response (
+    stream,
+    "This is the skg server verifying the connection."); }

@@ -28,7 +28,8 @@ fn test_a_mess_of_stuff
     let config = SkgConfig {
       db_name        : "skg-test-content-view" . into(),
       skg_folder     : "tests/content_view/fixtures".into(),
-      tantivy_folder : "irrelevant".into(), };
+      tantivy_folder : "irrelevant".into(),
+      port           : 1730, };
     let skg_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");

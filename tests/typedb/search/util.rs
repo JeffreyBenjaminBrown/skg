@@ -28,7 +28,8 @@ fn test_pid_from_id (
     let config = SkgConfig {
       db_name        : "skg-test-typedb-search-util"       . into(),
       skg_folder     : "tests/typedb/search/util/fixtures" . into(),
-      tantivy_folder : "irrelevant"                         . into() };
+      tantivy_folder : "irrelevant"                         . into(),
+      port           : 1730 };
     let index_folder : &str =
       config . skg_folder . to_str ()
       . expect ("Invalid UTF-8 in tantivy index path");

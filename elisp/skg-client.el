@@ -9,7 +9,23 @@
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-title-matches)
+(require 'skg-request-verify-connection)
 (require 'skg-state)
+
+(defun skg-client-init (file)
+  (defvar skg-port (skg-port-from-toml file))
+  (skg-tcp-connect-to-rust))
+
+(defun skg-port-from-toml (file)
+  "Return the integer value of `port = ...` from FILE (a TOML config)."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (if (re-search-forward
+         "^[ \t]*port[ \t]*=[ \t]*\\([0-9]+\\)"
+         nil t)
+        (string-to-number (match-string 1))
+      (error "No port setting found in %s" file)) ))
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
@@ -22,7 +38,7 @@
            :name "skg-doc"
            :buffer "*skg-doc-raw*"
            :host "127.0.0.1"
-           :service 1730
+           :service skg-port
            :filter ;; handles the response
            #'skg-handle-rust-response
            :coding 'utf-8

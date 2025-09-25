@@ -29,7 +29,8 @@ async fn setup_test_database (
     SkgConfig {
       db_name        : "skg-test-typedb-search-robust"       . into(),
       skg_folder     : "tests/typedb/search/robust/fixtures" . into(),
-      tantivy_folder : "irrelevant"                          . into() };
+      tantivy_folder : "irrelevant"                          . into(),
+      port           : 1730 };
   let index_folder : &str =
     config . skg_folder . to_str ()
     . expect ("Invalid UTF-8 in tantivy index path");
