@@ -7,7 +7,7 @@ use futures::executor::block_on;
 use std::net::TcpStream;
 use typedb_driver::TypeDBDriver;
 
-/// Extracts node ID and level from a containerward view request,
+/// Extracts parameters from a containerward view request,
 /// generates the containerward org view,
 /// and sends the response with length prefix.
 pub fn handle_containerward_view_request (
