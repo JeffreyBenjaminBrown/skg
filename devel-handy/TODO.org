@@ -1,3 +1,6 @@
+* render/ could be renamed graph_to_org
+  and deserves distinction from rendering title matches,
+  which is done in rust/serve/title_matches.rs
 * merge [[id:7b2499c4-4c93-44dc-83b1-0a4b9175d6a8][containerward view]] into main
 * integration tests
 ** updating `cargo run --bin skg` script
@@ -45,12 +48,27 @@ in elisp/skg-request-single-root-content-view.el:
   defun skg-open-org-buffer-from-text
 in elisp/skg-request-save.el:
   defun skg-replace-buffer-with-new-content
-** (more?) places with potential redundancy
-*** rust rendering
-    rust/render/*.rs (except util.rs)
-*** in rust/serve
-    rust/serve/containerward_view.rs
-    and the others
+** a flexible node-rendering function
+   Rather than each renderer having separate code for that,
+   a single function could handle cases like
+     body is included or ignored
+     metadata should include 'containerward' or not
+     level
+   and metadata could be encoded (in the code) via enum,
+   which already exists,
+   rather than its text representation.
+** use s-exp parsing
+*** in rust/serve/containerward_view.rs
+    fn extract_containerward_view_params
+*** in rust/serve/node_aliases.rs
+    fn extract_node_aliases_params
+*** in rust/serve/util.rs
+**** definitely
+     fn request_type_from_request (
+     fn node_id_from_single_root_view_request (
+     fn search_terms_from_request (
+**** and maybe
+     fn extract_quoted_value_from_sexp (
 * override ordinary save command
 * link-sourceward view
 ** then eliminate further redundancy, if any
@@ -76,7 +94,6 @@ let driver = TypeDBDriver::new(...)
 * A node's ID should probably always be its primary one.
   In the medatata?
   As its name in the filesystem?
-* Document the fact that filenames must correspond to PIDs.
 * `org_from_node_recursive` should use its `focus` argument.
   This seems easy.
 * Rust send and receive need fairly complete rewriting.
@@ -202,26 +219,25 @@ let driver = TypeDBDriver::new(...)
    But do make it investigable, both in a view,
    and in saved changes.
 * Avoid uses of `unwrap` in Rust.
-* Explain the dangers of repeated nodes to the user.
-  The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
-* find where to put this comment
-// Titles can include hyperlinks,
-// but can be searched for as if each hyperlink
-// was equal to its label, thanks to replace_each_link_with_its_label.
 * extract into a config file
-** let db_name = "skg-test";
-   in rust/serve.rs
 ** "127.0.0.1:1729",
    in rust/serve.rs
    in elisp/, somewhere
 ** TcpListener::bind("0.0.0.0:1730")?;
    in rust/serve.rs
-* change graph -> web
-* see also [[../docs/progress.md][progress.md]]
-* use [[~/hodal/emacs/property-dump.el][property-dump]] to send straight to Rust
-* in docs
+* document
+** that filenames must correspond to PIDs
+** the dangers of repeated nodes to the user
+   The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
+** find where to put this comment
+ // Titles can include hyperlinks,
+ // but can be searched for as if each hyperlink
+ // was equal to its label, thanks to replace_each_link_with_its_label.
+** change graph -> web
+** drop [[../docs/progress.md][progress.md]]
 ** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
-* the db_name "skg-test" should not be hardcoded
-* the TODO item in rust/serve.rs
+* solutions
+** to extract Emacs properties into Rust
+   use [[~/hodal/emacs/property-dump.el][property-dump]]
