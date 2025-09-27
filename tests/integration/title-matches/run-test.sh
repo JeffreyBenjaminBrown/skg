@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Integration test for skg verify-connection functionality
+# Integration test for skg title-matches functionality
 # This script:
 # - Verifies TypeDB server is running
 # - Starts an independent cargo run process with test config
-# - Uses Emacs to send the verify connection request
-# - Tests that Emacs receives the expected result
+# - Uses Emacs to send title-matches request for "apples"
+# - Tests that Emacs receives search results and can visit links
 
 set -e  # Exit on any error
 
@@ -15,12 +15,10 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 # Source common test library
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Verify Connection Integration Test ==="
+echo "=== SKG Title Matches Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 
-
-# Set up cleanup trap
 trap cleanup EXIT
 
 check_typedb_server
@@ -35,7 +33,7 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
-skg_folder = "$TEST_DIR/data/skg"
+skg_folder = "$TEST_DIR/data/skg-data"
 tantivy_folder = "$TEST_DIR/data/index.tantivy"
 port = $AVAILABLE_PORT
 EOF

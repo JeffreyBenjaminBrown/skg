@@ -20,3 +20,8 @@ temp-*
 temp/
 /tests/integration/verify-connection/server.log
 /tests/integration/verify-connection/data/index.tantivy/
+/tests/integration/title-matches/server.log
+/tests/integration/title-matches/data/index.tantivy/
+/tests/integration/tests.log
+/tests/integration/title-matches/test.log
+/tests/integration/verify-connection/test.log

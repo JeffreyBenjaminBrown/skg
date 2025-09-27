@@ -12,8 +12,6 @@
 * add new data without fetching preexisting data
   and add an integration test.
   Use a temp config, and delete it if the test passes.
-* divide fn containerward_org_view
-from rust/render/containerward_view.rs
 * eliminate redundancies
 ** generalize containerward_path
    call the generalization
