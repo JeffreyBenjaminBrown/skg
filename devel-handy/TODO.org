@@ -1,11 +1,4 @@
-* more integration tests
-** Each element of the API.
-   Don't test the many cases -- rust/ and tests/ already test those.
-   Just verify the total behavior.
-** Fetch a node, using a test config
-   It can be one of the existing configs.
-   Delete the 'tantivy index' folder it creates if it passes.
-** Search for a title and visit a link in it.
+* fix all tests to cleanup their temp TypeDB databases after running
 * extract the test that the metadata renders title unnecessary
   Aliases are like that right now.
   Arguably not good. I should give them a title instead.
