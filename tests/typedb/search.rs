@@ -1,6 +1,6 @@
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::typedb::search::robust::find_containers_of;
-use skg::typedb::search::robust::containerward_path;
+use skg::typedb::search::find_containers_of;
+use skg::typedb::search::containerward_path;
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;

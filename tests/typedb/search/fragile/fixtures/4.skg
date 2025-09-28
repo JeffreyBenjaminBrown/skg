@@ -1,6 +1,0 @@
-ids:
-- '4'
-- '44'
-title: This is a [[id:shgulasdghu][test]] of a second kind.
-body: |-
-  this one string could span pages
