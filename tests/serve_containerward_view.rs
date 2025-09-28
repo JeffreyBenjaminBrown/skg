@@ -2,33 +2,31 @@ use skg::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
 use skg::types::ID;
 
 use std::error::Error;
+use rand::prelude::*;
 
 #[test]
 fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
   // Characters that could befuddle S-expression parsing from Emacs
-  let problematic_chars = [' ', '"', '(', ')', '\'', '`'];
+  let problem_chars = [' ', '"', '(', ')', '\'', '`'];
 
-  // Generate 50 random test cases
-  for i in 0..50 {
-    // Create a random test ID
-    let test_id = format!("test{}", i);
-
-    // Pick two random problematic characters for this test
-    let char1 = problematic_chars[i % problematic_chars.len()];
-    let char2 = problematic_chars[(i * 3) % problematic_chars.len()];
-
-    // Create a title with the problematic characters
-    let title = format!("Title{}with{}chars", char1, char2);
-
-    // Create headline with random level (1-4 asterisks)
-    let level = (i % 4) + 1;
-    let asterisks = "*".repeat(level);
-    let headline = format!("{} <skg<id:{}>> {}", asterisks, test_id, title);
-
-    // Create the S-expression request
-    let request = format!(
+  let mut rng: ThreadRng = // for random numbers
+    thread_rng();
+  for i in 0..50 { // 50 random tests
+    let test_id: String = format!("test{}", i);
+    let char1: char = // random problem_char
+      problem_chars[rng.gen_range(0..problem_chars.len())];
+    let char2: char = // random problem_char
+      problem_chars[rng.gen_range(0..problem_chars.len())];
+    let title: String = // has just those two characters
+      format!("Title{}with{}chars", char1, char2);
+    let level: usize = rng.gen_range(1..=4); // random level in [1,4]
+    let asterisks: String = "*".repeat(level);
+    let headline: String =
+      format!("{} <skg<id:{}>> {}", asterisks, test_id, title);
+    let request: String = format!(
       "((request . \"containerward view\") (headline . \"{}\"))",
-      headline.replace("\"", "\\\"") // Escape quotes for the S-expression
+      headline.replace(
+        "\"", "\\\"") // Escape quotes for the S-expression
     );
 
     // Test the parsing
