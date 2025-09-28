@@ -3,7 +3,7 @@ use crate::render::aliases_to_org;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
-use crate::types::{SkgConfig, find_id_in_metadata_collection};
+use crate::types::{ID, SkgConfig, find_id_in_metadata_collection};
 
 use std::net::TcpStream;
 
@@ -18,7 +18,8 @@ pub fn handle_node_aliases_request (
 
   match parse_headline_from_sexp ( request ) {
     Ok ( (metadata_items, level, _title) ) => {
-      let node_id = find_id_in_metadata_collection(&metadata_items)
+      let node_id: Result<ID, &str> =
+        find_id_in_metadata_collection(&metadata_items)
         .ok_or("No ID found in headline metadata");
       match node_id {
         Ok(id) => {

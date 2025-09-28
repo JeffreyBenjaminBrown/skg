@@ -1,5 +1,3 @@
-* review tests/serve_containerward_view.rs
-* re-enable that third integration test
 * retain metadata when replacing node
   When a backview replaces text,
   it should retain the origin headline's

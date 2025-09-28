@@ -21,8 +21,9 @@ pub fn handle_containerward_view_request (
   match parse_headline_from_sexp ( request ) {
     Ok ( (metadata_items, level, _title) ) => {
       // Extract ID from metadata items
-      let node_id = find_id_in_metadata_collection(&metadata_items)
-        .ok_or("No ID found in headline metadata");
+      let node_id: Result<ID, &str> =
+        find_id_in_metadata_collection (&metadata_items)
+        . ok_or ("No ID found in headline metadata");
 
       match node_id {
         Ok(id) => {

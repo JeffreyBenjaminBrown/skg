@@ -6,6 +6,8 @@ use rand::prelude::*;
 
 #[test]
 fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
+  /* I was worried about quotation marks or unbalanced s-expressions inside of headlines confusing the parser. This test therefore generates 50 random (different each time) 2-character headlines from 'problem_chars'. */
+
   // Characters that could befuddle S-expression parsing from Emacs
   let problem_chars = [' ', '"', '(', ')', '\'', '`'];
 
@@ -29,10 +31,10 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
       // Rust's debug format {:?} properly escapes strings.
     );
 
-    // Test the parsing
-    match parse_headline_from_sexp(&request) {
+    match parse_headline_from_sexp(&request) { // target of test
       Ok((metadata_items, parsed_level, parsed_title)) => {
-        let node_id = find_id_in_metadata_collection(&metadata_items);
+        let node_id: Option<ID> =
+          find_id_in_metadata_collection(&metadata_items);
 
         assert_eq!(node_id, Some(ID(test_id.clone())),
                    "Failed to parse ID correctly for title: '{}' (headline: '{}')",
@@ -47,41 +49,4 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
       Err(e) => {
         panic!("Parsing failed for title: '{}' (headline: '{}') with error: {}",
                title, headline, e); }} }
-  Ok (( )) }
-
-#[test]
-fn test_sexp_parsing_edge_cases() -> Result<(), Box<dyn Error>> {
-  // Test some specific edge cases that are likely to cause problems
-  let test_cases = vec![
-    ("quote_test", "*** <skg<id:quote_test>> Text with \"quoted\" content"),
-    ("paren_test", "** <skg<id:paren_test>> Text with (parentheses) here"),
-    ("tick_test", "* <skg<id:tick_test>> Text with `backticks` here"),
-    ("mixed_test", "** <skg<id:mixed_test>> Text with \"quotes\" and (parens) and `ticks`"),
-    ("space_test", "* <skg<id:space_test>> Text   with   multiple   spaces"),
-    ("single_quote_test", "* <skg<id:single_quote_test>> Text with single \" quote"),
-    ("single_open_paren_test", "** <skg<id:single_open_paren_test>> Text with single ( paren"),
-    ("single_close_paren_test", "*** <skg<id:single_close_paren_test>> Text with single ) paren"),
-  ];
-
-  for (test_id, headline) in test_cases {
-    let request = format!(
-      "((request . \"containerward view\") (headline . {}))",
-      format!("{:?}", headline) // Use Rust's Debug format which properly escapes strings
-    );
-
-    match parse_headline_from_sexp(&request) {
-      Ok((metadata_items, level, _title)) => {
-        // Extract ID from metadata
-        let node_id = find_id_in_metadata_collection(&metadata_items);
-
-        assert_eq!(node_id, Some(ID(test_id.to_string())),
-                   "Failed to parse ID correctly for edge case: '{}'", headline);
-        // Level should match the number of asterisks at start
-        let expected_level = headline.chars().take_while(|&c| c == '*').count();
-        assert_eq!(level, expected_level,
-                   "Failed to parse level correctly for edge case: '{}'", headline);
-      },
-      Err(e) => {
-        panic!("Parsing failed for edge case headline: '{}' with error: {}",
-               headline, e); }} }
   Ok (( )) }

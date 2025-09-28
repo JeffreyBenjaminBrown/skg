@@ -16,6 +16,7 @@ echo "Results will be written to: $TESTS_LOG"
 TEST_DIRS=(
   "verify-connection"
   "search-for-title-and-visit-link"
+  "content-view-and-save"
 )
 
 # Function to run a single test in its directory
