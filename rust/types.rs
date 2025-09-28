@@ -10,7 +10,9 @@ pub use orgnode::{ OrgNode,
                    OrgNodeMetadata,
                    RelToOrgParent,
                    MetadataItem,
-                   parse_metadata_from_string, };
+                   parse_metadata_from_string,
+                   find_in_metadata_collection,
+                   find_id_in_metadata_collection, };
 pub mod skgnode;
 pub use skgnode::{ SkgNode,
                    NodeWithEphem,

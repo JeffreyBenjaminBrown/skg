@@ -137,9 +137,9 @@ impl MetadataItem {
     matches!(self, MetadataItem::Cycle)
   }
 
-  pub fn get_id(&self) -> Option<&str> {
+  pub fn get_id(&self) -> Option<ID> {
     match self {
-      MetadataItem::ID(id) => Some(id),
+      MetadataItem::ID(id) => Some(ID(id.clone())),
       _ => None, }}
 
   pub fn get_type(&self) -> Option<&RelToOrgParent> {
@@ -147,7 +147,29 @@ impl MetadataItem {
       MetadataItem::Type(rel_to_parent) => Some(rel_to_parent),
       _ => None, }} }
 
-/// Parse metadata string into Vec<MetadataItem>
+/// Find the first item in a generic MetaData collection
+/// that matches a generic accessor function.
+///
+/// Examples:
+/// - `find_in_metadata_collection(&metadata, MetadataItem::get_id)`
+/// - `find_in_metadata_collection(&metadata, |item| if item.is_cycle() { Some(()) } else { None })`
+
+pub fn find_in_metadata_collection<T, F>(
+  collection : &[MetadataItem],
+  accessor   : F,
+) -> Option<T>
+where
+  F : Fn(&MetadataItem) -> Option<T>,
+{ collection . iter() . find_map (accessor) }
+
+/// Special case: find ID in MetaData collection.
+pub fn find_id_in_metadata_collection(
+  collection : &[MetadataItem],
+) -> Option<ID>
+{ find_in_metadata_collection (
+  collection,
+  |item| item . get_id() ) }
+
 pub fn parse_metadata_from_string(
   metadata_str: &str
 ) -> Result<Vec<MetadataItem>, String> {
@@ -169,3 +191,4 @@ pub struct OrgNodeMetadata {
   pub rel_to_parent: RelToOrgParent,
   pub metadata: Vec<MetadataItem>,
 }
+

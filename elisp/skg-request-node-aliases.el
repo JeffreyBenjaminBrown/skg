@@ -7,21 +7,18 @@
 
 (defun skg-request-node-aliases (&optional tcp-proc)
   "Ask Rust for aliases of current headline's node, inserting at appropriate position.
-Parses current headline metadata to get node ID and level, then requests aliases
-and inserts them after the headline and body.
+Sends the full headline text for Rust to parse, then inserts aliases
+after the headline and body.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive)
   (condition-case err
-      (let* ((metadata (skg-get-current-headline-metadata))
-             (node-id (car metadata))
-             (level (cadr metadata))
+      (let* ((headline-text (skg-get-current-headline-text))
              (insertion-point (skg-find-branch-insertion-point))
              (tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
              (request-s-exp
               (concat (prin1-to-string
                        `((request . "node aliases")
-                         (id . ,node-id)
-                         (level . ,level)))
+                         (headline . ,headline-text)))
                       "\n")))
         (setq ;; Prepare LP state and handler
          skg-lp--buf        (unibyte-string) ;; empty string

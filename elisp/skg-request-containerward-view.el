@@ -49,15 +49,6 @@ Returns a cons cell (START . END) representing the region to replace."
                    (point-max))))
         (cons start end)))))
 
-(defun skg-get-current-headline-text ()
-  "Returns the current headline in its entirety,
-including asterisks and metadata, but not the trailing newline."
-  (save-excursion
-    (org-back-to-heading)
-    (let ((start (point)))
-      (end-of-line)
-      (buffer-substring-no-properties start (point)))))
-
 (defun skg-replace-headline-with-containerward-view
     (replacement-bounds payload)
   "Replace the region specified by REPLACEMENT-BOUNDS with PAYLOAD."

@@ -2,7 +2,7 @@
 
 use crate::types::NodeWithEphem;
 use crate::types::OrgNodeInterp;
-use crate::types::{ID,MetadataItem,OrgNode,OrgNodeMetadata,RelToOrgParent,parse_metadata_from_string};
+use crate::types::{MetadataItem,OrgNode,OrgNodeMetadata,RelToOrgParent,parse_metadata_from_string};
 
 use std::collections::{HashMap, HashSet};
 
@@ -110,7 +110,7 @@ pub fn parse_separating_metadata_and_title (
       return (
         OrgNodeMetadata {
           id            : metadata_values.iter().find_map(
-            |v| v.get_id()).map(|s| ID(s.to_string())),
+            |v| v.get_id()),
           repeated      : metadata_values.iter().any(|v| v.is_repeated()),
           folded        : metadata_values.iter().any(|v| v.is_folded()),
           focused       : metadata_values.iter().any(|v| v.is_focused()),

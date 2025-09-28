@@ -1,5 +1,5 @@
 use skg::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
-use skg::types::ID;
+use skg::types::{ID, find_id_in_metadata_collection};
 
 use std::error::Error;
 use rand::prelude::*;
@@ -24,17 +24,15 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
     let headline: String =
       format!("{} <skg<id:{}>> {}", asterisks, test_id, title);
     let request: String = format!(
-      "((request . \"containerward view\") (headline . \"{}\"))",
-      headline.replace(
-        "\"", "\\\"") // Escape quotes for the S-expression
+      "((request . \"containerward view\") (headline . {}))",
+      format!("{:?}", headline)
+      // Rust's debug format {:?} properly escapes strings.
     );
 
     // Test the parsing
     match parse_headline_from_sexp(&request) {
       Ok((metadata_items, parsed_level, parsed_title)) => {
-        let node_id = metadata_items.iter()
-          .find_map(|item| item.get_id())
-          .map(|id_str| ID(id_str.to_string()));
+        let node_id = find_id_in_metadata_collection(&metadata_items);
 
         assert_eq!(node_id, Some(ID(test_id.clone())),
                    "Failed to parse ID correctly for title: '{}' (headline: '{}')",
@@ -60,20 +58,21 @@ fn test_sexp_parsing_edge_cases() -> Result<(), Box<dyn Error>> {
     ("tick_test", "* <skg<id:tick_test>> Text with `backticks` here"),
     ("mixed_test", "** <skg<id:mixed_test>> Text with \"quotes\" and (parens) and `ticks`"),
     ("space_test", "* <skg<id:space_test>> Text   with   multiple   spaces"),
+    ("single_quote_test", "* <skg<id:single_quote_test>> Text with single \" quote"),
+    ("single_open_paren_test", "** <skg<id:single_open_paren_test>> Text with single ( paren"),
+    ("single_close_paren_test", "*** <skg<id:single_close_paren_test>> Text with single ) paren"),
   ];
 
   for (test_id, headline) in test_cases {
     let request = format!(
-      "((request . \"containerward view\") (headline . \"{}\"))",
-      headline.replace("\"", "\\\"") // Escape quotes for the S-expression
+      "((request . \"containerward view\") (headline . {}))",
+      format!("{:?}", headline) // Use Rust's Debug format which properly escapes strings
     );
 
     match parse_headline_from_sexp(&request) {
       Ok((metadata_items, level, _title)) => {
         // Extract ID from metadata
-        let node_id = metadata_items.iter()
-          .find_map(|item| item.get_id())
-          .map(|id_str| ID(id_str.to_string()));
+        let node_id = find_id_in_metadata_collection(&metadata_items);
 
         assert_eq!(node_id, Some(ID(test_id.to_string())),
                    "Failed to parse ID correctly for edge case: '{}'", headline);
