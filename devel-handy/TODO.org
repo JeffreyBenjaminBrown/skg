@@ -27,6 +27,8 @@
    This seems easy.
 * not pressing
 ** refactoring
+*** Parse metadata in Rust, not Emacs.
+    see `skg-get-current-headline-metadata`
 *** use s-exp parsing
 **** in rust/serve/containerward_view.rs
      fn extract_containerward_view_params

@@ -6,20 +6,18 @@
 (require 'skg-metadata)
 
 (defun skg-request-containerward-view (&optional tcp-proc)
-  "Ask Rust for containerward view of current headline's node, replacing current headline.
-Parses current headline metadata to get node ID and level, then requests containerward view
-and replaces the current headline and its body with the result.
+  "Asks Rust for containerward view of current headline's node,
+sending the full headline text for Rust to parse.
+Replaces the current headline and its body with the result.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive)
   (condition-case err
-      (let* ((metadata (skg-get-current-headline-metadata))
-             (node-id (car metadata))
-             (level (cadr metadata))
+      (let* ((headline-text (skg-get-current-headline-text))
              (replacement-bounds (skg-find-headline-replacement-bounds))
              (tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
              (request-sexp
-              (format "((request . \"containerward view\") (id . \"%s\") (level . \"%s\"))\n"
-                      node-id level)))
+              (format "((request . \"containerward view\") (headline . \"%s\"))\n"
+                      headline-text)))
         (setq ;; Prepare LP state and handler
          skg-lp--buf        (unibyte-string) ;; empty string
          skg-lp--bytes-left nil
@@ -48,6 +46,15 @@ Returns a cons cell (START . END) representing the region to replace."
                        (point))
                    (point-max))))
         (cons start end)))))
+
+(defun skg-get-current-headline-text ()
+  "Returns the current headline in its entirety,
+including asterisks and metadata, but not the trailing newline."
+  (save-excursion
+    (org-back-to-heading)
+    (let ((start (point)))
+      (end-of-line)
+      (buffer-substring-no-properties start (point)))))
 
 (defun skg-replace-headline-with-containerward-view
     (replacement-bounds payload)

@@ -17,7 +17,7 @@ So far there are five endpoints:
   - Request: ((request . "node aliases") (id . "NODE_ID") (level . "LEVEL"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains org-mode formatted aliases.
 - Containerward view
-  - Request: ((request . "containerward view") (id . "NODE_ID") (level . "LEVEL"))
+  - Request: ((request . "containerward view") (headline . "HEADLINE_TEXT")). HEADLINE_TEXT includes asterisks and metadata but no trailing newline.
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains org-mode formatted containerward view starting from the specified node.
 - Save buffer
   - Request: First `((request . \"save buffer\"))\n"`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` has length `LENGTH`.

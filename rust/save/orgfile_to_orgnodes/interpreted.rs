@@ -83,7 +83,7 @@ pub fn interpret_org_node (
 /// 3) Remaining text (after `>>`) is the trimmed title.
 /// 4) If no metadata block, the whole remainder is the trimmed title.
 /// 5) Extract the `type` field from metadata if present.
-fn parse_separating_metadata_and_title (
+pub fn parse_separating_metadata_and_title (
   line_after_bullet: &str
 ) -> (OrgNodeMetadata,
       String) { // the title
