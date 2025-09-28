@@ -3,8 +3,8 @@ pub mod interpreted;
 pub mod types;
 pub mod uninterpreted;
 
-use crate::save::orgfile_to_orgnodes::interpreted::interpret_org_node;
-use crate::save::orgfile_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
+use crate::text_to_orgnodes::interpreted::interpret_org_node;
+use crate::text_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
 use crate::types::{OrgNodeInterp, OrgNode};
 
 /* This function parses a "skg org" document

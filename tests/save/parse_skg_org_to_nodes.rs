@@ -1,6 +1,6 @@
 use indoc::indoc;
-use skg::save::orgfile_to_orgnodes::parse_skg_org_to_nodes;
-use skg::save::orgfile_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
+use skg::text_to_orgnodes::parse_skg_org_to_nodes;
+use skg::text_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
 use skg::types::{OrgNodeInterp, ID, OrgNode};
 
 
