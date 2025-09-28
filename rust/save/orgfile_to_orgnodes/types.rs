@@ -1,6 +1,6 @@
 // Local types for parsing org files.
 
-use crate::types::{ID, OrgNodeType, MetadataItem};
+use crate::types::{ID, RelToOrgParent, MetadataItem};
 
 /// Parsed metadata from an org-mode headline
 #[derive(Debug, Clone, PartialEq)]
@@ -9,6 +9,6 @@ pub struct OrgNodeMetadata {
   pub repeated: bool,
   pub folded: bool,
   pub focused: bool,
-  pub node_type: OrgNodeType,
+  pub rel_to_parent: RelToOrgParent,
   pub metadata: Vec<MetadataItem>,
 }

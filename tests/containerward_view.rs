@@ -59,8 +59,8 @@ async fn test_containerward_org_view (
     driver, config, &ID("111".to_string()), 2).await?;
   let expected2 = indoc! {"
     ** <skg<id:111>> 111
-    *** <skg<id:11,type:containsOrgParent>> 11
-    **** <skg<id:1,type:containsOrgParent>> 1
+    *** <skg<id:11,type:container>> 11
+    **** <skg<id:1,type:container>> 1
     "};
   assert_eq!(result2, expected2);
 
@@ -69,9 +69,9 @@ async fn test_containerward_org_view (
     driver, config, &ID("2".to_string()), 1).await?;
   let expected3 = indoc! {"
     * <skg<id:2,cycle>> 2
-    ** <skg<id:211,type:containsOrgParent>> 211
-    *** <skg<id:21,type:containsOrgParent>> 21
-    **** <skg<id:2,cycle,type:containsOrgParent>> 2
+    ** <skg<id:211,type:container>> 211
+    *** <skg<id:21,type:container>> 21
+    **** <skg<id:2,cycle,type:container>> 2
     "};
   assert_eq!(result3, expected3);
 
@@ -81,13 +81,13 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared".to_string()), 3).await?;
   let expected4a = indoc! {"
     *** <skg<id:shared>> shared
-    **** <skg<id:1,type:containsOrgParent>> 1
-    **** <skg<id:2,type:containsOrgParent>> 2
+    **** <skg<id:1,type:container>> 1
+    **** <skg<id:2,type:container>> 2
     "};
   let expected4b = indoc! {"
     *** <skg<id:shared>> shared
-    **** <skg<id:2,type:containsOrgParent>> 2
-    **** <skg<id:1,type:containsOrgParent>> 1
+    **** <skg<id:2,type:container>> 2
+    **** <skg<id:1,type:container>> 1
     "};
   assert!(result4 == expected4a ||
           result4 == expected4b,
@@ -101,17 +101,17 @@ async fn test_containerward_org_view (
     * <skg<id:shared_1>> shared_1
     Some body text.
     The second line of body text.
-    ** <skg<id:shared,type:containsOrgParent>> shared
-    *** <skg<id:1,type:containsOrgParent>> 1
-    *** <skg<id:2,type:containsOrgParent>> 2
+    ** <skg<id:shared,type:container>> shared
+    *** <skg<id:1,type:container>> 1
+    *** <skg<id:2,type:container>> 2
     "};
   let expected5b = indoc! {"
     * <skg<id:shared_1>> shared_1
     Some body text.
     The second line of body text.
-    ** <skg<id:shared,type:containsOrgParent>> shared
-    *** <skg<id:2,type:containsOrgParent>> 2
-    *** <skg<id:1,type:containsOrgParent>> 1
+    ** <skg<id:shared,type:container>> shared
+    *** <skg<id:2,type:container>> 2
+    *** <skg<id:1,type:container>> 1
     "};
   assert!(result5 == expected5a ||
           result5 == expected5b,
@@ -124,13 +124,13 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared_cyclic".to_string()), 1).await?;
   let expected6a = indoc! {"
     * <skg<id:shared_cyclic>> shared_cyclic
-    ** <skg<id:shared_cyclic_1,type:containsOrgParent>> shared_cyclic_1
-    ** <skg<id:uncyclic_container,type:containsOrgParent>> uncyclic_container
+    ** <skg<id:shared_cyclic_1,type:container>> shared_cyclic_1
+    ** <skg<id:uncyclic_container,type:container>> uncyclic_container
     "};
   let expected6b = indoc! {"
     * <skg<id:shared_cyclic>> shared_cyclic
-    ** <skg<id:uncyclic_container,type:containsOrgParent>> uncyclic_container
-    ** <skg<id:shared_cyclic_1,type:containsOrgParent>> shared_cyclic_1
+    ** <skg<id:uncyclic_container,type:container>> uncyclic_container
+    ** <skg<id:shared_cyclic_1,type:container>> shared_cyclic_1
     "};
   assert!(result6 == expected6a ||
           result6 == expected6b,
@@ -143,15 +143,15 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared_cyclic_1".to_string()), 1).await?;
   let expected7a = indoc! {"
     * <skg<id:shared_cyclic_1,cycle>> shared_cyclic_1
-    ** <skg<id:shared_cyclic,type:containsOrgParent>> shared_cyclic
-    *** <skg<id:shared_cyclic_1,cycle,type:containsOrgParent>> shared_cyclic_1
-    *** <skg<id:uncyclic_container,type:containsOrgParent>> uncyclic_container
+    ** <skg<id:shared_cyclic,type:container>> shared_cyclic
+    *** <skg<id:shared_cyclic_1,cycle,type:container>> shared_cyclic_1
+    *** <skg<id:uncyclic_container,type:container>> uncyclic_container
     "};
   let expected7b = indoc! {"
     * <skg<id:shared_cyclic_1,cycle>> shared_cyclic_1
-    ** <skg<id:shared_cyclic,type:containsOrgParent>> shared_cyclic
-    *** <skg<id:uncyclic_container,type:containsOrgParent>> uncyclic_container
-    *** <skg<id:shared_cyclic_1,cycle,type:containsOrgParent>> shared_cyclic_1
+    ** <skg<id:shared_cyclic,type:container>> shared_cyclic
+    *** <skg<id:uncyclic_container,type:container>> uncyclic_container
+    *** <skg<id:shared_cyclic_1,cycle,type:container>> shared_cyclic_1
     "};
   assert!(result7 == expected7a ||
           result7 == expected7b,

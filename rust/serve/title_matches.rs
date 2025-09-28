@@ -1,7 +1,7 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{TantivyIndex, MetadataItem, OrgNodeType};
+use crate::types::{TantivyIndex, MetadataItem, RelToOrgParent};
 use crate::render::orgnode::render_org_node_from_text;
 
 use std::collections::{HashMap, HashSet};
@@ -112,7 +112,7 @@ fn format_matches_as_org_mode (
   let mut title_search_metadata = HashSet::new();
   title_search_metadata.insert (
     MetadataItem::Type (
-      OrgNodeType::SearchResult ));
+      RelToOrgParent::SearchResult ));
 
   result.push_str(
     & render_org_node_from_text (

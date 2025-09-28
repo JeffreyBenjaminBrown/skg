@@ -1,183 +1,63 @@
-* generalize containerward_path
-  call the generalization
-    path_to_end_cycle_and_or_branches
-  Takes the relationship, including direction, as args.
+* retain metadata when replacing node
+  When a backview replaces text,
+  it should retain the origin headline's
+  relationship to its org-parent.
 * link-sourceward view
 ** then eliminate further redundancy, if any
-* add new data without fetching preexisting data
-  and add an integration test.
-  Use a temp config, and delete it if the test passes.
-* generalize the Rust rendering function
+* generalize the Rust backpath rendering function
   Takes a lambda involving (probably)
     path_to_end_cycle_and_or_branches,
   and a starting level.
   The lambda can drop the first member of the path, or not.
-* use s-exp parsing
-** in rust/serve/containerward_view.rs
-   fn extract_containerward_view_params
-** in rust/serve/node_aliases.rs
-   fn extract_node_aliases_params
-** in rust/serve/util.rs
-*** definitely
-    fn request_type_from_request (
-    fn node_id_from_single_root_view_request (
-    fn search_terms_from_request (
-*** and maybe
-    fn extract_quoted_value_from_sexp (
+* create new data without fetching preexisting data
+  and add an integration test.
+  Use a temp config, and delete it if the test passes.
+* [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
 * override ordinary save command
-* test the containerward "}" herald
-Just prompt Claude:
-
-Can you extend the test at tests/elisp/ for heralds-minor-mode to test the new-ish containerward herald which should be rendering as a blue "}"?
 * If there is a containerward "}" herald, the "ID exists" herald can be omitted.
 * [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
-  particularly, rootness and multiple containment
+  esp. rootness and multiple containment
 * [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
-* move empty_skgnode from tests into skgnode.rs
-  and then use it for lots of tests
-* Use anyhow or eyre crates for better error handling
-** Cargo.toml
-anyhow = "1.0"
-** usage
-use anyhow::Context;
-
-let driver = TypeDBDriver::new(...)
-    .await
-    .context("Failed to connect to TypeDB server")?;
+* [[id:bc8fd4c3-0566-400c-96a8-0f4632e7fd1c][merging]]
 * A node's ID should probably always be its primary one.
   In the medatata?
   As its name in the filesystem?
-* `org_from_node_recursive` should use its `focus` argument.
-  This seems easy.
-* Rust send and receive need fairly complete rewriting.
-** Rust send will not be hard.
-   add bullets, nesting
-   insert tags
-   obvious
-** features - checking feasibility in the all-Rust model
-*** initial content view
-**** read all the properties back
-**** if an ID is repeated, warn the user, report the ID, suggest aborting the save
-***** Don't worry (yet?) about something duplicated if its duplicate does not appear in the same view.
-      if the user puts a node somewhere and it's already somewhere else in the graph. They probably just moved it from elsewhere in the document. But if in fact they have duplicated something that's somewhere else, they'll someday probably find out about it by seeing a node marked "repeated".
-***** if they decide to save anyway, the last instance of the duplicated node probably wins
-**** create content relationships
-**** easy
-*** subscriptions
-**** User will need to create a "<< subscriptions >>" org-child
-     If that's all it says, it will be redisplayed herald-like,
-     and given an omits-some-content herald too.
-**** beneath that the user can add subscriptions
-**** to delete subscriptions the user can remove the omits-some-content tag
-*** hides_from_its_subscriptions
-**** If it hides anything, the << subscriptions >> node will have a special << hides >> child, also marked << omits-some-content >>.
-**** The user can manually edit that, but usually won't.
-**** If it's deleted, nothing will happen. Only if its omits-some-content tag is removed and its content are deleted with the "hides" relationships disappear.
-**** New "hides" relationships are created when Rust sees that the user has deleted (or moved) top-level content from the subscribing node.
-*** overrides_view_of
-**** normally announced with a herald
-**** to edit, an << overrides views of >> child can be created
-***** it appears with omits-some-content initially on
-***** the org-content of the << overrides view of >> node include everything that its parent overrides the view of
-*** merge
-**** in Emacs
-***** Make the two roots top-level siblings.
-      Remember the buffer as a whole belongs to no node, unlike org-roam where there is a title associated to the buffer.
-***** highlight them
-***** run the merge command
-***** the first root's title is kept, the second disappears, and the two merged roots' branches all become members of the first node
-      The disappearance can be a single delete in Emacs,
-      or two deletes if the second root has body text.
-      The user should be warned of their pending deletion
-      and given the chance to cencel.
-***** in the root the metadata records the new extra_id
-      As long as the user can be trusted to not delete the heralds,
-      this is as robust to user behavior as the contains relation.
-**** in Rust
-***** when the extra-id is found, the two nodes are merged
-***** the merged node's content is dictated by the saved file
-      without regard to the files on disk
-***** the merged node's subscriptions
-      for this nodes need subscriptions, which I haven't spec'd,
-      but it seems doable.
-      Either the subscriptions are read from disk and merged,
-      or if they are in the buffer, they are merged that way.
-      If one node's subscriptions are in the buffer
-      and the other's are on disk,
-      the buffer is treated as the source of subscriptions for one,
-      and the disk as the source of subscriptions for the other.
-*** show backlinks
-**** what Rust sends : no danger
-***** each backlink's hidden text has "<<id:_,links-to-parent,omits-some-content>>"
-      "parent" means "org-parent".
-      "omits-some-content" lets Rust know that the absence of content here does not indicate that the node has no content.
-**** how Emacs shows it
-***** they are immediate org-children
-***** backlink-ness is indicated with a system "<"
-***** content-not-shown is indicated "{█" or "{×"
-      the solid block indicating redaction
-**** how Rust receives it
-***** ignore link buffer-rootward, but process buffer-leafward from the backlink
-      elaboracion
-****** It ignores the relationship from something that "links-to-parent" to its parent.
-****** It saves any content of a node marked "links-to-parent" just like it weren't.
-**** the user can only screw it up by editing the metadata
-     :PROPERTIES:
-     :ID:       b4e7971e-7f7b-4989-bdd1-ce6cabccc710
-     :END:
-***** if they put the backlink somewhere else, no harm, because backlinks are ignored on save
-***** if they edit* the hidden text, who cares, that's on them
-      editing here includes deletion
-*** [[id:8e4ed00c-a6b6-4bce-8574-f399de72121e][Expose TypeDB querying to the user.]]
-*** content ancestries: similar to backlinks
-*** link targets in (recursive) contents: similar to backlinks
-*** ? [[id:562876f3-9608-4ebe-9ab1-f119188ffa32][Define relationships using ordinary org-roam syntax.]]
-*** [[id:8e4ed00c-a6b6-4bce-8574-f399de72121e][Expose TypeDB querying to the user.]]
-** better than checking each feature: a theorem
-*** for every query data I might want to run, it must be possible to
-**** represent it to Emacs (as plain text) alongside other kinds
-     Obviously true.
-     That it be alongside other kinds of queries is no hindrance,
-     because the tree permits all concerns to be separated.
-**** represent it to the user (as fontified text)
-     Similarly obviously true.
-**** represent edits to it to Rust (as plain text)
-     There are two kinds of relationships that might be in the buffer: Ones that should bear on the graph, and ones that shouldn't. The one's that shouldn't need merely to be recognized as relationships that don't get saved. For relationships that do get saved, it must be clear what kind of relationship they are and who their members are. I can't see how that could ever be hard to represent.
-* show binary relationship label with optional intermediating node
-  esp. nice if you can filter on those labels,
-  or on an ontology they belong to that groups them
-* extensions
-** show heralds
-   number of backlinks
-   number of contents
-   multiple containers
-** show ancestries
-*** what Rust sends : no danger
-**** each ancestry's hidden text has "<<id:_,contains-parent,omits-some-content>>"
-     "parent" meaning "org-parent"
-*** how Emacs shows it
-**** each* ancestry is an immediate org-child
-     hopefully there's only one, but nothing enforces that
-**** the `contains org-parent` tag translates to a "}" herald
-*** [[id:b4e7971e-7f7b-4989-bdd1-ce6cabccc710][the user can only screw it up by editing the hidden text]]
-** show when a link is bi-directional
-** list which links are in its recursive contents
-** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
-* some design choices
-** How Emacs returns text to Rust.
-   Exactly as it's stored in the buffer,
-   but not as it's displayed.
-** Let the user be responsible for avoiding duplication.
-   Don't make it impossible -- too hard.
-   But do make it investigable, both in a view,
-   and in saved changes.
-* Avoid uses of `unwrap` in Rust.
-* extract into a config file
-** "127.0.0.1:1729",
-   in rust/serve.rs
-   in elisp/, somewhere
-** TcpListener::bind("0.0.0.0:1730")?;
-   in rust/serve.rs
+* retain focus, folding on save
+** `org_from_node_recursive` should use its `focus` argument.
+   This seems easy.
+* not pressing
+** refactoring
+*** use s-exp parsing
+**** in rust/serve/containerward_view.rs
+     fn extract_containerward_view_params
+**** in rust/serve/node_aliases.rs
+     fn extract_node_aliases_params
+**** in rust/serve/util.rs
+***** definitely
+      fn request_type_from_request (
+      fn node_id_from_single_root_view_request (
+      fn search_terms_from_request (
+***** and maybe
+      fn extract_quoted_value_from_sexp (
+*** move empty_skgnode from tests into skgnode.rs
+    and then use it for lots of tests
+*** Use anyhow or eyre crates for better error handling
+**** Cargo.toml
+  anyhow = "1.0"
+**** usage
+  use anyhow::Context;
+
+  let driver = TypeDBDriver::new(...)
+      .await
+      .context("Failed to connect to TypeDB server")?;
+*** Avoid uses of `unwrap` in Rust.
+** fancy features
+*** show binary relationship label with optional intermediating node
+    esp. nice if you can filter on those labels,
+    or on an ontology they belong to that groups them
+*** show when a link is bi-directional
+*** list which links are in a node's recursive content
+*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user

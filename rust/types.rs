@@ -7,7 +7,7 @@ pub use misc::{ ID,
 pub mod orgnode;
 pub use orgnode::{ OrgNode,
                    OrgNodeInterp,
-                   OrgNodeType,
+                   RelToOrgParent,
                    MetadataItem,
                    parse_metadata_from_string, };
 pub mod skgnode;

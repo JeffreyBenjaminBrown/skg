@@ -12,10 +12,24 @@ pub struct OrgNode {
   pub branches : Vec<OrgNode>,
 }
 
+/* The RelToOrgParent serves two purposes:
+It (via heralds) tells the reader how to interpret a node on screen,
+and it tells Rust what to do with that node
+when the use saves their data.
+.
+PITFALL: The name of this type is somewhat imprecise.
+All orgnodes have a RelToOrgParent,
+even though the top-level nodes have no parent.
+Moreover, the SearchResult value of RelToOrgParent
+does not describe the node's relationship to its org parent;
+a search result is a search result, no matter where it is found.
+I considered using the name 'NodeType'
+but that seems even less helpful. */
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OrgNodeType {
+pub enum RelToOrgParent {
+
   Content, // Most nodes are this. Upon requesting a new content view, they all are. It means the org node's relationship to its org parent (if said parent exists) is that the parent 'contains' (in the sense defined in schema.tql) the child.
-  ContainsOrgParent, // This is the reverse of 'content'. If a node has this property, the node 'contains' (in the sense defined in schema.tql) its org-parent.
+  Container, // This is the reverse of 'content'. If a node has this relationship, the node 'contains' (in the sense defined in schema.tql) its org-parent.
   Aliases, // If an alias node A has org-parent P and org-children C0, C1 .. Cn, then the headline of each of the Ci is an alias of P. Any other recursive content (bodies, grandchildren, etc.) of A is ignored.
   SearchResult, // When the user searches for title/alias text, each hit is one of these. If, somehow, Rust finds a SearchResult in a saved org buffer, it ignores it, including all of its recursive content.
 }
@@ -29,45 +43,45 @@ pub enum MetadataItem {
   Focused,
   Cycle,
   ID (String),
-  Type (OrgNodeType), }
+  Type (RelToOrgParent), }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrgNodeInterp {
   // Tells Rust how to interpret -- what to do with -- an OrgNode it receives from Emacs when the user runs `skg-request-save-buffer` (defined in the elisp code).
   // Each org node's relationship to its org-container is determined by which of these it is. Thus org-container can relate differently to its different org-children.
-  Content (NodeWithEphem), // See the definition of OrgNodeType.
-  Aliases (Vec<String>),   // See the definition of OrgNodeType.
+  Content (NodeWithEphem), // See the definition of RelToOrgParent.
+  Aliases (Vec<String>),   // See the definition of RelToOrgParent.
   Ignored, }
 
 //
 // Implementations
 //
 
-impl Default for OrgNodeType {
+impl Default for RelToOrgParent {
   fn default() -> Self {
-    OrgNodeType::Content }}
+    RelToOrgParent::Content }}
 
 // String conversion implementations
 
-impl fmt::Display for OrgNodeType {
+impl fmt::Display for RelToOrgParent {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let s = match self {
-      OrgNodeType::Content => "content",
-      OrgNodeType::Aliases => "aliases",
-      OrgNodeType::SearchResult => "searchResult",
-      OrgNodeType::ContainsOrgParent => "containsOrgParent",
+      RelToOrgParent::Content => "content",
+      RelToOrgParent::Aliases => "aliases",
+      RelToOrgParent::SearchResult => "searchResult",
+      RelToOrgParent::Container => "container",
     };
     write!(f, "{}", s) }}
 
-impl FromStr for OrgNodeType {
+impl FromStr for RelToOrgParent {
   type Err = String;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "content" => Ok(OrgNodeType::Content),
-      "aliases" => Ok(OrgNodeType::Aliases),
-      "searchResult" => Ok(OrgNodeType::SearchResult),
-      "containsOrgParent" => Ok(OrgNodeType::ContainsOrgParent),
+      "content" => Ok(RelToOrgParent::Content),
+      "aliases" => Ok(RelToOrgParent::Aliases),
+      "searchResult" => Ok(RelToOrgParent::SearchResult),
+      "container" => Ok(RelToOrgParent::Container),
       _ => Err(format!("Unknown type value: {}", s)), }} }
 
 impl fmt::Display for MetadataItem {
@@ -93,8 +107,8 @@ impl FromStr for MetadataItem {
         if let Some((key_str, value_str)) = s.split_once(':') {
           match key_str.trim() {
             "type" => {
-              let type_val = OrgNodeType::from_str(value_str.trim())?;
-              Ok(MetadataItem::Type(type_val))
+              let rel_to_parent = RelToOrgParent::from_str(value_str.trim())?;
+              Ok(MetadataItem::Type(rel_to_parent))
             },
             "id" => {
               Ok(MetadataItem::ID(value_str.trim().to_string()))
@@ -127,9 +141,9 @@ impl MetadataItem {
       MetadataItem::ID(id) => Some(id),
       _ => None, }}
 
-  pub fn get_type(&self) -> Option<&OrgNodeType> {
+  pub fn get_type(&self) -> Option<&RelToOrgParent> {
     match self {
-      MetadataItem::Type(tv) => Some(tv),
+      MetadataItem::Type(rel_to_parent) => Some(rel_to_parent),
       _ => None, }} }
 
 /// Parse metadata string into Vec<MetadataItem>

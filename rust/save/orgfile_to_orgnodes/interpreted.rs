@@ -2,7 +2,7 @@
 
 use crate::types::NodeWithEphem;
 use crate::types::OrgNodeInterp;
-use crate::types::{OrgNode,MetadataItem,OrgNodeType,parse_metadata_from_string,ID};
+use crate::types::{OrgNode,MetadataItem,RelToOrgParent,parse_metadata_from_string,ID};
 use super::types::{OrgNodeMetadata};
 
 use std::collections::{HashMap, HashSet};
@@ -14,8 +14,8 @@ pub fn interpret_org_node (
   let (metadata, title): (OrgNodeMetadata, String) =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
-  match metadata.node_type {
-    OrgNodeType::Content => {
+  match metadata.rel_to_parent {
+    RelToOrgParent::Content => {
       let interpreted_branches: Vec<OrgNodeInterp> =
         if metadata.repeated { Vec::new()
         } else { uninterpreted.branches
@@ -52,7 +52,7 @@ pub fn interpret_org_node (
             } else { None // Filter out AliasNode values
             }} )
           . collect(), }) },
-    OrgNodeType::Aliases => {
+    RelToOrgParent::Aliases => {
       // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
       let branches: Vec<OrgNodeInterp> =
       { uninterpreted.branches
@@ -69,10 +69,10 @@ pub fn interpret_org_node (
             } else { None }} )
         . collect();
       OrgNodeInterp::Aliases (aliases) },
-    OrgNodeType::SearchResult => {
+    RelToOrgParent::SearchResult => {
       // It would be weird if these were ever present in the org data sent from Emacs -- they only appear in search result buffers, not content view buffers.
       OrgNodeInterp::Ignored },
-    OrgNodeType::ContainsOrgParent => {
+    RelToOrgParent::Container => {
       OrgNodeInterp::Ignored }} }
 
 /// Parse a headline into structured metadata and title.
@@ -98,37 +98,37 @@ fn parse_separating_metadata_and_title (
         parse_metadata_from_string (inner)
         . unwrap_or_else( |e| panic! (
           "Failed to parse metadata '{}': {}", inner, e));
-      let node_type: OrgNodeType =
+      let rel_to_parent: RelToOrgParent =
         match metadata_values.iter().find_map(|v| v.get_type()) {
           // TODO: This can be simplified.
-          Some(OrgNodeType::Content)           => OrgNodeType::Content,
-          Some(OrgNodeType::Aliases)           => OrgNodeType::Aliases,
-          Some(OrgNodeType::SearchResult)      => OrgNodeType::SearchResult,
-          Some(OrgNodeType::ContainsOrgParent) => OrgNodeType::ContainsOrgParent,
-          None                                 => OrgNodeType::Content, };
+          Some(RelToOrgParent::Content)      => RelToOrgParent::Content,
+          Some(RelToOrgParent::Aliases)      => RelToOrgParent::Aliases,
+          Some(RelToOrgParent::SearchResult) => RelToOrgParent::SearchResult,
+          Some(RelToOrgParent::Container)    => RelToOrgParent::Container,
+          None                               => RelToOrgParent::Content, };
       let title_rest: &str = &meta_start[end + 2..]; // skip ">>"
       let title: String = title_rest.trim().to_string();
       return (
         OrgNodeMetadata {
-          id        : metadata_values.iter().find_map(
+          id            : metadata_values.iter().find_map(
             |v| v.get_id()).map(|s| ID(s.to_string())),
-          repeated  : metadata_values.iter().any(|v| v.is_repeated()),
-          folded    : metadata_values.iter().any(|v| v.is_folded()),
-          focused   : metadata_values.iter().any(|v| v.is_focused()),
-          node_type : node_type,
-          metadata  : metadata_values, },
+          repeated      : metadata_values.iter().any(|v| v.is_repeated()),
+          folded        : metadata_values.iter().any(|v| v.is_folded()),
+          focused       : metadata_values.iter().any(|v| v.is_focused()),
+          rel_to_parent : rel_to_parent,
+          metadata      : metadata_values, },
         title ); }
     // If "<skg<" with no matching ">>",
     // fall through to default case
   } { // Default case: no (well-formed) metadata block
     let title: String = line_after_bullet.trim().to_string();
     ( OrgNodeMetadata
-      { id        : None,
-        repeated  : false,
-        folded    : false,
-        focused   : false,
-        node_type : OrgNodeType::Content,
-        metadata  : Vec::new(), },
+      { id            : None,
+        repeated      : false,
+        folded        : false,
+        focused       : false,
+        rel_to_parent : RelToOrgParent::Content,
+        metadata      : Vec::new(), },
       title ) }}
 
 /// Parse the content inside a `<skg< ... >>` metadata block.

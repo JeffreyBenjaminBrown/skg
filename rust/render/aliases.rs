@@ -1,4 +1,4 @@
-use crate::types::{MetadataItem, OrgNodeType};
+use crate::types::{MetadataItem, RelToOrgParent};
 use crate::render::orgnode::render_org_node_from_text;
 use std::collections::HashSet;
 
@@ -25,7 +25,7 @@ pub fn aliases_to_org (
   let mut aliases_metadata = HashSet::new();
   aliases_metadata.insert (
     MetadataItem::Type (
-      OrgNodeType::Aliases ));
+      RelToOrgParent::Aliases ));
 
   // build result
   let mut result = render_org_node_from_text(

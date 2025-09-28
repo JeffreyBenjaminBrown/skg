@@ -2,7 +2,7 @@ use crate::file_io::read_node_from_id;
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
-use crate::types::{ID, SkgConfig, MetadataItem, OrgNodeType};
+use crate::types::{ID, SkgConfig, MetadataItem, RelToOrgParent};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -136,5 +136,5 @@ fn metadata_for_element_of_path (
     // that appearance *should* (and does) get this type.
     metadata_set.insert (
       MetadataItem::Type (
-        OrgNodeType::ContainsOrgParent)); }
+        RelToOrgParent::Container)); }
   metadata_set }

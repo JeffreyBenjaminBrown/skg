@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use skg::render::orgnode::{render_org_node, render_org_node_from_text, render_metadata_header};
-use skg::types::{OrgNode, MetadataItem, OrgNodeType};
+use skg::types::{OrgNode, MetadataItem, RelToOrgParent};
 
 #[test]
 fn test_render_org_node_from_text_no_metadata() {
@@ -31,7 +31,7 @@ fn test_render_org_node_from_text_with_body() {
 #[test]
 fn test_render_org_node_from_text_with_metadata() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(OrgNodeType::Aliases));
+    metadata.insert(MetadataItem::Type(RelToOrgParent::Aliases));
     metadata.insert(MetadataItem::Folded);
 
     let result = render_org_node_from_text(
@@ -100,7 +100,7 @@ fn test_render_org_node_without_body() {
 #[test]
 fn test_metadata_ordering() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(OrgNodeType::Content));
+    metadata.insert(MetadataItem::Type(RelToOrgParent::Content));
     metadata.insert(MetadataItem::ID("xyz".to_string()));
     metadata.insert(MetadataItem::Cycle);
     metadata.insert(MetadataItem::Repeated);
@@ -133,7 +133,7 @@ fn test_render_metadata_header_single_item() {
 #[test]
 fn test_render_metadata_header_id_first() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(OrgNodeType::Content));
+    metadata.insert(MetadataItem::Type(RelToOrgParent::Content));
     metadata.insert(MetadataItem::ID("abc123".to_string()));
     metadata.insert(MetadataItem::Repeated);
 
