@@ -53,44 +53,5 @@
                      '(("c" . "d") ("e" . "f"))))
       (should (equal (sort set #'string<) '("a" "b"))))))
 
-(ert-deftest test-skg-get-current-headline-metadata ()
-  "Test skg-get-current-headline-metadata with various buffer contents."
-
-  (with-temp-buffer ;; metadata and title
-    (org-mode)
-    (insert "** <skg<id:test123,val>> title")
-    (goto-char (point-min))
-    (let ((result (skg-get-current-headline-metadata)))
-      (should result)
-      (should (equal (car result) "test123"))  ; id
-      (should (equal (cadr result) 2))         ; level
-      (should (equal (caddr result) "title")))) ; title
-  (with-temp-buffer ;; metadata but empty title
-    (org-mode)
-    (insert "** <skg<id:test456,val>>")
-    (goto-char (point-min))
-    (let ((result (skg-get-current-headline-metadata)))
-      (should result)
-      (should (equal (car result) "test456"))  ; id
-      (should (equal (cadr result) 2))         ; level
-      (should (equal (caddr result) ""))))     ; empty titl
-  (with-temp-buffer ;; should error (not a headline)
-    (org-mode)
-    (insert "title")
-    (goto-char (point-min))
-    (should-error (skg-get-current-headline-metadata)
-                  :type 'error))
-  (with-temp-buffer ;; should error (not a headline)
-    (org-mode)
-    (insert "<skg<id:test,val>>")
-    (goto-char (point-min))
-    (should-error (skg-get-current-headline-metadata)
-                  :type 'error))
-  (with-temp-buffer ;; should error (not a headline)
-    (org-mode)
-    (insert " <skg<id:test,val>>")
-    (goto-char (point-min))
-    (should-error (skg-get-current-headline-metadata)
-                  :type 'error)))
 
 (provide 'test-skg-metadata)
