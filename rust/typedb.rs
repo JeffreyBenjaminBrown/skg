@@ -11,6 +11,8 @@ pub use search::{
     climb_containerward_and_fetch_rootish_context,
     containerward_path,
     find_containers_of,
+    find_links_to,
+    find_related_nodes,
 };
 pub use update::update_nodes_and_relationships;
 pub mod update;

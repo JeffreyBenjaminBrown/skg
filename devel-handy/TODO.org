@@ -1,31 +1,30 @@
+* generalize containerward_path
+  call the generalization
+    path_to_end_cycle_and_or_branches
+  Takes the relationship, including direction, as args.
+* link-sourceward view
+** then eliminate further redundancy, if any
 * add new data without fetching preexisting data
   and add an integration test.
   Use a temp config, and delete it if the test passes.
-* eliminate redundancies
-** generalize containerward_path
-   call the generalization
-     path_to_end_cycle_and_or_branches
-   Takes the relationship, including direction, as args.
-** generalize the Rust rendering function
-   Takes a lambda involving (probably)
-     path_to_end_cycle_and_or_branches,
-   and a starting level.
-   The lambda can drop the first member of the path, or not.
-** use s-exp parsing
-*** in rust/serve/containerward_view.rs
-    fn extract_containerward_view_params
-*** in rust/serve/node_aliases.rs
-    fn extract_node_aliases_params
-*** in rust/serve/util.rs
-**** definitely
-     fn request_type_from_request (
-     fn node_id_from_single_root_view_request (
-     fn search_terms_from_request (
-**** and maybe
-     fn extract_quoted_value_from_sexp (
+* generalize the Rust rendering function
+  Takes a lambda involving (probably)
+    path_to_end_cycle_and_or_branches,
+  and a starting level.
+  The lambda can drop the first member of the path, or not.
+* use s-exp parsing
+** in rust/serve/containerward_view.rs
+   fn extract_containerward_view_params
+** in rust/serve/node_aliases.rs
+   fn extract_node_aliases_params
+** in rust/serve/util.rs
+*** definitely
+    fn request_type_from_request (
+    fn node_id_from_single_root_view_request (
+    fn search_terms_from_request (
+*** and maybe
+    fn extract_quoted_value_from_sexp (
 * override ordinary save command
-* link-sourceward view
-** then eliminate further redundancy, if any
 * test the containerward "}" herald
 Just prompt Claude:
 

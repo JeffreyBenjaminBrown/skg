@@ -108,31 +108,75 @@ pub async fn find_containers_of (
   driver  : &TypeDBDriver,
   node    : &ID
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
+  find_related_nodes (
+    db_name,
+    driver,
+    node,
+    "contains",
+    "contained",
+    "container"
+  ) . await
+}
+
+/// Runs a single TypeDB query.
+/// Returns the IDs of nodes that link to the input node.
+pub async fn find_links_to (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  find_related_nodes (
+    db_name,
+    driver,
+    node,
+    "hyperlinks_to",
+    "dest",
+    "source"
+  ) . await
+}
+
+/// Generalized function to find related nodes via a specified relationship.
+/// Returns the IDs of nodes in the `output_role` position related to the input node.
+pub async fn find_related_nodes (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  node        : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str
+) -> Result < HashSet<ID>, Box<dyn Error> > {
 
   let tx : Transaction =
     driver.transaction (
       db_name, TransactionType::Read
     ). await ?;
-  let answer : QueryAnswer =
-    tx.query (
-      format!( r#" match
-                     $container isa node, has id $container_id;
-                  {{ $contained isa node, has id "{}"; }} or
-                  {{ $contained isa node;
+  let output_id_var = format!("{}_id", output_role);
+  let match_clause = format!( r#" match
+                     ${} isa node, has id ${};
+                  {{ ${} isa node, has id "{}"; }} or
+                  {{ ${} isa node;
                      $e isa extra_id, has id "{}";
-                     $extra_rel isa has_extra_id ( node:     $contained,
-                                                   extra_id: $e ); }};
-                     $contains_rel isa contains ( container: $container,
-                                                  contained: $contained );
-                   select $container_id;"#,
-                   node, node )
-    ) . await?;
+                     $extra_rel isa has_extra_id ( node:     ${},
+                                                   extra_id: $e ); }};"#,
+                   output_role, output_id_var,
+                   input_role, node,
+                   input_role, node, input_role );
+  let relationship_and_select = format!( r#"
+                     $rel isa {} ( {}: ${},
+                                   {}: ${} );
+                     select ${};"#,
+                     relation, input_role, input_role,
+                     output_role, output_role,
+                     output_id_var );
+  let query = format!("{}{}", match_clause, relationship_and_select);
+
+  let answer : QueryAnswer = tx.query ( query ) . await?;
   let mut stream = answer.into_rows ();
-  let mut containers : HashSet<ID> = HashSet::new ();
+  let mut related_nodes : HashSet<ID> = HashSet::new ();
   while let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
-    if let Some (concept) = row.get ("container_id") ? {
-      containers.insert ( ID (
+    if let Some (concept) = row.get (&output_id_var) ? {
+      related_nodes.insert ( ID (
         extract_payload_from_typedb_string_rep (
           &concept . to_string () )) ); }}
-  Ok (containers) }
+  Ok (related_nodes) }
