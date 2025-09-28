@@ -12,12 +12,14 @@ Replaces the current headline and its body with the result.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive)
   (condition-case err
-      (let* ((headline-text (skg-get-current-headline-text))
-             (replacement-bounds (skg-find-headline-replacement-bounds))
-             (tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
-             (request-sexp
-              (format "((request . \"containerward view\") (headline . \"%s\"))\n"
-                      headline-text)))
+      (let ((headline-text (skg-get-current-headline-text))
+            (replacement-bounds (skg-find-headline-replacement-bounds))
+            (tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
+            (request-s-exp
+             (concat (prin1-to-string
+                      `((request . "containerward view")
+                        (headline . ,headline-text)))
+                     "\n")))
         (setq ;; Prepare LP state and handler
          skg-lp--buf        (unibyte-string) ;; empty string
          skg-lp--bytes-left nil
@@ -28,7 +30,7 @@ Optional TCP-PROC allows reusing an existing connection."
               (skg-replace-headline-with-containerward-view
                replacement-bounds payload))
             tcp-proc chunk)))
-        (process-send-string tcp-proc request-sexp))
+        (process-send-string tcp-proc request-s-exp))
     (error (message "Error: %s"
                     (error-message-string err)))))
 

@@ -17,9 +17,12 @@ Optional TCP-PROC allows reusing an existing connection."
              (level (cadr metadata))
              (insertion-point (skg-find-branch-insertion-point))
              (tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
-             (request-sexp
-              (format "((request . \"node aliases\") (id . \"%s\") (level . \"%s\"))\n"
-                      node-id level)))
+             (request-s-exp
+              (concat (prin1-to-string
+                       `((request . "node aliases")
+                         (id . ,node-id)
+                         (level . ,level)))
+                      "\n")))
         (setq ;; Prepare LP state and handler
          skg-lp--buf        (unibyte-string) ;; empty string
          skg-lp--bytes-left nil
@@ -30,7 +33,7 @@ Optional TCP-PROC allows reusing an existing connection."
               (skg-insert-aliases-at-point
                insertion-point payload))
             tcp-proc chunk)))
-        (process-send-string tcp-proc request-sexp))
+        (process-send-string tcp-proc request-s-exp))
     (error (message "Error: %s"
                     (error-message-string err)))))
 

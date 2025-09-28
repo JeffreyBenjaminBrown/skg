@@ -8,9 +8,11 @@ Installs a length-prefixed response handler.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
-         (request-sexp
-          (format "((request . \"single root content view\") (id . \"%s\"))\n"
-                  node-id )) )
+         (request-s-exp
+          (concat (prin1-to-string
+                   `((request . "single root content view")
+                     (id . ,node-id)))
+                  "\n")))
     (setq ;; Prepare LP state and handler
      skg-lp--buf               (unibyte-string) ;; empty string
      skg-lp--bytes-left        nil
@@ -21,7 +23,7 @@ Optional TCP-PROC allows reusing an existing connection."
           (skg-open-org-buffer-from-text
            tcp-proc payload "*skg-content-view*"))
        tcp-proc chunk)))
-    (process-send-string tcp-proc request-sexp)) )
+    (process-send-string tcp-proc request-s-exp)) )
 
 (defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode."

@@ -2,12 +2,15 @@
   "Request title matches from the Rust server."
   (interactive "sSearch terms: ")
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (request-sexp
-          (format "((request . \"title matches\") (terms . \"%s\"))\n" search-terms)))
+         (request-s-exp
+          (concat (prin1-to-string
+                   `((request . "title matches")
+                     (terms . ,search-terms)))
+                  "\n")))
     (setq skg-doc--response-handler
           ;; Prepare for response.
           #'skg-display-search-results)
-    (process-send-string tcp-proc request-sexp)))
+    (process-send-string tcp-proc request-s-exp)))
 
 (defun skg-display-search-results (tcp-proc string)
   "Display title search results from the Rust server."

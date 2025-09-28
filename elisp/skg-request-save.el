@@ -7,7 +7,9 @@ which will replace the current buffer contents."
   (interactive)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (buffer-contents (buffer-string))
-         (request-sexp (format "((request . \"save buffer\"))\n"))
+         (request-s-exp (concat (prin1-to-string
+                                 `((request . "save buffer")))
+                                "\n"))
          (content-bytes (encode-coding-string buffer-contents 'utf-8))
          (content-length (length content-bytes))
          (header (format "Content-Length: %d\r\n\r\n" content-length)))
@@ -21,7 +23,7 @@ which will replace the current buffer contents."
              #'skg-replace-buffer-with-new-content tcp-proc chunk)))
 
     ;; Send the request line first
-    (process-send-string tcp-proc request-sexp)
+    (process-send-string tcp-proc request-s-exp)
 
     ;; Send the length-prefixed buffer contents
     (process-send-string tcp-proc header)
