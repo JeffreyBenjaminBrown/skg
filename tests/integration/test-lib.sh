@@ -81,6 +81,15 @@ start_skg_server() {
   sleep 3
 }
 
+# Function to clean up Tantivy index contents
+cleanup_tantivy_index() {
+  local tantivy_dir="$1"
+  if [ -d "$tantivy_dir" ]; then
+    rm -f "$tantivy_dir"/* 2>/dev/null || true
+    echo "✓ Cleaned up Tantivy index contents"
+  fi
+}
+
 # Function to run Emacs integration test
 run_emacs_test() {
   local test_file="$1"

@@ -19,6 +19,9 @@ echo "=== SKG Title Matches Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 
+# Clean up Tantivy index to prevent bloat
+cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+
 trap cleanup EXIT
 
 check_typedb_server

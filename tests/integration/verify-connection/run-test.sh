@@ -20,6 +20,9 @@ echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 
 
+# Clean up Tantivy index to prevent bloat
+cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+
 # Set up cleanup trap
 trap cleanup EXIT
 

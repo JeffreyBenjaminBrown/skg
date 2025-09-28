@@ -28,12 +28,6 @@ backup_and_reset_test_data() {
     find "$TEST_DIR/data/skg-data" -name "*.skg" ! -name "1.skg" -delete 2>/dev/null || true
     echo "✓ Cleaned up existing UUID files"
 
-    # Clean up Tantivy index contents but keep the directory
-    if [ -d "$TEST_DIR/data/index.tantivy" ]; then
-        rm -f "$TEST_DIR/data/index.tantivy"/* 2>/dev/null || true
-        echo "✓ Cleaned up Tantivy index contents"
-    fi
-
     # Backup original 1.skg file
     if [ -f "$TEST_DIR/data/skg-data/1.skg" ]; then
         BACKUP_FILE="$TEST_DIR/data/skg-data/1.skg.backup.$(date +%s)"
@@ -63,11 +57,8 @@ cleanup_test_data() {
         done
     fi
 
-    # Clean up Tantivy index contents again (in case test created new data)
-    if [ -d "$TEST_DIR/data/index.tantivy" ]; then
-        rm -f "$TEST_DIR/data/index.tantivy"/* 2>/dev/null || true
-        echo "✓ Cleaned up Tantivy index contents"
-    fi
+    # Clean up Tantivy index contents but keep the directory
+    cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
 
     # Restore original 1.skg if backup exists
     BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "1.skg.backup.*" | head -1)
