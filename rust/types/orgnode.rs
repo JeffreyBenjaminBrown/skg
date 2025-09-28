@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::fmt;
 
 use super::skgnode::NodeWithEphem;
+use super::ID;
 
 /// Raw text from Emacs is first loaded as a forest of these.
 #[derive(Clone, Debug, PartialEq)]
@@ -157,3 +158,14 @@ pub fn parse_metadata_from_string(
       let value = MetadataItem::from_str(trimmed)?;
       values.push(value); }}
   Ok (values) }
+
+/// Parsed metadata from an org-mode headline
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrgNodeMetadata {
+  pub id: Option<ID>,
+  pub repeated: bool,
+  pub folded: bool,
+  pub focused: bool,
+  pub rel_to_parent: RelToOrgParent,
+  pub metadata: Vec<MetadataItem>,
+}

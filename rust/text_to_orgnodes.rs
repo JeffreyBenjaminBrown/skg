@@ -1,6 +1,5 @@
 pub mod cursor;
 pub mod interpreted;
-pub mod types;
 pub mod uninterpreted;
 
 use crate::text_to_orgnodes::interpreted::interpret_org_node;

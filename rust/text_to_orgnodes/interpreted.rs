@@ -2,8 +2,7 @@
 
 use crate::types::NodeWithEphem;
 use crate::types::OrgNodeInterp;
-use crate::types::{OrgNode,MetadataItem,RelToOrgParent,parse_metadata_from_string,ID};
-use super::types::{OrgNodeMetadata};
+use crate::types::{ID,MetadataItem,OrgNode,OrgNodeMetadata,RelToOrgParent,parse_metadata_from_string};
 
 use std::collections::{HashMap, HashSet};
 
