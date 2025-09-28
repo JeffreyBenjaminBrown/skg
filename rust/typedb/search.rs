@@ -20,7 +20,7 @@ which is either uncontained or multiply contained. Returns that node's ID.
 So for instance, if the input is uncontained, it just returns the input.
 .
 PITFALL: This just takes the last element of the path
-returned by `containerward_path`,
+returned by `path_containerward_to_end_cycle_and_or_branches`,
 throwing away the rest of the information.
 */
 pub async fn climb_containerward_and_fetch_rootish_context (
@@ -30,7 +30,7 @@ pub async fn climb_containerward_and_fetch_rootish_context (
 ) -> Result < ID, Box<dyn Error> > {
   let ( path, _cycle_node, _multi_containers )
     : ( Vec<ID>, Option<ID>, HashSet<ID> )
-    = containerward_path (
+    = path_containerward_to_end_cycle_and_or_branches (
       db_name, driver, node ). await ?;
   path . last () . ok_or_else ( || {
       // This should never happen,
@@ -38,29 +38,37 @@ pub async fn climb_containerward_and_fetch_rootish_context (
       std::io::Error::new (
         std::io::ErrorKind::InvalidData,
         format!(
-          "Empty path from containerward_path for node '{}'",
+          "Empty path from path_containerward_to_end_cycle_and_or_branches for node '{}'",
           node )) . into ()
     } ) . cloned ()
 }
 
-/* Returns (path, cycle_node, multi_containers).
+/* Follows a path via a single directed binary relation
+  until reaching a cycle and/or branches.
 The path begins with the input node.
-Searching containerward, each time we find a single container,
-we append it to the path.
+Following the specified relationship,
+  each time we find a single related node,
+  we append it to the path.
 The process can end in three ways:
-1 - If at any point no container is found, we return the path and exit.
+1 - If no related node is found, we return the path and exit.
     The option and the set are both null.
-2 - If at any point multiple containers are found, they are added to the set,
+2 - If at any point multiple related nodes are found,
+    the choice of 'next in path' has no answer,
+    so they are added to the set,
     nothing is added to the path, and the function returns.
-3 - If at any point a container is equal to one already in the path,
-    that ID becomes the option, and the function returns.
-.
-Note that 2 and 3 can coincide.
-Then and only then are all three outputs non-null. */
-pub async fn containerward_path (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node    : &ID
+3 - If at any point the related node is
+    equal to one already in the path, we have found a cycle.
+    That ID becomes the option, the path is not extended,
+    and the function returns.
+Note that 2 and 3 can coincide. That is the only case
+  in which are all three outputs non-null. */
+pub async fn path_to_end_cycle_and_or_branches (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  node        : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str
 ) -> Result < ( Vec<ID>, // The path. Its first node is the input.
                 Option<ID>, // If the path cycles, this is the first repeated node.
                 HashSet<ID> // If the path forks, these are the fork's branches.
@@ -72,34 +80,73 @@ pub async fn containerward_path (
     HashSet::from ( [ node.clone() ] );
   let mut current_node : ID = node.clone ();
   loop {
-    let containers : HashSet<ID> =
-      find_containers_of (
-        db_name, driver, &current_node ). await ?;
-    if containers.is_empty () {
-      // No container found, so this is the root.
+    let related_nodes : HashSet<ID> =
+      find_related_nodes (
+        db_name, driver, &current_node,
+        relation, input_role, output_role ). await ?;
+    if related_nodes.is_empty () {
+      // No related node found, so this is the end.
       return Ok (( path, None, HashSet::new () ));
     } else {
       let cycle_node : Option<ID> =
-        // 'Some' if the container has been seen already.
-        containers.iter ()
+        // 'Some' if the related node has been seen already.
+        related_nodes.iter ()
           .find ( |&c| path_set.contains ( c ) )
           .cloned ();
-      if ( containers.len () == 1
+      if ( related_nodes.len () == 1
            && cycle_node.is_none () ) {
-        // Add the container to the path and continue.
-        let container : ID =
-          containers . into_iter() . next() . unwrap();
-        path.push ( container.clone () );
-        path_set.insert ( container.clone () );
-        current_node = container;
+        // Add the related node to the path and continue.
+        let next_node : ID =
+          related_nodes . into_iter() . next() . unwrap();
+        path.push ( next_node.clone () );
+        path_set.insert ( next_node.clone () );
+        current_node = next_node;
       } else { // We are at a fork, or a cycle, or both.
         return Ok ((
           path,
           cycle_node,
-          ( if containers.len () == 1 {
+          ( if related_nodes.len () == 1 {
             HashSet::new () }
-            else {containers} ) ));
+            else {related_nodes} ) ));
         }} }}
+
+/// See path_to_end_cycle_and_or_branches.
+/// This is the case that searches sourceward.
+pub async fn path_containerward_to_end_cycle_and_or_branches (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < ( Vec<ID>,
+                Option<ID>,
+                HashSet<ID>
+), Box<dyn Error> > {
+  path_to_end_cycle_and_or_branches (
+    db_name,
+    driver,
+    node,
+    "contains",
+    "contained",
+    "container"
+  ). await }
+
+/// See path_to_end_cycle_and_or_branches.
+/// This is the case that searches containerward.
+pub async fn path_sourceward_to_end_cycle_and_or_branches (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &ID
+) -> Result < ( Vec<ID>,
+                Option<ID>,
+                HashSet<ID>
+), Box<dyn Error> > {
+  path_to_end_cycle_and_or_branches (
+    db_name,
+    driver,
+    node,
+    "hyperlinks_to",
+    "dest",
+    "source"
+  ). await }
 
 /// Runs a single TypeDB query.
 /// Returns the containing nodes' IDs.
@@ -115,8 +162,7 @@ pub async fn find_containers_of (
     "contains",
     "contained",
     "container"
-  ) . await
-}
+  ). await }
 
 /// Runs a single TypeDB query.
 /// Returns the IDs of nodes that link to the input node.
@@ -132,8 +178,7 @@ pub async fn find_links_to (
     "hyperlinks_to",
     "dest",
     "source"
-  ) . await
-}
+  ). await }
 
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position related to the input node.

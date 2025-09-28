@@ -1,7 +1,7 @@
 use crate::file_io::read_node_from_id;
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
-use crate::typedb::search::containerward_path;
+use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use crate::types::{ID, SkgConfig, MetadataItem, OrgNodeType};
 
 use std::collections::HashSet;
@@ -23,7 +23,7 @@ pub async fn containerward_org_view (
 
   let (path, cycle_node, branches)
     : (Vec<ID>, Option<ID>, HashSet<ID>)
-    = containerward_path (
+    = path_containerward_to_end_cycle_and_or_branches (
       &config.db_name,
       driver,
       terminus ). await ?;
