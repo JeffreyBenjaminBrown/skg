@@ -1,3 +1,84 @@
+* new types
+enum NodeSaveAction = {
+  might_contain_more : bool,
+  to_delete          : bool,
+struct OrgNode2 = {
+  metadata : OrgNodeMd2,
+  title    : String,
+  body     : String }
+struct OrgNodeMd2 = {
+  id                 : Option<ID>,
+  rel_to_parent      : RelToOrgParent2,
+  cycle              : bool,
+  focused            : bool,
+  folded             : bool,
+  might_contain_more : bool,
+  repeat             : bool,
+  to_delete          : bool, }
+enum RelToOrgParent2 = {
+  Conent, Container, AliasColl, Alias, None }
+* refactor: retain tree
+  serial, control flow
+** interpret_org_node2
+*** refuse and report all problems if any of these happen
+**** an AliasColl node has a body or a child with an ID
+**** an Alias node has a body
+**** a node is marked 'delete' somewhere but not everywhere
+*** continue but report all problems if any of these happen
+**** an alias node has children
+     They will be saved, perhaps becoming new roots.
+*** assign IDs where needed
+    see assign_ids_recursive
+*** assign rel_to_parent=Alias where needed
+*** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
+*** Collect from all AliasColls, rather than keeping only the first.
+*** Collect all duplicated nodes.
+    The user might have edited the contents of each,
+    even though they're not supposed to.
+    If they have, keep the first one's title,
+    add a warning about the title conflict if any
+    to the warnings being accumulated,
+    collect all of its contents from the different instances,
+    and dedup that collection.
+*** Any child of an alias is assigned RelToOrgParent2 = None.
+** clobber the Set<(SkgNode,NodeSaveAction)>
+   See 'clobber_none_fields_with_data_from_disk'.
+   Extend to also add extra-ids.
+   Do something similar for content,
+     if SkgNodeSaveAction.might_contain_more == true.
+** update_fs_and_dbs2
+   uses the Set<(SkgNode,NodeSaveAction)>
+*** TypeDB : update_nodes_and_relationships2
+    First, for each to_delete node,
+      delete every node using that ID, even if as an extra_id.
+    Do the rest of the existing update_nodes_and_relationships
+      only to the other nodes.
+*** FS
+**** write all non-delete nodes
+     as normal, but filtering to only those nodes
+**** delete all to-delete nodes
+*** update_index_with_nodes
+    Delete every entry for which the id is any to_delete id.
+      not just the pid
+    Add as normal.
+** rebuild view
+*** will build a Forest<OrgNode2> based on the original one
+*** The result begins as a copy of the original one.
+*** Process it DFS.
+*** Keep a running tally of which nodes have already been processed.
+*** recompute the following metadata values
+**** cycle
+     based on the breadcrumbs to root
+**** rel_to_parent
+     Verify Container relationships. If the relationship is no more,
+     replace rel_to_parent=None.
+**** might_contain_more defaults to true sometimes
+* Look at all my plans, and the code around saving, and ask what makes each difficult.
+  Do this to know how to change the data structure,
+  and likely the control flow.
+* Navigate the tree in Rust as a tree.
+* What {functions,types} bundle separble concerns?
+** NodeWithEphem
 * retain metadata when replacing node
   When a backview replaces text,
   it should retain the origin headline's

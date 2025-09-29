@@ -46,6 +46,17 @@ pub enum MetadataItem {
   ID (String),
   Type (RelToOrgParent), }
 
+/// Parsed metadata from an org-mode headline
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrgNodeMetadata {
+  pub id: Option<ID>,
+  pub repeated: bool,
+  pub folded: bool,
+  pub focused: bool,
+  pub rel_to_parent: RelToOrgParent,
+  pub metadata: Vec<MetadataItem>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrgNodeInterp {
   // Tells Rust how to interpret -- what to do with -- an OrgNode it receives from Emacs when the user runs `skg-request-save-buffer` (defined in the elisp code).
@@ -180,15 +191,3 @@ pub fn parse_metadata_from_string(
       let value = MetadataItem::from_str(trimmed)?;
       values.push(value); }}
   Ok (values) }
-
-/// Parsed metadata from an org-mode headline
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrgNodeMetadata {
-  pub id: Option<ID>,
-  pub repeated: bool,
-  pub folded: bool,
-  pub focused: bool,
-  pub rel_to_parent: RelToOrgParent,
-  pub metadata: Vec<MetadataItem>,
-}
-

@@ -20,8 +20,7 @@ pub fn interpret_org_node (
         } else { uninterpreted.branches
                  . into_iter()
                  . map (interpret_org_node) // recurse
-                 . collect()
-        };
+                 . collect() };
       let aliases: Option<Vec<String>> =
       // Uses aliases from the first OrgNodeInterp::AliasNode.
       // PITFALL: There should be at most one AliasNode in a given set of siblings, but the user could create more. If they do, all but the first are ignored. */
@@ -54,10 +53,10 @@ pub fn interpret_org_node (
     RelToOrgParent::Aliases => {
       // PITFALL: Perhaps counterintuitively, this recurses into all of the AliasNode's descendents, then collects the headlines of its top-level children and discards everything else. That's because there should not be other contents. (The user can make other contents, but it's not clear why they would want to.)
       let branches: Vec<OrgNodeInterp> =
-      { uninterpreted.branches
+        uninterpreted.branches
         . into_iter()
         . map (interpret_org_node) // recurse
-        . collect() };
+        . collect();
       let aliases: Vec<String> = branches
         . iter()
         . filter_map ( |child| {
