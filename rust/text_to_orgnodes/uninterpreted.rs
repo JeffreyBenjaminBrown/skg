@@ -11,7 +11,7 @@ use super::interpreted::parse_separating_metadata_and_title;
 
 use sexp::{Atom, Sexp};
 
-pub fn parse_skg_org_to_uninterpreted_nodes (
+pub fn org_to_uninterpreted_nodes (
   input : &str
 ) -> Vec<OrgNode> {
   let mut cursor = LineCursor::new (input);

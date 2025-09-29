@@ -1,10 +1,10 @@
 use indoc::indoc;
-use skg::new::parse_skg_org_to_uninterpreted_nodes2;
+use skg::new::org_to_uninterpreted_nodes2;
 use skg::types::{OrgNode2, ID, RelToOrgParent2};
 use ego_tree::Tree;
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2() {
+fn test_org_to_uninterpreted_nodes2() {
   let input: &str =
     indoc! {"
             Ignored text.
@@ -22,7 +22,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
 
   assert_eq!(trees.len(), 2, "Should have exactly 2 trees");
 
@@ -59,7 +59,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_with_metadata() {
+fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let input: &str =
     indoc! {"
             * <skg<id:root,focused>> root
@@ -73,7 +73,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_with_metadata() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
 
   assert_eq!(trees.len(), 3, "Should have exactly 3 trees");
 
@@ -101,7 +101,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_with_metadata() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_default_values() {
+fn test_org_to_uninterpreted_nodes2_default_values() {
   let input: &str =
     indoc! {"
             * simple node
@@ -110,7 +110,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_default_values() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -134,7 +134,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_default_values() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_body_spacing() {
+fn test_org_to_uninterpreted_nodes2_body_spacing() {
   let input: &str =
     indoc! {"
             * node with spaced body
@@ -148,7 +148,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_body_spacing() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -165,7 +165,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_body_spacing() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_basic_metadata() {
+fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
             * <skg<id:test,folded>> simple node with metadata
@@ -175,7 +175,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_basic_metadata() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -195,20 +195,20 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_basic_metadata() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_empty_input() {
+fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
   assert_eq!(trees.len(), 0);
 
   let input2 = "   \n  \n  ";
   let trees2: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input2).unwrap();
+    org_to_uninterpreted_nodes2(input2).unwrap();
   assert_eq!(trees2.len(), 0);
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_only_text() {
+fn test_org_to_uninterpreted_nodes2_only_text() {
   let input: &str =
     indoc! {"
             This is just text
@@ -217,13 +217,13 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_only_text() {
         "};
 
   let trees: Vec<Tree<OrgNode2>> =
-    parse_skg_org_to_uninterpreted_nodes2(input).unwrap();
+    org_to_uninterpreted_nodes2(input).unwrap();
   assert_eq!(trees.len(), 0,
              "Should have no trees when there are no headlines");
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_invalid_metadata() {
+fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * <skg<invalidKey:value>> invalid key
@@ -233,25 +233,25 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_invalid_metadata() {
 
   // Test invalid key
   let input_invalid_key = "* <skg<invalidKey:value>> invalid key";
-  let result = parse_skg_org_to_uninterpreted_nodes2(input_invalid_key);
+  let result = org_to_uninterpreted_nodes2(input_invalid_key);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
   // Test invalid relToOrgParent value
   let input_invalid_value = "* <skg<relToOrgParent:invalidValue>> invalid value";
-  let result = parse_skg_org_to_uninterpreted_nodes2(input_invalid_value);
+  let result = org_to_uninterpreted_nodes2(input_invalid_value);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown relToOrgParent value: invalidValue"));
 
   // Test unknown flag
   let input_unknown_flag = "* <skg<unknownFlag>> unknown flag";
-  let result = parse_skg_org_to_uninterpreted_nodes2(input_unknown_flag);
+  let result = org_to_uninterpreted_nodes2(input_unknown_flag);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata value: unknownFlag"));
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes2_orphaned_nodes() {
+fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
   // Test that nested nodes without a level 1 parent cause an error
   let input_orphaned: &str =
     indoc! {"
@@ -259,7 +259,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_orphaned_nodes() {
             This should cause an error
         "};
 
-  let result = parse_skg_org_to_uninterpreted_nodes2(input_orphaned);
+  let result = org_to_uninterpreted_nodes2(input_orphaned);
   assert!(result.is_err());
   let error_msg = result.unwrap_err();
   assert!(error_msg.contains("jumps too far between levels"));
@@ -271,7 +271,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes2_orphaned_nodes() {
             *** deeply orphaned level 3 node
         "};
 
-  let result = parse_skg_org_to_uninterpreted_nodes2(input_level3_orphaned);
+  let result = org_to_uninterpreted_nodes2(input_level3_orphaned);
   assert!(result.is_err());
   let error_msg = result.unwrap_err();
   assert!(error_msg.contains("jumps too far between levels"));

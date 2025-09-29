@@ -13,7 +13,7 @@ struct OrgNodeLineCol {
   body: Vec<String>,
 }
 
-pub fn parse_skg_org_to_uninterpreted_nodes2(
+pub fn org_to_uninterpreted_nodes2(
   input: &str)
   -> Result<Vec<Tree<OrgNode2>>, String> {
   let org_node_line_cols: Vec<OrgNodeLineCol> =

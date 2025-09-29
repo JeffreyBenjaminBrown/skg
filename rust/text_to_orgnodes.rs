@@ -3,7 +3,7 @@ pub mod interpreted;
 pub mod uninterpreted;
 
 use crate::text_to_orgnodes::interpreted::interpret_org_node;
-use crate::text_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
+use crate::text_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::types::{OrgNodeInterp, OrgNode};
 
 /* This function parses a "skg org" document
@@ -22,7 +22,7 @@ pub fn parse_skg_org_to_nodes (
 ) -> Vec<OrgNodeInterp> {
 
   let uninterpreted_nodes : Vec<OrgNode> =
-    parse_skg_org_to_uninterpreted_nodes (input);
+    org_to_uninterpreted_nodes (input);
   uninterpreted_nodes.into_iter ()
     .map (interpret_org_node)
     .collect () }

@@ -1,6 +1,6 @@
 use indoc::indoc;
 use skg::text_to_orgnodes::parse_skg_org_to_nodes;
-use skg::text_to_orgnodes::uninterpreted::parse_skg_org_to_uninterpreted_nodes;
+use skg::text_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::{OrgNodeInterp, ID, OrgNode};
 
 
@@ -102,7 +102,7 @@ fn test_parse_skg_org_to_nodes() {
 }
 
 #[test]
-fn test_parse_skg_org_to_uninterpreted_nodes() {
+fn test_org_to_uninterpreted_nodes() {
   let input: &str =
     indoc! {"
             Ignored text.
@@ -120,7 +120,7 @@ fn test_parse_skg_org_to_uninterpreted_nodes() {
         "};
 
   let parsed_nodes: Vec<OrgNode> =
-    parse_skg_org_to_uninterpreted_nodes ( input );
+    org_to_uninterpreted_nodes ( input );
 
   assert_eq! ( parsed_nodes.len (), 2,
                "Should have exactly 2 root nodes" );
