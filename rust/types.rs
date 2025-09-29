@@ -18,3 +18,8 @@ pub use skgnode::{ SkgNode,
                    NodeWithEphem,
                    skgnode_example,
                    empty_skgnode, };
+pub mod new;
+pub use new::{ NodeSaveAction,
+               OrgNode2,
+               OrgNodeMd2,
+               RelToOrgParent2, };

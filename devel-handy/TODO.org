@@ -1,28 +1,3 @@
-* might_contain_more metadata
-  Should almost always be false.
-  The only exception is when displaying a containerward view.
-  In 'metadata_for_element_of_path', everything should get the tag.
-  This will then be overridden in 'render_linear_portion_of_path',
-  where the first node will have the tag removed.
-* new types
-enum NodeSaveAction = {
-  might_contain_more : bool,
-  to_delete          : bool,
-struct OrgNode2 = {
-  metadata : OrgNodeMd2,
-  title    : String,
-  body     : String }
-struct OrgNodeMd2 = {
-  id                 : Option<ID>,
-  rel_to_parent      : RelToOrgParent2,
-  cycle              : bool,
-  focused            : bool,
-  folded             : bool,
-  might_contain_more : bool,
-  repeat             : bool,
-  to_delete          : bool, }
-enum RelToOrgParent2 = {
-  Conent, Container, AliasColl, Alias, None }
 * refactor: retain tree
   serial, control flow
 ** interpret_org_node2
@@ -70,15 +45,26 @@ enum RelToOrgParent2 = {
 ** rebuild view
 *** will build a Forest<OrgNode2> based on the original one
 *** The result begins as a copy of the original one.
-*** Process it DFS.
-*** Keep a running tally of which nodes have already been processed.
+*** Process it DFS, keeping a full breadcrumb aath back to root.
+*** Keep a running tally of which nodes have already been included in the result.
+*** Any to_delete node is dropped, along with its content.
+*** Every node is leeft in place except, maybe, nodes that are content of their parent.
+    Leave even them in place if the parent is might_contain_more.
+    Otherwise, remove them from the list,
+    and add them back in based on looking them up elsewhere.
+    Retain their metadata, so that 'leave these unchanged'
+    can be executed, below.
 *** recompute the following metadata values
 **** cycle
      based on the breadcrumbs to root
 **** rel_to_parent
      Verify Container relationships. If the relationship is no more,
      replace rel_to_parent=None.
-**** might_contain_more defaults to true sometimes
+**** repeat
+*** leave these unchanged
+**** might_contain_more
+**** focused
+**** folded
 * Look at all my plans, and the code around saving, and ask what makes each difficult.
   Do this to know how to change the data structure,
   and likely the control flow.
