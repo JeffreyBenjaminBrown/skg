@@ -73,7 +73,7 @@ async fn render_linear_portion_of_path (
           if i == 0 { node.body.as_deref() }
           else { None } },
         & metadata_for_element_of_path (
-          node_id, cycle_node, i != 0), )); }
+          node_id, cycle_node, i == 0), )); }
   Ok (result) }
 
 async fn render_branches (
@@ -94,7 +94,7 @@ async fn render_branches (
         & newline_to_space ( & node.title ),
         None,
         & metadata_for_element_of_path (
-          branch_id, cycle_node, true)
+          branch_id, cycle_node, false)
       )); }
   Ok (result) }
 
@@ -112,12 +112,12 @@ async fn render_terminating_cycle_when_no_branches(
     & newline_to_space (& node.title),
     None,
     & metadata_for_element_of_path (
-      cycle_id, cycle_node, true )) ) }
+      cycle_id, cycle_node, false )) ) }
 
 fn metadata_for_element_of_path (
   node_id: &ID,
   cycle_node: &Option<ID>,
-  containsOrgParent: bool
+  is_terminus: bool
 ) -> HashSet<MetadataItem> {
 
   let mut metadata_set = HashSet::new();
@@ -128,9 +128,9 @@ fn metadata_for_element_of_path (
     // The cycle node needs extra metadata.
     metadata_set.insert(
       MetadataItem::Cycle); }
-  if containsOrgParent {
-    // The 'containsOrgParent' type.
-    // All nodes except the terminus (first in path) get this type.
+  if !is_terminus {
+    // All nodes except the terminus (first in path)
+    // contain their org parent.
     // PITFALL: If there is a second appearance of the terminus,
     // later in the containerward path,
     // that appearance *should* (and does) get this type.

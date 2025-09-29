@@ -1,3 +1,9 @@
+* might_contain_more metadata
+  Should almost always be false.
+  The only exception is when displaying a containerward view.
+  In 'metadata_for_element_of_path', everything should get the tag.
+  This will then be overridden in 'render_linear_portion_of_path',
+  where the first node will have the tag removed.
 * new types
 enum NodeSaveAction = {
   might_contain_more : bool,
