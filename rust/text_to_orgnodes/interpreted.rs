@@ -13,7 +13,7 @@ pub fn interpret_org_node (
   let (metadata, title): (OrgNodeMetadata, String) =
     parse_separating_metadata_and_title (
       & uninterpreted.title );
-  match metadata.rel_to_parent {
+  match metadata.relToOrgParent {
     RelToOrgParent::Content => {
       let interpreted_branches: Vec<OrgNodeInterp> =
         if metadata.repeated { Vec::new()
@@ -96,9 +96,9 @@ pub fn parse_separating_metadata_and_title (
         parse_metadata_from_string (inner)
         . unwrap_or_else( |e| panic! (
           "Failed to parse metadata '{}': {}", inner, e));
-      let rel_to_parent: RelToOrgParent =
+      let relToOrgParent: RelToOrgParent =
         match metadata_values.iter() . find_map(
-          |v| v.get_rel_to_org_parent()) {
+          |v| v.get_relToOrgParent()) {
           // TODO: This can be simplified.
           Some(RelToOrgParent::Content)      => RelToOrgParent::Content,
           Some(RelToOrgParent::Aliases)      => RelToOrgParent::Aliases,
@@ -111,12 +111,12 @@ pub fn parse_separating_metadata_and_title (
         OrgNodeMetadata {
           id                 : metadata_values.iter().find_map(
             |v| v.get_id()),
-          repeated           : metadata_values.iter().any(|v| v.is_repeated()),
-          folded             : metadata_values.iter().any(|v| v.is_folded()),
-          focused            : metadata_values.iter().any(|v| v.is_focused()),
-          might_contain_more : metadata_values.iter().any(|v| v.is_might_contain_more()),
-          rel_to_parent      : rel_to_parent,
-          metadata           : metadata_values, },
+          repeated         : metadata_values.iter().any(|v| v.is_repeated()),
+          folded           : metadata_values.iter().any(|v| v.is_folded()),
+          focused          : metadata_values.iter().any(|v| v.is_focused()),
+          mightContainMore : metadata_values.iter().any(|v| v.is_mightContainMore()),
+          relToOrgParent   : relToOrgParent,
+          metadata         : metadata_values, },
         title ); }
     // If "<skg<" with no matching ">>",
     // fall through to default case
@@ -127,8 +127,8 @@ pub fn parse_separating_metadata_and_title (
         repeated           : false,
         folded             : false,
         focused            : false,
-        might_contain_more : false,
-        rel_to_parent      : RelToOrgParent::Content,
+        mightContainMore : false,
+        relToOrgParent      : RelToOrgParent::Content,
         metadata           : Vec::new(), },
       title ) }}
 

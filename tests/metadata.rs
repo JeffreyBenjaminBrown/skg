@@ -21,7 +21,7 @@ fn test_find_in_metadata_collection() {
 
   let type_val: Option<RelToOrgParent> = find_in_metadata_collection(
     &metadata,
-    |item| { item.get_rel_to_org_parent().cloned() } );
+    |item| { item.get_relToOrgParent().cloned() } );
   assert_eq!(type_val, Some(RelToOrgParent::Container));
 
   // Test with empty collection

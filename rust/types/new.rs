@@ -3,7 +3,7 @@ use super::ID;
 /// Tells Rust what to do with a node.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeSaveAction {
-  pub might_contain_more: bool,
+  pub mightContainMore: bool,
   pub to_delete: bool,
 }
 
@@ -17,11 +17,11 @@ pub struct OrgNode2 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgNodeMd2 {
   pub id: Option<ID>,
-  pub rel_to_org_parent: RelToOrgParent2,
+  pub relToOrgParent: RelToOrgParent2,
   pub cycle: bool,
   pub focused: bool,
   pub folded: bool,
-  pub might_contain_more: bool,
+  pub mightContainMore: bool,
   pub repeat: bool,
   pub to_delete: bool,
 }

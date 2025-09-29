@@ -1,5 +1,6 @@
 pub mod file_io;
 pub mod hyperlinks;
+pub mod new;
 pub mod text_to_orgnodes;
 pub mod render;
 pub mod save;

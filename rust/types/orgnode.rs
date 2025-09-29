@@ -54,8 +54,8 @@ pub struct OrgNodeMetadata {
   pub repeated: bool,
   pub folded: bool,
   pub focused: bool,
-  pub might_contain_more: bool,
-  pub rel_to_parent: RelToOrgParent,
+  pub mightContainMore: bool,
+  pub relToOrgParent: RelToOrgParent,
   pub metadata: Vec<MetadataItem>,
 }
 
@@ -105,7 +105,7 @@ impl fmt::Display for MetadataItem {
       MetadataItem::Folded => write!(f, "folded"),
       MetadataItem::Focused => write!(f, "focused"),
       MetadataItem::Cycle => write!(f, "cycle"),
-      MetadataItem::MightContainMore => write!(f, "might_contain_more"),
+      MetadataItem::MightContainMore => write!(f, "mightContainMore"),
       MetadataItem::ID(id) => write!(f, "id:{}", id),
       MetadataItem::RelToOrgParent(rel) => write!(f, "relToOrgParent:{}", rel), }} }
 
@@ -118,13 +118,13 @@ impl FromStr for MetadataItem {
       "folded" => Ok(MetadataItem::Folded),
       "focused" => Ok(MetadataItem::Focused),
       "cycle" => Ok(MetadataItem::Cycle),
-      "might_contain_more" => Ok(MetadataItem::MightContainMore),
+      "mightContainMore" => Ok(MetadataItem::MightContainMore),
       _ => {
         if let Some((key_str, value_str)) = s.split_once(':') {
           match key_str.trim() {
             "relToOrgParent" => {
-              let rel_to_parent = RelToOrgParent::from_str(value_str.trim())?;
-              Ok(MetadataItem::RelToOrgParent(rel_to_parent))
+              let relToOrgParent = RelToOrgParent::from_str(value_str.trim())?;
+              Ok(MetadataItem::RelToOrgParent(relToOrgParent))
             },
             "id" => {
               Ok(MetadataItem::ID(value_str.trim().to_string()))
@@ -152,7 +152,7 @@ impl MetadataItem {
     matches!(self, MetadataItem::Cycle)
   }
 
-  pub fn is_might_contain_more(&self) -> bool {
+  pub fn is_mightContainMore(&self) -> bool {
     matches!(self, MetadataItem::MightContainMore)
   }
 
@@ -161,9 +161,9 @@ impl MetadataItem {
       MetadataItem::ID(id) => Some(ID(id.clone())),
       _ => None, }}
 
-  pub fn get_rel_to_org_parent(&self) -> Option<&RelToOrgParent> {
+  pub fn get_relToOrgParent(&self) -> Option<&RelToOrgParent> {
     match self {
-      MetadataItem::RelToOrgParent(rel_to_parent) => Some(rel_to_parent),
+      MetadataItem::RelToOrgParent(relToOrgParent) => Some(relToOrgParent),
       _ => None, }} }
 
 /// Find the first item in a generic MetaData collection

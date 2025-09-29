@@ -16,6 +16,7 @@ path = "introspect/skg_filenames_match_pids.rs"
 
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }
+ego-tree = "0.6"
 filetime = "0.2"
 futures = "0.3"
 git2 = "0.18"

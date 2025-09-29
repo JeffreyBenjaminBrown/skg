@@ -11,7 +11,7 @@ fn test_parse_skg_org_to_nodes() {
             * <skg<id:root>> root
             ** <skg<id:a>> a
             *** aa
-            *** <skg<type:aliases>> This headline is ignored.
+            *** <skg<relToOrgParent:aliases>> This headline is ignored.
                 This body text should be ignored.
             **** alias 1
                  This body text should be ignored.
@@ -179,22 +179,22 @@ fn test_empty_aliases() {
             ** <skg<id:aa>> aa
             * <skg<id:b>> b has nothing.
             * <skg<id:c>> c has an alias and no children.
-            ** <skg<type:aliases>> ignore these four words
+            ** <skg<relToOrgParent:aliases>> ignore these four words
                 ignore these five words, too
             *** alias for c
             * <skg<id:d>> d has an alias and a child before it.
             ** a child with no id
-            ** <skg<type:aliases>>
+            ** <skg<relToOrgParent:aliases>>
                 Let's see if having no title after the metadata works.
             *** alias for d
             * <skg<id:e>> e has an alias and a child after it.
-            ** <skg<type:aliases>>
+            ** <skg<relToOrgParent:aliases>>
                 Let's see if having no title after the metadata works.
             *** alias for d
             ** another child with no id
             * <skg<id:f>> f has an empty but present alias list and a child before and after it.
             ** another child with no id
-            ** <skg<type:aliases>> yadda yadda
+            ** <skg<relToOrgParent:aliases>> yadda yadda
                 This is the main event. We should get Some( the empty vector ).
             ** another child with no id
         "};
