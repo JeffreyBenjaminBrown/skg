@@ -155,8 +155,6 @@ pub async fn update_fs_and_dbs (
   println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
 
   let db_name : &str = &config.db_name;
-  println!( "1) Updating TypeDB database '{}' ...", db_name );
-
   let nodes: Vec<SkgNode> =
     nodes . into_iter ()
     . map ( |node|
@@ -164,29 +162,30 @@ pub async fn update_fs_and_dbs (
         & config, node ))
     . collect :: <Result <_, _>> () ?;
 
-  update_nodes_and_relationships (
-    db_name,
-    driver,
-    &nodes, ). await ?;
-  println!( "   TypeDB update complete." );
+  { println!( "1) Updating TypeDB database '{}' ...", db_name );
+    update_nodes_and_relationships (
+      db_name,
+      driver,
+      &nodes, ). await ?;
+    println!( "   TypeDB update complete." ); }
 
-  let total_input : usize =
-    nodes.len ();
-  let target_dir  : &Path =
-    &config.skg_folder;
-  println!( "2) Writing {} file(s) to disk at {:?} ...",
-            total_input, target_dir );
-  let written_count : usize =
-    write_all_nodes (
-      nodes.clone (), config.clone () ) ?;
-  println!( "   Wrote {} file(s).", written_count );
+  { // filesystem
+    let total_input : usize = nodes.len ();
+    let target_dir  : &Path = &config.skg_folder;
+    println!( "2) Writing {} file(s) to disk at {:?} ...",
+               total_input, target_dir );
+    let written_count : usize =
+      write_all_nodes (
+        nodes.clone (), config.clone () ) ?;
+    println!( "   Wrote {} file(s).", written_count ); }
 
-  println!( "3) Updating Tantivy index ..." );
-  let indexed_count : usize =
-    update_index_with_nodes (
-      &nodes, tantivy_index )?;
-  println!( "   Tantivy updated for {} document(s).",
-                indexed_count );
+  { // Tantivy
+    println!( "3) Updating Tantivy index ..." );
+    let indexed_count : usize =
+      update_index_with_nodes (
+        &nodes, tantivy_index )?;
+    println!( "   Tantivy updated for {} document(s).",
+                  indexed_count ); }
 
   println!( "All updates finished successfully." );
   Ok (( )) }
