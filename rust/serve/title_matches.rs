@@ -111,7 +111,7 @@ fn format_matches_as_org_mode (
 
   let mut title_search_metadata = HashSet::new();
   title_search_metadata.insert (
-    MetadataItem::Type (
+    MetadataItem::RelToOrgParent (
       RelToOrgParent::SearchResult ));
 
   result.push_str(

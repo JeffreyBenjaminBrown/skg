@@ -24,7 +24,7 @@ pub fn aliases_to_org (
   let alias_level  : usize = level + 2;
   let mut aliases_metadata = HashSet::new();
   aliases_metadata.insert (
-    MetadataItem::Type (
+    MetadataItem::RelToOrgParent (
       RelToOrgParent::Aliases ));
 
   // build result

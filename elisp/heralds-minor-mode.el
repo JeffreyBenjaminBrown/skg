@@ -89,7 +89,7 @@ Whitespace in METADATA is ignored."
                                  'heralds-blue-face)
                      out))
              ( (and (string-equal k "type")
-                    (string-equal v "containsOrgParent"))
+                    (string-equal v "container"))
                (push (propertize "}" 'face
                                  'heralds-blue-face)
                      out))
@@ -102,6 +102,9 @@ Whitespace in METADATA is ignored."
         (cond
          ((string-equal part "repeated")
           (push (propertize "REP" 'face 'heralds-red-face)
+                out))
+         ((string-equal part "might_contain_more")
+          (push (propertize "+?" 'face 'heralds-blue-face)
                 out))
          ((string-equal part "cycle")
           (push (propertize "CYCLE" 'face 'heralds-yellow-face)

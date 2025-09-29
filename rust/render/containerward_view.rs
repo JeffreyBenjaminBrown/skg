@@ -135,6 +135,8 @@ fn metadata_for_element_of_path (
     // later in the containerward path,
     // that appearance *should* (and does) get this type.
     metadata_set.insert (
-      MetadataItem::Type (
-        RelToOrgParent::Container)); }
+      MetadataItem::RelToOrgParent (
+        RelToOrgParent::Container));
+    metadata_set.insert (
+      MetadataItem::MightContainMore); }
   metadata_set }

@@ -97,7 +97,8 @@ pub fn parse_separating_metadata_and_title (
         . unwrap_or_else( |e| panic! (
           "Failed to parse metadata '{}': {}", inner, e));
       let rel_to_parent: RelToOrgParent =
-        match metadata_values.iter().find_map(|v| v.get_type()) {
+        match metadata_values.iter() . find_map(
+          |v| v.get_rel_to_org_parent()) {
           // TODO: This can be simplified.
           Some(RelToOrgParent::Content)      => RelToOrgParent::Content,
           Some(RelToOrgParent::Aliases)      => RelToOrgParent::Aliases,
@@ -108,25 +109,27 @@ pub fn parse_separating_metadata_and_title (
       let title: String = title_rest.trim().to_string();
       return (
         OrgNodeMetadata {
-          id            : metadata_values.iter().find_map(
+          id                 : metadata_values.iter().find_map(
             |v| v.get_id()),
-          repeated      : metadata_values.iter().any(|v| v.is_repeated()),
-          folded        : metadata_values.iter().any(|v| v.is_folded()),
-          focused       : metadata_values.iter().any(|v| v.is_focused()),
-          rel_to_parent : rel_to_parent,
-          metadata      : metadata_values, },
+          repeated           : metadata_values.iter().any(|v| v.is_repeated()),
+          folded             : metadata_values.iter().any(|v| v.is_folded()),
+          focused            : metadata_values.iter().any(|v| v.is_focused()),
+          might_contain_more : metadata_values.iter().any(|v| v.is_might_contain_more()),
+          rel_to_parent      : rel_to_parent,
+          metadata           : metadata_values, },
         title ); }
     // If "<skg<" with no matching ">>",
     // fall through to default case
   } { // Default case: no (well-formed) metadata block
     let title: String = line_after_bullet.trim().to_string();
     ( OrgNodeMetadata
-      { id            : None,
-        repeated      : false,
-        folded        : false,
-        focused       : false,
-        rel_to_parent : RelToOrgParent::Content,
-        metadata      : Vec::new(), },
+      { id                 : None,
+        repeated           : false,
+        folded             : false,
+        focused            : false,
+        might_contain_more : false,
+        rel_to_parent      : RelToOrgParent::Content,
+        metadata           : Vec::new(), },
       title ) }}
 
 /// Parse the content inside a `<skg< ... >>` metadata block.

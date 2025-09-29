@@ -31,7 +31,7 @@ fn test_render_org_node_from_text_with_body() {
 #[test]
 fn test_render_org_node_from_text_with_metadata() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(RelToOrgParent::Aliases));
+    metadata.insert(MetadataItem::RelToOrgParent(RelToOrgParent::Aliases));
     metadata.insert(MetadataItem::Folded);
 
     let result = render_org_node_from_text(
@@ -40,7 +40,7 @@ fn test_render_org_node_from_text_with_metadata() {
         None,
         &metadata
     );
-    assert_eq!(result, "* <skg<folded,type:aliases>> Test Title\n");
+    assert_eq!(result, "* <skg<relToOrgParent:aliases,folded>> Test Title\n");
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_render_org_node_without_body() {
 #[test]
 fn test_metadata_ordering() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(RelToOrgParent::Content));
+    metadata.insert(MetadataItem::RelToOrgParent(RelToOrgParent::Content));
     metadata.insert(MetadataItem::ID("xyz".to_string()));
     metadata.insert(MetadataItem::Cycle);
     metadata.insert(MetadataItem::Repeated);
@@ -111,7 +111,7 @@ fn test_metadata_ordering() {
         None,
         &metadata
     );
-    assert_eq!(result, "* <skg<id:xyz,cycle,repeated,type:content>> Test\n");
+    assert_eq!(result, "* <skg<id:xyz,relToOrgParent:content,cycle,repeated>> Test\n");
 }
 
 #[test]
@@ -133,12 +133,12 @@ fn test_render_metadata_header_single_item() {
 #[test]
 fn test_render_metadata_header_id_first() {
     let mut metadata = HashSet::new();
-    metadata.insert(MetadataItem::Type(RelToOrgParent::Content));
+    metadata.insert(MetadataItem::RelToOrgParent(RelToOrgParent::Content));
     metadata.insert(MetadataItem::ID("abc123".to_string()));
     metadata.insert(MetadataItem::Repeated);
 
     let result = render_metadata_header(&metadata);
-    assert_eq!(result, "<skg<id:abc123,repeated,type:content>>");
+    assert_eq!(result, "<skg<id:abc123,relToOrgParent:content,repeated>>");
 }
 
 #[test]

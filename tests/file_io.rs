@@ -177,7 +177,7 @@ fn test_fetch_aliases_from_file() -> std::io::Result<()> {
 fn test_aliases_to_org() -> std::io::Result<()> {
   assert_eq! ( // a node without aliases
     aliases_to_org ( vec![], 3 ),
-    "**** <skg<type:aliases>>\n",
+    "**** <skg<relToOrgParent:aliases>>\n",
     "Should return just header for node without aliases" );
 
   assert_eq! ( // a node with aliases
@@ -185,7 +185,7 @@ fn test_aliases_to_org() -> std::io::Result<()> {
       vec![ "first alias".to_string(),
              "second alias".to_string() ], 1 ),
     indoc! { r#"
-      ** <skg<type:aliases>>
+      ** <skg<relToOrgParent:aliases>>
       *** first alias
       *** second alias
       "# }, // trailing newline matters

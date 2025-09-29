@@ -52,12 +52,21 @@ pub fn render_metadata_header(
   let mut metadata_vec: Vec<&MetadataItem> =
     metadata.iter().collect();
   metadata_vec.sort_by(|a, b| {
-    // Sort metadata: id first, then alphabetical by Display
+    // Sort metadata: id first, type second, then alphabetical by Display
     match (a, b) {
+      // ID always comes first
       (MetadataItem::ID(_), MetadataItem::ID(_)) =>
         a.to_string().cmp(&b.to_string()),
       (MetadataItem::ID(_), _) => std::cmp::Ordering::Less,
       (_, MetadataItem::ID(_)) => std::cmp::Ordering::Greater,
+
+      // RelToOrgParent (relationship to parent) always comes second
+      (MetadataItem::RelToOrgParent(_), MetadataItem::RelToOrgParent(_)) =>
+        a.to_string().cmp(&b.to_string()),
+      (MetadataItem::RelToOrgParent(_), _) => std::cmp::Ordering::Less,
+      (_, MetadataItem::RelToOrgParent(_)) => std::cmp::Ordering::Greater,
+
+      // Everything else alphabetical
       _ => a.to_string().cmp(&b.to_string()), } });
   let mut result = String::new();
   result.push_str("<skg<");
