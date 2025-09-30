@@ -13,14 +13,6 @@
 *** DONE assign IDs where needed
     see assign_ids_recursive
 *** DONE assign rel_to_parent=Alias where needed
-*** Collect all duplicated nodes.
-    The user might have edited the contents of each,
-    even though they're not supposed to.
-    If they have, keep the first one's title,
-    add a warning about the title conflict if any
-    to the warnings being accumulated,
-    collect all of its contents from the different instances,
-    and dedup that collection.
 *** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
 ** clobber the Set<(SkgNode,NodeSaveAction)>
    See 'clobber_none_fields_with_data_from_disk'.
@@ -134,6 +126,15 @@
 *** show when a link is bi-directional
 *** list which links are in a node's recursive content
 *** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
+* idiot-proof the save mechanism
+** Collect all duplicated nodes.
+   The user might have edited the contents of each,
+   even though they're not supposed to.
+   If they have, keep the first one's title,
+   add a warning about the title conflict if any
+   to the warnings being accumulated,
+   collect all of its contents from the different instances,
+   and dedup that collection.
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user

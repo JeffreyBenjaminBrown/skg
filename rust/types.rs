@@ -21,5 +21,5 @@ pub use skgnode::{ SkgNode,
 pub mod new;
 pub use new::{ NodeSaveAction,
                OrgNode2,
-               OrgNodeMd2,
+               HeadlineMd2,
                RelToOrgParent2, };

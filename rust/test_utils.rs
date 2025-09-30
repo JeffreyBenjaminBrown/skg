@@ -1,5 +1,5 @@
 use crate::new::{headline_to_triple, HeadlineInfo};
-use crate::types::{OrgNode2, OrgNodeMd2};
+use crate::types::{OrgNode2, HeadlineMd2};
 use ego_tree::Tree;
 
 /// Compare two org-mode headlines ignoring ID differences.
@@ -19,8 +19,8 @@ pub fn compare_headlines_modulo_id(
       if has_id1 != has_id2 {
         return false; } // One has ID, other doesn't, so they are unequal.
       // Strip IDs from both (no-op if no ID present) and compare
-      let stripped_metadata1: Option<OrgNodeMd2> = strip_id_from_metadata_struct(metadata1);
-      let stripped_metadata2: Option<OrgNodeMd2> = strip_id_from_metadata_struct(metadata2);
+      let stripped_metadata1: Option<HeadlineMd2> = strip_id_from_metadata_struct(metadata1);
+      let stripped_metadata2: Option<HeadlineMd2> = strip_id_from_metadata_struct(metadata2);
       (level1, stripped_metadata1, title1) == (level2, stripped_metadata2, title2)
     },
     (None, None) => headline1 == headline2,  // Both are not headlines, compare directly
@@ -95,8 +95,8 @@ fn compare_nodes_modulo_id(
 
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
-  metadata: Option<OrgNodeMd2>
-) -> Option<OrgNodeMd2> {
+  metadata: Option<HeadlineMd2>
+) -> Option<HeadlineMd2> {
   metadata.map(|mut meta| {
     meta.id = None;
     meta

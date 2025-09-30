@@ -1,10 +1,10 @@
-use crate::types::{OrgNode2, OrgNodeMd2, RelToOrgParent2, ID};
+use crate::types::{OrgNode2, HeadlineMd2, RelToOrgParent2, ID};
 
 use ego_tree::Tree;
 use regex::Regex;
 
 /// Type alias for headline information: (level, metadata, title)
-pub type HeadlineInfo = (usize, Option<OrgNodeMd2>, String);
+pub type HeadlineInfo = (usize, Option<HeadlineMd2>, String);
 
 /// Represents a parsed org node with its headline and body lines
 #[derive(Debug, Clone)]
@@ -99,7 +99,7 @@ fn mk_orgnode2(
   let body_text: Option<String> =
     if body_lines.is_empty() { None
     } else { Some(body_lines.join("\n")) };
-  let metadata : OrgNodeMd2 =
+  let metadata : HeadlineMd2 =
     if let Some(parsed_metadata) = metadata_option {
       parsed_metadata
     } else { // No metadata, so use defaults.
@@ -149,7 +149,7 @@ pub fn headline_to_triple (
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     let asterisks: &str = captures.get(1).unwrap().as_str();
     let level: usize = asterisks.len();
-    let metadata: Option<OrgNodeMd2> =
+    let metadata: Option<HeadlineMd2> =
       if let Some(meta_match) = captures.get(2) {
         match parse_metadata_to_orgNodeMd2(meta_match.as_str()) {
           Ok(parsed_metadata) => Some(parsed_metadata),
@@ -161,13 +161,13 @@ pub fn headline_to_triple (
     Some((level, metadata, title))
   } else { None }}
 
-/// Parse metadata string directly into OrgNodeMd2.
+/// Parse metadata string directly into HeadlineMd2.
 /// Parses comma-separated metadata items like "id:foo,folded,relToOrgParent:container".
 /// Returns an error for unknown metadata keys or values.
 fn parse_metadata_to_orgNodeMd2(
   metadata_str: &str
-) -> Result<OrgNodeMd2, String> {
-  let mut result : OrgNodeMd2 = create_default_orgNodeMd2();
+) -> Result<HeadlineMd2, String> {
+  let mut result : HeadlineMd2 = create_default_orgNodeMd2();
   for part in metadata_str.split(',') {
     let trimmed: &str = part.trim();
     if trimmed.is_empty() { continue; }
@@ -203,10 +203,10 @@ fn parse_metadata_to_orgNodeMd2(
         }} }}
   Ok(result) }
 
-/// Create default OrgNodeMd2 with all default values.
+/// Create default HeadlineMd2 with all default values.
 /// Used when a headline has no metadata.
-fn create_default_orgNodeMd2() -> OrgNodeMd2 {
-  OrgNodeMd2 {
+fn create_default_orgNodeMd2() -> HeadlineMd2 {
+  HeadlineMd2 {
     id: None,
     relToOrgParent: RelToOrgParent2::Content,
     cycle: false,
