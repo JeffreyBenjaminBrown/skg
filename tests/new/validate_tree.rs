@@ -1,5 +1,5 @@
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, find_buffer_errors_for_saving, BufferInvalidForSaving};
+use skg::new::{org_to_uninterpreted_nodes2, find_buffer_errors_for_saving, Buffer_Cannot_Be_Saved};
 use skg::types::OrgNode2;
 use ego_tree::Tree;
 
@@ -25,47 +25,47 @@ fn test_find_buffer_errors_for_saving() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(
       input_with_errors).unwrap();
-  let errors: Vec<BufferInvalidForSaving> =
+  let errors: Vec<Buffer_Cannot_Be_Saved> =
     find_buffer_errors_for_saving(&trees);
 
-  assert_eq!(errors.len(), 8,
-             "Should find exactly 8 validation errors");
+  assert_eq!(errors.len(), 9,
+             "Should find exactly 9 validation errors (8 original + 1 Multiple_DefiningContainers)");
 
-  { let aliasCol_body_errors: Vec<&BufferInvalidForSaving> =
+  { let aliasCol_body_errors: Vec<&Buffer_Cannot_Be_Saved> =
     errors.iter()
-    . filter(|e| matches!(e, BufferInvalidForSaving::Body_of_AliasCol(_)))
+    . filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Body_of_AliasCol(_)))
     .collect();
     assert_eq!(aliasCol_body_errors.len(), 1,
                "Should find 1 Body_of_AliasCol error");
-    if let BufferInvalidForSaving::Body_of_AliasCol(node)
+    if let Buffer_Cannot_Be_Saved::Body_of_AliasCol(node)
     = aliasCol_body_errors[0]
     { assert_eq!( node.title,
                   "AliasCol with body problem",
                   "Body_of_AliasCol error should come from correct node"); }}
 
-  { let aliasCol_child_id_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::Child_of_AliasCol_with_ID(_)))
+  { let aliasCol_child_id_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(_)))
     .collect();
   assert_eq!(aliasCol_child_id_errors.len(), 1, "Should find 1 Child_of_AliasCol_with_ID error");
-  if let BufferInvalidForSaving::Child_of_AliasCol_with_ID(node) = aliasCol_child_id_errors[0] {
+  if let Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(node) = aliasCol_child_id_errors[0] {
     assert_eq!(node.title, "Child of AliasCol with ID", "Child_of_AliasCol_with_ID error should come from correct node"); }}
 
-  { let alias_body_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::Body_of_Alias(_)))
+  { let alias_body_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Body_of_Alias(_)))
     .collect();
   assert_eq!(alias_body_errors.len(), 1, "Should find 1 Body_of_Alias error");
-  if let BufferInvalidForSaving::Body_of_Alias(node) = alias_body_errors[0] {
+  if let Buffer_Cannot_Be_Saved::Body_of_Alias(node) = alias_body_errors[0] {
     assert_eq!(node.title, "Alias with body problem and orphaned", "Body_of_Alias error should come from correct node"); }}
 
-  { let alias_child_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::Child_of_Alias(_)))
+  { let alias_child_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Child_of_Alias(_)))
     .collect();
   assert_eq!(alias_child_errors.len(), 1, "Should find 1 Child_of_Alias error");
-  if let BufferInvalidForSaving::Child_of_Alias(node) = alias_child_errors[0] {
+  if let Buffer_Cannot_Be_Saved::Child_of_Alias(node) = alias_child_errors[0] {
     assert_eq!(node.title, "Any child of Alias (bad)", "Child_of_Alias error should come from correct node"); }}
 
-  { let alias_no_aliascol_parent_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::Alias_with_no_AliasCol_Parent(_)))
+  { let alias_no_aliascol_parent_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(_)))
     .collect();
     assert_eq!(alias_no_aliascol_parent_errors.len(), 3, "Should find 3 Alias_with_no_AliasCol_Parent errors");
     let expected_titles: Vec<&str> = vec![
@@ -73,18 +73,30 @@ fn test_find_buffer_errors_for_saving() {
       "Alias under non-AliasCol parent",
       "Root level Alias (bad)" ];
     for error in &alias_no_aliascol_parent_errors {
-      if let BufferInvalidForSaving::Alias_with_no_AliasCol_Parent(node) = error {
+      if let Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(node) = error {
         assert!(expected_titles.contains(&node.title.as_str()),
                 "Alias_with_no_AliasCol_Parent error should come from expected node, got: {}", node.title); }} }
 
-  { let ambiguous_deletion_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::AmbiguousDeletion(_)))
+  { let ambiguous_deletion_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::AmbiguousDeletion(_)))
     .collect();
   assert_eq!(ambiguous_deletion_errors.len(), 1, "Should find 1 AmbiguousDeletion error");
-    if let BufferInvalidForSaving::AmbiguousDeletion(id)
+    if let Buffer_Cannot_Be_Saved::AmbiguousDeletion(id)
     = ambiguous_deletion_errors[0] {
       assert_eq!(id.0, "conflict",
-                 "AmbiguousDeletion error should come from conflicting ID"); }} }
+                 "AmbiguousDeletion error should come from conflicting ID"); }}
+
+  { let multiple_defining_errors: Vec<&Buffer_Cannot_Be_Saved> =
+    errors.iter()
+    .filter(|e| matches!(
+      e, Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(_)))
+    .collect();
+  assert_eq!(multiple_defining_errors.len(), 1, "Should find 1 Multiple_DefiningContainers error");
+    if let Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id)
+    = multiple_defining_errors[0] {
+      assert_eq!(id.0, "conflict",
+                 "Multiple_DefiningContainers error should come from conflicting ID"); } }
+}
 
 #[test]
 fn test_find_buffer_errors_for_saving_valid_input() {
@@ -102,7 +114,7 @@ fn test_find_buffer_errors_for_saving_valid_input() {
 
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(valid_input).unwrap();
-  let errors: Vec<BufferInvalidForSaving> = find_buffer_errors_for_saving(&trees);
+  let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&trees);
 
   assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
 }
@@ -111,7 +123,7 @@ fn test_find_buffer_errors_for_saving_valid_input() {
 fn test_find_buffer_errors_for_saving_empty_input() {
   // Test empty input
   let empty_trees: Vec<Tree<OrgNode2>> = Vec::new();
-  let errors: Vec<BufferInvalidForSaving> = find_buffer_errors_for_saving(&empty_trees);
+  let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&empty_trees);
 
   assert_eq!(errors.len(), 0, "Should find no errors in empty input");
 }
@@ -131,18 +143,18 @@ fn test_multiple_aliascols_in_children() {
 
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input_with_multiple_aliascols).unwrap();
-  let errors: Vec<BufferInvalidForSaving> =
+  let errors: Vec<Buffer_Cannot_Be_Saved> =
     find_buffer_errors_for_saving(&trees);
 
-  let multiple_aliascols_errors: Vec<&BufferInvalidForSaving> = errors.iter()
-    .filter(|e| matches!(e, BufferInvalidForSaving::MultipleAliasCols_in_Children(_)))
+  let multiple_aliascols_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(_)))
     .collect();
 
   assert_eq!(multiple_aliascols_errors.len(), 1,
-             "Should find exactly 1 MultipleAliasCols_in_Children error");
+             "Should find exactly 1 Multiple_AliasCols_in_Children error");
 
-  if let BufferInvalidForSaving::MultipleAliasCols_in_Children(node) = multiple_aliascols_errors[0] {
+  if let Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) = multiple_aliascols_errors[0] {
     assert_eq!(node.title, "Node with multiple AliasCol children",
-               "MultipleAliasCols_in_Children error should come from the parent node");
+               "Multiple_AliasCols_in_Children error should come from the parent node");
   }
 }
