@@ -115,3 +115,34 @@ fn test_find_buffer_errors_for_saving_empty_input() {
 
   assert_eq!(errors.len(), 0, "Should find no errors in empty input");
 }
+
+#[test]
+fn test_multiple_aliascols_in_children() {
+  // Test input with multiple AliasCol children
+  let input_with_multiple_aliascols: &str =
+    indoc! {"
+            * <skg<id:root>> Node with multiple AliasCol children
+            ** <skg<relToOrgParent:aliasCol>> First AliasCol
+            *** <skg<relToOrgParent:alias>> First alias
+            ** <skg<relToOrgParent:aliasCol>> Second AliasCol
+            *** <skg<relToOrgParent:alias>> Second alias
+            ** Normal child
+        "};
+
+  let trees: Vec<Tree<OrgNode2>> =
+    org_to_uninterpreted_nodes2(input_with_multiple_aliascols).unwrap();
+  let errors: Vec<BufferInvalidForSaving> =
+    find_buffer_errors_for_saving(&trees);
+
+  let multiple_aliascols_errors: Vec<&BufferInvalidForSaving> = errors.iter()
+    .filter(|e| matches!(e, BufferInvalidForSaving::MultipleAliasCols_in_Children(_)))
+    .collect();
+
+  assert_eq!(multiple_aliascols_errors.len(), 1,
+             "Should find exactly 1 MultipleAliasCols_in_Children error");
+
+  if let BufferInvalidForSaving::MultipleAliasCols_in_Children(node) = multiple_aliascols_errors[0] {
+    assert_eq!(node.title, "Node with multiple AliasCol children",
+               "MultipleAliasCols_in_Children error should come from the parent node");
+  }
+}

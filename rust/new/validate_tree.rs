@@ -16,6 +16,7 @@ pub enum BufferInvalidForSaving {
   Body_of_Alias                 (OrgNode2),
   Child_of_Alias                (OrgNode2),
   Alias_with_no_AliasCol_Parent (OrgNode2),
+  MultipleAliasCols_in_Children (OrgNode2),
   AmbiguousDeletion             (ID),
 }
 
@@ -84,6 +85,18 @@ fn validate_node_and_children(
           BufferInvalidForSaving::Child_of_Alias(
             node.clone() )); },
         _ => {} }}
+
+  { // At most one child should have relToOrgParent=AliasCol
+    let aliasCol_children_count: usize =
+      node_ref . children()
+      . filter ( |child|
+                  child.value() . metadata.relToOrgParent
+                  == RelToOrgParent2::AliasCol )
+      . count();
+    if aliasCol_children_count > 1 {
+      errors.push (
+        BufferInvalidForSaving::MultipleAliasCols_in_Children (
+          node.clone() )); }}
 
   for child in node_ref.children() { // recurse
     let cloned_rel: RelToOrgParent2 =
