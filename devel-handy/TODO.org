@@ -5,7 +5,6 @@
 **** an AliasColl node has a body or a child with an ID
 **** an Alias node has a body
 **** DONE a node is marked 'delete' somewhere but not everywhere
-*** continue but report all problems if any of these happen
 **** an alias node has children
      They will be saved, perhaps becoming new roots.
 *** assign IDs where needed
@@ -87,7 +86,7 @@
   Use a temp config, and delete it if the test passes.
 * integration test for containerward view
 * [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
-* override ordinary save command
+* override the ordinary save command
 * If there is a containerward "}" herald, the "ID exists" herald can be omitted.
 * [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
   esp. rootness and multiple containment

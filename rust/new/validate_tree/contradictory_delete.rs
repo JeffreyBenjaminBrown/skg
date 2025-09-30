@@ -1,6 +1,5 @@
 use crate::types::{OrgNode2, ID};
 
-
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 
