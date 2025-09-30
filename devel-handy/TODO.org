@@ -1,7 +1,8 @@
+* HeadlineInfo should have a parsed Metadata, not a metadata string
 * refactor: retain tree
   serial, control flow
 ** interpret_org_node2
-*** refuse and report all problems if any of these happen
+*** DONE refuse and report all problems if any of these happen
 **** an AliasColl node has a body or a child with an ID
 **** an Alias node has a body
 **** DONE a node is marked 'delete' somewhere but not everywhere

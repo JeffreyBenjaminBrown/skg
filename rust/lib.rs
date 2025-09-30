@@ -6,5 +6,6 @@ pub mod render;
 pub mod save;
 pub mod serve;
 pub mod tantivy;
+pub mod test_utils;
 pub mod typedb;
 pub mod types;
