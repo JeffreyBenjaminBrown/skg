@@ -202,6 +202,7 @@ fn parse_metadata_to_orgNodeMd2(
         "focused" => result.focused = true,
         "cycle" => result.cycle = true,
         "mightContainMore" => result.mightContainMore = true,
+        "toDelete" => result.toDelete = true,
         _ => {
           return Err(format!("Unknown metadata value: {}", trimmed));
         }
@@ -223,6 +224,7 @@ fn create_default_orgNodeMd2() -> OrgNodeMd2 {
     folded: false,
     mightContainMore: false,
     repeat: false,
-    to_delete: false,
+    toDelete: false,
   }
 }
+

@@ -125,7 +125,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.metadata.folded, false);
   assert_eq!(first_node.metadata.mightContainMore, false);
   assert_eq!(first_node.metadata.repeat, false);
-  assert_eq!(first_node.metadata.to_delete, false);
+  assert_eq!(first_node.metadata.toDelete, false);
 
   // Test second node - should have no body
   let second_node = trees[1].root().value();
@@ -277,3 +277,4 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
   assert!(error_msg.contains("jumps too far between levels"));
   assert!(error_msg.contains("level 3"));
 }
+

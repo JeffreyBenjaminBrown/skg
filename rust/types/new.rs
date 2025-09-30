@@ -4,7 +4,7 @@ use super::ID;
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeSaveAction {
   pub mightContainMore: bool,
-  pub to_delete: bool,
+  pub toDelete: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +23,7 @@ pub struct OrgNodeMd2 {
   pub folded: bool,
   pub mightContainMore: bool,
   pub repeat: bool,
-  pub to_delete: bool,
+  pub toDelete: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

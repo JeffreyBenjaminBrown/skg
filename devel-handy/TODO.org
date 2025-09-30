@@ -4,7 +4,7 @@
 *** refuse and report all problems if any of these happen
 **** an AliasColl node has a body or a child with an ID
 **** an Alias node has a body
-**** a node is marked 'delete' somewhere but not everywhere
+**** DONE a node is marked 'delete' somewhere but not everywhere
 *** continue but report all problems if any of these happen
 **** an alias node has children
      They will be saved, perhaps becoming new roots.
@@ -30,7 +30,7 @@
 ** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
-    First, for each to_delete node,
+    First, for each toDelete node,
       delete every node using that ID, even if as an extra_id.
     Do the rest of the existing update_nodes_and_relationships
       only to the other nodes.
@@ -39,7 +39,7 @@
      as normal, but filtering to only those nodes
 **** delete all to-delete nodes
 *** update_index_with_nodes
-    Delete every entry for which the id is any to_delete id.
+    Delete every entry for which the id is any toDelete id.
       not just the pid
     Add as normal.
 ** rebuild view
@@ -47,7 +47,7 @@
 *** The result begins as a copy of the original one.
 *** Process it DFS, keeping a full breadcrumb aath back to root.
 *** Keep a running tally of which nodes have already been included in the result.
-*** Any to_delete node is dropped, along with its content.
+*** Any toDelete node is dropped, along with its content.
 *** Every node is leeft in place except, maybe, nodes that are content of their parent.
     Leave even them in place if the parent is might_contain_more.
     Otherwise, remove them from the list,
