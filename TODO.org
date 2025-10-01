@@ -12,13 +12,8 @@
 *** assign IDs where needed
     see assign_ids_recursive
 *** assign rel_to_parent=Alias where needed
-** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
+** DONE Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
 ** collect SKgNodes with the same ID
-** clobber the Set<(SkgNode,NodeSaveAction)>
-   See 'clobber_none_fields_with_data_from_disk'.
-   Extend to also add extra-ids.
-   Do something similar for content,
-     if SkgNodeSaveAction.might_contain_more == true.
 ** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
