@@ -10,8 +10,8 @@ pub fn interpret_forest (
   let mut result: Vec<(SkgNode, NodeSaveAction)> =
     Vec::new();
   for tree in trees {
-    interpret_node_dfs( tree.root(),
-                        &mut result)?; }
+    interpret_node_dfs ( tree.root(),
+                         &mut result )?; }
   Ok(result) }
 
 /// Appends another pair to 'result' and recurses.
@@ -87,7 +87,8 @@ fn collect_aliases (
   if aliases.is_empty() { None
   } else { Some(aliases) }}
 
-/// Returns IDs of all children for which relToOrgParent = Content
+/// Returns IDs of all children for which relToOrgParent = Content.
+/// Excludes children for which metadata.toDelete is true.
 fn collect_contents (
   node_ref: &NodeRef<OrgNode2>
 ) -> Vec<ID> {
@@ -95,7 +96,8 @@ fn collect_contents (
     Vec::new();
   for child in node_ref.children() {
     if ( child . value() . metadata . relToOrgParent
-         == RelToOrgParent2::Content ) {
+         == RelToOrgParent2::Content
+         && ! child . value() . metadata . toDelete ) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone());
       }} }

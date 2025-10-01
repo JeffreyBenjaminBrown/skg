@@ -12,3 +12,9 @@ mod add_missing_info;
 
 #[path = "new/orgnodes_to_instructions.rs"]
 mod orgnodes_to_instructions;
+
+#[path = "new/orgnodes_to_instructions/reduce_dups.rs"]
+mod reduce_dups;
+
+#[path = "new/orgnodes_to_instructions/reduce_dups/by_claude.rs"]
+mod reduce_dups_by_claude;

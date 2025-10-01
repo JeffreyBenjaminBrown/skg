@@ -264,6 +264,7 @@ fn test_interpret_forest_complex_scenario() {
             Section 1 body
             *** <skg<id:subsection1a>> Subsection 1a
             ** <skg<id:section2,toDelete>> Section 2
+            ** <skg<id:section3>> Section 3
             * <skg<id:doc2>> Document 2
             ** <skg<id:ref_section,relToOrgParent:container>> Reference Section
         "};
@@ -273,13 +274,14 @@ fn test_interpret_forest_complex_scenario() {
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     interpret_forest(trees).unwrap();
 
-  assert_eq!(instructions.len(), 6); // doc1, section1, subsection1a, section2, doc2, ref_section
+  assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
   // Test doc1
   let (doc1_skg, doc1_action) = &instructions[0];
   assert_eq!(doc1_skg.title, "Document 1");
   assert_eq!(doc1_skg.aliases, Some(vec!["First Document".to_string(), "Primary Doc".to_string()]));
-  assert_eq!(doc1_skg.contains, vec![ID::from("section1"), ID::from("section2")]);
+  assert_eq!(doc1_skg.contains,
+             vec![ID::from("section1"), ID::from("section3")]);
   assert_eq!(doc1_action.mightContainMore, true);
   assert_eq!(doc1_action.toDelete, false);
 

@@ -14,7 +14,7 @@ Collisions are astronomically unlikely but not impossible.
 If there are fewer than 3.3e15 v4 UUIDs --
 equivalent to 9 billion people with 415,000 nodes each --
 the collision probability is less than 1 in 1e6. */
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ID ( pub String );
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]

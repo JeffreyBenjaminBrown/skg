@@ -14,6 +14,9 @@
 *** assign rel_to_parent=Alias where needed
 ** DONE Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
 ** collect SKgNodes with the same ID
+*** tests
+**** toDelete works
+  * <skg<id:1>> 1
 ** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
@@ -52,7 +55,6 @@
 **** might_contain_more
 **** focused
 **** folded
-* Nodes with 'repeated' should also have 'mightContainMore'.
 * Look at all my plans, and the code around saving, and ask what makes each difficult.
   Do this to know how to change the data structure,
   and likely the control flow.
@@ -115,6 +117,7 @@
       .await
       .context("Failed to connect to TypeDB server")?;
 *** Avoid uses of `unwrap` in Rust.
+*** find 'panic's, replace with Result
 ** fancy features
 *** show binary relationship label with optional intermediating node
     esp. nice if you can filter on those labels,
