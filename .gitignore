@@ -9,9 +9,9 @@
 /.npm
 /.ssh/
 /Cargo.lock
+/bash/kill-servers.sh
 /data/skg
 /devel-handy/temp.org
-/kill-servers.sh
 /target
 /tests/**/generated/
 TAGS

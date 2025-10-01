@@ -80,10 +80,10 @@ echo "Script PID: $$"
 echo "Process group: $(ps -o pgid= -p $$)"
 
 # Create kill script for easy shutdown
-echo "#!/bin/bash" > kill-servers.sh
-echo "kill -TERM -$$" >> kill-servers.sh
-chmod +x kill-servers.sh
-echo "Created kill-servers.sh - run it to stop all servers"
+echo "#!/bin/bash" >     bash/kill-servers.sh
+echo "kill -TERM -$$" >> bash/kill-servers.sh
+chmod +x                 bash/kill-servers.sh
+echo "Created bash/kill-servers.sh - run it to stop all servers"
 
 # Check and start TypeDB server if needed
 if is_typedb_running; then
