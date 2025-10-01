@@ -9,3 +9,6 @@ mod validate_tree;
 
 #[path = "new/buffer_to_orgnodes/add_missing_info.rs"]
 mod add_missing_info;
+
+#[path = "new/orgnodes_to_instructions.rs"]
+mod orgnodes_to_instructions;

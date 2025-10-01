@@ -3,6 +3,9 @@ use super::ID;
 /// Tells Rust what to do with a node.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeSaveAction {
+  // PITFALL: It's nonsense if both of these are true.
+  // The server will in that case delete,
+  // so the mightContainMore has no effect.
   pub mightContainMore: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content.
   pub toDelete: bool,
 }

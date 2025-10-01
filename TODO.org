@@ -3,16 +3,17 @@
 ** DONE buffer to orgnode forest
 *** refuse and report all problems if any of these happen
 **** a node appears twice without 'rep' or 'mightContainMore'.
-**** an AliasColl node has a body or a child with an ID
-**** an Alias node has a body
+**** an AliasColl node has a body, or a child with an ID
+**** an Alias node has a body, or children
 **** a node is marked 'delete' somewhere but not everywhere
-**** an alias node has children
-     They will be saved, perhaps becoming new roots.
 **** a node has multiple AliasCol children
+**** a node's contents are defined more than once
+     exception: they can be appended to any number of times
 *** assign IDs where needed
     see assign_ids_recursive
 *** assign rel_to_parent=Alias where needed
 ** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
+** collect SKgNodes with the same ID
 ** clobber the Set<(SkgNode,NodeSaveAction)>
    See 'clobber_none_fields_with_data_from_disk'.
    Extend to also add extra-ids.
@@ -56,7 +57,7 @@
 **** might_contain_more
 **** focused
 **** folded
-* rep should imply mightContainMore
+* Nodes with 'repeated' should also have 'mightContainMore'.
 * Look at all my plans, and the code around saving, and ask what makes each difficult.
   Do this to know how to change the data structure,
   and likely the control flow.
