@@ -1,0 +1,45 @@
+Claude wrote this guide.
+A human edited it but has not fact-checked it.
+* Corrupted TypeDB Checkpoints
+** PITFALL: Never delete the _system database.
+** The problem
+*** Symptoms
+- TypeDB server fails to start with error message about checkpoint recovery
+- Error mentions "Too many open files"
+- Specific error pattern:
+  #+begin_example
+  [STO10] Failed to recover from checkpoint for database 'DATABASE_NAME'.
+  Cause:
+        [CLO7] Error while opening storage keyspaces.
+  Cause:
+        RocksDB { name: "OptimisedPrefix25", source: Error { message: "IO error: While opendir: PATH: Too many open files" } }
+  #+end_example
+- The "too many open files" error occurs because TypeDB attempts to open all databases at startup, including corrupted ones
+*** Root Cause
+This typically happens when:
+1. Docker container or system is stopped abruptly while TypeDB is running
+2. TypeDB doesn't get a chance to properly close databases and flush checkpoints
+3. RocksDB (TypeDB's storage engine) leaves databases in an inconsistent state
+4. Accumulation of test databases can contribute to "too many open files" limit
+** Solution:
+*** Immediate Fix:
+1. Identify the problematic database from the error message
+2. Remove the corrupted database directory:
+   #+begin_src bash
+   rm -rf /opt/typedb/core/server/data/PROBLEMATIC_DATABASE_NAME
+   #+end_src
+*** Some scripts make it easier.
+Use the provided scripts for safe and thorough cleanup:
+**** troubleshooting/typedb/check-typedb-databases.sh
+- Classifies all TypeDB databases as 'okay', 'corrupt', or 'test'
+- Identifies corruption indicators like inaccessible storage directories
+- Provides summary and recommendations
+**** clean-typedb-test-databases.sh
+- Safely removes all test databases (pattern: *skg-*test*)
+- Interactive confirmation before deletion
+- Preserves system and production databases
+*** Manual Cleanup (Alternative):
+This deletes any database matching pattern "*skg-*test*".
+#+begin_src bash
+find /opt/typedb/core/server/data/ -name "*skg-*test*" -type d -exec rm -rf {} \;
+#+end_src

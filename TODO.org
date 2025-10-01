@@ -1,7 +1,7 @@
 * refactor: retain tree
   serial, control flow
-** interpret_org_node2
-*** DONE refuse and report all problems if any of these happen
+** DONE buffer to orgnode forest
+*** refuse and report all problems if any of these happen
 **** a node appears twice without 'rep' or 'mightContainMore'.
 **** an AliasColl node has a body or a child with an ID
 **** an Alias node has a body
@@ -9,10 +9,10 @@
 **** an alias node has children
      They will be saved, perhaps becoming new roots.
 **** a node has multiple AliasCol children
-*** DONE assign IDs where needed
+*** assign IDs where needed
     see assign_ids_recursive
-*** DONE assign rel_to_parent=Alias where needed
-*** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
+*** assign rel_to_parent=Alias where needed
+** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
 ** clobber the Set<(SkgNode,NodeSaveAction)>
    See 'clobber_none_fields_with_data_from_disk'.
    Extend to also add extra-ids.
