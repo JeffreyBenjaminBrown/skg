@@ -148,6 +148,8 @@ pub fn update_index_with_nodes (
     &mut writer, processed_count, "Updated")?;
   Ok (processed_count) }
 
+// TODO: So far nothing ensures that Tantivy indexes on the PID.
+
 
 /* -------------------- Private helpers -------------------- */
 

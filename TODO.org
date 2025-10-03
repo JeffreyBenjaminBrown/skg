@@ -17,27 +17,10 @@
 ** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
-    Use as a model
-      the function update_nodes_and_relationships
-      from rust/typedb/update.rs.
-    Our new function works differently in a few ways.
-    It ingests pairs (SkgNode, NodeSaveAction)
-      rather than bare SkgNodes.
-    To those pairs it adds a third element of type Optional<ID>
-      by calling typedb::search::pid_from_id
-      on the first element of the 'ids' of each SkNode.
-    It excludes 'toDelete' instructions
-      from the call to 'create_only_nodes_with_no_ids_present'.
-    It does not define the vector primary_ids
-      like the model function does.
-    It then, for each toDelete node,
-      deletes every node using that ID.
-    Do the rest of the existing update_nodes_and_relationships
-      only to the other nodes.
 *** FS
+**** delete all to-delete nodes
 **** write all non-delete nodes
      as normal, but filtering to only those nodes
-**** delete all to-delete nodes
 *** update_index_with_nodes
     Delete every entry for which the id is any toDelete id.
       not just the pid

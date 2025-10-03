@@ -1,13 +1,55 @@
 use indoc::indoc;
 use skg::new::{org_to_uninterpreted_nodes2, add_missing_info_to_trees};
-use skg::types::OrgNode2;
+use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::types::{OrgNode2, SkgConfig};
 use ego_tree::Tree;
 
 // Import test utilities
 use skg::test_utils::compare_trees_modulo_id;
 
+use futures::executor::block_on;
+use std::error::Error;
+use typedb_driver::{
+  Credentials,
+  DriverOptions,
+  TypeDBDriver, };
+
 #[test]
-fn test_add_missing_info_comprehensive() {
+fn test_add_missing_info_comprehensive(
+) -> Result<(), Box<dyn Error>> {
+  block_on ( async {
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_database () . await ?;
+    test_add_missing_info_logic ( &config, &driver ) . await ?;
+    Ok (( )) } ) }
+
+async fn setup_test_database (
+) -> Result < ( SkgConfig, TypeDBDriver ), Box<dyn Error> > {
+  let config : SkgConfig =
+    SkgConfig {
+      db_name        : "skg-test-add-missing-info"                           . into(),
+      skg_folder     : "tests/new/buffer_to_orgnodes/add_missing_info/fixtures" . into(),
+      tantivy_folder : "irrelevant"                                         . into(),
+      port           : 1730 };
+  let index_folder : &str =
+    config . skg_folder . to_str ()
+    . expect ("Invalid UTF-8 in tantivy index path");
+  let driver : TypeDBDriver =
+    TypeDBDriver::new(
+      "127.0.0.1:1729",
+      Credentials::new("admin", "password"),
+      DriverOptions::new(false, None)?
+    ).await?;
+  populate_test_db_from_fixtures (
+    index_folder,
+    & config . db_name,
+    & driver ). await ?;
+  Ok (( config, driver )) }
+
+async fn test_add_missing_info_logic (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
   // Applying 'add_missing_info_to_trees' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
@@ -33,7 +75,9 @@ fn test_add_missing_info_comprehensive() {
     org_to_uninterpreted_nodes2(
       with_missing_info).unwrap();
   add_missing_info_to_trees(
-    &mut after_adding_missing_info);
+    &mut after_adding_missing_info,
+    &config.db_name,
+    driver ).await ?;
   let expected_forest: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(
       without_missing_info ). unwrap();
@@ -42,4 +86,5 @@ fn test_add_missing_info_comprehensive() {
       &after_adding_missing_info,
       &expected_forest),
     "add_missing_info_to_trees: Forests not equivalent modulo ID."
-  ); }
+  );
+  Ok (( )) }
