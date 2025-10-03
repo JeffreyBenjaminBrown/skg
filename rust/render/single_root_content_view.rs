@@ -44,12 +44,15 @@ pub async fn org_from_node_recursive (
   level   : usize,
 ) -> Result<String, Box<dyn Error>> {
 
-  let path : String = path_from_pid (
-    &config,
+  let pid : ID =
     pid_from_id ( & config . db_name,
-                  driver,
-                  node_id,
-    ). await ? );
+                    driver,
+                    node_id,
+  ). await ?
+    . ok_or_else ( || format! (
+      "ID '{}' not found in database", node_id ) ) ?;
+  let path : String = path_from_pid (
+    &config, pid );
   let node : SkgNode = read_node ( path )?;
   if node.title.is_empty () {
     return Err ( Box::new ( io::Error::new (

@@ -13,10 +13,7 @@
     see assign_ids_recursive
 *** assign rel_to_parent=Alias where needed
 ** DONE Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
-** collect SKgNodes with the same ID
-*** tests
-**** toDelete works
-  * <skg<id:1>> 1
+** DONE collect SKgNodes with the same ID
 ** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2

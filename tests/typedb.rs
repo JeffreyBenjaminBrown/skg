@@ -290,18 +290,18 @@ pub async fn test_create_only_nodes_with_no_ids_present (
   // - 'absent' should not exist
   assert! (
     pid_from_id ( db_name, driver, &ID::from ( "a" ) )
-      . await . is_ok (),
-    "Expected lookup of existing id 'a' to succeed." );
+      . await . unwrap () . is_some (),
+    "Expected lookup of existing id 'a' to return Some." );
 
   assert! (
     pid_from_id ( db_name, driver, &ID::from ( "new" ) )
-      . await . is_ok (),
-    "Expected lookup of newly created id 'new' to succeed." );
+      . await . unwrap () . is_some (),
+    "Expected lookup of newly created id 'new' to return Some." );
 
   assert! (
     pid_from_id ( db_name, driver, &ID::from ( "absent" ) )
-      . await . is_err (),
-    "Expected lookup of missing id 'absent' to fail." );
+      . await . unwrap () . is_none (),
+    "Expected lookup of missing id 'absent' to return None." );
 
   // Final count should be +1 compared to initial.
   let final_number_of_nodes : usize =

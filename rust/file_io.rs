@@ -50,11 +50,13 @@ pub async fn read_node_from_id (
   node_id : &ID
 ) -> Result<SkgNode, Box<dyn Error>> {
 
+  let pid : ID = pid_from_id (
+    & config.db_name, driver, node_id
+  ). await ?
+    . ok_or_else ( || format! (
+      "ID '{}' not found in database", node_id ) ) ?;
   let node_file_path = path_from_pid (
-    config,
-    pid_from_id (
-      & config.db_name, driver, node_id
-    ). await ? );
+    config, pid );
   let node : SkgNode = read_node (node_file_path) ?;
   if node.title.is_empty() {
     return Err(Box::new(std::io::Error::new(

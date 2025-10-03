@@ -11,12 +11,12 @@ use crate::types::ID;
 
 
 /// Runs a single TypeDB query.
-/// Returns the node's filepath.
+/// Returns the PID associated with that ID, or None if not found.
 pub async fn pid_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
   node_id : &ID
-) -> Result < ID, Box<dyn Error> > {
+) -> Result < Option<ID>, Box<dyn Error> > {
 
   let tx : Transaction =
     driver.transaction (
@@ -39,12 +39,10 @@ pub async fn pid_from_id (
     let row : ConceptRow = row_result ?;
     if let Some (concept) = row.get ("primary_id") ? {
       return Ok (
-        ID (
+        Some ( ID (
           extract_payload_from_typedb_string_rep (
-            &concept . to_string () )) ); }}
-  Err ( format! ( "No primary id found for ID '{}'",
-                   node_id )
-        . into () ) }
+            &concept . to_string () )) ) ); }}
+  Ok ( None ) }
 
 pub fn extract_payload_from_typedb_string_rep (
   // Returns the string it finds

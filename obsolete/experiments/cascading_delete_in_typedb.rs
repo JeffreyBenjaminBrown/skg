@@ -87,11 +87,11 @@ fn test_cascading_delete_behavior() -> Result<(), Box<dyn Error>> {
 
     // Verify initial state: both nodes exist and relationship exists
     assert!(
-      pid_from_id(&config.db_name, &driver, &ID::from("test_container")).await.is_ok(),
+      pid_from_id(&config.db_name, &driver, &ID::from("test_container")).await.unwrap().is_some(),
       "Node test_container should exist before deletion"
     );
     assert!(
-      pid_from_id(&config.db_name, &driver, &ID::from("test_contained")).await.is_ok(),
+      pid_from_id(&config.db_name, &driver, &ID::from("test_contained")).await.unwrap().is_some(),
       "Node test_contained should exist before deletion"
     );
 
@@ -120,13 +120,13 @@ fn test_cascading_delete_behavior() -> Result<(), Box<dyn Error>> {
     // Verify results:
     // 1. Node test_container should be deleted
     assert!(
-      pid_from_id(&config.db_name, &driver, &ID::from("test_container")).await.is_err(),
+      pid_from_id(&config.db_name, &driver, &ID::from("test_container")).await.unwrap().is_none(),
       "Node test_container should be deleted"
     );
 
     // 2. Node test_contained should still exist
     assert!(
-      pid_from_id(&config.db_name, &driver, &ID::from("test_contained")).await.is_ok(),
+      pid_from_id(&config.db_name, &driver, &ID::from("test_contained")).await.unwrap().is_some(),
       "Node test_contained should still exist after deleting test_container"
     );
 

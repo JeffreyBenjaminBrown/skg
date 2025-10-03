@@ -49,11 +49,11 @@ fn test_pid_from_id (
     let path_to_4 = pid_from_id ( & config . db_name,
                                     & driver,
                                     & ID("4".to_string() ),
-    ) . await ?;
+    ) . await ? . unwrap ();
     let path_to_44 = pid_from_id ( & config . db_name,
                                      & driver,
                                      & ID("44".to_string() )
-    ) . await ?;
+    ) . await ? . unwrap ();
     assert_eq!(path_to_4,  ID("4" . to_string () ));
     assert_eq!(path_to_44, ID("4" . to_string () ));
 
