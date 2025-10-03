@@ -20,6 +20,7 @@ Upon starting each session, automatically:
 
 This is the **skg** project - a knowledge graph manipulation system with:
 - **Rust server** (`rust/`) handling core logic with TypeDB and Tantivy
+  - TypeDB is now on version 3, which has so far been after the cutoff date for training data for Claude, so bear in mind that your instincts might conflict with the current syntax.
 - **Emacs client** (`elisp/`) providing org-mode interface
 - **YAML data storage** in `.skg` files
 - **TCP communication** on port 1730 between client and server
