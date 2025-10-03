@@ -43,9 +43,9 @@ use typedb_driver::TypeDBDriver;
 type Instruction = (SkgNode, NodeSaveAction);
 
 /// Runs collect_dup_instructions to group pairs with the same ID.
-/// Then, on each group of Instructions, runs reduce_instructions_for_one_id
+/// Then, on each group of Instructions, runs reconcile_dup_instructions_for_one_id
 /// to get a single Instruction.
-pub async fn reduce_instructions(
+pub async fn reconcile_dup_instructions(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   instructions: Vec<Instruction>
@@ -56,7 +56,7 @@ pub async fn reduce_instructions(
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
     let reduced_instruction: Instruction =
-      reduce_instructions_for_one_id(
+      reconcile_dup_instructions_for_one_id(
         config, driver, instruction_group ). await ?;
     result.push (reduced_instruction); }
   Ok(result) }
@@ -76,7 +76,7 @@ pub fn collect_dup_instructions(
   grouped }
 
 /// Reduces Instructions with the same ID into a single Instruction.
-pub async fn reduce_instructions_for_one_id(
+pub async fn reconcile_dup_instructions_for_one_id(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   instructions: Vec<Instruction>

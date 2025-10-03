@@ -1,11 +1,11 @@
 // I spec'd these tests by hand.
 // They are much briefer than those by Claude
-// (at tests/new/orgnodes_to_instructions/reduce_dups/by_claude.rs),
+// (at tests/new/orgnodes_to_instructions/reconcile_dup_instructions/by_claude.rs),
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
 use skg::new::{org_to_uninterpreted_nodes2, interpret_forest, find_inconsistent_instructions};
-use skg::new::orgnodes_to_instructions::reduce_dups::reduce_instructions;
+use skg::new::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::types::{ID, SkgConfig};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -24,7 +24,7 @@ impl TestContext {
       Err(_) => {
         let config = SkgConfig {
           db_name: "skg-test-reduce-dups".to_string(),
-          skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reduce_dups/fixtures"),
+          skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
           tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
           port: 1730,
         };
@@ -36,7 +36,7 @@ impl TestContext {
   async fn setup_with_fixtures() -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
     let config = SkgConfig {
       db_name: "skg-test-reduce-dups".to_string(),
-      skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reduce_dups/fixtures"),
+      skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
       tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
       port: 1730,
     };
@@ -64,7 +64,7 @@ impl TestContext {
     let instructions = interpret_forest(trees)?;
 
     if let Some(driver) = &self.driver {
-      reduce_instructions(&self.config, driver, instructions).await
+      reconcile_dup_instructions(&self.config, driver, instructions).await
     } else {
       Err("TypeDB not available".into())
     }
@@ -163,7 +163,7 @@ async fn test_adding_without_definer(ctx: &TestContext) {
             ID::from("4"), ]); }}
 
 #[tokio::test]
-async fn test_reduce_instructions_pipeline() {
+async fn test_reconcile_dup_instructions_pipeline() {
   let ctx = TestContext::new().await;
 
   test_inconsistent_delete();

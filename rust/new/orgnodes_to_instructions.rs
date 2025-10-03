@@ -1,5 +1,5 @@
 pub mod from_tree;
-pub mod reduce_dups;
+pub mod reconcile_dup_instructions;
 
 pub use from_tree::interpret_forest;
-pub use reduce_dups::reduce_instructions_for_one_id;
+pub use reconcile_dup_instructions::reconcile_dup_instructions;
