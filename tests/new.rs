@@ -1,3 +1,5 @@
+// cargo test --test new
+
 #[path = "new/buffer_to_orgnodes/uninterpreted2.rs"]
 mod uninterpreted2;
 

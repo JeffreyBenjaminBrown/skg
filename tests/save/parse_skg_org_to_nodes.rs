@@ -1,3 +1,5 @@
+// cargo test parse_skg_org_to_nodes
+
 use indoc::indoc;
 use skg::text_to_orgnodes::parse_skg_org_to_nodes;
 use skg::text_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;

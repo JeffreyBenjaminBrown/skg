@@ -1,3 +1,5 @@
+// cargo test --test serve_containerward_view
+
 use skg::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
 use skg::types::{ID, find_id_in_metadata_collection};
 

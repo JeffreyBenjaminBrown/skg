@@ -1,3 +1,5 @@
+// cargo test --test test_utils
+
 use skg::test_utils::compare_headlines_modulo_id;
 
 #[test]

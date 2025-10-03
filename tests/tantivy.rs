@@ -1,3 +1,5 @@
+// cargo test --test tantivy
+
 use std::fs;
 use std::path::Path;
 use tantivy::schema as schema;

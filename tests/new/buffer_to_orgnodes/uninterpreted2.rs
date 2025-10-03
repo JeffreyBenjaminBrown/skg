@@ -1,3 +1,5 @@
+// cargo test uninterpreted2
+
 use indoc::indoc;
 use skg::new::org_to_uninterpreted_nodes2;
 use skg::types::{OrgNode2, ID, RelToOrgParent2};

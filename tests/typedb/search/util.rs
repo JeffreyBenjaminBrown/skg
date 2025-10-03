@@ -1,3 +1,5 @@
+// cargo test typedb::search::util
+
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::util::{pid_from_id, extract_payload_from_typedb_string_rep};
 use skg::types::{ID, SkgConfig};

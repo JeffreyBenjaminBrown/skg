@@ -1,3 +1,5 @@
+// cargo test --test text_to_orgnodes
+
 use skg::text_to_orgnodes::interpreted::metadata_inner_string_to_map_and_set;
 use skg::text_to_orgnodes::parse_skg_org_to_nodes;
 use skg::types::{OrgNodeInterp, NodeWithEphem};

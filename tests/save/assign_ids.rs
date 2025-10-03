@@ -1,3 +1,5 @@
+// cargo test assign_ids
+
 use skg::save::assign_ids::assign_ids_recursive;
 use skg::types::{ID, NodeWithEphem, OrgNodeInterp};
 

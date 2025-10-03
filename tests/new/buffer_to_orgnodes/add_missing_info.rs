@@ -1,3 +1,5 @@
+// cargo test test_add_missing_info_comprehensive
+
 use indoc::indoc;
 use skg::new::{org_to_uninterpreted_nodes2, add_missing_info_to_trees};
 use skg::typedb::init::populate_test_db_from_fixtures;
@@ -64,7 +66,7 @@ async fn test_add_missing_info_logic (
         "};
   let without_missing_info: &str =
     indoc! {"
-            * <skg<id:root>> root
+            * <skg<id:root-pid>> root
             ** <skg<relToOrgParent:aliasCol>> aliases
             *** <skg<relToOrgParent:alias>> new alias
             *** <skg<relToOrgParent:alias>> preexisting alias
@@ -81,10 +83,23 @@ async fn test_add_missing_info_logic (
   let expected_forest: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(
       without_missing_info ). unwrap();
+  assert_eq!(
+    expected_forest.len(),
+    1,
+    "Expected exactly one tree in the expected forest" );
   assert!(
     compare_trees_modulo_id(
       &after_adding_missing_info,
       &expected_forest),
-    "add_missing_info_to_trees: Forests not equivalent modulo ID."
-  );
+    "add_missing_info_to_trees: Forests not equivalent modulo ID." );
+
+  { // Verify replacing ID with PID works.
+    let actual_root = after_adding_missing_info[0].root().value();
+    let actual_root_id = actual_root.metadata.id.as_ref().unwrap();
+    assert_eq!(
+      actual_root_id.0,
+      "root-pid",
+      "Root node ID should have been changed from 'root' to 'root-pid'"
+    ); }
+
   Ok (( )) }

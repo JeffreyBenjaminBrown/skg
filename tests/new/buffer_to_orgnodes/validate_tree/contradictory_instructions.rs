@@ -1,3 +1,5 @@
+// cargo test contradictory_instructions
+
 use ego_tree::Tree;
 use indoc::indoc;
 use skg::new::{Buffer_Cannot_Be_Saved, org_to_uninterpreted_nodes2, find_inconsistent_instructions, find_buffer_errors_for_saving};

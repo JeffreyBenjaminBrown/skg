@@ -1,3 +1,5 @@
+// cargo test validate_tree
+
 use indoc::indoc;
 use skg::new::{org_to_uninterpreted_nodes2, find_buffer_errors_for_saving, Buffer_Cannot_Be_Saved};
 use skg::types::OrgNode2;

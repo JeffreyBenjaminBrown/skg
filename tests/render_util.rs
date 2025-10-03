@@ -1,3 +1,5 @@
+// cargo test --test render_util
+
 #[allow(unused_imports)]
 use std::collections::HashSet;
 

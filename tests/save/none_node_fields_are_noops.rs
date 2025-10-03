@@ -1,3 +1,5 @@
+// cargo test none_node_fields_are_noops
+
 use std::io;
 use std::path::PathBuf;
 

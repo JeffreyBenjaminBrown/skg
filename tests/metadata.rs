@@ -1,3 +1,5 @@
+// cargo test --test metadata
+
 use skg::types::{MetadataItem, RelToOrgParent, ID, find_in_metadata_collection, find_id_in_metadata_collection};
 
 #[test]
