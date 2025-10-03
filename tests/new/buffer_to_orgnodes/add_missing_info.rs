@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::new::{org_to_uninterpreted_nodes2, add_missing_info_to_trees};
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::types::{OrgNode2, SkgConfig};
+use skg::types::{OrgNode2, SkgConfig, ID};
 use ego_tree::Tree;
 
 // Import test utilities
@@ -93,13 +93,14 @@ async fn test_add_missing_info_logic (
       &expected_forest),
     "add_missing_info_to_trees: Forests not equivalent modulo ID." );
 
-  { // Verify replacing ID with PID works.
-    let actual_root = after_adding_missing_info[0].root().value();
-    let actual_root_id = actual_root.metadata.id.as_ref().unwrap();
+  { let actual_root : &OrgNode2 =
+      after_adding_missing_info[0] . root() . value();
+    let actual_root_id : &ID =
+      actual_root . metadata . id.as_ref() . unwrap();
     assert_eq!(
-      actual_root_id.0,
+      actual_root_id . 0,
       "root-pid",
-      "Root node ID should have been changed from 'root' to 'root-pid'"
+      "Root ID 'root' should have changed to 'root-pid', based on the .skg file in fixtures/."
     ); }
 
   Ok (( )) }
