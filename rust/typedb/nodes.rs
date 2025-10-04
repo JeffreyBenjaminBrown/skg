@@ -158,3 +158,38 @@ pub async fn which_ids_exist (
             & concept . to_string () );
         found.insert ( payload ); }}
   Ok ( found ) }
+
+/// Deletes the node corresponding to every ID it receives,
+/// using a single TypeDB query with a giant 'or' clause.
+/// Deletes in TypeDB are cascading by default --
+/// all relationships involved will disappear.
+pub async fn delete_nodes (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids     : &[ID]
+) -> Result < (), Box<dyn Error> > {
+  if ids.is_empty() { return Ok ( () ); }
+  let tx : Transaction =
+    driver.transaction (
+      db_name, TransactionType::Write
+    ). await ?;
+  let or_clause_over_ids : String =
+    ids . iter() . enumerate()
+    . map ( |(i, id)| format! (
+      r#"{{ $node has id "{}"; }} or
+         {{ $e{} isa extra_id, has id "{}";
+            $rel{} isa has_extra_id ( node: $node,
+                                      extra_id: $e{} ); }}"#,
+      id.0, i, id.0, i, i ) )
+    . collect::< Vec<_> > ()
+    . join ( " or\n" );
+  let _answer = tx.query (
+    format! (
+      r#"match
+        $node isa node;
+        {};
+        delete
+        $node;"#,
+      or_clause_over_ids )). await ?;
+  tx . commit (). await ?;
+  Ok ( () ) }

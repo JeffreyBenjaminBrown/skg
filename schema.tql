@@ -10,7 +10,7 @@ define
   # See `docs/vocabular.md` and  `docs/data-model.md`.
   relation contains,
     relates container,
-    relates contained @card(1..1);
+    relates contained;
 
   # These are not stored to disk,
   # but rather inferred by Rust from a node's text content
@@ -59,4 +59,4 @@ define
 
   relation has_extra_id,
     relates node,
-    relates extra_id @card(1..1);
+    relates extra_id;
