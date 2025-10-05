@@ -1,4 +1,6 @@
-use super::ID;
+use super::{ID,SkgNode};
+
+pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
 /// Tells Rust what to do with a node.
 #[derive(Debug, Clone, PartialEq)]

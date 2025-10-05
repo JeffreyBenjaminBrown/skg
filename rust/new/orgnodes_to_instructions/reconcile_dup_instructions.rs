@@ -1,16 +1,16 @@
 /* THE IDEA
-Different (SkgNode, NodeSaveAction) pairs, herein called Instructions,
-can have the same ID. And there might be information on disk
+Different SaveInstruction can have the same ID.
+And there might be information on disk
 that conflicts or supplements information in
 the buffer text that a user is trying to save.
 Those conflicts must be resolved.
 .
 The treatment of deletion is omitted from this comment,
 because it's simple. For the rest of this comment
-assume all Instructions have toDelete = false.
+assume all SaveInstructions have toDelete = false.
 .
-Some Instructions are mightContainMore and some aren't.
-If an Instruction is not mightContainMore,
+Some SaveInstructions are mightContainMore and some aren't.
+If an SaveInstruction is not mightContainMore,
 call it a 'defining' instruction.
 There can be at most one such instruction.
 If there is, it defines the title and body.
@@ -33,39 +33,38 @@ aliases are defined by what's on disk.
 Extra IDs are appended from disk.
 */
 
-use crate::types::{ID, SkgNode, NodeSaveAction, SkgConfig};
+use crate::types::{
+  ID, SkgNode, SaveInstruction, NodeSaveAction, SkgConfig};
 use crate::file_io::read_node_from_id;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 
-type Instruction = (SkgNode, NodeSaveAction);
-
 /// Runs collect_dup_instructions to group pairs with the same ID.
-/// Then, on each group of Instructions, runs reconcile_dup_instructions_for_one_id
-/// to get a single Instruction.
+/// Then, on each group of SaveInstructions, runs reconcile_dup_instructions_for_one_id
+/// to get a single SaveInstruction.
 pub async fn reconcile_dup_instructions(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<Instruction>
-) -> Result<Vec<Instruction>, Box<dyn Error>> {
-  let grouped_instructions: HashMap<ID, Vec<Instruction>> =
+  instructions: Vec<SaveInstruction>
+) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
+  let grouped_instructions: HashMap<ID, Vec<SaveInstruction>> =
     collect_dup_instructions (instructions);
-  let mut result: Vec<Instruction> =
+  let mut result: Vec<SaveInstruction> =
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
-    let reduced_instruction: Instruction =
+    let reduced_instruction: SaveInstruction =
       reconcile_dup_instructions_for_one_id(
         config, driver, instruction_group ). await ?;
     result.push (reduced_instruction); }
   Ok(result) }
 
-/// Group Instructions with the same ID.
+/// Group SaveInstructions with the same ID.
 pub fn collect_dup_instructions(
-  instructions: Vec<Instruction>
-) -> HashMap<ID, Vec<Instruction>> {
-  let mut grouped: HashMap<ID, Vec<Instruction>> =
+  instructions: Vec<SaveInstruction>
+) -> HashMap<ID, Vec<SaveInstruction>> {
+  let mut grouped: HashMap<ID, Vec<SaveInstruction>> =
     HashMap::new();
   for (skg_node, save_action) in instructions {
     if let Some(primary_id) = skg_node.ids.first() {
@@ -75,12 +74,12 @@ pub fn collect_dup_instructions(
         . push((skg_node, save_action)); }}
   grouped }
 
-/// Reduces Instructions with the same ID into a single Instruction.
+/// Reduces SaveInstructions with the same ID into a single SaveInstruction.
 pub async fn reconcile_dup_instructions_for_one_id(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<Instruction>
-) -> Result<Instruction, Box<dyn Error>> {
+  instructions: Vec<SaveInstruction>
+) -> Result<SaveInstruction, Box<dyn Error>> {
   if instructions.is_empty() {
     return Err("Cannot reduce empty instruction list".into()); }
   let to_delete: bool =
@@ -176,7 +175,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
 /// Extract consistent toDelete value from instructions, verifying they all match
 /// (This check is redundant given validate_tree.)
 fn to_delete_if_consistent(
-  instructions: &[Instruction]
+  instructions: &[SaveInstruction]
 ) -> Result<bool, Box<dyn Error>> {
   let to_delete_values: HashSet<bool> =
     instructions . iter ()

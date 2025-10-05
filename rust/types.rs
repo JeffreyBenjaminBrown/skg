@@ -19,7 +19,8 @@ pub use skgnode::{ SkgNode,
                    skgnode_example,
                    empty_skgnode, };
 pub mod new;
-pub use new::{ NodeSaveAction,
+pub use new::{ SaveInstruction,
+               NodeSaveAction,
                OrgNode2,
                HeadlineMd2,
                RelToOrgParent2, };
