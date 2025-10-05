@@ -3,7 +3,7 @@ use super::{ID,SkgNode};
 pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
 /// Tells Rust what to do with a node.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NodeSaveAction {
   // PITFALL: It's nonsense if both of these are true.
   // The server will in that case delete,

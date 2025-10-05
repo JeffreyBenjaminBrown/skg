@@ -159,11 +159,10 @@ pub async fn which_ids_exist (
         found.insert ( payload ); }}
   Ok ( found ) }
 
-/// Deletes the node corresponding to every ID it receives,
-/// using a single TypeDB query with a giant 'or' clause.
-/// Deletes in TypeDB are cascading by default --
-/// all relationships involved will disappear.
-pub async fn delete_nodes (
+/// ASSUMES: All input IDs are PIDs.
+/// PURPOSE: Delete the node corresponding to every ID it receives,
+/// including its extra IDs.
+pub async fn delete_nodes_from_pids (
   db_name : &str,
   driver  : &TypeDBDriver,
   ids     : &[ID]
@@ -173,23 +172,55 @@ pub async fn delete_nodes (
     driver.transaction (
       db_name, TransactionType::Write
     ). await ?;
-  let or_clause_over_ids : String =
-    ids . iter() . enumerate()
-    . map ( |(i, id)| format! (
-      r#"{{ $node has id "{}"; }} or
-         {{ $e{} isa extra_id, has id "{}";
-            $rel{} isa has_extra_id ( node: $node,
-                                      extra_id: $e{} ); }}"#,
-      id.0, i, id.0, i, i ) )
+  let pid_or_clause : String =
+    ids . iter()
+    . map ( |id| format! (
+      r#"{{ $node has id "{}"; }}"#,
+      id.0 ) )
     . collect::< Vec<_> > ()
     . join ( " or\n" );
-  let _answer = tx.query (
-    format! (
-      r#"match
-        $node isa node;
+  let extra_ids_query = format! (
+    // To find every associated extra_id.
+    r#"match $node isa node;
+      {};
+      $e isa extra_id;
+      $rel isa has_extra_id ( node: $node, extra_id: $e );
+      $e has id $extra_id_value;
+      select $extra_id_value;"#,
+    pid_or_clause );
+  let answer = tx.query ( extra_ids_query ). await ?;
+  let mut extra_id_values : Vec<String> =
+    Vec::new();
+  let mut rows = answer.into_rows();
+  while let Some(row_res) = rows.next().await {
+    let row = row_res?;
+    if let Some(concept) = row.get("extra_id_value")? {
+      let extra_id_value = extract_payload_from_typedb_string_rep(
+        &concept.to_string());
+      extra_id_values.push (extra_id_value); }}
+  { // delete nodes
+    let delete_nodes_from_pids_query = format! (
+      r#"match $node isa node;
+      {};
+      delete $node;"#,
+      pid_or_clause );
+    let _answer = tx.query (
+      delete_nodes_from_pids_query ). await ?; }
+  { // Delete extra_ids
+    if !extra_id_values.is_empty() {
+      let extra_id_or_clause : String =
+        extra_id_values . iter()
+        . map ( |id| format! (
+          r#"{{ $e has id "{}"; }}"#,
+          id ) )
+        . collect::< Vec<_> > ()
+        . join ( " or\n" );
+      let delete_extra_ids_query = format! (
+        r#"match $e isa extra_id;
         {};
-        delete
-        $node;"#,
-      or_clause_over_ids )). await ?;
+        delete $e;"#,
+        extra_id_or_clause );
+      let _answer = tx.query (
+        delete_extra_ids_query ). await ?; }}
   tx . commit (). await ?;
   Ok ( () ) }

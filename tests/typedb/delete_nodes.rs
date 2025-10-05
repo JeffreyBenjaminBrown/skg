@@ -3,7 +3,7 @@
 // cargo test test_delete_contained_node -- --nocapture
 
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::typedb::nodes::{delete_nodes, which_ids_exist};
+use skg::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::search::util::extract_payload_from_typedb_string_rep;
 use skg::types::{ID, SkgConfig};
@@ -55,9 +55,12 @@ fn test_delete_container_node (
       & driver,
       & initial_ids
     ) . await ?;
-    assert!(existing_ids.contains("1"), "Node 1 should exist initially");
-    assert!(existing_ids.contains("2"), "Node 2 should exist initially");
-    assert!(existing_ids.contains("3"), "Node 3 should exist initially");
+    assert!(existing_ids.contains("1"),
+            "Node 1 should exist initially");
+    assert!(existing_ids.contains("2"),
+            "Node 2 should exist initially");
+    assert!(existing_ids.contains("3"),
+            "Node 3 should exist initially");
 
     // Verify node 1 contains 2 and 3
     let initially_contained : HashSet<ID> = find_related_nodes (
@@ -73,7 +76,7 @@ fn test_delete_container_node (
     assert!(initially_contained.contains(&ID("3".to_string())),
             "Node 1 should initially contain node 3");
 
-    delete_nodes ( // Delete node 1
+    delete_nodes_from_pids ( // Delete node 1
       & config . db_name,
       & driver,
       & vec![ ID("1".to_string()) ],
@@ -170,11 +173,11 @@ fn test_delete_contained_node (
     assert!(initially_contained.contains(&ID("3".to_string())),
             "Node 1 should initially contain node 3");
 
-    // Delete node 2 (contained) using its extra_id 22
-    delete_nodes (
+    // Delete node 2 (contained) using its PID 2
+    delete_nodes_from_pids (
       & config . db_name,
       & driver,
-      & vec![ ID("22".to_string()) ]
+      & vec![ ID("2".to_string()) ]
     ) . await ?;
 
     // Verify nodes 1 and 3 exist, but 2 does not
@@ -188,6 +191,18 @@ fn test_delete_contained_node (
     assert!(remaining_ids.contains("1"), "Node 1 should still exist");
     assert!(!remaining_ids.contains("2"), "Node 2 should be deleted");
     assert!(remaining_ids.contains("3"), "Node 3 should still exist");
+
+    // Verify extra_id 22 is also gone
+    let extra_id_check : BTreeSet<String> =
+      ["22"].iter().map(|s| s.to_string()).collect();
+    let remaining_extra_ids : HashSet<String> =
+      which_ids_exist (
+        & config . db_name,
+        & driver,
+        & extra_id_check
+      ) . await ?;
+    assert!(!remaining_extra_ids.contains("22"),
+            "Extra ID 22 should be deleted");
 
     // Check what node 1 still contains after deleting node 2
     let finally_contained : HashSet<ID> = find_related_nodes (

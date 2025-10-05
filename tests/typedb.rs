@@ -3,6 +3,7 @@
 mod typedb {
   pub mod search;
   pub mod delete_nodes;
+  pub mod update_nodes_and_relationships2;
 }
 
 use skg::render::single_root_view;
