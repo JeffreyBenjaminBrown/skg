@@ -4,7 +4,7 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, interpret_forest, find_inconsistent_instructions};
+use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_save_instructions, find_inconsistent_instructions};
 use skg::new::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::types::{ID, SkgConfig};
@@ -61,7 +61,7 @@ impl TestContext {
 
   async fn run_pipeline(&self, input: &str) -> Result<Vec<(skg::types::SkgNode, skg::types::NodeSaveAction)>, Box<dyn std::error::Error>> {
     let trees = org_to_uninterpreted_nodes2(input)?;
-    let instructions = interpret_forest(trees)?;
+    let instructions = orgnodes_to_save_instructions(trees)?;
 
     if let Some(driver) = &self.driver {
       reconcile_dup_instructions(&self.config, driver, instructions).await
@@ -82,7 +82,7 @@ fn test_inconsistent_delete() {
   assert!(!inconsistent_deletes.is_empty(),
           "Should detect inconsistent toDelete");
 
-  let instructions = interpret_forest(trees).unwrap();
+  let instructions = orgnodes_to_save_instructions(trees).unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
   assert_eq!(instructions[1].0.ids[0], ID::from("1"));

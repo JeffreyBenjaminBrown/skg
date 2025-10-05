@@ -4,12 +4,12 @@
 // so the quality of these tests feels low-stakes.)
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, interpret_forest};
+use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_save_instructions};
 use skg::types::{OrgNode2, ID, SkgNode, NodeSaveAction};
 use ego_tree::Tree;
 
 #[test]
-fn test_interpret_forest_basic() {
+fn test_orgnodes_to_save_instructions_basic() {
   let input: &str =
     indoc! {"
             * <skg<id:root1>> root node 1
@@ -23,7 +23,7 @@ fn test_interpret_forest_basic() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 3, "Should have 3 instructions");
 
@@ -55,7 +55,7 @@ fn test_interpret_forest_basic() {
 }
 
 #[test]
-fn test_interpret_forest_with_aliases() {
+fn test_orgnodes_to_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
             * <skg<id:main>> main node
@@ -70,7 +70,7 @@ fn test_interpret_forest_with_aliases() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   // Should have 2 instructions: main node and content_child
   // AliasCol and Alias nodes should not appear in output
@@ -93,7 +93,7 @@ fn test_interpret_forest_with_aliases() {
 }
 
 #[test]
-fn test_interpret_forest_no_aliases() {
+fn test_orgnodes_to_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
             * <skg<id:node1>> node without aliases
@@ -105,7 +105,7 @@ fn test_interpret_forest_no_aliases() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 2);
 
@@ -115,7 +115,7 @@ fn test_interpret_forest_no_aliases() {
 }
 
 #[test]
-fn test_interpret_forest_multiple_alias_cols() {
+fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
             * <skg<id:main>> main node
@@ -130,7 +130,7 @@ fn test_interpret_forest_multiple_alias_cols() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 2); // main and content1
 
@@ -140,7 +140,7 @@ fn test_interpret_forest_multiple_alias_cols() {
 }
 
 #[test]
-fn test_interpret_forest_mixed_relations() {
+fn test_orgnodes_to_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * <skg<id:root>> root node
@@ -155,7 +155,7 @@ fn test_interpret_forest_mixed_relations() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   // Should have instructions for: root, container, content1, content2, none_rel
   // AliasCol and Alias should be skipped
@@ -168,7 +168,7 @@ fn test_interpret_forest_mixed_relations() {
 }
 
 #[test]
-fn test_interpret_forest_deep_nesting() {
+fn test_orgnodes_to_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
             * <skg<id:level1>> level 1
@@ -181,7 +181,7 @@ fn test_interpret_forest_deep_nesting() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 5);
 
@@ -203,7 +203,7 @@ fn test_interpret_forest_deep_nesting() {
 }
 
 #[test]
-fn test_interpret_forest_error_missing_id() {
+fn test_orgnodes_to_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
             * <skg<id:good_node>> good node
@@ -212,7 +212,7 @@ fn test_interpret_forest_error_missing_id() {
 
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
-  let result = interpret_forest(trees);
+  let result = orgnodes_to_save_instructions(trees);
 
   assert!(result.is_err(), "Should return error for missing ID");
   let error_msg = result.unwrap_err();
@@ -221,16 +221,16 @@ fn test_interpret_forest_error_missing_id() {
 }
 
 #[test]
-fn test_interpret_forest_empty_input() {
+fn test_orgnodes_to_save_instructions_empty_input() {
   let trees: Vec<Tree<OrgNode2>> = vec![];
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
 }
 
 #[test]
-fn test_interpret_forest_only_aliases() {
+fn test_orgnodes_to_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * <skg<id:main>> main node
@@ -242,7 +242,7 @@ fn test_interpret_forest_only_aliases() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 1); // Only main node
 
@@ -252,7 +252,7 @@ fn test_interpret_forest_only_aliases() {
 }
 
 #[test]
-fn test_interpret_forest_complex_scenario() {
+fn test_orgnodes_to_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
             * <skg<id:doc1,mightContainMore>> Document 1
@@ -272,7 +272,7 @@ fn test_interpret_forest_complex_scenario() {
   let trees: Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
-    interpret_forest(trees).unwrap();
+    orgnodes_to_save_instructions(trees).unwrap();
 
   assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 

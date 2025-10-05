@@ -2,7 +2,7 @@ use crate::types::{OrgNode2, RelToOrgParent2, ID, SkgNode, NodeSaveAction};
 use ego_tree::{NodeRef, Tree};
 
 /// Converts a forest of OrgNode2s to a forest of instructions.
-pub fn interpret_forest (
+pub fn orgnodes_to_save_instructions (
   trees: Vec<Tree<OrgNode2>>
 ) -> Result<Vec<(SkgNode,
                  NodeSaveAction)>,

@@ -88,7 +88,7 @@ fn assign_id_if_needed(
 
 /// Look up the PID for the node's current ID,
 /// and replace it if found.
-async fn assign_pid_if_possible(
+async fn assign_pid_if_possible (
   node: &mut OrgNode2,
   db_name: &str,
   driver: &TypeDBDriver
