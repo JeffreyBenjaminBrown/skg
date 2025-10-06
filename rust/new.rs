@@ -4,9 +4,6 @@ pub mod buffer_to_orgnodes;
 pub use orgnodes_to_instructions::*;
 pub mod orgnodes_to_instructions;
 
-pub use update_fs_from_saveinstructions::*;
-pub mod update_fs_from_saveinstructions;
-
 use crate::types::{ID, SkgConfig, SaveInstruction, OrgNode2};
 use ego_tree::Tree;
 

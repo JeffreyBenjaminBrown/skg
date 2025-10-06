@@ -9,40 +9,63 @@ use std::fs::{self};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::types::{ ID, SkgNode, SkgConfig };
+use crate::types::{ ID, SkgNode, SkgConfig, SaveInstruction };
 use crate::typedb::search::pid_from_id;
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 
-pub fn path_from_pid (
-  config : &SkgConfig,
-  pid    : ID,
-) -> String {
-  let f : PathBuf = config . skg_folder . clone() ;
-  let s: String = pid.0;
-  f . join (s)
-    . with_extension ("skg")
-    . to_string_lossy ()
-    . into_owned ()
-}
+pub fn update_fs_from_saveinstructions (
+  instructions : Vec<SaveInstruction>,
+  config       : SkgConfig,
+) -> io::Result<(usize, usize)> { // (deleted, written)
 
-pub fn read_node
-  <P : AsRef <Path>> // any type that can be converted to an &Path
-  (file_path : P)
-   -> io::Result <SkgNode>
-{ // The type signature explains everything.
+  let ( to_delete, to_write ) : ( Vec<_>, Vec<_> ) =
+    instructions . into_iter ()
+    . partition ( |(_, action)| action . toDelete );
 
- let file_path : &Path = file_path.as_ref ();
- let contents  : String = fs::read_to_string ( file_path )?;
- let node      : SkgNode =
-    serde_yaml::from_str ( &contents )
-    . map_err (
-      |e| io::Error::new (
-        io::ErrorKind::InvalidData,
-        e.to_string () )) ?;
-  Ok ( node ) }
+  let delete_nodes : Vec<SkgNode> =
+    to_delete . into_iter ()
+    . map ( |(node, _)| node )
+    . collect ();
+
+  let write_nodes : Vec<SkgNode> =
+    to_write . into_iter ()
+    . map ( |(node, _)| node )
+    . collect ();
+
+  let deleted = if ! delete_nodes . is_empty () {
+    delete_all_nodes_from_fs (
+      delete_nodes, config . clone () ) ?
+  } else { 0 };
+
+  let written = if ! write_nodes . is_empty () {
+    write_all_nodes_to_fs (
+      write_nodes, config ) ?
+  } else { 0 };
+
+  Ok ( (deleted, written) ) }
+
+pub fn read_skg_files
+  <P : AsRef<Path> > (
+    dir_path : P )
+  -> io::Result < Vec<SkgNode> >
+{ // Reads all relevant files from the path.
+
+  let mut nodes : Vec<SkgNode> = Vec::new ();
+  let entries : std::fs::ReadDir = // an iterator
+    fs::read_dir (dir_path) ?;
+  for entry in entries {
+    let entry : std::fs::DirEntry = entry ?;
+    let path = entry.path () ;
+    if ( path.is_file () &&
+         path . extension () . map_or (
+           false,                // None => no extension found
+           |ext| ext == "skg") ) // Some
+    { let node = read_node (&path) ?;
+      nodes.push (node); }}
+  Ok (nodes) }
 
 pub async fn read_node_from_id (
   config  : &SkgConfig,
@@ -69,26 +92,6 @@ pub async fn read_node_from_id (
       format!("SkgNode with ID {} has no IDs", node_id),
     )) ); }
   Ok (node) }
-
-pub fn read_skg_files
-  <P : AsRef<Path> > (
-    dir_path : P )
-  -> io::Result < Vec<SkgNode> >
-{ // Reads all relevant files from the path.
-
-  let mut nodes : Vec<SkgNode> = Vec::new ();
-  let entries : std::fs::ReadDir = // an iterator
-    fs::read_dir (dir_path) ?;
-  for entry in entries {
-    let entry : std::fs::DirEntry = entry ?;
-    let path = entry.path () ;
-    if ( path.is_file () &&
-         path . extension () . map_or (
-           false,                // None => no extension found
-           |ext| ext == "skg") ) // Some
-    { let node = read_node (&path) ?;
-      nodes.push (node); }}
-  Ok (nodes) }
 
 /// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.
@@ -165,6 +168,22 @@ pub fn fetch_aliases_from_file (
       Err ( _ )   => Vec::new(),
     }}
 
+pub fn read_node
+  <P : AsRef <Path>> // any type that can be converted to an &Path
+  (file_path : P)
+   -> io::Result <SkgNode>
+{ // The type signature explains everything.
+
+ let file_path : &Path = file_path.as_ref ();
+ let contents  : String = fs::read_to_string ( file_path )?;
+ let node      : SkgNode =
+    serde_yaml::from_str ( &contents )
+    . map_err (
+      |e| io::Error::new (
+        io::ErrorKind::InvalidData,
+        e.to_string () )) ?;
+  Ok ( node ) }
+
 pub fn write_node
   <P : AsRef<Path>>
   ( node      : &SkgNode,
@@ -180,3 +199,15 @@ pub fn write_node
         e.to_string () )) ?;
   fs::write ( file_path, yaml_string )?;
   Ok (( )) }
+
+pub fn path_from_pid (
+  config : &SkgConfig,
+  pid    : ID,
+) -> String {
+  let f : PathBuf = config . skg_folder . clone() ;
+  let s: String = pid.0;
+  f . join (s)
+    . with_extension ("skg")
+    . to_string_lossy ()
+    . into_owned ()
+}

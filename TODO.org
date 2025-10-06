@@ -1,6 +1,35 @@
-* refactor: retain tree
+* TODO yet to use
+** new.rs :: pub async fn buffer_to_save_instructions (
+   buffer_text : &str,
+   config      : &SkgConfig,
+   driver      : &TypeDBDriver
+   ) -> Result<Vec<SaveInstruction>, SaveError> {
+** rust/file_io.rs :: pub fn update_fs_from_saveinstructions (
+   instructions : Vec<SaveInstruction>,
+   config       : SkgConfig,
+   ) -> io::Result<(usize, usize)> { // (deleted, written)
+** rust/typedb/update.rs :: pub async fn update_nodes_and_relationships2 (
+     db_name : &str,
+     driver  : &TypeDBDriver,
+     instructions : &Vec<SaveInstruction>
+   ) -> Result<(), Box<dyn Error>> {
+** rust/tantivy.rs :: pub fn update_index_from_save_instructions (
+  instructions  : &[SaveInstruction],
+  tantivy_index : &TantivyIndex,
+) -> Result<usize, Box<dyn Error>> {
+* TODO improve serve/save
+** a new save
+   alternatives
+*** TODO duplicate it
+    Can refer to anything in the old code that the new could use.
+*** DONE don't duplicate; just replace the guts of serve/save
+    All existing tests should work.
+    Soon but not yet, can integration-test the new save features.
+** Once the new works, anything unused in the old gets deleted.
+   I suspect that includes all of rust/text_to_orgnodes/.
+* DONE refactor: retain tree
   serial, control flow
-** DONE buffer to orgnode forest
+** buffer to orgnode forest
 *** refuse and report all problems if any of these happen
 **** a node appears twice without 'rep' or 'mightContainMore'.
 **** an AliasColl node has a body, or a child with an ID
@@ -12,44 +41,101 @@
 *** assign IDs where needed
     see assign_ids_recursive
 *** assign rel_to_parent=Alias where needed
-** DONE Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
-** DONE collect SKgNodes with the same ID
-** DONE update_fs_and_dbs2
+** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
+** collect SKgNodes with the same ID
+** update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
 *** FS
 **** delete all to-delete nodes
 **** write all non-delete nodes
      as normal, but filtering to only those nodes
-*** update_index_with_nodes
+*** update_index_from_save_instructions
     Delete every entry for which the id is any toDelete id.
       not just the pid
     Add as normal.
-* rebuild view
-  indented to avoid noisy diff
-** rebuild view
-*** will build a Forest<OrgNode2> based on the original one
-*** The result begins as a copy of the original one.
-*** Process it DFS, keeping a full breadcrumb aath back to root.
-*** Keep a running tally of which nodes have already been included in the result.
-*** Any toDelete node is dropped, along with its content.
-*** Every node is leeft in place except, maybe, nodes that are content of their parent.
-    Leave even them in place if the parent is might_contain_more.
-    Otherwise, remove them from the list,
-    and add them back in based on looking them up elsewhere.
-    Retain their metadata, so that 'leave these unchanged'
-    can be executed, below.
-*** recompute the following metadata values
-**** cycle
-     based on the breadcrumbs to root
-**** rel_to_parent
-     Verify Container relationships. If the relationship is no more,
-     replace rel_to_parent=None.
-**** repeat
-*** leave these unchanged
-**** might_contain_more
-**** focused
-**** folded
+* TODO replace all uses of orgnode with orgnode2, etc.
+  Do it all at once:
+** can use
+*** OrgNode2
+*** RelToOrgParent2
+*** HeadlineMd2
+** can't use
+*** OrgNode
+*** RelToOrgParent
+*** NodeWithEphem
+*** MetadataItem
+*** OrgNodeMetadata
+*** OrgNodeInterp
+* ONGOING git diff main 4a6c10735efdf59b
+** new types
+*** pub type SaveInstruction = (SkgNode, NodeSaveAction);
+*** pub struct NodeSaveAction {
+  pub mightContainMore: bool,
+  pub toDelete: bool,
+}
+*** pub struct OrgNode2 {
+  pub metadata: HeadlineMd2,
+  pub title: String,
+  pub body: Option<String>,
+}
+*** pub struct HeadlineMd2 {
+  pub id: Option<ID>,
+  pub relToOrgParent: RelToOrgParent2,
+  pub cycle: bool,
+  pub focused: bool,
+  pub folded: bool,
+  pub mightContainMore: bool,
+  pub repeat: bool,
+  pub toDelete: bool,
+}
+*** pub enum RelToOrgParent2 {
+  Content,
+  Container,
+  AliasCol,
+  Alias,
+  None,
+}
+*** pub enum SaveError {
+  ParseError(String),
+  DatabaseError(Box<dyn Error>),
+  InconsistentInstructions {
+    inconsistent_deletions: Vec<ID>,
+    multiple_definers: Vec<ID>,
+  },
+}
+*** pub type HeadlineInfo = (usize, Option<HeadlineMd2>, String);
+*** pub enum Buffer_Cannot_Be_Saved {
+  // (content not fully visible in diff)
+}
+
+** field name changes in existing types
+*** OrgNodeMetadata fields renamed:
+  might_contain_more -> mightContainMore
+  rel_to_parent -> relToOrgParent
+** deleted types
+*** (none detected)
+** new functions
+*** pub fn write_all_nodes_to_fs (
+  nodes  : Vec<SkgNode>,
+  config : SkgConfig,
+) -> io  ::Result<usize> {
+*** pub fn delete_all_nodes_from_fs (
+  nodes  : Vec<SkgNode>,
+  config : SkgConfig,
+) -> io::Result<usize>
+*** pub enum SaveError {
+  ParseError(String),
+  DatabaseError(Box<dyn Error>),
+  InconsistentInstructions {
+    inconsistent_deletions: Vec<ID>,
+    multiple_definers: Vec<ID>, }, }
+*** pub async fn buffer_to_save_instructions (
+  buffer_text : &str,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver
+) -> Result<Vec<SaveInstruction>, SaveError> {
+* I regret not having asked for a refactoring plan.
 * What {functions,types} bundle separble concerns?
 ** NodeWithEphem
 * retain metadata when replacing node
