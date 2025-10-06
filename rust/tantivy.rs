@@ -5,7 +5,7 @@
 // See the Tantivy section in glossary.md.
 
 use crate::hyperlinks::replace_each_link_with_its_label;
-use crate::types::{ID, SkgNode, SkgConfig, TantivyIndex};
+use crate::types::{ID, SkgNode, SkgConfig, TantivyIndex, SaveInstruction};
 
 use tantivy::{Index, IndexWriter, doc, schema, Term};
 use tantivy::collector::TopDocs;
@@ -148,7 +148,38 @@ pub fn update_index_with_nodes (
     &mut writer, processed_count, "Updated")?;
   Ok (processed_count) }
 
-// TODO: So far nothing ensures that Tantivy indexes on the PID.
+/// Updates the index with the provided SaveInstructions.
+/// Deletes IDs from the index for every instruction,
+/// but only adds documents for instructions where toDelete is false.
+/// Returns the number of documents processed.
+pub fn update_index_from_save_instructions (
+  instructions  : &[SaveInstruction],
+  tantivy_index : &TantivyIndex,
+) -> Result<usize, Box<dyn Error>> {
+
+  let mut writer: IndexWriter =
+    tantivy_index.index.writer(50_000_000)?;
+  { // Delete all IDs from the index. (Some will come back next.)
+    for (node, _action) in instructions {
+      if !node.ids.is_empty() {
+        let primary_id: &ID = &node.ids[0];
+        let term: Term = Term::from_field_text(
+          tantivy_index.id_field,
+          primary_id.as_str() );
+        writer.delete_term(term); } } }
+  { // Add documents only for non-deleted instructions.
+    let mut processed_count: usize = 0;
+    for (node, action) in instructions {
+      if ! action . toDelete {
+        let documents: Vec<tantivy::Document> =
+          create_documents_from_node (
+            node, tantivy_index )?;
+        for document in documents {
+          writer.add_document (document)?;
+          processed_count += 1; } } }
+    commit_with_status(
+      &mut writer, processed_count, "Updated")?;
+    Ok (processed_count) } }
 
 
 /* -------------------- Private helpers -------------------- */
