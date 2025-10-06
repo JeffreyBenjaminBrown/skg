@@ -90,7 +90,7 @@ Steps:
   - Stores as `document_root` the root ID.
 - Puts the result through `orgNodeInterpretation_to_nodes` to get Nodes.
 - Runs `update_fs_and_dbs` on those Nodes.
-- Builds a single root content view from `document_root`. */
+- Returns a content view. */
 fn update_from_and_rerender_buffer (
   content       : &str,
   typedb_driver : &TypeDBDriver,

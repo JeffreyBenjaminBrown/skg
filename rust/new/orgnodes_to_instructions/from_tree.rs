@@ -4,13 +4,10 @@ use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
-/// Converts a forest of OrgNode2s to a forest of SaveInstructions.
-/// Along the way it
-///   - Fills in missing information in orgnode forest:
-///     - IDs if absent
-///     - PIDs if distinct from ID
-///     - alias relationship if applicable
-///   - Reconciles duplicate instructions
+/// Modifies the input forest of OrgNode2s:
+///   - Fills in information via 'add_missing_info_to_trees'
+///   - Reconciles duplicates via 'reconcile_dup_instructions'
+/// Outputs that plus a forest of SaveInstructions.
 pub async fn orgnodes_to_save_instructions (
   mut trees : Vec<Tree<OrgNode2>>,
   config    : &SkgConfig,
