@@ -19,7 +19,7 @@ that's a problem.
 .
 And if two nodes with the same ID 'define their contents'
 (identifiable if repeated=false and mightContainMore=false),
-that's a problem.
+that's a problem, too.
 .
 STRATEGY:
 Builds a map from IDs to sets of WhetherToDelete.

@@ -1,4 +1,4 @@
-use crate::file_io::write_all_nodes;
+use crate::file_io::write_all_nodes_to_fs;
 use crate::render::single_root_view;
 use crate::save::assign_ids::assign_ids_recursive;
 use crate::save::none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
@@ -175,7 +175,7 @@ pub async fn update_fs_and_dbs (
     println!( "2) Writing {} file(s) to disk at {:?} ...",
                total_input, target_dir );
     let written_count : usize =
-      write_all_nodes (
+      write_all_nodes_to_fs (
         nodes.clone (), config.clone () ) ?;
     println!( "   Wrote {} file(s).", written_count ); }
 

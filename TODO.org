@@ -14,7 +14,7 @@
 *** assign rel_to_parent=Alias where needed
 ** DONE Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
 ** DONE collect SKgNodes with the same ID
-** update_fs_and_dbs2
+** DONE update_fs_and_dbs2
    uses the Set<(SkgNode,NodeSaveAction)>
 *** TypeDB : update_nodes_and_relationships2
 *** FS
@@ -25,6 +25,8 @@
     Delete every entry for which the id is any toDelete id.
       not just the pid
     Add as normal.
+* rebuild view
+  indented to avoid noisy diff
 ** rebuild view
 *** will build a Forest<OrgNode2> based on the original one
 *** The result begins as a copy of the original one.
@@ -48,10 +50,6 @@
 **** might_contain_more
 **** focused
 **** folded
-* Look at all my plans, and the code around saving, and ask what makes each difficult.
-  Do this to know how to change the data structure,
-  and likely the control flow.
-* Navigate the tree in Rust as a tree.
 * What {functions,types} bundle separble concerns?
 ** NodeWithEphem
 * retain metadata when replacing node

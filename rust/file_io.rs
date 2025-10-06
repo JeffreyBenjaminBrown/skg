@@ -92,10 +92,10 @@ pub fn read_skg_files
 
 /// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.
-pub fn write_all_nodes (
-  nodes : Vec<SkgNode>,
-  config    : SkgConfig,
-) -> io::Result<usize> { // number of files written
+pub fn write_all_nodes_to_fs (
+  nodes  : Vec<SkgNode>,
+  config : SkgConfig,
+) -> io  ::Result<usize> { // number of files written
 
   fs::create_dir_all (
     // Ensure entire path to folder exists
@@ -115,6 +115,40 @@ pub fn write_all_nodes (
           & config, pid )) ) ?;
     written += 1; }
   Ok (written) }
+
+pub fn delete_all_nodes_from_fs (
+  nodes  : Vec<SkgNode>,
+  config : SkgConfig,
+) -> io::Result<usize> { // number of files deleted
+  { // Check that all files exist.
+    let mut missing_files : Vec<String> = Vec::new();
+    for node in &nodes {
+      let pid : ID = node . ids . get(0)
+        . ok_or_else (
+          || io::Error::new (
+            io::ErrorKind::InvalidInput,
+            "SkgNode has no IDs" ))?
+        . clone ();
+      let file_path = path_from_pid (
+        & config, pid );
+      if ! Path::new ( & file_path ) . exists () {
+        missing_files.push ( file_path ); }}
+    if ! missing_files . is_empty () {
+      return Err ( io::Error::new (
+        io::ErrorKind::NotFound,
+        format! ( "Files do not exist: {:?}",
+                   missing_files ) )); }}
+
+  let mut deleted : usize = 0;
+  for node in nodes {
+    let pid : ID = node . ids . get(0)
+      . unwrap () // Safe because we checked above
+      . clone ();
+    let file_path = path_from_pid (
+      & config, pid );
+    fs::remove_file ( & file_path ) ?;
+    deleted += 1; }
+  Ok (deleted) }
 
 /// If there's no such .skg file at path,
 /// returns the empty vector.
