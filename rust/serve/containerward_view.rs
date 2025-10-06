@@ -1,8 +1,8 @@
 use crate::render::containerward_org_view;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
-use crate::types::{ID, SkgConfig, find_id_in_metadata_collection};
+use crate::new::parse_headline_from_sexp;
+use crate::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
 use std::net::TcpStream;
@@ -19,14 +19,9 @@ pub fn handle_containerward_view_request (
 ) {
 
   match parse_headline_from_sexp ( request ) {
-    Ok ( (metadata_items, level, _title) ) => {
-      // Extract ID from metadata items
-      let node_id: Result<ID, &str> =
-        find_id_in_metadata_collection (&metadata_items)
-        . ok_or ("No ID found in headline metadata");
-
-      match node_id {
-        Ok(id) => {
+    Ok ( (headline_md, level, _title) ) => {
+      match headline_md.id {
+        Some ( id ) => {
           send_response_with_length_prefix (
             stream,
             & containerward_view_wrapped (
@@ -35,10 +30,9 @@ pub fn handle_containerward_view_request (
               typedb_driver,
               & config,
             )); },
-        Err(e) => {
-          let error_msg = format!(
-            "Error extracting ID from metadata: {}",
-            e);
+        None => {
+          let error_msg : String =
+            "No ID found in headline metadata".to_string ();
           println! ( "{}", error_msg ) ;
           send_response ( stream, &error_msg ); }} },
     Err ( err ) => {

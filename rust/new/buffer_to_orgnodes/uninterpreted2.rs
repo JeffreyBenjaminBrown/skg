@@ -179,11 +179,12 @@ fn parse_metadata_to_orgNodeMd2(
         "id" => { result.id = Some(ID::from(value)); },
         "relToOrgParent" => {
           result.relToOrgParent = match value {
-            "content" => RelToOrgParent2::Content,
-            "container" => RelToOrgParent2::Container,
-            "aliasCol" => RelToOrgParent2::AliasCol,
-            "alias" => RelToOrgParent2::Alias,
-            "none" => RelToOrgParent2::None,
+            "alias"        => RelToOrgParent2::Alias,
+            "aliasCol"     => RelToOrgParent2::AliasCol,
+            "container"    => RelToOrgParent2::Container,
+            "content"      => RelToOrgParent2::Content,
+            "none"         => RelToOrgParent2::None,
+            "searchResult" => RelToOrgParent2::SearchResult,
             _ => return Err(
               format!("Unknown relToOrgParent value: {}", value)),
           }; },

@@ -1,10 +1,10 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{TantivyIndex, MetadataItem, RelToOrgParent};
+use crate::types::{TantivyIndex, OrgNode2, HeadlineMd2, RelToOrgParent2};
 use crate::render::orgnode::render_org_node_from_text;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
 use tantivy::{Document};
 
@@ -108,16 +108,27 @@ fn format_matches_as_org_mode (
 
   let mut result : String =
     String::new();
-
-  let mut title_search_metadata = HashSet::new();
-  title_search_metadata.insert (
-    MetadataItem::RelToOrgParent (
-      RelToOrgParent::SearchResult ));
-
-  result.push_str(
-    & render_org_node_from_text (
+  let search_root_node : OrgNode2 =
+    OrgNode2 {
+      metadata :
+        HeadlineMd2 {
+          id : None,
+          relToOrgParent : RelToOrgParent2::SearchResult,
+          cycle : false,
+          focused : false,
+          folded : false,
+          mightContainMore : false,
+          repeat : false,
+          toDelete : false,
+        },
+      title : search_terms.to_string (),
       // The unique level-1 headline states the search terms.
-      1, search_terms, None, &title_search_metadata ));
+      body : None,
+    };
+  result.push_str (
+    & render_org_node_from_text (
+      1,
+      &search_root_node ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
@@ -140,19 +151,50 @@ fn format_matches_as_org_mode (
   for (id, matches) in id_entries {
     // First (best) match becomes level-2 headline
     let (score, title) = &matches[0];
-    result.push_str(&render_org_node_from_text(
-      2,
-      & format!("score: {:.2}, [[id:{}][{}]]",
-                score, id, title),
-      None,
-      &HashSet::new() ));
+    let match_node : OrgNode2 =
+      OrgNode2 {
+        metadata :
+          HeadlineMd2 {
+            id : None,
+            relToOrgParent : RelToOrgParent2::Content,
+            cycle : false,
+            focused : false,
+            folded : false,
+            mightContainMore : false,
+            repeat : false,
+            toDelete : false,
+          },
+        title : format! (
+          "score: {:.2}, [[id:{}][{}]]",
+          score, id, title ),
+        body : None,
+      };
+    result.push_str (
+      & render_org_node_from_text (
+        2,
+        &match_node ));
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
-      result.push_str(&render_org_node_from_text(
-        3,
-        & format!("score: {:.2}, [[id:{}][{}]]",
-                  score, id, title),
-        None,
-        &HashSet::new()
-      )); }}
+      let alias_match_node : OrgNode2 =
+        OrgNode2 {
+          metadata :
+            HeadlineMd2 {
+              id : None,
+              relToOrgParent : RelToOrgParent2::Content,
+              cycle : false,
+              focused : false,
+              folded : false,
+              mightContainMore : false,
+              repeat : false,
+              toDelete : false,
+            },
+          title : format! (
+            "score: {:.2}, [[id:{}][{}]]",
+            score, id, title ),
+          body : None,
+        };
+      result.push_str (
+        & render_org_node_from_text (
+          3,
+          &alias_match_node )); }}
   result }

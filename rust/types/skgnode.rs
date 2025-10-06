@@ -1,7 +1,6 @@
 use serde::{Serialize, Deserialize};
 
 use super::misc::ID;
-use super::orgnode::OrgNodeInterp;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SkgNode {
@@ -30,27 +29,6 @@ pub struct SkgNode {
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub overrides_view_of: Vec<ID>, // See schema.tql.
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct NodeWithEphem {
-  // See also /api.md.
-  // The data that can be seen about a node in an Emacs buffer. Includes ephemeral view data ("folded", "focused", and "repeated").
-  // The same structure is used to send to and receive from Emacs. However, the `id` can only be `None` when receiving from Emacs.
-  pub id       : Option<ID>,
-  pub title    : String,         // See comment in the type `OrgNode`
-  pub aliases  : Option<Vec<String>>, // aliases in the org-roam sense
-  pub body     : Option<String>, // See comment in the type `OrgNode`
-  pub folded   : bool,           // folded in the org-mode sense
-  pub focused  : bool,           // where the Emacs cursor is
-  pub repeated : bool, /* A node might appear in multiple places in a document. When Rust sends such a document, the second and later instances of such a node are marked "repeated". Their body and children are not displayed in Emacs. Moreover when Emacs sends them back to Rust, Rust should ignore any edits made under such repeated nodes. This permits handling infinite (recursive) data.
-.
-Both Rust and Emacs need to know this, because:
-.
-Emacs has to display repeated nodes differently, and report to Rust whether the node was repeated when saving.
-.
-Rust needs to save repeated nodes differently. It should ignore their content and changes to their text, because the single source of truth lies elsewhere in the view that Emacs sent Rust to save. */
-  pub branches : Vec<OrgNodeInterp>,
 }
 
 //

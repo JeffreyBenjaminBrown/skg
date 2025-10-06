@@ -2,7 +2,7 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
-use crate::types::{SkgNode, ID, SkgConfig, MetadataItem};
+use crate::types::{SkgNode, ID, SkgConfig, OrgNode2, HeadlineMd2, RelToOrgParent2};
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 
@@ -88,21 +88,28 @@ pub async fn org_from_node_recursive (
     return Ok ( format_repeated_node (
       node_id, level, & node.title )); }
   visited.insert ( node_id.clone () );
-  // Create metadata set with ID
-  let mut metadata_set = HashSet::new();
-  metadata_set.insert(MetadataItem::ID(node_id.to_string()));
-
-  let mut out = render_org_node_from_text(
-    level,
-    &newline_to_space(&node.title), // Over-cautious, because the title should contain no newlines, but probably cheap.
-    None,
-    &metadata_set
-  );
-  if let Some (text) = & node.body {
-    // Ensure a newline separates the body from the next headline.
-    out.push_str ( text );
-    if !text.ends_with ( '\n' ) {
-      out.push('\n'); }}
+  let orgnode2 : OrgNode2 =
+    OrgNode2 {
+      metadata :
+        HeadlineMd2 {
+          id : Some ( node_id.clone () ),
+          relToOrgParent : RelToOrgParent2::Content,
+          cycle : false,
+          focused : false,
+          folded : false,
+          mightContainMore : false,
+          repeat : false,
+          toDelete : false,
+        },
+      title : newline_to_space ( &node.title ),
+      // Over-cautious, because the title should contain no newlines, but probably cheap.
+      body : node.body.clone (),
+    };
+  let mut out : String =
+    render_org_node_from_text (
+      level,
+      &orgnode2
+    );
   for child_id in &node.contains { // Recurse at next level.
     let child = Box::pin (
       org_from_node_recursive (
@@ -116,15 +123,27 @@ pub async fn org_from_node_recursive (
 /// Produce a headline with a `repeated` herald and a short body.
 /// Do not recurse into children.
 pub fn format_repeated_node (
-  node_id: &ID,
-  level: usize,
-  title: &String
+  node_id : &ID,
+  level   : usize,
+  title   : &String
 ) -> String {
-  let mut metadata_set = HashSet::new();
-  metadata_set.insert(MetadataItem::ID(node_id.to_string()));
-  metadata_set.insert(MetadataItem::Repeated);
-  render_org_node_from_text(
+  let orgnode2 : OrgNode2 =
+    OrgNode2 {
+      metadata :
+        HeadlineMd2 {
+          id : Some ( node_id.clone () ),
+          relToOrgParent : RelToOrgParent2::Content,
+          cycle : false,
+          focused : false,
+          folded : false,
+          mightContainMore : false,
+          repeat : true,
+          toDelete : false,
+        },
+      title : newline_to_space ( title ),
+      body : Some (
+        "Repeated, probably above. Edit there, not here.".to_string () ),
+    };
+  render_org_node_from_text (
     level,
-    & newline_to_space (title),
-    Some("Repeated, probably above. Edit there, not here."),
-    &metadata_set ) }
+    &orgnode2 ) }

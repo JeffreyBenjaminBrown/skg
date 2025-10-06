@@ -2,8 +2,8 @@ use crate::file_io::fetch_aliases_from_file;
 use crate::render::aliases_to_org;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
-use crate::types::{ID, SkgConfig, find_id_in_metadata_collection};
+use crate::new::parse_headline_from_sexp;
+use crate::types::SkgConfig;
 
 use std::net::TcpStream;
 
@@ -17,12 +17,9 @@ pub fn handle_node_aliases_request (
 ) {
 
   match parse_headline_from_sexp ( request ) {
-    Ok ( (metadata_items, level, _title) ) => {
-      let node_id: Result<ID, &str> =
-        find_id_in_metadata_collection(&metadata_items)
-        .ok_or("No ID found in headline metadata");
-      match node_id {
-        Ok(id) => {
+    Ok ( (headline_md, level, _title) ) => {
+      match headline_md.id {
+        Some ( id ) => {
           let aliases : Vec<String> =
             fetch_aliases_from_file ( config, id );
           let org_content : String =
@@ -30,10 +27,9 @@ pub fn handle_node_aliases_request (
           send_response_with_length_prefix (
             stream,
             & org_content ); },
-        Err(e) => {
-          let error_msg = format!(
-            "Error extracting ID from metadata: {}",
-            e);
+        None => {
+          let error_msg : String =
+            "No ID found in headline metadata".to_string ();
           println! ( "{}", error_msg ) ;
           send_response ( stream, &error_msg ); }}
     }, Err ( err ) => {

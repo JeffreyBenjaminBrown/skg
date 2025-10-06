@@ -1,6 +1,5 @@
-use crate::types::{MetadataItem, RelToOrgParent};
+use crate::types::{OrgNode2, HeadlineMd2, RelToOrgParent2};
 use crate::render::orgnode::render_org_node_from_text;
-use std::collections::HashSet;
 
 /// Returns not an entire org buffer,
 /// but rather just a passage,
@@ -18,23 +17,49 @@ pub fn aliases_to_org (
   aliases : Vec<String>,
   level   : usize,
 ) -> String {
-
-  // build inputs
   let header_level : usize = level + 1;
   let alias_level  : usize = level + 2;
-  let mut aliases_metadata = HashSet::new();
-  aliases_metadata.insert (
-    MetadataItem::RelToOrgParent (
-      RelToOrgParent::Aliases ));
-
-  // build result
-  let mut result = render_org_node_from_text(
-    // The only child node, the 'aliases' headline, has no title.
-    header_level, "", None, &aliases_metadata);
-  for alias in aliases { // Each each alias grandchild, if any.
+  let aliases_header_node : OrgNode2 =
+    OrgNode2 {
+      metadata :
+        HeadlineMd2 {
+          id : None,
+          relToOrgParent : RelToOrgParent2::AliasCol,
+          cycle : false,
+          focused : false,
+          folded : false,
+          mightContainMore : false,
+          repeat : false,
+          toDelete : false,
+        },
+      title : "".to_string (),
+      // The only child node, the 'aliases' headline, has no title.
+      body : None,
+    };
+  let mut result : String =
+    render_org_node_from_text (
+      header_level,
+      &aliases_header_node );
+  for alias in aliases {
+    // Each alias grandchild, if any.
+    let alias_node : OrgNode2 =
+      OrgNode2 {
+        metadata :
+          HeadlineMd2 {
+            id : None,
+            relToOrgParent : RelToOrgParent2::Alias,
+            cycle : false,
+            focused : false,
+            folded : false,
+            mightContainMore : false,
+            repeat : false,
+            toDelete : false,
+          },
+        title : alias,
+        body : None,
+      };
     result.push_str (
-      & render_org_node_from_text(
-        alias_level, & alias, None, & HashSet::new()
-      ) ); }
-
+      & render_org_node_from_text (
+        alias_level,
+        &alias_node )); }
   result }

@@ -1,7 +1,7 @@
 // cargo test --test serve_containerward_view
 
-use skg::text_to_orgnodes::uninterpreted::parse_headline_from_sexp;
-use skg::types::{ID, find_id_in_metadata_collection};
+use skg::new::parse_headline_from_sexp;
+use skg::types::ID;
 
 use std::error::Error;
 use rand::prelude::*;
@@ -34,11 +34,8 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
     );
 
     match parse_headline_from_sexp(&request) { // target of test
-      Ok((metadata_items, parsed_level, parsed_title)) => {
-        let node_id: Option<ID> =
-          find_id_in_metadata_collection(&metadata_items);
-
-        assert_eq!(node_id, Some(ID(test_id.clone())),
+      Ok((headline_md, parsed_level, parsed_title)) => {
+        assert_eq!(headline_md.id, Some(ID(test_id.clone())),
                    "Failed to parse ID correctly for title: '{}' (headline: '{}')",
                    title, headline);
         assert_eq!(parsed_level, level,

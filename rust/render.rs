@@ -15,7 +15,6 @@ pub use content_view::{
     single_root_view,
 };
 pub use orgnode::{
-    render_org_node,
     render_org_node_from_text,
 };
 pub use util::{

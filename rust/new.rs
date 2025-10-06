@@ -4,6 +4,9 @@ pub mod buffer_to_orgnodes;
 pub use orgnodes_to_instructions::*;
 pub mod orgnodes_to_instructions;
 
+pub use parse_sexp::*;
+pub mod parse_sexp;
+
 use crate::types::{ID, SkgConfig, SkgNode, SaveInstruction, OrgNode2};
 use crate::save::clobber_none_fields_with_data_from_disk;
 use ego_tree::Tree;

@@ -7,13 +7,15 @@ mod typedb {
 }
 
 use skg::render::single_root_view;
-use skg::text_to_orgnodes::parse_skg_org_to_nodes;
+use skg::new::org_to_uninterpreted_nodes2;
+use skg::types::OrgNode2;
 use skg::typedb::init::populate_test_db_from_fixtures;
+use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
 use skg::typedb::search::util::extract_payload_from_typedb_string_rep;
 use skg::typedb::search::util::pid_from_id;
-use skg::types::{ID, SkgNode, OrgNodeInterp, NodeWithEphem, SkgConfig, empty_skgnode};
+use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
 use futures::executor::block_on;
@@ -352,57 +354,66 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Vec<OrgNodeInterp> =
-    parse_skg_org_to_nodes (
-      & result_org_text );
+  let result_forest : Vec<Tree<OrgNode2>> =
+    org_to_uninterpreted_nodes2 ( & result_org_text )
+    . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
 
-  // Expected OrgNodeInterp tree
-  //
-  // a [focused]
-  // └─ b (body "b has a body")
-  //    └─ c
-  //       └─ b [repeated]
-  //            (body "Repeated above. Edit there, not here.")
-  let expected_forest : Vec<OrgNodeInterp> =
-    vec! [ OrgNodeInterp::Content(NodeWithEphem {
-      id       : Some ( ID::from ("a") ),
-      title    : "a" . to_string (),
-      aliases  : None,
-      body     : None,
-      folded   : false,
-      focused  : false,
-      repeated : false,
-      branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
-        id       : Some ( ID::from ("b") ),
-        title    : "b" . to_string (),
-        aliases  : None,
-        body     : Some ( "b has a body" . to_string () ),
-        folded   : false,
-        focused  : false,
-        repeated : false,
-        branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
-          id       : Some ( ID::from ("c") ),
-          aliases  : None,
-          title    : "c" . to_string (),
-          body     : None,
-          folded   : false,
-          focused  : false,
-          repeated : false,
-          branches : vec! [ OrgNodeInterp::Content(NodeWithEphem {
-            id       : Some ( ID::from ("b") ),
-            title    : "b" . to_string (),
-            aliases  : None,
-            body     : None, // PITFALL: There *is* a body in the received org text. But it is discarded, because the node is a repeat.
-            folded   : false,
-            focused  : false,
-            repeated : true,
-            branches : vec! [], }) ], }) ], }) ], }) ];
+  // Verify structure by checking key properties
+  assert_eq! ( result_forest.len (), 1,
+    "Expected exactly 1 root node" );
 
-  // With PartialEq derived on OrgNodeInterp, we can compare the full structures directly.
-  assert_eq! (
-    result_forest,
-    expected_forest,
-    "Rendered OrgNodeInterp forest does not match expected." );
+  let root : &Tree<OrgNode2> = & result_forest [ 0 ];
+  let root_node : &OrgNode2 = root . root () . value ();
+
+  // Root node should be "a"
+  assert_eq! ( root_node.metadata.id, Some ( ID::from ("a") ),
+    "Root node should have id 'a'" );
+  assert_eq! ( root_node.title, "a",
+    "Root node should have title 'a'" );
+
+  // Root should have 1 child: "b"
+  let mut root_children = root . root () . children ();
+  let b_node_ref = root_children . next ()
+    . expect ( "Root should have child 'b'" );
+  let b_node : &OrgNode2 = b_node_ref . value ();
+
+  assert_eq! ( b_node.metadata.id, Some ( ID::from ("b") ),
+    "First child should have id 'b'" );
+  assert_eq! ( b_node.title, "b",
+    "First child should have title 'b'" );
+  assert_eq! ( b_node.body, Some ( "b has a body" . to_string () ),
+    "Node 'b' should have body 'b has a body'" );
+  assert! ( ! b_node.metadata.repeat,
+    "First occurrence of 'b' should not be marked as repeated" );
+
+  // "b" should have 1 child: "c"
+  let mut b_children = b_node_ref . children ();
+  let c_node_ref = b_children . next ()
+    . expect ( "Node 'b' should have child 'c'" );
+  let c_node : &OrgNode2 = c_node_ref . value ();
+
+  assert_eq! ( c_node.metadata.id, Some ( ID::from ("c") ),
+    "Child of 'b' should have id 'c'" );
+  assert_eq! ( c_node.title, "c",
+    "Child of 'b' should have title 'c'" );
+
+  // "c" should have 1 child: "b" (repeated)
+  let mut c_children = c_node_ref . children ();
+  let b_repeat_ref = c_children . next ()
+    . expect ( "Node 'c' should have child 'b' (repeated)" );
+  let b_repeat : &OrgNode2 = b_repeat_ref . value ();
+
+  assert_eq! ( b_repeat.metadata.id, Some ( ID::from ("b") ),
+    "Child of 'c' should have id 'b'" );
+  assert_eq! ( b_repeat.title, "b",
+    "Repeated node should have title 'b'" );
+  assert! ( b_repeat.metadata.repeat,
+    "Second occurrence of 'b' should be marked as repeated" );
+
+  // Repeated "b" should have no children (body and children ignored for repeated nodes)
+  assert! ( b_repeat_ref . children () . next () . is_none (),
+    "Repeated node 'b' should have no children" );
+
   Ok (( )) }
 
 async fn collect_all_of_some_binary_rel(

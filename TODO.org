@@ -1,3 +1,23 @@
+* moves
+Move default_metadata from tests/render_util.rs to
+rust/types/new.rs.
+* replace
+In a number of places there's a passage like this:
+
++        HeadlineMd2 {
++          id : None,
++          relToOrgParent : RelToOrgParent2::SearchResult,
++          cycle : false,
++          focused : false,
++          folded : false,
++          mightContainMore : false,
++          repeat : false,
++          toDelete : false,
++        },
+
+It would be less verbose if, in such places,
+we just created an HeadlineMd2 using default_metadata,
+and then replaced the one or two fields different from the default.
 * Once the new works, anything unused in the old gets deleted.
   I suspect that includes all of rust/text_to_orgnodes/.
 * DONE refactor: retain tree

@@ -1,80 +1,39 @@
-use crate::types::{OrgNode, MetadataItem};
+use crate::types::{OrgNode2, headlinemd2_to_string};
 
-use std::collections::HashSet;
-use std::fmt::Write as _;
-
-pub fn render_org_node (
-  node: &OrgNode,
-  level: usize,
-  metadata: &HashSet<MetadataItem>,
-  render_body: bool
-) -> String {
-  render_org_node_from_text (
-    level,
-    &node.title,
-    if render_body { node.body.as_deref() } else { None },
-    metadata ) }
-
+/// Renders an OrgNode2 as an org-mode formatted string.
 pub fn render_org_node_from_text (
-  level: usize,
-  title: &str,
-  body: Option<&str>,
-  metadata: &HashSet<MetadataItem>
+  level : usize,
+  node  : &OrgNode2
 ) -> String {
-  if ( metadata . is_empty() &&
-       title    . is_empty() ) {
-    panic!("render_org_node_from_text called with both empty metadata and empty title"); }
-
-  let mut result = String::new();
-  result.push_str( // Leading bullet is mandatory.
-    &org_bullet(level));
-  if ! metadata.is_empty() { // Maybe add metadata.
-    result.push(' ');
-    result.push_str(&render_metadata_header(metadata));
-  }
-  if ! title.is_empty() { // Maybe add title.
+  let metadata_str : String =
+    headlinemd2_to_string ( &node.metadata );
+  if ( metadata_str . is_empty() &&
+       node.title   . is_empty() ) {
+    panic! (
+      "render_org_node_from_text called with both empty metadata and empty title" ); }
+  let mut result : String =
+    String::new ();
+  result . push_str (
+    // Leading bullet is mandatory.
+    &org_bullet ( level ));
+  if ! metadata_str.is_empty () {
+    // Maybe add metadata.
+    result . push ( ' ' );
+    result . push_str ( "<skg<" );
+    result . push_str ( &metadata_str );
+    result . push_str ( ">>" ); }
+  if ! node.title.is_empty () {
+    // Maybe add title.
     // PITFALL: Title can be missing, for the right metadata.
-    result.push(' ');
-    result.push_str (title); }
-  result.push('\n');
-  if let Some(body_text) = body { // Maybe add body
-    if !body_text.is_empty() {
-      result.push_str(body_text);
-      if !body_text.ends_with('\n') {
-        result.push('\n'); }} }
-  result }
-
-pub fn render_metadata_header(
-  metadata: &HashSet<MetadataItem>
-) -> String {
-  if metadata.is_empty() {
-    panic!("render_metadata_header called with empty metadata - caller should check first"); }
-  let mut metadata_vec: Vec<&MetadataItem> =
-    metadata.iter().collect();
-  metadata_vec.sort_by(|a, b| {
-    // Sort metadata: id first, type second, then alphabetical by Display
-    match (a, b) {
-      // ID always comes first
-      (MetadataItem::ID(_), MetadataItem::ID(_)) =>
-        a.to_string().cmp(&b.to_string()),
-      (MetadataItem::ID(_), _) => std::cmp::Ordering::Less,
-      (_, MetadataItem::ID(_)) => std::cmp::Ordering::Greater,
-
-      // RelToOrgParent (relationship to parent) always comes second
-      (MetadataItem::RelToOrgParent(_), MetadataItem::RelToOrgParent(_)) =>
-        a.to_string().cmp(&b.to_string()),
-      (MetadataItem::RelToOrgParent(_), _) => std::cmp::Ordering::Less,
-      (_, MetadataItem::RelToOrgParent(_)) => std::cmp::Ordering::Greater,
-
-      // Everything else alphabetical
-      _ => a.to_string().cmp(&b.to_string()), } });
-  let mut result = String::new();
-  result.push_str("<skg<");
-  for (i, item) in metadata_vec.iter().enumerate() {
-    if i > 0 {
-      result.push(','); }
-    write!(&mut result, "{}", item).unwrap(); }
-  result.push_str(">>");
+    result . push ( ' ' );
+    result . push_str ( &node.title ); }
+  result . push ( '\n' );
+  if let Some ( ref body_text ) = node.body {
+    // Maybe add body
+    if ! body_text . is_empty () {
+      result . push_str ( body_text );
+      if ! body_text . ends_with ( '\n' ) {
+        result . push ( '\n' ); }} }
   result }
 
 pub fn org_bullet ( level: usize ) -> String {

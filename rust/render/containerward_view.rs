@@ -2,7 +2,7 @@ use crate::file_io::read_node_from_id;
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
-use crate::types::{ID, SkgConfig, MetadataItem, RelToOrgParent};
+use crate::types::{ID, SkgConfig, OrgNode2, HeadlineMd2, RelToOrgParent2};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -65,15 +65,20 @@ async fn render_linear_portion_of_path (
   for (i, node_id) in path.iter().enumerate() {
     let node = read_node_from_id (
       config, driver, node_id ). await ?;
+    let orgnode2 : OrgNode2 =
+      OrgNode2 {
+        metadata : metadata_for_element_of_path (
+          node_id, cycle_node, i == 0 ),
+        title : newline_to_space ( & node.title ),
+        body :
+          // Render body only for origin of path.
+          if i == 0 { node.body.clone () }
+          else { None },
+      };
     result.push_str (
       & render_org_node_from_text (
         terminus_level + i,
-        & newline_to_space ( & node.title ),
-        { // Render body only for origin of path.
-          if i == 0 { node.body.as_deref() }
-          else { None } },
-        & metadata_for_element_of_path (
-          node_id, cycle_node, i == 0), )); }
+        &orgnode2 )); }
   Ok (result) }
 
 async fn render_branches (
@@ -88,14 +93,17 @@ async fn render_branches (
   for branch_id in branches {
     let node = read_node_from_id (
       config, driver, branch_id ). await ?;
+    let orgnode2 : OrgNode2 =
+      OrgNode2 {
+        metadata : metadata_for_element_of_path (
+          branch_id, cycle_node, false ),
+        title : newline_to_space ( & node.title ),
+        body : None,
+      };
     result.push_str (
       & render_org_node_from_text (
         branch_level,
-        & newline_to_space ( & node.title ),
-        None,
-        & metadata_for_element_of_path (
-          branch_id, cycle_node, false)
-      )); }
+        &orgnode2 )); }
   Ok (result) }
 
 async fn render_terminating_cycle_when_no_branches(
@@ -107,36 +115,39 @@ async fn render_terminating_cycle_when_no_branches(
 ) -> Result<String, Box<dyn Error>> {
   let node = read_node_from_id (
     config, driver, cycle_id ). await ?;
+  let orgnode2 : OrgNode2 =
+    OrgNode2 {
+      metadata : metadata_for_element_of_path (
+        cycle_id, cycle_node, false ),
+      title : newline_to_space ( & node.title ),
+      body : None,
+    };
   Ok ( render_org_node_from_text (
     cycle_level,
-    & newline_to_space (& node.title),
-    None,
-    & metadata_for_element_of_path (
-      cycle_id, cycle_node, false )) ) }
+    &orgnode2 )) }
 
 fn metadata_for_element_of_path (
-  node_id: &ID,
-  cycle_node: &Option<ID>,
-  is_terminus: bool
-) -> HashSet<MetadataItem> {
-
-  let mut metadata_set = HashSet::new();
-  metadata_set.insert (
-    MetadataItem::ID (
-      node_id.to_string () ));
-  if cycle_node.as_ref() == Some(node_id) {
-    // The cycle node needs extra metadata.
-    metadata_set.insert(
-      MetadataItem::Cycle); }
-  if !is_terminus {
-    // All nodes except the terminus (first in path)
-    // contain their org parent.
-    // PITFALL: If there is a second appearance of the terminus,
-    // later in the containerward path,
-    // that appearance *should* (and does) get this type.
-    metadata_set.insert (
-      MetadataItem::RelToOrgParent (
-        RelToOrgParent::Container));
-    metadata_set.insert (
-      MetadataItem::MightContainMore); }
-  metadata_set }
+  node_id     : &ID,
+  cycle_node  : &Option<ID>,
+  is_terminus : bool
+) -> HeadlineMd2 {
+  HeadlineMd2 {
+    id : Some ( node_id.clone () ),
+    relToOrgParent :
+      if is_terminus {
+        RelToOrgParent2::Content
+      } else {
+        // All nodes except the terminus (first in path)
+        // contain their org parent.
+        // PITFALL: If there is a second appearance of the terminus,
+        // later in the containerward path,
+        // that appearance *should* (and does) get this type.
+        RelToOrgParent2::Container
+      },
+    cycle : cycle_node.as_ref () == Some ( node_id ),
+    focused : false,
+    folded : false,
+    mightContainMore : ! is_terminus,
+    repeat : false,
+    toDelete : false,
+  } }

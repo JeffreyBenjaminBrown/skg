@@ -5,17 +5,8 @@ pub use misc::{ ID,
                 Hyperlink,
                 HyperlinkParseError, };
 pub mod orgnode;
-pub use orgnode::{ OrgNode,
-                   OrgNodeInterp,
-                   OrgNodeMetadata,
-                   RelToOrgParent,
-                   MetadataItem,
-                   parse_metadata_from_string,
-                   find_in_metadata_collection,
-                   find_id_in_metadata_collection, };
 pub mod skgnode;
 pub use skgnode::{ SkgNode,
-                   NodeWithEphem,
                    skgnode_example,
                    empty_skgnode, };
 pub mod new;
@@ -23,4 +14,5 @@ pub use new::{ SaveInstruction,
                NodeSaveAction,
                OrgNode2,
                HeadlineMd2,
-               RelToOrgParent2, };
+               RelToOrgParent2,
+               headlinemd2_to_string, };
