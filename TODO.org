@@ -1,4 +1,3 @@
-* 'repeated' flags not showing up
 * report errors if found by buffer_to_save_instructions
 * TODO improve serve/save
 ** a new save

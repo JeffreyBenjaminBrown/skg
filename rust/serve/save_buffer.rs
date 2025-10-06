@@ -80,7 +80,7 @@ fn read_length_prefixed_content (
   let content = String::from_utf8 (buffer) ?;
   Ok (content) }
 
-/* Updates dbs and filesystem, and generates text for a new org-buffer.
+/* Update dbs and filesystem, and generate text for a new org-buffer.
 Steps:
 - Put the text through `buffer_to_save_instructions` to get orgnode forest and save instructions.
 - Extract root IDs from the orgnode forest.
