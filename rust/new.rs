@@ -23,20 +23,25 @@ pub async fn buffer_to_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver
-) -> Result<Vec<SaveInstruction>, SaveError> {
+) -> Result<
+    ( Vec<Tree<OrgNode2>>,
+      Vec<SaveInstruction>
+    ), SaveError> {
 
-  let trees : Vec<Tree<OrgNode2>> =
+  let orgnode_forest : Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2 ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
   let ( inconsistent_deletions, multiple_definers )
     : ( Vec<ID>, Vec<ID> ) =
-    find_inconsistent_instructions ( & trees );
+    find_inconsistent_instructions ( & orgnode_forest );
   if ( ! inconsistent_deletions . is_empty () ||
        ! multiple_definers . is_empty () ) {
     return Err ( SaveError::InconsistentInstructions {
       inconsistent_deletions,
       multiple_definers, } ); }
-  let instructions : Vec<SaveInstruction> =
-    orgnodes_to_save_instructions ( trees, config, driver )
+  let (orgnode_forest_2, instructions)
+    : (Vec<Tree<OrgNode2>>, Vec<SaveInstruction>) =
+    orgnodes_to_save_instructions (
+      orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
-  Ok (instructions) }
+  Ok ((orgnode_forest_2, instructions)) }

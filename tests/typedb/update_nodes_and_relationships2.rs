@@ -64,8 +64,9 @@ fn test_update_nodes_and_relationships2 (
              multiple_definers );
 
     // Convert to instructions (adds missing info and reconciles)
-    let reconciled_instructions =
-      orgnodes_to_save_instructions ( trees, & config, & driver ) . await ?;
+    let (_orgnode_forest, reconciled_instructions) =
+      orgnodes_to_save_instructions (
+        trees, & config, & driver ) . await ?;
 
     // Apply the update
     update_nodes_and_relationships2 (

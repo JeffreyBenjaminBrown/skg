@@ -15,6 +15,10 @@ use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
 /// Main entry point.
+/// Runs the following on each node:
+/// - assign_alias_relation_if_needed(
+/// - assign_id_if_needed(
+/// - assign_pid_if_possible(
 pub async fn add_missing_info_to_trees(
   trees: &mut [Tree<OrgNode2>],
   db_name: &str,
@@ -32,8 +36,15 @@ fn add_missing_info_dfs<'a>(
   parent_relToOrgParent: Option<RelToOrgParent2>,
   db_name: &'a str,
   driver: &'a TypeDBDriver
-) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
-  Box::pin(async move {
+) -> Pin<
+    Box<
+        dyn Future<
+            Output = Result<
+                (),
+              Box<dyn Error>>>
+        + 'a>>
+
+{ Box::pin(async move {
   { // Process current node
     assign_alias_relation_if_needed(
       node_ref.value(), parent_relToOrgParent);
@@ -47,7 +58,7 @@ fn add_missing_info_dfs<'a>(
   { // Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
-    // PITFALL: don't confused egoTree NodeIDs, which are all distinct,
+    // PITFALL: don't confuse egoTree NodeIDs, which are all distinct,
     // from Skg IDs (which might not be).
     let node_id: ego_tree::NodeId = node_ref.id();
     let child_ids: Vec<ego_tree::NodeId> = {
