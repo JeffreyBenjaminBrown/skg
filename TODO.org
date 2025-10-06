@@ -1,6 +1,3 @@
-* change names
-update_typedb_from_saveinstructions
-OrgnodeMetadata
 * moves
 Move default_metadata from tests/render_util.rs to
 rust/types/new.rs.

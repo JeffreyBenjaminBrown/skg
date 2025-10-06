@@ -28,8 +28,8 @@ check_database() {
     # Skip if not a directory
     [ ! -d "$db_path" ] && return
 
-    # Classify as test database if matches pattern
-    if [[ "$db_name" == *skg-*test* ]]; then
+    # Classify as test database if matches pattern (matches both skg-test and skg-*test*)
+    if [[ "$db_name" == *skg-*test* ]] || [[ "$db_name" == "skg-test" ]]; then
         test_dbs+=("$db_name")
         return
     fi

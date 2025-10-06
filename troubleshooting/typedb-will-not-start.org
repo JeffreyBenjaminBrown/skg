@@ -21,6 +21,11 @@ This typically happens when:
 2. TypeDB doesn't get a chance to properly close databases and flush checkpoints
 3. RocksDB (TypeDB's storage engine) leaves databases in an inconsistent state
 4. Accumulation of test databases can contribute to "too many open files" limit
+
+Another common corruption pattern:
+- Error: "Corruption: Mismatch in unique ID on table file"
+- Cause: RocksDB MANIFEST file corruption from incomplete writes
+- Solution: Same as above - delete the corrupted database
 ** Solution:
 *** Immediate Fix:
 1. Identify the problematic database from the error message
@@ -39,7 +44,13 @@ Use the provided scripts for safe and thorough cleanup:
 - Interactive confirmation before deletion
 - Preserves system and production databases
 *** Manual Cleanup (Alternative):
-This deletes any database matching pattern "*skg-*test*".
+This deletes test databases. Note: Some test databases are named "skg-test"
+without a dash before "test", so we need to match both patterns.
 #+begin_src bash
-find /opt/typedb/core/server/data/ -name "*skg-*test*" -type d -exec rm -rf {} \;
+rm -rf /opt/typedb/core/server/data/skg-test*
+#+end_src
+
+Or using find (more portable but slower):
+#+begin_src bash
+find /opt/typedb/core/server/data/ -maxdepth 1 -type d \( -name "*skg-*test*" -o -name "skg-test" \) -exec rm -rf {} \;
 #+end_src

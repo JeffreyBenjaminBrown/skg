@@ -16,8 +16,8 @@ echo "Scanning for TypeDB test databases to delete..."
 echo "Pattern: *skg-*test*"
 echo
 
-# Find databases matching the pattern
-test_dbs=$(find "$TYPEDB_DATA_DIR" -maxdepth 1 -type d -name "*skg-*test*" | sort)
+# Find databases matching the pattern (matches both skg-test and skg-*test*)
+test_dbs=$(find "$TYPEDB_DATA_DIR" -maxdepth 1 -type d \( -name "*skg-*test*" -o -name "skg-test" \) | sort)
 
 if [ -z "$test_dbs" ]; then
     echo "No test databases found matching pattern *skg-*test*"
