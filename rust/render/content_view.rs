@@ -33,6 +33,30 @@ pub async fn single_root_view (
     ) . await ?;
   Ok (org) }
 
+/// Just like 'single_root_view',
+/// except it builds a forest rather than a tree.
+pub async fn multi_root_view (
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig,
+  focii   : &[ID],
+) -> Result < String, Box<dyn Error> > {
+
+  let mut result : String = String::new();
+  let mut visited : HashSet<ID> = HashSet::new();
+  for focus in focii {
+    let root_id : ID = climb_containerward_and_fetch_rootish_context (
+      & config . db_name,
+      driver , focus
+    ) . await ?;
+    let org : String =
+      org_from_node_recursive (
+        driver, config,
+        &root_id, focus, &mut visited, 1
+      ) . await ?;
+    result . push_str ( & org );
+  }
+  Ok ( result ) }
+
 /// Recursively render a node and its branches into Org.
 /// `level` controls the number of leading `*` on the headline.
 pub async fn org_from_node_recursive (

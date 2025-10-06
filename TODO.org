@@ -1,4 +1,13 @@
 * TODO yet to use
+In rust/serve.rs you'll see "save buffer" is one of the API methods.
+I would like to replace part of that.
+Specifically, let's change these functions:
+```
+  update_from_and_rerender_buffer
+  update_fs_and_dbs
+```
+
+First, to interpret the contents of the buffer, it should use buffer_to_save_instructions.
 ** new.rs :: pub async fn buffer_to_save_instructions (
    buffer_text : &str,
    config      : &SkgConfig,
