@@ -28,7 +28,7 @@ pub async fn buffer_to_save_instructions (
   driver      : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, SaveError> {
 
-  let mut trees : Vec<Tree<OrgNode2>> =
+  let trees : Vec<Tree<OrgNode2>> =
     org_to_uninterpreted_nodes2 ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
   let ( inconsistent_deletions, multiple_definers )
@@ -39,14 +39,7 @@ pub async fn buffer_to_save_instructions (
     return Err ( SaveError::InconsistentInstructions {
       inconsistent_deletions,
       multiple_definers, } ); }
-  add_missing_info_to_trees (
-    & mut trees, & config . db_name, driver )
-    . await . map_err ( SaveError::DatabaseError ) ?;
   let instructions : Vec<SaveInstruction> =
-    orgnodes_to_save_instructions ( trees )
-    . map_err ( SaveError::ParseError ) ?;
-  let reconciled_instructions : Vec<SaveInstruction> =
-    reconcile_dup_instructions (
-      config, driver, instructions )
+    orgnodes_to_save_instructions ( trees, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
-  Ok (reconciled_instructions) }
+  Ok (instructions) }

@@ -4,7 +4,7 @@ use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::update::update_nodes_and_relationships2;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
-use skg::new::{org_to_uninterpreted_nodes2, add_missing_info_to_trees, orgnodes_to_save_instructions, reconcile_dup_instructions, find_inconsistent_instructions};
+use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_save_instructions, find_inconsistent_instructions};
 use skg::types::{ID, SkgConfig, OrgNode2};
 use ego_tree::Tree;
 use indoc::indoc;
@@ -50,7 +50,7 @@ fn test_update_nodes_and_relationships2 (
     "};
 
     // Parse org text to uninterpreted nodes
-    let mut trees : Vec<Tree<OrgNode2>> =
+    let trees : Vec<Tree<OrgNode2>> =
       org_to_uninterpreted_nodes2 ( org_text )?;
 
     // Check for inconsistent instructions
@@ -63,13 +63,9 @@ fn test_update_nodes_and_relationships2 (
              "Found multiple definer instructions: {:?}",
              multiple_definers );
 
-    // Add missing info, convert to instructions, and reconcile
-    add_missing_info_to_trees (
-      & mut trees, & config . db_name, & driver ) . await ?;
+    // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions =
-      reconcile_dup_instructions (
-        & config, & driver,
-        orgnodes_to_save_instructions ( trees )? ) . await ?;
+      orgnodes_to_save_instructions ( trees, & config, & driver ) . await ?;
 
     // Apply the update
     update_nodes_and_relationships2 (

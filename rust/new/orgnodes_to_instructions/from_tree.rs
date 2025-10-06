@@ -1,12 +1,36 @@
-use crate::types::{OrgNode2, RelToOrgParent2, ID, SkgNode, NodeSaveAction};
+use crate::types::{OrgNode2, RelToOrgParent2, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
+use crate::new::{add_missing_info_to_trees, reconcile_dup_instructions};
 use ego_tree::{NodeRef, Tree};
+use typedb_driver::TypeDBDriver;
+use std::error::Error;
 
-/// Converts a forest of OrgNode2s to a forest of instructions.
-pub fn orgnodes_to_save_instructions (
+/// Converts a forest of OrgNode2s to a forest of SaveInstructions.
+/// Along the way it
+///   - Fills in missing information
+///   - Reconciles duplicate instructions
+pub async fn orgnodes_to_save_instructions (
+  mut trees : Vec<Tree<OrgNode2>>,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver
+) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
+  add_missing_info_to_trees (
+    & mut trees, & config . db_name, driver ) . await ?;
+  let instructions : Vec<SaveInstruction> =
+    orgnodes_to_dirty_save_instructions ( trees ) ?;
+  let reconciled_instructions : Vec<SaveInstruction> =
+    reconcile_dup_instructions (
+      config, driver, instructions ) . await ?;
+  Ok (reconciled_instructions) }
+
+/// PITFALL: Leaves important work undone,
+/// which orgnodes_to_save_instructions does.
+/// This is only public for testing.
+///
+/// Converts a forest of OrgNode2s to SaveInstructions,
+/// taking them all at face value.
+pub fn orgnodes_to_dirty_save_instructions (
   trees: Vec<Tree<OrgNode2>>
-) -> Result<Vec<(SkgNode,
-                 NodeSaveAction)>,
-            String> {
+) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<(SkgNode, NodeSaveAction)> =
     Vec::new();
   for tree in trees {
