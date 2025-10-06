@@ -2,7 +2,7 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode2, HeadlineMd2, RelToOrgParent2};
+use crate::types::{SkgNode, ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 
@@ -88,12 +88,12 @@ pub async fn org_from_node_recursive (
     return Ok ( format_repeated_node (
       node_id, level, & node.title )); }
   visited.insert ( node_id.clone () );
-  let orgnode2 : OrgNode2 =
-    OrgNode2 {
+  let orgnode2 : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : Some ( node_id.clone () ),
-          relToOrgParent : RelToOrgParent2::Content,
+          relToOrgParent : RelToOrgParent::Content,
           cycle : false,
           focused : false,
           folded : false,
@@ -127,12 +127,12 @@ pub fn format_repeated_node (
   level   : usize,
   title   : &String
 ) -> String {
-  let orgnode2 : OrgNode2 =
-    OrgNode2 {
+  let orgnode2 : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : Some ( node_id.clone () ),
-          relToOrgParent : RelToOrgParent2::Content,
+          relToOrgParent : RelToOrgParent::Content,
           cycle : false,
           focused : false,
           folded : false,

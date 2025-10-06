@@ -3,12 +3,12 @@
 mod typedb {
   pub mod search;
   pub mod delete_nodes;
-  pub mod update_nodes_and_relationships2;
+  pub mod update_typedb_from_saveinstructions;
 }
 
 use skg::render::single_root_view;
-use skg::new::org_to_uninterpreted_nodes2;
-use skg::types::OrgNode2;
+use skg::save::org_to_uninterpreted_nodes;
+use skg::types::OrgNode;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -354,16 +354,16 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2 ( & result_org_text )
+  let result_forest : Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
 
   // Verify structure by checking key properties
   assert_eq! ( result_forest.len (), 1,
     "Expected exactly 1 root node" );
 
-  let root : &Tree<OrgNode2> = & result_forest [ 0 ];
-  let root_node : &OrgNode2 = root . root () . value ();
+  let root : &Tree<OrgNode> = & result_forest [ 0 ];
+  let root_node : &OrgNode = root . root () . value ();
 
   // Root node should be "a"
   assert_eq! ( root_node.metadata.id, Some ( ID::from ("a") ),
@@ -375,7 +375,7 @@ async fn test_recursive_document (
   let mut root_children = root . root () . children ();
   let b_node_ref = root_children . next ()
     . expect ( "Root should have child 'b'" );
-  let b_node : &OrgNode2 = b_node_ref . value ();
+  let b_node : &OrgNode = b_node_ref . value ();
 
   assert_eq! ( b_node.metadata.id, Some ( ID::from ("b") ),
     "First child should have id 'b'" );
@@ -390,7 +390,7 @@ async fn test_recursive_document (
   let mut b_children = b_node_ref . children ();
   let c_node_ref = b_children . next ()
     . expect ( "Node 'b' should have child 'c'" );
-  let c_node : &OrgNode2 = c_node_ref . value ();
+  let c_node : &OrgNode = c_node_ref . value ();
 
   assert_eq! ( c_node.metadata.id, Some ( ID::from ("c") ),
     "Child of 'b' should have id 'c'" );
@@ -401,7 +401,7 @@ async fn test_recursive_document (
   let mut c_children = c_node_ref . children ();
   let b_repeat_ref = c_children . next ()
     . expect ( "Node 'c' should have child 'b' (repeated)" );
-  let b_repeat : &OrgNode2 = b_repeat_ref . value ();
+  let b_repeat : &OrgNode = b_repeat_ref . value ();
 
   assert_eq! ( b_repeat.metadata.id, Some ( ID::from ("b") ),
     "Child of 'c' should have id 'b'" );

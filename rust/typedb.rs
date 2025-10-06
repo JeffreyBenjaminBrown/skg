@@ -16,5 +16,5 @@ pub use search::{
     find_links_to,
     find_related_nodes,
 };
-pub use update::update_nodes_and_relationships;
+pub use update::update_typedb_from_saveinstructions;
 pub mod update;

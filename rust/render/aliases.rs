@@ -1,4 +1,4 @@
-use crate::types::{OrgNode2, HeadlineMd2, RelToOrgParent2};
+use crate::types::{OrgNode, OrgnodeMetadata, RelToOrgParent};
 use crate::render::orgnode::render_org_node_from_text;
 
 /// Returns not an entire org buffer,
@@ -19,12 +19,12 @@ pub fn aliases_to_org (
 ) -> String {
   let header_level : usize = level + 1;
   let alias_level  : usize = level + 2;
-  let aliases_header_node : OrgNode2 =
-    OrgNode2 {
+  let aliases_header_node : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : None,
-          relToOrgParent : RelToOrgParent2::AliasCol,
+          relToOrgParent : RelToOrgParent::AliasCol,
           cycle : false,
           focused : false,
           folded : false,
@@ -42,12 +42,12 @@ pub fn aliases_to_org (
       &aliases_header_node );
   for alias in aliases {
     // Each alias grandchild, if any.
-    let alias_node : OrgNode2 =
-      OrgNode2 {
+    let alias_node : OrgNode =
+      OrgNode {
         metadata :
-          HeadlineMd2 {
+          OrgnodeMetadata {
             id : None,
-            relToOrgParent : RelToOrgParent2::Alias,
+            relToOrgParent : RelToOrgParent::Alias,
             cycle : false,
             focused : false,
             folded : false,

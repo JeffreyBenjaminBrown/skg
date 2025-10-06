@@ -1,12 +1,12 @@
-use crate::types::{OrgNode2, headlinemd2_to_string};
+use crate::types::{OrgNode, headlinemd_to_string};
 
-/// Renders an OrgNode2 as an org-mode formatted string.
+/// Renders an OrgNode as an org-mode formatted string.
 pub fn render_org_node_from_text (
   level : usize,
-  node  : &OrgNode2
+  node  : &OrgNode
 ) -> String {
   let metadata_str : String =
-    headlinemd2_to_string ( &node.metadata );
+    headlinemd_to_string ( &node.metadata );
   if ( metadata_str . is_empty() &&
        node.title   . is_empty() ) {
     panic! (

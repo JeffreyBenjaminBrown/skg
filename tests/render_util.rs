@@ -1,12 +1,12 @@
 // cargo test --test render_util
 
 use skg::render::orgnode::render_org_node_from_text;
-use skg::types::{OrgNode2, HeadlineMd2, RelToOrgParent2, ID};
+use skg::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
 
-fn default_metadata () -> HeadlineMd2 {
-  HeadlineMd2 {
+fn default_metadata () -> OrgnodeMetadata {
+  OrgnodeMetadata {
     id : None,
-    relToOrgParent : RelToOrgParent2::Content,
+    relToOrgParent : RelToOrgParent::Content,
     cycle : false,
     focused : false,
     folded : false,
@@ -17,8 +17,8 @@ fn default_metadata () -> HeadlineMd2 {
 
 #[test]
 fn test_render_org_node_from_text_no_metadata () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata : default_metadata (),
       title : "Test Title".to_string (),
       body : None,
@@ -29,8 +29,8 @@ fn test_render_org_node_from_text_no_metadata () {
 
 #[test]
 fn test_render_org_node_from_text_with_body () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata : default_metadata (),
       title : "Test Title".to_string (),
       body : Some ( "Test body content".to_string () ),
@@ -41,12 +41,12 @@ fn test_render_org_node_from_text_with_body () {
 
 #[test]
 fn test_render_org_node_from_text_with_metadata () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : None,
-          relToOrgParent : RelToOrgParent2::AliasCol,
+          relToOrgParent : RelToOrgParent::AliasCol,
           cycle : false,
           focused : false,
           folded : true,
@@ -63,12 +63,12 @@ fn test_render_org_node_from_text_with_metadata () {
 
 #[test]
 fn test_render_org_node_from_text_with_id_metadata () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : Some ( ID::from ( "test123" )),
-          relToOrgParent : RelToOrgParent2::Content,
+          relToOrgParent : RelToOrgParent::Content,
           cycle : false,
           focused : false,
           folded : false,
@@ -85,12 +85,12 @@ fn test_render_org_node_from_text_with_id_metadata () {
 
 #[test]
 fn test_metadata_ordering () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
-          relToOrgParent : RelToOrgParent2::Content,
+          relToOrgParent : RelToOrgParent::Content,
           cycle : true,
           focused : false,
           folded : false,
@@ -108,8 +108,8 @@ fn test_metadata_ordering () {
 #[test]
 #[should_panic ( expected = "render_org_node_from_text called with both empty metadata and empty title" )]
 fn test_render_org_node_from_text_empty_metadata_and_title () {
-  let node : OrgNode2 =
-    OrgNode2 {
+  let node : OrgNode =
+    OrgNode {
       metadata : default_metadata (),
       title : "".to_string (),
       body : None,

@@ -1,9 +1,9 @@
 // cargo test validate_tree
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, find_buffer_errors_for_saving, Buffer_Cannot_Be_Saved};
-use skg::types::OrgNode2;
 use ego_tree::Tree;
+use skg::types::{OrgNode, Buffer_Cannot_Be_Saved};
+use skg::save::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving};
 
 #[test]
 fn test_find_buffer_errors_for_saving() {
@@ -24,8 +24,8 @@ fn test_find_buffer_errors_for_saving() {
             * <skg<id:conflict>> Same ID but no toDelete flag
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(
       input_with_errors).unwrap();
   let errors: Vec<Buffer_Cannot_Be_Saved> =
     find_buffer_errors_for_saving(&trees);
@@ -114,8 +114,8 @@ fn test_find_buffer_errors_for_saving_valid_input() {
             This body is allowed on normal nodes
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(valid_input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(valid_input).unwrap();
   let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&trees);
 
   assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
@@ -124,7 +124,7 @@ fn test_find_buffer_errors_for_saving_valid_input() {
 #[test]
 fn test_find_buffer_errors_for_saving_empty_input() {
   // Test empty input
-  let empty_trees: Vec<Tree<OrgNode2>> = Vec::new();
+  let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
   let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&empty_trees);
 
   assert_eq!(errors.len(), 0, "Should find no errors in empty input");
@@ -143,8 +143,8 @@ fn test_multiple_aliascols_in_children() {
             ** Normal child
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input_with_multiple_aliascols).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
   let errors: Vec<Buffer_Cannot_Be_Saved> =
     find_buffer_errors_for_saving(&trees);
 

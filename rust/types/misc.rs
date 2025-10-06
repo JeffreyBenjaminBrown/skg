@@ -51,6 +51,7 @@ pub enum HyperlinkParseError {
   MissingDivider,
 }
 
+
 //
 // Implementations
 //

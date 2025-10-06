@@ -4,7 +4,7 @@ Namely, make it so when relToOrgParent should be Alias,
 and add missing IDs where relToOrgParent is Content.
 */
 
-use crate::types::{OrgNode2, RelToOrgParent2, ID};
+use crate::types::{OrgNode, RelToOrgParent, ID};
 use crate::typedb::search::util::pid_from_id;
 use ego_tree::Tree;
 use std::boxed::Box;
@@ -20,7 +20,7 @@ use uuid::Uuid;
 /// - assign_id_if_needed(
 /// - assign_pid_if_possible(
 pub async fn add_missing_info_to_trees(
-  trees: &mut [Tree<OrgNode2>],
+  trees: &mut [Tree<OrgNode>],
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
@@ -32,8 +32,8 @@ pub async fn add_missing_info_to_trees(
   Ok(()) }
 
 fn add_missing_info_dfs<'a>(
-  mut node_ref: ego_tree::NodeMut<'a, OrgNode2>,
-  parent_relToOrgParent: Option<RelToOrgParent2>,
+  mut node_ref: ego_tree::NodeMut<'a, OrgNode>,
+  parent_relToOrgParent: Option<RelToOrgParent>,
   db_name: &'a str,
   driver: &'a TypeDBDriver
 ) -> Pin<
@@ -52,7 +52,7 @@ fn add_missing_info_dfs<'a>(
       node_ref.value() );
     assign_pid_if_possible(
       node_ref.value(), db_name, driver ).await ?; }
-  let node_rel: RelToOrgParent2 =
+  let node_rel: RelToOrgParent =
     ( // Used to process each of its children.
       node_ref.value() . metadata.relToOrgParent . clone() );
   { // Process children, DFS.
@@ -81,18 +81,18 @@ fn add_missing_info_dfs<'a>(
 /// Assign relToOrgParent=Alias
 /// to nodes whose parent has relToOrgParent=AliasCol
 fn assign_alias_relation_if_needed(
-  node: &mut OrgNode2,
-  parent_relToOrgParent: Option<RelToOrgParent2>
+  node: &mut OrgNode,
+  parent_relToOrgParent: Option<RelToOrgParent>
 ) {
   if let Some(parent_rel) = parent_relToOrgParent {
-    if parent_rel == RelToOrgParent2::AliasCol {
-      node.metadata.relToOrgParent = RelToOrgParent2::Alias; }} }
+    if parent_rel == RelToOrgParent::AliasCol {
+      node.metadata.relToOrgParent = RelToOrgParent::Alias; }} }
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_id_if_needed(
-  node: &mut OrgNode2
+  node: &mut OrgNode
 ) {
-  if ( node.metadata.relToOrgParent == RelToOrgParent2::Content
+  if ( node.metadata.relToOrgParent == RelToOrgParent::Content
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}
@@ -100,7 +100,7 @@ fn assign_id_if_needed(
 /// Look up the PID for the node's current ID,
 /// and replace it if found.
 async fn assign_pid_if_possible (
-  node: &mut OrgNode2,
+  node: &mut OrgNode,
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {

@@ -4,8 +4,8 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_dirty_save_instructions, find_inconsistent_instructions};
-use skg::new::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
+use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions, find_inconsistent_instructions};
+use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::types::{ID, SkgConfig};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -60,7 +60,7 @@ impl TestContext {
   }
 
   async fn run_pipeline(&self, input: &str) -> Result<Vec<(skg::types::SkgNode, skg::types::NodeSaveAction)>, Box<dyn std::error::Error>> {
-    let trees = org_to_uninterpreted_nodes2(input)?;
+    let trees = org_to_uninterpreted_nodes(input)?;
     let instructions = orgnodes_to_dirty_save_instructions(trees)?;
 
     if let Some(driver) = &self.driver {
@@ -77,7 +77,7 @@ fn test_inconsistent_delete() {
         * <skg<id:1,toDelete>> 2
     "};
 
-  let trees = org_to_uninterpreted_nodes2(input).unwrap();
+  let trees = org_to_uninterpreted_nodes(input).unwrap();
   let (inconsistent_deletes, _) = find_inconsistent_instructions(&trees);
   assert!(!inconsistent_deletes.is_empty(),
           "Should detect inconsistent toDelete");

@@ -1,5 +1,5 @@
-use crate::new::{headline_to_triple, HeadlineInfo};
-use crate::types::{OrgNode2, HeadlineMd2};
+use crate::save::{headline_to_triple, HeadlineInfo};
+use crate::types::{OrgNode, OrgnodeMetadata};
 use ego_tree::Tree;
 
 /// Compare two org-mode headlines ignoring ID differences.
@@ -19,8 +19,8 @@ pub fn compare_headlines_modulo_id(
       if has_id1 != has_id2 {
         return false; } // One has ID, other doesn't, so they are unequal.
       // Strip IDs from both (no-op if no ID present) and compare
-      let stripped_metadata1: Option<HeadlineMd2> = strip_id_from_metadata_struct(metadata1);
-      let stripped_metadata2: Option<HeadlineMd2> = strip_id_from_metadata_struct(metadata2);
+      let stripped_metadata1: Option<OrgnodeMetadata> = strip_id_from_metadata_struct(metadata1);
+      let stripped_metadata2: Option<OrgnodeMetadata> = strip_id_from_metadata_struct(metadata2);
       (level1, stripped_metadata1, title1) == (level2, stripped_metadata2, title2)
     },
     (None, None) => headline1 == headline2,  // Both are not headlines, compare directly
@@ -32,8 +32,8 @@ pub fn compare_headlines_modulo_id(
 /// Trees are considered the same if their structure and content match,
 /// ignoring ID values (but not ID presence/absence).
 pub fn compare_trees_modulo_id(
-  trees1: &[Tree<OrgNode2>],
-  trees2: &[Tree<OrgNode2>]
+  trees1: &[Tree<OrgNode>],
+  trees2: &[Tree<OrgNode>]
 ) -> bool {
   if trees1.len() != trees2.len() {
     return false;
@@ -50,8 +50,8 @@ pub fn compare_trees_modulo_id(
 
 /// Compare two nodes and their subtrees modulo ID differences.
 fn compare_nodes_modulo_id(
-  node1: ego_tree::NodeRef<OrgNode2>,
-  node2: ego_tree::NodeRef<OrgNode2>
+  node1: ego_tree::NodeRef<OrgNode>,
+  node2: ego_tree::NodeRef<OrgNode>
 ) -> bool {
   let n1 = node1.value();
   let n2 = node2.value();
@@ -95,8 +95,8 @@ fn compare_nodes_modulo_id(
 
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
-  metadata: Option<HeadlineMd2>
-) -> Option<HeadlineMd2> {
+  metadata: Option<OrgnodeMetadata>
+) -> Option<OrgnodeMetadata> {
   metadata.map(|mut meta| {
     meta.id = None;
     meta

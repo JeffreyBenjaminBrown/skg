@@ -1,10 +1,10 @@
-use crate::types::{OrgNode2, HeadlineMd2, RelToOrgParent2, ID};
+use crate::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
 
 use ego_tree::Tree;
 use regex::Regex;
 
 /// Type alias for headline information: (level, metadata, title)
-pub type HeadlineInfo = (usize, Option<HeadlineMd2>, String);
+pub type HeadlineInfo = (usize, Option<OrgnodeMetadata>, String);
 
 /// Represents a parsed org node with its headline and body lines
 #[derive(Debug, Clone)]
@@ -13,17 +13,17 @@ struct OrgNodeLineCol {
   body: Vec<String>,
 }
 
-pub fn org_to_uninterpreted_nodes2(
+pub fn org_to_uninterpreted_nodes(
   input: &str)
-  -> Result<Vec<Tree<OrgNode2>>, String> {
+  -> Result<Vec<Tree<OrgNode>>, String> {
   let org_node_line_cols: Vec<OrgNodeLineCol> =
     divide_into_orgNodeLineCols(input)?;
-  let mut result_trees: Vec<Tree<OrgNode2>> = Vec::new();
-  let mut current_tree: Option<Tree<OrgNode2>> = None;
+  let mut result_trees: Vec<Tree<OrgNode>> = Vec::new();
+  let mut current_tree: Option<Tree<OrgNode>> = None;
   let mut node_stack: Vec<ego_tree::NodeId> = Vec::new();
   for org_node_line_col in &org_node_line_cols {
-    let (level, node): (usize, OrgNode2) =
-      mk_orgnode2(org_node_line_col)?;
+    let (level, node): (usize, OrgNode) =
+      mk_orgnode(org_node_line_col)?;
     if level == 1 { // Start a new tree.
       if let Some(tree) = current_tree.take() {
         result_trees.push(tree); }
@@ -37,7 +37,7 @@ pub fn org_to_uninterpreted_nodes2(
           node_stack.pop(); }
         let parent_id: ego_tree::NodeId =
           *node_stack.last().unwrap();
-        let mut parent_node: ego_tree::NodeMut<OrgNode2> =
+        let mut parent_node: ego_tree::NodeMut<OrgNode> =
           tree.get_mut(parent_id).unwrap();
         let new_node_id: ego_tree::NodeId =
           parent_node.append(node).id();
@@ -87,25 +87,25 @@ fn divide_into_orgNodeLineCols (
       i += 1; }}
   Ok (result) }
 
-/// Create an OrgNode2 from an OrgNodeLineCol.
+/// Create an OrgNode from an OrgNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
 /// Returns an error if the metadata cannot be parsed.
-fn mk_orgnode2(
+fn mk_orgnode(
   org_node_line_col: &OrgNodeLineCol
-) -> Result<(usize, OrgNode2), String> {
+) -> Result<(usize, OrgNode), String> {
   let (level, metadata_option, title): HeadlineInfo =
     org_node_line_col.headline.clone();
   let body_lines: &[String] = &org_node_line_col.body;
   let body_text: Option<String> =
     if body_lines.is_empty() { None
     } else { Some(body_lines.join("\n")) };
-  let metadata : HeadlineMd2 =
+  let metadata : OrgnodeMetadata =
     if let Some(parsed_metadata) = metadata_option {
       parsed_metadata
     } else { // No metadata, so use defaults.
-      create_default_orgNodeMd2 () };
+      create_default_headline_metadata () };
   Ok (( level,
-        OrgNode2 {
+        OrgNode {
           metadata,
           title,
           body: body_text, }
@@ -125,7 +125,7 @@ fn validate_headline_metadata(
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     if let Some(meta_match) = captures.get(2) {
       // This line has metadata, validate it
-      parse_metadata_to_orgNodeMd2(
+      parse_metadata_to_headline_md(
         meta_match.as_str())?; }}
   Ok (( )) }
 
@@ -149,9 +149,9 @@ pub fn headline_to_triple (
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     let asterisks: &str = captures.get(1).unwrap().as_str();
     let level: usize = asterisks.len();
-    let metadata: Option<HeadlineMd2> =
+    let metadata: Option<OrgnodeMetadata> =
       if let Some(meta_match) = captures.get(2) {
-        match parse_metadata_to_orgNodeMd2(meta_match.as_str()) {
+        match parse_metadata_to_headline_md(meta_match.as_str()) {
           Ok(parsed_metadata) => Some(parsed_metadata),
           Err(_) => // Invalid metadata, treat as invalid headline
             return None, }
@@ -161,13 +161,13 @@ pub fn headline_to_triple (
     Some((level, metadata, title))
   } else { None }}
 
-/// Parse metadata string directly into HeadlineMd2.
+/// Parse metadata string directly into OrgnodeMetadata.
 /// Parses comma-separated metadata items like "id:foo,folded,relToOrgParent:container".
 /// Returns an error for unknown metadata keys or values.
-fn parse_metadata_to_orgNodeMd2(
+fn parse_metadata_to_headline_md(
   metadata_str: &str
-) -> Result<HeadlineMd2, String> {
-  let mut result : HeadlineMd2 = create_default_orgNodeMd2();
+) -> Result<OrgnodeMetadata, String> {
+  let mut result : OrgnodeMetadata = create_default_headline_metadata();
   for part in metadata_str.split(',') {
     let trimmed: &str = part.trim();
     if trimmed.is_empty() { continue; }
@@ -179,12 +179,12 @@ fn parse_metadata_to_orgNodeMd2(
         "id" => { result.id = Some(ID::from(value)); },
         "relToOrgParent" => {
           result.relToOrgParent = match value {
-            "alias"        => RelToOrgParent2::Alias,
-            "aliasCol"     => RelToOrgParent2::AliasCol,
-            "container"    => RelToOrgParent2::Container,
-            "content"      => RelToOrgParent2::Content,
-            "none"         => RelToOrgParent2::None,
-            "searchResult" => RelToOrgParent2::SearchResult,
+            "alias"        => RelToOrgParent::Alias,
+            "aliasCol"     => RelToOrgParent::AliasCol,
+            "container"    => RelToOrgParent::Container,
+            "content"      => RelToOrgParent::Content,
+            "none"         => RelToOrgParent::None,
+            "searchResult" => RelToOrgParent::SearchResult,
             _ => return Err(
               format!("Unknown relToOrgParent value: {}", value)),
           }; },
@@ -204,12 +204,12 @@ fn parse_metadata_to_orgNodeMd2(
         }} }}
   Ok(result) }
 
-/// Create default HeadlineMd2 with all default values.
+/// Create default OrgnodeMetadata with all default values.
 /// Used when a headline has no metadata.
-fn create_default_orgNodeMd2() -> HeadlineMd2 {
-  HeadlineMd2 {
+fn create_default_headline_metadata() -> OrgnodeMetadata {
+  OrgnodeMetadata {
     id: None,
-    relToOrgParent: RelToOrgParent2::Content,
+    relToOrgParent: RelToOrgParent::Content,
     cycle: false,
     focused: false,
     folded: false,

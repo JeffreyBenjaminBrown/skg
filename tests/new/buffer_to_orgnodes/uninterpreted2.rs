@@ -1,8 +1,8 @@
 // cargo test uninterpreted2
 
 use indoc::indoc;
-use skg::new::org_to_uninterpreted_nodes2;
-use skg::types::{OrgNode2, ID, RelToOrgParent2};
+use skg::save::org_to_uninterpreted_nodes;
+use skg::types::{OrgNode, ID, RelToOrgParent};
 use ego_tree::Tree;
 
 #[test]
@@ -23,8 +23,8 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
 
   assert_eq!(trees.len(), 2, "Should have exactly 2 trees");
 
@@ -74,8 +74,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle and repeated flags
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
 
   assert_eq!(trees.len(), 3, "Should have exactly 3 trees");
 
@@ -90,7 +90,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test container node
   let container_node = trees[1].root().value();
   assert_eq!(container_node.title, "container node");
-  assert_eq!(container_node.metadata.relToOrgParent, RelToOrgParent2::Container);
+  assert_eq!(container_node.metadata.relToOrgParent, RelToOrgParent::Container);
   assert_eq!(container_node.metadata.mightContainMore, true);
   assert_eq!(container_node.body, Some("Container body".to_string()));
 
@@ -111,8 +111,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title, "simple node");
   assert_eq!(first_node.body, Some("Simple body".to_string()));
   assert_eq!(first_node.metadata.id, None);
-  assert_eq!(first_node.metadata.relToOrgParent, RelToOrgParent2::Content);
+  assert_eq!(first_node.metadata.relToOrgParent, RelToOrgParent::Content);
   assert_eq!(first_node.metadata.cycle, false);
   assert_eq!(first_node.metadata.focused, false);
   assert_eq!(first_node.metadata.folded, false);
@@ -149,8 +149,8 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -176,8 +176,8 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
 
   assert_eq!(trees.len(), 2);
 
@@ -199,13 +199,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   assert_eq!(trees.len(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input2).unwrap();
+  let trees2: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input2).unwrap();
   assert_eq!(trees2.len(), 0);
 }
 
@@ -218,8 +218,8 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   assert_eq!(trees.len(), 0,
              "Should have no trees when there are no headlines");
 }
@@ -235,19 +235,19 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
 
   // Test invalid key
   let input_invalid_key = "* <skg<invalidKey:value>> invalid key";
-  let result = org_to_uninterpreted_nodes2(input_invalid_key);
+  let result = org_to_uninterpreted_nodes(input_invalid_key);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
   // Test invalid relToOrgParent value
   let input_invalid_value = "* <skg<relToOrgParent:invalidValue>> invalid value";
-  let result = org_to_uninterpreted_nodes2(input_invalid_value);
+  let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown relToOrgParent value: invalidValue"));
 
   // Test unknown flag
   let input_unknown_flag = "* <skg<unknownFlag>> unknown flag";
-  let result = org_to_uninterpreted_nodes2(input_unknown_flag);
+  let result = org_to_uninterpreted_nodes(input_unknown_flag);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata value: unknownFlag"));
 }
@@ -261,7 +261,7 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
             This should cause an error
         "};
 
-  let result = org_to_uninterpreted_nodes2(input_orphaned);
+  let result = org_to_uninterpreted_nodes(input_orphaned);
   assert!(result.is_err());
   let error_msg = result.unwrap_err();
   assert!(error_msg.contains("jumps too far between levels"));
@@ -273,7 +273,7 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
             *** deeply orphaned level 3 node
         "};
 
-  let result = org_to_uninterpreted_nodes2(input_level3_orphaned);
+  let result = org_to_uninterpreted_nodes(input_level3_orphaned);
   assert!(result.is_err());
   let error_msg = result.unwrap_err();
   assert!(error_msg.contains("jumps too far between levels"));

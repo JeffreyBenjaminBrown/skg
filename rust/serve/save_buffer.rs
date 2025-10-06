@@ -1,10 +1,11 @@
 use crate::file_io::update_fs_from_saveinstructions;
-use crate::new::{buffer_to_save_instructions, SaveError};
+use crate::save::buffer_to_save_instructions;
+use crate::types::SaveError;
 use crate::render::multi_root_view;
 use crate::serve::util::send_response;
-use crate::tantivy::update_index_from_save_instructions;
-use crate::typedb::update::update_nodes_and_relationships2;
-use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode2};
+use crate::tantivy::update_index_from_saveinstructions;
+use crate::typedb::update::update_typedb_from_saveinstructions;
+use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -108,7 +109,7 @@ async fn update_from_and_rerender_buffer (
 ) -> Result<String, Box<dyn Error>> {
 
   let (orgnode_forest, save_instructions)
-    : (Vec<Tree<OrgNode2>>, Vec<SaveInstruction>)
+    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
     = buffer_to_save_instructions (
       content, config, typedb_driver )
     . await . map_err (
@@ -152,7 +153,7 @@ pub async fn update_fs_and_dbs (
   let db_name : &str = &config.db_name;
 
   { println!( "1) Updating TypeDB database '{}' ...", db_name );
-    update_nodes_and_relationships2 (
+    update_typedb_from_saveinstructions (
       db_name,
       driver,
       &instructions ). await ?;
@@ -172,7 +173,7 @@ pub async fn update_fs_and_dbs (
   { // Tantivy
     println!( "3) Updating Tantivy index ..." );
     let indexed_count : usize =
-      update_index_from_save_instructions (
+      update_index_from_saveinstructions (
         &instructions, tantivy_index )?;
     println!( "   Tantivy updated for {} document(s).",
                   indexed_count ); }

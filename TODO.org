@@ -1,10 +1,13 @@
+* change names
+update_typedb_from_saveinstructions
+OrgnodeMetadata
 * moves
 Move default_metadata from tests/render_util.rs to
 rust/types/new.rs.
 * replace
 In a number of places there's a passage like this:
 
-+        HeadlineMd2 {
++        OrgnodeMetadata2 {
 +          id : None,
 +          relToOrgParent : RelToOrgParent2::SearchResult,
 +          cycle : false,
@@ -16,96 +19,9 @@ In a number of places there's a passage like this:
 +        },
 
 It would be less verbose if, in such places,
-we just created an HeadlineMd2 using default_metadata,
+we just created an OrgnodeMetadata2 using default_metadata,
 and then replaced the one or two fields different from the default.
-* Once the new works, anything unused in the old gets deleted.
-  I suspect that includes all of rust/text_to_orgnodes/.
-* DONE refactor: retain tree
-  serial, control flow
-** buffer to orgnode forest
-*** refuse and report all problems if any of these happen
-**** a node appears twice without 'rep' or 'mightContainMore'.
-**** an AliasColl node has a body, or a child with an ID
-**** an Alias node has a body, or children
-**** a node is marked 'delete' somewhere but not everywhere
-**** a node has multiple AliasCol children
-**** a node's contents are defined more than once
-     exception: they can be appended to any number of times
-*** assign IDs where needed
-    see assign_ids_recursive
-*** assign rel_to_parent=Alias where needed
-** Forest<OrgNode2> -> Set<(SkgNode,NodeSaveAction)>
-** collect SKgNodes with the same ID
-** update_fs_and_dbs2
-   uses the Set<(SkgNode,NodeSaveAction)>
-*** TypeDB : update_nodes_and_relationships2
-*** FS
-**** delete all to-delete nodes
-**** write all non-delete nodes
-     as normal, but filtering to only those nodes
-*** update_index_from_save_instructions
-    Delete every entry for which the id is any toDelete id.
-      not just the pid
-    Add as normal.
-* TODO replace all uses of orgnode with orgnode2, etc.
-  Do it all at once:
-** can use
-*** OrgNode2
-*** RelToOrgParent2
-*** HeadlineMd2
-** can't use
-*** OrgNode
-*** RelToOrgParent
-*** NodeWithEphem
-*** MetadataItem
-*** OrgNodeMetadata
-*** OrgNodeInterp
-* ONGOING git diff main 4a6c10735efdf59b
-** new types
-*** pub type SaveInstruction = (SkgNode, NodeSaveAction);
-*** pub struct NodeSaveAction {
-  pub mightContainMore: bool,
-  pub toDelete: bool,
-}
-*** pub struct OrgNode2 {
-  pub metadata: HeadlineMd2,
-  pub title: String,
-  pub body: Option<String>,
-}
-*** pub struct HeadlineMd2 {
-  pub id: Option<ID>,
-  pub relToOrgParent: RelToOrgParent2,
-  pub cycle: bool,
-  pub focused: bool,
-  pub folded: bool,
-  pub mightContainMore: bool,
-  pub repeat: bool,
-  pub toDelete: bool,
-}
-*** pub enum RelToOrgParent2 {
-  Content,
-  Container,
-  AliasCol,
-  Alias,
-  None,
-}
-*** pub enum SaveError {
-  ParseError(String),
-  DatabaseError(Box<dyn Error>),
-  InconsistentInstructions {
-    inconsistent_deletions: Vec<ID>,
-    multiple_definers: Vec<ID>,
-  },
-}
-*** pub type HeadlineInfo = (usize, Option<HeadlineMd2>, String);
-*** pub enum Buffer_Cannot_Be_Saved {
-  // (content not fully visible in diff)
-}
-
-** field name changes in existing types
-*** OrgNodeMetadata fields renamed:
-  might_contain_more -> mightContainMore
-  rel_to_parent -> relToOrgParent
+* Propogate Buffer_Cannot_Be_Saved to user if it finds errors.
 * I regret not having asked for a refactoring plan.
 * What {functions,types} bundle separble concerns?
 ** NodeWithEphem

@@ -1,7 +1,7 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{TantivyIndex, OrgNode2, HeadlineMd2, RelToOrgParent2};
+use crate::types::{TantivyIndex, OrgNode, OrgnodeMetadata, RelToOrgParent};
 use crate::render::orgnode::render_org_node_from_text;
 
 use std::collections::HashMap;
@@ -108,12 +108,12 @@ fn format_matches_as_org_mode (
 
   let mut result : String =
     String::new();
-  let search_root_node : OrgNode2 =
-    OrgNode2 {
+  let search_root_node : OrgNode =
+    OrgNode {
       metadata :
-        HeadlineMd2 {
+        OrgnodeMetadata {
           id : None,
-          relToOrgParent : RelToOrgParent2::SearchResult,
+          relToOrgParent : RelToOrgParent::SearchResult,
           cycle : false,
           focused : false,
           folded : false,
@@ -151,12 +151,12 @@ fn format_matches_as_org_mode (
   for (id, matches) in id_entries {
     // First (best) match becomes level-2 headline
     let (score, title) = &matches[0];
-    let match_node : OrgNode2 =
-      OrgNode2 {
+    let match_node : OrgNode =
+      OrgNode {
         metadata :
-          HeadlineMd2 {
+          OrgnodeMetadata {
             id : None,
-            relToOrgParent : RelToOrgParent2::Content,
+            relToOrgParent : RelToOrgParent::Content,
             cycle : false,
             focused : false,
             folded : false,
@@ -175,12 +175,12 @@ fn format_matches_as_org_mode (
         &match_node ));
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
-      let alias_match_node : OrgNode2 =
-        OrgNode2 {
+      let alias_match_node : OrgNode =
+        OrgNode {
           metadata :
-            HeadlineMd2 {
+            OrgnodeMetadata {
               id : None,
-              relToOrgParent : RelToOrgParent2::Content,
+              relToOrgParent : RelToOrgParent::Content,
               cycle : false,
               focused : false,
               folded : false,

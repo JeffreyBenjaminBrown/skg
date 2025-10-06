@@ -1,5 +1,5 @@
-use crate::types::{OrgNode2, RelToOrgParent2, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
-use crate::new::{add_missing_info_to_trees, reconcile_dup_instructions};
+use crate::types::{OrgNode, RelToOrgParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
+use crate::save::{add_missing_info_to_trees, reconcile_dup_instructions};
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
@@ -9,10 +9,10 @@ use std::error::Error;
 ///   - Reconciles duplicates via 'reconcile_dup_instructions'
 /// Outputs that plus a forest of SaveInstructions.
 pub async fn orgnodes_to_save_instructions (
-  mut trees : Vec<Tree<OrgNode2>>,
+  mut trees : Vec<Tree<OrgNode>>,
   config    : &SkgConfig,
   driver    : &TypeDBDriver
-) -> Result< ( Vec<Tree<OrgNode2>>,
+) -> Result< ( Vec<Tree<OrgNode>>,
                Vec<SaveInstruction>),
             Box<dyn Error>> {
   add_missing_info_to_trees (
@@ -32,7 +32,7 @@ pub async fn orgnodes_to_save_instructions (
 /// Converts a forest of OrgNode2s to SaveInstructions,
 /// taking them all at face value.
 pub fn orgnodes_to_dirty_save_instructions (
-  trees: Vec<Tree<OrgNode2>>
+  trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<(SkgNode, NodeSaveAction)> =
     Vec::new();
@@ -43,7 +43,7 @@ pub fn orgnodes_to_dirty_save_instructions (
 
 /// Appends another pair to 'result' and recurses.
 fn interpret_node_dfs(
-  node_ref: NodeRef<OrgNode2>,
+  node_ref: NodeRef<OrgNode>,
   result: &mut Vec<(SkgNode, NodeSaveAction)>
 ) -> Result<(), String> {
   { // push another pair
@@ -59,7 +59,7 @@ fn interpret_node_dfs(
     for child in node_ref.children() {
       let child_rel = &child.value().metadata.relToOrgParent;
       match child_rel {
-        RelToOrgParent2::AliasCol | RelToOrgParent2::Alias => {
+        RelToOrgParent::AliasCol | RelToOrgParent::Alias => {
           // These are ignored.
         },
         _ => {
@@ -68,8 +68,8 @@ fn interpret_node_dfs(
   Ok (( )) }
 
 fn mk_skgnode (
-  orgnode: &OrgNode2,
-  noderef: &NodeRef<OrgNode2> // the same node, but in the tree
+  orgnode: &OrgNode,
+  noderef: &NodeRef<OrgNode> // the same node, but in the tree
 ) -> Result<SkgNode, String> {
   let title: String =
     orgnode . title . clone();
@@ -100,15 +100,15 @@ This is programmed defensively:
   children under the same node,
   but this function will work even if there are. */
 fn collect_aliases (
-  node_ref: &NodeRef<OrgNode2>
+  node_ref: &NodeRef<OrgNode>
 ) -> Option<Vec<String>> {
   let mut aliases: Vec<String> = Vec::new();
   for alias_col_child in node_ref.children() {
     if ( alias_col_child . value() . metadata . relToOrgParent
-         == RelToOrgParent2::AliasCol ) // child of interest
+         == RelToOrgParent::AliasCol ) // child of interest
     { for alias_child in alias_col_child.children() {
       if ( alias_child . value() . metadata . relToOrgParent
-           == RelToOrgParent2::Alias ) // grandchild of interest
+           == RelToOrgParent::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
   if aliases.is_empty() { None
@@ -117,13 +117,13 @@ fn collect_aliases (
 /// Returns IDs of all children for which relToOrgParent = Content.
 /// Excludes children for which metadata.toDelete is true.
 fn collect_contents (
-  node_ref: &NodeRef<OrgNode2>
+  node_ref: &NodeRef<OrgNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
     if ( child . value() . metadata . relToOrgParent
-         == RelToOrgParent2::Content
+         == RelToOrgParent::Content
          && ! child . value() . metadata . toDelete ) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone());

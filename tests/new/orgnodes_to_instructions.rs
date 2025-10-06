@@ -4,8 +4,8 @@
 // so the quality of these tests feels low-stakes.)
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_dirty_save_instructions};
-use skg::types::{OrgNode2, ID, SkgNode, NodeSaveAction};
+use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions};
+use skg::types::{OrgNode, ID, SkgNode, NodeSaveAction};
 use ego_tree::Tree;
 
 #[test]
@@ -20,8 +20,8 @@ fn test_orgnodes_to_save_instructions_basic() {
             Root 2 body
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -67,8 +67,8 @@ fn test_orgnodes_to_save_instructions_with_aliases() {
             Content body
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -102,8 +102,8 @@ fn test_orgnodes_to_save_instructions_no_aliases() {
             Child body
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -127,8 +127,8 @@ fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
             ** <skg<id:content1>> content node
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -152,8 +152,8 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
             ** <skg<id:none_rel,relToOrgParent:none>> none relation child
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -178,8 +178,8 @@ fn test_orgnodes_to_save_instructions_deep_nesting() {
             ** <skg<id:level2b>> level 2b
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -210,8 +210,8 @@ fn test_orgnodes_to_save_instructions_error_missing_id() {
             * node without ID
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let result = orgnodes_to_dirty_save_instructions(trees);
 
   assert!(result.is_err(), "Should return error for missing ID");
@@ -222,7 +222,7 @@ fn test_orgnodes_to_save_instructions_error_missing_id() {
 
 #[test]
 fn test_orgnodes_to_save_instructions_empty_input() {
-  let trees: Vec<Tree<OrgNode2>> = vec![];
+  let trees: Vec<Tree<OrgNode>> = vec![];
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -239,8 +239,8 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
             *** <skg<id:alias2,relToOrgParent:alias>> alias two
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
@@ -269,8 +269,8 @@ fn test_orgnodes_to_save_instructions_complex_scenario() {
             ** <skg<id:ref_section,relToOrgParent:container>> Reference Section
         "};
 
-  let trees: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(input).unwrap();
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 

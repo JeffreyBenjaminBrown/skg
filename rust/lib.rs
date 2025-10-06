@@ -1,6 +1,5 @@
 pub mod file_io;
 pub mod hyperlinks;
-pub mod new;
 pub mod render;
 pub mod save;
 pub mod serve;

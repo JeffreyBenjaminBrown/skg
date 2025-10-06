@@ -152,7 +152,7 @@ pub fn update_index_with_nodes (
 /// Deletes IDs from the index for every instruction,
 /// but only adds documents for instructions where toDelete is false.
 /// Returns the number of documents processed.
-pub fn update_index_from_save_instructions (
+pub fn update_index_from_saveinstructions (
   instructions  : &[SaveInstruction],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {

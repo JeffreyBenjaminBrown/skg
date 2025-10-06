@@ -1,9 +1,9 @@
 // cargo test test_add_missing_info_comprehensive
 
 use indoc::indoc;
-use skg::new::{org_to_uninterpreted_nodes2, add_missing_info_to_trees};
+use skg::save::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::types::{OrgNode2, SkgConfig, ID};
+use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
 
 // Import test utilities
@@ -73,15 +73,15 @@ async fn test_add_missing_info_logic (
             ** <skg<id:unpredictable>> no id
             *** <skg<id:unpredictable>> also no id
         "};
-  let mut after_adding_missing_info: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(
+  let mut after_adding_missing_info: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(
       with_missing_info).unwrap();
   add_missing_info_to_trees(
     &mut after_adding_missing_info,
     &config.db_name,
     driver ).await ?;
-  let expected_forest: Vec<Tree<OrgNode2>> =
-    org_to_uninterpreted_nodes2(
+  let expected_forest: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(
       without_missing_info ). unwrap();
   assert_eq!(
     expected_forest.len(),
@@ -93,7 +93,7 @@ async fn test_add_missing_info_logic (
       &expected_forest),
     "add_missing_info_to_trees: Forests not equivalent modulo ID." );
 
-  { let actual_root : &OrgNode2 =
+  { let actual_root : &OrgNode =
       after_adding_missing_info[0] . root() . value();
     let actual_root_id : &ID =
       actual_root . metadata . id.as_ref() . unwrap();

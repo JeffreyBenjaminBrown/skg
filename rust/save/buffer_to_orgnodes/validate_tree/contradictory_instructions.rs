@@ -1,4 +1,4 @@
-use crate::types::{OrgNode2, ID};
+use crate::types::{OrgNode, ID};
 
 use ego_tree::{Tree,NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -31,7 +31,7 @@ TODO:
 Maybe this needs to be more complicated,
 because one could delete an extra_id. */
 pub fn find_inconsistent_instructions(
-  trees: &[Tree<OrgNode2>]
+  trees: &[Tree<OrgNode>]
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>) { // IDs with multiple defining nodes
   let (id_toDelete_instructions, id_to_definer_count) =
@@ -54,7 +54,7 @@ pub fn find_inconsistent_instructions(
 
 /// Traverse all trees to collect delete instructions and defining containers
 fn traverse_forest_and_collect(
-  trees: &[Tree<OrgNode2>]
+  trees: &[Tree<OrgNode>]
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // contradictory deletes
       HashMap<ID, usize>) { // multiple defining containers
   let mut id_toDelete_instructions
@@ -72,13 +72,13 @@ fn traverse_forest_and_collect(
 
 /// Traverse a single node and its children to collect delete instructions and defining containers
 fn traverse_node_recursively_and_collect(
-  node_ref: NodeRef<OrgNode2>,
+  node_ref: NodeRef<OrgNode>,
   id_toDelete_instructions: &mut
     HashMap<ID, HashSet<WhetherToDelete>>,
   id_defining_count: &mut
     HashMap<ID, usize>
 ) {
-  let node: &OrgNode2 = node_ref.value();
+  let node: &OrgNode = node_ref.value();
   if let Some(id) = &node.metadata.id {
     // Handle delete instructions
     let delete_instruction =

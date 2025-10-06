@@ -1,11 +1,11 @@
-// cargo test --test typedb typedb::update_nodes_and_relationships2 -- --nocapture
+// cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
 use skg::typedb::init::populate_test_db_from_fixtures;
-use skg::typedb::update::update_nodes_and_relationships2;
+use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
-use skg::new::{org_to_uninterpreted_nodes2, orgnodes_to_save_instructions, find_inconsistent_instructions};
-use skg::types::{ID, SkgConfig, OrgNode2};
+use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_save_instructions, find_inconsistent_instructions};
+use skg::types::{ID, SkgConfig, OrgNode};
 use ego_tree::Tree;
 use indoc::indoc;
 
@@ -29,7 +29,7 @@ fn test_update_nodes_and_relationships2 (
     ).await?;
     let config : SkgConfig = SkgConfig {
       db_name        : "skg-test-update2"      . into(),
-      skg_folder     : "tests/typedb/update_nodes_and_relationships2/fixtures" . into(),
+      skg_folder     : "tests/typedb/update_typedb_from_saveinstructions/fixtures" . into(),
       tantivy_folder : "irrelevant"            . into(),
       port           : 1730 };
 
@@ -50,8 +50,8 @@ fn test_update_nodes_and_relationships2 (
     "};
 
     // Parse org text to uninterpreted nodes
-    let trees : Vec<Tree<OrgNode2>> =
-      org_to_uninterpreted_nodes2 ( org_text )?;
+    let trees : Vec<Tree<OrgNode>> =
+      org_to_uninterpreted_nodes ( org_text )?;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers ) =
@@ -69,7 +69,7 @@ fn test_update_nodes_and_relationships2 (
         trees, & config, & driver ) . await ?;
 
     // Apply the update
-    update_nodes_and_relationships2 (
+    update_typedb_from_saveinstructions (
       & config . db_name,
       & driver,
       & reconciled_instructions ). await ?;

@@ -1,11 +1,11 @@
-// Parse S-expressions from Emacs requests into HeadlineMd2
+// Parse S-expressions from Emacs requests into OrgnodeMetadata
 
-use crate::types::{HeadlineMd2, RelToOrgParent2, ID};
+use crate::types::{OrgnodeMetadata, RelToOrgParent, ID};
 use sexp::{Atom, Sexp};
 
 pub fn parse_headline_from_sexp (
   request : &str
-) -> Result<( HeadlineMd2,
+) -> Result<( OrgnodeMetadata,
              usize,   // level in org buffer
              String), // title
            String> {
@@ -20,7 +20,7 @@ pub fn parse_headline_from_sexp (
     . ok_or ( "Could not count asterisks in (supposed) headline." ) ?;
   let line_after_bullet : &str =
     extract_line_after_bullet ( &headline_text );
-  let (metadata, title) : (HeadlineMd2, String) =
+  let (metadata, title) : (OrgnodeMetadata, String) =
     parse_separating_metadata_and_title ( line_after_bullet ) ?;
   Ok (( metadata, level, title )) }
 
@@ -71,10 +71,10 @@ fn extract_line_after_bullet (
   &headline_text[i..] }
 
 /// Parse a headline string that might contain metadata and a title.
-/// Returns (HeadlineMd2, title)
+/// Returns (OrgnodeMetadata, title)
 fn parse_separating_metadata_and_title (
   line_after_bullet : &str
-) -> Result<(HeadlineMd2, String), String> {
+) -> Result<(OrgnodeMetadata, String), String> {
   let headline_with_metadata : &str =
     line_after_bullet.trim_start ();
   if let Some ( meta_start ) =
@@ -82,27 +82,27 @@ fn parse_separating_metadata_and_title (
     if let Some ( end ) = meta_start.find ( ">>" ) {
       let inner : &str =
         &meta_start[..end]; // between "<skg<" and ">>"
-      let metadata : HeadlineMd2 =
-        parse_metadata_to_orgNodeMd2 ( inner ) ?;
+      let metadata : OrgnodeMetadata =
+        parse_metadata_to_headline_md ( inner ) ?;
       let title_rest : &str =
         &meta_start[end + 2..]; // skip ">>"
       let title : String =
         title_rest.trim () . to_string ();
       return Ok (( metadata, title )); }}
   // No metadata found - use defaults
-  let default_metadata : HeadlineMd2 =
-    create_default_orgNodeMd2 ();
+  let default_metadata : OrgnodeMetadata =
+    create_default_headline_metadata ();
   Ok (( default_metadata,
         headline_with_metadata.to_string () )) }
 
-/// Parse metadata string into HeadlineMd2.
-/// This is a copy of the function from uninterpreted2.rs
+/// Parse metadata string into OrgnodeMetadata.
+/// This is a copy of the function from uninterpreted.rs
 /// to avoid circular dependencies.
-fn parse_metadata_to_orgNodeMd2 (
+fn parse_metadata_to_headline_md (
   metadata_str : &str
-) -> Result<HeadlineMd2, String> {
-  let mut result : HeadlineMd2 =
-    create_default_orgNodeMd2 ();
+) -> Result<OrgnodeMetadata, String> {
+  let mut result : OrgnodeMetadata =
+    create_default_headline_metadata ();
   for part in metadata_str.split ( ',' ) {
     let trimmed : &str = part.trim ();
     if trimmed.is_empty () { continue; }
@@ -114,12 +114,12 @@ fn parse_metadata_to_orgNodeMd2 (
         "id" => { result.id = Some ( ID::from ( value )); },
         "relToOrgParent" => {
           result.relToOrgParent = match value {
-            "alias"        => RelToOrgParent2::Alias,
-            "aliasCol"     => RelToOrgParent2::AliasCol,
-            "container"    => RelToOrgParent2::Container,
-            "content"      => RelToOrgParent2::Content,
-            "none"         => RelToOrgParent2::None,
-            "searchResult" => RelToOrgParent2::SearchResult,
+            "alias"        => RelToOrgParent::Alias,
+            "aliasCol"     => RelToOrgParent::AliasCol,
+            "container"    => RelToOrgParent::Container,
+            "content"      => RelToOrgParent::Content,
+            "none"         => RelToOrgParent::None,
+            "searchResult" => RelToOrgParent::SearchResult,
             _ => return Err (
               format! ( "Unknown relToOrgParent value: {}", value )),
           }; },
@@ -139,11 +139,11 @@ fn parse_metadata_to_orgNodeMd2 (
         }} }}
   Ok ( result ) }
 
-/// Create default HeadlineMd2 with all default values.
-fn create_default_orgNodeMd2 () -> HeadlineMd2 {
-  HeadlineMd2 {
+/// Create default OrgnodeMetadata with all default values.
+fn create_default_headline_metadata () -> OrgnodeMetadata {
+  OrgnodeMetadata {
     id : None,
-    relToOrgParent : RelToOrgParent2::Content,
+    relToOrgParent : RelToOrgParent::Content,
     cycle : false,
     focused : false,
     folded : false,

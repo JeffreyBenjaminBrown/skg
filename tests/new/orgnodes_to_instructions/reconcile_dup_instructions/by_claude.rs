@@ -1,7 +1,7 @@
 // Tests for the reconcile_dup_instructions module
 // Testing the logic for collecting and reducing duplicate instructions
 
-use skg::new::orgnodes_to_instructions::reconcile_dup_instructions::collect_dup_instructions;
+use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::collect_dup_instructions;
 use skg::types::{ID, SkgNode, NodeSaveAction};
 
 // Helper function to create a basic SkgNode for testing

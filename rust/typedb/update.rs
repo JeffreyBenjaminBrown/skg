@@ -7,38 +7,6 @@ use crate::typedb::relationships::create_all_relationships;
 use crate::typedb::relationships::delete_out_links;
 use crate::types::{SkgNode, ID, SaveInstruction};
 
-/// Update the DB from a batch of `SkgNode`s:
-/// 1) Create only nodes whose IDs are not present, via
-///      create_only_nodes_with_no_ids_present
-/// 2) Delete all outbound `contains` from those nodes, via
-///      delete_out_links
-///    PITFALL: Only the primary ID from each SkgNode is used.
-/// 3) Recreate all relationships for those nodes, via
-///      create_all_relationships
-pub async fn update_nodes_and_relationships (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  nodes   : &Vec<SkgNode>,
-) -> Result<(), Box<dyn Error>> {
-
-  create_only_nodes_with_no_ids_present (
-    db_name, driver, nodes ). await ?;
-  let primary_ids : Vec<ID> =
-    nodes . iter ()
-    . filter_map ( |n|
-                    n . ids
-                    . get(0)
-                    . cloned() )
-    . collect ();
-  delete_out_links (
-    db_name, driver,
-    & primary_ids, // Will barf if nonempty, which is good.
-    "contains",
-    "container" ). await ?;
-  create_all_relationships (
-    db_name, driver, nodes ). await ?;
-  Ok (( )) }
-
 /// Update the DB from a batch of `(SkgNode, NodeSaveAction)` pairs:
 /// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids
 /// 2) Remove deleted nodes from further processing
@@ -49,7 +17,7 @@ pub async fn update_nodes_and_relationships (
 ///    PITFALL: Only the primary ID from each SkgNode is used.
 /// 5) Recreate all relationships for those nodes, via
 ///      create_all_relationships
-pub async fn update_nodes_and_relationships2 (
+pub async fn update_typedb_from_saveinstructions (
   db_name : &str,
   driver  : &TypeDBDriver,
   instructions : &Vec<SaveInstruction>
