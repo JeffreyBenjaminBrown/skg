@@ -4,10 +4,12 @@ pub mod buffer_to_orgnodes;
 pub use orgnodes_to_instructions::*;
 pub mod orgnodes_to_instructions;
 
-use crate::types::{ID, SkgConfig, SaveInstruction, OrgNode2};
+use crate::types::{ID, SkgConfig, SkgNode, SaveInstruction, OrgNode2};
+use crate::save::clobber_none_fields_with_data_from_disk;
 use ego_tree::Tree;
 
 use std::error::Error;
+use std::io;
 use typedb_driver::TypeDBDriver;
 
 
@@ -15,6 +17,7 @@ use typedb_driver::TypeDBDriver;
 pub enum SaveError {
   ParseError(String),
   DatabaseError(Box<dyn Error>),
+  IoError(io::Error),
   InconsistentInstructions {
     inconsistent_deletions: Vec<ID>,
     multiple_definers: Vec<ID>, }, }
@@ -48,4 +51,13 @@ pub async fn buffer_to_save_instructions (
     orgnodes_to_save_instructions (
       orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
-  Ok ((orgnode_forest_2, instruction_vector)) }
+  let clobbered_instruction_vector : Vec<SaveInstruction> =
+    instruction_vector . into_iter ()
+    . map ( |(node, action)| {
+      let clobbered_node : SkgNode =
+        clobber_none_fields_with_data_from_disk (
+          config, node ) ?;
+      Ok ((clobbered_node, action)) } )
+    . collect::<io::Result<Vec<SaveInstruction>>>()
+    . map_err ( SaveError::IoError ) ?;
+  Ok ((orgnode_forest_2, clobbered_instruction_vector)) }
