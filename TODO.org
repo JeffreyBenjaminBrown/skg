@@ -1,39 +1,4 @@
-* TODO yet to use
-In rust/serve.rs you'll see "save buffer" is one of the API methods.
-I would like to replace part of that.
-Specifically, let's change these functions:
-```
-  update_from_and_rerender_buffer
-  update_fs_and_dbs
-```
-
-In update_from_and_rerender_buffer, to interpret the contents of the buffer, it should use buffer_to_save_instructions, saving the orgnode forest as orgnode_forest, and the vector of instructions as save_instructions. It will not need to run assign_ids_recursive (because add_missing_info_to_trees already does that). It will not collect a single root, but rather all the roots of orgnode_forest.
-
-It won't need orgNodeInterpretation_to_nodes either. It will pass save_instructions to (described next) the modified update_fs_and_dbs, and return a view using multi_root_view.
-
-In update_fs_and_dbs, it will use
-
-** new.rs :: pub async fn buffer_to_save_instructions (
-  buffer_text : &str,
-  config      : &SkgConfig,
-  driver      : &TypeDBDriver
-) -> Result<
-    ( Vec<Tree<OrgNode2>>,
-      Vec<SaveInstruction>
-    ), SaveError> {
-** rust/file_io.rs :: pub fn update_fs_from_saveinstructions (
-   instructions : Vec<SaveInstruction>,
-   config       : SkgConfig,
-   ) -> io::Result<(usize, usize)> { // (deleted, written)
-** rust/typedb/update.rs :: pub async fn update_nodes_and_relationships2 (
-     db_name : &str,
-     driver  : &TypeDBDriver,
-     instructions : &Vec<SaveInstruction>
-   ) -> Result<(), Box<dyn Error>> {
-** rust/tantivy.rs :: pub fn update_index_from_save_instructions (
-  instructions  : &[SaveInstruction],
-  tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
+* 'repeated' flags not showing up
 * report errors if found by buffer_to_save_instructions
 * TODO improve serve/save
 ** a new save

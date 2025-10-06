@@ -22,6 +22,33 @@ pub enum SaveError {
     inconsistent_deletions: Vec<ID>,
     multiple_definers: Vec<ID>, }, }
 
+impl std::fmt::Display for SaveError {
+  fn fmt ( &self,
+            f: &mut std::fmt::Formatter<'_>
+  ) -> std::fmt::Result {
+    match self {
+      SaveError::ParseError(msg) =>
+        write!(f, "Parse error: {}", msg),
+      SaveError::DatabaseError(err) =>
+        write!(f, "Database error: {}", err),
+      SaveError::IoError(err) =>
+        write!(f, "IO error: {}", err),
+      SaveError::InconsistentInstructions {
+        inconsistent_deletions, multiple_definers } => {
+        write!(
+          f,
+          "Inconsistent deletions: {:?} or multiple definers: {:?}",
+          inconsistent_deletions,
+          multiple_definers) }} }}
+
+impl std::error::Error for SaveError {
+  fn source(&self
+  ) -> Option<&(dyn std::error::Error + 'static)> {
+    match self {
+      SaveError::DatabaseError(err) => Some(err.as_ref()),
+      SaveError::IoError(err) => Some(err),
+      _ => None, }} }
+
 /// Builds a forest of OrgNode2s:
 ///   - Fills in information via 'add_missing_info_to_trees'
 ///   - Reconciles duplicates via 'reconcile_dup_instructions'
