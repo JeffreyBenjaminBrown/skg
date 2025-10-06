@@ -1,14 +1,5 @@
-* report errors if found by buffer_to_save_instructions
-* TODO improve serve/save
-** a new save
-   alternatives
-*** TODO duplicate it
-    Can refer to anything in the old code that the new could use.
-*** DONE don't duplicate; just replace the guts of serve/save
-    All existing tests should work.
-    Soon but not yet, can integration-test the new save features.
-** Once the new works, anything unused in the old gets deleted.
-   I suspect that includes all of rust/text_to_orgnodes/.
+* Once the new works, anything unused in the old gets deleted.
+  I suspect that includes all of rust/text_to_orgnodes/.
 * DONE refactor: retain tree
   serial, control flow
 ** buffer to orgnode forest
@@ -95,28 +86,6 @@
 *** OrgNodeMetadata fields renamed:
   might_contain_more -> mightContainMore
   rel_to_parent -> relToOrgParent
-** deleted types
-*** (none detected)
-** new functions
-*** pub fn write_all_nodes_to_fs (
-  nodes  : Vec<SkgNode>,
-  config : SkgConfig,
-) -> io  ::Result<usize> {
-*** pub fn delete_all_nodes_from_fs (
-  nodes  : Vec<SkgNode>,
-  config : SkgConfig,
-) -> io::Result<usize>
-*** pub enum SaveError {
-  ParseError(String),
-  DatabaseError(Box<dyn Error>),
-  InconsistentInstructions {
-    inconsistent_deletions: Vec<ID>,
-    multiple_definers: Vec<ID>, }, }
-*** pub async fn buffer_to_save_instructions (
-  buffer_text : &str,
-  config      : &SkgConfig,
-  driver      : &TypeDBDriver
-) -> Result<Vec<SaveInstruction>, SaveError> {
 * I regret not having asked for a refactoring plan.
 * What {functions,types} bundle separble concerns?
 ** NodeWithEphem

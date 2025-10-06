@@ -1,8 +1,7 @@
 use crate::file_io::update_fs_from_saveinstructions;
-use crate::new::buffer_to_save_instructions;
+use crate::new::{buffer_to_save_instructions, SaveError};
 use crate::render::multi_root_view;
 use crate::serve::util::send_response;
-use crate::serve::util::send_response_with_length_prefix;
 use crate::tantivy::update_index_from_save_instructions;
 use crate::typedb::update::update_nodes_and_relationships2;
 use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode2};
@@ -10,7 +9,7 @@ use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode2};
 use ego_tree::Tree;
 use futures::executor::block_on;
 use std::error::Error;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::Path;
 use typedb_driver::TypeDBDriver;
@@ -35,13 +34,28 @@ pub fn handle_save_buffer_request (
           // Most of the work happens here.
           &content, typedb_driver, config, tantivy_index )) {
         Ok (processed_content) => {
-          send_response_with_length_prefix (
-            stream, &processed_content ); }
+          // Send success indicator followed by length-prefixed content
+          let success_header = "save: success\n";
+          let header = format!("Content-Length: {}\r\n\r\n", processed_content.len());
+          let full_response = format!("{}{}{}", success_header, header, processed_content);
+          stream.write_all(full_response.as_bytes()).unwrap();
+          stream.flush().unwrap(); }
         Err (err) => {
-          let error_msg : String =
-            format! ("Error processing buffer content: {}", err );
-          println! ( "{}", error_msg );
-          send_response ( stream, &error_msg ); }} }
+          // Check if this is a SaveError that should be formatted for the client
+          if let Some(save_error) = err.downcast_ref::<SaveError>() {
+            let error_buffer_content = format_save_error_as_org(save_error);
+            // Send failure indicator followed by length-prefixed error content
+            let failure_header = "save: failure\n";
+            let header = format!("Content-Length: {}\r\n\r\n", error_buffer_content.len());
+            let full_response = format!("{}{}{}", failure_header, header, error_buffer_content);
+            stream.write_all(full_response.as_bytes()).unwrap();
+            stream.flush().unwrap();
+          } else {
+            let error_msg = format!("Error processing buffer content: {}", err);
+            println!("{}", error_msg);
+            send_response(stream, &error_msg);
+          }
+        }} }
     Err(err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
@@ -165,3 +179,43 @@ pub async fn update_fs_and_dbs (
 
   println!( "All updates finished successfully." );
   Ok (( )) }
+
+/// Formats a SaveError as an org-mode buffer content for the client.
+fn format_save_error_as_org(error: &SaveError) -> String {
+  match error {
+    SaveError::ParseError(msg) => {
+      format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", msg)
+    },
+    SaveError::DatabaseError(err) => {
+      format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", err)
+    },
+    SaveError::IoError(err) => {
+      format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", err)
+    },
+    SaveError::InconsistentInstructions { inconsistent_deletions, multiple_definers } => {
+      let mut content = String::from("* NOTHING WAS SAVED\n\nInconsistencies found when interpreting buffer text as save instructions.\n\n");
+
+      if !inconsistent_deletions.is_empty() {
+        content.push_str("** Inconsistent Deletion Instructions\n");
+        content.push_str("The following IDs have conflicting toDelete instructions:\n");
+        for id in inconsistent_deletions {
+          content.push_str(&format!("- {}\n", id.0));
+        }
+        content.push('\n');
+      }
+
+      if !multiple_definers.is_empty() {
+        content.push_str("** Multiple Defining Containers\n");
+        content.push_str("The following IDs are defined by multiple containers:\n");
+        for id in multiple_definers {
+          content.push_str(&format!("- {}\n", id.0));
+        }
+        content.push('\n');
+      }
+
+      content.push_str("** Resolution\n");
+      content.push_str("Please fix these inconsistencies and try saving again.\n");
+      content
+    }
+  }
+}

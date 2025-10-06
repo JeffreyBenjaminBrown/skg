@@ -17,6 +17,7 @@ TEST_DIRS=(
   "verify-connection"
   "search-for-title-and-visit-link"
   "content-view-and-save"
+  "valid_and_invalid_saves"
 )
 
 # Function to run a single test in its directory

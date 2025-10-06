@@ -1,0 +1,4 @@
+db_name = "skg-test-valid-invalid-saves"
+skg_folder = "tests/integration/valid_and_invalid_saves/data/skg"
+tantivy_folder = "tests/integration/valid_and_invalid_saves/data/index.tantivy"
+port = 1731
