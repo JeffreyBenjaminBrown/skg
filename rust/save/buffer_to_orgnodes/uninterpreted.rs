@@ -60,8 +60,8 @@ fn divide_into_orgNodeLineCols (
 ) -> Result<Vec<OrgNodeLineCol>, String> {
   // TODO ? This is quite inefficient.
   // Both headline_to_triple and validate_headline_metadata
-  // parse the same string in nearly the same way,
-  // for all but the first node, both are run twice.
+  // parse the same string in nearly the same way.
+  // And for all but the first node, both are run twice.
 
   let lines: Vec<&str> = input.lines().collect();
   let mut result: Vec<OrgNodeLineCol> = Vec::new();
@@ -161,4 +161,3 @@ pub fn headline_to_triple (
       captures . get(3) . unwrap() . as_str() . to_string();
     Some((level, metadata, title))
   } else { None }}
-

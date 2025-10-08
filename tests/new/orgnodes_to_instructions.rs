@@ -1,7 +1,7 @@
-// TODO ? These tests are AI-generated,
+// todo ? These tests are AI-generated,
 // and no human has verified (most of) them.
 // (The library code looks bulletproof to me,
-// so the quality of these tests feels low-stakes.)
+// so revising these tests feels low-priority.)
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions};

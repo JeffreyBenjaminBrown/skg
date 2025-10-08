@@ -17,7 +17,8 @@ fn test_find_inconsistent_toDelete_instructions() {
 
   let trees_consistent: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input_consistent).unwrap();
-  let (inconsistent_ids_consistent, _) = find_inconsistent_instructions(&trees_consistent);
+  let (inconsistent_ids_consistent, _) =
+    find_inconsistent_instructions(&trees_consistent);
   assert_eq!(inconsistent_ids_consistent.len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
 
   // Test case with inconsistent toDelete instructions (conflicts)

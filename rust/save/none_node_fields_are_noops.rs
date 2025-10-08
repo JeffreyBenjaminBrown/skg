@@ -43,7 +43,7 @@ pub fn clobber_none_fields_with_data_from_disk (
         from_user;
       if result.aliases.is_none () {
         // TODO: Include subscription and override relationships.
-        result.aliases = disk_node.aliases;
-      }
-      Ok (result)
-    }} }
+        // This will require making them optionals in SkgNode,
+        // like aliases already is.
+        result.aliases = disk_node.aliases; }
+      Ok (result) }} }

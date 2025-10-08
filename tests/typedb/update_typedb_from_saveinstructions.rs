@@ -85,7 +85,7 @@ fn test_update_nodes_and_relationships2 (
       "Node 3 should be completely deleted, but found IDs: {:?}",
       existing_node3_ids );
 
-    // TODO: Node 4 (not mentioned in buffer) should still exist.
+    // Node 4 (not mentioned in buffer) should still exist.
     let existing_node4_ids : HashSet<String> = which_ids_exist (
       & config . db_name,
       & driver,

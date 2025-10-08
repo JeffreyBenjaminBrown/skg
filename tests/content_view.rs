@@ -9,7 +9,7 @@ use typedb_driver::{
   DriverOptions,
 };
 
-use skg::render::{single_root_view, multi_root_view};
+use skg::render::{multi_root_view};
 use skg::typedb::init::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
@@ -39,30 +39,6 @@ fn test_a_mess_of_stuff
       & config . db_name,
       & driver
     ) . await?;
-
-    { // Print org views.
-      // TODO ? Automate these "manual eyballing" tests.
-      { // from the root of node "1".
-        println!("Building org view from ID 2...");
-        let view = single_root_view (
-          & driver, & config,
-          & ID ( "2" . to_string () )
-        ) . await?;
-        println!("{}", view); }
-      { // From the root of node "5".
-        println!("Building org view from ID 5...");
-        let view = single_root_view (
-          & driver, & config,
-          & ID ( "5" . to_string () )
-        ) . await?;
-        println!("{}", view); }
-      { // From the root of node "cycle-1".
-        println!("Building org view from ID cycle-1...");
-        let view = single_root_view (
-          & driver, & config,
-          & ID ( "cycle-1" . to_string () )
-        ) . await?;
-        println!("{}", view); } }
 
     // Test the path from node "4" to the root container
     match path_containerward_to_end_cycle_and_or_branches (
