@@ -2,7 +2,8 @@
 
 use crate::types::OrgnodeMetadata;
 use crate::types::orgnode::{parse_metadata_to_headline_md, default_metadata};
-use sexp::{Atom, Sexp};
+use crate::serve::util::extract_string_from_sexp;
+use sexp::Sexp;
 
 pub fn parse_headline_from_sexp (
   request : &str
@@ -15,7 +16,7 @@ pub fn parse_headline_from_sexp (
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
   let headline_text : String =
-    extract_headline_from_sexp ( &sexp ) ?;
+    extract_string_from_sexp ( &sexp, "headline" ) ?;
   let level : usize =
     count_headline_level ( &headline_text )
     . ok_or ( "Could not count asterisks in (supposed) headline." ) ?;
@@ -24,27 +25,6 @@ pub fn parse_headline_from_sexp (
   let (metadata, title) : (OrgnodeMetadata, String) =
     parse_separating_metadata_and_title ( line_after_bullet ) ?;
   Ok (( metadata, level, title )) }
-
-/// Extract the headline value from a parsed S-expression
-/// Expected format: (.. (headline . "HEADLINE") ..)
-fn extract_headline_from_sexp (
-  sexp : &Sexp
-) -> Result<String, String> {
-  match sexp {
-    Sexp::List ( items ) => {
-      for item in items {
-        if let Sexp::List ( pair ) = item {
-          if pair.len() == 3 {
-            if let ( Sexp::Atom ( Atom::S ( key ) ),
-                     Sexp::Atom ( Atom::S ( dot ) ),
-                     Sexp::Atom ( Atom::S ( value ) ) ) =
-              ( &pair[0], &pair[1], &pair[2] )
-            { if key == "headline" && dot == "." {
-              return Ok ( value.clone() ); }} }} }
-      Err ( "No headline field found in S-expression"
-             . to_string() ) },
-    _ => Err ( "Expected list as top-level S-expression"
-                . to_string() ) }}
 
 /// Count the number of leading asterisks in a headline
 fn count_headline_level (
@@ -93,4 +73,3 @@ fn parse_separating_metadata_and_title (
   // No metadata found - use defaults
   Ok (( default_metadata (),
         headline_with_metadata.to_string () )) }
-

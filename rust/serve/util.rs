@@ -1,7 +1,30 @@
 use crate::types::{ID};
 
+use sexp::{Atom, Sexp};
 use std::io::Write;
 use std::net::TcpStream; // handles two-way communication
+
+/// Extract a string value from an S-expression key-value pair.
+/// Expected format: (.. (key . "value") ..)
+pub fn extract_string_from_sexp (
+  sexp : &Sexp,
+  key  : &str,
+) -> Result<String, String> {
+  match sexp {
+    Sexp::List ( items ) => {
+      for item in items {
+        if let Sexp::List ( pair ) = item {
+          if pair.len() == 3 {
+            if let ( Sexp::Atom ( Atom::S ( k ) ),
+                     Sexp::Atom ( Atom::S ( dot ) ),
+                     Sexp::Atom ( Atom::S ( value ) ) ) =
+              ( &pair[0], &pair[1], &pair[2] )
+            { if k == key && dot == "." {
+              return Ok ( value.clone() ); }} }} }
+      Err ( format! (
+        "No {} field found in S-expression", key ) ) },
+    _ => Err ( "Expected list as top-level S-expression"
+                . to_string() ) }}
 
 pub fn send_response (
   stream   : &mut TcpStream,
@@ -27,44 +50,27 @@ pub fn send_response_with_length_prefix (
 pub fn request_type_from_request (
   request : &str
 ) -> Result<String, String> {
-  extract_quoted_value_from_sexp ( request,
-                                   "(request . \"",
-                                   "request type" ) }
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_string_from_sexp ( &sexp, "request" ) }
 
 pub fn node_id_from_single_root_view_request (
   request : &str
 ) -> Result<ID, String> {
-  extract_quoted_value_from_sexp ( request,
-                                   "(id . \"",
-                                   "ID" )
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_string_from_sexp ( &sexp, "id" )
     . map(ID) }
 
 pub fn search_terms_from_request (
   request : &str
 ) -> Result<String, String> {
-  extract_quoted_value_from_sexp ( request,
-                                   "(terms . \"",
-                                   "search terms" ) }
-
-/// Returns the string between the first appearance of `pattern`
-/// and the next quotation mark.
-fn extract_quoted_value_from_sexp (
-  request    : &str,
-  pattern    : &str,
-  field_name : &str
-) -> Result < String, String > {
-  // TODO ? this is brittle to API changes
-  // (athough seems safe as the API stands today).
-  // It seems better to do proper s-exp parsing.
-
-  if let Some ( start_pos ) = request.find ( pattern ) {
-    let value_start = start_pos + pattern.len ();
-    if let Some ( end_pos ) =
-      request [ value_start.. ].find("\"")
-    { Ok ( request [ value_start ..
-                     (value_start + end_pos) ]
-           . to_string () )
-    } else { Err ( format! (
-      "Could not find end quote for {} in request", field_name ) ) }
-  } else { Err ( format! (
-    "Could not find {} in request", field_name ) ) } }
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_string_from_sexp ( &sexp, "terms" ) }
