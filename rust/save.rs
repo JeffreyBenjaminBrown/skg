@@ -30,9 +30,15 @@ pub async fn buffer_to_save_instructions (
       Vec<SaveInstruction>
     ), SaveError> {
 
-  let orgnode_forest : Vec<Tree<OrgNode>> =
+  let mut orgnode_forest : Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
+  add_missing_info_to_trees (
+    /* Do 'add_missing_info_to_trees'
+    before 'find_buffer_errors_for_saving'.
+    See the latter's header comment for why. */
+    & mut orgnode_forest, & config . db_name, driver
+  ). await . map_err ( SaveError::DatabaseError ) ?;
   let validation_errors : Vec<Buffer_Cannot_Be_Saved> =
     find_buffer_errors_for_saving ( & orgnode_forest );
   if ! validation_errors . is_empty () {

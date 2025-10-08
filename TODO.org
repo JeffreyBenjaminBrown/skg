@@ -2,6 +2,7 @@
   Ask for a refactoring plan before embarking.
 * research
 ** What {functions, types} bundle separble concerns?
+** look for TODO items
 * features
 ** rebuild buffer with the same structure
 *** retain metadata when replacing node

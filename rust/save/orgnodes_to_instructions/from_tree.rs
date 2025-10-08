@@ -1,29 +1,26 @@
 use crate::types::{OrgNode, RelToOrgParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
-use crate::save::{add_missing_info_to_trees, reconcile_dup_instructions};
+use crate::save::reconcile_dup_instructions;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
-/// Modifies the input forest of OrgNode2s:
-///   - Fills in information via 'add_missing_info_to_trees'
-///   - Reconciles duplicates via 'reconcile_dup_instructions'
-/// Outputs that plus a forest of SaveInstructions.
+/// Converts a forest of OrgNode2s to SaveInstructions,
+/// reconciling duplicates via 'reconcile_dup_instructions'.
+/// Returns the original forest plus the reconciled SaveInstructions.
 pub async fn orgnodes_to_save_instructions (
-  mut trees : Vec<Tree<OrgNode>>,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver
+  forest  : Vec<Tree<OrgNode>>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver
 ) -> Result< ( Vec<Tree<OrgNode>>,
                Vec<SaveInstruction>),
             Box<dyn Error>> {
-  add_missing_info_to_trees (
-    & mut trees, & config . db_name, driver ) . await ?;
   let instructions : Vec<SaveInstruction> =
     orgnodes_to_dirty_save_instructions (
-      trees . clone () ) ?;
+      forest . clone () ) ?;
   let reconciled_instructions : Vec<SaveInstruction> =
     reconcile_dup_instructions (
       config, driver, instructions ) . await ?;
-  Ok ((trees, reconciled_instructions)) }
+  Ok ((forest, reconciled_instructions)) }
 
 /// PITFALL: Leaves important work undone,
 /// which orgnodes_to_save_instructions does.
