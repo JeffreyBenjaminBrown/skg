@@ -10,7 +10,10 @@ enum WhetherToDelete {
   DoNotDelete,
 }
 
-/* PURPOSE:
+/* ASSUMES:
+The same thing 'find_buffer_errors_for_saving' assumes.
+.
+PURPOSE:
 Find contradictory instructions in a buffer the user has tried to save.
 .
 If there's a node with 'toDelete' true,
@@ -25,11 +28,7 @@ STRATEGY:
 Builds a map from IDs to sets of WhetherToDelete.
 After traversing the tree, reports every key (ID)
 for which the associated value (set) has size 2.
-Also builds a map from IDs to count of defining containers.
-.
-TODO:
-Maybe this needs to be more complicated,
-because one could delete an extra_id. */
+Also builds a map from IDs to count of defining containers. */
 pub fn find_inconsistent_instructions(
   trees: &[Tree<OrgNode>]
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes

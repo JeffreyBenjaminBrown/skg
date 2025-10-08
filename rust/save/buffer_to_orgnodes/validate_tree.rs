@@ -6,8 +6,12 @@ use ego_tree::Tree;
 // Re-export the main function
 pub use contradictory_instructions::find_inconsistent_instructions;
 
-/// Look for invalid structure in the org buffer
+/// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
+///
+/// ASSUMES: IDs have been replaced with PIDs.
+/// Otherwise two org nodes might refer to the same skg node,
+/// yet appear not to.
 pub fn find_buffer_errors_for_saving (
   trees: &[Tree<OrgNode>]
 ) -> Vec<Buffer_Cannot_Be_Saved> {
