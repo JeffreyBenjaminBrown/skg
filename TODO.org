@@ -1,6 +1,3 @@
-* moves
-Move default_metadata from tests/render_util.rs to
-rust/types/new.rs.
 * replace
 In a number of places there's a passage like this:
 

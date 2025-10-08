@@ -2,18 +2,7 @@
 
 use skg::render::orgnode::render_org_node_from_text;
 use skg::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
-
-fn default_metadata () -> OrgnodeMetadata {
-  OrgnodeMetadata {
-    id : None,
-    relToOrgParent : RelToOrgParent::Content,
-    cycle : false,
-    focused : false,
-    folded : false,
-    mightContainMore : false,
-    repeat : false,
-    toDelete : false,
-  } }
+use skg::types::orgnode::default_metadata;
 
 #[test]
 fn test_render_org_node_from_text_no_metadata () {

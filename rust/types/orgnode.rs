@@ -71,6 +71,18 @@ impl FromStr for RelToOrgParent {
       _ => Err ( format! ( "Unknown RelToOrgParent value: {}", s )),
     }} }
 
+pub fn default_metadata () -> OrgnodeMetadata {
+  OrgnodeMetadata {
+    id : None,
+    relToOrgParent : RelToOrgParent::Content,
+    cycle : false,
+    focused : false,
+    folded : false,
+    mightContainMore : false,
+    repeat : false,
+    toDelete : false,
+  } }
+
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_headline_md.
 /// Returns string like "id:abc123,repeated,focused" etc.
