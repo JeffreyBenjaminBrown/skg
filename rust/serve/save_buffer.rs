@@ -36,23 +36,36 @@ pub fn handle_save_buffer_request (
           &content, typedb_driver, config, tantivy_index )) {
         Ok (processed_content) => {
           // Send success indicator followed by length-prefixed content
-          let success_header = "save: success\n";
-          let header = format!("Content-Length: {}\r\n\r\n", processed_content.len());
-          let full_response = format!("{}{}{}", success_header, header, processed_content);
-          stream.write_all(full_response.as_bytes()).unwrap();
-          stream.flush().unwrap(); }
+          let success_header : &str =
+            "save: success\n";
+          let header : String =
+            format!("Content-Length: {}\r\n\r\n",
+                    processed_content.len());
+          let full_response : String =
+            format!("{}{}{}",
+                    success_header, header, processed_content);
+          stream . write_all(
+            full_response . as_bytes () ). unwrap ();
+          stream . flush() . unwrap (); }
         Err (err) => {
           // Check if this is a SaveError that should be formatted for the client
           if let Some(save_error) = err.downcast_ref::<SaveError>() {
-            let error_buffer_content = format_save_error_as_org(save_error);
+            let error_buffer_content : String =
+              format_save_error_as_org(save_error);
             // Send failure indicator followed by length-prefixed error content
-            let failure_header = "save: failure\n";
-            let header = format!("Content-Length: {}\r\n\r\n", error_buffer_content.len());
-            let full_response = format!("{}{}{}", failure_header, header, error_buffer_content);
+            let failure_header : &str =
+              "save: failure\n";
+            let header : String =
+              format!("Content-Length: {}\r\n\r\n",
+                      error_buffer_content.len());
+            let full_response : String =
+              format!("{}{}{}",
+                      failure_header, header, error_buffer_content);
             stream.write_all(full_response.as_bytes()).unwrap();
             stream.flush().unwrap();
           } else {
-            let error_msg = format!("Error processing buffer content: {}", err);
+            let error_msg : String =
+              format!("Error processing buffer content: {}", err);
             println!("{}", error_msg);
             send_response(stream, &error_msg);
           }
@@ -92,7 +105,8 @@ fn read_length_prefixed_content (
   let mut buffer : Vec<u8> = // Read content_length bytes.
     vec! [0u8; content_length] ;
   reader.read_exact (&mut buffer) ?;
-  let content = String::from_utf8 (buffer) ?;
+  let content : String =
+    String::from_utf8 (buffer) ?;
   Ok (content) }
 
 /* Update dbs and filesystem, and generate text for a new org-buffer.
@@ -182,41 +196,37 @@ pub async fn update_fs_and_dbs (
   Ok (( )) }
 
 /// Formats a SaveError as an org-mode buffer content for the client.
-fn format_save_error_as_org(error: &SaveError) -> String {
+fn format_save_error_as_org (
+  error : &SaveError
+) -> String {
   match error {
     SaveError::ParseError(msg) => {
       format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", msg)
     },
     SaveError::DatabaseError(err) => {
-      format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", err)
-    },
+      format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
+              err) },
     SaveError::IoError(err) => {
-      format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", err)
-    },
-    SaveError::InconsistentInstructions { inconsistent_deletions, multiple_definers } => {
-      let mut content = String::from("* NOTHING WAS SAVED\n\nInconsistencies found when interpreting buffer text as save instructions.\n\n");
-
+      format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
+              err) },
+    SaveError::InconsistentInstructions {
+      inconsistent_deletions, multiple_definers }
+    => {
+      let mut content : String =
+        String::from("* NOTHING WAS SAVED\n\nInconsistencies found when interpreting buffer text as save instructions.\n\n");
       if !inconsistent_deletions.is_empty() {
         content.push_str("** Inconsistent Deletion Instructions\n");
         content.push_str("The following IDs have conflicting toDelete instructions:\n");
         for id in inconsistent_deletions {
-          content.push_str(&format!("- {}\n", id.0));
-        }
-        content.push('\n');
-      }
-
+          content.push_str(&format!("- {}\n", id.0)); }
+        content.push('\n'); }
       if !multiple_definers.is_empty() {
         content.push_str("** Multiple Defining Containers\n");
         content.push_str("The following IDs are defined by multiple containers:\n");
         for id in multiple_definers {
-          content.push_str(&format!("- {}\n", id.0));
-        }
-        content.push('\n');
-      }
-
+          content.push_str(&format!("- {}\n", id.0)); }
+        content.push('\n'); }
       content.push_str("** Resolution\n");
-      content.push_str("Please fix these inconsistencies and try saving again.\n");
-      content
-    }
-  }
-}
+      content.push_str(
+        "Please fix these inconsistencies and try saving again.\n");
+      content }} }

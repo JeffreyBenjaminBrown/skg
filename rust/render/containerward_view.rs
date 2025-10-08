@@ -3,7 +3,6 @@ use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
-use crate::types::orgnode::default_metadata;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -133,8 +132,8 @@ fn metadata_for_element_of_path (
   is_terminus : bool
 ) -> OrgnodeMetadata {
   OrgnodeMetadata {
-    id : Some ( node_id.clone () ),
-    relToOrgParent :
+    id               : Some ( node_id.clone () ),
+    relToOrgParent   :
       if is_terminus {
         RelToOrgParent::Content
       } else {
