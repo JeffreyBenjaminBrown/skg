@@ -11,7 +11,10 @@ use futures::StreamExt;
 use crate::types::ID;
 
 /// Runs one query per ID, but in parallel.
-/// TODO: If/when TypeDB becomes able to express it,
+/// TODO ? SOLVED: Could nested subqueries do this?
+/// See the TypeDB feature gallery:
+///   https://typedb.com/features
+/// If/when TypeDB becomes able to express it,
 /// run these all in a single query.
 /// That will require the ability to pass a list of (x)
 /// to Rust and get a list of (x,y).

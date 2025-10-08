@@ -1,17 +1,29 @@
+* rebuild buffer with the same structure
+** to know
+*** Most of the API can be left alone.
+**** where orgnodes are built
+***** save_buffer
+***** containerward_view
+      Document that if you haven't saved the buffer,
+      the retrieved view won't include any changes
+      that that saved buffer would cause.
+***** node_aliases
+      Document that if you haven't saved the buffer,
+      the retrieved aliases won't include any changes
+      that that saved buffer would cause.
+***** single_root_view
+**** Only save_buffer needs changing for now.
+** retain metadata when replacing node
+   When a backview replaces text,
+   it should retain the origin headline's
+   relationship to its org-parent.
+** retain focus, folding on save
+*** `org_from_node_recursive` should use its `focus` argument.
+    This seems easy.
+* ====== BELOW: SORTED =======
 * internalize
   Ask for a refactoring plan before embarking.
-* research
-** What {functions, types} bundle separble concerns?
-** look for TODO items
 * features
-** rebuild buffer with the same structure
-*** retain metadata when replacing node
-    When a backview replaces text,
-    it should retain the origin headline's
-    relationship to its org-parent.
-*** retain focus, folding on save
-**** `org_from_node_recursive` should use its `focus` argument.
-     This seems easy.
 ** [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
 ** generalize the Rust backpath rendering function
    Takes a lambda involving (probably)
@@ -70,6 +82,8 @@
       .context("Failed to connect to TypeDB server")?;
 *** once it's possible, make a good pids_from_ids
     see [[./not_using/pids_from_ids]]
+* questions
+** {Do, should} backward paths include node bodies?
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user
