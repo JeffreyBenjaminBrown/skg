@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::render::orgnode::render_org_node_from_text;
-use skg::types::{OrgNode, RelToOrgParent, ID};
+use skg::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
 use skg::types::orgnode::default_metadata;
 
 #[test]

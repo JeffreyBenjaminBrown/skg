@@ -13,6 +13,10 @@ use crate::types::ID;
 /// Runs one query per ID, but in parallel.
 /// TODO: If/when TypeDB becomes able to express it,
 /// run these all in a single query.
+/// That will require the ability to pass a list of (x)
+/// to Rust and get a list of (x,y).
+/// (Currently I can get a list of (y) from a list of (x),
+/// but I don't know how to track which y corresponds to which x.)
 pub async fn pids_from_ids (
   db_name : &str,
   driver  : &TypeDBDriver,
