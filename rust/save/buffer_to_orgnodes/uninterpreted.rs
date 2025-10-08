@@ -1,4 +1,5 @@
-use crate::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
+use crate::types::{OrgNode, OrgnodeMetadata};
+use crate::types::orgnode::{parse_metadata_to_headline_md, default_metadata};
 
 use ego_tree::Tree;
 use regex::Regex;
@@ -103,7 +104,7 @@ fn mk_orgnode(
     if let Some(parsed_metadata) = metadata_option {
       parsed_metadata
     } else { // No metadata, so use defaults.
-      create_default_headline_metadata () };
+      default_metadata () };
   Ok (( level,
         OrgNode {
           metadata,
@@ -161,58 +162,3 @@ pub fn headline_to_triple (
     Some((level, metadata, title))
   } else { None }}
 
-/// Parse metadata string directly into OrgnodeMetadata.
-/// Parses comma-separated metadata items like "id:foo,folded,relToOrgParent:container".
-/// Returns an error for unknown metadata keys or values.
-fn parse_metadata_to_headline_md(
-  metadata_str: &str
-) -> Result<OrgnodeMetadata, String> {
-  let mut result : OrgnodeMetadata = create_default_headline_metadata();
-  for part in metadata_str.split(',') {
-    let trimmed: &str = part.trim();
-    if trimmed.is_empty() { continue; }
-    if let Some((key_str, value_str)) = trimmed.split_once(':') {
-      // Handle key:value pairs
-      let key: &str = key_str.trim();
-      let value: &str = value_str.trim();
-      match key {
-        "id" => { result.id = Some(ID::from(value)); },
-        "relToOrgParent" => {
-          result.relToOrgParent = match value {
-            "alias"        => RelToOrgParent::Alias,
-            "aliasCol"     => RelToOrgParent::AliasCol,
-            "container"    => RelToOrgParent::Container,
-            "content"      => RelToOrgParent::Content,
-            "none"         => RelToOrgParent::None,
-            "searchResult" => RelToOrgParent::SearchResult,
-            _ => return Err(
-              format!("Unknown relToOrgParent value: {}", value)),
-          }; },
-        _ => {
-          return Err(format!("Unknown metadata key: {}", key)); }}
-    } else {
-      // Handle bare values (boolean flags)
-      match trimmed {
-        "repeated"         => result.repeat = true,
-        "folded"           => result.folded = true,
-        "focused"          => result.focused = true,
-        "cycle"            => result.cycle = true,
-        "mightContainMore" => result.mightContainMore = true,
-        "toDelete"         => result.toDelete = true,
-        _ => {
-          return Err(format!("Unknown metadata value: {}", trimmed));
-        }} }}
-  Ok(result) }
-
-/// Create default OrgnodeMetadata with all default values.
-/// Used when a headline has no metadata.
-fn create_default_headline_metadata() -> OrgnodeMetadata {
-  OrgnodeMetadata {
-    id: None,
-    relToOrgParent: RelToOrgParent::Content,
-    cycle: false,
-    focused: false,
-    folded: false,
-    mightContainMore: false,
-    repeat: false,
-    toDelete: false, }}

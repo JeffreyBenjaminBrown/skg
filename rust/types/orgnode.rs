@@ -83,6 +83,49 @@ pub fn default_metadata () -> OrgnodeMetadata {
     toDelete : false,
   } }
 
+/// Parse metadata string from org-mode headline into OrgnodeMetadata.
+/// Format: "id:xyz,repeated,folded,relToOrgParent:container"
+pub fn parse_metadata_to_headline_md (
+  metadata_str : &str
+) -> Result<OrgnodeMetadata, String> {
+  let mut result : OrgnodeMetadata =
+    default_metadata ();
+  for part in metadata_str.split ( ',' ) {
+    let trimmed : &str = part.trim ();
+    if trimmed.is_empty () { continue; }
+    if let Some (( key_str, value_str )) = trimmed.split_once ( ':' ) {
+      // Handle key:value pairs
+      let key : &str = key_str.trim ();
+      let value : &str = value_str.trim ();
+      match key {
+        "id" => { result.id = Some ( ID::from ( value )); },
+        "relToOrgParent" => {
+          result.relToOrgParent = match value {
+            "alias"        => RelToOrgParent::Alias,
+            "aliasCol"     => RelToOrgParent::AliasCol,
+            "container"    => RelToOrgParent::Container,
+            "content"      => RelToOrgParent::Content,
+            "none"         => RelToOrgParent::None,
+            "searchResult" => RelToOrgParent::SearchResult,
+            _ => return Err (
+              format! ( "Unknown relToOrgParent value: {}", value )),
+          }; },
+        _ => {
+          return Err ( format! ( "Unknown metadata key: {}", key )); }}
+    } else {
+      // Handle bare values (boolean flags)
+      match trimmed {
+        "repeated"         => result.repeat = true,
+        "folded"           => result.folded = true,
+        "focused"          => result.focused = true,
+        "cycle"            => result.cycle = true,
+        "mightContainMore" => result.mightContainMore = true,
+        "toDelete"         => result.toDelete = true,
+        _ => {
+          return Err ( format! ( "Unknown metadata value: {}", trimmed ));
+        }} }}
+  Ok ( result ) }
+
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_headline_md.
 /// Returns string like "id:abc123,repeated,focused" etc.
