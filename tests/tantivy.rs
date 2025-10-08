@@ -201,8 +201,8 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     kiwi.aliases   = Some(vec![    "munch kiwi".to_string()]); }
   let nodes = vec![apple, banana, kiwi];
 
-  // Create Tantivy index
-  let index_dir = "tests/tantivy/generated";
+  // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
+  let index_dir = "tests/tantivy/generated_aliases";
   if Path::new(index_dir).exists() {
     fs::remove_dir_all(index_dir)?; }
   fs::create_dir_all(index_dir)?;

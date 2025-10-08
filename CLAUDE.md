@@ -43,3 +43,7 @@ When writing or modifying code:
 - `cargo run` must be running for some Emacs Lisp tests, and for all integration tests, to pass.
 
 The script `run-servers.sh` persists those things. Only one TypeDB server should be running at a time, but many Skg servers (`cargo run --bash skg`) can run at the same time. Config files like the one at `data/skgconfig.toml` can be used to change TCP ports, database names and data folders,, so that different instances of Skg don't collide.
+
+## Handling Reverted Edits
+
+If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this means the user or linter has rejected those changes. **DO NOT re-apply those edits**. The reversion is intentional and indicates the changes were not wanted. Move on without attempting to restore the reverted changes.

@@ -1,55 +1,49 @@
-Bugfix: use find_buffer_errors_for_saving
-
-  Use that, rather than
-    find_inconsistent_instructions
-  (because the first already was calling the second!)
-  in
-    buffer_to_save_instructions
-
-
-* Propogate Buffer_Cannot_Be_Saved to user if it finds errors.
-** use find_buffer_errors_for_saving
-/// Look for invalid structure in the org buffer
-/// when a user asks to save it.
-pub fn find_buffer_errors_for_saving (
-  trees: &[Tree<OrgNode>]
-) -> Vec<Buffer_Cannot_Be_Saved> {
-** in buffer_to_save_instructions
-* I regret not having asked for a refactoring plan.
-* What {functions,types} bundle separble concerns?
-** NodeWithEphem
-* retain metadata when replacing node
-  When a backview replaces text,
-  it should retain the origin headline's
-  relationship to its org-parent.
-* link-sourceward view
-** then eliminate further redundancy, if any
-* generalize the Rust backpath rendering function
-  Takes a lambda involving (probably)
-    path_to_end_cycle_and_or_branches,
-  and a starting level.
-  The lambda can drop the first member of the path, or not.
-* create new data without fetching preexisting data
-  and add an integration test.
-  Use a temp config, and delete it if the test passes.
-* integration test for containerward view
-* [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
-* override the ordinary save command
-* If there is a containerward "}" herald, the "ID exists" herald can be omitted.
-* [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
-  esp. rootness and multiple containment
-* [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
-* [[id:bc8fd4c3-0566-400c-96a8-0f4632e7fd1c][merging]]
-* A node's ID should probably always be its primary one.
-  In the medatata?
-  As its name in the filesystem?
-* retain focus, folding on save
-** `org_from_node_recursive` should use its `focus` argument.
-   This seems easy.
-* not pressing
-** refactoring
-*** Parse metadata in Rust, not Emacs.
-    see `skg-get-current-headline-metadata`
+* internalize
+  Ask for a refactoring plan before embarking.
+* research
+** What {functions, types} bundle separble concerns?
+* features
+** rebuild buffer with the same structure
+*** retain metadata when replacing node
+    When a backview replaces text,
+    it should retain the origin headline's
+    relationship to its org-parent.
+*** retain focus, folding on save
+**** `org_from_node_recursive` should use its `focus` argument.
+     This seems easy.
+** [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
+** generalize the Rust backpath rendering function
+   Takes a lambda involving (probably)
+     path_to_end_cycle_and_or_branches,
+   and a starting level.
+   The lambda can drop the first member of the path, or not.
+** link-sourceward view
+*** then eliminate further redundancy, if any
+** override the ordinary save command
+** If there is a containerward "}" herald, the "ID exists" herald can be omitted.
+** [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
+   esp. rootness and multiple containment
+** [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
+** [[id:bc8fd4c3-0566-400c-96a8-0f4632e7fd1c][merging]]
+** not pressing
+*** show binary relationship label with optional intermediating node
+    esp. nice if you can filter on those labels,
+    or on an ontology they belong to that groups them
+*** show when a link is bi-directional
+*** list which links are in a node's recursive content
+*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
+* QA
+** test the propagation of Buffer_Cannot_Be_Saved errors
+   in commit 130318842f5ad0ad92279d14f85d8b950e6f844a,
+   I started using
+     find_buffer_errors_for_saving,
+   which covers more cases than what I had been using,
+     find_inconsistent_instructions
+   But the tests only cover what
+     find_inconsistent_instructions
+   might return.
+** integration test for containerward view
+** not pressing
 *** use s-exp parsing
 **** in rust/serve/containerward_view.rs
      fn extract_containerward_view_params
@@ -62,8 +56,8 @@ pub fn find_buffer_errors_for_saving (
       fn search_terms_from_request (
 ***** and maybe
       fn extract_quoted_value_from_sexp (
-*** move empty_skgnode from tests into skgnode.rs
-    and then use it for lots of tests
+*** Avoid uses of `unwrap` in Rust.
+*** find 'panic's, replace with Result.
 *** Use anyhow or eyre crates for better error handling
 **** Cargo.toml
   anyhow = "1.0"
@@ -73,26 +67,8 @@ pub fn find_buffer_errors_for_saving (
   let driver = TypeDBDriver::new(...)
       .await
       .context("Failed to connect to TypeDB server")?;
-*** Avoid uses of `unwrap` in Rust.
-*** find 'panic's, replace with Result
 *** once it's possible, make a good pids_from_ids
     see [[./not_using/pids_from_ids]]
-** fancy features
-*** show binary relationship label with optional intermediating node
-    esp. nice if you can filter on those labels,
-    or on an ontology they belong to that groups them
-*** show when a link is bi-directional
-*** list which links are in a node's recursive content
-*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
-* idiot-proof the save mechanism
-** Collect all duplicated nodes.
-   The user might have edited the contents of each,
-   even though they're not supposed to.
-   If they have, keep the first one's title,
-   add a warning about the title conflict if any
-   to the warnings being accumulated,
-   collect all of its contents from the different instances,
-   and dedup that collection.
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user

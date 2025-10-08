@@ -14,6 +14,7 @@
 /devel-handy/temp.org
 /target
 /tests/**/generated/
+/tests/tantivy/generated_aliases/
 TAGS
 temp-*
 temp/
