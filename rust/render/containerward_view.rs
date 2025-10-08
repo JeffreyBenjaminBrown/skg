@@ -3,6 +3,7 @@ use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
+use crate::types::orgnode::default_metadata;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -144,10 +145,10 @@ fn metadata_for_element_of_path (
         // that appearance *should* (and does) get this type.
         RelToOrgParent::Container
       },
-    cycle : cycle_node.as_ref () == Some ( node_id ),
-    focused : false,
-    folded : false,
+    cycle            : cycle_node.as_ref () == Some ( node_id ),
+    focused          : false,
+    folded           : false,
     mightContainMore : ! is_terminus,
-    repeat : false,
-    toDelete : false,
+    repeat           : false,
+    toDelete         : false,
   } }

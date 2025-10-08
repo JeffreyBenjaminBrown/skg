@@ -2,7 +2,8 @@ use crate::file_io::{read_node,path_from_pid};
 use crate::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   pid_from_id, };
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
+use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
+use crate::types::orgnode::default_metadata;
 use crate::render::util::newline_to_space;
 use crate::render::orgnode::render_org_node_from_text;
 
@@ -90,21 +91,12 @@ pub async fn org_from_node_recursive (
   visited.insert ( node_id.clone () );
   let orgnode2 : OrgNode =
     OrgNode {
-      metadata :
-        OrgnodeMetadata {
-          id : Some ( node_id.clone () ),
-          relToOrgParent : RelToOrgParent::Content,
-          cycle : false,
-          focused : false,
-          folded : false,
-          mightContainMore : false,
-          repeat : false,
-          toDelete : false,
-        },
+      metadata : { let mut md = default_metadata ();
+                   md.id = Some ( node_id.clone () );
+                   md },
       title : newline_to_space ( &node.title ),
       // Over-cautious, because the title should contain no newlines, but probably cheap.
-      body : node.body.clone (),
-    };
+      body : node.body.clone (), };
   let mut out : String =
     render_org_node_from_text (
       level,
@@ -129,21 +121,14 @@ pub fn format_repeated_node (
 ) -> String {
   let orgnode2 : OrgNode =
     OrgNode {
-      metadata :
-        OrgnodeMetadata {
-          id : Some ( node_id.clone () ),
-          relToOrgParent : RelToOrgParent::Content,
-          cycle : false,
-          focused : false,
-          folded : false,
-          mightContainMore : false,
-          repeat : true,
-          toDelete : false,
-        },
+      metadata : { let mut md = default_metadata ();
+                   md.id = Some ( node_id.clone () );
+                   md.repeat = true;
+                   md },
       title : newline_to_space ( title ),
       body : Some (
-        "Repeated, probably above. Edit there, not here.".to_string () ),
-    };
+        "Repeated, probably above. Edit there, not here."
+          . to_string () ), };
   render_org_node_from_text (
     level,
     &orgnode2 ) }

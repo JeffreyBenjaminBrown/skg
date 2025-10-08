@@ -1,20 +1,3 @@
-* replace
-In a number of places there's a passage like this:
-
-+        OrgnodeMetadata2 {
-+          id : None,
-+          relToOrgParent : RelToOrgParent2::SearchResult,
-+          cycle : false,
-+          focused : false,
-+          folded : false,
-+          mightContainMore : false,
-+          repeat : false,
-+          toDelete : false,
-+        },
-
-It would be less verbose if, in such places,
-we just created an OrgnodeMetadata2 using default_metadata,
-and then replaced the one or two fields different from the default.
 * Propogate Buffer_Cannot_Be_Saved to user if it finds errors.
 * I regret not having asked for a refactoring plan.
 * What {functions,types} bundle separble concerns?

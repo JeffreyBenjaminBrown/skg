@@ -1,7 +1,8 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{TantivyIndex, OrgNode, OrgnodeMetadata, RelToOrgParent};
+use crate::types::{TantivyIndex, OrgNode, RelToOrgParent};
+use crate::types::orgnode::default_metadata;
 use crate::render::orgnode::render_org_node_from_text;
 
 use std::collections::HashMap;
@@ -110,21 +111,12 @@ fn format_matches_as_org_mode (
     String::new();
   let search_root_node : OrgNode =
     OrgNode {
-      metadata :
-        OrgnodeMetadata {
-          id : None,
-          relToOrgParent : RelToOrgParent::SearchResult,
-          cycle : false,
-          focused : false,
-          folded : false,
-          mightContainMore : false,
-          repeat : false,
-          toDelete : false,
-        },
+      metadata : { let mut md = default_metadata ();
+                   md.relToOrgParent = RelToOrgParent::SearchResult;
+                   md },
       title : search_terms.to_string (),
       // The unique level-1 headline states the search terms.
-      body : None,
-    };
+      body : None, };
   result.push_str (
     & render_org_node_from_text (
       1,
@@ -153,22 +145,11 @@ fn format_matches_as_org_mode (
     let (score, title) = &matches[0];
     let match_node : OrgNode =
       OrgNode {
-        metadata :
-          OrgnodeMetadata {
-            id : None,
-            relToOrgParent : RelToOrgParent::Content,
-            cycle : false,
-            focused : false,
-            folded : false,
-            mightContainMore : false,
-            repeat : false,
-            toDelete : false,
-          },
+        metadata : default_metadata (),
         title : format! (
           "score: {:.2}, [[id:{}][{}]]",
           score, id, title ),
-        body : None,
-      };
+        body : None, };
     result.push_str (
       & render_org_node_from_text (
         2,
@@ -177,22 +158,11 @@ fn format_matches_as_org_mode (
       // The rest, if any, become level-3 headlines.
       let alias_match_node : OrgNode =
         OrgNode {
-          metadata :
-            OrgnodeMetadata {
-              id : None,
-              relToOrgParent : RelToOrgParent::Content,
-              cycle : false,
-              focused : false,
-              folded : false,
-              mightContainMore : false,
-              repeat : false,
-              toDelete : false,
-            },
+          metadata : default_metadata (),
           title : format! (
             "score: {:.2}, [[id:{}][{}]]",
             score, id, title ),
-          body : None,
-        };
+          body : None, };
       result.push_str (
         & render_org_node_from_text (
           3,
