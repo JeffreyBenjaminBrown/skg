@@ -123,24 +123,6 @@ pub fn delete_all_nodes_from_fs (
   nodes  : Vec<SkgNode>,
   config : SkgConfig,
 ) -> io::Result<usize> { // number of files deleted
-  { // Check that all files exist.
-    let mut missing_files : Vec<String> = Vec::new();
-    for node in &nodes {
-      let pid : ID = node . ids . get(0)
-        . ok_or_else (
-          || io::Error::new (
-            io::ErrorKind::InvalidInput,
-            "SkgNode has no IDs" ))?
-        . clone ();
-      let file_path = path_from_pid (
-        & config, pid );
-      if ! Path::new ( & file_path ) . exists () {
-        missing_files.push ( file_path ); }}
-    if ! missing_files . is_empty () {
-      return Err ( io::Error::new (
-        io::ErrorKind::NotFound,
-        format! ( "Files do not exist: {:?}",
-                   missing_files ) )); }}
 
   let mut deleted : usize = 0;
   for node in nodes {
@@ -149,8 +131,16 @@ pub fn delete_all_nodes_from_fs (
       . clone ();
     let file_path = path_from_pid (
       & config, pid );
-    fs::remove_file ( & file_path ) ?;
-    deleted += 1; }
+    match fs::remove_file ( & file_path ) {
+      Ok ( () ) => {
+        deleted += 1; },
+      Err ( e ) if e.kind () == io::ErrorKind::NotFound => {
+        // File doesn't exist, which is fine.
+        // The user created something and deleted it in the same pass.
+      },
+      Err ( e ) => {
+        // TODO : Should return a list of IDs not found.
+        return Err ( e ); }} }
   Ok (deleted) }
 
 /// If there's no such .skg file at path,

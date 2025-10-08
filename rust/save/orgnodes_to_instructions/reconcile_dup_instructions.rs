@@ -80,6 +80,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
   driver: &TypeDBDriver,
   instructions: Vec<SaveInstruction>
 ) -> Result<SaveInstruction, Box<dyn Error>> {
+  // TODO ? Break into smaller functions.
   if instructions.is_empty() {
     return Err("Cannot reduce empty instruction list".into()); }
   let to_delete: bool =

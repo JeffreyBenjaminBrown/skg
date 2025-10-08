@@ -69,8 +69,7 @@ pub fn handle_save_buffer_request (
               format!("Error processing buffer content: {}", err);
             println!("{}", error_msg);
             send_response(stream, &error_msg);
-          }
-        }} }
+          }} }}
     Err(err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );

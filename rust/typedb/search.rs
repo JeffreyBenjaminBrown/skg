@@ -69,10 +69,11 @@ pub async fn path_to_end_cycle_and_or_branches (
   relation    : &str,
   input_role  : &str,
   output_role : &str
-) -> Result < ( Vec<ID>, // The path. Its first node is the input.
-                Option<ID>, // If the path cycles, this is the first repeated node.
-                HashSet<ID> // If the path forks, these are the fork's branches.
-), Box<dyn Error> > {
+) -> Result <
+    ( Vec<ID>,    // The path. Its first node is the input.
+      Option<ID>, // If the path cycles, this is the first repeated node.
+      HashSet<ID> // If the path forks, these are the fork's branches.
+    ), Box<dyn Error> > {
 
   let mut path : Vec<ID> = vec![ node.clone () ];
   let mut path_set : HashSet<ID> =
