@@ -10,7 +10,7 @@ pub mod orgnodes_to_instructions;
 pub use parse_sexp::*;
 pub mod parse_sexp;
 
-use crate::types::{ID, SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError};
+use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved};
 use ego_tree::Tree;
 
 use std::io;
@@ -33,14 +33,11 @@ pub async fn buffer_to_save_instructions (
   let orgnode_forest : Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
-  let ( inconsistent_deletions, multiple_definers )
-    : ( Vec<ID>, Vec<ID> ) =
-    find_inconsistent_instructions ( & orgnode_forest );
-  if ( ! inconsistent_deletions . is_empty () ||
-       ! multiple_definers . is_empty () ) {
-    return Err ( SaveError::InconsistentInstructions {
-      inconsistent_deletions,
-      multiple_definers, } ); }
+  let validation_errors : Vec<Buffer_Cannot_Be_Saved> =
+    find_buffer_errors_for_saving ( & orgnode_forest );
+  if ! validation_errors . is_empty () {
+    return Err ( SaveError::BufferValidationErrors (
+      validation_errors ) ); }
   let (orgnode_forest_2, instruction_vector)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>) =
     orgnodes_to_save_instructions (

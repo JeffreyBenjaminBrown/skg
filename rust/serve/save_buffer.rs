@@ -6,6 +6,7 @@ use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
 use crate::typedb::update::update_typedb_from_saveinstructions;
 use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode};
+use crate::types::save::format_save_error_as_org;
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -194,39 +195,3 @@ pub async fn update_fs_and_dbs (
 
   println!( "All updates finished successfully." );
   Ok (( )) }
-
-/// Formats a SaveError as an org-mode buffer content for the client.
-fn format_save_error_as_org (
-  error : &SaveError
-) -> String {
-  match error {
-    SaveError::ParseError(msg) => {
-      format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", msg)
-    },
-    SaveError::DatabaseError(err) => {
-      format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
-              err) },
-    SaveError::IoError(err) => {
-      format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
-              err) },
-    SaveError::InconsistentInstructions {
-      inconsistent_deletions, multiple_definers }
-    => {
-      let mut content : String =
-        String::from("* NOTHING WAS SAVED\n\nInconsistencies found when interpreting buffer text as save instructions.\n\n");
-      if !inconsistent_deletions.is_empty() {
-        content.push_str("** Inconsistent Deletion Instructions\n");
-        content.push_str("The following IDs have conflicting toDelete instructions:\n");
-        for id in inconsistent_deletions {
-          content.push_str(&format!("- {}\n", id.0)); }
-        content.push('\n'); }
-      if !multiple_definers.is_empty() {
-        content.push_str("** Multiple Defining Containers\n");
-        content.push_str("The following IDs are defined by multiple containers:\n");
-        for id in multiple_definers {
-          content.push_str(&format!("- {}\n", id.0)); }
-        content.push('\n'); }
-      content.push_str("** Resolution\n");
-      content.push_str(
-        "Please fix these inconsistencies and try saving again.\n");
-      content }} }

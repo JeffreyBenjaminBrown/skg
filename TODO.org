@@ -1,4 +1,20 @@
+Bugfix: use find_buffer_errors_for_saving
+
+  Use that, rather than
+    find_inconsistent_instructions
+  (because the first already was calling the second!)
+  in
+    buffer_to_save_instructions
+
+
 * Propogate Buffer_Cannot_Be_Saved to user if it finds errors.
+** use find_buffer_errors_for_saving
+/// Look for invalid structure in the org buffer
+/// when a user asks to save it.
+pub fn find_buffer_errors_for_saving (
+  trees: &[Tree<OrgNode>]
+) -> Vec<Buffer_Cannot_Be_Saved> {
+** in buffer_to_save_instructions
 * I regret not having asked for a refactoring plan.
 * What {functions,types} bundle separble concerns?
 ** NodeWithEphem
