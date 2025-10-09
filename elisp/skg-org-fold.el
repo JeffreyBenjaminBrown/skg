@@ -11,9 +11,13 @@
 
 (defun skg-add-folded-markers ()
   "Add 'folded' to metadata of all invisible headlines in the buffer.
-If a headline has no <skg<...>> metadata, prefix the title with '<skg<folded>>'.
-If it has metadata without 'folded', append ',folded' to the existing metadata.
-If metadata already contains 'folded', do nothing."
+- If a headline has no <skg<...>> metadata,
+  prefix the title with '<skg<folded>>'.
+- If it has empty metadata (e.g. '<skg<>>' or '<skg< >>'),
+  replace with '<skg<folded>>'.
+- If it has metadata without 'folded',
+  append ',folded' to the existing metadata.
+- If metadata already contains 'folded', do nothing."
   (save-excursion
     (goto-char (point-min))
     (while (not (eobp))
@@ -31,11 +35,17 @@ If metadata already contains 'folded', do nothing."
               (let* ((metadata (match-string 1 rest-of-line))
                      (title (match-string 2 rest-of-line)))
                 (unless (string-match-p "\\bfolded\\b" metadata)
-                  (let ;; Doesn't have 'folded', so append it.
-                      ((new-line (format "%s <skg<%s,folded>> %s"
-                                         stars
-                                         metadata
-                                         title)))
+                  (let ;; Doesn't have 'folded', so add it.
+                      ((new-line
+                        (if ;; if metadata is empty, add "folded"
+                            ;; if not, append ",folded".
+                            ;; (The only difference is the comma.)
+                            (string-match-p "^[[:space:]]*$" metadata)
+                            (format "%s <skg<folded>> %s" stars title)
+                          (format "%s <skg<%s,folded>> %s"
+                                  stars
+                                  metadata
+                                  title))))
                     (delete-region (line-beginning-position)
                                    (line-end-position))
                     (insert new-line))))
@@ -55,10 +65,12 @@ Hide all headlines marked with 'folded' metadata,
 by folding their parents.
 .
 METHOD:
-Process the buffer from the top, via this loop:
+First unfold everything.
+Then process the buffer from the top, via this loop:
 - Find the next visible node with 'folded' in its metadata
 - Navigate to its parent
 - Fold that parent"
+  (org-show-all)
   (goto-char (point-min))
   (let ((found t))
     (while found
