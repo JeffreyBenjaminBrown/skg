@@ -17,7 +17,19 @@
    When a backview replaces text,
    it should retain the origin headline's
    relationship to its org-parent.
+** will have to treat focus similar to folding
+*** in brief
+    Emacs receives it from Rust, uses it, discards it,
+    then recomputes it before sending to Rust.
+*** in detail with correspondences to folding functions
+**** Upon receiving from Rust, use it.
+     (like skg-fold-marked-headlines)
+**** After using it, remove it from the metadata.
+     (like skg-remove-folded-markers).
+**** Add it back to the metadata before sending from Emacs to Rust.
+     (like skg-add-folded-markers)
 ** retain focus, folding on save
+*** for folding, see elisp/skg-org-fold.rs
 *** `org_from_node_recursive` should use its `focus` argument.
     This seems easy.
 * ====== BELOW: SORTED =======

@@ -5,7 +5,14 @@
 
 set -e  # Exit on any error
 
-INTEGRATION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the directory of the actual script (not the symlink)
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_SOURCE" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+  [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+done
+INTEGRATION_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 TESTS_LOG="$INTEGRATION_DIR/tests.log"
 
 echo "=== SKG Integration Test Suite ==="
