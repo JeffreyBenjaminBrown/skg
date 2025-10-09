@@ -19,6 +19,8 @@ and can be recovered by a later session.
 
 ## interp = interpretation
 
+## kv-pair = key-value pair
+
 ## lp = length-prefixed
 
 Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.

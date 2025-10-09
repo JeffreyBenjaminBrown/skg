@@ -8,6 +8,7 @@
 ;; Currently foldedness is recognized via '(invisible-p (point))'.
 
 (require 'org)
+(require 'skg-metadata)
 
 (defun skg-add-folded-markers ()
   "Add 'folded' to metadata of all invisible headlines in the buffer.
@@ -22,41 +23,9 @@
     (goto-char (point-min))
     (while (not (eobp))
       (beginning-of-line)
-      (when (and (looking-at org-heading-regexp)
+      (when (and (org-at-heading-p)
                  (invisible-p (point)))
-        (let* ;; This headline is invisible, so add folded marker
-            ((stars        (match-string 1))
-             (rest-of-line (buffer-substring (match-end 1)
-                                             (line-end-position)))
-             (has-metadata (string-match "<skg<\\([^>]*\\)>> *\\(.*\\)"
-                                         rest-of-line)))
-          (if has-metadata
-              ;; Check if metadata already has 'folded'.
-              (let* ((metadata (match-string 1 rest-of-line))
-                     (title (match-string 2 rest-of-line)))
-                (unless (string-match-p "\\bfolded\\b" metadata)
-                  (let ;; Doesn't have 'folded', so add it.
-                      ((new-line
-                        (if ;; if metadata is empty, add "folded"
-                            ;; if not, append ",folded".
-                            ;; (The only difference is the comma.)
-                            (string-match-p "^[[:space:]]*$" metadata)
-                            (format "%s <skg<folded>> %s" stars title)
-                          (format "%s <skg<%s,folded>> %s"
-                                  stars
-                                  metadata
-                                  title))))
-                    (delete-region (line-beginning-position)
-                                   (line-end-position))
-                    (insert new-line))))
-            (let* ;; No metadata, so prefix it with <skg<folded>>.
-                ((title (string-trim rest-of-line))
-                 (new-line (format "%s <skg<folded>> %s"
-                                   stars
-                                   title)))
-              (delete-region (line-beginning-position)
-                             (line-end-position))
-              (insert new-line)))))
+        (skg-insert-bare-value-into-metadata "folded"))
       (forward-line 1))))
 
 (defun skg-fold-marked-headlines ()
