@@ -14,11 +14,15 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
-/// Main entry point.
-/// Runs the following on each node:
-/// - assign_alias_relation_if_needed(
-/// - assign_id_if_needed(
-/// - assign_pid_if_possible(
+/* Runs the following on each node:
+- assign_alias_relation_if_needed(
+- assign_id_if_needed(
+- assign_pid_if_possible(
+.
+PITFALL:
+Does not add *all* missing info.
+'clobber_none_fields_with_data_from_disk' does some of that, too,
+but it operates on SaveInstructions, downstream. */
 pub async fn add_missing_info_to_trees(
   trees: &mut [Tree<OrgNode>],
   db_name: &str,

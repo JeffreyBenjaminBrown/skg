@@ -1,7 +1,7 @@
 use crate::file_io::update_fs_from_saveinstructions;
 use crate::save::buffer_to_save_instructions;
 use crate::types::SaveError;
-use crate::render::multi_root_view;
+use crate::mk_org_text::multi_root_view;
 use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
 use crate::typedb::update::update_typedb_from_saveinstructions;

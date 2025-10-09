@@ -7,9 +7,6 @@ pub mod buffer_to_orgnodes;
 pub use orgnodes_to_instructions::*;
 pub mod orgnodes_to_instructions;
 
-pub use parse_sexp::*;
-pub mod parse_sexp;
-
 use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved};
 use ego_tree::Tree;
 
@@ -44,13 +41,13 @@ pub async fn buffer_to_save_instructions (
   if ! validation_errors . is_empty () {
     return Err ( SaveError::BufferValidationErrors (
       validation_errors ) ); }
-  let (orgnode_forest_2, instruction_vector)
+  let (orgnode_forest_2, instructions)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>) =
     orgnodes_to_save_instructions (
       orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
-  let clobbered_instruction_vector : Vec<SaveInstruction> =
-    instruction_vector . into_iter ()
+  let clobbered_instructions : Vec<SaveInstruction> =
+    instructions . into_iter ()
     . map ( |(node, action)| {
       let clobbered_node : SkgNode =
         clobber_none_fields_with_data_from_disk (
@@ -58,4 +55,4 @@ pub async fn buffer_to_save_instructions (
       Ok ((clobbered_node, action)) } )
     . collect::<io::Result<Vec<SaveInstruction>>>()
     . map_err ( SaveError::IoError ) ?;
-  Ok ((orgnode_forest_2, clobbered_instruction_vector)) }
+  Ok ((orgnode_forest_2, clobbered_instructions)) }

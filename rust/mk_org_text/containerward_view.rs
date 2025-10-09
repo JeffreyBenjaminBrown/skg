@@ -1,6 +1,6 @@
 use crate::file_io::read_node_from_id;
-use crate::render::util::newline_to_space;
-use crate::render::orgnode::render_org_node_from_text;
+use crate::mk_org_text::util::newline_to_space;
+use crate::mk_org_text::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
 

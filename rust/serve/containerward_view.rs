@@ -1,7 +1,7 @@
-use crate::render::containerward_org_view;
+use crate::mk_org_text::containerward_org_view;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::save::parse_headline_from_sexp;
+use crate::serve::parse_headline_from_sexp;
 use crate::types::SkgConfig;
 
 use futures::executor::block_on;

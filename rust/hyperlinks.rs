@@ -9,7 +9,7 @@ pub fn hyperlinks_from_node (
   // and (if present) its body.
 
   let combined_text = format!(
-    "{}{}",
+    "{} {}",
     node.title,
     node . body . as_deref () . unwrap_or ("") );
   hyperlinks_from_text ( &combined_text ) }

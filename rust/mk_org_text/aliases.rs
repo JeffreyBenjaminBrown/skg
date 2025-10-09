@@ -1,6 +1,6 @@
 use crate::types::{OrgNode, RelToOrgParent};
 use crate::types::orgnode::default_metadata;
-use crate::render::orgnode::render_org_node_from_text;
+use crate::mk_org_text::orgnode::render_org_node_from_text;
 
 /// Returns not an entire org buffer,
 /// but rather just a passage,

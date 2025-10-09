@@ -5,7 +5,8 @@ it might not have all information relevant to the node.
 This supplements the information from the user (from Emacs)
 with information from disk.
 .
-For instance, the node might have some aliases stored on disk,
+EXAMPLE:
+The node might have some aliases stored on disk,
 but the information the user sent about that node from Emacs
 does not mention the aliases at all.
 In that case the 'aliases' field should be whatever is on disk,
@@ -16,7 +17,8 @@ use std::io;
 use std::path::Path;
 
 use crate::types::{ ID, SkgConfig, SkgNode };
-use crate::file_io::{ path_from_pid, read_node };
+use crate::file_io::read_node;
+use crate::util::path_from_pid;
 
 pub fn clobber_none_fields_with_data_from_disk (
   config    : &SkgConfig,

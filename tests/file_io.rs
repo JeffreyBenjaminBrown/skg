@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use skg::file_io::{
   read_node, write_node, fetch_aliases_from_file};
-use skg::render::aliases_to_org;
+use skg::mk_org_text::aliases_to_org;
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 
 #[test]

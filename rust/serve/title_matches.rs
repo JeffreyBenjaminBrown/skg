@@ -3,7 +3,7 @@ use crate::serve::util::send_response;
 use crate::tantivy::search_index;
 use crate::types::{TantivyIndex, OrgNode, RelToOrgParent};
 use crate::types::orgnode::default_metadata;
-use crate::render::orgnode::render_org_node_from_text;
+use crate::mk_org_text::orgnode::render_org_node_from_text;
 
 use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication

@@ -1,9 +1,10 @@
 pub mod file_io;
 pub mod hyperlinks;
-pub mod render;
+pub mod mk_org_text;
 pub mod save;
 pub mod serve;
 pub mod tantivy;
 pub mod test_utils;
 pub mod typedb;
 pub mod types;
+pub mod util;

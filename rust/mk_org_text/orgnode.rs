@@ -1,4 +1,5 @@
 use crate::types::{OrgNode, headlinemd_to_string};
+use crate::mk_org_text::util::org_bullet;
 
 /// Renders an OrgNode as an org-mode formatted string.
 pub fn render_org_node_from_text (
@@ -35,6 +36,3 @@ pub fn render_org_node_from_text (
       if ! body_text . ends_with ( '\n' ) {
         result . push ( '\n' ); }} }
   result }
-
-pub fn org_bullet ( level: usize ) -> String {
-  "*" . repeat ( level.max ( 1 )) }
