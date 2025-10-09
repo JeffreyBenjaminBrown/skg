@@ -6,7 +6,7 @@ use std::net::TcpStream; // handles two-way communication
 
 /// Extract a string value from an S-expression key-value pair.
 /// Expected format: (.. (key . "value") ..)
-pub fn extract_string_from_sexp (
+pub fn extract_v_from_kv_pair_in_sexp (
   sexp : &Sexp,
   key  : &str,
 ) -> Result<String, String> {
@@ -54,7 +54,7 @@ pub fn request_type_from_request (
     sexp::parse ( request )
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
-  extract_string_from_sexp ( &sexp, "request" ) }
+  extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
 
 pub fn node_id_from_single_root_view_request (
   request : &str
@@ -63,7 +63,7 @@ pub fn node_id_from_single_root_view_request (
     sexp::parse ( request )
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
-  extract_string_from_sexp ( &sexp, "id" )
+  extract_v_from_kv_pair_in_sexp ( &sexp, "id" )
     . map(ID) }
 
 pub fn search_terms_from_request (
@@ -73,4 +73,4 @@ pub fn search_terms_from_request (
     sexp::parse ( request )
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
-  extract_string_from_sexp ( &sexp, "terms" ) }
+  extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) }

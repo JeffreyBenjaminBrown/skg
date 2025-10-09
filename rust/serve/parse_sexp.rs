@@ -2,7 +2,7 @@
 
 use crate::types::OrgnodeMetadata;
 use crate::types::orgnode::{parse_metadata_to_headline_md, default_metadata};
-use crate::serve::util::extract_string_from_sexp;
+use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::Sexp;
 
 pub fn parse_headline_from_sexp (
@@ -16,7 +16,7 @@ pub fn parse_headline_from_sexp (
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
   let headline_text : String =
-    extract_string_from_sexp ( &sexp, "headline" ) ?;
+    extract_v_from_kv_pair_in_sexp ( &sexp, "headline" ) ?;
   let level : usize =
     count_headline_level ( &headline_text )
     . ok_or ( "Could not count asterisks in (supposed) headline." ) ?;
