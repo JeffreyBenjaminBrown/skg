@@ -112,4 +112,4 @@ Returns the newly created buffer."
       (goto-char (point-min)))
     buf))
 
-(provide 'backtracking-fold)
+(provide 'skg-org-fold)

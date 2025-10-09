@@ -15,8 +15,8 @@ echo -e "${YELLOW}Running Skg Emacs Tests...${NC}"
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Test directory
-TEST_DIR="$SCRIPT_DIR/tests/elisp"
+# Test directory (relative to project root, which is parent of SCRIPT_DIR)
+TEST_DIR="$SCRIPT_DIR/../tests/elisp"
 
 # Check if test directory exists
 if [ ! -d "$TEST_DIR" ]; then
