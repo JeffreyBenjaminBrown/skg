@@ -1,7 +1,5 @@
 ;; Metadata parsing utilities for skg headlines
 
-;; TODO: Does this duplicate functionality in heralds-minor-mode.el?
-
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.
 Returns (METADATA-ALIST BARE-VALUES-SET TITLE-TEXT) or nil if no metadata found.

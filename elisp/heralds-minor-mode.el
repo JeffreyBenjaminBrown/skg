@@ -4,6 +4,8 @@
 ;; TESTING
 ;; Try it on the sample text at the end of the file.
 
+(require 'skg-metadata)
+
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
   "When Rust sends a view of the graph to Emacs,
@@ -67,50 +69,41 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
     (metadata) ;; line's first text inside (not including) <skg< and >>
   "Returns a propertized space-separated string of heralds.
 Whitespace in METADATA is ignored."
-  (let* ( (s ;; discard whitespace
-           (replace-regexp-in-string "[ \t\n]+" "" metadata))
-          (parts (split-string s "," t))
-          (out '() )) ;; accumulates the output
-    (dolist (part parts)
-      (if (string-match ":" part)
-          ;; If so, it's a key-value pair.
-          (let* ((kv (split-string part ":" t))
-                 (k (car kv))
-                 (v (cadr kv)))
-            (cond
-             ( (and (string-equal k "type")
-                    (string-equal v "searchResult"))
-               (push (propertize "title matches" 'face
-                                 'heralds-blue-face)
-                     out))
-             ( (and (string-equal k "type")
-                    (string-equal v "aliases"))
-               (push (propertize "aliases" 'face
-                                 'heralds-blue-face)
-                     out))
-             ( (and (string-equal k "type")
-                    (string-equal v "container"))
-               (push (propertize "}" 'face
-                                 'heralds-blue-face)
-                     out))
-             (( string-equal k "id")
-              ( push (propertize "⅄" 'face
-                                 'heralds-green-face)
-                out)) ))
-        ;; Otherwise it's just a value.
-        ;; Handle bare values with a cond for multiple cases.
-        (cond
-         ((string-equal part "repeated")
-          (push (propertize "REP" 'face 'heralds-red-face)
-                out))
-         ((string-equal part "might_contain_more")
-          (push (propertize "+?" 'face 'heralds-blue-face)
-                out))
-         ((string-equal part "cycle")
-          (push (propertize "CYCLE" 'face 'heralds-yellow-face)
-                out))) ))
+  (let* ((parsed (skg-parse-metadata-inner metadata))
+         (alist (car parsed))
+         (bare-values (cadr parsed))
+         (out '()))
+    (dolist (kv alist)
+      (let ((k (car kv))
+           (v (cdr kv)))
+        ( cond
+          ((and (string-equal k "type")
+                (string-equal v "searchResult"))
+           (push (propertize "title matches" 'face 'heralds-blue-face)
+                 out))
+          ((and (string-equal k "type")
+                (string-equal v "aliases"))
+           (push (propertize "aliases" 'face 'heralds-blue-face)
+                 out))
+          ((and (string-equal k "type")
+                (string-equal v "container"))
+           (push (propertize "}" 'face 'heralds-blue-face)
+                 out))
+          ((string-equal k "id")
+           (push (propertize "⅄" 'face 'heralds-green-face)
+                 out)))))
+    (dolist (bare-val bare-values)
+      (cond ((string-equal bare-val "repeated")
+        (push (propertize "REP" 'face 'heralds-red-face)
+              out))
+       ((string-equal bare-val "might_contain_more")
+        (push (propertize "+?" 'face 'heralds-blue-face)
+              out))
+       ((string-equal bare-val "cycle")
+        (push (propertize "CYCLE" 'face 'heralds-yellow-face)
+              out))))
     (when out
-      (mapconcat #'identity (nreverse out) " ")) ))
+      (mapconcat #'identity (nreverse out) " "))))
 
 (defun heralds-clear-overlays ()
   "Remove all overlays from buffer."
