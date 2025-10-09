@@ -46,6 +46,10 @@
 *** list which links are in a node's recursive content
 *** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
 * QA
+** redundancies
+*** mk_orgnode from save/buffer_to_orgnodes/uninterpreted.rs
+    does something already done in mk_org_text/
+*** Buffer_Cannot_Be_Saved and SaveError
 ** test the propagation of Buffer_Cannot_Be_Saved errors
    in commit 130318842f5ad0ad92279d14f85d8b950e6f844a,
    I started using

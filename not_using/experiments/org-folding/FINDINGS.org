@@ -1,0 +1,7 @@
+* Collection is non-destructive.
+  Both collections (before and after folding) produced identical results, confirming that we can collect folding information without modifying the buffer.
+* Folded invisible children, but not their visible parent, are marked folded.
+  When you fold ** 12, the children (*** 121 and *** 122) show Folded: org-fold-outline, while the parent ** 12 itself shows Folded: nil. This makes sense because the parent headline is visible - it's the children that are hidden.
+* Org uses the property key-value pair ('folded . 'org-fold-outline).
+  Where true, the folded property returns 'org-fold-outline
+  (a symbol) when folded, not just a simple boolean t.
