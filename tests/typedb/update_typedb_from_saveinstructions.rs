@@ -1,6 +1,6 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;

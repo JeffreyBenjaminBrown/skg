@@ -1,6 +1,30 @@
 use crate::save::{headline_to_triple, HeadlineInfo};
-use crate::types::{OrgNode, OrgnodeMetadata};
+use crate::types::{OrgNode, OrgnodeMetadata, SkgNode};
+use crate::file_io::read_skg_files;
+use crate::typedb::init::{overwrite_new_empty_db, define_schema};
+use crate::typedb::nodes::create_all_nodes;
+use crate::typedb::relationships::create_all_relationships;
 use ego_tree::Tree;
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
+
+/// A helper function for tests.
+pub async fn populate_test_db_from_fixtures (
+  data_folder: &str,
+  db_name: &str,
+  driver: &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+  let nodes: Vec<SkgNode> =
+    read_skg_files(data_folder)?;
+  overwrite_new_empty_db (
+    db_name, driver ). await ?;
+  define_schema (
+    db_name, driver ). await?;
+  create_all_nodes (
+    db_name, driver, &nodes ). await ?;
+  create_all_relationships (
+    db_name, driver, &nodes ). await ?;
+  Ok (( )) }
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.

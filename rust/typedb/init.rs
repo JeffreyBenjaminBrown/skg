@@ -16,24 +16,6 @@ use typedb_driver::{
 };
 
 
-/// A helper function for tests.
-pub async fn populate_test_db_from_fixtures (
-  data_folder: &str,
-  db_name: &str,
-  driver: &TypeDBDriver
-) -> Result<(), Box<dyn Error>> {
-  let nodes: Vec<SkgNode> =
-    read_skg_files(data_folder)?;
-  overwrite_new_empty_db (
-    db_name, driver ). await ?;
-  define_schema (
-    db_name, driver ). await?;
-  create_all_nodes (
-    db_name, driver, &nodes ). await ?;
-  create_all_relationships (
-    db_name, driver, &nodes ). await ?;
-  Ok (( )) }
-
 pub fn initialize_typedb_from_nodes (
   config : & SkgConfig,
   nodes: &[SkgNode],
@@ -93,7 +75,7 @@ pub fn initialize_typedb_from_nodes (
   println!("TypeDB database initialized successfully.");
   Arc::new( driver ) }
 
-async fn overwrite_new_empty_db (
+pub async fn overwrite_new_empty_db (
   // Destroys the db named `db_name` if it exists,
   // then makes a new, empty one.
   db_name : &str,

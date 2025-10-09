@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
 

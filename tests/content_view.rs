@@ -10,7 +10,7 @@ use typedb_driver::{
 };
 
 use skg::mk_org_text::{multi_root_view};
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   path_containerward_to_end_cycle_and_or_branches, };

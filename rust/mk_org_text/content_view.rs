@@ -1,8 +1,7 @@
 use crate::file_io::read_node;
 use crate::util::path_from_pid;
-use crate::typedb::search::{
-  climb_containerward_and_fetch_rootish_context,
-  pid_from_id, };
+use crate::typedb::search::climb_containerward_and_fetch_rootish_context;
+use crate::typedb::util::pid_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::util::newline_to_space;

@@ -2,10 +2,10 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::typedb::search::find_related_nodes;
-use skg::typedb::search::util::extract_payload_from_typedb_string_rep;
+use skg::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::types::{ID, SkgConfig};
 
 use futures::StreamExt;

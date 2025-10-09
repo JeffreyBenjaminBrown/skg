@@ -1,5 +1,5 @@
 use crate::types::{ID, SkgNode};
-use crate::typedb::search::util::extract_payload_from_typedb_string_rep;
+use crate::typedb::util::extract_payload_from_typedb_string_rep;
 
 use futures::StreamExt;
 use std::collections::{ HashSet, BTreeSet };

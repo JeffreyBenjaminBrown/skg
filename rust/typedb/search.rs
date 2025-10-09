@@ -9,10 +9,7 @@ use typedb_driver::{
 };
 
 use crate::types::ID;
-
-pub mod util;
-pub use util::extract_payload_from_typedb_string_rep;
-pub use util::pid_from_id;
+use crate::typedb::util::{extract_payload_from_typedb_string_rep, pid_from_id};
 
 
 /* Searches containerward recursively until reaching the first node

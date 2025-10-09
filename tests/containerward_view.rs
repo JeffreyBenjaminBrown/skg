@@ -1,7 +1,7 @@
 // cargo test test_containerward_view
 
 use indoc::indoc;
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::mk_org_text::containerward_org_view;
 use skg::types::{ID, SkgConfig};
 

@@ -5,7 +5,7 @@ and add missing IDs where relToOrgParent is Content.
 */
 
 use crate::types::{OrgNode, RelToOrgParent, ID};
-use crate::typedb::search::util::pid_from_id;
+use crate::typedb::util::pid_from_id;
 use ego_tree::Tree;
 use std::boxed::Box;
 use std::error::Error;

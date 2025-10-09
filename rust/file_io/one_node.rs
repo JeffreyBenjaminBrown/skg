@@ -1,5 +1,5 @@
 use crate::types::{ID, SkgNode, SkgConfig};
-use crate::typedb::search::pid_from_id;
+use crate::typedb::util::pid_from_id;
 use crate::util::path_from_pid;
 use std::error::Error;
 use std::io;

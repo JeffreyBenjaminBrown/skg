@@ -6,7 +6,7 @@
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions, find_inconsistent_instructions};
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
-use skg::typedb::init::populate_test_db_from_fixtures;
+use skg::test_utils::populate_test_db_from_fixtures;
 use skg::types::{ID, SkgConfig};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 use std::path::PathBuf;
