@@ -54,8 +54,13 @@ pub fn replace_each_link_with_its_label (
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::types::{HyperlinkParseError, ID, empty_skgnode};
+  use super::{
+    Hyperlink,
+    hyperlinks_from_node,
+    hyperlinks_from_text,
+    replace_each_link_with_its_label,
+  };
+  use crate::types::{HyperlinkParseError, ID, SkgNode, empty_skgnode};
 
   #[test]
   fn test_hyperlink_to_string() {

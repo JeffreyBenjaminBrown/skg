@@ -1,8 +1,19 @@
 pub use init::initialize_typedb_from_nodes;
 pub mod init;
-pub use nodes::*;
+pub use nodes::{
+    create_all_nodes,
+    create_only_nodes_with_no_ids_present,
+    create_node,
+    insert_extra_ids,
+    which_ids_exist,
+    delete_nodes_from_pids,
+};
 pub mod nodes;
-pub use relationships::*;
+pub use relationships::{
+    create_all_relationships,
+    create_relationships_from_node,
+    delete_out_links,
+};
 pub mod relationships;
 pub mod search;
 pub use search::{

@@ -1,10 +1,21 @@
 pub mod none_node_fields_are_noops;
 pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 
-pub use buffer_to_orgnodes::*;
+pub use buffer_to_orgnodes::{
+    org_to_uninterpreted_nodes,
+    headline_to_triple,
+    HeadlineInfo,
+    find_inconsistent_instructions,
+    find_buffer_errors_for_saving,
+    add_missing_info_to_trees,
+};
 pub mod buffer_to_orgnodes;
 
-pub use orgnodes_to_instructions::*;
+pub use orgnodes_to_instructions::{
+    orgnodes_to_save_instructions,
+    orgnodes_to_dirty_save_instructions,
+    reconcile_dup_instructions,
+};
 pub mod orgnodes_to_instructions;
 
 use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved};

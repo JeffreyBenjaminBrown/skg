@@ -4,7 +4,8 @@ use skg::serve::parse_headline_from_sexp;
 use skg::types::ID;
 
 use std::error::Error;
-use rand::prelude::*;
+use rand::prelude::{thread_rng, ThreadRng};
+use rand::Rng;
 
 #[test]
 fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {

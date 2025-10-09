@@ -1,7 +1,7 @@
 pub mod containerward_view;
 pub mod node_aliases;
 pub mod parse_sexp;
-pub use parse_sexp::*;
+pub use parse_sexp::parse_headline_from_sexp;
 pub mod save_buffer;
 pub mod single_root_view;
 pub use title_matches::generate_title_matches_response;
