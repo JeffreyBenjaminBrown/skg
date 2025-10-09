@@ -55,6 +55,28 @@
                        expected))))
     (kill-buffer buf)))
 
+(ert-deftest test-skg-remove-folded-markers ()
+  "Test that skg-remove-folded-markers handles all cases correctly."
+  (let ((buf (generate-new-buffer "*test-remove-folded*")))
+    (with-current-buffer buf
+      (org-mode)
+      (insert "* <skg<folded>> only folded
+* <skg<folded,other>> folded first
+Body text.
+* <skg<key:value,folded>> folded last
+* <skg<k:v,folded,other>> folded middle
+* <skg<other>> no folded")
+      (skg-remove-folded-markers)
+      (should (equal (buffer-substring-no-properties (point-min)
+                                                     (point-max))
+                     "* <skg<>> only folded
+* <skg<other>> folded first
+Body text.
+* <skg<key:value>> folded last
+* <skg<k:v,other>> folded middle
+* <skg<other>> no folded")))
+    (kill-buffer buf)))
+
 (defun count-visible-nonempty-lines ()
   "Count the number of visible non-empty lines in the current buffer."
   (let

@@ -63,18 +63,36 @@ Then process the buffer from the top, via this loop:
           (org-cycle)) )) ))
 
 (defun skg-remove-folded-markers ()
-  "Remove ', *folded' from all <skg<...>> metadata markers.
-Removes any amount of whitespace before 'folded', preserving the
-trailing > or , character.
-Works on all text including invisible regions."
+  "Remove 'folded' from all <skg<...>> metadata markers.
+Handles all cases:
+folded as only value, first value, middle value, or last value.
+Works on all text including invisible regions.
+.
+PITFALL: Does not use skg-metadata.el, even though that module
+defines functions for modifying metadata,
+because those functions change the buffer's folding state.
+.
+SOLUTION: If this ever gives me problems, this can be deleted,
+PROVIDED that (just) before it sends the buffer to Rust,
+Emacs recomputes all folded metadata."
   (save-excursion
     (goto-char (point-min))
     (let ((inhibit-read-only t)
           (buffer-invisibility-spec buffer-invisibility-spec))
       (setq ;; Temporarily make all text visible for replacement
        buffer-invisibility-spec nil)
-      (while (re-search-forward ", *folded\\([>,]\\)" nil t)
-        (replace-match "\\1" nil nil))
+      (progn ;; folded is the only value: <skg<folded>> → <skg<>>
+        (goto-char (point-min))
+        (while (re-search-forward "<skg< *folded *>>" nil t)
+          (replace-match "<skg<>>" nil nil)))
+      (progn ;; folded is first with comma after: <skg<folded,other>> → <skg<other>>
+        (goto-char (point-min))
+        (while (re-search-forward "<skg< *folded *, *" nil t)
+          (replace-match "<skg<" nil nil)))
+      (progn ;; folded is in middle or last: <skg<...,folded...>> → <skg<...>>
+        (goto-char (point-min))
+        (while (re-search-forward ", *folded\\([>,]\\)" nil t)
+          (replace-match "\\1" nil nil)))
       (setq ;; Restore invisibility
        buffer-invisibility-spec buffer-invisibility-spec))))
 
