@@ -14,9 +14,9 @@
   "* 1
 1 body
 * (skg) 2
-* (skg k:v value) 3
+* (skg (k v) value) 3
 3 body
-* (skg value k:v) 4"
+* (skg value (k v)) 4"
   "Immutable example data for metadata editing tests.")
 
 (defun apply-to-all-lines
@@ -61,9 +61,9 @@
                      "* 1
 1 body
 * (skg) 2
-* (skg k:v value) 3
+* (skg (k v) value) 3
 3 body
-* (skg k:v value) 4")))
+* (skg (k v) value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-delete-value-exists ()
@@ -80,9 +80,9 @@
                      "* 1
 1 body
 * (skg) 2
-* (skg k:v) 3
+* (skg (k v)) 3
 3 body
-* (skg k:v) 4")))
+* (skg (k v)) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-delete-value-not-exists ()
@@ -99,9 +99,9 @@
                      "* 1
 1 body
 * (skg) 2
-* (skg k:v value) 3
+* (skg (k v) value) 3
 3 body
-* (skg k:v value) 4")))
+* (skg (k v) value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-value-exists ()
@@ -118,9 +118,9 @@
                      "* (skg value) 1
 1 body
 * (skg value) 2
-* (skg k:v value) 3
+* (skg (k v) value) 3
 3 body
-* (skg value k:v) 4")))
+* (skg value (k v)) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-value-not-exists ()
@@ -137,9 +137,9 @@
                      "* (skg new-value) 1
 1 body
 * (skg new-value) 2
-* (skg k:v value new-value) 3
+* (skg (k v) value new-value) 3
 3 body
-* (skg k:v value new-value) 4")))
+* (skg (k v) value new-value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-kv-pair-exists ()
@@ -153,12 +153,12 @@
        #'skg-insert-kv-pair-into-metadata "k" "v")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* (skg k:v) 1
+                     "* (skg (k v)) 1
 1 body
-* (skg k:v) 2
-* (skg k:v value) 3
+* (skg (k v)) 2
+* (skg (k v) value) 3
 3 body
-* (skg value k:v) 4")))
+* (skg value (k v)) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-kv-pair-not-exists ()
@@ -172,12 +172,12 @@
        #'skg-insert-kv-pair-into-metadata "h" "w")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* (skg h:w) 1
+                     "* (skg (h w)) 1
 1 body
-* (skg h:w) 2
-* (skg k:v h:w value) 3
+* (skg (h w)) 2
+* (skg (k v) (h w) value) 3
 3 body
-* (skg k:v h:w value) 4")))
+* (skg (k v) (h w) value) 4")))
     (kill-buffer buf)))
 
 (provide 'test-skg-metadata-editing)

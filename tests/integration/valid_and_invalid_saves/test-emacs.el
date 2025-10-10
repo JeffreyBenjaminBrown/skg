@@ -1,7 +1,7 @@
 ;;; Integration test for skg save error handling
 ;;; This script tests:
-;;; 1. Invalid save (duplicate ID without ,repeated) should show error buffer
-;;; 2. Valid save (with ,repeated) should work normally
+;;; 1. Invalid save (duplicate ID without repeated) should show error buffer
+;;; 2. Valid save (with repeated) should work normally
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -42,12 +42,12 @@
 
 (defun test-invalid-save ()
   "Test invalid save that should create error buffer."
-  (message "=== PHASE 1: Testing invalid save (duplicate ID without ,repeated) ===")
+  (message "=== PHASE 1: Testing invalid save (duplicate ID without repeated) ===")
 
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
     (erase-buffer)
-    (insert "* <skg<id:1>> 1\n** <skg<id:1>> 1")
+    (insert "* (skg (id 1)) 1\n** (skg (id 1)) 1")
     (org-mode)
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
@@ -82,7 +82,7 @@
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* <skg<id:1>> 1\n** <skg<id:1>> 1")
+                  (if (string= content "* (skg (id 1)) 1\n** (skg (id 1)) 1")
                       (progn
                         (message "✓ PASS: Original *skg-content-view* buffer preserved")
                         (setq integration-test-phase "invalid-save-complete")
@@ -90,7 +90,7 @@
                         (test-valid-save))
                     (progn
                       (message "✗ FAIL: Original buffer content was modified")
-                      (message "Expected: %S" "* <skg<id:1>> 1\n** <skg<id:1>> 1")
+                      (message "Expected: %S" "* (skg (id 1)) 1\n** (skg (id 1)) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn
@@ -105,14 +105,14 @@
 
 (defun test-valid-save ()
   "Test valid save after fixing the content."
-  (message "=== PHASE 2: Testing valid save (with ,repeated) ===")
+  (message "=== PHASE 2: Testing valid save (with repeated) ===")
 
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
-    (search-forward "** <skg<id:1>> 1")
-    (replace-match "** <skg<id:1,repeated>> 1")
-    (message "✓ Fixed content to use ,repeated"))
+    (search-forward "** (skg (id 1)) 1")
+    (replace-match "** (skg (id 1) repeated) 1")
+    (message "✓ Fixed content to use repeated"))
 
   ;; Switch to buffer to make it current
   (switch-to-buffer "*skg-content-view*")

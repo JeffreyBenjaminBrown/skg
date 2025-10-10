@@ -10,18 +10,18 @@ fn test_find_buffer_errors_for_saving() {
   // Test input with various validation errors
   let input_with_errors: &str =
     indoc! {"
-            * (skg id:root) Valid root node
-            ** (skg relToOrgParent:aliasCol) AliasCol with body problem
+            * (skg (id root)) Valid root node
+            ** (skg (relToOrgParent aliasCol)) AliasCol with body problem
             This body should not exist on AliasCol
-            *** (skg id:bad_child) Child of AliasCol with ID
+            *** (skg (id bad_child)) Child of AliasCol with ID
             *** Regular child without ID
-            ** (skg relToOrgParent:alias) Alias with body problem and orphaned
+            ** (skg (relToOrgParent alias)) Alias with body problem and orphaned
             This body should not exist on Alias
             *** Any child of Alias (bad)
-            ** (skg relToOrgParent:alias) Alias under non-AliasCol parent
-            * (skg relToOrgParent:alias) Root level Alias (bad)
-            * (skg id:conflict toDelete) Node with deletion conflict
-            * (skg id:conflict) Same ID but no toDelete flag
+            ** (skg (relToOrgParent alias)) Alias under non-AliasCol parent
+            * (skg (relToOrgParent alias)) Root level Alias (bad)
+            * (skg (id conflict) toDelete) Node with deletion conflict
+            * (skg (id conflict)) Same ID but no toDelete flag
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -105,12 +105,12 @@ fn test_find_buffer_errors_for_saving_valid_input() {
   // Test input with no validation errors
   let valid_input: &str =
     indoc! {"
-            * (skg id:root) Valid root node
-            ** (skg relToOrgParent:aliasCol) AliasCol without body
+            * (skg (id root)) Valid root node
+            ** (skg (relToOrgParent aliasCol)) AliasCol without body
             *** Regular child without ID
             *** Another child without ID
-            *** (skg relToOrgParent:alias) Alias without body
-            ** (skg id:normal) Normal node with body
+            *** (skg (relToOrgParent alias)) Alias without body
+            ** (skg (id normal)) Normal node with body
             This body is allowed on normal nodes
         "};
 
@@ -135,11 +135,11 @@ fn test_multiple_aliascols_in_children() {
   // Test input with multiple AliasCol children
   let input_with_multiple_aliascols: &str =
     indoc! {"
-            * (skg id:root) Node with multiple AliasCol children
-            ** (skg relToOrgParent:aliasCol) First AliasCol
-            *** (skg relToOrgParent:alias) First alias
-            ** (skg relToOrgParent:aliasCol) Second AliasCol
-            *** (skg relToOrgParent:alias) Second alias
+            * (skg (id root)) Node with multiple AliasCol children
+            ** (skg (relToOrgParent aliasCol)) First AliasCol
+            *** (skg (relToOrgParent alias)) First alias
+            ** (skg (relToOrgParent aliasCol)) Second AliasCol
+            *** (skg (relToOrgParent alias)) Second alias
             ** Normal child
         "};
 

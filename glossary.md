@@ -28,8 +28,8 @@ Sometimes an API response is prefixed with a length, letting the receiver know h
 ## md = Metadata
 
 Most org nodes are prefixed with some metadata.
-In Emacs, that metadata is represented as a string like
-<sgk<key:value,bare_value,..>>,
+In Emacs, that metadata is represented as an s-expression like
+(skg (key value) bare_value ...),
 with any number of key-value and bare-value pairs in any order.
 The metadata is used for Rust to know what to do with it,
 and for Emacs to let the user know how to interpret it.

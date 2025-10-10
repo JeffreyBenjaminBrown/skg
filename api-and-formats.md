@@ -33,28 +33,23 @@ Rust sends the entire text document to Emacs, org-bullets and all.
 Each org-bullet is followed by a space, some metadata, a space,
 and then headline text.
 
-The metadata is a comma-separated list of values and key-value pairs,
-bracketed by "<skg<" and ">>" -- something like
+The metadata is an s-expression containing bare values and key-value pairs,
+wrapped in "(skg ...)" -- something like
 ```
- <skg<id:long-string, repeated, key:value, another-value>>
+ (skg (id long-string) repeated (key value) another-value)
 ```
 
 Any such string is valid metadata
 (although much of it might be ignored by Emacs),
 if and only if it adheres to the following:
 
-- commas
-  - The values and key-value pairs are separated by commas.
-  - There should be no other commas in the metadata.
-- colons
-  - Keys are separated from values by colons.
-  - There should be no other colons.
+- parentheses
+  - The metadata starts with "(skg" and ends with ")".
+  - Key-value pairs are wrapped in their own parens: "(key value)".
 - whitespace
-  - Whitespace in the raw metadata is ignored.
+  - Whitespace separates all elements.
+  - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
-- < and > characters
-  - The metadata should start with <skg< and wend with >>.
-  - There should be no other < or > characters.
 
 # The .skg file format
 
@@ -74,8 +69,8 @@ Each node's filename is just its primary ID followed by ".skg".
 
 Most org headlines in the client will have a 'metadata header',
 consisting of some bare values and some key-value pairs
-separated by commas. Each kv pair is separated by a colon.
-The whole collection is wrapped in <skg<...>>.
+separated by whitespace. Each kv pair is wrapped in parens: (key value).
+The whole collection is wrapped in (skg ...).
 This metadata appears right after the org bullet and a whitespace,
 and right before another whitespace and the node's title.
 

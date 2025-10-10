@@ -127,12 +127,12 @@ fn test_hyperlinks_extracted_during_read() -> std::io::Result<()> {
   let file_path = dir.path().join("test_node.skg");
 
   let mut test_node : SkgNode = empty_skgnode ();
-  { test_node.title = "Title with two hyperlinks: [[id:hyperlink1][First Hyperlink]] and [[id:hyperlink2][Second Hyperlink]]"
+  { test_node.title = "Title with two hyperlinks: [[(id hyperlink1][First) Hyperlink]] and [[(id hyperlink2][Second) Hyperlink]]"
       .to_string();
     test_node.aliases = Some(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
     test_node.ids = vec![ID::new("test123")];
-    test_node.body = Some("Some text with a link [[id:hyperlink3][Third Hyperlink]] and another [[id:hyperlink4][Fourth Hyperlink]]".to_string()); }
+    test_node.body = Some("Some text with a link [[(id hyperlink3][Third) Hyperlink]] and another [[(id hyperlink4][Fourth) Hyperlink]]".to_string()); }
 
   { // Write the node to a file
     let yaml = serde_yaml::to_string(&test_node)
@@ -179,7 +179,7 @@ fn test_fetch_aliases_from_file() -> std::io::Result<()> {
 fn test_aliases_to_org() -> std::io::Result<()> {
   assert_eq! ( // a node without aliases
     aliases_to_org ( vec![], 3 ),
-    "**** (skg relToOrgParent:aliasCol)\n",
+    "**** (skg (relToOrgParent aliasCol))\n",
     "Should return just header for node without aliases" );
 
   assert_eq! ( // a node with aliases
@@ -187,9 +187,9 @@ fn test_aliases_to_org() -> std::io::Result<()> {
       vec![ "first alias".to_string(),
              "second alias".to_string() ], 1 ),
     indoc! { r#"
-      ** (skg relToOrgParent:aliasCol)
-      *** (skg relToOrgParent:alias) first alias
-      *** (skg relToOrgParent:alias) second alias
+      ** (skg (relToOrgParent aliasCol))
+      *** (skg (relToOrgParent alias)) first alias
+      *** (skg (relToOrgParent alias)) second alias
       "# }, // trailing newline matters
     "Should return header + alias lines for node with aliases" );
 

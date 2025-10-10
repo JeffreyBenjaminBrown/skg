@@ -15,11 +15,11 @@
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
-*** (skg id:1 folded) 111
-*** (skg id:2 folded mightContainMore) 112
+*** (skg (id 1) folded) 111
+*** (skg (id 2) folded mightContainMore) 112
 ** 12
 12 body
-*** (skg id:3 folded) 121
+*** (skg (id 3) folded) 121
 121 body
 *** 122
 ** 13")
@@ -41,11 +41,11 @@
             "* 1
 1 body
 ** 11
-*** (skg id:1 folded) 111
-*** (skg id:2 mightContainMore folded) 112
+*** (skg (id 1) folded) 111
+*** (skg (id 2) mightContainMore folded) 112
 ** 12
 12 body
-*** (skg id:3 folded) 121
+*** (skg (id 3) folded) 121
 121 body
 *** (skg folded) 122
 ** 13")
@@ -63,8 +63,8 @@
       (insert "* (skg folded) only folded
 * (skg folded other) folded first
 Body text.
-* (skg key:value folded) folded last
-* (skg k:v folded other) folded middle
+* (skg (key value) folded) folded last
+* (skg (k v) folded other) folded middle
 * (skg other) no folded")
       (skg-remove-folded-markers)
       (should (equal (buffer-substring-no-properties (point-min)
@@ -72,8 +72,8 @@ Body text.
                      "* (skg) only folded
 * (skg other) folded first
 Body text.
-* (skg key:value) folded last
-* (skg k:v other) folded middle
+* (skg (key value)) folded last
+* (skg (k v) other) folded middle
 * (skg other) no folded")))
     (kill-buffer buf)))
 

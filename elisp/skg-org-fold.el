@@ -68,33 +68,57 @@ Handles all cases:
 folded as only value, first value, middle value, or last value.
 Works on all text including invisible regions.
 .
-PITFALL: Does not use skg-metadata.el, even though that module
-defines functions for modifying metadata,
-because those functions change the buffer's folding state.
-.
-SOLUTION: If this ever gives me problems, this can be deleted,
-PROVIDED that (just) before it sends the buffer to Rust,
-Emacs recomputes all folded metadata."
+Uses skg-metadata.el functions to properly handle nested parentheses."
   (save-excursion
     (goto-char (point-min))
     (let ((inhibit-read-only t)
-          (buffer-invisibility-spec buffer-invisibility-spec))
-      (setq ;; Temporarily make all text visible for replacement
-       buffer-invisibility-spec nil)
-      (progn ;; folded is the only value: (skg folded) → (skg)
-        (goto-char (point-min))
-        (while (re-search-forward "(skg +folded *)" nil t)
-          (replace-match "(skg)" nil nil)))
-      (progn ;; folded is first with whitespace after: (skg folded other) → (skg other)
-        (goto-char (point-min))
-        (while (re-search-forward "(skg +folded +\\([^)]+\\))" nil t)
-          (replace-match "(skg \\1)" nil nil)))
-      (progn ;; folded is in middle or last within (skg ...): → remove it
-        (goto-char (point-min))
-        (while (re-search-forward "(skg\\([^)]*\\) +\\<folded\\>\\([^)]*\\))" nil t)
-          (replace-match "(skg\\1\\2)" nil nil)))
-      (setq ;; Restore invisibility
-       buffer-invisibility-spec buffer-invisibility-spec))))
+          (saved-invisibility-spec buffer-invisibility-spec)
+          (invisible-markers '()))
+      ;; First pass: record which headlines are invisible
+      (while (not (eobp))
+        (beginning-of-line)
+        (when (and (org-at-heading-p)
+                   (invisible-p (point)))
+          (push (point-marker) invisible-markers))
+        (forward-line 1))
+      ;; Second pass: remove folded markers, making text temporarily visible
+      (setq buffer-invisibility-spec nil)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (beginning-of-line)
+        (when (org-at-heading-p)
+          (let* ((bol (line-beginning-position))
+                 (eol (line-end-position))
+                 (headline-text (buffer-substring-no-properties bol eol)))
+            (when (string-match-p "(skg" headline-text)
+              (let* ((match-result (skg-match-headline-with-metadata headline-text)))
+                (when match-result
+                  (let* ((stars (nth 0 match-result))
+                         (inner (nth 1 match-result))
+                         (title (nth 2 match-result))
+                         (parsed (skg-parse-metadata-inner inner))
+                         (alist (car parsed))
+                         (bare-values (cadr parsed))
+                         (filtered-values
+                          (seq-filter (lambda (v)
+                                        (not (string-equal v "folded")))
+                                      bare-values))
+                         (new-inner (skg-reconstruct-metadata-inner
+                                     alist filtered-values))
+                         (new-headline (skg-format-headline stars new-inner title)))
+                    (delete-region bol eol)
+                    (goto-char bol)
+                    (insert new-headline)))))))
+        (forward-line 1))
+      ;; Third pass: restore invisibility for marked headlines
+      (setq buffer-invisibility-spec saved-invisibility-spec)
+      (dolist (marker invisible-markers)
+        (goto-char marker)
+        (when (org-at-heading-p)
+          ;; Make this headline invisible again using an overlay
+          (let ((ov (make-overlay (line-beginning-position) (line-end-position))))
+            (overlay-put ov 'invisible 'outline)))
+        (set-marker marker nil)))))
 
 (defun skg-create-org-buffer-with-folds (content)
   "Create an org-mode buffer from CONTENT string.

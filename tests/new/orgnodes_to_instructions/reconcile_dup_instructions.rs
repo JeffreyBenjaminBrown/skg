@@ -73,8 +73,8 @@ impl TestContext {
 
 fn test_inconsistent_delete() {
   let input = indoc! {"
-        * (skg id:1) 1
-        * (skg id:1 toDelete) 2
+        * (skg (id 1)) 1
+        * (skg (id 1) toDelete) 2
     "};
 
   let trees = org_to_uninterpreted_nodes(input).unwrap();
@@ -93,9 +93,9 @@ fn test_inconsistent_delete() {
 
 async fn test_deletions_excluded(ctx: &TestContext) {
   let input = indoc! {"
-        * (skg id:1) 1
-        ** (skg id:2 toDelete) 2
-        ** (skg id:3) 3
+        * (skg (id 1)) 1
+        ** (skg (id 2) toDelete) 2
+        ** (skg (id 3)) 3
     "};
 
   if let Ok(reduced) = ctx.run_pipeline(input).await {
@@ -115,11 +115,11 @@ async fn test_deletions_excluded(ctx: &TestContext) {
 
 async fn test_defining_node_defines(ctx: &TestContext) {
   let input = indoc! {"
-        * (skg id:1 mightContainMore) 1 adder
+        * (skg (id 1) mightContainMore) 1 adder
         Ignored body.
-        ** (skg id:2) 2
-        * (skg id:1) 1 definer
-        ** (skg id:3) 3
+        ** (skg (id 2)) 2
+        * (skg (id 1)) 1 definer
+        ** (skg (id 3)) 3
     "};
 
   if let Ok(reduced) = ctx.run_pipeline(input).await {
@@ -136,10 +136,10 @@ async fn test_defining_node_defines(ctx: &TestContext) {
 
 async fn test_adding_without_definer(ctx: &TestContext) {
   let input = indoc! {"
-        * (skg id:1 mightContainMore) 1 adder
-        ** (skg id:2) 2
-        ** (skg id:4) 4
-        ** (skg id:4 mightContainMore) 4 again
+        * (skg (id 1) mightContainMore) 1 adder
+        ** (skg (id 2)) 2
+        ** (skg (id 4)) 4
+        ** (skg (id 4) mightContainMore) 4 again
     "};
 
   if let Ok(reduced) = ctx.run_pipeline(input).await {

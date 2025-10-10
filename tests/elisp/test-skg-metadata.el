@@ -15,7 +15,7 @@
       ((result (skg-parse-headline-metadata "title")))
     (should (null result)))
   (let ;; Test id and value only - should parse correctly with empty title
-      ((result (skg-parse-headline-metadata "(skg id:1 value)")))
+      ((result (skg-parse-headline-metadata "(skg (id 1) value)")))
     (should result)
     (let ((alist (car result))
           (set (cadr result))
@@ -24,7 +24,7 @@
       (should (equal set '("value")))
       (should (equal title ""))))
   (let ;; Test complex metadata with title
-      ((result (skg-parse-headline-metadata "(skg a b c:d e:f) title")))
+      ((result (skg-parse-headline-metadata "(skg a b (c d) (e f)) title")))
     (should result)
     (let ((alist (car result))
           (set (cadr result))
@@ -38,14 +38,14 @@
   "Test skg-parse-metadata-inner with various inputs."
 
   (let ;; Test id and value
-      ((result (skg-parse-metadata-inner "id:1 value")))
+      ((result (skg-parse-metadata-inner "(id 1) value")))
     (should result)
     (let ((alist (car result))
           (set (cadr result)))
       (should (equal alist '(("id" . "1"))))
       (should (equal set '("value")))))
   (let ;; Test complex metadata
-      ((result (skg-parse-metadata-inner "a b c:d e:f")))
+      ((result (skg-parse-metadata-inner "a b (c d) (e f)")))
     (should result)
     (let ((alist (car result))
           (set (cadr result)))

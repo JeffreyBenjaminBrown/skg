@@ -40,7 +40,7 @@ fn test_render_org_node_from_text_with_metadata () {
       body : None, };
   let result : String =
     render_org_node_from_text ( 1, &node );
-  assert_eq! ( result, "* (skg relToOrgParent:aliasCol folded) Test Title\n" ); }
+  assert_eq! ( result, "* (skg (relToOrgParent aliasCol) folded) Test Title\n" ); }
 
 #[test]
 fn test_render_org_node_from_text_with_id_metadata () {
@@ -54,7 +54,7 @@ fn test_render_org_node_from_text_with_id_metadata () {
       body : None, };
   let result : String =
     render_org_node_from_text ( 3, &node );
-  assert_eq! ( result, "*** (skg id:test123 repeated) Test Title\n" ); }
+  assert_eq! ( result, "*** (skg (id test123) repeated) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {
@@ -74,7 +74,7 @@ fn test_metadata_ordering () {
       body : None, };
   let result : String =
     render_org_node_from_text ( 1, &node );
-  assert_eq! ( result, "* (skg id:xyz repeated cycle) Test\n" ); }
+  assert_eq! ( result, "* (skg (id xyz) repeated cycle) Test\n" ); }
 
 #[test]
 #[should_panic ( expected = "render_org_node_from_text called with both empty metadata and empty title" )]

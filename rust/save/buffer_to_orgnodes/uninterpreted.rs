@@ -7,6 +7,9 @@ use regex::Regex;
 /// Type alias for headline information: (level, metadata, title)
 pub type HeadlineInfo = (usize, Option<OrgnodeMetadata>, String);
 
+/// Result type for headline parsing with specific error messages
+type HeadlineResult = Result<HeadlineInfo, String>;
+
 /// Represents a parsed org node with its headline and body lines
 #[derive(Debug, Clone)]
 struct OrgNodeLineCol {
@@ -58,34 +61,37 @@ pub fn org_to_uninterpreted_nodes(
 fn divide_into_orgNodeLineCols (
   input: &str
 ) -> Result<Vec<OrgNodeLineCol>, String> {
-  // TODO ? This is quite inefficient.
-  // Both headline_to_triple and validate_headline_metadata
-  // parse the same string in nearly the same way.
-  // And for all but the first node, both are run twice.
-
   let lines: Vec<&str> = input.lines().collect();
   let mut result: Vec<OrgNodeLineCol> = Vec::new();
   let mut i: usize = 0;
   while i < lines.len() {
-    validate_headline_metadata( lines[i] )?;
-    if let Some(headline_info) = headline_to_triple( lines[i] ) {
-      // Found a headline. Now collect its body lines.
-      let mut body_lines: Vec<String> = Vec::new();
-      i += 1; // Move past the headline
-      while i < lines.len() {
-        validate_headline_metadata( lines[i] )?;
-        if headline_to_triple( lines[i] ) . is_some() {
-          break; // Found another headline.
-        } else {
-          body_lines.push(
-            lines[i] . to_string());
-          i += 1; }}
-      result.push ( OrgNodeLineCol {
-        headline: headline_info,
-        body: body_lines, } );
-    } else {
-      // Skip non-headline lines at the beginning of the document
-      i += 1; }}
+    match headline_to_triple( lines[i] ) {
+      Ok(headline_info) => {
+        // Found a headline. Now collect its body lines.
+        let mut body_lines: Vec<String> = Vec::new();
+        i += 1; // Move past the headline
+        while i < lines.len() {
+          match headline_to_triple( lines[i] ) {
+            Ok(_) => break, // Found another headline
+            Err(e) if e == "__NOT_A_HEADLINE__" => {
+              // Not a headline, it's a body line
+              body_lines.push( lines[i] . to_string() );
+              i += 1;
+            },
+            Err(e) => return Err(e), // Invalid metadata
+          }
+        }
+        result.push ( OrgNodeLineCol {
+          headline: headline_info,
+          body: body_lines, } );
+      },
+      Err(e) if e == "__NOT_A_HEADLINE__" => {
+        // Skip non-headline lines at the beginning of the document
+        i += 1;
+      },
+      Err(e) => return Err(e), // Invalid metadata
+    }
+  }
   Ok (result) }
 
 /// Create an OrgNode from an OrgNodeLineCol.
@@ -112,52 +118,66 @@ fn mk_orgnode(
           body: body_text, }
   )) }
 
-/// Validate a headline for metadata errors without parsing it.
-/// Returns an error if the line looks like a headline but has invalid metadata.
-/// Returns Ok(()) if the line is not a headline or has valid metadata.
-fn validate_headline_metadata(
-  headline: &str
-) -> Result<(), String> {
-  static HEADLINE_REGEX
-    : std::sync::LazyLock<Regex>
-    = std::sync::LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(?:\(skg\s*([^)]*)\)\s*)?(.+)").unwrap()
-    });
-  if let Some(captures) = HEADLINE_REGEX.captures(headline) {
-    if let Some(meta_match) = captures.get(2) {
-      // This line has metadata, validate it
-      parse_metadata_to_headline_md(
-        meta_match.as_str())?; }}
-  Ok (( )) }
-
 /// Check if a line is a valid headline and extract level, metadata, and title.
-/// Returns Some(HeadlineInfo) if it's a valid headline, None if it's not a headline.
-/// A valid headline starts with asterisks, followed by at least one whitespace,
-/// followed by at least one non-whitespace character.
-/// Invalid metadata will cause this function to return None.
+/// Returns Ok(HeadlineInfo) if it's a valid headline with valid metadata.
+/// Returns Ok with None metadata if it's a valid headline without metadata.
+/// Returns Err with specific error message if metadata is invalid.
+/// Returns Ok for non-headlines (they are valid non-headline lines).
 pub fn headline_to_triple (
   headline: &str
-) -> Option<HeadlineInfo> {
-  // Regex with capture groups:
-  // ^\s*(\*+)\s+ - capture asterisks, ditch following whitespace
-  // (?:\(skg\s*([^)]*)\)\s*)? - optionally capture metadata content, ditch following whitespace
-  // (.+) - capture the rest of the line as title
+) -> HeadlineResult {
+  // Simple regex to capture just asterisks and remainder
   static HEADLINE_REGEX
     : std::sync::LazyLock<Regex>
     = std::sync::LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(?:\(skg\s*([^)]*)\)\s*)?(.+)").unwrap()
+      Regex::new(r"^\s*(\*+)\s+(.+)").unwrap()
     });
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     let asterisks: &str = captures.get(1).unwrap().as_str();
     let level: usize = asterisks.len();
-    let metadata: Option<OrgnodeMetadata> =
-      if let Some(meta_match) = captures.get(2) {
-        match parse_metadata_to_headline_md(meta_match.as_str()) {
-          Ok(parsed_metadata) => Some(parsed_metadata),
-          Err(_) => // Invalid metadata, treat as invalid headline
-            return None, }
-      } else { None };
-    let title: String =
-      captures . get(3) . unwrap() . as_str() . to_string();
-    Some((level, metadata, title))
-  } else { None }}
+    let remainder: &str = captures.get(2).unwrap().as_str().trim();
+
+    // Check if remainder starts with metadata
+    if let Some(after_skg) = remainder.strip_prefix("(skg") {
+      // Find matching closing paren with depth tracking
+      let after_skg_trimmed: &str = after_skg.trim_start();
+      let mut depth: i32 = 1; // We already consumed the opening "(skg"
+      let mut pos: usize = 0;
+      let chars: Vec<char> = after_skg_trimmed.chars().collect();
+
+      while pos < chars.len() && depth > 0 {
+        match chars[pos] {
+          '(' => depth += 1,
+          ')' => depth -= 1,
+          _ => {}
+        }
+        if depth == 0 {
+          break;
+        }
+        pos += 1;
+      }
+
+      if depth == 0 {
+        let inner: &str = &after_skg_trimmed[..pos];
+        let metadata: Option<OrgnodeMetadata> =
+          match parse_metadata_to_headline_md(inner) {
+            Ok(parsed_metadata) => Some(parsed_metadata),
+            Err(e) => return Err(e), // Invalid metadata with specific error
+          };
+        let title: String =
+          after_skg_trimmed[pos + 1..].trim().to_string();
+        return Ok((level, metadata, title));
+      } else {
+        return Err("Unclosed metadata parentheses".to_string());
+      }
+    }
+
+    // No metadata, just title
+    let title: String = remainder.to_string();
+    Ok((level, None, title))
+  } else {
+    // Not a headline - this is OK (it's a valid non-headline line)
+    // We use a special error to signal "not a headline"
+    // This is a bit of a hack, but maintains backward compatibility
+    Err("__NOT_A_HEADLINE__".to_string())
+  }}

@@ -84,23 +84,61 @@ pub fn default_metadata () -> OrgnodeMetadata {
   } }
 
 /// Parse metadata string from org-mode headline into OrgnodeMetadata.
-/// Format: "id:xyz repeated folded relToOrgParent:container"
+/// Format: "(id xyz) repeated folded (relToOrgParent container)"
 pub fn parse_metadata_to_headline_md (
   metadata_str : &str
 ) -> Result<OrgnodeMetadata, String> {
   let mut result : OrgnodeMetadata =
     default_metadata ();
-  for part in metadata_str.split_whitespace () {
-    let trimmed : &str = part.trim ();
-    if trimmed.is_empty () { continue; }
-    if let Some (( key_str, value_str )) = trimmed.split_once ( ':' ) {
-      // Handle key:value pairs
-      let key : &str = key_str.trim ();
-      let value : &str = value_str.trim ();
+  let mut chars : std::iter::Peekable<std::str::Chars> =
+    metadata_str.chars ().peekable ();
+
+  while let Some ( c ) = chars.peek () {
+    // Skip whitespace
+    if c.is_whitespace () {
+      chars.next ();
+      continue;
+    }
+
+    if *c == '(' {
+      // Parse (key value) pair
+      chars.next (); // consume '('
+      let mut token : String = String::new ();
+      // Read until whitespace or ')'
+      while let Some ( &ch ) = chars.peek () {
+        if ch.is_whitespace () || ch == ')' {
+          break;
+        }
+        token.push ( ch );
+        chars.next ();
+      }
+
+      // Skip whitespace between key and value
+      while let Some ( &ch ) = chars.peek () {
+        if ch.is_whitespace () {
+          chars.next ();
+        } else {
+          break;
+        }}
+
+      // Read value
+      let mut value : String = String::new ();
+      while let Some ( &ch ) = chars.peek () {
+        if ch == ')' {
+          chars.next (); // consume ')'
+          break;
+        }
+        value.push ( ch );
+        chars.next ();
+      }
+
+      let key : &str = token.trim ();
+      let val : &str = value.trim ();
+
       match key {
-        "id" => { result.id = Some ( ID::from ( value )); },
+        "id" => { result.id = Some ( ID::from ( val )); },
         "relToOrgParent" => {
-          result.relToOrgParent = match value {
+          result.relToOrgParent = match val {
             "alias"        => RelToOrgParent::Alias,
             "aliasCol"     => RelToOrgParent::AliasCol,
             "container"    => RelToOrgParent::Container,
@@ -108,36 +146,47 @@ pub fn parse_metadata_to_headline_md (
             "none"         => RelToOrgParent::None,
             "searchResult" => RelToOrgParent::SearchResult,
             _ => return Err (
-              format! ( "Unknown relToOrgParent value: {}", value )),
+              format! ( "Unknown relToOrgParent value: {}", val )),
           }; },
         _ => {
           return Err ( format! ( "Unknown metadata key: {}", key )); }}
     } else {
-      // Handle bare values (boolean flags)
-      match trimmed {
-        "repeated"         => result.repeat = true,
-        "folded"           => result.folded = true,
-        "focused"          => result.focused = true,
-        "cycle"            => result.cycle = true,
-        "mightContainMore" => result.mightContainMore = true,
-        "toDelete"         => result.toDelete = true,
-        _ => {
-          return Err ( format! ( "Unknown metadata value: {}", trimmed ));
-        }} }}
+      // Parse bare value
+      let mut token : String = String::new ();
+      while let Some ( &ch ) = chars.peek () {
+        if ch.is_whitespace () || ch == '(' {
+          break;
+        }
+        token.push ( ch );
+        chars.next ();
+      }
+
+      let trimmed : &str = token.trim ();
+      if ! trimmed.is_empty () {
+        match trimmed {
+          "repeated"         => result.repeat = true,
+          "folded"           => result.folded = true,
+          "focused"          => result.focused = true,
+          "cycle"            => result.cycle = true,
+          "mightContainMore" => result.mightContainMore = true,
+          "toDelete"         => result.toDelete = true,
+          _ => {
+            return Err ( format! ( "Unknown metadata value: {}", trimmed ));
+          }}}}}
   Ok ( result ) }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_headline_md.
-/// Returns string like "id:abc123 repeated focused" etc.
+/// Returns string like "(id abc123) repeated focused" etc.
 pub fn headlinemd_to_string (
   metadata : &OrgnodeMetadata
 ) -> String {
   let mut parts : Vec<String> =
     Vec::new ();
   if let Some ( ref id ) = metadata.id {
-    parts.push ( format! ( "id:{}", id.0 )); }
+    parts.push ( format! ( "(id {})", id.0 )); }
   if metadata.relToOrgParent != RelToOrgParent::Content {
-    parts.push ( format! ( "relToOrgParent:{}", metadata.relToOrgParent )); }
+    parts.push ( format! ( "(relToOrgParent {})", metadata.relToOrgParent )); }
   if metadata.repeat {
     parts.push ( "repeated".to_string () ); }
   if metadata.folded {

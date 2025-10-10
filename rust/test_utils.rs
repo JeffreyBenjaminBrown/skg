@@ -32,12 +32,12 @@ pub fn compare_headlines_modulo_id(
   headline1: &str,
   headline2: &str
 ) -> bool {
-  let info1: Option<HeadlineInfo> = headline_to_triple(headline1);
-  let info2: Option<HeadlineInfo> = headline_to_triple(headline2);
+  let info1: Result<HeadlineInfo, String> = headline_to_triple(headline1);
+  let info2: Result<HeadlineInfo, String> = headline_to_triple(headline2);
 
   match (info1, info2) {
-    (Some((level1, metadata1, title1)),
-     Some((level2, metadata2, title2))) => {
+    (Ok((level1, metadata1, title1)),
+     Ok((level2, metadata2, title2))) => {
       let has_id1: bool = metadata1.as_ref().map_or(false, |m| m.id.is_some());
       let has_id2: bool = metadata2.as_ref().map_or(false, |m| m.id.is_some());
       if has_id1 != has_id2 {
@@ -47,8 +47,10 @@ pub fn compare_headlines_modulo_id(
       let stripped_metadata2: Option<OrgnodeMetadata> = strip_id_from_metadata_struct(metadata2);
       (level1, stripped_metadata1, title1) == (level2, stripped_metadata2, title2)
     },
-    (None, None) => headline1 == headline2,  // Both are not headlines, compare directly
-    _ => false,  // One is headline, other is not
+    (Err(e1), Err(e2)) if e1 == "__NOT_A_HEADLINE__" && e2 == "__NOT_A_HEADLINE__" => {
+      headline1 == headline2  // Both are not headlines, compare directly
+    },
+    _ => false,  // One is headline, other is not, or they have different errors
   }
 }
 

@@ -60,18 +60,36 @@ fn parse_separating_metadata_and_title (
     line_after_bullet.trim_start ();
   if let Some ( meta_start ) =
     headline_with_metadata . strip_prefix ( "(skg" ) {
-    // Look for closing paren, handling whitespace after skg
+    // Find matching closing paren with depth tracking
     let meta_start_trimmed : &str = meta_start.trim_start ();
-    if let Some ( end ) = meta_start_trimmed.find ( ')' ) {
+    let mut depth : i32 = 1; // We already consumed the opening "(skg"
+    let mut pos : usize = 0;
+    let chars : Vec<char> = meta_start_trimmed.chars().collect();
+
+    while pos < chars.len() && depth > 0 {
+      match chars[pos] {
+        '(' => depth += 1,
+        ')' => depth -= 1,
+        _ => {}
+      }
+      if depth == 0 {
+        break;
+      }
+      pos += 1;
+    }
+
+    if depth == 0 {
       let inner : &str =
-        &meta_start_trimmed[..end]; // between "(skg" and ")"
+        &meta_start_trimmed[..pos]; // between "(skg" and ")"
       let metadata : OrgnodeMetadata =
         parse_metadata_to_headline_md ( inner ) ?;
       let title_rest : &str =
-        &meta_start_trimmed[end + 1..]; // skip ")"
+        &meta_start_trimmed[pos + 1..]; // skip ")"
       let title : String =
         title_rest.trim () . to_string ();
-      return Ok (( metadata, title )); }}
+      return Ok (( metadata, title ));
+    }
+  }
   // No metadata found - use defaults
   Ok (( default_metadata (),
         headline_with_metadata.to_string () )) }
