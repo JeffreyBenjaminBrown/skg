@@ -1,4 +1,5 @@
-// Parse S-expressions from Emacs requests into OrgnodeMetadata
+/// PURPOSE: Parse headlines:
+/// the bullet, the title, and the (s-expr) metadata.
 
 use crate::types::{OrgnodeMetadata, ID, RelToOrgParent};
 use crate::types::orgnode::default_metadata;
