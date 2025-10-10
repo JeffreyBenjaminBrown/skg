@@ -22,13 +22,13 @@ pub struct SkgConfig {
   pub db_name        : String,
   pub skg_folder     : PathBuf, // The user's .skg files go here.
   pub tantivy_folder : PathBuf,
+
   #[serde(default = "default_port")]
-  pub port           : u16,     // Server port (default: 1730)
+  pub port           : u16,     // TCP port for Rust-Emacs comms.
 }
 
 fn default_port() -> u16 {
-  1730
-}
+  1730 }
 
 #[derive(Clone)]
 pub struct TantivyIndex {

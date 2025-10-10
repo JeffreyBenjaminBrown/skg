@@ -37,10 +37,11 @@ pub fn serve (
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
     = initialize_dbs ( &config );
+  // Bind to TCP port for Rust-Emacs API communication.
   let bind_addr = format!("0.0.0.0:{}", config.port);
   let emacs_listener : TcpListener =
     TcpListener::bind(&bind_addr)?;
-  println!("Listening on port {}...", config.port);
+  println!("Listening on port {} for Emacs connections...", config.port);
   for stream_res in emacs_listener.incoming() {
     match stream_res {
       Ok(stream) => {

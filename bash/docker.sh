@@ -4,6 +4,8 @@ CONTAINER_NAME=skg
 docker start $CONTAINER_NAME
 docker exec -it $CONTAINER_NAME bash
 
+# The DNS bits, somehow, permit Claude Code to
+# work through my phone's mobile hotspot.
 NATIVE=/home/jeff/hodal/skg
 docker run --name $CONTAINER_NAME -it -d \
   -v $NATIVE:/home/ubuntu                \
@@ -11,6 +13,8 @@ docker run --name $CONTAINER_NAME -it -d \
   -p 1730:1730                           \
   --platform linux/amd64                 \
   --user 1000:1000                       \
+  --dns 8.8.8.8                          \
+  --dns 1.1.1.1                          \
   jeffreybbrown/hode:latest # CAREFUL! new? latest?
 
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME

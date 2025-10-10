@@ -1,8 +1,10 @@
 # API
 
-Communication between Rust and Emacs is via TCP on port 1730. The connection is persistent.
+Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
 
-So far there are five endpoints:
+Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not Rust-Emacs communication.
+
+So far there are these endpoints:
 
 - Verify connection
   - Request: ((request . "verify connection"))

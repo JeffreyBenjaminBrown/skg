@@ -23,7 +23,9 @@ This is the **skg** project - a knowledge graph manipulation system with:
   - TypeDB is now on version 3, which has so far been after the cutoff date for training data for Claude, so bear in mind that your instincts might conflict with the current syntax.
 - **Emacs client** (`elisp/`) providing org-mode interface
 - **YAML data storage** in `.skg` files
-- **TCP communication** on port 1730 between client and server
+- **TCP communication** between components:
+  - Port 1730 (default): Rust-Emacs API communication (configurable)
+  - Port 1729: Rust-TypeDB database connection (TypeDB server)
 
 ## Critical Formatting Rules
 
