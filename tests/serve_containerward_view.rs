@@ -35,8 +35,8 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
     );
 
     match parse_headline_from_sexp(&request) { // target of test
-      Ok((headline_md, parsed_level, parsed_title)) => {
-        assert_eq!(headline_md.id, Some(ID(test_id.clone())),
+      Ok((orgnode_md, parsed_level, parsed_title)) => {
+        assert_eq!(orgnode_md.id, Some(ID(test_id.clone())),
                    "Failed to parse ID correctly for title: '{}' (headline: '{}')",
                    title, headline);
         assert_eq!(parsed_level, level,

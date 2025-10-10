@@ -47,7 +47,7 @@ pub fn find_sexp_end (
 /// Format: "(skg (id xyz) repeated folded (relToOrgParent container))"
 /// Now uses the sexp crate for proper s-expression parsing.
 /// Takes the full s-expression including the "(skg ...)" wrapper.
-pub fn parse_metadata_to_headline_md (
+pub fn parse_metadata_to_orgnodemd (
   sexp_str : &str
 ) -> Result<OrgnodeMetadata, String> {
   let mut result : OrgnodeMetadata =
@@ -112,9 +112,9 @@ pub fn parse_metadata_to_headline_md (
   Ok ( result ) }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
-/// This is the inverse of parse_metadata_to_headline_md.
+/// This is the inverse of parse_metadata_to_orgnodemd.
 /// Returns string like "(id abc123) repeated focused" etc.
-pub fn headlinemd_to_string (
+pub fn orgnodemd_to_string (
   metadata : &OrgnodeMetadata
 ) -> String {
   let mut parts : Vec<String> =
@@ -204,7 +204,7 @@ fn parse_separating_metadata_and_title (
 
       // Parse the metadata from the s-expression
       let metadata : OrgnodeMetadata =
-        parse_metadata_to_headline_md ( sexp_str ) ?;
+        parse_metadata_to_orgnodemd ( sexp_str ) ?;
 
       // The title is everything after the s-expression
       let title : String =

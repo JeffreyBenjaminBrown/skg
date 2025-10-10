@@ -9,7 +9,7 @@ pub use orgnode::{ SaveInstruction,
                    OrgNode,
                    OrgnodeMetadata,
                    RelToOrgParent, };
-pub use crate::serve::parse_sexp::headlinemd_to_string;
+pub use crate::serve::parse_sexp::orgnodemd_to_string;
 pub mod skgnode;
 pub use skgnode::{ SkgNode,
                    skgnode_example,

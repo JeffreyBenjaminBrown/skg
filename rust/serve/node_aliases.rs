@@ -17,8 +17,8 @@ pub fn handle_node_aliases_request (
 ) {
 
   match parse_headline_from_sexp ( request ) {
-    Ok ( (headline_md, level, _title) ) => {
-      match headline_md.id {
+    Ok ( (orgnode_md, level, _title) ) => {
+      match orgnode_md.id {
         Some ( id ) => {
           let aliases : Vec<String> =
             fetch_aliases_from_file ( config, id );

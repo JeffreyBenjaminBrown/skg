@@ -1,6 +1,6 @@
 use crate::types::{OrgNode, OrgnodeMetadata};
 use crate::types::orgnode::default_metadata;
-use crate::serve::parse_sexp::{parse_metadata_to_headline_md, find_sexp_end};
+use crate::serve::parse_sexp::{parse_metadata_to_orgnodemd, find_sexp_end};
 
 use ego_tree::Tree;
 use regex::Regex;
@@ -152,7 +152,7 @@ pub fn headline_to_triple (
 
         // Parse the metadata from the s-expression
         let metadata: Option<OrgnodeMetadata> =
-          match parse_metadata_to_headline_md(sexp_str) {
+          match parse_metadata_to_orgnodemd(sexp_str) {
             Ok(parsed_metadata) => Some(parsed_metadata),
             Err(e) => return Err(e), // Invalid metadata with specific error
           };

@@ -19,8 +19,8 @@ pub fn handle_containerward_view_request (
 ) {
 
   match parse_headline_from_sexp ( request ) {
-    Ok ( (headline_md, level, _title) ) => {
-      match headline_md.id {
+    Ok ( (orgnode_md, level, _title) ) => {
+      match orgnode_md.id {
         Some ( id ) => {
           let content : String = block_on ( async {
             match containerward_org_view (
