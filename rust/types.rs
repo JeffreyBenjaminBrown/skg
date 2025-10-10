@@ -8,8 +8,8 @@ pub mod orgnode;
 pub use orgnode::{ SaveInstruction,
                    OrgNode,
                    OrgnodeMetadata,
-                   RelToOrgParent,
-                   headlinemd_to_string, };
+                   RelToOrgParent, };
+pub use crate::serve::parse_sexp::headlinemd_to_string;
 pub mod skgnode;
 pub use skgnode::{ SkgNode,
                    skgnode_example,

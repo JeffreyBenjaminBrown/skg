@@ -1,7 +1,6 @@
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
 use crate::types::{SkgNode, SkgConfig};
-use crate::file_io::read_skg_files;
 
 use futures::executor::block_on;
 use std::error::Error;

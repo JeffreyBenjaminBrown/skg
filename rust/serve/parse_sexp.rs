@@ -1,9 +1,141 @@
 // Parse S-expressions from Emacs requests into OrgnodeMetadata
 
-use crate::types::OrgnodeMetadata;
-use crate::types::orgnode::{parse_metadata_to_headline_md, default_metadata};
+use crate::types::{OrgnodeMetadata, ID, RelToOrgParent};
+use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
-use sexp::Sexp;
+use sexp::{Sexp, Atom};
+
+
+/// Helper function to extract string value from any Sexp atom.
+/// Converts integers and floats to strings as needed.
+fn atom_to_string (
+  atom : &Sexp
+) -> Result<String, String> {
+  match atom {
+    Sexp::Atom ( Atom::S ( s ) ) => Ok ( s . clone () ),
+    Sexp::Atom ( Atom::I ( i ) ) => Ok ( i . to_string () ),
+    Sexp::Atom ( Atom::F ( f ) ) => Ok ( f . to_string () ),
+    _ => Err ( "Expected atom (string, integer, or float)".to_string () ),
+  } }
+
+/// Find the end position of an s-expression in a string.
+/// Uses simple parenthesis matching to locate the closing paren.
+/// Returns the byte position immediately after the closing paren,
+/// or None if parentheses are unbalanced.
+pub fn find_sexp_end (
+  text : &str
+) -> Option<usize> {
+  let mut depth : i32 = 0;
+
+  for ( i, ch ) in text . char_indices () {
+    match ch {
+      '(' => depth += 1,
+      ')' => {
+        depth -= 1;
+        if depth == 0 {
+          return Some ( i + 1 ); // Return position after closing paren
+        }
+      },
+      _ => {}
+    }
+  }
+
+  None // Unbalanced parentheses
+}
+
+/// Parse metadata from org-mode headline into OrgnodeMetadata.
+/// Format: "(skg (id xyz) repeated folded (relToOrgParent container))"
+/// Now uses the sexp crate for proper s-expression parsing.
+/// Takes the full s-expression including the "(skg ...)" wrapper.
+pub fn parse_metadata_to_headline_md (
+  sexp_str : &str
+) -> Result<OrgnodeMetadata, String> {
+  let mut result : OrgnodeMetadata =
+    default_metadata ();
+
+  let parsed : Sexp =
+    sexp::parse ( sexp_str )
+    . map_err ( |e| format! ( "Failed to parse metadata as s-expression: {}", e ) ) ?;
+
+  // Extract the list of elements from (skg ...)
+  let elements : &[Sexp] =
+    match &parsed {
+      Sexp::List ( items ) => {
+        // First element should be the symbol 'skg'
+        if items . is_empty () {
+          return Err ( "Empty metadata s-expression".to_string () ); }
+        // Skip the 'skg' symbol and return the rest
+        &items[1..]
+      },
+      _ => return Err ( "Expected metadata to be a list".to_string () ),
+    };
+
+  // Process each element
+  for element in elements {
+    match element {
+      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
+        // This is a (key value) pair
+        let key : String =
+          atom_to_string ( &kv_pair[0] ) ?;
+        let value : String =
+          atom_to_string ( &kv_pair[1] ) ?;
+        match key . as_str () {
+          "id" => { result.id = Some ( ID::from ( value )); },
+          "relToOrgParent" => {
+            result.relToOrgParent = match value . as_str () {
+              "alias"        => RelToOrgParent::Alias,
+              "aliasCol"     => RelToOrgParent::AliasCol,
+              "container"    => RelToOrgParent::Container,
+              "content"      => RelToOrgParent::Content,
+              "none"         => RelToOrgParent::None,
+              "searchResult" => RelToOrgParent::SearchResult,
+              _ => return Err (
+                format! ( "Unknown relToOrgParent value: {}", value )),
+            }; },
+          _ => { return Err ( format! ( "Unknown metadata key: {}",
+                                         key )); }} },
+      Sexp::Atom ( _ ) => { // This is a bare value
+        let bare_value : String =
+          atom_to_string ( element ) ?;
+        match bare_value . as_str () {
+          "repeated"         => result.repeat = true,
+          "folded"           => result.folded = true,
+          "focused"          => result.focused = true,
+          "cycle"            => result.cycle = true,
+          "mightContainMore" => result.mightContainMore = true,
+          "toDelete"         => result.toDelete = true,
+          _ => {
+            return Err ( format! ( "Unknown metadata value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in metadata"
+                           . to_string () ); }} }
+  Ok ( result ) }
+
+/// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
+/// This is the inverse of parse_metadata_to_headline_md.
+/// Returns string like "(id abc123) repeated focused" etc.
+pub fn headlinemd_to_string (
+  metadata : &OrgnodeMetadata
+) -> String {
+  let mut parts : Vec<String> =
+    Vec::new ();
+  if let Some ( ref id ) = metadata.id {
+    parts.push ( format! ( "(id {})", id.0 )); }
+  if metadata.relToOrgParent != RelToOrgParent::Content {
+    parts.push ( format! ( "(relToOrgParent {})", metadata.relToOrgParent )); }
+  if metadata.repeat {
+    parts.push ( "repeated".to_string () ); }
+  if metadata.folded {
+    parts.push ( "folded".to_string () ); }
+  if metadata.focused {
+    parts.push ( "focused".to_string () ); }
+  if metadata.cycle {
+    parts.push ( "cycle".to_string () ); }
+  if metadata.mightContainMore {
+    parts.push ( "mightContainMore".to_string () ); }
+  if metadata.toDelete {
+    parts.push ( "toDelete".to_string () ); }
+  parts.join ( " " ) }
 
 pub fn parse_headline_from_sexp (
   request : &str
@@ -58,38 +190,32 @@ fn parse_separating_metadata_and_title (
 ) -> Result<(OrgnodeMetadata, String), String> {
   let headline_with_metadata : &str =
     line_after_bullet.trim_start ();
-  if let Some ( meta_start ) =
-    headline_with_metadata . strip_prefix ( "(skg" ) {
-    // Find matching closing paren with depth tracking
-    let meta_start_trimmed : &str = meta_start.trim_start ();
-    let mut depth : i32 = 1; // We already consumed the opening "(skg"
-    let mut pos : usize = 0;
-    let chars : Vec<char> = meta_start_trimmed.chars().collect();
 
-    while pos < chars.len() && depth > 0 {
-      match chars[pos] {
-        '(' => depth += 1,
-        ')' => depth -= 1,
-        _ => {}
-      }
-      if depth == 0 {
-        break;
-      }
-      pos += 1;
-    }
+  if headline_with_metadata.starts_with ( "(skg" ) {
+    // Find the end of the s-expression
+    if let Some ( sexp_end ) = find_sexp_end ( headline_with_metadata ) {
+      // Extract the s-expression substring
+      let sexp_str : &str = &headline_with_metadata[..sexp_end];
 
-    if depth == 0 {
-      let inner : &str =
-        &meta_start_trimmed[..pos]; // between "(skg" and ")"
+      // Verify it's valid by attempting to parse it
+      if let Err ( e ) = sexp::parse ( sexp_str ) {
+        return Err ( format! ( "Invalid s-expression syntax: {}", e ) );
+      }
+
+      // Parse the metadata from the s-expression
       let metadata : OrgnodeMetadata =
-        parse_metadata_to_headline_md ( inner ) ?;
-      let title_rest : &str =
-        &meta_start_trimmed[pos + 1..]; // skip ")"
+        parse_metadata_to_headline_md ( sexp_str ) ?;
+
+      // The title is everything after the s-expression
       let title : String =
-        title_rest.trim () . to_string ();
+        headline_with_metadata[sexp_end..] . trim () . to_string ();
+
       return Ok (( metadata, title ));
+    } else {
+      return Err ( "Unclosed metadata parentheses".to_string () );
     }
   }
+
   // No metadata found - use defaults
   Ok (( default_metadata (),
         headline_with_metadata.to_string () )) }

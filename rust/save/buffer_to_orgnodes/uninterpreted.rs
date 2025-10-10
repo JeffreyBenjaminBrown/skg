@@ -1,5 +1,6 @@
 use crate::types::{OrgNode, OrgnodeMetadata};
-use crate::types::orgnode::{parse_metadata_to_headline_md, default_metadata};
+use crate::types::orgnode::default_metadata;
+use crate::serve::parse_sexp::{parse_metadata_to_headline_md, find_sexp_end};
 
 use ego_tree::Tree;
 use regex::Regex;
@@ -138,34 +139,28 @@ pub fn headline_to_triple (
     let remainder: &str = captures.get(2).unwrap().as_str().trim();
 
     // Check if remainder starts with metadata
-    if let Some(after_skg) = remainder.strip_prefix("(skg") {
-      // Find matching closing paren with depth tracking
-      let after_skg_trimmed: &str = after_skg.trim_start();
-      let mut depth: i32 = 1; // We already consumed the opening "(skg"
-      let mut pos: usize = 0;
-      let chars: Vec<char> = after_skg_trimmed.chars().collect();
+    if remainder.starts_with("(skg") {
+      // Find the end of the s-expression
+      if let Some(sexp_end) = find_sexp_end(remainder) {
+        // Extract the s-expression substring
+        let sexp_str: &str = &remainder[..sexp_end];
 
-      while pos < chars.len() && depth > 0 {
-        match chars[pos] {
-          '(' => depth += 1,
-          ')' => depth -= 1,
-          _ => {}
+        // Verify it's valid by attempting to parse it
+        if let Err(e) = sexp::parse(sexp_str) {
+          return Err(format!("Invalid s-expression syntax: {}", e));
         }
-        if depth == 0 {
-          break;
-        }
-        pos += 1;
-      }
 
-      if depth == 0 {
-        let inner: &str = &after_skg_trimmed[..pos];
+        // Parse the metadata from the s-expression
         let metadata: Option<OrgnodeMetadata> =
-          match parse_metadata_to_headline_md(inner) {
+          match parse_metadata_to_headline_md(sexp_str) {
             Ok(parsed_metadata) => Some(parsed_metadata),
             Err(e) => return Err(e), // Invalid metadata with specific error
           };
+
+        // The title is everything after the s-expression
         let title: String =
-          after_skg_trimmed[pos + 1..].trim().to_string();
+          remainder[sexp_end..].trim().to_string();
+
         return Ok((level, metadata, title));
       } else {
         return Err("Unclosed metadata parentheses".to_string());

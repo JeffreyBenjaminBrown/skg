@@ -5,6 +5,7 @@
 ;; Try it on the sample text at the end of the file.
 
 (require 'skg-metadata)
+(require 'skg-sexpr)
 
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
@@ -56,20 +57,11 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
       (goto-char bol)
       (when (search-forward "(skg" eol t)
         (let* ((start (- (point) 4))
-               (pos (point))
-               (depth 1)
-               (end nil))
-          ;; Find matching close paren with depth tracking
-          (while (and (< pos eol) (> depth 0))
-            (cond ((eq (char-after pos) ?\()
-                   (setq depth (1+ depth)))
-                  ((eq (char-after pos) ?\))
-                   (setq depth (1- depth))
-                   (when (= depth 0)
-                     (setq end pos))))
-            (setq pos (1+ pos)))
-          (when end
-            (let* ((skg-sexp (buffer-substring-no-properties start (1+ end)))
+               (remaining-text (buffer-substring-no-properties start eol))
+               (sexp-end-pos (skg-find-sexp-end remaining-text)))
+          (when sexp-end-pos
+            (let* ((end (+ start sexp-end-pos -1))
+                   (skg-sexp (buffer-substring-no-properties start (1+ end)))
                    (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp)))))
                    (heralds (heralds-from-metadata inner)))
               (when heralds

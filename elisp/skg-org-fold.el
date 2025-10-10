@@ -66,9 +66,7 @@ Then process the buffer from the top, via this loop:
   "Remove 'folded' from all (skg ...) metadata markers.
 Handles all cases:
 folded as only value, first value, middle value, or last value.
-Works on all text including invisible regions.
-.
-Uses skg-metadata.el functions to properly handle nested parentheses."
+Works on all text including invisible regions."
   (save-excursion
     (goto-char (point-min))
     (let ((inhibit-read-only t)

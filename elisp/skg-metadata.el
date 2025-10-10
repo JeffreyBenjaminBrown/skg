@@ -1,6 +1,7 @@
 ;; Utilities to parse and edit skg headline metadata
 
 (require 'org)
+(require 'skg-sexpr)
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.
@@ -8,22 +9,11 @@ Returns (METADATA-ALIST BARE-VALUES-SET TITLE-TEXT) or nil if no metadata found.
 METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone values."
   (let ((trimmed (string-trim-left headline-text)))
     (when (string-prefix-p "(skg" trimmed)
-      ;; Find the matching close paren for the skg s-expression
-      (let ((pos 0)
-            (len (length trimmed))
-            (depth 0)
-            (end nil))
-        (while (and (< pos len) (or (= depth 0) (not end)))
-          (cond ((eq (aref trimmed pos) ?\()
-                 (setq depth (1+ depth)))
-                ((eq (aref trimmed pos) ?\))
-                 (setq depth (1- depth))
-                 (when (= depth 0)
-                   (setq end pos))))
-          (setq pos (1+ pos)))
-        (when end
-          (let* ((skg-sexp (substring trimmed 0 (1+ end)))
-                 (title-start (1+ end))
+      (let ((sexp-end-pos (skg-find-sexp-end trimmed)))
+        (when sexp-end-pos
+          (let* ((skg-sexp (substring trimmed 0 sexp-end-pos))
+                 (title-start sexp-end-pos)
+                 (len (length trimmed))
                  (title (string-trim (if (< title-start len)
                                          (substring trimmed title-start)
                                        "")))
@@ -37,43 +27,25 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
 Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare values."
   (let ((alist '())
         (set '())
-        (pos 0)
-        (len (length inner)))
-    (while (< pos len)
-      ;; Skip whitespace
-      (while (and (< pos len) (memq (aref inner pos) '(?\s ?\t ?\n)))
-        (setq pos (1+ pos)))
-      (when (< pos len)
-        (if (eq (aref inner pos) ?\()
-            ;; Parse s-expression (key value)
-            (let ((start (1+ pos))
-                  (depth 1)
-                  (end nil))
-              ;; Find matching close paren
-              (setq pos (1+ pos))
-              (while (and (< pos len) (> depth 0))
-                (cond ((eq (aref inner pos) ?\()
-                       (setq depth (1+ depth)))
-                      ((eq (aref inner pos) ?\))
-                       (setq depth (1- depth))
-                       (when (= depth 0)
-                         (setq end pos))))
-                (setq pos (1+ pos)))
-              (when end
-                (let* ((sexp-content (substring inner start end))
-                       (parts (split-string sexp-content nil t)))
-                  (when (>= (length parts) 2)
-                    (let ((key (string-trim (nth 0 parts)))
-                          (val (string-trim (nth 1 parts))))
-                      (push (cons key val) alist))))))
-          ;; Parse bare value
-          (let ((start pos))
-            (while (and (< pos len)
-                        (not (memq (aref inner pos) '(?\s ?\t ?\n ?\())))
-              (setq pos (1+ pos)))
-            (let ((tok (string-trim (substring inner start pos))))
-              (unless (string-empty-p tok)
-                (push tok set)))))))
+        (input (concat "(" inner ")"))
+        (pos 0))
+    (with-temp-buffer
+      (insert input)
+      (goto-char (point-min))
+      (condition-case nil
+          (let ((elements (read (current-buffer))))
+            (dolist (element elements)
+              (cond
+               (;; (key value) pair
+                (and (listp element)
+                     (= (length element) 2))
+                (let ((key (format "%s" (car element)))
+                      (val (format "%s" (cadr element))))
+                  (push (cons key val) alist)))
+               (t ;; Bare value (symbol or other atom)
+                (let ((bare-val (format "%s" element)))
+                  (push bare-val set))))))
+        (error nil)))
     (list (nreverse alist) (nreverse set))))
 
 (defun skg-match-headline-with-metadata (headline-text)
@@ -86,21 +58,11 @@ Handles nested parentheses in metadata correctly."
              (after-stars (substring trimmed (match-end 1))))
         (if (string-prefix-p "(skg" after-stars)
             ;; Has metadata - find matching close paren
-            (let ((pos 0)
-                  (len (length after-stars))
-                  (depth 0)
-                  (end nil))
-              (while (and (< pos len) (or (= depth 0) (not end)))
-                (cond ((eq (aref after-stars pos) ?\()
-                       (setq depth (1+ depth)))
-                      ((eq (aref after-stars pos) ?\))
-                       (setq depth (1- depth))
-                       (when (= depth 0)
-                         (setq end pos))))
-                (setq pos (1+ pos)))
-              (when end
-                (let* ((skg-sexp (substring after-stars 0 (1+ end)))
-                       (title-start (1+ end))
+            (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
+              (when sexp-end-pos
+                (let* ((skg-sexp (substring after-stars 0 sexp-end-pos))
+                       (title-start sexp-end-pos)
+                       (len (length after-stars))
                        (title (string-trim (if (< title-start len)
                                                (substring after-stars title-start)
                                              "")))
