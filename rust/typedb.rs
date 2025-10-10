@@ -28,4 +28,4 @@ pub use search::{
 pub use update::update_typedb_from_saveinstructions;
 pub mod update;
 pub mod util;
-pub use util::{pid_from_id, extract_payload_from_typedb_string_rep};
+pub use util::{pid_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};

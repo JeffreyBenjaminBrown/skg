@@ -1,3 +1,6 @@
+pub mod pids_from_ids;
+pub use pids_from_ids::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
+
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer},
@@ -44,9 +47,10 @@ pub async fn pid_from_id (
             &concept . to_string () )) ) ); }}
   Ok ( None ) }
 
+
+/// Returns the string it finds
+/// between the first and the second quotation marks.
 pub fn extract_payload_from_typedb_string_rep (
-  // Returns the string it finds
-  // between the first and the second quotation marks.
   attribute_str : &str )
   -> String {
 

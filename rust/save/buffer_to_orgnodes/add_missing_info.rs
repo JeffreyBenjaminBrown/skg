@@ -5,12 +5,11 @@ and add missing IDs where relToOrgParent is Content.
 */
 
 use crate::types::{OrgNode, RelToOrgParent, ID};
-use crate::typedb::util::pid_from_id;
+use crate::typedb::util::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
 use ego_tree::Tree;
 use std::boxed::Box;
+use std::collections::HashMap;
 use std::error::Error;
-use std::pin::Pin;
-use std::future::Future;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
@@ -28,59 +27,55 @@ pub async fn add_missing_info_to_trees(
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  for tree in trees {
-    add_missing_info_dfs ( tree.root_mut(),
-                           None,
-                           db_name,
-                           driver ).await ?; }
-  Ok(()) }
+  for tree in trees . iter_mut () {
+    add_missing_info_dfs (
+      tree . root_mut (),
+      None ); }
+  let mut ids_to_lookup : Vec < ID > = Vec::new ();
+  for tree in trees . iter () {
+    collect_ids_for_pid_lookup (
+      tree . root (),
+      & mut ids_to_lookup ); }
+  let pid_map : HashMap < ID, Option < ID > > =
+    pids_from_ids (
+      db_name, driver, & ids_to_lookup ). await ?;
+  for tree in trees . iter_mut () {
+    assign_pids_from_map (
+      tree . root_mut (),
+      & pid_map ); }
+  Ok (( )) }
 
-fn add_missing_info_dfs<'a>(
-  mut node_ref: ego_tree::NodeMut<'a, OrgNode>,
-  parent_relToOrgParent: Option<RelToOrgParent>,
-  db_name: &'a str,
-  driver: &'a TypeDBDriver
-) -> Pin<
-    Box<
-        dyn Future<
-            Output = Result<
-                (),
-              Box<dyn Error>>>
-        + 'a>>
+fn add_missing_info_dfs (
+  mut node_ref: ego_tree::NodeMut < OrgNode >,
+  parent_relToOrgParent: Option < RelToOrgParent >
+) {
+  // Process current node
+  assign_alias_relation_if_needed (
+    node_ref . value (), parent_relToOrgParent );
+  assign_id_if_needed (
+    node_ref . value () );
 
-{ Box::pin(async move {
-  { // Process current node
-    assign_alias_relation_if_needed(
-      node_ref.value(), parent_relToOrgParent);
-    assign_id_if_needed(
-      node_ref.value() );
-    assign_pid_if_possible(
-      node_ref.value(), db_name, driver ).await ?; }
   let node_rel: RelToOrgParent =
-    ( // Used to process each of its children.
-      node_ref.value() . metadata.relToOrgParent . clone() );
+    ( // Used to process each child.
+      node_ref . value () . metadata . relToOrgParent . clone () );
   { // Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
     // PITFALL: don't confuse egoTree NodeIDs, which are all distinct,
     // from Skg IDs (which might not be).
-    let node_id: ego_tree::NodeId = node_ref.id();
-    let child_ids: Vec<ego_tree::NodeId> = {
-      let tree = node_ref.tree();
-      tree . get (node_id) . unwrap()
-        . children() . map( |child|
-                             child.id() )
-        . collect() };
+    let node_id: ego_tree::NodeId = node_ref . id ();
+    let child_ids: Vec < ego_tree::NodeId > = {
+      let tree = node_ref . tree ();
+      tree . get ( node_id ) . unwrap ()
+        . children () . map ( | child |
+                             child . id () )
+        . collect () };
     for child_id in child_ids {
-      if let Some(child_mut) =
-        node_ref . tree() . get_mut(child_id)
-      { add_missing_info_dfs(
+      if let Some ( child_mut ) =
+        node_ref . tree () . get_mut ( child_id )
+      { add_missing_info_dfs (
         child_mut,
-        Some (node_rel.clone() ),
-        db_name,
-        driver ).await ?; }} }
-  Ok(())
-  }) }
+        Some ( node_rel . clone () ) ); } } } }
 
 /// Assign relToOrgParent=Alias
 /// to nodes whose parent has relToOrgParent=AliasCol
@@ -100,16 +95,3 @@ fn assign_id_if_needed(
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}
-
-/// Look up the PID for the node's current ID,
-/// and replace it if found.
-async fn assign_pid_if_possible (
-  node: &mut OrgNode,
-  db_name: &str,
-  driver: &TypeDBDriver
-) -> Result<(), Box<dyn Error>> {
-  if let Some(current_id) = &node.metadata.id {
-    if let Some(pid) = pid_from_id(
-      db_name, driver, current_id ). await ? {
-      node . metadata . id = Some(pid); }}
-  Ok (( )) }

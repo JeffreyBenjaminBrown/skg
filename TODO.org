@@ -1,37 +1,11 @@
-* rebuild buffer with the same structure
-** to know
-*** Most of the API can be left alone.
-**** where orgnodes are built
-***** save_buffer
-***** containerward_view
-      Document that if you haven't saved the buffer,
-      the retrieved view won't include any changes
-      that that saved buffer would cause.
-***** node_aliases
-      Document that if you haven't saved the buffer,
-      the retrieved aliases won't include any changes
-      that that saved buffer would cause.
-***** single_root_view
-**** Only save_buffer needs changing for now.
-** retain metadata when replacing node
-   When a backview replaces text,
-   it should retain the origin headline's
-   relationship to its org-parent.
-** will have to treat focus similar to folding
-*** in brief
-    Emacs receives it from Rust, uses it, discards it,
-    then recomputes it before sending to Rust.
-*** in detail with correspondences to folding functions
-**** Upon receiving from Rust, use it.
-     (like skg-fold-marked-headlines)
-**** After using it, remove it from the metadata.
-     (like skg-remove-folded-markers).
-**** Add it back to the metadata before sending from Emacs to Rust.
-     (like skg-add-folded-markers)
-** retain focus, folding on save
-*** for folding, see elisp/skg-org-fold.rs
-*** `org_from_node_recursive` should use its `focus` argument.
-    This seems easy.
+* [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
+* Metadata and intent should be independent.
+  They are entangled, e.g. in [[id:f6f8c460-2553-4fd7-b81d-6ce17a333591]["relToOrgParent" is misleading.]]
+  Instead, determine the structure of the tree,
+  and each node's intent
+  (which is currently part of what relToOrgParent encodes),
+  but then generate certain metadata de-novo:
+  cycle, rep, relToOrgParent (can have multiple),
 * ====== BELOW: SORTED =======
 * internalize
   Ask for a refactoring plan before embarking.

@@ -6,6 +6,10 @@ mod typedb {
   pub mod update_typedb_from_saveinstructions;
 }
 
+mod util {
+  pub mod search;
+}
+
 use skg::mk_org_text::single_root_view;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
