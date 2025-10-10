@@ -27,7 +27,7 @@ fn test_sexp_parsing_generative() -> Result<(), Box<dyn Error>> {
     let level: usize = rng.gen_range(1..=4); // random level in [1,4]
     let asterisks: String = "*".repeat(level);
     let headline: String =
-      format!("{} <skg<id:{}>> {}", asterisks, test_id, title);
+      format!("{} (skg id:{}) {}", asterisks, test_id, title);
     let request: String = format!(
       "((request . \"containerward view\") (headline . {}))",
       format!("{:?}", headline)

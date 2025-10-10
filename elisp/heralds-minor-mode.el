@@ -11,7 +11,7 @@
   "When Rust sends a view of the graph to Emacs,
 each line (after the org-bullet) begins with some metadata.
 The API is in flux -- see api.md -- but might look something like
-<skg<id:long-string, repeated, key:value, another-value>>
+(skg id:long-string repeated key:value another-value)
 This minor mode changes how such things are displayed:
 .
 The id becomes a single '⅄' character. (It looks graphy to me.)
@@ -48,13 +48,13 @@ The metadata is otherwise not displayed."
       (forward-line 1))))
 
 (defun heralds-apply-to-line ()
-  "On the current line, lens only the first <skg<...>> occurrence.
+  "On the current line, lens only the first (skg ...) occurrence.
 Creates one overlay (at most) and pushes it onto `heralds-overlays`."
   (save-excursion
     (let ((bol (line-beginning-position))
           (eol (line-end-position)) )
       (goto-char bol)
-      (when (re-search-forward "<skg<\\([^<>]*\\)>>" eol t)
+      (when (re-search-forward "(skg\\s-*\\([^()]*\\))" eol t)
         (let* ((beg (match-beginning 0))
                (end (match-end 0))
                (inner (match-string-no-properties 1))
@@ -66,7 +66,7 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
               (push ov heralds-overlays)) )) )) ))
 
 (defun heralds-from-metadata
-    (metadata) ;; line's first text inside (not including) <skg< and >>
+    (metadata) ;; line's first text inside (not including) (skg and )
   "Returns a propertized space-separated string of heralds.
 Whitespace in METADATA is ignored."
   (let* ((parsed (skg-parse-metadata-inner metadata))
@@ -166,10 +166,10 @@ Whitespace in METADATA is ignored."
 ;; TESTING, interactive:
 ;; `M-x heralds-minor-mode` should change how the text below looks.
 ;;
-;; Here is some example text <skg<id:123,repeated,other:ignored>> and more text.
-;; Another example: <skg<id:456,repeated,type:searchResult>> end of line.
-;; <skg<id:789>> A second batch of similarly-formatted data should render normally: <skg<id:yeah,repeated>>
-;; Type aliases test: <skg<id:test,type:aliases,other:ignored>> should show blue "aliases".
-;; <skg<foo:Azure,bar:Forest,bazoo>> Metadata with unrecognized keys and values is not rendered at all.
+;; Here is some example text (skg id:123 repeated other:ignored) and more text.
+;; Another example: (skg id:456 repeated type:searchResult) end of line.
+;; (skg id:789) A second batch of similarly-formatted data should render normally: (skg id:yeah repeated)
+;; Type aliases test: (skg id:test type:aliases other:ignored) should show blue "aliases".
+;; (skg foo:Azure bar:Forest bazoo) Metadata with unrecognized keys and values is not rendered at all.
 
 (provide 'heralds-minor-mode)

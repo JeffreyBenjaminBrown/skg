@@ -13,10 +13,10 @@
 (defconst example-data
   "* 1
 1 body
-* <skg<>> 2
-* <skg<k:v,value>> 3
+* (skg) 2
+* (skg k:v value) 3
 3 body
-* <skg<value,k:v>> 4"
+* (skg value k:v) 4"
   "Immutable example data for metadata editing tests.")
 
 (defun apply-to-all-lines
@@ -41,10 +41,10 @@
                                                      (point-max))
                      "* 1
 1 body
-* <skg<>> 2
-* <skg<value>> 3
+* (skg) 2
+* (skg value) 3
 3 body
-* <skg<value>> 4")))
+* (skg value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-delete-kv-pair-key-not-exists ()
@@ -60,10 +60,10 @@
                                                      (point-max))
                      "* 1
 1 body
-* <skg<>> 2
-* <skg<k:v,value>> 3
+* (skg) 2
+* (skg k:v value) 3
 3 body
-* <skg<k:v,value>> 4")))
+* (skg k:v value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-delete-value-exists ()
@@ -79,10 +79,10 @@
                                                      (point-max))
                      "* 1
 1 body
-* <skg<>> 2
-* <skg<k:v>> 3
+* (skg) 2
+* (skg k:v) 3
 3 body
-* <skg<k:v>> 4")))
+* (skg k:v) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-delete-value-not-exists ()
@@ -98,10 +98,10 @@
                                                      (point-max))
                      "* 1
 1 body
-* <skg<>> 2
-* <skg<k:v,value>> 3
+* (skg) 2
+* (skg k:v value) 3
 3 body
-* <skg<k:v,value>> 4")))
+* (skg k:v value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-value-exists ()
@@ -115,12 +115,12 @@
        #'skg-insert-bare-value-into-metadata "value")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* <skg<value>> 1
+                     "* (skg value) 1
 1 body
-* <skg<value>> 2
-* <skg<k:v,value>> 3
+* (skg value) 2
+* (skg k:v value) 3
 3 body
-* <skg<value,k:v>> 4")))
+* (skg value k:v) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-value-not-exists ()
@@ -134,12 +134,12 @@
        #'skg-insert-bare-value-into-metadata "new-value")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* <skg<new-value>> 1
+                     "* (skg new-value) 1
 1 body
-* <skg<new-value>> 2
-* <skg<k:v,value,new-value>> 3
+* (skg new-value) 2
+* (skg k:v value new-value) 3
 3 body
-* <skg<k:v,value,new-value>> 4")))
+* (skg k:v value new-value) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-kv-pair-exists ()
@@ -153,12 +153,12 @@
        #'skg-insert-kv-pair-into-metadata "k" "v")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* <skg<k:v>> 1
+                     "* (skg k:v) 1
 1 body
-* <skg<k:v>> 2
-* <skg<k:v,value>> 3
+* (skg k:v) 2
+* (skg k:v value) 3
 3 body
-* <skg<value,k:v>> 4")))
+* (skg value k:v) 4")))
     (kill-buffer buf)))
 
 (ert-deftest test-insert-kv-pair-not-exists ()
@@ -172,12 +172,12 @@
        #'skg-insert-kv-pair-into-metadata "h" "w")
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* <skg<h:w>> 1
+                     "* (skg h:w) 1
 1 body
-* <skg<h:w>> 2
-* <skg<k:v,h:w,value>> 3
+* (skg h:w) 2
+* (skg k:v h:w value) 3
 3 body
-* <skg<k:v,h:w,value>> 4")))
+* (skg k:v h:w value) 4")))
     (kill-buffer buf)))
 
 (provide 'test-skg-metadata-editing)

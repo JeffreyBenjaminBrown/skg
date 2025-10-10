@@ -15,11 +15,11 @@
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
-*** <skg<id:1,folded>> 111
-*** <skg<id:2,folded,mightContainMore>> 112
+*** (skg id:1 folded) 111
+*** (skg id:2 folded mightContainMore) 112
 ** 12
 12 body
-*** <skg<id:3,folded>> 121
+*** (skg id:3 folded) 121
 121 body
 *** 122
 ** 13")
@@ -36,18 +36,18 @@
       (skg-add-folded-markers)
       (let*
           ((expected
-            ;; Every sibling of a folded node should be folded,
+            ;; Every sibling of a folded node should be folded
             ;; and folded should be last in every metadata string.
             "* 1
 1 body
 ** 11
-*** <skg<id:1,folded>> 111
-*** <skg<id:2,mightContainMore,folded>> 112
+*** (skg id:1 folded) 111
+*** (skg id:2 mightContainMore folded) 112
 ** 12
 12 body
-*** <skg<id:3,folded>> 121
+*** (skg id:3 folded) 121
 121 body
-*** <skg<folded>> 122
+*** (skg folded) 122
 ** 13")
            (actual (buffer-substring-no-properties (point-min)
                                                    (point-max))))
@@ -60,21 +60,21 @@
   (let ((buf (generate-new-buffer "*test-remove-folded*")))
     (with-current-buffer buf
       (org-mode)
-      (insert "* <skg<folded>> only folded
-* <skg<folded,other>> folded first
+      (insert "* (skg folded) only folded
+* (skg folded other) folded first
 Body text.
-* <skg<key:value,folded>> folded last
-* <skg<k:v,folded,other>> folded middle
-* <skg<other>> no folded")
+* (skg key:value folded) folded last
+* (skg k:v folded other) folded middle
+* (skg other) no folded")
       (skg-remove-folded-markers)
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* <skg<>> only folded
-* <skg<other>> folded first
+                     "* (skg) only folded
+* (skg other) folded first
 Body text.
-* <skg<key:value>> folded last
-* <skg<k:v,other>> folded middle
-* <skg<other>> no folded")))
+* (skg key:value) folded last
+* (skg k:v other) folded middle
+* (skg other) no folded")))
     (kill-buffer buf)))
 
 (defun count-visible-nonempty-lines ()

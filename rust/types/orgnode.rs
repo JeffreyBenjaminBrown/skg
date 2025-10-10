@@ -84,13 +84,13 @@ pub fn default_metadata () -> OrgnodeMetadata {
   } }
 
 /// Parse metadata string from org-mode headline into OrgnodeMetadata.
-/// Format: "id:xyz,repeated,folded,relToOrgParent:container"
+/// Format: "id:xyz repeated folded relToOrgParent:container"
 pub fn parse_metadata_to_headline_md (
   metadata_str : &str
 ) -> Result<OrgnodeMetadata, String> {
   let mut result : OrgnodeMetadata =
     default_metadata ();
-  for part in metadata_str.split ( ',' ) {
+  for part in metadata_str.split_whitespace () {
     let trimmed : &str = part.trim ();
     if trimmed.is_empty () { continue; }
     if let Some (( key_str, value_str )) = trimmed.split_once ( ':' ) {
@@ -128,7 +128,7 @@ pub fn parse_metadata_to_headline_md (
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_headline_md.
-/// Returns string like "id:abc123,repeated,focused" etc.
+/// Returns string like "id:abc123 repeated focused" etc.
 pub fn headlinemd_to_string (
   metadata : &OrgnodeMetadata
 ) -> String {
@@ -150,4 +150,4 @@ pub fn headlinemd_to_string (
     parts.push ( "mightContainMore".to_string () ); }
   if metadata.toDelete {
     parts.push ( "toDelete".to_string () ); }
-  parts.join ( "," ) }
+  parts.join ( " " ) }

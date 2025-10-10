@@ -10,9 +10,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with consistent toDelete instructions (no conflicts)
   let input_consistent: &str =
     indoc! {"
-            * <skg<id:node1,toDelete>> first node
-            * <skg<id:node2>> second node
-            * <skg<id:node1,toDelete>> duplicate of first node (same delete instruction)
+            * (skg id:node1 toDelete) first node
+            * (skg id:node2) second node
+            * (skg id:node1 toDelete) duplicate of first node (same delete instruction)
         "};
 
   let trees_consistent: Vec<Tree<OrgNode>> =
@@ -24,11 +24,11 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with inconsistent toDelete instructions (conflicts)
   let input_inconsistent: &str =
     indoc! {"
-            * <skg<id:conflict1,toDelete>> first conflicting node (toDelete=true)
-            * <skg<id:normal>> normal node
-            * <skg<id:conflict1>> duplicate node but toDelete=false
-            * <skg<id:conflict2,toDelete>> another conflict start
-            * <skg<id:conflict2>> another conflict end
+            * (skg id:conflict1 toDelete) first conflicting node (toDelete=true)
+            * (skg id:normal) normal node
+            * (skg id:conflict1) duplicate node but toDelete=false
+            * (skg id:conflict2 toDelete) another conflict start
+            * (skg id:conflict2) another conflict end
         "};
 
   let trees_inconsistent: Vec<Tree<OrgNode>> =
@@ -42,9 +42,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with nodes that have no IDs (should be skipped)
   let input_no_ids: &str =
     indoc! {"
-            * <skg<toDelete>> node without id (should be skipped)
+            * (skg toDelete) node without id (should be skipped)
             * regular node without any metadata
-            * <skg<id:valid_node>> only node with id
+            * (skg id:valid_node) only node with id
         "};
 
   let trees_no_ids: Vec<Tree<OrgNode>> =
@@ -63,15 +63,15 @@ fn test_multiple_defining_containers() {
   // Test input with multiple nodes having the same ID and both repeated=false, mightContainMore=false
   let input_with_multiple_defining_containers: &str =
     indoc! {"
-            * <skg<id:duplicate>> First defining container
+            * (skg id:duplicate) First defining container
             Regular node with shared ID
-            * <skg<id:duplicate>> Second defining container
+            * (skg id:duplicate) Second defining container
             Another regular node with the same ID
-            * <skg<id:duplicate,repeated>> Repeated node (not defining)
+            * (skg id:duplicate repeated) Repeated node (not defining)
             This one is ok because repeated=true
-            * <skg<id:duplicate,mightContainMore>> Might contain more (not defining)
+            * (skg id:duplicate mightContainMore) Might contain more (not defining)
             This one is ok because mightContainMore=true
-            * <skg<id:unique>> Unique node
+            * (skg id:unique) Unique node
             This one is fine
         "};
 

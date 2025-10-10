@@ -12,38 +12,38 @@ fn test_compare_headlines_modulo_id() {
 
     // Test headlines that differ only by ID
     assert!(compare_headlines_modulo_id(
-        "* <skg<id:abc123>> Title",
-        "* <skg<id:xyz789>> Title"
+        "* (skg id:abc123) Title",
+        "* (skg id:xyz789) Title"
     ));
 
     // Test headlines where one has ID and other doesn't - should be unequal
     assert!(!compare_headlines_modulo_id(
-        "* <skg<id:abc123>> Title",
+        "* (skg id:abc123) Title",
         "* Title"
     ));
 
     // Test headlines with same other metadata but different IDs
     assert!(compare_headlines_modulo_id(
-        "* <skg<id:abc,relToOrgParent:content>> Title",
-        "* <skg<id:xyz,relToOrgParent:content>> Title"
+        "* (skg id:abc relToOrgParent:content) Title",
+        "* (skg id:xyz relToOrgParent:content) Title"
     ));
 
     // Test headlines that differ by title
     assert!(!compare_headlines_modulo_id(
-        "* <skg<id:abc>> Title One",
-        "* <skg<id:xyz>> Title Two"
+        "* (skg id:abc) Title One",
+        "* (skg id:xyz) Title Two"
     ));
 
     // Test headlines that differ by level
     assert!(!compare_headlines_modulo_id(
-        "* <skg<id:abc>> Title",
-        "** <skg<id:xyz>> Title"
+        "* (skg id:abc) Title",
+        "** (skg id:xyz) Title"
     ));
 
     // Test headlines that differ by other metadata
     assert!(!compare_headlines_modulo_id(
-        "* <skg<id:abc,relToOrgParent:content>> Title",
-        "* <skg<id:xyz,relToOrgParent:alias>> Title"
+        "* (skg id:abc relToOrgParent:content) Title",
+        "* (skg id:xyz relToOrgParent:alias) Title"
     ));
 
     // Test non-headlines

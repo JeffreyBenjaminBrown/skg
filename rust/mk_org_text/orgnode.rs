@@ -20,9 +20,9 @@ pub fn render_org_node_from_text (
   if ! metadata_str.is_empty () {
     // Maybe add metadata.
     result . push ( ' ' );
-    result . push_str ( "<skg<" );
+    result . push_str ( "(skg " );
     result . push_str ( &metadata_str );
-    result . push_str ( ">>" ); }
+    result . push ( ')' ); }
   if ! node.title.is_empty () {
     // Maybe add title.
     // PITFALL: Title can be missing, for the right metadata.

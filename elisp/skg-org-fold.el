@@ -53,7 +53,7 @@ Then process the buffer from the top, via this loop:
                      (not (invisible-p (point)))
                      (save-excursion
                        (beginning-of-line)
-                       (looking-at ".*<skg<.*folded.*>>")))
+                       (looking-at ".*(skg.*\\<folded\\>.*)")))
             (setq found (point)))
           (forward-line 1)))
       (when found
@@ -63,7 +63,7 @@ Then process the buffer from the top, via this loop:
           (org-cycle)) )) ))
 
 (defun skg-remove-folded-markers ()
-  "Remove 'folded' from all <skg<...>> metadata markers.
+  "Remove 'folded' from all (skg ...) metadata markers.
 Handles all cases:
 folded as only value, first value, middle value, or last value.
 Works on all text including invisible regions.
@@ -81,18 +81,18 @@ Emacs recomputes all folded metadata."
           (buffer-invisibility-spec buffer-invisibility-spec))
       (setq ;; Temporarily make all text visible for replacement
        buffer-invisibility-spec nil)
-      (progn ;; folded is the only value: <skg<folded>> → <skg<>>
+      (progn ;; folded is the only value: (skg folded) → (skg)
         (goto-char (point-min))
-        (while (re-search-forward "<skg< *folded *>>" nil t)
-          (replace-match "<skg<>>" nil nil)))
-      (progn ;; folded is first with comma after: <skg<folded,other>> → <skg<other>>
+        (while (re-search-forward "(skg +folded *)" nil t)
+          (replace-match "(skg)" nil nil)))
+      (progn ;; folded is first with whitespace after: (skg folded other) → (skg other)
         (goto-char (point-min))
-        (while (re-search-forward "<skg< *folded *, *" nil t)
-          (replace-match "<skg<" nil nil)))
-      (progn ;; folded is in middle or last: <skg<...,folded...>> → <skg<...>>
+        (while (re-search-forward "(skg +folded +\\([^)]+\\))" nil t)
+          (replace-match "(skg \\1)" nil nil)))
+      (progn ;; folded is in middle or last within (skg ...): → remove it
         (goto-char (point-min))
-        (while (re-search-forward ", *folded\\([>,]\\)" nil t)
-          (replace-match "\\1" nil nil)))
+        (while (re-search-forward "(skg\\([^)]*\\) +\\<folded\\>\\([^)]*\\))" nil t)
+          (replace-match "(skg\\1\\2)" nil nil)))
       (setq ;; Restore invisibility
        buffer-invisibility-spec buffer-invisibility-spec))))
 

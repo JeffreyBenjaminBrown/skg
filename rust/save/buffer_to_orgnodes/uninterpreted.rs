@@ -121,7 +121,7 @@ fn validate_headline_metadata(
   static HEADLINE_REGEX
     : std::sync::LazyLock<Regex>
     = std::sync::LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(?:<skg<([^>]*)>>\s*)?(.+)").unwrap()
+      Regex::new(r"^\s*(\*+)\s+(?:\(skg\s*([^)]*)\)\s*)?(.+)").unwrap()
     });
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     if let Some(meta_match) = captures.get(2) {
@@ -140,12 +140,12 @@ pub fn headline_to_triple (
 ) -> Option<HeadlineInfo> {
   // Regex with capture groups:
   // ^\s*(\*+)\s+ - capture asterisks, ditch following whitespace
-  // (?:<skg<([^>]*)>>\s*)? - optionally capture metadata content, ditch following whitespace
+  // (?:\(skg\s*([^)]*)\)\s*)? - optionally capture metadata content, ditch following whitespace
   // (.+) - capture the rest of the line as title
   static HEADLINE_REGEX
     : std::sync::LazyLock<Regex>
     = std::sync::LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(?:<skg<([^>]*)>>\s*)?(.+)").unwrap()
+      Regex::new(r"^\s*(\*+)\s+(?:\(skg\s*([^)]*)\)\s*)?(.+)").unwrap()
     });
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {
     let asterisks: &str = captures.get(1).unwrap().as_str();

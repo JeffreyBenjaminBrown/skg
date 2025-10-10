@@ -40,7 +40,7 @@ pub fn handle_title_matches_request (
 /// Runs `search_index`.
 /// Returns an org-mode formatted string with grouped results by ID.
 /// The resulting buffer looks something like this:
-///   * <skg<type:searchResult>> second
+///   * (skg type:searchResult) second
 ///   ** score: 1.29, [[id:5a][imperfect test second]]
 ///   *** score: 1.17, [[id:5a][perfect match test second]]
 ///   ** score: 0.98, [[id:2a][This is a second test file.]]

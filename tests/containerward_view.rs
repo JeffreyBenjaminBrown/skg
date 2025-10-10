@@ -53,16 +53,16 @@ async fn test_containerward_org_view (
   // A root.
   let result1 = containerward_org_view(
     driver, config, &ID("1".to_string()), 1).await?;
-  let expected1 = "* <skg<id:1>> 1\n";
+  let expected1 = "* (skg id:1) 1\n";
   assert_eq!(result1, expected1);
 
   // A linear path.
   let result2 = containerward_org_view(
     driver, config, &ID("111".to_string()), 2).await?;
   let expected2 = indoc! {"
-    ** <skg<id:111>> 111
-    *** <skg<id:11,relToOrgParent:container,mightContainMore>> 11
-    **** <skg<id:1,relToOrgParent:container,mightContainMore>> 1
+    ** (skg id:111) 111
+    *** (skg id:11 relToOrgParent:container mightContainMore) 11
+    **** (skg id:1 relToOrgParent:container mightContainMore) 1
     "};
   assert_eq!(result2, expected2);
 
@@ -70,10 +70,10 @@ async fn test_containerward_org_view (
   let result3 = containerward_org_view(
     driver, config, &ID("2".to_string()), 1).await?;
   let expected3 = indoc! {"
-    * <skg<id:2,cycle>> 2
-    ** <skg<id:211,relToOrgParent:container,mightContainMore>> 211
-    *** <skg<id:21,relToOrgParent:container,mightContainMore>> 21
-    **** <skg<id:2,relToOrgParent:container,cycle,mightContainMore>> 2
+    * (skg id:2 cycle) 2
+    ** (skg id:211 relToOrgParent:container mightContainMore) 211
+    *** (skg id:21 relToOrgParent:container mightContainMore) 21
+    **** (skg id:2 relToOrgParent:container cycle mightContainMore) 2
     "};
   assert_eq!(result3, expected3);
 
@@ -82,14 +82,14 @@ async fn test_containerward_org_view (
   let result4 = containerward_org_view(
     driver, config, &ID("shared".to_string()), 3).await?;
   let expected4a = indoc! {"
-    *** <skg<id:shared>> shared
-    **** <skg<id:1,relToOrgParent:container,mightContainMore>> 1
-    **** <skg<id:2,relToOrgParent:container,mightContainMore>> 2
+    *** (skg id:shared) shared
+    **** (skg id:1 relToOrgParent:container mightContainMore) 1
+    **** (skg id:2 relToOrgParent:container mightContainMore) 2
     "};
   let expected4b = indoc! {"
-    *** <skg<id:shared>> shared
-    **** <skg<id:2,relToOrgParent:container,mightContainMore>> 2
-    **** <skg<id:1,relToOrgParent:container,mightContainMore>> 1
+    *** (skg id:shared) shared
+    **** (skg id:2 relToOrgParent:container mightContainMore) 2
+    **** (skg id:1 relToOrgParent:container mightContainMore) 1
     "};
   assert!(result4 == expected4a ||
           result4 == expected4b,
@@ -100,20 +100,20 @@ async fn test_containerward_org_view (
   let result5 = containerward_org_view(
     driver, config, &ID("shared_1".to_string()), 1).await?;
   let expected5a = indoc! {"
-    * <skg<id:shared_1>> shared_1
+    * (skg id:shared_1) shared_1
     Some body text.
     The second line of body text.
-    ** <skg<id:shared,relToOrgParent:container,mightContainMore>> shared
-    *** <skg<id:1,relToOrgParent:container,mightContainMore>> 1
-    *** <skg<id:2,relToOrgParent:container,mightContainMore>> 2
+    ** (skg id:shared relToOrgParent:container mightContainMore) shared
+    *** (skg id:1 relToOrgParent:container mightContainMore) 1
+    *** (skg id:2 relToOrgParent:container mightContainMore) 2
     "};
   let expected5b = indoc! {"
-    * <skg<id:shared_1>> shared_1
+    * (skg id:shared_1) shared_1
     Some body text.
     The second line of body text.
-    ** <skg<id:shared,relToOrgParent:container,mightContainMore>> shared
-    *** <skg<id:2,relToOrgParent:container,mightContainMore>> 2
-    *** <skg<id:1,relToOrgParent:container,mightContainMore>> 1
+    ** (skg id:shared relToOrgParent:container mightContainMore) shared
+    *** (skg id:2 relToOrgParent:container mightContainMore) 2
+    *** (skg id:1 relToOrgParent:container mightContainMore) 1
     "};
   assert!(result5 == expected5a ||
           result5 == expected5b,
@@ -125,14 +125,14 @@ async fn test_containerward_org_view (
   let result6 = containerward_org_view(
     driver, config, &ID("shared_cyclic".to_string()), 1).await?;
   let expected6a = indoc! {"
-    * <skg<id:shared_cyclic>> shared_cyclic
-    ** <skg<id:shared_cyclic_1,relToOrgParent:container,mightContainMore>> shared_cyclic_1
-    ** <skg<id:uncyclic_container,relToOrgParent:container,mightContainMore>> uncyclic_container
+    * (skg id:shared_cyclic) shared_cyclic
+    ** (skg id:shared_cyclic_1 relToOrgParent:container mightContainMore) shared_cyclic_1
+    ** (skg id:uncyclic_container relToOrgParent:container mightContainMore) uncyclic_container
     "};
   let expected6b = indoc! {"
-    * <skg<id:shared_cyclic>> shared_cyclic
-    ** <skg<id:uncyclic_container,relToOrgParent:container,mightContainMore>> uncyclic_container
-    ** <skg<id:shared_cyclic_1,relToOrgParent:container,mightContainMore>> shared_cyclic_1
+    * (skg id:shared_cyclic) shared_cyclic
+    ** (skg id:uncyclic_container relToOrgParent:container mightContainMore) uncyclic_container
+    ** (skg id:shared_cyclic_1 relToOrgParent:container mightContainMore) shared_cyclic_1
     "};
   assert!(result6 == expected6a ||
           result6 == expected6b,
@@ -144,16 +144,16 @@ async fn test_containerward_org_view (
   let result7 = containerward_org_view(
     driver, config, &ID("shared_cyclic_1".to_string()), 1).await?;
   let expected7a = indoc! {"
-    * <skg<id:shared_cyclic_1,cycle>> shared_cyclic_1
-    ** <skg<id:shared_cyclic,relToOrgParent:container,mightContainMore>> shared_cyclic
-    *** <skg<id:shared_cyclic_1,relToOrgParent:container,cycle,mightContainMore>> shared_cyclic_1
-    *** <skg<id:uncyclic_container,relToOrgParent:container,mightContainMore>> uncyclic_container
+    * (skg id:shared_cyclic_1 cycle) shared_cyclic_1
+    ** (skg id:shared_cyclic relToOrgParent:container mightContainMore) shared_cyclic
+    *** (skg id:shared_cyclic_1 relToOrgParent:container cycle mightContainMore) shared_cyclic_1
+    *** (skg id:uncyclic_container relToOrgParent:container mightContainMore) uncyclic_container
     "};
   let expected7b = indoc! {"
-    * <skg<id:shared_cyclic_1,cycle>> shared_cyclic_1
-    ** <skg<id:shared_cyclic,relToOrgParent:container,mightContainMore>> shared_cyclic
-    *** <skg<id:uncyclic_container,relToOrgParent:container,mightContainMore>> uncyclic_container
-    *** <skg<id:shared_cyclic_1,relToOrgParent:container,cycle,mightContainMore>> shared_cyclic_1
+    * (skg id:shared_cyclic_1 cycle) shared_cyclic_1
+    ** (skg id:shared_cyclic relToOrgParent:container mightContainMore) shared_cyclic
+    *** (skg id:uncyclic_container relToOrgParent:container mightContainMore) uncyclic_container
+    *** (skg id:shared_cyclic_1 relToOrgParent:container cycle mightContainMore) shared_cyclic_1
     "};
   assert!(result7 == expected7a ||
           result7 == expected7b,

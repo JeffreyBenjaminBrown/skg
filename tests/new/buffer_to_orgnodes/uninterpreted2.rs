@@ -64,13 +64,13 @@ fn test_org_to_uninterpreted_nodes2() {
 fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let input: &str =
     indoc! {"
-            * <skg<id:root,focused>> root
+            * (skg id:root focused) root
             Root body content
-            ** <skg<id:child1,folded>> child1
+            ** (skg id:child1 folded) child1
             Child1 body
-            * <skg<relToOrgParent:container,mightContainMore>> container node
+            * (skg relToOrgParent:container mightContainMore) container node
             Container body
-            * <skg<cycle,repeated>> cycling node
+            * (skg cycle repeated) cycling node
             This node has cycle and repeated flags
         "};
 
@@ -170,7 +170,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
-            * <skg<id:test,folded>> simple node with metadata
+            * (skg id:test folded) simple node with metadata
             Node body
             * regular node without metadata
             Regular body
@@ -228,25 +228,25 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
 fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
-            * <skg<invalidKey:value>> invalid key
-            * <skg<relToOrgParent:invalidValue>> invalid value
-            * <skg<unknownFlag>> unknown flag
+            * (skg invalidKey:value) invalid key
+            * (skg relToOrgParent:invalidValue) invalid value
+            * (skg unknownFlag) unknown flag
         "};
 
   // Test invalid key
-  let input_invalid_key = "* <skg<invalidKey:value>> invalid key";
+  let input_invalid_key = "* (skg invalidKey:value) invalid key";
   let result = org_to_uninterpreted_nodes(input_invalid_key);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
   // Test invalid relToOrgParent value
-  let input_invalid_value = "* <skg<relToOrgParent:invalidValue>> invalid value";
+  let input_invalid_value = "* (skg relToOrgParent:invalidValue) invalid value";
   let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown relToOrgParent value: invalidValue"));
 
   // Test unknown flag
-  let input_unknown_flag = "* <skg<unknownFlag>> unknown flag";
+  let input_unknown_flag = "* (skg unknownFlag) unknown flag";
   let result = org_to_uninterpreted_nodes(input_unknown_flag);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata value: unknownFlag"));

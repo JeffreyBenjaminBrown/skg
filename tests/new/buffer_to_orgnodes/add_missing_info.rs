@@ -57,21 +57,21 @@ async fn test_add_missing_info_logic (
   // modulo the specific ID values added.
   let with_missing_info: &str =
     indoc! {"
-            * <skg<id:root>> root
-            ** <skg<relToOrgParent:aliasCol>> aliases
+            * (skg id:root) root
+            ** (skg relToOrgParent:aliasCol) aliases
             *** new alias
-            *** <skg<relToOrgParent:alias>> preexisting alias
+            *** (skg relToOrgParent:alias) preexisting alias
             ** no id
             *** also no id
         "};
   let without_missing_info: &str =
     indoc! {"
-            * <skg<id:root-pid>> root
-            ** <skg<relToOrgParent:aliasCol>> aliases
-            *** <skg<relToOrgParent:alias>> new alias
-            *** <skg<relToOrgParent:alias>> preexisting alias
-            ** <skg<id:unpredictable>> no id
-            *** <skg<id:unpredictable>> also no id
+            * (skg id:root-pid) root
+            ** (skg relToOrgParent:aliasCol) aliases
+            *** (skg relToOrgParent:alias) new alias
+            *** (skg relToOrgParent:alias) preexisting alias
+            ** (skg id:unpredictable) no id
+            *** (skg id:unpredictable) also no id
         "};
   let mut after_adding_missing_info: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(

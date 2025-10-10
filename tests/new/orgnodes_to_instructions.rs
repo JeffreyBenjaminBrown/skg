@@ -12,11 +12,11 @@ use ego_tree::Tree;
 fn test_orgnodes_to_save_instructions_basic() {
   let input: &str =
     indoc! {"
-            * <skg<id:root1>> root node 1
+            * (skg id:root1) root node 1
             Root body content
-            ** <skg<id:child1>> child 1
+            ** (skg id:child1) child 1
             Child body
-            * <skg<id:root2,mightContainMore,toDelete>> root node 2
+            * (skg id:root2 mightContainMore toDelete) root node 2
             Root 2 body
         "};
 
@@ -58,12 +58,12 @@ fn test_orgnodes_to_save_instructions_basic() {
 fn test_orgnodes_to_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
-            * <skg<id:main>> main node
+            * (skg id:main) main node
             Main body
-            ** <skg<id:alias_col,relToOrgParent:aliasCol>> aliases
-            *** <skg<id:alias1,relToOrgParent:alias>> first alias
-            *** <skg<id:alias2,relToOrgParent:alias>> second alias
-            ** <skg<id:content_child>> content child
+            ** (skg id:alias_col relToOrgParent:aliasCol) aliases
+            *** (skg id:alias1 relToOrgParent:alias) first alias
+            *** (skg id:alias2 relToOrgParent:alias) second alias
+            ** (skg id:content_child) content child
             Content body
         "};
 
@@ -96,9 +96,9 @@ fn test_orgnodes_to_save_instructions_with_aliases() {
 fn test_orgnodes_to_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
-            * <skg<id:node1>> node without aliases
+            * (skg id:node1) node without aliases
             Body content
-            ** <skg<id:child1>> regular child
+            ** (skg id:child1) regular child
             Child body
         "};
 
@@ -118,13 +118,13 @@ fn test_orgnodes_to_save_instructions_no_aliases() {
 fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
-            * <skg<id:main>> main node
-            ** <skg<id:alias_col1,relToOrgParent:aliasCol>> first alias collection
-            *** <skg<id:alias1,relToOrgParent:alias>> alias one
-            *** <skg<id:alias2,relToOrgParent:alias>> alias two
-            ** <skg<id:alias_col2,relToOrgParent:aliasCol>> second alias collection
-            *** <skg<id:alias3,relToOrgParent:alias>> alias three
-            ** <skg<id:content1>> content node
+            * (skg id:main) main node
+            ** (skg id:alias_col1 relToOrgParent:aliasCol) first alias collection
+            *** (skg id:alias1 relToOrgParent:alias) alias one
+            *** (skg id:alias2 relToOrgParent:alias) alias two
+            ** (skg id:alias_col2 relToOrgParent:aliasCol) second alias collection
+            *** (skg id:alias3 relToOrgParent:alias) alias three
+            ** (skg id:content1) content node
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -143,13 +143,13 @@ fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
 fn test_orgnodes_to_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
-            * <skg<id:root>> root node
-            ** <skg<id:container,relToOrgParent:container>> container child
-            ** <skg<id:content1>> content child 1
-            ** <skg<id:alias_col,relToOrgParent:aliasCol>> aliases
-            *** <skg<id:alias1,relToOrgParent:alias>> my alias
-            ** <skg<id:content2>> content child 2
-            ** <skg<id:none_rel,relToOrgParent:none>> none relation child
+            * (skg id:root) root node
+            ** (skg id:container relToOrgParent:container) container child
+            ** (skg id:content1) content child 1
+            ** (skg id:alias_col relToOrgParent:aliasCol) aliases
+            *** (skg id:alias1 relToOrgParent:alias) my alias
+            ** (skg id:content2) content child 2
+            ** (skg id:none_rel relToOrgParent:none) none relation child
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -171,11 +171,11 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
 fn test_orgnodes_to_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
-            * <skg<id:level1>> level 1
-            ** <skg<id:level2a>> level 2a
-            *** <skg<id:level3a>> level 3a
-            **** <skg<id:level4>> level 4
-            ** <skg<id:level2b>> level 2b
+            * (skg id:level1) level 1
+            ** (skg id:level2a) level 2a
+            *** (skg id:level3a) level 3a
+            **** (skg id:level4) level 4
+            ** (skg id:level2b) level 2b
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -206,7 +206,7 @@ fn test_orgnodes_to_save_instructions_deep_nesting() {
 fn test_orgnodes_to_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
-            * <skg<id:good_node>> good node
+            * (skg id:good_node) good node
             * node without ID
         "};
 
@@ -233,10 +233,10 @@ fn test_orgnodes_to_save_instructions_empty_input() {
 fn test_orgnodes_to_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
-            * <skg<id:main>> main node
-            ** <skg<id:alias_col,relToOrgParent:aliasCol>> aliases only
-            *** <skg<id:alias1,relToOrgParent:alias>> alias one
-            *** <skg<id:alias2,relToOrgParent:alias>> alias two
+            * (skg id:main) main node
+            ** (skg id:alias_col relToOrgParent:aliasCol) aliases only
+            *** (skg id:alias1 relToOrgParent:alias) alias one
+            *** (skg id:alias2 relToOrgParent:alias) alias two
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -255,18 +255,18 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
 fn test_orgnodes_to_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
-            * <skg<id:doc1,mightContainMore>> Document 1
+            * (skg id:doc1 mightContainMore) Document 1
             Document body
-            ** <skg<id:aliases1,relToOrgParent:aliasCol>> Doc1 Aliases
-            *** <skg<id:alias_a,relToOrgParent:alias>> First Document
-            *** <skg<id:alias_b,relToOrgParent:alias>> Primary Doc
-            ** <skg<id:section1>> Section 1
+            ** (skg id:aliases1 relToOrgParent:aliasCol) Doc1 Aliases
+            *** (skg id:alias_a relToOrgParent:alias) First Document
+            *** (skg id:alias_b relToOrgParent:alias) Primary Doc
+            ** (skg id:section1) Section 1
             Section 1 body
-            *** <skg<id:subsection1a>> Subsection 1a
-            ** <skg<id:section2,toDelete>> Section 2
-            ** <skg<id:section3>> Section 3
-            * <skg<id:doc2>> Document 2
-            ** <skg<id:ref_section,relToOrgParent:container>> Reference Section
+            *** (skg id:subsection1a) Subsection 1a
+            ** (skg id:section2 toDelete) Section 2
+            ** (skg id:section3) Section 3
+            * (skg id:doc2) Document 2
+            ** (skg id:ref_section relToOrgParent:container) Reference Section
         "};
 
   let trees: Vec<Tree<OrgNode>> =

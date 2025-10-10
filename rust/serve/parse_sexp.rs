@@ -59,14 +59,16 @@ fn parse_separating_metadata_and_title (
   let headline_with_metadata : &str =
     line_after_bullet.trim_start ();
   if let Some ( meta_start ) =
-    headline_with_metadata . strip_prefix ( "<skg<" ) {
-    if let Some ( end ) = meta_start.find ( ">>" ) {
+    headline_with_metadata . strip_prefix ( "(skg" ) {
+    // Look for closing paren, handling whitespace after skg
+    let meta_start_trimmed : &str = meta_start.trim_start ();
+    if let Some ( end ) = meta_start_trimmed.find ( ')' ) {
       let inner : &str =
-        &meta_start[..end]; // between "<skg<" and ">>"
+        &meta_start_trimmed[..end]; // between "(skg" and ")"
       let metadata : OrgnodeMetadata =
         parse_metadata_to_headline_md ( inner ) ?;
       let title_rest : &str =
-        &meta_start[end + 2..]; // skip ">>"
+        &meta_start_trimmed[end + 1..]; // skip ")"
       let title : String =
         title_rest.trim () . to_string ();
       return Ok (( metadata, title )); }}
