@@ -1,5 +1,14 @@
 pub mod pids_from_ids;
-pub use pids_from_ids::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
+pub use pids_from_ids::{
+  pids_from_ids,
+  collect_ids_for_pid_lookup,
+  assign_pids_from_map};
+
+pub mod concept_document;
+pub use concept_document::{
+  extract_id_from_node,
+  extract_id_from_map,
+  build_id_disjunction};
 
 use std::error::Error;
 use typedb_driver::{
@@ -46,7 +55,6 @@ pub async fn pid_from_id (
           extract_payload_from_typedb_string_rep (
             &concept . to_string () )) ) ); }}
   Ok ( None ) }
-
 
 /// Returns the string it finds
 /// between the first and the second quotation marks.

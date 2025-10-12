@@ -2,7 +2,7 @@ use std::error::Error;
 use std::collections::{HashMap, HashSet};
 use typedb_driver::{
   answer::{QueryAnswer, ConceptDocument},
-  answer::concept_document::{Node, Leaf},
+  answer::concept_document::Node,
   Transaction,
   TransactionType,
   TypeDBDriver,
@@ -10,7 +10,10 @@ use typedb_driver::{
 use futures::StreamExt;
 
 use crate::types::ID;
-use crate::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::typedb::util::{
+  extract_id_from_node,
+  extract_id_from_map,
+  build_id_disjunction};
 
 
 /// PURPOSE: Run one TypeDB query, using nested subqueries,
@@ -41,15 +44,8 @@ pub async fn contains_from_pids (
       db_name, TransactionType::Read
     ) . await ?;
 
-  let disjunction_clauses : String = (
-    // looks like "{$node_id == "1";} or {$node_id == "2";} or ..."
-    pids
-    . iter ()
-    . map ( | pid |
-              format! ( "{{$node_id == \"{}\";}}",
-                           pid . 0 ) )
-    . collect::< Vec < _ > > ()
-    . join ( " or " ));
+  let disjunction_clauses : String =
+    build_id_disjunction ( pids, "node_id" );
   let query : String = (
     // - Outer match finds each node in our input set
     // - First nested fetch finds what this node contains (if any)
@@ -140,24 +136,3 @@ pub async fn contains_from_pids (
                   . insert ( container_id ); }} }} }} }}
   Ok (( container_to_contents,
         content_to_containers )) }
-
-/// Extract ID from a Node
-fn extract_id_from_node (
-  node : & Node
-) -> Option < ID > {
-  if let Node::Leaf ( Some ( leaf ) ) = node {
-    if let Leaf::Concept ( concept ) = leaf {
-      return Some ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () )) ); }}
-  None }
-
-/// Extract ID from a map node at a specific key
-fn extract_id_from_map (
-  node : & Node,
-  key  : &str
-) -> Option < ID > {
-  if let Node::Map ( inner_map ) = node {
-    inner_map . get ( key )
-      . and_then ( extract_id_from_node )
-  } else { None }}

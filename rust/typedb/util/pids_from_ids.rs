@@ -2,8 +2,7 @@ use std::error::Error;
 use std::collections::HashMap;
 use typedb_driver::{
   answer::{QueryAnswer, ConceptDocument},
-  answer::concept_document::{Node, Leaf},
-  concept::Concept,
+  answer::concept_document::Node,
   Transaction,
   TransactionType,
   TypeDBDriver,
@@ -12,7 +11,10 @@ use futures::StreamExt;
 use ego_tree;
 
 use crate::types::{OrgNode, ID};
-use crate::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::typedb::util::{
+  extract_id_from_node,
+  extract_id_from_map,
+  build_id_disjunction};
 
 
 /// Collect IDs for bulk PID lookup
@@ -70,14 +72,7 @@ pub async fn pids_from_ids (
       db_name, TransactionType::Read
     ) . await ?;
   let disjunction_clauses : String =
-    // Looks like "{$id == "id1";} or {$id == "id2";} or ..."
-    node_ids
-    . iter ()
-    . map ( | node_id |
-              format! ( "{{$id == \"{}\";}}",
-                           node_id . 0 ) )
-    . collect::< Vec < _ > > ()
-    . join ( " or " );
+    build_id_disjunction ( node_ids, "id" );
   let query : String =
     format! (
       // Query for (id, primary_id) pairs.
@@ -125,58 +120,26 @@ pub async fn pids_from_ids (
       // We expect root to be a Map with keys "id" and "primary_ids".
       if let Some ( Node::Map ( ref map ) ) = doc . root {
 
-        // Extract the ID from the outer fetch.
-        // The value at "id" is a Node, which we need to unwrap:
-        //   Node::Leaf → Option<Leaf> → Leaf::Concept → Concept
-        // Then convert Concept's string representation to our ID type
-        // (hence the '_opt' in its name).
+        // Extract the ID from the outer fetch
         let id_opt : Option < ID > =
           map . get ( "id" )
-          . and_then (
-            | node : & Node |
-            if let Node::Leaf ( Some ( leaf ) ) = node
-            { if let Leaf::Concept ( concept ) = leaf
-              { Some ( concept ) }
-              else { None } }
-            else { None } )
-          . and_then (
-            | concept : & Concept |
-            Some ( ID ( extract_payload_from_typedb_string_rep (
-              & concept . to_string () )) ));
+          . and_then ( extract_id_from_node );
 
         // Extract the primary_id from the nested subquery result.
         // The value at "primary_ids" is a Node::List with one Map.
-        // We need to navigate:
-        //   Node::List → Vec<Node> → first element
-        //   → Node::Map → get "primary_id"
-        //   → Node::Leaf → Leaf::Concept → Concept → string → ID
         let primary_id_opt : Option < ID > =
           map . get ( "primary_ids" )
           . and_then (
             | node : & Node |
-            // Unwrap Node::List, get first element.
-            // (There should be the only one.)
+            // Unwrap Node::List, get first element
             if let Node::List ( list ) = node
             { list . first () }
             else { None } )
           . and_then (
             | first_node : & Node |
-            // Unwrap the first element, which should be a Map
-            if let Node::Map ( inner_map ) = first_node
-            { inner_map . get ( "primary_id" ) }
-            else { None } )
-          . and_then (
-            | node : & Node |
-            if let Node::Leaf ( Some ( leaf ) ) = node
-            { // Unwrap Leaf::Concept
-              if let Leaf::Concept ( concept ) = leaf
-              { Some ( concept ) }
-              else { None } }
-            else { None } )
-          . and_then (
-            | concept : & Concept |
-            Some ( ID ( extract_payload_from_typedb_string_rep (
-              & concept . to_string () )) ));
+            // Extract "primary_id" from the map
+            extract_id_from_map ( first_node, "primary_id" ) );
+
         if let Some ( id ) = id_opt {
           result . insert ( id, primary_id_opt ); }} }}
   Ok ( result ) }
