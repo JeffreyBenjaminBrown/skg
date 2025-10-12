@@ -1,6 +1,7 @@
 // cargo test typedb::search
 
 pub mod contains_from_pids;
+pub mod count_relationships;
 
 use skg::test_utils::populate_test_db_from_fixtures;
 use skg::typedb::search::find_containers_of;
