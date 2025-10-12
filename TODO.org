@@ -1,12 +1,22 @@
-* [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
-* Metadata and intent should be independent.
+* TODO in serial
+** [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
+** Containerward view should not duplicate content.
+  If a node N is only in one container C, which N contains,
+  then the containerward view should unfold from C.
+  If N has multiple, then all that N does not contain
+  should be prepended to its children.
+  The ones N does contain should not need modification,
+  because the heralds should already indicate they are
+  both content and container to their parents.
+** Metadata and intent should be independent.
   They are entangled, e.g. in [[id:f6f8c460-2553-4fd7-b81d-6ce17a333591]["relToOrgParent" is misleading.]]
   Instead, determine the structure of the tree,
   and each node's intent
   (which is currently part of what relToOrgParent encodes),
   but then generate certain metadata de-novo:
   cycle, rep, relToOrgParent (can have multiple),
-* ====== BELOW: SORTED =======
+** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
+* ====== BELOW: SORTED, no execution order =======
 * internalize
   Ask for a refactoring plan before embarking.
 * features
@@ -20,8 +30,6 @@
 *** then eliminate further redundancy, if any
 ** override the ordinary save command
 ** If there is a containerward "}" herald, the "ID exists" herald can be omitted.
-** [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
-   esp. rootness and multiple containment
 ** [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
 ** [[id:bc8fd4c3-0566-400c-96a8-0f4632e7fd1c][merging]]
 ** not pressing
@@ -36,6 +44,7 @@
 *** mk_orgnode from save/buffer_to_orgnodes/uninterpreted.rs
     does something already done in mk_org_text/
 *** Buffer_Cannot_Be_Saved and SaveError
+** use the tests at not_using/pids_from_ids/tests.rs
 ** test the propagation of Buffer_Cannot_Be_Saved errors
    in commit 130318842f5ad0ad92279d14f85d8b950e6f844a,
    I started using

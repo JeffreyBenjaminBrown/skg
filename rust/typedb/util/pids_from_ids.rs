@@ -20,16 +20,14 @@ pub fn collect_ids_for_pid_lookup (
   node_ref : ego_tree::NodeRef < OrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  // Collect ID if present
-  if let Some ( ref id ) = node_ref . value () . metadata . id {
+  if let Some ( ref id )
+    = node_ref . value () . metadata . id
+  { // Collect ID if present
     ids_to_lookup . push ( id . clone () ); }
-
-  // Process children recursively
-  for child in node_ref . children () {
+  for child in node_ref . children () { // Recurse
     collect_ids_for_pid_lookup (
       child,
       ids_to_lookup ); } }
-
 
 /// Assign PIDs from the bulk lookup results
 pub fn assign_pids_from_map (
@@ -43,7 +41,6 @@ pub fn assign_pids_from_map (
       pid_map . get ( current_id )
     { node_ref . value () . metadata . id =
       Some ( pid . clone () ); }}
-
   { // Process children recursively
     let node_id : ego_tree::NodeId = node_ref . id ();
     let child_ids : Vec < ego_tree::NodeId > = {
@@ -57,9 +54,9 @@ pub fn assign_pids_from_map (
       { assign_pids_from_map (
         child_mut, pid_map ); }} }}
 
-
-/// PURPOSE: Run a *single* TypeDB query, using nested subqueries,
+/// PURPOSE: Run one TypeDB query, using nested subqueries,
 /// to look up PIDs for multiple IDs.
+/// (That it is one query complicates things but makes them faster.)
 /// Return a HashMap mapping each ID to its PID (or None if not found).
 pub async fn pids_from_ids (
   db_name : &str,

@@ -25,6 +25,11 @@ pub struct OrgnodeMetadata {
   pub toDelete: bool,
 }
 
+/* PITFALL:
+RelToOrgParent is not necessarily the only relationship
+bewteen a node and its parent.
+It has two uses: to make clear to the user one way they relate,
+and to instruct the server what to do when the buffer is saved. */
 #[derive(Debug, Clone, PartialEq)]
 pub enum RelToOrgParent {
   Content, // The default relationship.
