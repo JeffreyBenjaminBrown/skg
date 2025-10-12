@@ -6,6 +6,11 @@ mod typedb {
   pub mod update_typedb_from_saveinstructions;
 }
 
+#[path = "typedb/search"]
+mod search {
+  pub mod contains_from_pids;
+}
+
 mod util {
   pub mod search;
 }
