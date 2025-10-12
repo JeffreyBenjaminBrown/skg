@@ -1,7 +1,7 @@
 // cargo test typedb::search::count_relationships
 
 use skg::test_utils::populate_test_db_from_fixtures;
-use skg::typedb::search::count_containers;
+use skg::typedb::search::{count_containers, count_contents};
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
@@ -19,6 +19,8 @@ fn the_tests (
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
       setup_test_database () . await ?;
     test_count_containers (
+      &config, &driver ) . await ?;
+    test_count_contents (
       &config, &driver ) . await ?;
     Ok (( )) } ) }
 
@@ -76,6 +78,42 @@ async fn test_count_containers (
   expected_counts . insert ( ID ( "3" . to_string () ), 1 );
   expected_counts . insert ( ID ( "10" . to_string () ), 0 );
   expected_counts . insert ( ID ( "11" . to_string () ), 1 );
+
+  assert_eq! ( counts, expected_counts );
+
+  Ok (( )) }
+
+async fn test_count_contents (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+
+  let input_ids : Vec<ID> =
+    vec! [ ID ( "1"  . to_string () ),
+           ID ( "2"  . to_string () ),
+           ID ( "3"  . to_string () ),
+           ID ( "10" . to_string () ),
+           ID ( "11" . to_string () ) ];
+
+  let counts : HashMap < ID, usize > =
+    count_contents (
+      & config . db_name,
+      & driver,
+      & input_ids ) . await ?;
+
+  // Expected counts:
+  // 1 contains 2 and 3 (count = 2)
+  // 2 contains nothing (count = 0)
+  // 3 contains 1 (count = 1)
+  // 10 contains 11 and 12 (count = 2)
+  // 11 contains nothing (count = 0)
+  let mut expected_counts : HashMap < ID, usize > =
+    HashMap::new ();
+  expected_counts . insert ( ID ( "1" . to_string () ), 2 );
+  expected_counts . insert ( ID ( "2" . to_string () ), 0 );
+  expected_counts . insert ( ID ( "3" . to_string () ), 1 );
+  expected_counts . insert ( ID ( "10" . to_string () ), 2 );
+  expected_counts . insert ( ID ( "11" . to_string () ), 0 );
 
   assert_eq! ( counts, expected_counts );
 

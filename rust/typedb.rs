@@ -29,6 +29,7 @@ pub use search::{
     find_related_nodes,
     contains_from_pids,
     count_containers,
+    count_contents,
 };
 
 pub mod update;
