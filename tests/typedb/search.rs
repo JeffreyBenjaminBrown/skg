@@ -1,5 +1,7 @@
 // cargo test typedb::search
 
+pub mod contains_from_pids;
+
 use skg::test_utils::populate_test_db_from_fixtures;
 use skg::typedb::search::find_containers_of;
 use skg::typedb::search::path_containerward_to_end_cycle_and_or_branches;

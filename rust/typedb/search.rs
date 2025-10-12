@@ -1,3 +1,6 @@
+pub mod contains_from_pids;
+pub use contains_from_pids::contains_from_pids;
+
 use std::collections::HashSet;
 use futures::StreamExt;
 use std::error::Error;
