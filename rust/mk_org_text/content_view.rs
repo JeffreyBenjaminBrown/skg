@@ -185,15 +185,17 @@ pub async fn org_from_node_recursive (
     fetch_node_with_pid (
       driver, config, node_id ) . await ?;
   validate_node_title ( node_id, & node ) ?;
+  let metadata : OrgnodeMetadata =
+    build_metadata_for_node (
+      node_id, org_parent_id, & pid, rel_data );
   if visited . contains ( node_id ) {
     return Ok (
       format_repeated_node (
-        node_id, level, & node . title )); }
+        level, & node . title, metadata )); }
   visited . insert ( node_id . clone () );
   render_node_and_children (
     driver, config, node_id, focus,
-    visited, level, org_parent_id,
-    & pid, & node, rel_data
+    visited, level, & node, metadata, rel_data
   ) . await }
 
 async fn fetch_node_with_pid (
@@ -224,20 +226,16 @@ fn validate_node_title (
   Ok (()) }
 
 async fn render_node_and_children (
-  driver        : &TypeDBDriver,
-  config        : &SkgConfig,
-  node_id       : &ID,
-  focus         : &ID,
-  visited       : &mut HashSet<ID>,
-  level         : usize,
-  org_parent_id : Option<&ID>,
-  pid           : &ID,
-  node          : &SkgNode,
-  rel_data      : &RelationshipData,
+  driver   : &TypeDBDriver,
+  config   : &SkgConfig,
+  node_id  : &ID,
+  focus    : &ID,
+  visited  : &mut HashSet<ID>,
+  level    : usize,
+  node     : &SkgNode,
+  metadata : OrgnodeMetadata,
+  rel_data : &RelationshipData,
 ) -> Result < String, Box<dyn Error> > {
-  let metadata : OrgnodeMetadata =
-    build_metadata_for_node (
-      node_id, org_parent_id, pid, rel_data );
   let orgnode : OrgNode =
     OrgNode {
       metadata,
@@ -287,20 +285,19 @@ fn build_metadata_for_node (
 /// Produce a headline with a `repeated` herald and a short body.
 /// Do not recurse into children.
 pub fn format_repeated_node (
-  node_id : &ID,
-  level   : usize,
-  title   : &String
+  level    : usize,
+  title    : &String,
+  metadata : OrgnodeMetadata,
 ) -> String {
-  let orgnode2 : OrgNode =
+  let mut md = metadata;
+  md . repeat = true;
+  let orgnode : OrgNode =
     OrgNode {
-      metadata : { let mut md = default_metadata ();
-                   md.id = Some ( node_id.clone () );
-                   md.repeat = true;
-                   md },
+      metadata : md,
       title : newline_to_space ( title ),
       body : Some (
         "Repeated, probably above. Edit there, not here."
           . to_string () ), };
   render_org_node_from_text (
     level,
-    &orgnode2 ) }
+    &orgnode ) }

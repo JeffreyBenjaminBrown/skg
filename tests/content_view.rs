@@ -144,7 +144,7 @@ fn test_multi_root_view
     let expected = indoc! {"* (skg (id 1) (numContainers 0) (numContents 0) (numLinksIn 0)) 1
                             1 has a body
                             * (skg (id 2) (numContainers 0) (numContents 0) (numLinksIn 0)) 2
-                            * (skg (id 1) repeated) 1
+                            * (skg (id 1) repeated (numContainers 0) (numContents 0) (numLinksIn 0)) 1
                             Repeated, probably above. Edit there, not here.
                             "};
     assert_eq!(result, expected,
