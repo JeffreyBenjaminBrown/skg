@@ -90,35 +90,8 @@ pub async fn single_root_view (
   config  : &SkgConfig,
   focus   : &ID,
 ) -> Result < String, Box<dyn Error> > {
-
-  let root_id : ID = climb_containerward_and_fetch_rootish_context (
-    & config . db_name,
-    driver , focus
-  ) . await ?;
-
-  // Collect all PIDs in the view
-  let mut visited : HashSet<ID> = HashSet::new();
-  let mut pids : Vec<ID> = Vec::new();
-  collect_pids_in_view (
-    driver, config,
-    &root_id, &mut visited, &mut pids
-  ) . await ?;
-
-  // Fetch relationship data for all PIDs
-  let rel_data : RelationshipData =
-    fetch_relationship_data (
-      driver, & config . db_name, &pids
-    ) . await ?;
-
-  // Render with relationship data
-  visited . clear ();
-  let org : String =
-    org_from_node_recursive (
-      driver, config,
-      &root_id, focus, &mut visited, 1,
-      None, &rel_data
-    ) . await ?;
-  Ok (org) }
+  multi_root_view (
+    driver, config, & [ focus . clone () ] ) . await }
 
 /// Just like 'single_root_view',
 /// except it builds a forest rather than a tree.
@@ -128,40 +101,68 @@ pub async fn multi_root_view (
   focii   : &[ID],
 ) -> Result < String, Box<dyn Error> > {
 
-  // Collect root IDs for all foci
-  let mut root_ids : Vec<ID> = Vec::new();
+  let root_id_focus_pairs : Vec < ( ID, ID ) > =
+    collect_root_ids (
+      driver, & config . db_name, focii ) . await ?;
+  let root_ids : Vec < ID > =
+    root_id_focus_pairs
+    . iter() . map ( | (root, _) |
+                        root . clone ()
+    ). collect ();
+  let pids : Vec < ID > =
+    collect_all_pids (
+      driver, config, & root_ids ). await ?;
+  let rel_data : RelationshipData =
+    fetch_relationship_data (
+      driver, & config . db_name, & pids ). await ?;
+  render_all_roots (
+    driver, config, & root_id_focus_pairs, & rel_data
+  ). await }
+
+async fn collect_root_ids (
+  driver  : &TypeDBDriver,
+  db_name : &str,
+  focii   : &[ID],
+) -> Result < Vec < ( ID, ID ) >, Box<dyn Error> > {
+  let mut root_id_focus_pairs
+    : Vec < ( ID, ID ) >
+    = Vec::new();
   for focus in focii {
     let root_id : ID =
       climb_containerward_and_fetch_rootish_context (
-        & config . db_name,
-        driver , focus
-      ) . await ?;
-    root_ids . push ( root_id ); }
+        db_name, driver, focus
+      ). await ?;
+    root_id_focus_pairs . push (( root_id,
+                                  focus . clone () )); }
+  Ok ( root_id_focus_pairs ) }
 
-  // Collect all PIDs in all views
-  let mut visited_collect : HashSet<ID> = HashSet::new();
-  let mut pids : Vec<ID> = Vec::new();
-  for root_id in &root_ids {
+async fn collect_all_pids (
+  driver   : &TypeDBDriver,
+  config   : &SkgConfig,
+  root_ids : &[ID],
+) -> Result < Vec < ID >, Box<dyn Error> > {
+  let mut visited : HashSet < ID > = HashSet::new();
+  let mut pids : Vec < ID > = Vec::new();
+  for root_id in root_ids {
     collect_pids_in_view (
-      driver, config,
-      root_id, &mut visited_collect, &mut pids
+      driver, config, root_id, &mut visited, &mut pids
     ) . await ?; }
+  Ok ( pids ) }
 
-  // Fetch relationship data for all PIDs
-  let rel_data : RelationshipData =
-    fetch_relationship_data (
-      driver, & config . db_name, &pids
-    ) . await ?;
-
-  // Render each root with relationship data
+async fn render_all_roots (
+  driver               : &TypeDBDriver,
+  config               : &SkgConfig,
+  root_id_focus_pairs  : & [ ( ID, ID ) ],
+  rel_data             : &RelationshipData,
+) -> Result < String, Box<dyn Error> > {
   let mut result : String = String::new();
-  let mut visited_render : HashSet<ID> = HashSet::new();
-  for (root_id, focus) in root_ids . iter () . zip ( focii . iter () ) {
+  let mut visited : HashSet < ID > = HashSet::new();
+  for (root_id, focus) in root_id_focus_pairs {
     let org : String =
       org_from_node_recursive (
         driver, config,
-        root_id, focus, &mut visited_render, 1,
-        None, &rel_data
+        root_id, focus, &mut visited, 1,
+        None, rel_data
       ) . await ?;
     result . push_str ( & org ); }
   Ok ( result ) }

@@ -1,5 +1,5 @@
 Claude wrote this guide.
-A human edited it but has not fact-checked it.
+Jeff edited it but has not fact-checked it.
 * Corrupted TypeDB Checkpoints
 ** PITFALL: Never delete the _system database.
 ** Quick Diagnostic Workflow
