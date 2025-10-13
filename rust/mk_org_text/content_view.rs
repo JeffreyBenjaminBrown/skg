@@ -7,7 +7,7 @@ use crate::typedb::search::{
   count_contents,
   count_link_sources};
 use crate::typedb::util::pid_from_id;
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
+use crate::types::{SkgNode, ID, SkgConfig, OrgNode, OrgnodeMetadata};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::util::newline_to_space;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
@@ -181,66 +181,107 @@ pub async fn org_from_node_recursive (
   org_parent_id : Option<&ID>,
   rel_data      : &RelationshipData,
 ) -> Result<String, Box<dyn Error>> {
+  let ( pid, node ) =
+    fetch_node_with_pid (
+      driver, config, node_id ) . await ?;
+  validate_node_title ( node_id, & node ) ?;
+  if visited . contains ( node_id ) {
+    return Ok (
+      format_repeated_node (
+        node_id, level, & node . title )); }
+  visited . insert ( node_id . clone () );
+  render_node_and_children (
+    driver, config, node_id, focus,
+    visited, level, org_parent_id,
+    & pid, & node, rel_data
+  ) . await }
 
+async fn fetch_node_with_pid (
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig,
+  node_id : &ID,
+) -> Result < ( ID, SkgNode ), Box<dyn Error> > {
   let pid : ID =
-    pid_from_id ( & config . db_name,
-                    driver,
-                    node_id,
-  ). await ?
+    pid_from_id (
+      & config . db_name, driver, node_id ). await ?
     . ok_or_else ( || format! (
-      "ID '{}' not found in database", node_id ) ) ?;
-  let path : String = path_from_pid (
-    &config, pid . clone () );
-  let node : SkgNode = read_node ( path )?;
-  if node.title.is_empty () {
+      "ID '{}' not found in database", node_id )) ?;
+  let path : String =
+    path_from_pid ( &config, pid . clone () );
+  let node : SkgNode =
+    read_node ( path ) ?;
+  Ok (( pid, node )) }
+
+fn validate_node_title (
+  node_id : &ID,
+  node    : &SkgNode,
+) -> Result < (), Box<dyn Error> > {
+  if node . title . is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ( "SkgNode with ID {} has an empty title",
-                 node_id ),
-    )) ); }
-  if visited.contains (node_id) {
-    return Ok ( format_repeated_node (
-      node_id, level, & node.title )); }
-  visited.insert ( node_id.clone () );
-  let orgnode2 : OrgNode =
+      format! ( "SkgNode with ID {} has an empty title", node_id ),
+    ))); }
+  Ok (()) }
+
+async fn render_node_and_children (
+  driver        : &TypeDBDriver,
+  config        : &SkgConfig,
+  node_id       : &ID,
+  focus         : &ID,
+  visited       : &mut HashSet<ID>,
+  level         : usize,
+  org_parent_id : Option<&ID>,
+  pid           : &ID,
+  node          : &SkgNode,
+  rel_data      : &RelationshipData,
+) -> Result < String, Box<dyn Error> > {
+  let metadata : OrgnodeMetadata =
+    build_metadata_for_node (
+      node_id, org_parent_id, pid, rel_data );
+  let orgnode : OrgNode =
     OrgNode {
-      metadata : {
-        let mut md = default_metadata ();
-        md.id = Some ( node_id.clone () );
-        // Check parent relationships
-        if let Some ( parent_id ) = org_parent_id {
-          md.parentIsContainer =
-            rel_data . content_to_containers
-            . get ( & pid )
-            . map_or ( false, |containers|
-                       containers . contains ( parent_id ));
-          md.parentIsContent =
-            rel_data . container_to_contents
-            . get ( & pid )
-            . map_or ( false, |contents|
-                       contents . contains ( parent_id )); }
-        // Set relationship counts
-        md.numContainers = rel_data . num_containers . get ( & pid ) . copied ();
-        md.numContents = rel_data . num_contents . get ( & pid ) . copied ();
-        md.numLinksIn = rel_data . num_links_in . get ( & pid ) . copied ();
-        md },
-      title : newline_to_space ( &node.title ),
-      // Over-cautious, because the title should contain no newlines, but probably cheap.
-      body : node.body.clone (), };
+      metadata,
+      title : newline_to_space ( & node . title ),
+      body  : node . body . clone (), };
   let mut out : String =
-    render_org_node_from_text (
-      level,
-      &orgnode2
-    );
-  for child_id in &node.contains { // Recurse at next level.
-    let child = Box::pin (
-      org_from_node_recursive (
-        driver, config,
-        child_id, focus, visited, level + 1,
-        Some ( node_id ), rel_data
-      )) . await? ;
-    out.push_str ( &child ); }
-  Ok (out) }
+    render_org_node_from_text ( level, & orgnode );
+  for child_id in & node . contains {
+    let child : String =
+      Box::pin (
+        org_from_node_recursive (
+          driver, config,
+          child_id, focus, visited, level + 1,
+          Some ( node_id ), rel_data
+        )) . await ?;
+    out . push_str ( & child ); }
+  Ok ( out ) }
+
+fn build_metadata_for_node (
+  node_id       : &ID,
+  org_parent_id : Option<&ID>,
+  pid           : &ID,
+  rel_data      : &RelationshipData,
+) -> OrgnodeMetadata {
+  let mut md = default_metadata ();
+  md . id = Some ( node_id . clone () );
+  if let Some ( parent_id ) = org_parent_id {
+    md . parentIsContainer =
+      rel_data . content_to_containers
+      . get ( pid )
+      . map_or ( false, | containers |
+                 containers . contains ( parent_id ));
+    md . parentIsContent =
+      rel_data . container_to_contents
+      . get ( pid )
+      . map_or ( false, | contents |
+                 contents . contains ( parent_id )); }
+  md . numContainers =
+    rel_data . num_containers . get ( pid ) . copied ();
+  md . numContents =
+    rel_data . num_contents . get ( pid ) . copied ();
+  md . numLinksIn =
+    rel_data . num_links_in . get ( pid ) . copied ();
+  md }
 
 /// When a node is encountered again in the same document:
 /// Produce a headline with a `repeated` herald and a short body.
