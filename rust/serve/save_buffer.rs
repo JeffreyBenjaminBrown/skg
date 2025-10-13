@@ -30,21 +30,23 @@ pub fn handle_save_buffer_request (
   tantivy_index : &TantivyIndex ) {
 
   match read_length_prefixed_content (reader) {
-    Ok (content) => {
+    Ok (initial_buffer_content) => {
       match block_on(
         update_from_and_rerender_buffer (
           // Most of the work happens here.
-          &content, typedb_driver, config, tantivy_index )) {
-        Ok (processed_content) => {
-          // Send success indicator followed by length-prefixed content
+          & initial_buffer_content,
+          typedb_driver, config, tantivy_index ))
+      { Ok (regenerated_buffer_content) =>
+        { // Send success indicator followed by length-prefixed content
           let success_header : &str =
             "save: success\n";
           let header : String =
             format!("Content-Length: {}\r\n\r\n",
-                    processed_content.len());
+                    regenerated_buffer_content.len());
           let full_response : String =
             format!("{}{}{}",
-                    success_header, header, processed_content);
+                    success_header, header,
+                    regenerated_buffer_content);
           stream . write_all(
             full_response . as_bytes () ). unwrap ();
           stream . flush() . unwrap (); }

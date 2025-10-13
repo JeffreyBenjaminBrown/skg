@@ -20,7 +20,7 @@ pub fn handle_single_root_view_request (
 
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
-      let content : String = block_on ( async {
+      let buffer_content : String = block_on ( async {
         match single_root_view (
           typedb_driver,
           config,
@@ -30,7 +30,7 @@ pub fn handle_single_root_view_request (
             "Error generating document: {}", e), }} );
       send_response_with_length_prefix (
         stream,
-        & content ); },
+        & buffer_content ); },
     Err ( err ) => {
       let error_msg = format!(
         "Error extracting node ID: {}", err);
