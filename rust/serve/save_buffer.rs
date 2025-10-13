@@ -140,7 +140,8 @@ async fn update_from_and_rerender_buffer (
   let root_focus_ids : Vec<ID> =
     orgnode_forest . iter ()
     . map ( |tree| {
-      let root_node = tree . root () . value ();
+      let root_node : &OrgNode =
+        tree . root () . value ();
       root_node . metadata . id . as_ref ()
         . ok_or_else ( || format!(
           "Root node '{}' has no ID", root_node . title ) )

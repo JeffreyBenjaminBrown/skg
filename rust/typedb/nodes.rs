@@ -9,6 +9,7 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver,
 };
+use typedb_driver::answer::QueryAnswer;
 
 pub async fn create_all_nodes (
   // Maps `create_node` over `nodes`, creating:
@@ -84,8 +85,9 @@ pub async fn create_node (
 
   if node . ids . is_empty () {
     return Err ( "SkgNode with no IDs.".into() ); }
-  let primary_id = node . ids [0] . as_str ();
-  let insert_node_query = format! (
+  let primary_id : &str =
+    node . ids [0] . as_str ();
+  let insert_node_query : String = format! (
     r#"insert $n isa node,
                  has id "{}";"#,
     primary_id );
@@ -99,7 +101,8 @@ pub async fn insert_extra_ids (
 ) -> Result < (), Box<dyn Error> > {
 
   if node.ids.len () > 1 {
-    let primary_id = node . ids [0] . as_str ();
+    let primary_id : &str =
+      node . ids [0] . as_str ();
     let extra_ids: Vec < &ID > =
       node . ids . iter() . skip(1) . collect();
     for extra_id in extra_ids {
@@ -145,10 +148,12 @@ pub async fn which_ids_exist (
       db_name,
       TransactionType::Read
     ) . await ?;
-  let answer = tx . query ( query ) . await ?;
+  let answer : QueryAnswer =
+    tx . query ( query ) . await ?;
   let mut found : HashSet < String > =
     HashSet::new ();
-  let mut rows = answer . into_rows ();
+  let mut rows = // TODO ? Is this hard to assign a type signature?
+    answer . into_rows ();
   while let Some ( row_res ) = rows . next () . await {
     let row = row_res ?;
     if let Some ( concept ) =
@@ -179,7 +184,7 @@ pub async fn delete_nodes_from_pids (
       id.0 ) )
     . collect::< Vec<_> > ()
     . join ( " or\n" );
-  let extra_ids_query = format! (
+  let extra_ids_query : String = format! (
     // To find every associated extra_id.
     r#"match $node isa node;
       {};
@@ -188,23 +193,25 @@ pub async fn delete_nodes_from_pids (
       $e has id $extra_id_value;
       select $extra_id_value;"#,
     pid_or_clause );
-  let answer = tx.query ( extra_ids_query ). await ?;
+  let answer : QueryAnswer =
+    tx.query ( extra_ids_query ). await ?;
   let mut extra_id_values : Vec<String> =
     Vec::new();
   let mut rows = answer.into_rows();
   while let Some(row_res) = rows.next().await {
     let row = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_value = extract_payload_from_typedb_string_rep(
-        &concept.to_string());
+      let extra_id_value : String =
+        extract_payload_from_typedb_string_rep(
+          &concept.to_string());
       extra_id_values.push (extra_id_value); }}
   { // delete nodes
-    let delete_nodes_from_pids_query = format! (
+    let delete_nodes_from_pids_query : String = format! (
       r#"match $node isa node;
       {};
       delete $node;"#,
       pid_or_clause );
-    let _answer = tx.query (
+    let _answer : QueryAnswer = tx.query (
       delete_nodes_from_pids_query ). await ?; }
   { // Delete extra_ids
     if !extra_id_values.is_empty() {
@@ -215,12 +222,12 @@ pub async fn delete_nodes_from_pids (
           id ) )
         . collect::< Vec<_> > ()
         . join ( " or\n" );
-      let delete_extra_ids_query = format! (
+      let delete_extra_ids_query : String = format! (
         r#"match $e isa extra_id;
         {};
         delete $e;"#,
         extra_id_or_clause );
-      let _answer = tx.query (
+      let _answer : QueryAnswer = tx.query (
         delete_extra_ids_query ). await ?; }}
   tx . commit (). await ?;
   Ok ( () ) }

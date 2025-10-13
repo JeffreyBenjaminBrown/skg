@@ -34,7 +34,8 @@ pub async fn create_relationships_from_node (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id = node . ids [0] . as_str ();
+  let primary_id : &str =
+    node . ids [0] . as_str ();
   insert_relationship_from_list (
     primary_id,
     &node.contains,

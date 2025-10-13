@@ -81,6 +81,7 @@ pub async fn overwrite_new_empty_db (
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
 
+  // TODO ? Is it hard to give a type signature to 'databases'?
   let databases = driver.databases ();
   if databases.contains (db_name) . await ? {
     println! ( "Deleting existing database '{}'...",

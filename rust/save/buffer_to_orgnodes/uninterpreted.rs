@@ -4,6 +4,7 @@ use crate::serve::parse_headline_md_sexp::{parse_metadata_to_orgnodemd, find_sex
 
 use ego_tree::Tree;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// Type alias for headline information: (level, metadata, title)
 pub type HeadlineInfo = (usize, Option<OrgnodeMetadata>, String);
@@ -129,8 +130,8 @@ pub fn headline_to_triple (
 ) -> HeadlineResult {
   // Simple regex to capture just asterisks and remainder
   static HEADLINE_REGEX
-    : std::sync::LazyLock<Regex>
-    = std::sync::LazyLock::new(|| {
+    : LazyLock<Regex>
+    = LazyLock::new(|| {
       Regex::new(r"^\s*(\*+)\s+(.+)").unwrap()
     });
   if let Some(captures) = HEADLINE_REGEX.captures(headline) {

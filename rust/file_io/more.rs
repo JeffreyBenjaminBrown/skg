@@ -1,8 +1,8 @@
 use crate::types::{SkgNode, SkgConfig};
 use crate::file_io::read_node;
 use std::io;
-use std::path::Path;
-use std::fs;
+use std::path::{Path, PathBuf};
+use std::fs::{self, DirEntry, ReadDir};
 
 pub fn read_skg_files
   <P : AsRef<Path> > (
@@ -11,11 +11,11 @@ pub fn read_skg_files
 { // Reads all relevant files from the path.
 
   let mut nodes : Vec<SkgNode> = Vec::new ();
-  let entries : std::fs::ReadDir = // an iterator
+  let entries : ReadDir = // an iterator
     fs::read_dir (dir_path) ?;
   for entry in entries {
-    let entry : std::fs::DirEntry = entry ?;
-    let path = entry.path () ;
+    let entry : DirEntry = entry ?;
+    let path : PathBuf = entry.path () ;
     if ( path.is_file () &&
          path . extension () . map_or (
            false,                // None => no extension found

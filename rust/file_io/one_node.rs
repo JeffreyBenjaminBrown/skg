@@ -19,8 +19,8 @@ pub async fn read_node_from_id (
   ). await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", node_id ) ) ?;
-  let node_file_path = path_from_pid (
-    config, pid );
+  let node_file_path : String =
+    path_from_pid ( config, pid );
   let node : SkgNode = read_node (node_file_path) ?;
   if node.title.is_empty() {
     return Err(Box::new(std::io::Error::new(
@@ -72,7 +72,7 @@ pub fn write_node
   ) -> io::Result<()>
 { // Writes `node` to `path`.
 
-  let yaml_string =
+  let yaml_string : String =
     serde_yaml::to_string ( node )
     . map_err (
       |e| io::Error::new(

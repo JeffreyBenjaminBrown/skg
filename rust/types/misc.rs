@@ -5,7 +5,8 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tantivy::{Index, schema};
+use tantivy::Index;
+use tantivy::schema::Field;
 
 /* Each node has a random ID. Skg does not check for collisions.
 So far the IDs are Version 4 UUIDs.
@@ -34,8 +35,8 @@ fn default_port() -> u16 {
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
   pub index                : Arc<Index>,
-  pub id_field             : schema::Field,
-  pub title_or_alias_field : schema::Field,
+  pub id_field             : Field,
+  pub title_or_alias_field : Field,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,11 +112,11 @@ impl FromStr for Hyperlink {
           !text.ends_with("]]") ) {
       return Err(HyperlinkParseError::InvalidFormat); }
 
-    let interior = &text [5 .. text.len () - 2];
+    let interior : &str = &text [5 .. text.len () - 2];
 
     if let Some ( idx ) = interior.find ( "][" ) {
-      let id    = &interior [0..idx];
-      let label = &interior [idx+2..];
+      let id    : &str = &interior [0..idx];
+      let label : &str = &interior [idx+2..];
       Ok ( Hyperlink {
         id    : ID ( id.to_string () ),
         label : label.to_string (),

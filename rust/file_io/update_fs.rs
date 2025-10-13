@@ -24,15 +24,17 @@ pub fn update_fs_from_saveinstructions (
     . map ( |(node, _)| node )
     . collect ();
 
-  let deleted = if ! delete_nodes . is_empty () {
-    delete_all_nodes_from_fs (
-      delete_nodes, config . clone () ) ?
-  } else { 0 };
+  let deleted : usize =
+    if ! delete_nodes . is_empty () {
+      delete_all_nodes_from_fs (
+        delete_nodes, config . clone () ) ?
+    } else { 0 };
 
-  let written = if ! write_nodes . is_empty () {
-    write_all_nodes_to_fs (
-      write_nodes, config ) ?
-  } else { 0 };
+  let written : usize =
+    if ! write_nodes . is_empty () {
+      write_all_nodes_to_fs (
+        write_nodes, config ) ?
+    } else { 0 };
 
   Ok ( (deleted, written) ) }
 
@@ -72,7 +74,8 @@ pub fn delete_all_nodes_from_fs (
     let pid : ID = node . ids . get(0)
       . unwrap () // Safe because we checked above
       . clone ();
-    let file_path = path_from_pid (
+    let file_path : String =
+      path_from_pid (
       & config, pid );
     match fs::remove_file ( & file_path ) {
       Ok ( () ) => {

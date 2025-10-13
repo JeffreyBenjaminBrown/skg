@@ -32,7 +32,7 @@ pub fn handle_single_root_view_request (
         stream,
         & buffer_content ); },
     Err ( err ) => {
-      let error_msg = format!(
+      let error_msg : String = format!(
         "Error extracting node ID: {}", err);
       println! ( "{}", error_msg ) ;
       send_response ( stream, &error_msg ); } } }

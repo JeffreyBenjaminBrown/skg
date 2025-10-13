@@ -79,8 +79,8 @@ fn compare_nodes_modulo_id(
   node1: ego_tree::NodeRef<OrgNode>,
   node2: ego_tree::NodeRef<OrgNode>
 ) -> bool {
-  let n1 = node1.value();
-  let n2 = node2.value();
+  let n1 : &OrgNode = node1.value();
+  let n2 : &OrgNode = node2.value();
 
   // Compare structure and content
   if n1.title != n2.title ||

@@ -202,8 +202,10 @@ pub async fn find_related_nodes (
     driver.transaction (
       db_name, TransactionType::Read
     ). await ?;
-  let output_id_var = format!("{}_id", output_role);
-  let match_clause = format!( r#" match
+  let output_id_var : String =
+    format!("{}_id", output_role);
+  let match_clause : String =
+    format!( r#" match
                      ${} isa node, has id ${};
                   {{ ${} isa node, has id "{}"; }} or
                   {{ ${} isa node;
@@ -213,14 +215,15 @@ pub async fn find_related_nodes (
                    output_role, output_id_var,
                    input_role, node,
                    input_role, node, input_role );
-  let relationship_and_select = format!( r#"
+  let relationship_and_select : String = format!( r#"
                      $rel isa {} ( {}: ${},
                                    {}: ${} );
                      select ${};"#,
                      relation, input_role, input_role,
                      output_role, output_role,
                      output_id_var );
-  let query = format!("{}{}", match_clause, relationship_and_select);
+  let query : String = format!(
+    "{}{}", match_clause, relationship_and_select);
 
   let answer : QueryAnswer = tx.query ( query ) . await?;
   let mut stream = answer.into_rows ();

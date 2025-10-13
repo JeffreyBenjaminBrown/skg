@@ -38,7 +38,8 @@ pub fn serve (
     : (Arc<TypeDBDriver>, TantivyIndex)
     = initialize_dbs ( &config );
   // Bind to TCP port for Rust-Emacs API communication.
-  let bind_addr = format!("0.0.0.0:{}", config.port);
+  let bind_addr : String =
+    format!("0.0.0.0:{}", config.port);
   let emacs_listener : TcpListener =
     TcpListener::bind(&bind_addr)?;
   println!("Listening on port {} for Emacs connections...", config.port);
@@ -48,8 +49,10 @@ pub fn serve (
         let stream : TcpStream = stream; // The least-ugly way to type-annotate `stream`.
         let typedb_driver_clone : Arc<TypeDBDriver> =
           Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
-        let tantivy_index_clone = tantivy_index . clone ();
-        let config_clone        = config        . clone ();
+        let tantivy_index_clone : TantivyIndex =
+          tantivy_index . clone ();
+        let config_clone : SkgConfig =
+          config        . clone ();
         thread::spawn ( move || {
           handle_emacs (
             stream,

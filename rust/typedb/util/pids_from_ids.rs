@@ -8,7 +8,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 use futures::StreamExt;
-use ego_tree;
+use ego_tree::{NodeRef, NodeMut, NodeId};
 
 use crate::types::{OrgNode, ID};
 use crate::typedb::util::{
@@ -19,7 +19,7 @@ use crate::typedb::util::{
 
 /// Collect IDs for bulk PID lookup
 pub fn collect_ids_for_pid_lookup (
-  node_ref : ego_tree::NodeRef < OrgNode >,
+  node_ref : NodeRef < OrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
   if let Some ( ref id )
@@ -33,7 +33,7 @@ pub fn collect_ids_for_pid_lookup (
 
 /// Assign PIDs from the bulk lookup results
 pub fn assign_pids_from_map (
-  mut node_ref : ego_tree::NodeMut < OrgNode >,
+  mut node_ref : NodeMut < OrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
   if let Some ( ref current_id )
@@ -44,8 +44,8 @@ pub fn assign_pids_from_map (
     { node_ref . value () . metadata . id =
       Some ( pid . clone () ); }}
   { // Process children recursively
-    let node_id : ego_tree::NodeId = node_ref . id ();
-    let child_ids : Vec < ego_tree::NodeId > = {
+    let node_id : NodeId = node_ref . id ();
+    let child_ids : Vec < NodeId > = {
       let tree = node_ref . tree ();
       tree . get ( node_id ) . unwrap ()
         . children () . map ( | child | child . id () )

@@ -33,7 +33,7 @@ pub fn handle_node_aliases_request (
           println! ( "{}", error_msg ) ;
           send_response ( stream, &error_msg ); }}
     }, Err ( err ) => {
-      let error_msg = format!(
+      let error_msg : String = format!(
         "Error extracting node aliases parameters: {}",
         err);
       println! ( "{}", error_msg ) ;

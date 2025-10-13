@@ -2,7 +2,7 @@ use crate::file_io::read_node_from_id;
 use crate::mk_org_text::util::newline_to_space;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
-use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent};
+use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent, SkgNode};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -33,7 +33,8 @@ pub async fn containerward_org_view (
     & render_linear_portion_of_path(
       config, driver, &path, &cycle_node, terminus_level
     ). await ?);
-  let branch_or_cycle_level = terminus_level + path.len();
+  let branch_or_cycle_level : usize =
+    terminus_level + path.len();
   if ! branches.is_empty() {
     // There are branches, one of which might be a cycle.
     result_acc.push_str (
@@ -63,7 +64,7 @@ async fn render_linear_portion_of_path (
     )) ); }
   let mut result = String::new();
   for (i, node_id) in path.iter().enumerate() {
-    let node = read_node_from_id (
+    let node : SkgNode = read_node_from_id (
       config, driver, node_id ). await ?;
     let orgnode2 : OrgNode =
       OrgNode {
@@ -91,7 +92,7 @@ async fn render_branches (
   let mut result = String::new();
 
   for branch_id in branches {
-    let node = read_node_from_id (
+    let node : SkgNode = read_node_from_id (
       config, driver, branch_id ). await ?;
     let orgnode2 : OrgNode =
       OrgNode {
@@ -113,7 +114,7 @@ async fn render_terminating_cycle_when_no_branches(
   cycle_node: &Option<ID>,
   cycle_level: usize,
 ) -> Result<String, Box<dyn Error>> {
-  let node = read_node_from_id (
+  let node : SkgNode = read_node_from_id (
     config, driver, cycle_id ). await ?;
   let orgnode2 : OrgNode =
     OrgNode {

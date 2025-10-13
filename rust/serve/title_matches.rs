@@ -7,7 +7,7 @@ use crate::mk_org_text::orgnode::render_org_node_from_text;
 
 use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
-use tantivy::{Document};
+use tantivy::{Document, Searcher};
 
 type MatchGroups =
   HashMap < String,              // ID
@@ -71,7 +71,7 @@ pub fn generate_title_matches_response (
 
 fn group_matches_by_id (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
-  searcher      : tantivy::Searcher,
+  searcher      : Searcher,
   tantivy_index : &TantivyIndex )
   -> MatchGroups {
 

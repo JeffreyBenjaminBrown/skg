@@ -7,7 +7,8 @@
 use crate::hyperlinks::replace_each_link_with_its_label;
 use crate::types::{ID, SkgNode, SkgConfig, TantivyIndex, SaveInstruction};
 
-use tantivy::{Index, IndexWriter, doc, schema, Term};
+use tantivy::{Index, IndexWriter, doc, schema, Term, IndexReader, Searcher, Document};
+use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
 use std::path::Path;
 use std::sync::Arc;
@@ -22,21 +23,25 @@ pub fn search_index (
 ) -> Result <
     ( Vec< ( f32, // relevance score
              tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
-      tantivy::Searcher ),
+      Searcher ),
     Box <dyn std::error::Error> > {
 
   println! (
     "\nFinding files with titles or aliases matching \"{}\".",
     query_text);
-  let reader = tantivy_index.index.reader () ?;
-  let searcher = reader.searcher();
-  let query_parser : tantivy::query::QueryParser =
-    tantivy::query::QueryParser::for_index (
+  let reader : IndexReader =
+    tantivy_index.index.reader () ?;
+  let searcher : Searcher =
+    reader.searcher();
+  let query_parser : QueryParser =
+    QueryParser::for_index (
       &tantivy_index.index,
       vec! [ tantivy_index.title_or_alias_field ] );
-  let query = query_parser.parse_query ( query_text ) ?;
-  let best_matches = searcher.search (
-    &query, &TopDocs::with_limit (10) )?;
+  let query : Box < dyn Query > =
+    query_parser.parse_query ( query_text ) ?;
+  let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
+    searcher.search (
+      &query, &TopDocs::with_limit (10) )?;
   Ok (( best_matches, searcher )) }
 
 /// Build a schema,
@@ -58,9 +63,9 @@ pub fn initialize_tantivy_from_nodes (
   let schema: schema::Schema =
     schema_builder.build();
 
-  let index_path: &Path =
+  let index_path : &Path =
     Path::new ( & config . tantivy_folder );
-  let (tantivy_index, indexed_count): (TantivyIndex, usize) =
+  let (tantivy_index, indexed_count) : ( TantivyIndex, usize ) =
     wipe_fs_then_create_index_there (
       nodes,
       index_path,
@@ -85,9 +90,9 @@ pub fn initialize_tantivy_from_nodes (
 pub fn wipe_fs_then_create_index_there (
   nodes                : &[SkgNode],
   index_path           : &Path,
-  schema               : tantivy::schema::Schema,
-  id_field             : tantivy::schema::Field,
-  title_or_alias_field : tantivy::schema::Field,
+  schema               : schema::Schema,
+  id_field             : schema::Field,
+  title_or_alias_field : schema::Field,
 ) -> Result<(TantivyIndex,
              usize), // number of documents indexed
             Box<dyn Error>> {
@@ -95,9 +100,9 @@ pub fn wipe_fs_then_create_index_there (
   if index_path.exists() {
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all ( index_path )?;
-  let index: Index =
+  let index : Index =
     Index::create_in_dir ( index_path, schema )?;
-  let tantivy_index = TantivyIndex {
+  let tantivy_index : TantivyIndex = TantivyIndex {
     index: Arc::new(index),
     id_field: id_field,
     title_or_alias_field, };
@@ -171,7 +176,7 @@ pub fn update_index_from_saveinstructions (
     let mut processed_count: usize = 0;
     for (node, action) in instructions {
       if ! action . toDelete {
-        let documents: Vec<tantivy::Document> =
+        let documents : Vec < Document > =
           create_documents_from_node (
             node, tantivy_index )?;
         for document in documents {
@@ -187,13 +192,13 @@ pub fn update_index_from_saveinstructions (
 fn create_documents_from_node (
   node: &SkgNode,
   tantivy_index: &TantivyIndex,
-) -> Result < Vec < tantivy::Document >,
+) -> Result < Vec < Document >,
               Box < dyn Error >> {
 
   if node.ids.is_empty() {
     return Err("SkgNode has no IDs" . into () ); }
   let primary_id: &ID = &node.ids[0];
-  let mut documents_acc: Vec<tantivy::Document> =
+  let mut documents_acc: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> = // what to index
     vec![node.title.clone()];
@@ -201,7 +206,7 @@ fn create_documents_from_node (
     titles_and_aliases . extend(
       aliases.clone () ); }
   for title_or_alias in titles_and_aliases { // index them
-    let doc: tantivy::Document = doc!(
+    let doc : Document = doc!(
       tantivy_index . id_field =>
         primary_id.as_str (),
       tantivy_index . title_or_alias_field =>
@@ -220,7 +225,7 @@ fn add_documents_to_writer (
   for node in nodes {
     if node.ids.is_empty() {
       return Err ( "SkgNode has no IDs".into () ); }
-    let documents: Vec<tantivy::Document> =
+    let documents: Vec<Document> =
       create_documents_from_node(
         node, tantivy_index )?;
     for document in documents {

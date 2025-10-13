@@ -34,7 +34,7 @@ pub async fn pid_from_id (
     driver.transaction (
       db_name, TransactionType::Read
     ). await ?;
-  let query = format! (
+  let query : String = format! (
     r#"match
       $node isa node,
             has id $primary_id;
