@@ -71,3 +71,30 @@ pub fn extract_payload_from_typedb_string_rep (
         . to_string (); }}
   panic! ( "Failed to extract payload from TypeDB output: {}",
             attribute_str ) }
+
+/// Conjugates a binary role within a specified relation.
+/// Given a relation name and one role, returns the other role.
+/// Returns an error if the role doesn't belong to the relation.
+pub fn conjugate_binary_role (
+  relation : &str,
+  role     : &str
+) -> Result < &'static str,
+                Box < dyn Error > > {
+  match ( relation, role ) {
+    ( "contains", "container" )            => Ok ( "contained" ),
+    ( "contains", "contained" )            => Ok ( "container" ),
+    ( "hyperlinks_to", "source" )          => Ok ( "dest" ),
+    ( "hyperlinks_to", "dest" )            => Ok ( "source" ),
+    ( "subscribes", "subscriber" )         => Ok ( "subscribee" ),
+    ( "subscribes", "subscribee" )         => Ok ( "subscriber" ),
+    ( "overrides_view_of", "replacement" ) => Ok ( "replaced" ),
+    ( "overrides_view_of", "replaced" )    => Ok ( "replacement" ),
+    ( "hides_from_its_subscriptions", "hider" )  => Ok ( "hidden" ),
+    ( "hides_from_its_subscriptions", "hidden" ) => Ok ( "hider" ),
+    _ => Err (
+      format! (
+        "Role '{}' does not belong to relation '{}'",
+        role, relation
+      ) . into () )
+  }
+}

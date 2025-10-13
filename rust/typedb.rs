@@ -30,6 +30,7 @@ pub use search::{
     contains_from_pids,
     count_containers,
     count_contents,
+    count_link_sources,
 };
 
 pub mod update;
@@ -39,4 +40,5 @@ pub mod util;
 pub use util::{
   pid_from_id,
   extract_payload_from_typedb_string_rep,
-  pids_from_ids};
+  pids_from_ids,
+  conjugate_binary_role};

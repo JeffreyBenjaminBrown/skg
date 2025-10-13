@@ -12,7 +12,8 @@ use futures::StreamExt;
 use crate::types::ID;
 use crate::typedb::util::{
   extract_id_from_node,
-  build_id_disjunction};
+  build_id_disjunction,
+  conjugate_binary_role};
 
 
 /// Generic function to count relationships for a collection of nodes.
@@ -40,10 +41,7 @@ async fn count_relations (
   let disjunction_clauses : String =
     build_id_disjunction ( ids, "node_id" );
   let other_role : &str =
-    if input_role == "contained" { "container"
-    } else if input_role == "container" { "contained"
-    } else { return Err ( format! (
-      "Unknown role: {}", input_role ). into () ); };
+    conjugate_binary_role ( relation, input_role ) ?;
   let query : String =
     format! ( r#"match
         {{ $node isa node, has id $node_id; }} or
@@ -127,4 +125,21 @@ pub async fn count_contents (
                     ids,
                     "contains",
                     "container"
+  ). await }
+
+/// PURPOSE: Count how many nodes link to each node
+/// in a 'hyperlinks_to' relationship.
+/// Takes a vector of IDs and returns a map from each ID to its count.
+/// IDs with count 0 are included in the result.
+pub async fn count_link_sources (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids : &[ID]
+) -> Result < HashMap < ID, usize >,
+              Box < dyn Error > > {
+  count_relations ( db_name,
+                    driver,
+                    ids,
+                    "hyperlinks_to",
+                    "dest"
   ). await }

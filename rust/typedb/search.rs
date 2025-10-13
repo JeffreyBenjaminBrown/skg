@@ -2,7 +2,10 @@ pub mod contains_from_pids;
 pub use contains_from_pids::contains_from_pids;
 
 pub mod count_relationships;
-pub use count_relationships::{count_containers, count_contents};
+pub use count_relationships::{
+  count_containers,
+  count_contents,
+  count_link_sources};
 
 use std::collections::HashSet;
 use futures::StreamExt;

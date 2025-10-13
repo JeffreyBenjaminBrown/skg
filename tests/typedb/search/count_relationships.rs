@@ -1,7 +1,7 @@
 // cargo test typedb::search::count_relationships
 
 use skg::test_utils::populate_test_db_from_fixtures;
-use skg::typedb::search::{count_containers, count_contents};
+use skg::typedb::search::{count_containers, count_contents, count_link_sources};
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
@@ -21,6 +21,8 @@ fn the_tests (
     test_count_containers (
       &config, &driver ) . await ?;
     test_count_contents (
+      &config, &driver ) . await ?;
+    test_count_link_sources (
       &config, &driver ) . await ?;
     Ok (( )) } ) }
 
@@ -113,6 +115,42 @@ async fn test_count_contents (
   expected_counts . insert ( ID ( "2" . to_string () ), 0 );
   expected_counts . insert ( ID ( "3" . to_string () ), 1 );
   expected_counts . insert ( ID ( "10" . to_string () ), 2 );
+  expected_counts . insert ( ID ( "11" . to_string () ), 0 );
+
+  assert_eq! ( counts, expected_counts );
+
+  Ok (( )) }
+
+async fn test_count_link_sources (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+
+  let input_ids : Vec<ID> =
+    vec! [ ID ( "1"  . to_string () ),
+           ID ( "2"  . to_string () ),
+           ID ( "3"  . to_string () ),
+           ID ( "10" . to_string () ),
+           ID ( "11" . to_string () ) ];
+
+  let counts : HashMap < ID, usize > =
+    count_link_sources (
+      & config . db_name,
+      & driver,
+      & input_ids ) . await ?;
+
+  // Expected counts:
+  // 1 is linked to by 3 (count = 1)
+  // 2 is linked to by 3 and 10 (count = 2)
+  // 3 is not linked to by anyone (count = 0)
+  // 10 is not linked to by anyone (count = 0)
+  // 11 is not linked to by anyone (count = 0)
+  let mut expected_counts : HashMap < ID, usize > =
+    HashMap::new ();
+  expected_counts . insert ( ID ( "1" . to_string () ), 1 );
+  expected_counts . insert ( ID ( "2" . to_string () ), 2 );
+  expected_counts . insert ( ID ( "3" . to_string () ), 0 );
+  expected_counts . insert ( ID ( "10" . to_string () ), 0 );
   expected_counts . insert ( ID ( "11" . to_string () ), 0 );
 
   assert_eq! ( counts, expected_counts );
