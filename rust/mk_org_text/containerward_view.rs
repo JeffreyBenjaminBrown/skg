@@ -144,10 +144,15 @@ fn metadata_for_element_of_path (
         // that appearance *should* (and does) get this type.
         RelToOrgParent::Container
       },
-    cycle            : cycle_node.as_ref () == Some ( node_id ),
-    focused          : false,
-    folded           : false,
-    mightContainMore : ! is_terminus,
-    repeat           : false,
-    toDelete         : false,
+    cycle              : cycle_node.as_ref () == Some ( node_id ),
+    focused            : false,
+    folded             : false,
+    mightContainMore   : ! is_terminus,
+    repeat             : false,
+    toDelete           : false,
+    parentIsContainer  : false,
+    parentIsContent    : false,
+    numContainers      : None,
+    numContents        : None,
+    numLinksIn         : None,
   } }

@@ -93,18 +93,35 @@ pub fn parse_metadata_to_orgnodemd (
               _ => return Err (
                 format! ( "Unknown relToOrgParent value: {}", value )),
             }; },
+          "numContainers" => {
+            result.numContainers = Some (
+              value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid numContainers value: {}", value )) ? ); },
+          "numContents" => {
+            result.numContents = Some (
+              value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid numContents value: {}", value )) ? ); },
+          "numLinksIn" => {
+            result.numLinksIn = Some (
+              value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid numLinksIn value: {}", value )) ? ); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => { // This is a bare value
         let bare_value : String =
           atom_to_string ( element ) ?;
         match bare_value . as_str () {
-          "repeated"         => result.repeat = true,
-          "folded"           => result.folded = true,
-          "focused"          => result.focused = true,
-          "cycle"            => result.cycle = true,
-          "mightContainMore" => result.mightContainMore = true,
-          "toDelete"         => result.toDelete = true,
+          "repeated"           => result.repeat = true,
+          "folded"             => result.folded = true,
+          "focused"            => result.focused = true,
+          "cycle"              => result.cycle = true,
+          "mightContainMore"   => result.mightContainMore = true,
+          "toDelete"           => result.toDelete = true,
+          "parentIsContainer"  => result.parentIsContainer = true,
+          "parentIsContent"    => result.parentIsContent = true,
           _ => {
             return Err ( format! ( "Unknown metadata value: {}",
                                     bare_value )); }} },
@@ -136,6 +153,16 @@ pub fn orgnodemd_to_string (
     parts.push ( "mightContainMore".to_string () ); }
   if metadata.toDelete {
     parts.push ( "toDelete".to_string () ); }
+  if metadata.parentIsContainer {
+    parts.push ( "parentIsContainer".to_string () ); }
+  if metadata.parentIsContent {
+    parts.push ( "parentIsContent".to_string () ); }
+  if let Some ( count ) = metadata.numContainers {
+    parts.push ( format! ( "(numContainers {})", count )); }
+  if let Some ( count ) = metadata.numContents {
+    parts.push ( format! ( "(numContents {})", count )); }
+  if let Some ( count ) = metadata.numLinksIn {
+    parts.push ( format! ( "(numLinksIn {})", count )); }
   parts.join ( " " ) }
 
 pub fn parse_headline_from_sexp (

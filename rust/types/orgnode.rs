@@ -23,6 +23,11 @@ pub struct OrgnodeMetadata {
   pub mightContainMore: bool,
   pub repeat: bool,
   pub toDelete: bool,
+  pub parentIsContainer: bool,
+  pub parentIsContent: bool,
+  pub numContainers: Option<usize>,
+  pub numContents: Option<usize>,
+  pub numLinksIn: Option<usize>,
 }
 
 /* PITFALL:
@@ -86,4 +91,9 @@ pub fn default_metadata () -> OrgnodeMetadata {
     mightContainMore : false,
     repeat : false,
     toDelete : false,
+    parentIsContainer : false,
+    parentIsContent : false,
+    numContainers : None,
+    numContents : None,
+    numLinksIn : None,
   } }

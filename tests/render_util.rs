@@ -64,12 +64,17 @@ fn test_metadata_ordering () {
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
           relToOrgParent : RelToOrgParent::Content,
-          cycle            : true,
-          focused          : false,
-          folded           : false,
-          mightContainMore : false,
-          repeat           : true,
-          toDelete         : false, },
+          cycle             : true,
+          focused           : false,
+          folded            : false,
+          mightContainMore  : false,
+          repeat            : true,
+          toDelete          : false,
+          parentIsContainer : false,
+          parentIsContent   : false,
+          numContainers     : None,
+          numContents       : None,
+          numLinksIn        : None, },
       title : "Test".to_string (),
       body : None, };
   let result : String =
