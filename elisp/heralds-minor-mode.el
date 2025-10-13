@@ -77,56 +77,63 @@ Whitespace in METADATA is ignored."
   (let* ((parsed (skg-parse-metadata-inner metadata))
          (alist (car parsed))
          (bare-values (cadr parsed))
-         (out '()))
-    (dolist (kv alist)
-      (let ((k (car kv))
-           (v (cdr kv)))
-        ( cond
-          ((and (string-equal k "type")
-                (string-equal v "searchResult"))
-           (push (propertize "title matches" 'face 'heralds-blue-face)
-                 out))
-          ((and (string-equal k "type")
-                (string-equal v "aliases"))
-           (push (propertize "aliases" 'face 'heralds-blue-face)
-                 out))
-          ((and (string-equal k "type")
-                (string-equal v "container"))
-           (push (propertize "}" 'face 'heralds-blue-face)
-                 out))
-          ((string-equal k "id")
-           (push (propertize "⅄" 'face 'heralds-green-face)
-                 out))
-          ((string-equal k "numContents")
-           (let ((n (string-to-number v)))
-             (when (> n 0)
-               (push (propertize (format "{%d" n)
-                                 'face 'heralds-green-face) out))))
-          ((string-equal k "numContainers")
-           (let ((n (string-to-number v)))
-             (when (/= n 1)
-               (push (propertize (format "}%d" n)
-                                 'face 'heralds-green-face) out))))
-          ((string-equal k "numLinksIn")
-           (let ((n (string-to-number v)))
-             (when (> n 0)
-               (push (propertize (format "%d→" n)
-                                 'face 'heralds-green-face) out)))))))
-    (dolist (bare-val bare-values)
-      (cond ((string-equal bare-val "repeated")
-        (push (propertize "REP" 'face 'heralds-red-face)
-              out))
-       ((string-equal bare-val "might_contain_more")
-        (push (propertize "+?" 'face 'heralds-blue-face)
-              out))
-       ((string-equal bare-val "cycle")
-        (push (propertize "CYCLE" 'face 'heralds-yellow-face)
-              out))
-       ((string-equal bare-val "parentIsContent")
-        (push (propertize "⮌" 'face 'heralds-green-face) out))))
-    ;; Check if parentIsContainer is NOT present (means not contained by parent)
+         (out '())
+         (id-val (cdr (assoc "id" alist)))
+         (type-val (cdr (assoc "type" alist)))
+         (num-containers-val (cdr (assoc "numContainers" alist)))
+         (num-contents-val (cdr (assoc "numContents" alist)))
+         (num-links-in-val (cdr (assoc "numLinksIn" alist))))
+
+    ;; Build heralds in a particular order.
+    (when id-val ;; ID
+      (push (propertize "⅄" 'face 'heralds-green-face) out))
+
+    ;; ! (if NOT contained by parent)
     (unless (member "parentIsContainer" bare-values)
-      (push (propertize "!" 'face 'heralds-green-face) out))
+      (push (propertize "!" 'face 'heralds-blue-face) out))
+
+    ;; parentIsContent
+    (when (member "parentIsContent" bare-values)
+      (push (propertize "⮌" 'face 'heralds-green-face) out))
+
+    ;; mightContainMore
+    (when (member "might_contain_more" bare-values)
+      (push (propertize "+?" 'face 'heralds-blue-face) out))
+
+    ;; cycle
+    (when (member "cycle" bare-values)
+      (push (propertize "CYCLE" 'face 'heralds-yellow-face) out))
+
+    ;; REP (repeated)
+    (when (member "repeated" bare-values)
+      (push (propertize "REP" 'face 'heralds-red-face) out))
+
+    ;; aliases
+    (when (and type-val (string-equal type-val "aliases"))
+      (push (propertize "aliases" 'face 'heralds-blue-face) out))
+
+    ;; searchResult
+    (when (and type-val (string-equal type-val "searchResult"))
+      (push (propertize "title matches" 'face 'heralds-blue-face) out))
+
+    ;; container count (N})
+    (when num-containers-val
+      (let ((n (string-to-number num-containers-val)))
+        (when (/= n 1)
+          (push (propertize (format "%d}" n) 'face 'heralds-green-face) out))))
+
+    ;; links in (N→)
+    (when num-links-in-val
+      (let ((n (string-to-number num-links-in-val)))
+        (when (> n 0)
+          (push (propertize (format "%d→" n) 'face 'heralds-green-face) out))))
+
+    ;; content count ({N)
+    (when num-contents-val
+      (let ((n (string-to-number num-contents-val)))
+        (when (> n 0)
+          (push (propertize (format "{%d" n) 'face 'heralds-green-face) out))))
+
     (when out
       (mapconcat #'identity (nreverse out) " "))))
 
