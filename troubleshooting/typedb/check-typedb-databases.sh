@@ -131,5 +131,12 @@ fi
 if [ ${#test_dbs[@]} -gt 0 ]; then
     echo
     echo "💡 TIP: You can safely remove all test databases with:"
-    echo "   ./clean-typedb-test-databases.sh"
+    echo "   bash troubleshooting/typedb/clean-typedb-test-databases.sh"
+    if [ ${#test_dbs[@]} -gt 20 ]; then
+        echo
+        echo "⚠️  WARNING: ${#test_dbs[@]} test databases is a lot!"
+        echo "   This many databases can cause 'Too many open files' errors."
+        echo "   TypeDB tries to open all databases at startup."
+        echo "   Recommend cleanup before restarting TypeDB."
+    fi
 fi
