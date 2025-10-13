@@ -49,13 +49,14 @@ async fn collect_pids_in_view (
       )) . await ?; }
   Ok (()) }
 
-/// Holds cached relationship data for all nodes in the view.
-pub struct RelationshipData {
-  num_containers : HashMap < ID, usize >,
-  num_contents : HashMap < ID, usize >,
-  num_links_in : HashMap < ID, usize >,
-  container_to_contents : HashMap < ID, HashSet < ID > >,
-  content_to_containers : HashMap < ID, HashSet < ID > >,
+/// Each of these describes some kind of relationship,
+/// for each of a view's nodes.
+pub struct MapsFromIdForView {
+  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
+  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
+  num_links_in : HashMap < ID, usize >, // number of hyperlinks relationship for which the node plays the 'target' role
+  container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
+  content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
 }
 
 /// Run four batch queries to fetch all relationship data for the given PIDs.
@@ -63,7 +64,7 @@ async fn fetch_relationship_data (
   driver  : &TypeDBDriver,
   db_name : &str,
   pids    : &[ID],
-) -> Result < RelationshipData, Box<dyn Error> > {
+) -> Result < MapsFromIdForView, Box<dyn Error> > {
 
   let num_containers : HashMap < ID, usize > =
     count_containers ( db_name, driver, pids ) . await ?;
@@ -73,7 +74,7 @@ async fn fetch_relationship_data (
     count_link_sources ( db_name, driver, pids ) . await ?;
   let ( container_to_contents, content_to_containers ) =
     contains_from_pids ( db_name, driver, pids ) . await ?;
-  Ok ( RelationshipData {
+  Ok ( MapsFromIdForView {
     num_containers,
     num_contents,
     num_links_in,
@@ -112,7 +113,7 @@ pub async fn multi_root_view (
   let pids : Vec < ID > =
     collect_all_pids (
       driver, config, & root_ids ). await ?;
-  let rel_data : RelationshipData =
+  let rel_data : MapsFromIdForView =
     fetch_relationship_data (
       driver, & config . db_name, & pids ). await ?;
   render_all_roots (
@@ -153,7 +154,7 @@ async fn render_all_roots (
   driver               : &TypeDBDriver,
   config               : &SkgConfig,
   root_id_focus_pairs  : & [ ( ID, ID ) ],
-  rel_data             : &RelationshipData,
+  rel_data             : &MapsFromIdForView,
 ) -> Result < String, Box<dyn Error> > {
   let mut result : String = String::new();
   let mut visited : HashSet < ID > = HashSet::new();
@@ -179,7 +180,7 @@ pub async fn org_from_node_recursive (
   visited       : &mut HashSet<ID>,
   level         : usize,
   org_parent_id : Option<&ID>,
-  rel_data      : &RelationshipData,
+  rel_data      : &MapsFromIdForView,
 ) -> Result<String, Box<dyn Error>> {
   let ( pid, node ) =
     fetch_node_with_pid (
@@ -234,7 +235,7 @@ async fn render_node_and_children (
   level    : usize,
   node     : &SkgNode,
   metadata : OrgnodeMetadata,
-  rel_data : &RelationshipData,
+  rel_data : &MapsFromIdForView,
 ) -> Result < String, Box<dyn Error> > {
   let orgnode : OrgNode =
     OrgNode {
@@ -258,7 +259,7 @@ fn build_metadata_for_node (
   node_id       : &ID,
   org_parent_id : Option<&ID>,
   pid           : &ID,
-  rel_data      : &RelationshipData,
+  rel_data      : &MapsFromIdForView,
 ) -> OrgnodeMetadata {
   let mut md = default_metadata ();
   md . id = Some ( node_id . clone () );
