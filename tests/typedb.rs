@@ -13,7 +13,7 @@ mod util {
 use skg::mk_org_text::single_root_view;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{populate_test_db_from_fixtures, setup_test_db, cleanup_test_db};
 use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
@@ -27,8 +27,6 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
   answer::{ ConceptRow, QueryAnswer },
-  Credentials,
-  DriverOptions,
   Transaction,
   TransactionType,
   TypeDBDriver, };
@@ -38,25 +36,14 @@ fn test_typedb_integration (
 ) -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let config = SkgConfig {
-      db_name        : "skg-test-typedb"       . into(),
-      skg_folder     : "tests/typedb/fixtures" . into(),
-      tantivy_folder : "irrelevant"            . into(),
-      port           : 1730 };
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+    let db_name : &str =
+      "skg-test-typedb";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/fixtures",
+        "/tmp/tantivy-test-typedb"
+      ) . await ?;
 
     let has_extra_id_pairs = collect_all_of_some_binary_rel(
       & config . db_name,
@@ -189,6 +176,11 @@ fn test_typedb_integration (
       & driver,
     ) . await ?;
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
 
 pub async fn test_delete_out_links_contains_container (

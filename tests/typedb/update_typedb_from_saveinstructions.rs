@@ -1,6 +1,6 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
@@ -12,35 +12,20 @@ use indoc::indoc;
 use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TypeDBDriver,
-};
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_update_nodes_and_relationships2 (
 ) -> Result<(), Box<dyn Error>> {
   block_on ( async {
-    let driver : TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let config : SkgConfig = SkgConfig {
-      db_name        : "skg-test-update2"      . into(),
-      skg_folder     : "tests/typedb/update_typedb_from_saveinstructions/fixtures" . into(),
-      tantivy_folder : "irrelevant"            . into(),
-      port           : 1730 };
-
-    // Setup test database with initial data from new fixtures
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver ). await ?;
+    let db_name : &str =
+      "skg-test-update2";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/update_typedb_from_saveinstructions/fixtures",
+        "/tmp/tantivy-test-update2"
+      ) . await ?;
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
@@ -128,4 +113,9 @@ fn test_update_nodes_and_relationships2 (
       "Node 2 should only contain node 1, but contains: {:?}",
       node2_contains );
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }

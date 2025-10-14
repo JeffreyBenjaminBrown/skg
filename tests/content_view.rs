@@ -3,14 +3,10 @@
 use indoc::indoc;
 use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{
-  TypeDBDriver,
-  Credentials,
-  DriverOptions,
-};
+use typedb_driver::TypeDBDriver;
 
 use skg::mk_org_text::{multi_root_view};
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   path_containerward_to_end_cycle_and_or_branches, };
@@ -21,24 +17,14 @@ fn test_a_mess_of_stuff
   () -> Result<(), Box<dyn Error>> {
   // Use block_on to run async code in a synchronous test
   block_on(async {
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let config = SkgConfig {
-      db_name        : "skg-test-content-view" . into(),
-      skg_folder     : "tests/content_view/fixtures".into(),
-      tantivy_folder : "irrelevant".into(),
-      port           : 1730, };
-    let skg_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-    populate_test_db_from_fixtures (
-      skg_folder,
-      & config . db_name,
-      & driver
-    ) . await?;
+    let db_name : &str =
+      "skg-test-content-view";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/content_view/fixtures",
+        "/tmp/tantivy-test-content-view"
+      ) . await ?;
 
     // Test the path from node "4" to the root container
     match path_containerward_to_end_cycle_and_or_branches (
@@ -103,30 +89,25 @@ fn test_a_mess_of_stuff
       }, Err(e) => {
         panic!("Error finding path to root container: {}", e); } }
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (()) } ) }
 
 #[test]
 fn test_multi_root_view
   () -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let config = SkgConfig {
-      db_name        : "skg-test-multi-root-view" . into(),
-      skg_folder     : "tests/content_view/fixtures-2".into(),
-      tantivy_folder : "irrelevant".into(),
-      port           : 1730, };
-    let skg_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-    populate_test_db_from_fixtures (
-      skg_folder,
-      & config . db_name,
-      & driver
-    ) . await?;
+    let db_name : &str =
+      "skg-test-multi-root-view";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/content_view/fixtures-2",
+        "/tmp/tantivy-test-multi-root-view"
+      ) . await ?;
 
     let focii : Vec<ID> = vec![
       ID("1".to_string()),
@@ -150,4 +131,9 @@ fn test_multi_root_view
     assert_eq!(result, expected,
                "Multi-root view should produce exact expected output");
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (()) } ) }

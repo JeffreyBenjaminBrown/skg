@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::file_io::{read_node_from_id, update_fs_from_saveinstructions};
 use skg::save::buffer_to_save_instructions;
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::types::{ID, SkgConfig, SkgNode};
 
@@ -11,51 +11,33 @@ use futures::executor::block_on;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_parentignores_and_mightcontainmore(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    // Setup
-    let driver: TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?,
-    )
-    .await?;
-
-    let fixtures_path = PathBuf::from(
-      "tests/save/parentIgnores_and_mightContainMore/fixtures"
-    );
-    let backup_path = PathBuf::from(
-      "tests/save/parentIgnores_and_mightContainMore/fixtures_backup"
-    );
-
-    let config: SkgConfig = SkgConfig {
-      db_name: "skg-test-parentignores".into(),
-      skg_folder: fixtures_path.clone(),
-      tantivy_folder: "irrelevant".into(),
-      port: 1730,
-    };
+    let db_name: &str =
+      "skg-test-parentignores";
+    let fixtures_path: PathBuf =
+      PathBuf::from (
+        "tests/save/parentIgnores_and_mightContainMore/fixtures" );
+    let backup_path: PathBuf =
+      PathBuf::from (
+        "tests/save/parentIgnores_and_mightContainMore/fixtures_backup" );
 
     // Backup fixtures
-    if backup_path.exists() {
-      fs::remove_dir_all(&backup_path)?;
-    }
-    copy_dir_all(&fixtures_path, &backup_path)?;
+    if backup_path . exists () {
+      fs::remove_dir_all ( &backup_path ) ?; }
+    copy_dir_all ( &fixtures_path, &backup_path ) ?;
 
-    // Populate test database from fixtures
-    let index_folder: &str = config
-      .skg_folder
-      .to_str()
-      .expect("Invalid UTF-8 in path");
-    populate_test_db_from_fixtures(
-      index_folder,
-      &config.db_name,
-      &driver,
-    )
-    .await?;
+    // Setup test database
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/save/parentIgnores_and_mightContainMore/fixtures",
+        "/tmp/tantivy-test-parentignores"
+      ) . await ?;
 
     // Simulate user saving this org buffer:
     // Node 1 contains node 2 (which has treatment=parentIgnores and mightContainMore)
@@ -111,11 +93,19 @@ fn test_parentignores_and_mightcontainmore(
       vec![],
       "Node 1 should, like before it was saved, have empty contents, because its child 2 has 'treatment=parentIgnores' in its metadata." ); }
 
-    { // Restore fixtures from backup
-      fs::remove_dir_all(&fixtures_path)?;
-      copy_dir_all(&backup_path, &fixtures_path)?;
-      fs::remove_dir_all(&backup_path)?; }
-    Ok(( )) } ) }
+    // Cleanup: delete TypeDB database and Tantivy index
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
+
+    // Restore fixtures from backup
+    fs::remove_dir_all ( &fixtures_path ) ?;
+    copy_dir_all ( &backup_path, &fixtures_path ) ?;
+    fs::remove_dir_all ( &backup_path ) ?;
+
+    Ok (( )) } ) }
 
 /// Recursively copy a directory
 fn copy_dir_all(

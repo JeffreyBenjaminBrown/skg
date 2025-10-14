@@ -1,49 +1,34 @@
 // cargo test typedb::search::contains_from_pids
 
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::search::contains_from_pids;
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TypeDBDriver, };
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
   block_on ( async {
+    let db_name : &str =
+      "skg-test-typedb-search-contains-from-pids";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_database () . await ?;
+      setup_test_db (
+        db_name,
+        "tests/typedb/search/contains_from_pids/fixtures",
+        "/tmp/tantivy-test-typedb-search-contains-from-pids"
+      ) . await ?;
     test_contains_from_pids (
       &config, &driver ) . await ?;
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
-
-async fn setup_test_database (
-) -> Result < ( SkgConfig, TypeDBDriver ), Box<dyn Error> > {
-  let config : SkgConfig =
-    SkgConfig {
-      db_name        : "skg-test-typedb-search-contains-from-pids" . into(),
-      skg_folder     : "tests/typedb/search/contains_from_pids/fixtures" . into(),
-      tantivy_folder : "irrelevant"                                . into(),
-      port           : 1730 };
-  let index_folder : &str =
-    config . skg_folder . to_str ()
-    . expect ("Invalid UTF-8 in skg folder path");
-  let driver : TypeDBDriver =
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-  populate_test_db_from_fixtures (
-    index_folder,
-    & config . db_name,
-    & driver ). await ?;
-  Ok (( config, driver )) }
 
 async fn test_contains_from_pids (
   config : &SkgConfig,

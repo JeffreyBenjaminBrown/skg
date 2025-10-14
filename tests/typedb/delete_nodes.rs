@@ -2,7 +2,7 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::util::extract_payload_from_typedb_string_rep;
@@ -14,8 +14,6 @@ use std::collections::{HashSet, BTreeSet};
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer},
-  Credentials,
-  DriverOptions,
   Transaction,
   TransactionType,
   TypeDBDriver,
@@ -28,24 +26,14 @@ fn test_delete_container_node (
   //   1 contains [2, 3]
   //   2 has extra_id 22
   block_on(async {
-    let config : SkgConfig = SkgConfig {
-      db_name        : "skg-test-delete-container" . into(),
-      skg_folder     : "tests/typedb/fixtures"     . into(),
-      tantivy_folder : "irrelevant"               . into(),
-      port           : 1730 };
-    let driver : TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+    let db_name : &str =
+      "skg-test-delete-container";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/fixtures",
+        "/tmp/tantivy-test-delete-container"
+      ) . await ?;
 
     // Verify nodes 1, 2 and 3 exist
     let initial_ids : BTreeSet<String> =
@@ -95,30 +83,37 @@ fn test_delete_container_node (
     assert!(remaining_ids.contains("3"), "Node 3 should still exist");
 
     // Check for any remaining contains relationships where 2 is contained
-    let tx : Transaction = driver . transaction (
-      & config . db_name,
-      TransactionType::Read
+    { let tx : Transaction = driver . transaction (
+        & config . db_name,
+        TransactionType::Read
+      ) . await ?;
+      let query : &str = r#"
+        match
+          $container isa node, has id $container_id;
+          $contained isa node, has id "2";
+          $rel isa contains (container: $container, contained: $contained);
+        select $container_id;
+      "#;
+      let answer : QueryAnswer = tx . query ( query ) . await ?;
+      let mut rows = answer . into_rows ();
+      println!("Checking for containers of node 2 after deleting node 1...");
+      let mut container_count : usize = 0;
+      while let Some ( row_res ) = rows . next () . await {
+        let row : ConceptRow = row_res ?;
+        if let Some ( concept ) = row . get ( "container_id" ) ? {
+          let container_id : String =
+            extract_payload_from_typedb_string_rep (
+              & concept . to_string () );
+          println!("Found container of node 2: {}", container_id);
+          container_count += 1; }}
+      assert_eq!(container_count, 0, "No containers should be found for node 2 after deleting node 1 (cascading delete should work)");
+    } // Drop transaction here
+
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
     ) . await ?;
-    let query : &str = r#"
-      match
-        $container isa node, has id $container_id;
-        $contained isa node, has id "2";
-        $rel isa contains (container: $container, contained: $contained);
-      select $container_id;
-    "#;
-    let answer : QueryAnswer = tx . query ( query ) . await ?;
-    let mut rows = answer . into_rows ();
-    println!("Checking for containers of node 2 after deleting node 1...");
-    let mut container_count : usize = 0;
-    while let Some ( row_res ) = rows . next () . await {
-      let row : ConceptRow = row_res ?;
-      if let Some ( concept ) = row . get ( "container_id" ) ? {
-        let container_id : String =
-          extract_payload_from_typedb_string_rep (
-            & concept . to_string () );
-        println!("Found container of node 2: {}", container_id);
-        container_count += 1; }}
-    assert_eq!(container_count, 0, "No containers should be found for node 2 after deleting node 1 (cascading delete should work)");
     Ok (( )) } ) }
 
 #[test]
@@ -128,24 +123,14 @@ fn test_delete_contained_node (
   //   1 contains [2, 3]
   //   2 has extra_id 22
   block_on(async {
-    let config : SkgConfig = SkgConfig {
-      db_name        : "skg-test-delete-contained" . into(),
-      skg_folder     : "tests/typedb/fixtures"     . into(),
-      tantivy_folder : "irrelevant"               . into(),
-      port           : 1730 };
-    let driver : TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+    let db_name : &str =
+      "skg-test-delete-contained";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/fixtures",
+        "/tmp/tantivy-test-delete-contained"
+      ) . await ?;
 
     // Verify nodes 1, 2, 3 exist
     let initial_ids : BTreeSet<String> =
@@ -222,4 +207,9 @@ fn test_delete_contained_node (
     assert!(finally_contained.contains(&ID("3".to_string())),
             "Node 1 should still contain node 3");
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
