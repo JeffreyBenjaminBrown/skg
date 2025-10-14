@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, RelToOrgParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
+use crate::types::{OrgNode, Treatment, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
 use crate::save::reconcile_dup_instructions;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
@@ -54,9 +54,9 @@ fn interpret_node_dfs(
     result.push((skg_node, save_action)); }
   { // Recurse into everything except aliases.
     for child in node_ref.children() {
-      let child_rel = &child.value().metadata.relToOrgParent;
+      let child_rel = &child.value().metadata.treatment;
       match child_rel {
-        RelToOrgParent::AliasCol | RelToOrgParent::Alias => {
+        Treatment::AliasCol | Treatment::Alias => {
           // These are ignored.
         },
         _ => {
@@ -89,8 +89,8 @@ fn mk_skgnode (
   } ) }
 
 /* Collect aliases for a node using a double-loop:
-- For each child CA of N such that CA has relToOrgParent=AliasCol,
-  - for each child A of CA such that A has relToOrgParent=Alias,
+- For each child CA of N such that CA has treatment=AliasCol,
+  - for each child A of CA such that A has treatment=Alias,
     - collect A into the list of aliases for N.
 This is programmed defensively:
   'validate_tree' will not currently permit multiple AliasCol
@@ -100,27 +100,29 @@ fn collect_aliases (
   node_ref: &NodeRef<OrgNode>
 ) -> Option<Vec<String>> {
   let mut aliases: Vec<String> = Vec::new();
-  for alias_col_child in node_ref.children() {
-    if ( alias_col_child . value() . metadata . relToOrgParent
-         == RelToOrgParent::AliasCol ) // child of interest
+  for alias_col_child in node_ref.children()
+  { if ( alias_col_child . value() . metadata . treatment
+         == Treatment::AliasCol ) // child of interest
     { for alias_child in alias_col_child.children() {
-      if ( alias_child . value() . metadata . relToOrgParent
-           == RelToOrgParent::Alias ) // grandchild of interest
+      if ( alias_child . value() . metadata . treatment
+           == Treatment::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
   if aliases.is_empty() { None
   } else { Some(aliases) }}
 
-/// Returns IDs of all children for which relToOrgParent = Content.
+/// Returns IDs of all children for which treatment = Content.
 /// Excludes children for which metadata.toDelete is true.
+/// This is not a recursive traversal;
+/// it is only concerned with this node's contents.
 fn collect_contents (
   node_ref: &NodeRef<OrgNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if ( child . value() . metadata . relToOrgParent
-         == RelToOrgParent::Content
+    if ( child . value() . metadata . treatment
+         == Treatment::Content
          && ! child . value() . metadata . toDelete ) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone());

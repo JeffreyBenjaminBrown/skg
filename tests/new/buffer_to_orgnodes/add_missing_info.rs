@@ -58,18 +58,18 @@ async fn test_add_missing_info_logic (
   let with_missing_info: &str =
     indoc! {"
             * (skg (id root)) root
-            ** (skg (relToOrgParent aliasCol)) aliases
+            ** (skg (treatment aliasCol)) aliases
             *** new alias
-            *** (skg (relToOrgParent alias)) preexisting alias
+            *** (skg (treatment alias)) preexisting alias
             ** no id
             *** also no id
         "};
   let without_missing_info: &str =
     indoc! {"
             * (skg (id root-pid)) root
-            ** (skg (relToOrgParent aliasCol)) aliases
-            *** (skg (relToOrgParent alias)) new alias
-            *** (skg (relToOrgParent alias)) preexisting alias
+            ** (skg (treatment aliasCol)) aliases
+            *** (skg (treatment alias)) new alias
+            *** (skg (treatment alias)) preexisting alias
             ** (skg (id unpredictable)) no id
             *** (skg (id unpredictable)) also no id
         "};

@@ -16,7 +16,7 @@ This is the metadata necessary to interpret the headline. */
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
   pub id: Option<ID>,
-  pub relToOrgParent: RelToOrgParent,
+  pub treatment: Treatment,
   pub cycle: bool,
   pub focused: bool,
   pub folded: bool,
@@ -30,61 +30,50 @@ pub struct OrgnodeMetadata {
   pub numLinksIn: Option<usize>,
 }
 
-/* PITFALL:
-RelToOrgParent is not necessarily the only relationship
-bewteen a node and its parent.
-It has two uses: to make clear to the user one way they relate,
-and to instruct the server what to do when the buffer is saved. */
 #[derive(Debug, Clone, PartialEq)]
-pub enum RelToOrgParent {
+pub enum Treatment {
   Content, // The default relationship.
-  Container, // For looking 'backward': The node contains its parent.
   AliasCol, // The node collects aliases for its parent.
   Alias, // The node is an alias for its grandparent.
-  SearchResult, // When the user searches for title/alias text, each hit is one of these. If, somehow, Rust finds a SearchResult in a saved org buffer, it ignores it, including all of its recursive content.
-  None, // The node bears no relationship to its parent.
+  ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
 }
 
 //
 // Implementations
 //
 
-impl fmt::Display for RelToOrgParent {
+impl fmt::Display for Treatment {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     let s : &str =
       match self {
-        RelToOrgParent::Content => "content",
-        RelToOrgParent::Container => "container",
-        RelToOrgParent::AliasCol => "aliasCol",
-        RelToOrgParent::Alias => "alias",
-        RelToOrgParent::SearchResult => "searchResult",
-        RelToOrgParent::None => "none",
+        Treatment::Content => "content",
+        Treatment::AliasCol => "aliasCol",
+        Treatment::Alias => "alias",
+        Treatment::ParentIgnores => "parentIgnores",
       };
     write! ( f, "{}", s ) } }
 
-impl FromStr for RelToOrgParent {
+impl FromStr for Treatment {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "content" => Ok ( RelToOrgParent::Content ),
-      "container" => Ok ( RelToOrgParent::Container ),
-      "aliasCol" => Ok ( RelToOrgParent::AliasCol ),
-      "alias" => Ok ( RelToOrgParent::Alias ),
-      "searchResult" => Ok ( RelToOrgParent::SearchResult ),
-      "none" => Ok ( RelToOrgParent::None ),
-      _ => Err ( format! ( "Unknown RelToOrgParent value: {}", s )),
+      "content" => Ok ( Treatment::Content ),
+      "aliasCol" => Ok ( Treatment::AliasCol ),
+      "alias" => Ok ( Treatment::Alias ),
+      "parentIgnores" => Ok ( Treatment::ParentIgnores ),
+      _ => Err ( format! ( "Unknown Treatment value: {}", s )),
     }} }
 
 pub fn default_metadata () -> OrgnodeMetadata {
   OrgnodeMetadata {
     id : None,
-    relToOrgParent : RelToOrgParent::Content,
+    treatment : Treatment::Content,
     cycle : false,
     focused : false,
     folded : false,

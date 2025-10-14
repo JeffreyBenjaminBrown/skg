@@ -1,7 +1,7 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, ID, RelToOrgParent};
+use crate::types::{OrgnodeMetadata, ID, Treatment};
 use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
@@ -45,7 +45,7 @@ pub fn find_sexp_end (
 }
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
-/// Format: "(skg (id xyz) repeated folded (relToOrgParent container))"
+/// Format: "(skg (id xyz) repeated folded (treatment parentIgnores))"
 /// Now uses the sexp crate for proper s-expression parsing.
 /// Takes the full s-expression including the "(skg ...)" wrapper.
 pub fn parse_metadata_to_orgnodemd (
@@ -82,16 +82,14 @@ pub fn parse_metadata_to_orgnodemd (
           atom_to_string ( &kv_pair[1] ) ?;
         match key . as_str () {
           "id" => { result.id = Some ( ID::from ( value )); },
-          "relToOrgParent" => {
-            result.relToOrgParent = match value . as_str () {
-              "alias"        => RelToOrgParent::Alias,
-              "aliasCol"     => RelToOrgParent::AliasCol,
-              "container"    => RelToOrgParent::Container,
-              "content"      => RelToOrgParent::Content,
-              "none"         => RelToOrgParent::None,
-              "searchResult" => RelToOrgParent::SearchResult,
+          "treatment" => {
+            result.treatment = match value . as_str () {
+              "alias"         => Treatment::Alias,
+              "aliasCol"      => Treatment::AliasCol,
+              "content"       => Treatment::Content,
+              "parentIgnores" => Treatment::ParentIgnores,
               _ => return Err (
-                format! ( "Unknown relToOrgParent value: {}", value )),
+                format! ( "Unknown treatment value: {}", value )),
             }; },
           "numContainers" => {
             result.numContainers = Some (
@@ -139,8 +137,9 @@ pub fn orgnodemd_to_string (
     Vec::new ();
   if let Some ( ref id ) = metadata.id {
     parts.push ( format! ( "(id {})", id.0 )); }
-  if metadata.relToOrgParent != RelToOrgParent::Content {
-    parts.push ( format! ( "(relToOrgParent {})", metadata.relToOrgParent )); }
+  if metadata.treatment != Treatment::Content {
+    parts.push ( format! (
+      "(treatment {})", metadata.treatment )); }
   if metadata.repeat {
     parts.push ( "repeated".to_string () ); }
   if metadata.folded {

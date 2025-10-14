@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::save::org_to_uninterpreted_nodes;
-use skg::types::{OrgNode, ID, RelToOrgParent};
+use skg::types::{OrgNode, ID, Treatment};
 use ego_tree::Tree;
 
 #[test]
@@ -68,8 +68,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg (id child1) folded) child1
             Child1 body
-            * (skg (relToOrgParent container) mightContainMore) container node
-            Container body
+            * (skg (treatment parentIgnores) mightContainMore) parentIgnores node
+            ParentIgnores body
             * (skg cycle repeated) cycling node
             This node has cycle and repeated flags
         "};
@@ -87,12 +87,12 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   assert_eq!(root_node.metadata.folded, false);
   assert_eq!(root_node.body, Some("Root body content".to_string()));
 
-  // Test container node
-  let container_node = trees[1].root().value();
-  assert_eq!(container_node.title, "container node");
-  assert_eq!(container_node.metadata.relToOrgParent, RelToOrgParent::Container);
-  assert_eq!(container_node.metadata.mightContainMore, true);
-  assert_eq!(container_node.body, Some("Container body".to_string()));
+  // Test parentIgnores node
+  let parentIgnores_node = trees[1].root().value();
+  assert_eq!(parentIgnores_node.title, "parentIgnores node");
+  assert_eq!(parentIgnores_node.metadata.treatment, Treatment::ParentIgnores);
+  assert_eq!(parentIgnores_node.metadata.mightContainMore, true);
+  assert_eq!(parentIgnores_node.body, Some("ParentIgnores body".to_string()));
 
   // Test cycling node
   let cycle_node = trees[2].root().value();
@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title, "simple node");
   assert_eq!(first_node.body, Some("Simple body".to_string()));
   assert_eq!(first_node.metadata.id, None);
-  assert_eq!(first_node.metadata.relToOrgParent, RelToOrgParent::Content);
+  assert_eq!(first_node.metadata.treatment, Treatment::Content);
   assert_eq!(first_node.metadata.cycle, false);
   assert_eq!(first_node.metadata.focused, false);
   assert_eq!(first_node.metadata.folded, false);
@@ -229,7 +229,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * (skg invalidKey:value) invalid key
-            * (skg (relToOrgParent invalidValue) invalid value
+            * (skg (treatment invalidValue) invalid value
             * (skg unknownFlag) unknown flag
         "};
 
@@ -239,11 +239,11 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
-  // Test invalid relToOrgParent value
-  let input_invalid_value = "* (skg (relToOrgParent invalidValue)) invalid value";
+  // Test invalid treatment value
+  let input_invalid_value = "* (skg (treatment invalidValue)) invalid value";
   let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unknown relToOrgParent value: invalidValue"));
+  assert!(result.unwrap_err().contains("Unknown treatment value: invalidValue"));
 
   // Test unknown flag
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";

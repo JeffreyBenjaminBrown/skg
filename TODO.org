@@ -1,5 +1,7 @@
 * TODO in serial
-** [[id:28d61c54-d474-4828-8ef9-e83b25c12ae8][heralds: more properties]]
+** read ahead in plans, estimate duration
+   Do it not just for the durations,
+   but to have a good sense of how complex each stage is.
 ** Containerward view should not duplicate content.
   If a node N is only in one container C, which N contains,
   then the containerward view should unfold from C.

@@ -1,6 +1,6 @@
 pub mod contradictory_instructions;
 
-use crate::types::{OrgNode, RelToOrgParent, Buffer_Cannot_Be_Saved};
+use crate::types::{OrgNode, Treatment, Buffer_Cannot_Be_Saved};
 use ego_tree::Tree;
 
 // Re-export the main function
@@ -38,24 +38,25 @@ pub fn find_buffer_errors_for_saving (
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children(
   node_ref: ego_tree::NodeRef<OrgNode>,
-  parent_relToOrgParent : Option<RelToOrgParent>, // that is, the reltoorgparent2 of the parent of what node_ref points to
+  parent_treatment : Option<Treatment>, // that is, the treatment of the parent of what node_ref points to
   errors: &mut Vec<Buffer_Cannot_Be_Saved>
 ) {
 
   let node: &OrgNode = node_ref.value();
-  match node.metadata.relToOrgParent {
-    RelToOrgParent::AliasCol => {
+  match node.metadata.treatment {
+    Treatment::AliasCol => {
       if node.body.is_some() {
         errors.push(
           Buffer_Cannot_Be_Saved::Body_of_AliasCol(
             node.clone() )); }},
-    RelToOrgParent::Alias => {
+
+    Treatment::Alias => {
       if node.body.is_some() {
         errors.push(
           Buffer_Cannot_Be_Saved::Body_of_Alias(
             node.clone() )); }
-      if let Some(ref parent_rel) = parent_relToOrgParent {
-        if *parent_rel != RelToOrgParent::AliasCol {
+      if let Some(ref parent_rel) = parent_treatment {
+        if *parent_rel != Treatment::AliasCol {
           errors.push(
             Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(
               node.clone() )); }
@@ -66,27 +67,27 @@ fn validate_node_and_children(
             node.clone() )); }},
     _ => {} }
 
-  if let Some(parent_rel) = parent_relToOrgParent {
+  if let Some(parent_rel) = parent_treatment {
     match parent_rel {
-      RelToOrgParent::AliasCol => {
+      Treatment::AliasCol => {
         // Children of AliasCol should not have IDs
         if node.metadata.id.is_some() {
           errors.push(
             Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(
               node.clone() )); }},
-      RelToOrgParent::Alias => {
+      Treatment::Alias => {
         // Children of Alias should not exist at all
         errors.push(
           Buffer_Cannot_Be_Saved::Child_of_Alias(
             node.clone() )); },
         _ => {} }}
 
-  { // At most one child should have relToOrgParent=AliasCol
+  { // At most one child should have treatment=AliasCol
     let aliasCol_children_count: usize =
       node_ref . children()
       . filter ( |child|
-                  child.value() . metadata.relToOrgParent
-                  == RelToOrgParent::AliasCol )
+                  child.value() . metadata.treatment
+                  == Treatment::AliasCol )
       . count();
     if aliasCol_children_count > 1 {
       errors.push (
@@ -94,8 +95,8 @@ fn validate_node_and_children(
           node.clone() )); }}
 
   for child in node_ref.children() { // recurse
-    let cloned_rel: RelToOrgParent =
-      node.metadata.relToOrgParent.clone();
+    let cloned_rel: Treatment =
+      node.metadata.treatment.clone();
     validate_node_and_children(
       child, Some(cloned_rel), errors);
   }}

@@ -60,9 +60,9 @@ fn test_orgnodes_to_save_instructions_with_aliases() {
     indoc! {"
             * (skg (id main)) main node
             Main body
-            ** (skg (id alias_col) (relToOrgParent aliasCol)) aliases
-            *** (skg (id alias1) (relToOrgParent alias)) first alias
-            *** (skg (id alias2) (relToOrgParent alias)) second alias
+            ** (skg (id alias_col) (treatment aliasCol)) aliases
+            *** (skg (id alias1) (treatment alias)) first alias
+            *** (skg (id alias2) (treatment alias)) second alias
             ** (skg (id content_child)) content child
             Content body
         "};
@@ -119,11 +119,11 @@ fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
             * (skg (id main)) main node
-            ** (skg (id alias_col1) (relToOrgParent aliasCol)) first alias collection
-            *** (skg (id alias1) (relToOrgParent alias)) alias one
-            *** (skg (id alias2) (relToOrgParent alias)) alias two
-            ** (skg (id alias_col2) (relToOrgParent aliasCol)) second alias collection
-            *** (skg (id alias3) (relToOrgParent alias)) alias three
+            ** (skg (id alias_col1) (treatment aliasCol)) first alias collection
+            *** (skg (id alias1) (treatment alias)) alias one
+            *** (skg (id alias2) (treatment alias)) alias two
+            ** (skg (id alias_col2) (treatment aliasCol)) second alias collection
+            *** (skg (id alias3) (treatment alias)) alias three
             ** (skg (id content1)) content node
         "};
 
@@ -144,12 +144,12 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (id root)) root node
-            ** (skg (id container) (relToOrgParent container)) container child
+            ** (skg (id parentIgnores) (treatment parentIgnores)) parentIgnores child
             ** (skg (id content1)) content child 1
-            ** (skg (id alias_col) (relToOrgParent aliasCol)) aliases
-            *** (skg (id alias1) (relToOrgParent alias)) my alias
+            ** (skg (id alias_col) (treatment aliasCol)) aliases
+            *** (skg (id alias1) (treatment alias)) my alias
             ** (skg (id content2)) content child 2
-            ** (skg (id none_rel) (relToOrgParent none)) none relation child
+            ** (skg (id none_rel) (treatment parentIgnores)) parentIgnores relation child
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -157,7 +157,7 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
   let instructions: Vec<(SkgNode, NodeSaveAction)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
 
-  // Should have instructions for: root, container, content1, content2, none_rel
+  // Should have instructions for: root, parentIgnores, content1, content2, none_rel
   // AliasCol and Alias should be skipped
   assert_eq!(instructions.len(), 5);
 
@@ -234,9 +234,9 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (id main)) main node
-            ** (skg (id alias_col) (relToOrgParent aliasCol)) aliases only
-            *** (skg (id alias1) (relToOrgParent alias)) alias one
-            *** (skg (id alias2) (relToOrgParent alias)) alias two
+            ** (skg (id alias_col) (treatment aliasCol)) aliases only
+            *** (skg (id alias1) (treatment alias)) alias one
+            *** (skg (id alias2) (treatment alias)) alias two
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -257,16 +257,16 @@ fn test_orgnodes_to_save_instructions_complex_scenario() {
     indoc! {"
             * (skg (id doc1) mightContainMore) Document 1
             Document body
-            ** (skg (id aliases1) (relToOrgParent aliasCol)) Doc1 Aliases
-            *** (skg (id alias_a) (relToOrgParent alias)) First Document
-            *** (skg (id alias_b) (relToOrgParent alias)) Primary Doc
+            ** (skg (id aliases1) (treatment aliasCol)) Doc1 Aliases
+            *** (skg (id alias_a) (treatment alias)) First Document
+            *** (skg (id alias_b) (treatment alias)) Primary Doc
             ** (skg (id section1)) Section 1
             Section 1 body
             *** (skg (id subsection1a)) Subsection 1a
             ** (skg (id section2) toDelete) Section 2
             ** (skg (id section3)) Section 3
             * (skg (id doc2)) Document 2
-            ** (skg (id ref_section) (relToOrgParent container)) Reference Section
+            ** (skg (id ref_section) (treatment parentIgnores)) Reference Section
         "};
 
   let trees: Vec<Tree<OrgNode>> =

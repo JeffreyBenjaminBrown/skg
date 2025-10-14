@@ -1,7 +1,7 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{TantivyIndex, OrgNode, RelToOrgParent};
+use crate::types::{TantivyIndex, OrgNode, Treatment};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 
@@ -112,7 +112,7 @@ fn format_matches_as_org_mode (
   let search_root_node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.relToOrgParent = RelToOrgParent::SearchResult;
+                   md.treatment = Treatment::ParentIgnores;
                    md },
       title : search_terms.to_string (),
       // The unique level-1 headline states the search terms.

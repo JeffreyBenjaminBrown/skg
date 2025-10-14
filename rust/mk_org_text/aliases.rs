@@ -1,11 +1,11 @@
-use crate::types::{OrgNode, RelToOrgParent};
+use crate::types::{OrgNode, Treatment};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 
 /// Returns not an entire org buffer,
 /// but rather just a passage,
 /// which should replace the current headline and its body.
-/// The new passage include the current headline
+/// The new passage includes the current headline
 /// with potentially different metadata (if it is part of a cycle),
 /// the same body, a child 'aliases' headline,
 /// and a grandchild under it corresponding to each alias.
@@ -23,7 +23,7 @@ pub fn aliases_to_org (
   let aliases_header_node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.relToOrgParent = RelToOrgParent::AliasCol;
+                   md.treatment = Treatment::AliasCol;
                    md },
       title : "".to_string (),
       // The only child node, the 'aliases' headline, has no title.
@@ -37,7 +37,7 @@ pub fn aliases_to_org (
     let alias_node : OrgNode =
       OrgNode {
         metadata : { let mut md = default_metadata ();
-                     md.relToOrgParent = RelToOrgParent::Alias;
+                     md.treatment = Treatment::Alias;
                      md },
         title : alias,
         body : None, };

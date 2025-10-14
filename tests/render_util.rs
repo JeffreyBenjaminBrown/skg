@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::mk_org_text::orgnode::render_org_node_from_text;
-use skg::types::{OrgNode, OrgnodeMetadata, RelToOrgParent, ID};
+use skg::types::{OrgNode, OrgnodeMetadata, Treatment, ID};
 use skg::types::orgnode::default_metadata;
 
 #[test]
@@ -33,14 +33,14 @@ fn test_render_org_node_from_text_with_metadata () {
   let node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.relToOrgParent = RelToOrgParent::AliasCol;
+                   md.treatment = Treatment::AliasCol;
                    md.folded = true;
                    md },
       title : "Test Title".to_string (),
       body : None, };
   let result : String =
     render_org_node_from_text ( 1, &node );
-  assert_eq! ( result, "* (skg (relToOrgParent aliasCol) folded) Test Title\n" ); }
+  assert_eq! ( result, "* (skg (treatment aliasCol) folded) Test Title\n" ); }
 
 #[test]
 fn test_render_org_node_from_text_with_id_metadata () {
@@ -63,7 +63,7 @@ fn test_metadata_ordering () {
       metadata :
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
-          relToOrgParent : RelToOrgParent::Content,
+          treatment : Treatment::Content,
           cycle             : true,
           focused           : false,
           folded            : false,

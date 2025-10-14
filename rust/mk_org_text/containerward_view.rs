@@ -2,7 +2,7 @@ use crate::file_io::read_node_from_id;
 use crate::mk_org_text::util::newline_to_space;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
-use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, RelToOrgParent, SkgNode};
+use crate::types::{ID, SkgConfig, OrgNode, OrgnodeMetadata, Treatment, SkgNode};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -134,16 +134,16 @@ fn metadata_for_element_of_path (
 ) -> OrgnodeMetadata {
   OrgnodeMetadata {
     id               : Some ( node_id.clone () ),
-    relToOrgParent   :
+    treatment        :
       if is_terminus {
-        RelToOrgParent::Content
+        Treatment::Content
       } else {
         // All nodes except the terminus (first in path)
         // contain their org parent.
         // PITFALL: If there is a second appearance of the terminus,
         // later in the containerward path,
         // that appearance *should* (and does) get this type.
-        RelToOrgParent::Container
+        Treatment::ParentIgnores
       },
     cycle              : cycle_node.as_ref () == Some ( node_id ),
     focused            : false,

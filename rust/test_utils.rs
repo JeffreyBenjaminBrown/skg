@@ -85,7 +85,7 @@ fn compare_nodes_modulo_id(
   // Compare structure and content
   if n1.title != n2.title ||
      n1.body != n2.body ||
-     n1.metadata.relToOrgParent != n2.metadata.relToOrgParent ||
+     n1.metadata.treatment != n2.metadata.treatment ||
      n1.metadata.cycle != n2.metadata.cycle ||
      n1.metadata.focused != n2.metadata.focused ||
      n1.metadata.folded != n2.metadata.folded ||
