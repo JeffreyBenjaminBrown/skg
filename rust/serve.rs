@@ -37,6 +37,18 @@ pub fn serve (
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
     = initialize_dbs ( &config );
+
+  // Set up signal handler for Ctrl+C and SIGTERM
+  // This allows graceful shutdown with database cleanup
+  let driver_for_signal = Arc::clone ( &typedb_driver );
+  let config_for_signal = config . clone ();
+  ctrlc::set_handler ( move || {
+    println! ( "\nReceived shutdown signal..." );
+    perform_shutdown_cleanup (
+      &driver_for_signal,
+      &config_for_signal );
+  } ) . expect ( "Error setting Ctrl+C handler" );
+
   // Bind to TCP port for Rust-Emacs API communication.
   let bind_addr : String =
     format!("0.0.0.0:{}", config.port);
@@ -148,6 +160,12 @@ fn handle_emacs (
           } else if request_type == "verify connection" {
             handle_verify_connection_request(
               &mut stream);
+          } else if request_type == "shutdown" {
+            handle_shutdown_request(
+              &mut stream,
+              &typedb_driver,
+              config);
+            // Never returns - exits process
           } else {
             let error_msg : String =
               format! ( "Unsupported request type: {}",
@@ -169,3 +187,42 @@ fn handle_verify_connection_request (
   send_response (
     stream,
     "This is the skg server verifying the connection."); }
+
+fn handle_shutdown_request (
+  stream        : &mut std::net::TcpStream,
+  typedb_driver : &Arc<TypeDBDriver>,
+  config        : &SkgConfig,
+) {
+  send_response ( stream,
+                  "Server shutting down..." );
+  perform_shutdown_cleanup (
+    typedb_driver, config ); }
+
+/// Performs cleanup before server shutdown.
+/// Deletes the database if delete_on_quit is configured, then exits.
+fn perform_shutdown_cleanup (
+  typedb_driver : &Arc<TypeDBDriver>,
+  config        : &SkgConfig,
+) {
+  if config . delete_on_quit {
+    println! (
+      "Deleting database '{}' before shutdown...",
+      config . db_name );
+    futures::executor::block_on ( async {
+      if let Err ( e ) =
+        delete_database (
+          typedb_driver, & config . db_name ) . await {
+        eprintln! ( "Failed to delete database: {}", e );
+        }} ); }
+  println! ( "Shutdown complete." );
+  std::process::exit (0); }
+
+async fn delete_database (
+  driver  : &TypeDBDriver,
+  db_name : &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+  let databases = driver . databases ();
+  if databases . contains ( db_name ) . await ? {
+    databases . get ( db_name ) . await ? . delete () . await ?;
+    println! ( "Database '{}' deleted successfully", db_name ); }
+  Ok (( )) }

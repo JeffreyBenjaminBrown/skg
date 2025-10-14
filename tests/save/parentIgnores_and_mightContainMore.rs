@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::file_io::{read_node_from_id, update_fs_from_saveinstructions};
 use skg::save::buffer_to_save_instructions;
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::types::{ID, SkgConfig, SkgNode};
 
@@ -33,7 +33,7 @@ fn test_parentignores_and_mightcontainmore(
 
     // Setup test database
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/save/parentIgnores_and_mightContainMore/fixtures",
         "/tmp/tantivy-test-parentignores"
@@ -94,7 +94,7 @@ fn test_parentignores_and_mightcontainmore(
       "Node 1 should, like before it was saved, have empty contents, because its child 2 has 'treatment=parentIgnores' in its metadata." ); }
 
     // Cleanup: delete TypeDB database and Tantivy index
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )

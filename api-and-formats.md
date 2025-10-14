@@ -26,6 +26,12 @@ So far there are these endpoints:
   - Response: success/failure indicator followed by length-prefixed content:
     - Success: `save: success\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains the processed buffer content
     - Failure: `save: failure\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains org-mode formatted error details
+- Shutdown server
+  - Request: ((request . "shutdown"))
+  - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
+  - Response: "Server shutting down..."
+  - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
+  - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 Error responses are sent as simple text.
 

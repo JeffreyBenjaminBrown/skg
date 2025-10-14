@@ -1,6 +1,6 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
@@ -21,7 +21,7 @@ fn test_update_nodes_and_relationships2 (
     let db_name : &str =
       "skg-test-update2";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/update_typedb_from_saveinstructions/fixtures",
         "/tmp/tantivy-test-update2"
@@ -113,7 +113,7 @@ fn test_update_nodes_and_relationships2 (
       "Node 2 should only contain node 1, but contains: {:?}",
       node2_contains );
 
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )

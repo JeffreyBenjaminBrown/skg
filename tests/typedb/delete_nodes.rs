@@ -2,7 +2,7 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::util::extract_payload_from_typedb_string_rep;
@@ -29,7 +29,7 @@ fn test_delete_container_node (
     let db_name : &str =
       "skg-test-delete-container";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/fixtures",
         "/tmp/tantivy-test-delete-container"
@@ -109,7 +109,7 @@ fn test_delete_container_node (
       assert_eq!(container_count, 0, "No containers should be found for node 2 after deleting node 1 (cascading delete should work)");
     } // Drop transaction here
 
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )
@@ -126,7 +126,7 @@ fn test_delete_contained_node (
     let db_name : &str =
       "skg-test-delete-contained";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/fixtures",
         "/tmp/tantivy-test-delete-contained"
@@ -207,7 +207,7 @@ fn test_delete_contained_node (
     assert!(finally_contained.contains(&ID("3".to_string())),
             "Node 1 should still contain node 3");
 
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )

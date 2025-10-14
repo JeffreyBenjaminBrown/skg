@@ -16,7 +16,8 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
       "tests/save/none_node_fields_are_noops/fixtures"),
     tantivy_folder : PathBuf::from (
       "/tmp/tantivy"),
-    port           : 1730, };
+    port           : 1730,
+    delete_on_quit : false, };
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node.title   = "Title from user".to_string ();

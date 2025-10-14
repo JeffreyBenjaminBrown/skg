@@ -156,6 +156,7 @@ fn test_fetch_aliases_from_file() -> std::io::Result<()> {
     skg_folder     : PathBuf::from ("tests/file_io/fixtures"),
     tantivy_folder : PathBuf::from ("/tmp/tantivy"),
     port           : 1730,
+    delete_on_quit : false,
   };
 
   let aliases_result : Vec<String> =

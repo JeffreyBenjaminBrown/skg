@@ -27,6 +27,7 @@ impl TestContext {
           skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
           tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
           port: 1730,
+          delete_on_quit: false,
         };
         Self { config, driver: None }
       }
@@ -39,6 +40,7 @@ impl TestContext {
       skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
       tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
       port: 1730,
+      delete_on_quit: false,
     };
 
     let driver = TypeDBDriver::new(

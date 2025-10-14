@@ -1,6 +1,6 @@
 // cargo test typedb::search::count_relationships
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::search::{count_containers, count_contents, count_link_sources};
 use skg::types::{ID, SkgConfig};
 
@@ -16,7 +16,7 @@ fn the_tests (
     let db_name : &str =
       "skg-test-typedb-search-count-relationships";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/search/contains_from_pids/fixtures",
         "/tmp/tantivy-test-typedb-search-count-relationships"
@@ -27,7 +27,7 @@ fn the_tests (
       &config, &driver ) . await ?;
     test_count_link_sources (
       &config, &driver ) . await ?;
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )

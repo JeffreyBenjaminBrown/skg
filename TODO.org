@@ -10,13 +10,6 @@
   The ones N does contain should not need modification,
   because the heralds should already indicate they are
   both content and container to their parents.
-** Metadata and intent should be independent.
-  They are entangled, e.g. in [[id:f6f8c460-2553-4fd7-b81d-6ce17a333591]["relToOrgParent" is misleading.]]
-  Instead, determine the structure of the tree,
-  and each node's intent
-  (which is currently part of what relToOrgParent encodes),
-  but then generate certain metadata de-novo:
-  cycle, rep, relToOrgParent (can have multiple),
 ** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
 * ====== BELOW: SORTED, no execution order =======
 * internalize

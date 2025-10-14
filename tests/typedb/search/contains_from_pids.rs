@@ -1,6 +1,6 @@
 // cargo test typedb::search::contains_from_pids
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::search::contains_from_pids;
 use skg::types::{ID, SkgConfig};
 
@@ -16,14 +16,14 @@ fn the_tests (
     let db_name : &str =
       "skg-test-typedb-search-contains-from-pids";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/search/contains_from_pids/fixtures",
         "/tmp/tantivy-test-typedb-search-contains-from-pids"
       ) . await ?;
     test_contains_from_pids (
       &config, &driver ) . await ?;
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )

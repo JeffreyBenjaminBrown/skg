@@ -1,6 +1,6 @@
 // cargo test typedb::search::util
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
 use skg::typedb::util::{pid_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
 use skg::types::{ID, SkgConfig};
 
@@ -27,7 +27,7 @@ fn test_pid_from_id (
     let db_name : &str =
       "skg-test-typedb-search-util";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/search/util/fixtures",
         "/tmp/tantivy-test-typedb-search-util"
@@ -44,7 +44,7 @@ fn test_pid_from_id (
     assert_eq!(path_to_4,  ID("4" . to_string () ));
     assert_eq!(path_to_44, ID("4" . to_string () ));
 
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )
@@ -59,7 +59,7 @@ fn test_pids_from_ids (
     let db_name : &str =
       "skg-test-typedb-pids-from-ids";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
+      setup_test_tantivy_and_typedb_dbs (
         db_name,
         "tests/typedb/search/util/fixtures",
         "/tmp/tantivy-test-typedb-pids-from-ids"
@@ -90,7 +90,7 @@ fn test_pids_from_ids (
                                         &[] ). await ?;
     assert!(empty_results.is_empty());
 
-    cleanup_test_db (
+    cleanup_test_tantivy_and_typedb_dbs (
       db_name,
       &driver,
       Some ( config . tantivy_folder . as_path () )
