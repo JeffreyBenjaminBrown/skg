@@ -2,6 +2,10 @@
 
 # Script to safely delete TypeDB test databases
 # Deletes any database whose name matches "*skg-*test*"
+#
+# Note: /opt/typedb/core/server/data is a symlink to /var/lib/typedb/core/data
+# If this script doesn't work, try manual cleanup:
+#   cd /var/lib/typedb/core/data && rm -rf skg-test*
 
 set -e
 

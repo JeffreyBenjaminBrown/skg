@@ -1,8 +1,113 @@
 Claude wrote this guide.
 Jeff edited it but has not fact-checked it.
+
+* First: Check If TypeDB Is Already Running
+
+Before trying to start TypeDB, always check if it's already running.
+
+** Quick Status Check (Recommended)
+
+Use this script for a comprehensive status check:
+
+#+begin_src bash
+bash troubleshooting/typedb/check-typedb-status.sh
+#+end_src
+
+This will show:
+- Whether TypeDB process is running
+- Recent log entries
+- Whether startup was successful
+- Helpful commands for your situation
+
+** Manual Check
+
+You can also check manually:
+
+#+begin_src bash
+ps aux | grep typedb | grep -v grep
+#+end_src
+
+**Important:** Use `ps aux` (not `ps -a`). The `x` flag is necessary because TypeDB runs without a controlling terminal (shown as `?` in the TTY column). The `-a` flag alone won't show background daemon processes.
+
+If you see output like this, TypeDB is already running:
+#+begin_example
+ubuntu    276330 10.5  0.8 6410476 130144 ?      Sl   14:45   1:02 /opt/typedb/core/server/typedb_server_bin
+                                                 ^
+                                    Note: ? means no terminal (this is normal for daemons)
+#+end_example
+
+Other commands that work:
+- `pgrep typedb` - simple process name search
+- `ps -ef | grep typedb` - alternative format
+
+** "Address already in use" Error
+
+If you try to run `typedb server` and get this error:
+#+begin_example
+error creating server listener: Address already in use (os error 98)
+Exited with error: [SRO11] Could not serve gRPC on 0.0.0.0:1729.
+#+end_example
+
+This means TypeDB is **already running**. This is not a problem - you don't need to start it again.
+
+** What to do
+
+- If TypeDB is already running and working: Nothing! You're good.
+- If you want to restart it:
+  1. Kill the existing process: `pkill -f typedb`
+  2. Start it fresh: `nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &`
+- If it's running but not responding: Check the log file and see the sections below
+
+* TypeDB Exits Immediately After "Ready!" Message
+** Symptoms
+- TypeDB log shows "Ready!" message indicating successful startup
+- Process appears in `ps` output briefly but then disappears
+- No error messages in the log file
+- Log file ends cleanly with "Ready!" but process is not running
+** Root Cause
+This happens when TypeDB is backgrounded without redirecting stdin from /dev/null. The process receives EOF on stdin (either when the shell session ends or stdin closes) and exits gracefully. Since it's a clean exit after successful startup, no error is logged.
+** Solution
+Always redirect stdin from /dev/null when backgrounding TypeDB:
+#+begin_src bash
+nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
+#+end_src
+
+The critical part is `< /dev/null` which disconnects stdin from the terminal.
+
+** Verification
+After starting TypeDB, wait a few seconds and verify it's still running:
+#+begin_src bash
+sleep 5 && ps aux | grep -v grep | grep typedb
+#+end_src
+
+You should see the typedb_server_bin process running.
+
+** Note
+This issue was fixed in `/home/ubuntu/bash/run-servers.sh` on 2025-10-14. If you're using that script, it should now work correctly. If you're manually starting TypeDB, remember to include the stdin redirection.
+
 * Corrupted TypeDB Checkpoints
 ** PITFALL: Never delete the _system database.
 ** Quick Diagnostic Workflow
+When TypeDB fails to start with "Connection refused" on port 1729, or when you want to prevent issues:
+
+*** Scenario A: TypeDB is Running (Preventive Maintenance)
+If TypeDB is currently running but you want to prevent future issues:
+
+1. *Check database count* - Use diagnostic script while TypeDB is running:
+   #+begin_src bash
+   bash troubleshooting/typedb/check-typedb-databases.sh
+   #+end_src
+
+2. *If many test databases found* (e.g., 20+ databases):
+   - Clean them up immediately to prevent "Too many open files" on next restart
+   - Use manual cleanup (most reliable):
+     #+begin_src bash
+     cd /var/lib/typedb/core/data && rm -rf skg-test*
+     #+end_src
+   - TypeDB will continue running normally after cleanup
+   - No restart needed unless you encounter issues
+
+*** Scenario B: TypeDB Won't Start
 When TypeDB fails to start with "Connection refused" on port 1729:
 
 1. *Check the TypeDB log first* - This is your most valuable diagnostic tool:
@@ -67,18 +172,26 @@ The most reliable way to fix this issue:
    - Gives you confidence about what to remove
    - VERIFIED: Successfully identified 31 test databases causing the problem
 
-2. *Clean up test databases* - Use the safe cleanup script:
+2. *Clean up test databases* - Use manual cleanup (most reliable):
+   #+begin_src bash
+   cd /var/lib/typedb/core/data && rm -rf skg-test*
+   #+end_src
+   - The cleanup script may have issues with symlinked directories
+   - Manual cleanup is the most reliable approach
+   - VERIFIED: Successfully resolved "Too many open files" issue
+
+   Alternative: Use the cleanup script (may require adjustments):
    #+begin_src bash
    bash troubleshooting/typedb/clean-typedb-test-databases.sh
    #+end_src
    - Interactive confirmation before deletion
-   - Preserves system and production databases
-   - VERIFIED: Successfully resolved "Too many open files" issue
+   - Note: Script uses /opt/typedb/core/server/data which is symlinked to /var/lib/typedb/core/data
+   - If script doesn't find databases, use manual cleanup above instead
 
 3. *Restart TypeDB*:
    #+begin_src bash
    pkill -f typedb
-   nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 &
+   nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
    #+end_src
 
 4. *Verify* - Check that TypeDB started successfully:
@@ -92,12 +205,17 @@ The most reliable way to fix this issue:
 This deletes test databases. Note: Some test databases are named "skg-test"
 without a dash before "test", so we need to match both patterns.
 #+begin_src bash
+cd /var/lib/typedb/core/data && rm -rf skg-test*
+#+end_src
+
+Or using the symlinked path (equivalent):
+#+begin_src bash
 rm -rf /opt/typedb/core/server/data/skg-test*
 #+end_src
 
 Or using find (more portable but slower):
 #+begin_src bash
-find /opt/typedb/core/server/data/ -maxdepth 1 -type d \( -name "*skg-*test*" -o -name "skg-test" \) -exec rm -rf {} \;
+find /var/lib/typedb/core/data/ -maxdepth 1 -type d -name "skg-test*" -exec rm -rf {} \;
 #+end_src
 
 **** For specific corrupted database:
@@ -125,9 +243,10 @@ find /opt/typedb/core/server/data/ -maxdepth 1 -type d \( -name "*skg-*test*" -o
    - Start here every time TypeDB won't start
 
 2. *Using check-typedb-databases.sh* - Confirmed the diagnosis
-   - Showed exactly how many test databases had accumulated (31 in this case)
+   - Showed exactly how many test databases had accumulated (31 to 56 in documented cases)
    - Gave confidence that test database cleanup was the right solution
    - Quick to run and informative
+   - Can be run even when TypeDB is running (for preventive maintenance)
 
 3. *Following the documented solution* - The existing documentation was accurate
    - Manual cleanup with `rm -rf /opt/typedb/core/server/data/skg-test*` worked perfectly
@@ -152,19 +271,26 @@ find /opt/typedb/core/server/data/ -maxdepth 1 -type d \( -name "*skg-*test*" -o
 *** Prevention
 To avoid accumulating test databases in the future:
 
-1. *Regular cleanup* - Add to periodic maintenance:
+1. *Regular cleanup* - Add to periodic maintenance (before TypeDB restarts):
    #+begin_src bash
-   bash troubleshooting/typedb/clean-typedb-test-databases.sh
+   cd /var/lib/typedb/core/data && rm -rf skg-test*
    #+end_src
+   - Safe to run even while TypeDB is running
+   - Prevents "Too many open files" errors on next restart
 
 2. *After test runs* - Clean up test databases when done testing:
    #+begin_src bash
-   rm -rf /opt/typedb/core/server/data/skg-test*
+   cd /var/lib/typedb/core/data && rm -rf skg-test*
    #+end_src
 
-3. *Monitor database count* - Check occasionally:
+3. *Monitor database count* - Check occasionally (especially before restarts):
    #+begin_src bash
    bash troubleshooting/typedb/check-typedb-databases.sh
    #+end_src
+   - Alert threshold: 20+ test databases is risky
+   - Documented cases: 31, 56 test databases caused issues
 
 4. Consider adding test database cleanup to test teardown procedures
+
+Note: Manual cleanup using `cd /var/lib/typedb/core/data && rm -rf skg-test*`
+is more reliable than the cleanup script, especially with symlinked directories.

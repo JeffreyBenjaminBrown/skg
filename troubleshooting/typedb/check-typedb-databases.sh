@@ -2,6 +2,8 @@
 
 # Script to classify TypeDB databases as 'corrupt' or 'okay'
 # Checks for common corruption indicators
+#
+# Note: /opt/typedb/core/server/data is a symlink to /var/lib/typedb/core/data
 
 set -e
 
