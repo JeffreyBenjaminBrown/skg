@@ -74,6 +74,50 @@ pub async fn create_only_nodes_with_no_ids_present (
     tx . commit () . await ?; }
   Ok ( to_create.len () ) }
 
+/// Batch existence check:
+/// Given a set of candidate ID *strings*,
+/// return the subset that already exist in the DB.
+pub async fn which_ids_exist (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids     : &BTreeSet < String >
+) -> Result < HashSet < String >, Box<dyn Error> > {
+
+  if ids.is_empty () {
+    return Ok ( HashSet::new () ); }
+  let or_block : String =
+    ids . iter ()
+    . map ( |v| {
+      format! (
+        r#"{{ $found isa id;
+                $found == "{}"; }}"#,
+        v ) } )
+    . collect::<Vec<String>> ()
+    . join ( " or\n" );
+  let query : String = format! (
+    "match\n{}\n;\nselect $found;",
+    or_block );
+  let tx : Transaction =
+    driver . transaction (
+      db_name,
+      TransactionType::Read
+    ) . await ?;
+  let answer : QueryAnswer =
+    tx . query ( query ) . await ?;
+  let mut found : HashSet < String > =
+    HashSet::new ();
+  let mut rows = // TODO ? Is this hard to assign a type signature?
+    answer . into_rows ();
+  while let Some ( row_res ) = rows . next () . await {
+    let row = row_res ?;
+    if let Some ( concept ) =
+      row . get ( "found" ) ? {
+        let payload : String =
+          extract_payload_from_typedb_string_rep (
+            & concept . to_string () );
+        found.insert ( payload ); }}
+  Ok ( found ) }
+
 pub async fn create_node (
   // Creates: the `node`,
   //          any `extra_id` entities it needs.
@@ -119,50 +163,6 @@ pub async fn insert_extra_ids (
                     extra_id.as_str () ))
         . await ?; }}
   Ok (()) }
-
-/// Batch existence check:
-/// Given a set of candidate ID *strings*,
-/// return the subset that already exist in the DB.
-pub async fn which_ids_exist (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  ids     : &BTreeSet < String >
-) -> Result < HashSet < String >, Box<dyn Error> > {
-
-  if ids.is_empty () {
-    return Ok ( HashSet::new () ); }
-  let or_block : String =
-    ids . iter ()
-    . map ( |v| {
-      format! (
-        r#"{{ $found isa id;
-                $found == "{}"; }}"#,
-        v ) } )
-    . collect::<Vec<String>> ()
-    . join ( " or\n" );
-  let query : String = format! (
-    "match\n{}\n;\nselect $found;",
-    or_block );
-  let tx : Transaction =
-    driver . transaction (
-      db_name,
-      TransactionType::Read
-    ) . await ?;
-  let answer : QueryAnswer =
-    tx . query ( query ) . await ?;
-  let mut found : HashSet < String > =
-    HashSet::new ();
-  let mut rows = // TODO ? Is this hard to assign a type signature?
-    answer . into_rows ();
-  while let Some ( row_res ) = rows . next () . await {
-    let row = row_res ?;
-    if let Some ( concept ) =
-      row . get ( "found" ) ? {
-        let payload : String =
-          extract_payload_from_typedb_string_rep (
-            & concept . to_string () );
-        found.insert ( payload ); }}
-  Ok ( found ) }
 
 /// ASSUMES: All input IDs are PIDs.
 /// PURPOSE: Delete the node corresponding to every ID it receives,

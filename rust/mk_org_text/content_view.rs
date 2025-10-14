@@ -17,71 +17,6 @@ use std::error::Error;
 use std::io;
 use typedb_driver::TypeDBDriver;
 
-/// Pre-traverse to collect all PIDs that will appear in the view.
-/// Mirrors the structure of org_from_node_recursive but only collects IDs.
-async fn collect_pids_in_view (
-  driver  : &TypeDBDriver,
-  config  : &SkgConfig,
-  node_id : &ID,
-  visited : &mut HashSet<ID>,
-  pids    : &mut Vec<ID>,
-) -> Result<(), Box<dyn Error>> {
-
-  let pid : ID =
-    pid_from_id ( & config . db_name,
-                    driver,
-                    node_id,
-  ). await ?
-    . ok_or_else ( || format! (
-      "ID '{}' not found in database", node_id ) ) ?;
-  pids . push ( pid . clone () );
-  if visited . contains ( node_id ) {
-    return Ok (()); }
-  visited . insert ( node_id . clone () );
-  let path : String = path_from_pid (
-    &config, pid );
-  let node : SkgNode = read_node ( path )?;
-  for child_id in &node.contains {
-    Box::pin (
-      collect_pids_in_view (
-        driver, config,
-        child_id, visited, pids
-      )) . await ?; }
-  Ok (()) }
-
-/// Each of these describes some kind of relationship,
-/// for each of a view's nodes.
-pub struct MapsFromIdForView {
-  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
-  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
-  num_links_in : HashMap < ID, usize >, // number of hyperlinks relationship for which the node plays the 'target' role
-  container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
-  content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
-}
-
-/// Run four batch queries to fetch all relationship data for the given PIDs.
-async fn fetch_relationship_data (
-  driver  : &TypeDBDriver,
-  db_name : &str,
-  pids    : &[ID],
-) -> Result < MapsFromIdForView, Box<dyn Error> > {
-
-  let num_containers : HashMap < ID, usize > =
-    count_containers ( db_name, driver, pids ) . await ?;
-  let num_contents : HashMap < ID, usize > =
-    count_contents ( db_name, driver, pids ) . await ?;
-  let num_links_in : HashMap < ID, usize > =
-    count_link_sources ( db_name, driver, pids ) . await ?;
-  let ( container_to_contents, content_to_containers ) =
-    contains_from_pids ( db_name, driver, pids ) . await ?;
-  Ok ( MapsFromIdForView {
-    num_containers,
-    num_contents,
-    num_links_in,
-    container_to_contents,
-    content_to_containers,
-  }) }
-
 /// Given the id `focus`,
 /// identifies its context (`climb_containerward_and_fetch_rootish_context()`),
 /// and builds a view from that root,
@@ -149,6 +84,61 @@ async fn collect_all_pids (
       driver, config, root_id, &mut visited, &mut pids
     ) . await ?; }
   Ok ( pids ) }
+
+/// Pre-traverse to collect all PIDs that will appear in the view.
+/// Mirrors the structure of org_from_node_recursive but only collects IDs.
+async fn collect_pids_in_view (
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig,
+  node_id : &ID,
+  visited : &mut HashSet<ID>,
+  pids    : &mut Vec<ID>,
+) -> Result<(), Box<dyn Error>> {
+
+  let pid : ID =
+    pid_from_id ( & config . db_name,
+                    driver,
+                    node_id,
+  ). await ?
+    . ok_or_else ( || format! (
+      "ID '{}' not found in database", node_id ) ) ?;
+  pids . push ( pid . clone () );
+  if visited . contains ( node_id ) {
+    return Ok (()); }
+  visited . insert ( node_id . clone () );
+  let path : String = path_from_pid (
+    &config, pid );
+  let node : SkgNode = read_node ( path )?;
+  for child_id in &node.contains {
+    Box::pin (
+      collect_pids_in_view (
+        driver, config,
+        child_id, visited, pids
+      )) . await ?; }
+  Ok (()) }
+
+/// Run four batch queries to fetch all relationship data for the given PIDs.
+async fn fetch_relationship_data (
+  driver  : &TypeDBDriver,
+  db_name : &str,
+  pids    : &[ID],
+) -> Result < MapsFromIdForView, Box<dyn Error> > {
+
+  let num_containers : HashMap < ID, usize > =
+    count_containers ( db_name, driver, pids ) . await ?;
+  let num_contents : HashMap < ID, usize > =
+    count_contents ( db_name, driver, pids ) . await ?;
+  let num_links_in : HashMap < ID, usize > =
+    count_link_sources ( db_name, driver, pids ) . await ?;
+  let ( container_to_contents, content_to_containers ) =
+    contains_from_pids ( db_name, driver, pids ) . await ?;
+  Ok ( MapsFromIdForView {
+    num_containers,
+    num_contents,
+    num_links_in,
+    container_to_contents,
+    content_to_containers,
+  }) }
 
 async fn render_all_roots (
   driver               : &TypeDBDriver,
@@ -302,3 +292,13 @@ pub fn format_repeated_node (
   render_org_node_from_text (
     level,
     &orgnode ) }
+
+/// Each of these describes some kind of relationship,
+/// for each of a view's nodes.
+pub struct MapsFromIdForView {
+  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
+  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
+  num_links_in : HashMap < ID, usize >, // number of hyperlinks relationship for which the node plays the 'target' role
+  container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
+  content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
+}

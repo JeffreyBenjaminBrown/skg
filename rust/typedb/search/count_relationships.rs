@@ -16,6 +16,57 @@ use crate::typedb::util::{
   conjugate_binary_role};
 
 
+/// PURPOSE: Count how many times each node appears as 'contained'
+/// in a 'contains' relationship.
+/// Takes a vector of IDs and returns a map from each ID to its count.
+/// IDs with count 0 are included in the result.
+pub async fn count_containers (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids : &[ID]
+) -> Result < HashMap < ID, usize >,
+              Box < dyn Error > > {
+  count_relations ( db_name,
+                    driver,
+                    ids,
+                    "contains",
+                    "contained"
+  ). await }
+
+/// PURPOSE: Count how many nodes each node contains
+/// in a 'contains' relationship.
+/// Takes a vector of IDs and returns a map from each ID to its count.
+/// IDs with count 0 are included in the result.
+pub async fn count_contents (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids : &[ID]
+) -> Result < HashMap < ID, usize >,
+              Box < dyn Error > > {
+  count_relations ( db_name,
+                    driver,
+                    ids,
+                    "contains",
+                    "container"
+  ). await }
+
+/// PURPOSE: Count how many nodes link to each node
+/// in a 'hyperlinks_to' relationship.
+/// Takes a vector of IDs and returns a map from each ID to its count.
+/// IDs with count 0 are included in the result.
+pub async fn count_link_sources (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids : &[ID]
+) -> Result < HashMap < ID, usize >,
+              Box < dyn Error > > {
+  count_relations ( db_name,
+                    driver,
+                    ids,
+                    "hyperlinks_to",
+                    "dest"
+  ). await }
+
 /// Generic function to count relationships for a collection of nodes.
 /// Counts how many relationships exist where each input node plays a specified role.
 /// For example, to count containers: relation="contains", input_role="contained"
@@ -92,54 +143,3 @@ async fn count_relations (
             result . insert ( node_id, count );
           }} }} }
   Ok (result) }
-
-/// PURPOSE: Count how many times each node appears as 'contained'
-/// in a 'contains' relationship.
-/// Takes a vector of IDs and returns a map from each ID to its count.
-/// IDs with count 0 are included in the result.
-pub async fn count_containers (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  ids : &[ID]
-) -> Result < HashMap < ID, usize >,
-              Box < dyn Error > > {
-  count_relations ( db_name,
-                    driver,
-                    ids,
-                    "contains",
-                    "contained"
-  ). await }
-
-/// PURPOSE: Count how many nodes each node contains
-/// in a 'contains' relationship.
-/// Takes a vector of IDs and returns a map from each ID to its count.
-/// IDs with count 0 are included in the result.
-pub async fn count_contents (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  ids : &[ID]
-) -> Result < HashMap < ID, usize >,
-              Box < dyn Error > > {
-  count_relations ( db_name,
-                    driver,
-                    ids,
-                    "contains",
-                    "container"
-  ). await }
-
-/// PURPOSE: Count how many nodes link to each node
-/// in a 'hyperlinks_to' relationship.
-/// Takes a vector of IDs and returns a map from each ID to its count.
-/// IDs with count 0 are included in the result.
-pub async fn count_link_sources (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  ids : &[ID]
-) -> Result < HashMap < ID, usize >,
-              Box < dyn Error > > {
-  count_relations ( db_name,
-                    driver,
-                    ids,
-                    "hyperlinks_to",
-                    "dest"
-  ). await }
