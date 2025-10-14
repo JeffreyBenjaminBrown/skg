@@ -24,7 +24,7 @@ check_typedb_server() {
   echo "✓ TypeDB server is running"
 }
 
-# Function to cleanup background processes
+# Function to cleanup background processes and test databases
 cleanup() {
   echo ""
   echo "Cleaning up..."
@@ -33,6 +33,13 @@ cleanup() {
     echo "Stopping cargo process (PID: $CARGO_PID)"
     kill $CARGO_PID 2>/dev/null || true
     wait $CARGO_PID 2>/dev/null || true
+  fi
+
+  # Clean up TypeDB test database to prevent accumulation
+  if [ -n "$DB_NAME" ]; then
+    echo "Removing TypeDB test database: $DB_NAME"
+    rm -rf "/var/lib/typedb/core/data/$DB_NAME" 2>/dev/null || true
+    rm -rf "/opt/typedb/core/server/data/$DB_NAME" 2>/dev/null || true
   fi
 }
 
