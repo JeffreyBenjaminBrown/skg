@@ -48,6 +48,20 @@ The metadata is otherwise not displayed."
       (heralds-apply-to-line)
       (forward-line 1))))
 
+(defun heralds-after-change (beg end _len)
+  "Refresh overlays only on lines touched by the edit from BEG to END."
+  (when heralds-minor-mode
+    (save-excursion
+      (let* ((lbeg (progn (goto-char beg) (line-beginning-position)) )
+             (lend (progn (goto-char end) (line-end-position)) )
+             (start-line (line-number-at-pos lbeg))
+             (end-line   (line-number-at-pos lend)) )
+        (heralds-clear-overlays-in-region lbeg lend)
+        (goto-char lbeg)
+        (dotimes (_ (1+ (- end-line start-line)) )
+          (heralds-apply-to-line)
+          (forward-line 1)) )) ))
+
 (defun heralds-apply-to-line ()
   "On the current line, lens only the first (skg ...) occurrence.
 Creates one overlay (at most) and pushes it onto `heralds-overlays`."
@@ -69,6 +83,27 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
                   (overlay-put ov 'display heralds)
                   (overlay-put ov 'evaporate t)
                   (push ov heralds-overlays))))))))))
+
+(defun heralds-clear-overlays ()
+  "Remove all overlays from buffer."
+  (dolist (ov heralds-overlays)
+    (when ;; Exclude invalid overlays.
+        (and (overlayp ov) (overlay-buffer ov))
+      (delete-overlay ov)))
+  (setq heralds-overlays nil))
+
+(defun heralds-clear-overlays-in-region (start end)
+  "Delete overlays we manage that overlap [START, END)."
+  (let (keep)
+    (dolist (ov heralds-overlays)
+      (let ((valid (heralds-overlay-valid-and-useable-p ov)))
+        (if (and valid
+                 (< (overlay-start ov) end)
+                 (> (overlay-end ov) start))
+            (delete-overlay ov)
+          (when valid
+            (push ov keep)))))
+    (setq heralds-overlays (nreverse keep))))
 
 (defun heralds-from-metadata
     (metadata) ;; line's first text inside (not including) (skg and )
@@ -137,47 +172,12 @@ Whitespace in METADATA is ignored."
     (when out
       (mapconcat #'identity (nreverse out) " "))))
 
-(defun heralds-clear-overlays ()
-  "Remove all overlays from buffer."
-  (dolist (ov heralds-overlays)
-    (when ;; Exclude invalid overlays.
-        (and (overlayp ov) (overlay-buffer ov))
-      (delete-overlay ov)))
-  (setq heralds-overlays nil))
-
-(defun heralds-clear-overlays-in-region (start end)
-  "Delete overlays we manage that overlap [START, END)."
-  (let (keep)
-    (dolist (ov heralds-overlays)
-      (let ((valid (heralds-overlay-valid-and-useable-p ov)))
-        (if (and valid
-                 (< (overlay-start ov) end)
-                 (> (overlay-end ov) start))
-            (delete-overlay ov)
-          (when valid
-            (push ov keep)))))
-    (setq heralds-overlays (nreverse keep))))
-
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."
   (and (overlayp ov)
        (overlay-buffer ov)
        (overlay-start ov)
        (overlay-end ov)))
-
-(defun heralds-after-change (beg end _len)
-  "Refresh overlays only on lines touched by the edit from BEG to END."
-  (when heralds-minor-mode
-    (save-excursion
-      (let* ((lbeg (progn (goto-char beg) (line-beginning-position)) )
-             (lend (progn (goto-char end) (line-end-position)) )
-             (start-line (line-number-at-pos lbeg))
-             (end-line   (line-number-at-pos lend)) )
-        (heralds-clear-overlays-in-region lbeg lend)
-        (goto-char lbeg)
-        (dotimes (_ (1+ (- end-line start-line)) )
-          (heralds-apply-to-line)
-          (forward-line 1)) )) ))
 
 (defface heralds-blue-face
   '((t :foreground "white" :background "blue"))

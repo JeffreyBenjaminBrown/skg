@@ -45,13 +45,6 @@
            :nowait nil )) )
   skg-rust-tcp-proc)
 
-(defun skg-doc-disconnect ()
-  "Manually close the connection to the Rust server."
-  (interactive)
-  (when (process-live-p skg-rust-tcp-proc)
-    (delete-process skg-rust-tcp-proc)
-    (setq skg-rust-tcp-proc nil )) )
-
 (defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the appropriate handler.
 .
@@ -64,5 +57,12 @@ and neither of them uses the `tcp-proc` argument. Unless it will be used by late
   (if skg-doc--response-handler
       (funcall skg-doc--response-handler tcp-proc string)
     (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )
+
+(defun skg-doc-disconnect ()
+  "Manually close the connection to the Rust server."
+  (interactive)
+  (when (process-live-p skg-rust-tcp-proc)
+    (delete-process skg-rust-tcp-proc)
+    (setq skg-rust-tcp-proc nil )) )
 
 (provide 'skg-client)
