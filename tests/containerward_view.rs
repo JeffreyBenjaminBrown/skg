@@ -1,49 +1,24 @@
 // cargo test test_containerward_view
 
 use indoc::indoc;
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::run_with_test_db;
 use skg::mk_org_text::containerward_org_view;
 use skg::types::{ID, SkgConfig};
 
-use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TypeDBDriver, };
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_containerward_view (
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_database () . await ?;
-    test_containerward_org_view (
-      &config, &driver ) . await ?;
-    Ok (( )) } ) }
-
-async fn setup_test_database (
-) -> Result < ( SkgConfig, TypeDBDriver ), Box<dyn Error> > {
-  let config : SkgConfig =
-    SkgConfig {
-      db_name        : "skg-test-containerward-view"       . into(),
-      skg_folder     : "tests/containerward_view/fixtures" . into(),
-      tantivy_folder : "irrelevant"                        . into(),
-      port           : 1730 };
-  let index_folder : &str =
-    config . skg_folder . to_str ()
-    . expect ("Invalid UTF-8 in tantivy index path");
-  let driver : TypeDBDriver =
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-  populate_test_db_from_fixtures (
-    index_folder,
-    & config . db_name,
-    & driver ). await ?;
-  Ok (( config, driver )) }
+  run_with_test_db (
+    "skg-test-containerward-view",
+    "tests/containerward_view/fixtures",
+    "/tmp/tantivy-test-containerward-view",
+    |config, driver| Box::pin ( async move {
+      test_containerward_org_view (
+        config, driver ) . await ?;
+      Ok (( )) } )) }
 
 async fn test_containerward_org_view (
   config : &SkgConfig,

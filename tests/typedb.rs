@@ -13,7 +13,7 @@ mod util {
 use skg::mk_org_text::single_root_view;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{populate_test_db_from_fixtures, run_with_test_db};
 use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
@@ -22,13 +22,10 @@ use skg::typedb::util::pid_from_id;
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
-use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
   answer::{ ConceptRow, QueryAnswer },
-  Credentials,
-  DriverOptions,
   Transaction,
   TransactionType,
   TypeDBDriver, };
@@ -36,160 +33,144 @@ use typedb_driver::{
 #[test]
 fn test_typedb_integration (
 ) -> Result<(), Box<dyn Error>> {
-  // Use block_on to run async code in a synchronous test
-  block_on(async {
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-    let config = SkgConfig {
-      db_name        : "skg-test-typedb"       . into(),
-      skg_folder     : "tests/typedb/fixtures" . into(),
-      tantivy_folder : "irrelevant"            . into(),
-      port           : 1730 };
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
+  run_with_test_db (
+    "skg-test-typedb",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb",
+    |config, driver| Box::pin ( async move {
+      test_all_relationships ( config, driver ) . await ?;
+      test_recursive_document ( driver, config ) . await ?;
+      test_create_only_nodes_with_no_ids_present (
+        & config . db_name, driver ) . await ?;
+      test_delete_out_links_contains_container (
+        & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
 
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+async fn test_all_relationships (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
 
-    let has_extra_id_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $n isa node, has id $ni;
-            $e isa extra_id, has id $ei;
-            $rel isa has_extra_id (node: $n,
-                                   extra_id: $e);
-          select $ni, $ei;"#,
-      "ni",
-      "ei"
-    ).await?;
-    let expected_has_extra_id: HashSet<_> = [
-      ("2", "22"),
-      ("3", "33"),
-      ("4", "44"),
-      ("5", "55"), ].iter()
-      .map(|(a, b)| (a.to_string(), b.to_string()))
-      .collect();
-    assert_eq!(has_extra_id_pairs, expected_has_extra_id);
+  let has_extra_id_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $n isa node, has id $ni;
+          $e isa extra_id, has id $ei;
+          $rel isa has_extra_id (node: $n,
+                                 extra_id: $e);
+        select $ni, $ei;"#,
+    "ni",
+    "ei"
+  ).await?;
+  let expected_has_extra_id: HashSet<_> = [
+    ("2", "22"),
+    ("3", "33"),
+    ("4", "44"),
+    ("5", "55"), ].iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+  assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
-    let contains_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $container isa node, has id $container_id;
-            $contained isa node, has id $contained_id;
-            $rel isa contains (container: $container,
-                               contained: $contained);
-          select $container_id, $contained_id;"#,
-      "container_id",
-      "contained_id"
-    ).await?;
-    let mut expected_contains = HashSet::new();
-    expected_contains.insert(("1".to_string(), "2".to_string()));
-    expected_contains.insert(("1".to_string(), "3".to_string()));
-    expected_contains.insert(("a".to_string(), "b".to_string()));
-    expected_contains.insert(("b".to_string(), "c".to_string()));
-    expected_contains.insert(("c".to_string(), "b".to_string()));
-    assert_eq!(contains_pairs, expected_contains);
+  let contains_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $container isa node, has id $container_id;
+          $contained isa node, has id $contained_id;
+          $rel isa contains (container: $container,
+                             contained: $contained);
+        select $container_id, $contained_id;"#,
+    "container_id",
+    "contained_id"
+  ).await?;
+  let mut expected_contains = HashSet::new();
+  expected_contains.insert(("1".to_string(), "2".to_string()));
+  expected_contains.insert(("1".to_string(), "3".to_string()));
+  expected_contains.insert(("a".to_string(), "b".to_string()));
+  expected_contains.insert(("b".to_string(), "c".to_string()));
+  expected_contains.insert(("c".to_string(), "b".to_string()));
+  assert_eq!(contains_pairs, expected_contains);
 
-    let hyperlink_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $source isa node, has id $source_id;
-            $dest   isa node, has id $dest_id;
-            $rel    isa hyperlinks_to (source: $source,
-                                       dest:   $dest);
-          select $source_id, $dest_id;"#,
-      "source_id",
-      "dest_id"
-    ).await?;
-    let mut expected_contains = HashSet::new();
-    expected_contains.insert(("5".to_string(), "2".to_string()));
-    expected_contains.insert(("5".to_string(), "3".to_string()));
-    expected_contains.insert(("5".to_string(), "5".to_string()));
-    assert_eq!(hyperlink_pairs, expected_contains);
+  let hyperlink_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $source isa node, has id $source_id;
+          $dest   isa node, has id $dest_id;
+          $rel    isa hyperlinks_to (source: $source,
+                                     dest:   $dest);
+        select $source_id, $dest_id;"#,
+    "source_id",
+    "dest_id"
+  ).await?;
+  let mut expected_hyperlinks = HashSet::new();
+  expected_hyperlinks.insert(("5".to_string(), "2".to_string()));
+  expected_hyperlinks.insert(("5".to_string(), "3".to_string()));
+  expected_hyperlinks.insert(("5".to_string(), "5".to_string()));
+  assert_eq!(hyperlink_pairs, expected_hyperlinks);
 
-    let subscribes_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $subscriber isa node, has id $from;
-            $subscribee isa node, has id $to;
-            $rel isa subscribes (subscriber: $subscriber,
-                                 subscribee: $subscribee);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let expected_subscribes : HashSet<_> = [
-      ("2", "4"),
-      ("2", "5"),
-      ("3", "4"),
-      ("3", "5"), ].iter()
-      .map(|(a, b)| (a.to_string(), b.to_string()))
-      .collect();
-    assert_eq!(subscribes_pairs, expected_subscribes);
+  let subscribes_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $subscriber isa node, has id $from;
+          $subscribee isa node, has id $to;
+          $rel isa subscribes (subscriber: $subscriber,
+                               subscribee: $subscribee);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let expected_subscribes : HashSet<_> = [
+    ("2", "4"),
+    ("2", "5"),
+    ("3", "4"),
+    ("3", "5"), ].iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+  assert_eq!(subscribes_pairs, expected_subscribes);
 
-    let hides_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $hider isa node, has id $from;
-            $hidden isa node, has id $to;
-            $rel isa hides_from_its_subscriptions
-              ( hider:  $hider,
-                hidden: $hidden);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let mut expected_hides_from_its_subscriptions = HashSet::new();
-    expected_hides_from_its_subscriptions.insert((
-      "1".to_string(), "4".to_string()));
-    expected_hides_from_its_subscriptions.insert((
-      "1".to_string(), "5".to_string()));
-    assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
+  let hides_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $hider isa node, has id $from;
+          $hidden isa node, has id $to;
+          $rel isa hides_from_its_subscriptions
+            ( hider:  $hider,
+              hidden: $hidden);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let mut expected_hides_from_its_subscriptions = HashSet::new();
+  expected_hides_from_its_subscriptions.insert((
+    "1".to_string(), "4".to_string()));
+  expected_hides_from_its_subscriptions.insert((
+    "1".to_string(), "5".to_string()));
+  assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
-    let replacement_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $replacement isa node, has id $from;
-            $replaced isa node, has id $to;
-            $rel isa overrides_view_of (replacement: $replacement,
-                                        replaced:    $replaced);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let mut expected_replacements = HashSet::new();
-    expected_replacements.insert((
-      "5".to_string(), "3".to_string()));
-    expected_replacements.insert((
-      "5".to_string(), "4".to_string()));
-    assert_eq!(replacement_pairs, expected_replacements);
+  let replacement_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $replacement isa node, has id $from;
+          $replaced isa node, has id $to;
+          $rel isa overrides_view_of (replacement: $replacement,
+                                      replaced:    $replaced);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let mut expected_replacements = HashSet::new();
+  expected_replacements.insert((
+    "5".to_string(), "3".to_string()));
+  expected_replacements.insert((
+    "5".to_string(), "4".to_string()));
+  assert_eq!(replacement_pairs, expected_replacements);
 
-    test_recursive_document (
-      & driver, & config
-    ) . await ?;
-    test_create_only_nodes_with_no_ids_present (
-      & config . db_name,
-      & driver,
-    ) . await ?;
-    test_delete_out_links_contains_container (
-      & config . db_name,
-      & driver,
-    ) . await ?;
-
-    Ok (( )) } ) }
+  Ok (( )) }
 
 pub async fn test_delete_out_links_contains_container (
   db_name : &str,

@@ -2,51 +2,33 @@
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db, compare_trees_modulo_id};
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
 
-// Import test utilities
-use skg::test_utils::compare_trees_modulo_id;
-
 use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TypeDBDriver, };
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_add_missing_info_comprehensive(
 ) -> Result<(), Box<dyn Error>> {
   block_on ( async {
+    let db_name : &str =
+      "skg-test-add-missing-info";
     let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_database () . await ?;
+      setup_test_db (
+        db_name,
+        "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
+        "/tmp/tantivy-test-add-missing-info"
+      ) . await ?;
     test_add_missing_info_logic ( &config, &driver ) . await ?;
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
-
-async fn setup_test_database (
-) -> Result < ( SkgConfig, TypeDBDriver ), Box<dyn Error> > {
-  let config : SkgConfig =
-    SkgConfig {
-      db_name        : "skg-test-add-missing-info"                           . into(),
-      skg_folder     : "tests/new/buffer_to_orgnodes/add_missing_info/fixtures" . into(),
-      tantivy_folder : "irrelevant"                                         . into(),
-      port           : 1730 };
-  let index_folder : &str =
-    config . skg_folder . to_str ()
-    . expect ("Invalid UTF-8 in tantivy index path");
-  let driver : TypeDBDriver =
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-  populate_test_db_from_fixtures (
-    index_folder,
-    & config . db_name,
-    & driver ). await ?;
-  Ok (( config, driver )) }
 
 async fn test_add_missing_info_logic (
   config : &SkgConfig,

@@ -1,12 +1,16 @@
 use crate::save::{headline_to_triple, HeadlineInfo};
-use crate::types::{OrgNode, OrgnodeMetadata, SkgNode};
+use crate::types::{OrgNode, OrgnodeMetadata, SkgNode, SkgConfig};
 use crate::file_io::read_skg_files;
 use crate::typedb::init::{overwrite_new_empty_db, define_schema};
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
 use ego_tree::Tree;
+use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use std::fs;
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 /// A helper function for tests.
 pub async fn populate_test_db_from_fixtures (
@@ -25,6 +29,115 @@ pub async fn populate_test_db_from_fixtures (
   create_all_relationships (
     db_name, driver, &nodes ). await ?;
   Ok (( )) }
+
+/// Setup a test database with fixtures from a given folder.
+/// Returns (SkgConfig, TypeDBDriver) for use in tests.
+///
+/// The test database will be named with the given db_name prefix.
+/// Call `cleanup_test_db` after the test completes to remove the database.
+pub async fn setup_test_db (
+  db_name: &str,
+  fixtures_folder: &str,
+  tantivy_folder: &str,
+) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
+  let config: SkgConfig = SkgConfig {
+    db_name: db_name.to_string(),
+    skg_folder: PathBuf::from(fixtures_folder),
+    tantivy_folder: PathBuf::from(tantivy_folder),
+    port: 1730,
+  };
+
+  let driver: TypeDBDriver = TypeDBDriver::new(
+    "127.0.0.1:1729",
+    Credentials::new("admin", "password"),
+    DriverOptions::new(false, None)?
+  ).await?;
+
+  populate_test_db_from_fixtures(
+    fixtures_folder,
+    db_name,
+    &driver
+  ).await?;
+
+  Ok((config, driver))
+}
+
+/// Clean up test database and tantivy index after a test completes.
+///
+/// This deletes:
+/// - The TypeDB database (if it exists)
+/// - The Tantivy index directory (if it exists)
+///
+/// Does NOT delete the .skg fixture files.
+pub async fn cleanup_test_db(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  tantivy_folder: Option<&Path>,
+) -> Result<(), Box<dyn Error>> {
+  // Delete TypeDB database
+  let databases = driver.databases();
+  if databases.contains(db_name).await? {
+    let database = databases.get(db_name).await?;
+    database.delete().await?;
+  }
+
+  // Delete Tantivy index if path provided and exists
+  if let Some(tantivy_path) = tantivy_folder {
+    if tantivy_path.exists() {
+      fs::remove_dir_all(tantivy_path)?;
+    }
+  }
+
+  Ok(())
+}
+
+/// Run tests with automatic database setup and cleanup.
+///
+/// This helper function encapsulates the common pattern of:
+/// 1. Setting up a test database and Tantivy index
+/// 2. Running test functions
+/// 3. Cleaning up the database and index
+///
+/// The test_fn closure receives references to SkgConfig and TypeDBDriver
+/// and can run multiple test functions sequentially.
+///
+/// Example:
+/// ```
+/// #[test]
+/// fn my_test() -> Result<(), Box<dyn Error>> {
+///   run_with_test_db(
+///     "skg-test-my-test",
+///     "tests/my_test/fixtures",
+///     "/tmp/tantivy-test-my-test",
+///     |config, driver| Box::pin(async move {
+///       test_function_1(config, driver).await?;
+///       test_function_2(config, driver).await?;
+///       Ok(())
+///     })
+///   )
+/// }
+/// ```
+pub fn run_with_test_db<F>(
+  db_name: &str,
+  fixtures_folder: &str,
+  tantivy_folder: &str,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
+where
+  F: for<'a> FnOnce(&'a SkgConfig, &'a TypeDBDriver) -> std::pin::Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>>,
+{
+  block_on(async {
+    let (config, driver): (SkgConfig, TypeDBDriver) =
+      setup_test_db(db_name, fixtures_folder, tantivy_folder).await?;
+    let result = test_fn(&config, &driver).await;
+    cleanup_test_db(
+      db_name,
+      &driver,
+      Some(config.tantivy_folder.as_path())
+    ).await?;
+    result
+  })
+}
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.
@@ -127,4 +240,71 @@ fn strip_id_from_metadata_struct(
     meta.id = None;
     meta
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_compare_headlines_modulo_id() {
+    // Test identical headlines
+    assert!(compare_headlines_modulo_id(
+      "* Title",
+      "* Title"
+    ));
+
+    // Test headlines that differ only by ID
+    assert!(compare_headlines_modulo_id(
+      "* (skg (id abc123)) Title",
+      "* (skg (id xyz789)) Title"
+    ));
+
+    // Test headlines where one has ID and other doesn't - should be unequal
+    assert!(!compare_headlines_modulo_id(
+      "* (skg (id abc123)) Title",
+      "* Title"
+    ));
+
+    // Test headlines with same other metadata but different IDs
+    assert!(compare_headlines_modulo_id(
+      "* (skg (id abc) (treatment content)) Title",
+      "* (skg (id xyz) (treatment content)) Title"
+    ));
+
+    // Test headlines that differ by title
+    assert!(!compare_headlines_modulo_id(
+      "* (skg (id abc)) Title One",
+      "* (skg (id xyz)) Title Two"
+    ));
+
+    // Test headlines that differ by level
+    assert!(!compare_headlines_modulo_id(
+      "* (skg (id abc)) Title",
+      "** (skg (id xyz)) Title"
+    ));
+
+    // Test headlines that differ by other metadata
+    assert!(!compare_headlines_modulo_id(
+      "* (skg (id abc) (treatment content)) Title",
+      "* (skg (id xyz) (treatment alias)) Title"
+    ));
+
+    // Test non-headlines
+    assert!(compare_headlines_modulo_id(
+      "This is body text",
+      "This is body text"
+    ));
+
+    assert!(!compare_headlines_modulo_id(
+      "This is body text",
+      "This is different text"
+    ));
+
+    // Test mixed (one headline, one not)
+    assert!(!compare_headlines_modulo_id(
+      "* Title",
+      "Body text"
+    ));
+  }
 }

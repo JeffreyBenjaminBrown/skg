@@ -1,15 +1,12 @@
 // cargo test typedb::search::util
 
-use skg::test_utils::populate_test_db_from_fixtures;
+use skg::test_utils::{setup_test_db, cleanup_test_db};
 use skg::typedb::util::{pid_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
 use skg::types::{ID, SkgConfig};
 
 use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{
-  Credentials,
-  DriverOptions,
-  TypeDBDriver, };
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_extract_payload_from_typedb_string_rep() {
@@ -27,26 +24,14 @@ fn test_extract_payload_from_typedb_string_rep() {
 fn test_pid_from_id (
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let config = SkgConfig {
-      db_name        : "skg-test-typedb-search-util"       . into(),
-      skg_folder     : "tests/typedb/search/util/fixtures" . into(),
-      tantivy_folder : "irrelevant"                         . into(),
-      port           : 1730 };
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+    let db_name : &str =
+      "skg-test-typedb-search-util";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/search/util/fixtures",
+        "/tmp/tantivy-test-typedb-search-util"
+      ) . await ?;
 
     let path_to_4 = pid_from_id ( & config . db_name,
                                     & driver,
@@ -59,6 +44,11 @@ fn test_pid_from_id (
     assert_eq!(path_to_4,  ID("4" . to_string () ));
     assert_eq!(path_to_44, ID("4" . to_string () ));
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
 
 
@@ -66,26 +56,14 @@ fn test_pid_from_id (
 fn test_pids_from_ids (
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let config = SkgConfig {
-      db_name        : "skg-test-typedb-pids-from-ids"    . into(),
-      skg_folder     : "tests/typedb/search/util/fixtures" . into(),
-      tantivy_folder : "irrelevant"                        . into(),
-      port           : 1730 };
-    let index_folder : &str =
-      config . skg_folder . to_str ()
-      . expect ("Invalid UTF-8 in tantivy index path");
-
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-
-    populate_test_db_from_fixtures (
-      index_folder,
-      & config . db_name,
-      & driver
-    ) . await ?;
+    let db_name : &str =
+      "skg-test-typedb-pids-from-ids";
+    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
+      setup_test_db (
+        db_name,
+        "tests/typedb/search/util/fixtures",
+        "/tmp/tantivy-test-typedb-pids-from-ids"
+      ) . await ?;
 
     // Test bulk lookup of multiple IDs using nested subqueries
     let input_ids = vec![
@@ -112,4 +90,9 @@ fn test_pids_from_ids (
                                         &[] ). await ?;
     assert!(empty_results.is_empty());
 
+    cleanup_test_db (
+      db_name,
+      &driver,
+      Some ( config . tantivy_folder . as_path () )
+    ) . await ?;
     Ok (( )) } ) }
