@@ -24,7 +24,7 @@ is_typedb_running() {
 start_typedb() {
   echo ""
   echo "Starting TypeDB server..."
-  nohup typedb server > logs/typedb.log 2>&1 &
+  nohup typedb server > logs/typedb.log 2>&1 < /dev/null &
   echo "TypeDB server started in background (PID: $!)"
   echo "Waiting for TypeDB server to be ready..."
   for i in {1..30}; do

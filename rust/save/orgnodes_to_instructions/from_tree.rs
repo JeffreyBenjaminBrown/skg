@@ -51,7 +51,7 @@ fn interpret_node_dfs(
       toDelete         : node_data.metadata.toDelete, };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;
-    result.push((skg_node, save_action)); }
+    result.push (( skg_node, save_action )); }
   { // Recurse into everything except aliases.
     for child in node_ref.children() {
       let child_rel = &child.value().metadata.treatment;
