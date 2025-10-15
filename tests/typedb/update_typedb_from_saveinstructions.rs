@@ -1,6 +1,6 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
+use skg::test_utils::run_with_test_db;
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
@@ -9,7 +9,6 @@ use skg::types::{ID, SkgConfig, OrgNode};
 use ego_tree::Tree;
 use indoc::indoc;
 
-use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -17,15 +16,11 @@ use typedb_driver::TypeDBDriver;
 #[test]
 fn test_update_nodes_and_relationships2 (
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str =
-      "skg-test-update2";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_tantivy_and_typedb_dbs (
-        db_name,
-        "tests/typedb/update_typedb_from_saveinstructions/fixtures",
-        "/tmp/tantivy-test-update2"
-      ) . await ?;
+  run_with_test_db (
+    "skg-test-update2",
+    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
+    "/tmp/tantivy-test-update2",
+    | config, driver | Box::pin ( async move {
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
@@ -113,9 +108,5 @@ fn test_update_nodes_and_relationships2 (
       "Node 2 should only contain node 1, but contains: {:?}",
       node2_contains );
 
-    cleanup_test_tantivy_and_typedb_dbs (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+      Ok (( )) } )
+  ) }

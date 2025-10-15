@@ -1,10 +1,9 @@
 // cargo test typedb::search::count_relationships
 
-use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
+use skg::test_utils::run_with_test_db;
 use skg::typedb::search::{count_containers, count_contents, count_link_sources};
 use skg::types::{ID, SkgConfig};
 
-use futures::executor::block_on;
 use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -12,27 +11,19 @@ use typedb_driver::TypeDBDriver;
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str =
-      "skg-test-typedb-search-count-relationships";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_tantivy_and_typedb_dbs (
-        db_name,
-        "tests/typedb/search/contains_from_pids/fixtures",
-        "/tmp/tantivy-test-typedb-search-count-relationships"
-      ) . await ?;
-    test_count_containers (
-      &config, &driver ) . await ?;
-    test_count_contents (
-      &config, &driver ) . await ?;
-    test_count_link_sources (
-      &config, &driver ) . await ?;
-    cleanup_test_tantivy_and_typedb_dbs (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+  run_with_test_db (
+    "skg-test-typedb-search-count-relationships",
+    "tests/typedb/search/contains_from_pids/fixtures",
+    "/tmp/tantivy-test-typedb-search-count-relationships",
+    | config, driver | Box::pin ( async move {
+      test_count_containers (
+        config, driver ) . await ?;
+      test_count_contents (
+        config, driver ) . await ?;
+      test_count_link_sources (
+        config, driver ) . await ?;
+      Ok (( )) } )
+  ) }
 
 async fn test_count_containers (
   config : &SkgConfig,
