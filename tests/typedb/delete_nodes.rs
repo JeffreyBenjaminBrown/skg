@@ -2,21 +2,19 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::test_utils::{setup_test_tantivy_and_typedb_dbs, cleanup_test_tantivy_and_typedb_dbs};
+use skg::test_utils::run_with_test_db;
 use skg::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::types::{ID, SkgConfig};
+use skg::types::ID;
 
 use futures::StreamExt;
-use futures::executor::block_on;
 use std::collections::{HashSet, BTreeSet};
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer},
   Transaction,
   TransactionType,
-  TypeDBDriver,
 };
 
 #[test]
@@ -25,15 +23,11 @@ fn test_delete_container_node (
   // Relevant aspects of the fixtures for this test:
   //   1 contains [2, 3]
   //   2 has extra_id 22
-  block_on(async {
-    let db_name : &str =
-      "skg-test-delete-container";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_tantivy_and_typedb_dbs (
-        db_name,
-        "tests/typedb/fixtures",
-        "/tmp/tantivy-test-delete-container"
-      ) . await ?;
+  run_with_test_db (
+    "skg-test-delete-container",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-delete-container",
+    | config, driver | Box::pin ( async move {
 
     // Verify nodes 1, 2 and 3 exist
     let initial_ids : BTreeSet<String> =
@@ -109,12 +103,8 @@ fn test_delete_container_node (
       assert_eq!(container_count, 0, "No containers should be found for node 2 after deleting node 1 (cascading delete should work)");
     } // Drop transaction here
 
-    cleanup_test_tantivy_and_typedb_dbs (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+      Ok (( )) } )
+  ) }
 
 #[test]
 fn test_delete_contained_node (
@@ -122,15 +112,11 @@ fn test_delete_contained_node (
   // Relevant aspects of the fixtures for this test:
   //   1 contains [2, 3]
   //   2 has extra_id 22
-  block_on(async {
-    let db_name : &str =
-      "skg-test-delete-contained";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_tantivy_and_typedb_dbs (
-        db_name,
-        "tests/typedb/fixtures",
-        "/tmp/tantivy-test-delete-contained"
-      ) . await ?;
+  run_with_test_db (
+    "skg-test-delete-contained",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-delete-contained",
+    | config, driver | Box::pin ( async move {
 
     // Verify nodes 1, 2, 3 exist
     let initial_ids : BTreeSet<String> =
@@ -207,9 +193,5 @@ fn test_delete_contained_node (
     assert!(finally_contained.contains(&ID("3".to_string())),
             "Node 1 should still contain node 3");
 
-    cleanup_test_tantivy_and_typedb_dbs (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+      Ok (( )) } )
+  ) }

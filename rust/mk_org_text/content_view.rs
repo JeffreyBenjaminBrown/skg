@@ -254,21 +254,21 @@ fn build_metadata_for_node (
   let mut md = default_metadata ();
   md . id = Some ( node_id . clone () );
   if let Some ( parent_id ) = org_parent_id {
-    md . parentIsContainer =
+    md . relationships . parentIsContainer =
       rel_data . content_to_containers
       . get ( pid )
       . map_or ( false, | containers |
                  containers . contains ( parent_id ));
-    md . parentIsContent =
+    md . relationships . parentIsContent =
       rel_data . container_to_contents
       . get ( pid )
       . map_or ( false, | contents |
                  contents . contains ( parent_id )); }
-  md . numContainers =
+  md . relationships . numContainers =
     rel_data . num_containers . get ( pid ) . copied ();
-  md . numContents =
+  md . relationships . numContents =
     rel_data . num_contents . get ( pid ) . copied ();
-  md . numLinksIn =
+  md . relationships . numLinksIn =
     rel_data . num_links_in . get ( pid ) . copied ();
   md }
 

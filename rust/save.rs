@@ -52,10 +52,9 @@ pub async fn buffer_to_save_instructions (
   if ! validation_errors . is_empty () {
     return Err ( SaveError::BufferValidationErrors (
       validation_errors ) ); }
-  let (orgnode_forest_2, instructions)
-    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>) =
+  let instructions : Vec<SaveInstruction> =
     orgnodes_to_save_instructions (
-      orgnode_forest, config, driver )
+      & orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
   let clobbered_instructions : Vec<SaveInstruction> =
     instructions . into_iter ()
@@ -66,4 +65,4 @@ pub async fn buffer_to_save_instructions (
       Ok ((clobbered_node, action)) } )
     . collect::<io::Result<Vec<SaveInstruction>>>()
     . map_err ( SaveError::IoError ) ?;
-  Ok ((orgnode_forest_2, clobbered_instructions)) }
+  Ok ((orgnode_forest, clobbered_instructions)) }

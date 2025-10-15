@@ -92,17 +92,17 @@ pub fn parse_metadata_to_orgnodemd (
                 format! ( "Unknown treatment value: {}", value )),
             }; },
           "numContainers" => {
-            result.numContainers = Some (
+            result.relationships.numContainers = Some (
               value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid numContainers value: {}", value )) ? ); },
           "numContents" => {
-            result.numContents = Some (
+            result.relationships.numContents = Some (
               value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid numContents value: {}", value )) ? ); },
           "numLinksIn" => {
-            result.numLinksIn = Some (
+            result.relationships.numLinksIn = Some (
               value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid numLinksIn value: {}", value )) ? ); },
@@ -118,8 +118,8 @@ pub fn parse_metadata_to_orgnodemd (
           "cycle"              => result.cycle = true,
           "mightContainMore"   => result.mightContainMore = true,
           "toDelete"           => result.toDelete = true,
-          "parentIsContainer"  => result.parentIsContainer = true,
-          "parentIsContent"    => result.parentIsContent = true,
+          "parentIsContainer"  => result.relationships.parentIsContainer = true,
+          "parentIsContent"    => result.relationships.parentIsContent = true,
           _ => {
             return Err ( format! ( "Unknown metadata value: {}",
                                     bare_value )); }} },
@@ -152,15 +152,15 @@ pub fn orgnodemd_to_string (
     parts.push ( "mightContainMore".to_string () ); }
   if metadata.toDelete {
     parts.push ( "toDelete".to_string () ); }
-  if metadata.parentIsContainer {
+  if metadata.relationships.parentIsContainer {
     parts.push ( "parentIsContainer".to_string () ); }
-  if metadata.parentIsContent {
+  if metadata.relationships.parentIsContent {
     parts.push ( "parentIsContent".to_string () ); }
-  if let Some ( count ) = metadata.numContainers {
+  if let Some ( count ) = metadata.relationships.numContainers {
     parts.push ( format! ( "(numContainers {})", count )); }
-  if let Some ( count ) = metadata.numContents {
+  if let Some ( count ) = metadata.relationships.numContents {
     parts.push ( format! ( "(numContents {})", count )); }
-  if let Some ( count ) = metadata.numLinksIn {
+  if let Some ( count ) = metadata.relationships.numLinksIn {
     parts.push ( format! ( "(numLinksIn {})", count )); }
   parts.join ( " " ) }
 

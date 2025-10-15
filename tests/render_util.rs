@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::mk_org_text::orgnode::render_org_node_from_text;
-use skg::types::{OrgNode, OrgnodeMetadata, Treatment, ID};
+use skg::types::{OrgNode, OrgnodeMetadata, OrgnodeRelationships, Treatment, ID};
 use skg::types::orgnode::default_metadata;
 
 #[test]
@@ -64,17 +64,18 @@ fn test_metadata_ordering () {
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
           treatment : Treatment::Content,
-          cycle             : true,
-          focused           : false,
-          folded            : false,
-          mightContainMore  : false,
-          repeat            : true,
-          toDelete          : false,
-          parentIsContainer : false,
-          parentIsContent   : false,
-          numContainers     : None,
-          numContents       : None,
-          numLinksIn        : None, },
+          cycle            : true,
+          focused          : false,
+          folded           : false,
+          mightContainMore : false,
+          repeat           : true,
+          toDelete         : false,
+          relationships    : OrgnodeRelationships {
+            parentIsContainer : false,
+            parentIsContent   : false,
+            numContainers     : None,
+            numContents       : None,
+            numLinksIn        : None, }, },
       title : "Test".to_string (),
       body : None, };
   let result : String =
