@@ -154,10 +154,20 @@ This typically happens when:
 3. TypeDB doesn't get a chance to properly close databases and flush checkpoints
 4. RocksDB (TypeDB's storage engine) leaves databases in an inconsistent state
 
-Another common corruption pattern:
+Other common corruption patterns:
 - Error: "Corruption: Mismatch in unique ID on table file"
-- Cause: RocksDB MANIFEST file corruption from incomplete writes
-- Solution: Same as above - delete the corrupted database
+  - Cause: RocksDB MANIFEST file corruption from incomplete writes
+  - Solution: Same as above - delete the corrupted database
+- Error: "Could not open database" with "LoadErrorDirectoryMissing" for WAL directory
+  #+begin_example
+  [SRO6] Could not open database.
+  Cause:
+        [DBO5] Error opening WAL.
+  Cause:
+        WAL { source: LoadErrorDirectoryMissing { directory: "/.../wal" } }
+  #+end_example
+  - Cause: Database directory is incomplete or corrupted (missing WAL subdirectory)
+  - Solution: Same as above - delete the corrupted database (usually a test database)
 ** Solution:
 *** Recommended Approach: Use Diagnostic Script First
 The most reliable way to fix this issue:

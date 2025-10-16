@@ -25,11 +25,13 @@ pub struct SkgConfig {
   pub tantivy_folder : PathBuf,
 
   #[serde(default = "default_port")]
-  pub port           : u16,     // TCP port for Rust-Emacs comms.
+  pub port           : u16,  // TCP port for Rust-Emacs comms.
+
+  #[serde(default)] // defaults to false
+  pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
 }
 
-fn default_port() -> u16 {
-  1730 }
+fn default_port() -> u16 { 1730 }
 
 #[derive(Clone)]
 pub struct TantivyIndex {

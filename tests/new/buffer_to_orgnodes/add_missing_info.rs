@@ -2,33 +2,24 @@
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
-use skg::test_utils::{setup_test_db, cleanup_test_db, compare_trees_modulo_id};
+use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id};
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
 
-use futures::executor::block_on;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_add_missing_info_comprehensive(
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str =
-      "skg-test-add-missing-info";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
-        db_name,
-        "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
-        "/tmp/tantivy-test-add-missing-info"
-      ) . await ?;
-    test_add_missing_info_logic ( &config, &driver ) . await ?;
-    cleanup_test_db (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+  run_with_test_db (
+    "skg-test-add-missing-info",
+    "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
+    "/tmp/tantivy-test-add-missing-info",
+    | config, driver | Box::pin ( async move {
+      test_add_missing_info_logic ( config, driver ) . await ?;
+      Ok (( )) } )
+  ) }
 
 async fn test_add_missing_info_logic (
   config : &SkgConfig,
@@ -70,7 +61,7 @@ async fn test_add_missing_info_logic (
     1,
     "Expected exactly one tree in the expected forest" );
   assert!(
-    compare_trees_modulo_id(
+    compare_two_forests_modulo_id(
       &after_adding_missing_info,
       &expected_forest),
     "add_missing_info_to_trees: Forests not equivalent modulo ID." );

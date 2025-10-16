@@ -10,6 +10,21 @@
 (require 'org)
 (require 'skg-metadata)
 
+(defun skg-create-org-buffer-with-folds (content)
+  "Create an org-mode buffer from CONTENT string.
+First inserts all content unchanged, then folds headlines marked with
+'folded' by backtracking to their parents, then removes the fold markers.
+Returns the newly created buffer."
+  (let ((buf (generate-new-buffer "*org-backtracking-fold*")))
+    (with-current-buffer buf
+      (org-mode)
+      (insert content)
+      (goto-char (point-min))
+      (skg-fold-marked-headlines)
+      (skg-remove-folded-markers)
+      (goto-char (point-min)))
+    buf))
+
 (defun skg-add-folded-markers ()
   "Add 'folded' to metadata of all invisible headlines in the buffer.
 - If a headline has no <skg<...>> metadata,
@@ -117,20 +132,5 @@ Works on all text including invisible regions."
           (let ((ov (make-overlay (line-beginning-position) (line-end-position))))
             (overlay-put ov 'invisible 'outline)))
         (set-marker marker nil)))))
-
-(defun skg-create-org-buffer-with-folds (content)
-  "Create an org-mode buffer from CONTENT string.
-First inserts all content unchanged, then folds headlines marked with
-'folded' by backtracking to their parents, then removes the fold markers.
-Returns the newly created buffer."
-  (let ((buf (generate-new-buffer "*org-backtracking-fold*")))
-    (with-current-buffer buf
-      (org-mode)
-      (insert content)
-      (goto-char (point-min))
-      (skg-fold-marked-headlines)
-      (skg-remove-folded-markers)
-      (goto-char (point-min)))
-    buf))
 
 (provide 'skg-org-fold)

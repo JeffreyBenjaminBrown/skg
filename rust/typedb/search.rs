@@ -49,74 +49,6 @@ pub async fn climb_containerward_and_fetch_rootish_context (
     } ) . cloned ()
 }
 
-/* Follows a path via a single directed binary relation
-  until reaching a cycle and/or branches.
-The path begins with the input node.
-Following the specified relationship,
-  each time we find a single related node,
-  we append it to the path.
-The process can end in three ways:
-1 - If no related node is found, we return the path and exit.
-    The option and the set are both null.
-2 - If at any point multiple related nodes are found,
-    the choice of 'next in path' has no answer,
-    so they are added to the set,
-    nothing is added to the path, and the function returns.
-3 - If at any point the related node is
-    equal to one already in the path, we have found a cycle.
-    That ID becomes the option, the path is not extended,
-    and the function returns.
-Note that 2 and 3 can coincide. That is the only case
-  in which are all three outputs non-null. */
-pub async fn path_to_end_cycle_and_or_branches (
-  db_name     : &str,
-  driver      : &TypeDBDriver,
-  node        : &ID,
-  relation    : &str,
-  input_role  : &str,
-  output_role : &str
-) -> Result <
-    ( Vec<ID>,    // The path. Its first node is the input.
-      Option<ID>, // If the path cycles, this is the first repeated node.
-      HashSet<ID> // If the path forks, these are the fork's branches.
-    ), Box<dyn Error> > {
-
-  let mut path : Vec<ID> = vec![ node.clone () ];
-  let mut path_set : HashSet<ID> =
-    // path and path_set have the same nodes.
-    HashSet::from ( [ node.clone() ] );
-  let mut current_node : ID = node.clone ();
-  loop {
-    let related_nodes : HashSet<ID> =
-      find_related_nodes (
-        db_name, driver, &current_node,
-        relation, input_role, output_role ). await ?;
-    if related_nodes.is_empty () {
-      // No related node found, so this is the end.
-      return Ok (( path, None, HashSet::new () ));
-    } else {
-      let cycle_node : Option<ID> =
-        // 'Some' if the related node has been seen already.
-        related_nodes.iter ()
-          .find ( |&c| path_set.contains ( c ) )
-          .cloned ();
-      if ( related_nodes.len () == 1
-           && cycle_node.is_none () ) {
-        // Add the related node to the path and continue.
-        let next_node : ID =
-          related_nodes . into_iter() . next() . unwrap();
-        path.push ( next_node.clone () );
-        path_set.insert ( next_node.clone () );
-        current_node = next_node;
-      } else { // We are at a fork, or a cycle, or both.
-        return Ok ((
-          path,
-          cycle_node,
-          ( if related_nodes.len () == 1 {
-            HashSet::new () }
-            else {related_nodes} ) ));
-        }} }}
-
 /// See path_to_end_cycle_and_or_branches.
 /// This is the case that searches sourceward.
 pub async fn path_containerward_to_end_cycle_and_or_branches (
@@ -186,6 +118,74 @@ pub async fn find_links_to (
     "dest",
     "source"
   ). await }
+
+/* Follows a path via a single directed binary relation
+  until reaching a cycle and/or branches.
+The path begins with the input node.
+Following the specified relationship,
+  each time we find a single related node,
+  we append it to the path.
+The process can end in three ways:
+1 - If no related node is found, we return the path and exit.
+    The option and the set are both null.
+2 - If at any point multiple related nodes are found,
+    the choice of 'next in path' has no answer,
+    so they are added to the set,
+    nothing is added to the path, and the function returns.
+3 - If at any point the related node is
+    equal to one already in the path, we have found a cycle.
+    That ID becomes the option, the path is not extended,
+    and the function returns.
+Note that 2 and 3 can coincide. That is the only case
+  in which are all three outputs non-null. */
+pub async fn path_to_end_cycle_and_or_branches (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  node        : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str
+) -> Result <
+    ( Vec<ID>,    // The path. Its first node is the input.
+      Option<ID>, // If the path cycles, this is the first repeated node.
+      HashSet<ID> // If the path forks, these are the fork's branches.
+    ), Box<dyn Error> > {
+
+  let mut path : Vec<ID> = vec![ node.clone () ];
+  let mut path_set : HashSet<ID> =
+    // path and path_set have the same nodes.
+    HashSet::from ( [ node.clone() ] );
+  let mut current_node : ID = node.clone ();
+  loop {
+    let related_nodes : HashSet<ID> =
+      find_related_nodes (
+        db_name, driver, &current_node,
+        relation, input_role, output_role ). await ?;
+    if related_nodes.is_empty () {
+      // No related node found, so this is the end.
+      return Ok (( path, None, HashSet::new () ));
+    } else {
+      let cycle_node : Option<ID> =
+        // 'Some' if the related node has been seen already.
+        related_nodes.iter ()
+          .find ( |&c| path_set.contains ( c ) )
+          .cloned ();
+      if ( related_nodes.len () == 1
+           && cycle_node.is_none () ) {
+        // Add the related node to the path and continue.
+        let next_node : ID =
+          related_nodes . into_iter() . next() . unwrap();
+        path.push ( next_node.clone () );
+        path_set.insert ( next_node.clone () );
+        current_node = next_node;
+      } else { // We are at a fork, or a cycle, or both.
+        return Ok ((
+          path,
+          cycle_node,
+          ( if related_nodes.len () == 1 {
+            HashSet::new () }
+            else {related_nodes} ) ));
+        }} }}
 
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position related to the input node.

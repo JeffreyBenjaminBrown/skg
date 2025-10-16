@@ -22,67 +22,6 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
                  (parsed (skg-parse-metadata-inner inner)))
             (list (car parsed) (cadr parsed) title)))))))
 
-(defun skg-parse-metadata-inner (inner)
-  "Parse metadata INNER string containing s-expressions and bare values.
-Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare values."
-  (let ((alist '())
-        (set '())
-        (input (concat "(" inner ")"))
-        (pos 0))
-    (with-temp-buffer
-      (insert input)
-      (goto-char (point-min))
-      (condition-case nil
-          (let ((elements (read (current-buffer))))
-            (dolist (element elements)
-              (cond
-               (;; (key value) pair
-                (and (listp element)
-                     (= (length element) 2))
-                (let ((key (format "%s" (car element)))
-                      (val (format "%s" (cadr element))))
-                  (push (cons key val) alist)))
-               (t ;; Bare value (symbol or other atom)
-                (let ((bare-val (format "%s" element)))
-                  (push bare-val set))))))
-        (error nil)))
-    (list (nreverse alist) (nreverse set))))
-
-(defun skg-match-headline-with-metadata (headline-text)
-  "Match HEADLINE-TEXT and extract stars, metadata inner, and title.
-Returns (STARS INNER TITLE) or nil if no match.
-Handles nested parentheses in metadata correctly."
-  (let ((trimmed (string-trim-left headline-text)))
-    (when (string-match "^\\(\\*+\\s-+\\)" trimmed)
-      (let* ((stars (match-string 1 trimmed))
-             (after-stars (substring trimmed (match-end 1))))
-        (if (string-prefix-p "(skg" after-stars)
-            ;; Has metadata - find matching close paren
-            (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
-              (when sexp-end-pos
-                (let* ((skg-sexp (substring after-stars 0 sexp-end-pos))
-                       (title-start sexp-end-pos)
-                       (len (length after-stars))
-                       (title (string-trim (if (< title-start len)
-                                               (substring after-stars title-start)
-                                             "")))
-                       (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp))))))
-                  (list stars inner title))))
-          ;; No metadata
-          (list stars "" after-stars))))))
-
-(defun skg-get-current-headline-text ()
-  "ASSUMES
-point is already on a headline - does not move point.
-.
-Returns the current headline in its entirety,
-including asterisks and metadata, but not the trailing newline."
-  (save-excursion
-    (beginning-of-line)
-    (let ((start (point)))
-      (end-of-line)
-      (buffer-substring-no-properties start (point)))))
-
 (defun skg-delete-kv-pair-from-metadata-by-key
     (key)
   "Delete all kv-pairs with KEY from the metadata of the headline at point.
@@ -204,6 +143,77 @@ Does nothing if KEY already exists in metadata."
             (delete-region (line-beginning-position)
                            (line-end-position))
             (insert (skg-format-headline stars kv-pair title))))))))
+
+(defun skg-match-headline-with-metadata (headline-text)
+  "Match HEADLINE-TEXT and extract stars, metadata inner, and title.
+Returns (STARS INNER TITLE) or nil if no match.
+Handles nested parentheses in metadata correctly."
+  (let ((trimmed (string-trim-left headline-text)))
+    (when (string-match "^\\(\\*+\\s-+\\)" trimmed)
+      (let* ((stars (match-string 1 trimmed))
+             (after-stars (substring trimmed (match-end 1))))
+        (if (string-prefix-p "(skg" after-stars)
+            ;; Has metadata - find matching close paren
+            (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
+              (when sexp-end-pos
+                (let* ((skg-sexp (substring after-stars 0 sexp-end-pos))
+                       (title-start sexp-end-pos)
+                       (len (length after-stars))
+                       (title (string-trim (if (< title-start len)
+                                               (substring after-stars title-start)
+                                             "")))
+                       (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp))))))
+                  (list stars inner title))))
+          ;; No metadata
+          (list stars "" after-stars))))))
+
+(defun skg-get-current-headline-text ()
+  "ASSUMES
+point is already on a headline - does not move point.
+.
+Returns the current headline in its entirety,
+including asterisks and metadata, but not the trailing newline."
+  (save-excursion
+    (beginning-of-line)
+    (let ((start (point)))
+      (end-of-line)
+      (buffer-substring-no-properties start (point)))))
+
+(defun skg-parse-metadata-inner (inner)
+  "Parse metadata INNER string containing s-expressions and bare values.
+Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare values."
+  (let ((alist '())
+        (set '())
+        (input (concat "(" inner ")"))
+        (pos 0))
+    (with-temp-buffer
+      (insert input)
+      (goto-char (point-min))
+      (condition-case nil
+          (let ((elements (read (current-buffer))))
+            (dolist (element elements)
+              (cond
+               (;; (key value) pair
+                (and (listp element)
+                     (= (length element) 2))
+                (let ((key (format "%s" (car element)))
+                      (val (format "%s" (cadr element))))
+                  (push (cons key val) alist)))
+               (;; Special case: (rels ...) sub-s-expr
+                (and (listp element)
+                     (> (length element) 2)
+                     (eq (car element) 'rels))
+                ;; Store as a special entry with the inner content as a string
+                (let ((rel-inner (mapconcat
+                                  (lambda (x) (format "%s" x))
+                                  (cdr element)
+                                  " ")))
+                  (push (cons "rels" rel-inner) alist)))
+               (t ;; Bare value (symbol or other atom)
+                (let ((bare-val (format "%s" element)))
+                  (push bare-val set))))))
+        (error nil)))
+    (list (nreverse alist) (nreverse set))))
 
 (defun skg-reconstruct-metadata-inner
     (alist bare-values)

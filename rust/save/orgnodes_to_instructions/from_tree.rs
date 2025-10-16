@@ -6,21 +6,18 @@ use std::error::Error;
 
 /// Converts a forest of OrgNode2s to SaveInstructions,
 /// reconciling duplicates via 'reconcile_dup_instructions'.
-/// Returns the original forest plus the reconciled SaveInstructions.
 pub async fn orgnodes_to_save_instructions (
-  forest  : Vec<Tree<OrgNode>>,
+  forest  : &Vec<Tree<OrgNode>>,
   config : &SkgConfig,
   driver : &TypeDBDriver
-) -> Result< ( Vec<Tree<OrgNode>>,
-               Vec<SaveInstruction>),
-            Box<dyn Error>> {
+) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
   let instructions : Vec<SaveInstruction> =
     orgnodes_to_dirty_save_instructions (
       forest . clone () ) ?;
   let reconciled_instructions : Vec<SaveInstruction> =
     reconcile_dup_instructions (
       config, driver, instructions ) . await ?;
-  Ok ((forest, reconciled_instructions)) }
+  Ok (reconciled_instructions) }
 
 /// PITFALL: Leaves important work undone,
 /// which orgnodes_to_save_instructions does.

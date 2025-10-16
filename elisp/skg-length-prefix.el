@@ -56,43 +56,12 @@ Returns one of:
 
 (defun skg-lp-append-chunk (buf chunk)
   "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
-  (let ((bytes (encode-coding-string chunk 'utf-8)))
-    (concat buf bytes)))
-
-(defun skg-lp-try-parse-header (response)
-  "Extract length and remainder from RESPONSE.
-Returns one of:
-  (:incomplete)
-  (:ok LEN BYTES-SO-FAR)
-  (:error MESSAGE)"
-  (let ((sep (string-match "\r\n\r\n" response)))
-    (if (not sep)
-        '(:incomplete)
-      (let* ((header       (substring response 0 (+ sep 4)))
-             (bytes-so-far (substring response (+ sep 4)))
-             (len (and (string-match "Content-Length: \\([0-9]+\\)" header)
-                       (string-to-number (match-string 1 header)))))
-        (if len
-            (list :ok len bytes-so-far)
-          (list :error "Malformed header in length-prefixed response"))))))
-
-(defun skg-lp-try-consume-body (byte-acc bytes-left)
-  "If BYTE-ACC contains BYTES-LEFT bytes, return (:done ORG-TEXT REMAINDER), else (:incomplete)."
-  (let ((have (length byte-acc)))
-    (if (< have bytes-left)
-        '(:incomplete)
-      (let* ((payload-bytes (substring byte-acc 0 bytes-left))
-             (remainder     (substring byte-acc bytes-left))
-             (org-text      (decode-coding-string payload-bytes 'utf-8 t)))
-        (list :done org-text remainder)))))
-
-(defun skg-lp-append-chunk (buf chunk)
-  "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
   (let ((bytes (encode-coding-string chunk 'utf-8)) )
     (concat buf bytes)) )
 
 (defun skg-lp-try-parse-header (response)
-  "Extracts the length of the response bytes-so-far, and the bytes-so-far itself, from `response`.
+  "Extracts the length of the response bytes-so-far,
+and the bytes-so-far itself, from `response`.
 Returns one of:
   (:incomplete)
   (:ok LEN BYTES-SO-FAR)

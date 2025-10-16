@@ -24,12 +24,48 @@ check_typedb_server() {
   echo "✓ TypeDB server is running"
 }
 
-# Function to cleanup background processes
+# Function to send shutdown command to skg server via Emacs
+send_shutdown_command() {
+  local port=$1
+  echo "Sending shutdown command to server on port $port..."
+
+  # Create temporary Emacs Lisp script to send shutdown
+  local shutdown_script=$(mktemp)
+  cat > "$shutdown_script" << 'EOF'
+;; Send shutdown command to skg server
+(require 'cl-lib)
+
+(let* ((port (string-to-number (getenv "SKG_TEST_PORT")))
+       (tcp-proc (make-network-process
+                  :name "skg-shutdown"
+                  :host "127.0.0.1"
+                  :service port
+                  :family 'ipv4)))
+  (process-send-string tcp-proc "((request . \"shutdown\"))\n")
+  (sleep-for 0.5)
+  (delete-process tcp-proc))
+EOF
+
+  # Run the script
+  SKG_TEST_PORT=$port emacs --batch -l "$shutdown_script" 2>/dev/null || true
+  rm -f "$shutdown_script"
+  sleep 1
+}
+
+# Function to cleanup background processes and test databases
 cleanup() {
   echo ""
   echo "Cleaning up..."
   rm -f "$TEMP_CONFIG"
-  if [ -n "$CARGO_PID" ]; then
+
+  if [ -n "$CARGO_PID" ] && [ -n "$AVAILABLE_PORT" ]; then
+    # Send shutdown command to gracefully stop server and clean up database
+    send_shutdown_command "$AVAILABLE_PORT"
+
+    # Wait for process to exit
+    wait $CARGO_PID 2>/dev/null || true
+  elif [ -n "$CARGO_PID" ]; then
+    # Fallback: kill if we don't have the port
     echo "Stopping cargo process (PID: $CARGO_PID)"
     kill $CARGO_PID 2>/dev/null || true
     wait $CARGO_PID 2>/dev/null || true

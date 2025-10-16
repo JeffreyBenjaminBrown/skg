@@ -3,12 +3,11 @@
 pub mod contains_from_pids;
 pub mod count_relationships;
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::run_with_test_db;
 use skg::typedb::search::find_containers_of;
 use skg::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::{ID, SkgConfig};
 
-use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -16,25 +15,16 @@ use typedb_driver::TypeDBDriver;
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str =
-      "skg-test-typedb-search-robust";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
-        db_name,
-        "tests/typedb/search/robust/fixtures",
-        "/tmp/tantivy-test-typedb-search-robust"
-      ) . await ?;
-    test_find_containers_of (
-      &config, &driver ) . await ?;
-    test_path_containerward_to_end_cycle_and_or_branches (
-      &config, &driver ) . await ?;
-    cleanup_test_db (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+  run_with_test_db (
+    "skg-test-typedb-search-robust",
+    "tests/typedb/search/robust/fixtures",
+    "/tmp/tantivy-test-typedb-search-robust",
+    |config, driver| Box::pin ( async move {
+      test_find_containers_of (
+        config, driver ) . await ?;
+      test_path_containerward_to_end_cycle_and_or_branches (
+        config, driver ) . await ?;
+      Ok (( )) } ) ) }
 
 async fn test_find_containers_of (
   config : &SkgConfig,

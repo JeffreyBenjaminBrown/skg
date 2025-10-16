@@ -13,7 +13,7 @@ mod util {
 use skg::mk_org_text::single_root_view;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
-use skg::test_utils::{populate_test_db_from_fixtures, setup_test_db, cleanup_test_db};
+use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
@@ -22,7 +22,6 @@ use skg::typedb::util::pid_from_id;
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
-use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
@@ -32,168 +31,182 @@ use typedb_driver::{
   TypeDBDriver, };
 
 #[test]
-fn test_typedb_integration (
+fn test_typedb_all_relationships (
 ) -> Result<(), Box<dyn Error>> {
-  // Use block_on to run async code in a synchronous test
-  block_on(async {
-    let db_name : &str =
-      "skg-test-typedb";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
-        db_name,
-        "tests/typedb/fixtures",
-        "/tmp/tantivy-test-typedb"
-      ) . await ?;
+  run_with_test_db (
+    "skg-test-typedb-relationships",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb-relationships",
+    |config, driver| Box::pin ( async move {
+      test_all_relationships ( config, driver ) . await ?;
+      Ok (( )) } ) ) }
 
-    let has_extra_id_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $n isa node, has id $ni;
-            $e isa extra_id, has id $ei;
-            $rel isa has_extra_id (node: $n,
-                                   extra_id: $e);
-          select $ni, $ei;"#,
-      "ni",
-      "ei"
-    ).await?;
-    let expected_has_extra_id: HashSet<_> = [
-      ("2", "22"),
-      ("3", "33"),
-      ("4", "44"),
-      ("5", "55"), ].iter()
-      .map(|(a, b)| (a.to_string(), b.to_string()))
-      .collect();
-    assert_eq!(has_extra_id_pairs, expected_has_extra_id);
+#[test]
+fn test_typedb_recursive_document (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-recursive",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb-recursive",
+    |config, driver| Box::pin ( async move {
+      test_recursive_document ( driver, config ) . await ?;
+      Ok (( )) } ) ) }
 
-    let contains_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $container isa node, has id $container_id;
-            $contained isa node, has id $contained_id;
-            $rel isa contains (container: $container,
-                               contained: $contained);
-          select $container_id, $contained_id;"#,
-      "container_id",
-      "contained_id"
-    ).await?;
-    let mut expected_contains = HashSet::new();
-    expected_contains.insert(("1".to_string(), "2".to_string()));
-    expected_contains.insert(("1".to_string(), "3".to_string()));
-    expected_contains.insert(("a".to_string(), "b".to_string()));
-    expected_contains.insert(("b".to_string(), "c".to_string()));
-    expected_contains.insert(("c".to_string(), "b".to_string()));
-    assert_eq!(contains_pairs, expected_contains);
+#[test]
+fn test_typedb_create_only_nodes (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-create-nodes",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb-create-nodes",
+    |config, driver| Box::pin ( async move {
+      test_create_only_nodes_with_no_ids_present (
+        & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
 
-    let hyperlink_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $source isa node, has id $source_id;
-            $dest   isa node, has id $dest_id;
-            $rel    isa hyperlinks_to (source: $source,
-                                       dest:   $dest);
-          select $source_id, $dest_id;"#,
-      "source_id",
-      "dest_id"
-    ).await?;
-    let mut expected_contains = HashSet::new();
-    expected_contains.insert(("5".to_string(), "2".to_string()));
-    expected_contains.insert(("5".to_string(), "3".to_string()));
-    expected_contains.insert(("5".to_string(), "5".to_string()));
-    assert_eq!(hyperlink_pairs, expected_contains);
+#[test]
+fn test_typedb_delete_out_links (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-delete-links",
+    "tests/typedb/fixtures-2",
+    "/tmp/tantivy-test-typedb-delete-links",
+    |config, driver| Box::pin ( async move {
+      test_delete_out_links_contains_container (
+        & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
 
-    let subscribes_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $subscriber isa node, has id $from;
-            $subscribee isa node, has id $to;
-            $rel isa subscribes (subscriber: $subscriber,
-                                 subscribee: $subscribee);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let expected_subscribes : HashSet<_> = [
-      ("2", "4"),
-      ("2", "5"),
-      ("3", "4"),
-      ("3", "5"), ].iter()
-      .map(|(a, b)| (a.to_string(), b.to_string()))
-      .collect();
-    assert_eq!(subscribes_pairs, expected_subscribes);
+async fn test_all_relationships (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
 
-    let hides_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $hider isa node, has id $from;
-            $hidden isa node, has id $to;
-            $rel isa hides_from_its_subscriptions
-              ( hider:  $hider,
-                hidden: $hidden);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let mut expected_hides_from_its_subscriptions = HashSet::new();
-    expected_hides_from_its_subscriptions.insert((
-      "1".to_string(), "4".to_string()));
-    expected_hides_from_its_subscriptions.insert((
-      "1".to_string(), "5".to_string()));
-    assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
+  let has_extra_id_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $n isa node, has id $ni;
+          $e isa extra_id, has id $ei;
+          $rel isa has_extra_id (node: $n,
+                                 extra_id: $e);
+        select $ni, $ei;"#,
+    "ni",
+    "ei"
+  ).await?;
+  let expected_has_extra_id: HashSet<_> = [
+    ("2", "22"),
+    ("3", "33"),
+    ("4", "44"),
+    ("5", "55"), ].iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+  assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
-    let replacement_pairs = collect_all_of_some_binary_rel(
-      & config . db_name,
-      & driver,
-      r#" match
-            $replacement isa node, has id $from;
-            $replaced isa node, has id $to;
-            $rel isa overrides_view_of (replacement: $replacement,
-                                        replaced:    $replaced);
-          select $from, $to;"#,
-      "from",
-      "to"
-    ).await?;
-    let mut expected_replacements = HashSet::new();
-    expected_replacements.insert((
-      "5".to_string(), "3".to_string()));
-    expected_replacements.insert((
-      "5".to_string(), "4".to_string()));
-    assert_eq!(replacement_pairs, expected_replacements);
+  let contains_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $container isa node, has id $container_id;
+          $contained isa node, has id $contained_id;
+          $rel isa contains (container: $container,
+                             contained: $contained);
+        select $container_id, $contained_id;"#,
+    "container_id",
+    "contained_id"
+  ).await?;
+  let mut expected_contains = HashSet::new();
+  expected_contains.insert(("1".to_string(), "2".to_string()));
+  expected_contains.insert(("1".to_string(), "3".to_string()));
+  expected_contains.insert(("a".to_string(), "b".to_string()));
+  expected_contains.insert(("b".to_string(), "c".to_string()));
+  expected_contains.insert(("c".to_string(), "b".to_string()));
+  assert_eq!(contains_pairs, expected_contains);
 
-    test_recursive_document (
-      & driver, & config
-    ) . await ?;
-    test_create_only_nodes_with_no_ids_present (
-      & config . db_name,
-      & driver,
-    ) . await ?;
-    test_delete_out_links_contains_container (
-      & config . db_name,
-      & driver,
-    ) . await ?;
+  let hyperlink_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $source isa node, has id $source_id;
+          $dest   isa node, has id $dest_id;
+          $rel    isa hyperlinks_to (source: $source,
+                                     dest:   $dest);
+        select $source_id, $dest_id;"#,
+    "source_id",
+    "dest_id"
+  ).await?;
+  let mut expected_hyperlinks = HashSet::new();
+  expected_hyperlinks.insert(("5".to_string(), "2".to_string()));
+  expected_hyperlinks.insert(("5".to_string(), "3".to_string()));
+  expected_hyperlinks.insert(("5".to_string(), "5".to_string()));
+  assert_eq!(hyperlink_pairs, expected_hyperlinks);
 
-    cleanup_test_db (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+  let subscribes_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $subscriber isa node, has id $from;
+          $subscribee isa node, has id $to;
+          $rel isa subscribes (subscriber: $subscriber,
+                               subscribee: $subscribee);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let expected_subscribes : HashSet<_> = [
+    ("2", "4"),
+    ("2", "5"),
+    ("3", "4"),
+    ("3", "5"), ].iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+  assert_eq!(subscribes_pairs, expected_subscribes);
 
-pub async fn test_delete_out_links_contains_container (
+  let hides_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $hider isa node, has id $from;
+          $hidden isa node, has id $to;
+          $rel isa hides_from_its_subscriptions
+            ( hider:  $hider,
+              hidden: $hidden);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let mut expected_hides_from_its_subscriptions = HashSet::new();
+  expected_hides_from_its_subscriptions.insert((
+    "1".to_string(), "4".to_string()));
+  expected_hides_from_its_subscriptions.insert((
+    "1".to_string(), "5".to_string()));
+  assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
+
+  let replacement_pairs = collect_all_of_some_binary_rel(
+    & config . db_name,
+    & driver,
+    r#" match
+          $replacement isa node, has id $from;
+          $replaced isa node, has id $to;
+          $rel isa overrides_view_of (replacement: $replacement,
+                                      replaced:    $replaced);
+        select $from, $to;"#,
+    "from",
+    "to"
+  ).await?;
+  let mut expected_replacements = HashSet::new();
+  expected_replacements.insert((
+    "5".to_string(), "3".to_string()));
+  expected_replacements.insert((
+    "5".to_string(), "4".to_string()));
+  assert_eq!(replacement_pairs, expected_replacements);
+
+  Ok (( )) }
+
+async fn test_delete_out_links_contains_container (
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
   // The README at fixtures-2/ draws the initial contains tree.
-  populate_test_db_from_fixtures (
-    "tests/typedb/fixtures-2/",
-    db_name,
-    driver
-  ) . await ?;
-
   // Sanity: initial contains edges include the full tree.
   let before_pairs = collect_all_of_some_binary_rel(
     db_name,
@@ -246,17 +259,10 @@ pub async fn test_delete_out_links_contains_container (
   assert_eq!(after_pairs, expected_after);
   Ok (( )) }
 
-pub async fn test_create_only_nodes_with_no_ids_present (
+async fn test_create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
-
-  // Rebuild DB from fixtures and schema.
-  populate_test_db_from_fixtures (
-    "tests/typedb/fixtures/",
-    db_name,
-    driver
-  ) . await ?;
 
   // Baseline node count.
   let initial_number_of_nodes : usize =

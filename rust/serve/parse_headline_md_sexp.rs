@@ -74,15 +74,59 @@ pub fn parse_metadata_to_orgnodemd (
   // Process each element
   for element in elements {
     match element {
-      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
-        // This is a (key value) pair
-        let key : String =
-          atom_to_string ( &kv_pair[0] ) ?;
-        let value : String =
-          atom_to_string ( &kv_pair[1] ) ?;
-        match key . as_str () {
-          "id" => { result.id = Some ( ID::from ( value )); },
+      Sexp::List ( items ) if items . len () >= 2 => {
+        let first : String =
+          atom_to_string ( &items[0] ) ?;
+        match first . as_str () {
+          "rels" => {
+            // Parse nested rels s-expr
+            for rel_element in &items[1..] {
+              match rel_element {
+                Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
+                  let key : String =
+                    atom_to_string ( &kv_pair[0] ) ?;
+                  let value : String =
+                    atom_to_string ( &kv_pair[1] ) ?;
+                  match key . as_str () {
+                    "containers" => {
+                      result.relationships.numContainers = Some (
+                        value.parse::<usize>()
+                          . map_err ( |_| format! (
+                            "Invalid containers value: {}", value )) ? ); },
+                    "contents" => {
+                      result.relationships.numContents = Some (
+                        value.parse::<usize>()
+                          . map_err ( |_| format! (
+                            "Invalid contents value: {}", value )) ? ); },
+                    "linksIn" => {
+                      result.relationships.numLinksIn = Some (
+                        value.parse::<usize>()
+                          . map_err ( |_| format! (
+                            "Invalid linksIn value: {}", value )) ? ); },
+                    _ => { return Err ( format! ( "Unknown rels key: {}",
+                                                   key )); }} },
+                Sexp::Atom ( _ ) => {
+                  let bare_value : String =
+                    atom_to_string ( rel_element ) ?;
+                  match bare_value . as_str () {
+                    "notInParent"    => result.relationships.parentIsContainer = false,
+                    "containsParent" => result.relationships.parentIsContent   = true,
+                    _ => {
+                      return Err ( format! ( "Unknown rels value: {}",
+                                              bare_value )); }} },
+                _ => { return Err ( "Unexpected element in rels"
+                                     . to_string () ); }} }},
+          "id" => {
+            if items . len () != 2 {
+              return Err ( "id requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &items[1] ) ?;
+            result.id = Some ( ID::from ( value )); },
           "treatment" => {
+            if items . len () != 2 {
+              return Err ( "treatment requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &items[1] ) ?;
             result.treatment = match value . as_str () {
               "alias"         => Treatment::Alias,
               "aliasCol"      => Treatment::AliasCol,
@@ -91,23 +135,8 @@ pub fn parse_metadata_to_orgnodemd (
               _ => return Err (
                 format! ( "Unknown treatment value: {}", value )),
             }; },
-          "numContainers" => {
-            result.numContainers = Some (
-              value.parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid numContainers value: {}", value )) ? ); },
-          "numContents" => {
-            result.numContents = Some (
-              value.parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid numContents value: {}", value )) ? ); },
-          "numLinksIn" => {
-            result.numLinksIn = Some (
-              value.parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid numLinksIn value: {}", value )) ? ); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
-                                         key )); }} },
+                                         first )); }} },
       Sexp::Atom ( _ ) => { // This is a bare value
         let bare_value : String =
           atom_to_string ( element ) ?;
@@ -118,8 +147,6 @@ pub fn parse_metadata_to_orgnodemd (
           "cycle"              => result.cycle = true,
           "mightContainMore"   => result.mightContainMore = true,
           "toDelete"           => result.toDelete = true,
-          "parentIsContainer"  => result.parentIsContainer = true,
-          "parentIsContent"    => result.parentIsContent = true,
           _ => {
             return Err ( format! ( "Unknown metadata value: {}",
                                     bare_value )); }} },
@@ -152,16 +179,31 @@ pub fn orgnodemd_to_string (
     parts.push ( "mightContainMore".to_string () ); }
   if metadata.toDelete {
     parts.push ( "toDelete".to_string () ); }
-  if metadata.parentIsContainer {
-    parts.push ( "parentIsContainer".to_string () ); }
-  if metadata.parentIsContent {
-    parts.push ( "parentIsContent".to_string () ); }
-  if let Some ( count ) = metadata.numContainers {
-    parts.push ( format! ( "(numContainers {})", count )); }
-  if let Some ( count ) = metadata.numContents {
-    parts.push ( format! ( "(numContents {})", count )); }
-  if let Some ( count ) = metadata.numLinksIn {
-    parts.push ( format! ( "(numLinksIn {})", count )); }
+
+  // Build rels s-expr (only if has non-default values)
+  let mut rel_parts : Vec<String> = Vec::new ();
+  // Only emit if not default (default is true)
+  if ! metadata.relationships.parentIsContainer {
+    rel_parts.push ( "notInParent".to_string () ); }
+  // Only emit if not default (default is false)
+  if metadata.relationships.parentIsContent {
+    rel_parts.push ( "containsParent".to_string () ); }
+  // Only emit if not default (default is Some(1))
+  if metadata.relationships.numContainers != Some ( 1 ) {
+    if let Some ( count ) = metadata.relationships.numContainers {
+      rel_parts.push ( format! ( "(containers {})", count )); } }
+  // Only emit if not default (default is Some(0))
+  if metadata.relationships.numContents != Some ( 0 ) {
+    if let Some ( count ) = metadata.relationships.numContents {
+      rel_parts.push ( format! ( "(contents {})", count )); } }
+  // Only emit if not default (default is Some(0))
+  if metadata.relationships.numLinksIn != Some ( 0 ) {
+    if let Some ( count ) = metadata.relationships.numLinksIn {
+      rel_parts.push ( format! ( "(linksIn {})", count )); } }
+
+  if ! rel_parts . is_empty () {
+    parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
+
   parts.join ( " " ) }
 
 pub fn parse_headline_from_sexp (

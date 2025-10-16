@@ -23,6 +23,12 @@ pub struct OrgnodeMetadata {
   pub mightContainMore: bool,
   pub repeat: bool,
   pub toDelete: bool,
+  pub relationships: OrgnodeRelationships,
+}
+
+/* Relationship metadata about a node's connections in the graph. */
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrgnodeRelationships {
   pub parentIsContainer: bool,
   pub parentIsContent: bool,
   pub numContainers: Option<usize>,
@@ -70,6 +76,16 @@ impl FromStr for Treatment {
       _ => Err ( format! ( "Unknown Treatment value: {}", s )),
     }} }
 
+impl Default for OrgnodeRelationships {
+  fn default () -> Self {
+    OrgnodeRelationships {
+      parentIsContainer : true,
+      parentIsContent   : false,
+      numContainers : Some ( 1 ),
+      numContents   : Some ( 0 ),
+      numLinksIn    : Some ( 0 ),
+    }} }
+
 pub fn default_metadata () -> OrgnodeMetadata {
   OrgnodeMetadata {
     id : None,
@@ -80,9 +96,5 @@ pub fn default_metadata () -> OrgnodeMetadata {
     mightContainMore : false,
     repeat : false,
     toDelete : false,
-    parentIsContainer : false,
-    parentIsContent : false,
-    numContainers : None,
-    numContents : None,
-    numLinksIn : None,
+    relationships : OrgnodeRelationships::default (),
   } }

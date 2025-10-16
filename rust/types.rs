@@ -8,6 +8,7 @@ pub mod orgnode;
 pub use orgnode::{ SaveInstruction,
                    OrgNode,
                    OrgnodeMetadata,
+                   OrgnodeRelationships,
                    Treatment, };
 pub use crate::serve::parse_headline_md_sexp::orgnodemd_to_string;
 pub mod skgnode;

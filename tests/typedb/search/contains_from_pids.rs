@@ -1,10 +1,9 @@
 // cargo test typedb::search::contains_from_pids
 
-use skg::test_utils::{setup_test_db, cleanup_test_db};
+use skg::test_utils::run_with_test_db;
 use skg::typedb::search::contains_from_pids;
 use skg::types::{ID, SkgConfig};
 
-use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -12,23 +11,15 @@ use typedb_driver::TypeDBDriver;
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str =
-      "skg-test-typedb-search-contains-from-pids";
-    let ( config, driver ) : ( SkgConfig, TypeDBDriver ) =
-      setup_test_db (
-        db_name,
-        "tests/typedb/search/contains_from_pids/fixtures",
-        "/tmp/tantivy-test-typedb-search-contains-from-pids"
-      ) . await ?;
-    test_contains_from_pids (
-      &config, &driver ) . await ?;
-    cleanup_test_db (
-      db_name,
-      &driver,
-      Some ( config . tantivy_folder . as_path () )
-    ) . await ?;
-    Ok (( )) } ) }
+  run_with_test_db (
+    "skg-test-typedb-search-contains-from-pids",
+    "tests/typedb/search/contains_from_pids/fixtures",
+    "/tmp/tantivy-test-typedb-search-contains-from-pids",
+    | config, driver | Box::pin ( async move {
+      test_contains_from_pids (
+        config, driver ) . await ?;
+      Ok (( )) } )
+  ) }
 
 async fn test_contains_from_pids (
   config : &SkgConfig,

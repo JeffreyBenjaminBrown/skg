@@ -189,6 +189,24 @@ pub fn update_index_from_saveinstructions (
 
 /* -------------------- Private helpers -------------------- */
 
+fn add_documents_to_writer (
+  nodes         : &[SkgNode],
+  writer        : &mut IndexWriter,
+  tantivy_index : &TantivyIndex,
+) -> Result<usize, Box<dyn Error>> {
+
+  let mut indexed_count: usize = 0;
+  for node in nodes {
+    if node.ids.is_empty() {
+      return Err ( "SkgNode has no IDs".into () ); }
+    let documents: Vec<Document> =
+      create_documents_from_node(
+        node, tantivy_index )?;
+    for document in documents {
+      writer.add_document (document)?;
+      indexed_count += 1; }}
+  Ok (indexed_count) }
+
 fn create_documents_from_node (
   node: &SkgNode,
   tantivy_index: &TantivyIndex,
@@ -214,24 +232,6 @@ fn create_documents_from_node (
           & title_or_alias ));
     documents_acc.push (doc); }
   Ok ( documents_acc ) }
-
-fn add_documents_to_writer (
-  nodes         : &[SkgNode],
-  writer        : &mut IndexWriter,
-  tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
-
-  let mut indexed_count: usize = 0;
-  for node in nodes {
-    if node.ids.is_empty() {
-      return Err ( "SkgNode has no IDs".into () ); }
-    let documents: Vec<Document> =
-      create_documents_from_node(
-        node, tantivy_index )?;
-    for document in documents {
-      writer.add_document (document)?;
-      indexed_count += 1; }}
-  Ok (indexed_count) }
 
 fn commit_with_status (
   writer: &mut IndexWriter,
