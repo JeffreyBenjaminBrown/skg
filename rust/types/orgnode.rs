@@ -97,4 +97,4 @@ pub fn default_metadata () -> OrgnodeMetadata {
     repeat : false,
     toDelete : false,
     relationships : OrgnodeRelationships::default (),
-  } }
+  }}

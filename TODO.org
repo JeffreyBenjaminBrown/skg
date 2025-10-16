@@ -2,15 +2,35 @@
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
    but to have a good sense of how complex each stage is.
-** Containerward view should not duplicate content.
-  If a node N is only in one container C, which N contains,
-  then the containerward view should unfold from C.
-  If N has multiple, then all that N does not contain
-  should be prepended to its children.
-  The ones N does contain should not need modification,
-  because the heralds should already indicate they are
-  both content and container to their parents.
 ** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
+*** current arrangement
+**** rust/serve/save_buffer::update_from_and_rerender_buffer
+  let (orgnode_forest, save_instructions)
+    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
+    = buffer_to_save_instructions (
+      content, config, typedb_driver )
+    . await . map_err (
+      |e| Box::new(e) as Box<dyn Error> ) ?;
+
+  ...
+
+  let regenerated_document : String =
+    multi_root_view ( typedb_driver,
+                      config,
+                      &root_focus_ids ). await ?;
+**** rust/mk_org_text::format_repeated_node
+*** ask (unfinished prompt)
+Our next step will be a function 'regenerateChildren'.
+
+It takes a node N from a tree of OrgNodes, and does the following:
+
+- If N is mightContainMore, does nothing to it.
+- If N is not mightContainMore, then:
+  - N's branches in the OrgNode tree are divided into two groups, 'content-saved' and 'other-saved'.
+  - N's content IDs are read from disk into a variable called 'content-from-disk'.
+  - We transform 'content-from-disk' from a list of IDs to a list of OrgNode trees, by doing the following:
+    - For each ID in 'content-from-disk' that is not found in the top-level IDs of 'content-saved', we render a new view, using single_root_view.
+    - For each ID in 'content-from-disk' that *is* among the IDs of the top-level branches of 'content-saved', we just replace the ID with the corresponding branch.
 * ====== BELOW: SORTED, no execution order =======
 * internalize
   Ask for a refactoring plan before embarking.

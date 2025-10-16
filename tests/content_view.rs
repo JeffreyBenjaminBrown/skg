@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::mk_org_text::{multi_root_view};
+use skg::mk_org_text::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
 use skg::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
@@ -130,3 +130,68 @@ async fn test_multi_root_view_logic (
              "Multi-root view should produce exact expected output");
 
   Ok (( )) }
+
+#[test]
+fn test_single_root_view_with_cycle
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-single-root-view-cycle",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-single-root-view-cycle",
+    |config, driver| Box::pin ( async move {
+      // Test with node "a" which has a cycle (a -> b -> c -> b)
+      let result : String = single_root_view (
+        driver,
+        config,
+        &ID ( "a".to_string () )
+      ) . await ?;
+
+      println!("Single root view with cycle result:\n{}", result);
+
+      let expected = indoc! {"* (skg (id a) (rels (containers 0) (contents 1))) a
+                              ** (skg (id b) (rels (containers 2) (contents 1))) b
+                              b has a body
+                              *** (skg (id c) (rels containsParent (contents 1))) c
+                              **** (skg (id b) repeated (rels containsParent (containers 2) (contents 1))) b
+                              Repeated, probably above. Edit there, not here.
+                              "};
+      assert_eq!(result, expected,
+                 "Single root view should detect cycle and mark repeated node");
+
+      Ok (( )) } )) }
+
+#[test]
+fn test_multi_root_view_with_shared_nodes
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-multi-root-view-shared",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-multi-root-view-shared",
+    |config, driver| Box::pin ( async move {
+      // Test with multiple roots that share a node
+      let focii = vec![
+        ID ( "1".to_string () ),
+        ID ( "2".to_string () )
+      ];
+      let result : String = multi_root_view (
+        driver,
+        config,
+        & focii
+      ) . await ?;
+
+      println!("Multi root view with shared nodes result:\n{}", result);
+
+      let expected = indoc! {"* (skg (id 1) (rels (containers 0) (contents 2))) title 1
+                              This one string could span pages,
+                              and it can include newlines, no problem.
+                              ** (skg (id 2) (rels (linksIn 1))) title 2
+                              this one string could span pages
+                              ** (skg (id 3) (rels (linksIn 1))) title 3
+                              this one string could span pages
+                              * (skg (id 2) repeated (rels (linksIn 1))) title 2
+                              Repeated, probably above. Edit there, not here.
+                              "};
+      assert_eq!(result, expected,
+                 "Multi root view should detect cross-tree duplicates");
+
+      Ok (( )) } )) }

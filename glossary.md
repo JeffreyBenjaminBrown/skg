@@ -34,6 +34,8 @@ with any number of key-value and bare-value pairs in any order.
 The metadata is used for Rust to know what to do with it,
 and for Emacs to let the user know how to interpret it.
 
+## mk = make / create
+
 ## title != headline
 
 Headline is a term from org-mode. It refers to a line that begins with some asterisks, followed by at least one whitespace, followed by at least one non-whitespace. The text after the first chunk of adjacent whitespace is what I'm calling the 'title'.
