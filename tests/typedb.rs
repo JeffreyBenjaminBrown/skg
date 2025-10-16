@@ -13,7 +13,7 @@ mod util {
 use skg::mk_org_text::single_root_view;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
-use skg::test_utils::{populate_test_db_from_fixtures, run_with_test_db};
+use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::typedb::relationships::delete_out_links;
@@ -31,17 +31,47 @@ use typedb_driver::{
   TypeDBDriver, };
 
 #[test]
-fn test_typedb_integration (
+fn test_typedb_all_relationships (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb",
+    "skg-test-typedb-relationships",
     "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb",
+    "/tmp/tantivy-test-typedb-relationships",
     |config, driver| Box::pin ( async move {
       test_all_relationships ( config, driver ) . await ?;
+      Ok (( )) } ) ) }
+
+#[test]
+fn test_typedb_recursive_document (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-recursive",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb-recursive",
+    |config, driver| Box::pin ( async move {
       test_recursive_document ( driver, config ) . await ?;
+      Ok (( )) } ) ) }
+
+#[test]
+fn test_typedb_create_only_nodes (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-create-nodes",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-typedb-create-nodes",
+    |config, driver| Box::pin ( async move {
       test_create_only_nodes_with_no_ids_present (
         & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
+
+#[test]
+fn test_typedb_delete_out_links (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-typedb-delete-links",
+    "tests/typedb/fixtures-2",
+    "/tmp/tantivy-test-typedb-delete-links",
+    |config, driver| Box::pin ( async move {
       test_delete_out_links_contains_container (
         & config . db_name, driver ) . await ?;
       Ok (( )) } ) ) }
@@ -172,17 +202,11 @@ async fn test_all_relationships (
 
   Ok (( )) }
 
-pub async fn test_delete_out_links_contains_container (
+async fn test_delete_out_links_contains_container (
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
   // The README at fixtures-2/ draws the initial contains tree.
-  populate_test_db_from_fixtures (
-    "tests/typedb/fixtures-2/",
-    db_name,
-    driver
-  ) . await ?;
-
   // Sanity: initial contains edges include the full tree.
   let before_pairs = collect_all_of_some_binary_rel(
     db_name,
@@ -235,17 +259,10 @@ pub async fn test_delete_out_links_contains_container (
   assert_eq!(after_pairs, expected_after);
   Ok (( )) }
 
-pub async fn test_create_only_nodes_with_no_ids_present (
+async fn test_create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
-
-  // Rebuild DB from fixtures and schema.
-  populate_test_db_from_fixtures (
-    "tests/typedb/fixtures/",
-    db_name,
-    driver
-  ) . await ?;
 
   // Baseline node count.
   let initial_number_of_nodes : usize =

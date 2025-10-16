@@ -6,73 +6,11 @@
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions, find_inconsistent_instructions};
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
-use skg::test_utils::populate_test_db_from_fixtures;
-use skg::types::{ID, SkgConfig};
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
-use std::path::PathBuf;
+use skg::test_utils::run_with_test_db;
+use skg::types::ID;
 use std::error::Error;
 
-struct TestContext {
-  config: SkgConfig,
-  driver: Option<TypeDBDriver>,
-}
-
-impl TestContext {
-  async fn new() -> Self {
-    match Self::setup_with_fixtures().await {
-      Ok((config, driver)) => Self { config, driver: Some(driver) },
-      Err(_) => {
-        let config = SkgConfig {
-          db_name: "skg-test-reduce-dups".to_string(),
-          skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
-          tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
-          port: 1730,
-          delete_on_quit: false,
-        };
-        Self { config, driver: None }
-      }
-    }
-  }
-
-  async fn setup_with_fixtures() -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
-    let config = SkgConfig {
-      db_name: "skg-test-reduce-dups".to_string(),
-      skg_folder: PathBuf::from("tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures"),
-      tantivy_folder: PathBuf::from("/tmp/test/tantivy"),
-      port: 1730,
-      delete_on_quit: false,
-    };
-
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
-
-    let fixtures_folder = config.skg_folder.to_str()
-      .ok_or("Invalid UTF-8 in fixtures path")?;
-
-    populate_test_db_from_fixtures(
-      fixtures_folder,
-      &config.db_name,
-      &driver
-    ).await?;
-
-    Ok((config, driver))
-  }
-
-  async fn run_pipeline(&self, input: &str) -> Result<Vec<(skg::types::SkgNode, skg::types::NodeSaveAction)>, Box<dyn std::error::Error>> {
-    let trees = org_to_uninterpreted_nodes(input)?;
-    let instructions = orgnodes_to_dirty_save_instructions(trees)?;
-
-    if let Some(driver) = &self.driver {
-      reconcile_dup_instructions(&self.config, driver, instructions).await
-    } else {
-      Err("TypeDB not available".into())
-    }
-  }
-}
-
+#[test]
 fn test_inconsistent_delete() {
   let input = indoc! {"
         * (skg (id 1)) 1
@@ -93,89 +31,104 @@ fn test_inconsistent_delete() {
   assert_ne!(instructions[0].1.toDelete, instructions[1].1.toDelete);
 }
 
-async fn test_deletions_excluded(ctx: &TestContext) {
-  let input = indoc! {"
-        * (skg (id 1)) 1
-        ** (skg (id 2) toDelete) 2
-        ** (skg (id 3)) 3
-    "};
+#[test]
+fn test_deletions_excluded (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-deletions-excluded",
+    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "/tmp/tantivy-test-deletions-excluded",
+    |config, driver| Box::pin ( async move {
+      let input = indoc! {"
+            * (skg (id 1)) 1
+            ** (skg (id 2) toDelete) 2
+            ** (skg (id 3)) 3
+        "};
 
-  if let Ok(reduced) = ctx.run_pipeline(input).await {
-    assert_eq!(reduced.len(), 3); // There are 3 instructions.
-    let id1_instruction = reduced.iter()
-      .find(|(node, _)| node.ids.contains(&ID::from("1")))
-      .expect("Should have instruction for id:1");
-    let id2_instruction = reduced.iter()
-      .find(|(node, _)| node.ids.contains(&ID::from("2")))
-      .expect("Should have instruction for id:2");
-    assert_eq!(id1_instruction.1.toDelete, false);
-    assert_eq!(id2_instruction.1.toDelete, true);
-    assert_eq!( // id 1 should contain 3 and not 2 (which is being deleted)
-      id1_instruction.0.contains, vec![ID::from("3")]);
-  }
-}
+      let trees = org_to_uninterpreted_nodes(input)?;
+      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
+      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
-async fn test_defining_node_defines(ctx: &TestContext) {
-  let input = indoc! {"
-        * (skg (id 1) mightContainMore) 1 adder
-        Ignored body.
-        ** (skg (id 2)) 2
-        * (skg (id 1)) 1 definer
-        ** (skg (id 3)) 3
-    "};
+      assert_eq!(reduced.len(), 3); // There are 3 instructions.
+      let id1_instruction = reduced.iter()
+        .find(|(node, _)| node.ids.contains(&ID::from("1")))
+        .expect("Should have instruction for id:1");
+      let id2_instruction = reduced.iter()
+        .find(|(node, _)| node.ids.contains(&ID::from("2")))
+        .expect("Should have instruction for id:2");
+      assert_eq!(id1_instruction.1.toDelete, false);
+      assert_eq!(id2_instruction.1.toDelete, true);
+      assert_eq!( // id 1 should contain 3 and not 2 (which is being deleted)
+        id1_instruction.0.contains, vec![ID::from("3")]);
+      Ok (( )) } ) ) }
 
-  if let Ok(reduced) = ctx.run_pipeline(input).await {
-    assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
-    let id1_instruction = reduced.iter()
-      .find(|(node, _)| node.ids.contains(&ID::from("1")))
-      .unwrap();
-    assert_eq!(id1_instruction.0.title, "1 definer");
-    // Defining instruction should define body completely, even if None
-    assert_eq!(id1_instruction.0.body, None);
-    assert_eq!(id1_instruction.0.contains, vec![ID::from("3"), ID::from("2")]);
-  }
-}
+#[test]
+fn test_defining_node_defines (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-defining-node",
+    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "/tmp/tantivy-test-defining-node",
+    |config, driver| Box::pin ( async move {
+      let input = indoc! {"
+            * (skg (id 1) mightContainMore) 1 adder
+            Ignored body.
+            ** (skg (id 2)) 2
+            * (skg (id 1)) 1 definer
+            ** (skg (id 3)) 3
+        "};
 
-async fn test_adding_without_definer(ctx: &TestContext) {
-  let input = indoc! {"
-        * (skg (id 1) mightContainMore) 1 adder
-        ** (skg (id 2)) 2
-        ** (skg (id 4)) 4
-        ** (skg (id 4) mightContainMore) 4 again
-    "};
+      let trees = org_to_uninterpreted_nodes(input)?;
+      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
+      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
-  if let Ok(reduced) = ctx.run_pipeline(input).await {
-    let id1_instruction = reduced.iter()
-      .find(|(node, _)| node.ids.contains(&ID::from("1")))
-      .expect("Should have instruction for id:1");
+      assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
+      let id1_instruction = reduced.iter()
+        .find(|(node, _)| node.ids.contains(&ID::from("1")))
+        .unwrap();
+      assert_eq!(id1_instruction.0.title, "1 definer");
+      // Defining instruction should define body completely, even if None
+      assert_eq!(id1_instruction.0.body, None);
+      assert_eq!(id1_instruction.0.contains, vec![ID::from("3"), ID::from("2")]);
+      Ok (( )) } ) ) }
 
-    assert_eq!(
-      // even a mightContainMore will clobber the title on disk
-      id1_instruction.0.title,
-      "1 adder");
-    assert_eq!(
-      // Body comes from disk since no instruction provides one.
-      id1_instruction.0.body,
-      Some("body from disk".to_string()));
-    assert_eq!(
-      // Since there is no defining node, contents are read from disk,
-      // and then the mightContainMore node with id 1
-      // appends its contents, with deduplication.
-      id1_instruction.0.contains,
-      vec![ ID::from("2"),
-            ID::from("3"),
-            ID::from("4"), ]); }}
+#[test]
+fn test_adding_without_definer (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-adding-without-definer",
+    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "/tmp/tantivy-test-adding-without-definer",
+    |config, driver| Box::pin ( async move {
+      let input = indoc! {"
+            * (skg (id 1) mightContainMore) 1 adder
+            ** (skg (id 2)) 2
+            ** (skg (id 4)) 4
+            ** (skg (id 4) mightContainMore) 4 again
+        "};
 
-#[tokio::test]
-async fn test_reconcile_dup_instructions_pipeline() {
-  let ctx = TestContext::new().await;
+      let trees = org_to_uninterpreted_nodes(input)?;
+      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
+      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
-  test_inconsistent_delete();
-  test_deletions_excluded(&ctx).await;
-  test_defining_node_defines(&ctx).await;
-  test_adding_without_definer(&ctx).await;
+      let id1_instruction = reduced.iter()
+        .find(|(node, _)| node.ids.contains(&ID::from("1")))
+        .expect("Should have instruction for id:1");
 
-  if ctx.driver.is_none() {
-    println!("TypeDB not available, skipped driver-dependent tests");
-  }
-}
+      assert_eq!(
+        // even a mightContainMore will clobber the title on disk
+        id1_instruction.0.title,
+        "1 adder");
+      assert_eq!(
+        // Body comes from disk since no instruction provides one.
+        id1_instruction.0.body,
+        Some("body from disk".to_string()));
+      assert_eq!(
+        // Since there is no defining node, contents are read from disk,
+        // and then the mightContainMore node with id 1
+        // appends its contents, with deduplication.
+        id1_instruction.0.contains,
+        vec![ ID::from("2"),
+              ID::from("3"),
+              ID::from("4"), ]);
+      Ok (( )) } ) ) }
