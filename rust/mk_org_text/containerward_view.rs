@@ -151,11 +151,6 @@ fn metadata_for_element_of_path (
     mightContainMore : ! is_terminus,
     repeat           : false,
     toDelete         : false,
-    relationships       : OrgnodeRelationships {
+    relationships    : OrgnodeRelationships {
       parentIsContainer : false,
-      parentIsContent   : false,
-      numContainers     : None,
-      numContents       : None,
-      numLinksIn        : None,
-    },
-  } }
+      .. OrgnodeRelationships::default () }, }}

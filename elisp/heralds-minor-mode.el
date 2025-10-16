@@ -105,6 +105,28 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
             (push ov keep)))))
     (setq heralds-overlays (nreverse keep))))
 
+(defun skg--parse-relationships-from-alist (alist)
+  "Extract and parse the rels sub-s-expr from ALIST.
+Returns an alist of key-value pairs from the rels."
+  (let ((rel-entry (assoc "rels" alist)))
+    (if rel-entry
+        ;; The cdr is a string like "parentContainsIt (contents 3)"
+        ;; We need to parse it
+        (let* ((rel-string (cdr rel-entry))
+               (parsed (skg-parse-metadata-inner rel-string)))
+          (car parsed)) ;; Return the alist part
+      '())))
+
+(defun skg--parse-relationships-bare-values-from-alist (alist)
+  "Extract and parse bare values from the rels sub-s-expr in ALIST.
+Returns a list of bare value strings from the rels."
+  (let ((rel-entry (assoc "rels" alist)))
+    (if rel-entry
+        (let* ((rel-string (cdr rel-entry))
+               (parsed (skg-parse-metadata-inner rel-string)))
+          (cadr parsed)) ;; Return the bare-values part
+      '())))
+
 (defun heralds-from-metadata
     (metadata) ;; line's first text inside (not including) (skg and )
   "Returns a propertized space-separated string of heralds.
@@ -115,20 +137,23 @@ Whitespace in METADATA is ignored."
          (out '())
          (id-val (cdr (assoc "id" alist)))
          (type-val (cdr (assoc "type" alist)))
-         (num-containers-val (cdr (assoc "numContainers" alist)))
-         (num-contents-val (cdr (assoc "numContents" alist)))
-         (num-links-in-val (cdr (assoc "numLinksIn" alist))))
+         ;; Parse rels sub-s-expr
+         (rel-alist (skg--parse-relationships-from-alist alist))
+         (rel-bare-values (skg--parse-relationships-bare-values-from-alist alist))
+         (num-containers-val (cdr (assoc "containers" rel-alist)))
+         (num-contents-val (cdr (assoc "contents" rel-alist)))
+         (num-links-in-val (cdr (assoc "linksIn" rel-alist))))
 
     ;; Build heralds in a particular order.
     (when id-val ;; ID
       (push (propertize "⅄" 'face 'heralds-green-face) out))
 
     ;; ! (if NOT contained by parent)
-    (unless (member "parentIsContainer" bare-values)
+    (when (member "notInParent" rel-bare-values)
       (push (propertize "!" 'face 'heralds-blue-face) out))
 
-    ;; parentIsContent
-    (when (member "parentIsContent" bare-values)
+    ;; containsParent
+    (when (member "containsParent" rel-bare-values)
       (push (propertize "⮌" 'face 'heralds-green-face) out))
 
     ;; mightContainMore
@@ -153,21 +178,18 @@ Whitespace in METADATA is ignored."
 
     ;; container count (N})
     (when num-containers-val
-      (let ((n (string-to-number num-containers-val)))
-        (when (/= n 1)
-          (push (propertize (format "%d}" n) 'face 'heralds-green-face) out))))
+      (push (propertize (format "%d}" (string-to-number num-containers-val))
+                        'face 'heralds-green-face) out))
 
     ;; links in (N→)
     (when num-links-in-val
-      (let ((n (string-to-number num-links-in-val)))
-        (when (> n 0)
-          (push (propertize (format "%d→" n) 'face 'heralds-green-face) out))))
+      (push (propertize (format "%d→" (string-to-number num-links-in-val))
+                        'face 'heralds-green-face) out))
 
     ;; content count ({N)
     (when num-contents-val
-      (let ((n (string-to-number num-contents-val)))
-        (when (> n 0)
-          (push (propertize (format "{%d" n) 'face 'heralds-green-face) out))))
+      (push (propertize (format "{%d" (string-to-number num-contents-val))
+                        'face 'heralds-green-face) out))
 
     (when out
       (mapconcat #'identity (nreverse out) " "))))

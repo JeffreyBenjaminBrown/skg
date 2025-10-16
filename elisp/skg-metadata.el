@@ -199,6 +199,16 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
                 (let ((key (format "%s" (car element)))
                       (val (format "%s" (cadr element))))
                   (push (cons key val) alist)))
+               (;; Special case: (rels ...) sub-s-expr
+                (and (listp element)
+                     (> (length element) 2)
+                     (eq (car element) 'rels))
+                ;; Store as a special entry with the inner content as a string
+                (let ((rel-inner (mapconcat
+                                  (lambda (x) (format "%s" x))
+                                  (cdr element)
+                                  " ")))
+                  (push (cons "rels" rel-inner) alist)))
                (t ;; Bare value (symbol or other atom)
                 (let ((bare-val (format "%s" element)))
                   (push bare-val set))))))

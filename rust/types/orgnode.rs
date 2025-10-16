@@ -79,11 +79,11 @@ impl FromStr for Treatment {
 impl Default for OrgnodeRelationships {
   fn default () -> Self {
     OrgnodeRelationships {
-      parentIsContainer : false,
+      parentIsContainer : true,
       parentIsContent   : false,
-      numContainers : None,
-      numContents   : None,
-      numLinksIn    : None,
+      numContainers : Some ( 1 ),
+      numContents   : Some ( 0 ),
+      numLinksIn    : Some ( 0 ),
     }} }
 
 pub fn default_metadata () -> OrgnodeMetadata {

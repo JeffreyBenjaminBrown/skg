@@ -60,8 +60,8 @@
             (message "Content view received")
             (message "Content: %s" content)
 
-            ;; Verify exact content: should be exactly "* (skg (id 1) (numContainers 0) (numContents 0) (numLinksIn 0)) 1\n" and nothing more
-            (let ((expected-content "* (skg (id 1) (numContainers 0) (numContents 0) (numLinksIn 0)) 1\n"))
+            ;; Verify exact content: should be exactly "* (skg (id 1) (rels (containers 0))) 1\n" and nothing more
+            (let ((expected-content "* (skg (id 1) (rels (containers 0))) 1\n"))
               (if (string= content expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")

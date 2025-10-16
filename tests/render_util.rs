@@ -72,15 +72,13 @@ fn test_metadata_ordering () {
           toDelete         : false,
           relationships    : OrgnodeRelationships {
             parentIsContainer : false,
-            parentIsContent   : false,
-            numContainers     : None,
-            numContents       : None,
-            numLinksIn        : None, }, },
+            .. OrgnodeRelationships::default ()
+          }, },
       title : "Test".to_string (),
       body : None, };
   let result : String =
     render_org_node_from_text ( 1, &node );
-  assert_eq! ( result, "* (skg (id xyz) repeated cycle) Test\n" ); }
+  assert_eq! ( result, "* (skg (id xyz) repeated cycle (rels notInParent)) Test\n" ); }
 
 #[test]
 #[should_panic ( expected = "render_org_node_from_text called with both empty metadata and empty title" )]

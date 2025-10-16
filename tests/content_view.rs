@@ -120,10 +120,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (id 1) (numContainers 0) (numContents 0) (numLinksIn 0)) 1
+  let expected = indoc! {"* (skg (id 1) (rels (containers 0))) 1
                           1 has a body
-                          * (skg (id 2) (numContainers 0) (numContents 0) (numLinksIn 0)) 2
-                          * (skg (id 1) repeated (numContainers 0) (numContents 0) (numLinksIn 0)) 1
+                          * (skg (id 2) (rels (containers 0))) 2
+                          * (skg (id 1) repeated (rels (containers 0))) 1
                           Repeated, probably above. Edit there, not here.
                           "};
   assert_eq!(result, expected,
