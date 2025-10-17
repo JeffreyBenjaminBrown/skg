@@ -12,14 +12,19 @@ use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 
 #[test]
 fn test_node_io() {
+  // Create temporary directory for test output
+  let test_dir : PathBuf =
+    PathBuf::from("/tmp/file_io_test");
+  fs::create_dir_all ( &test_dir )
+    . unwrap ();
+
   // Write the example node to a file
   let example : SkgNode = skgnode_example();
   let out_filename: PathBuf =
-    PathBuf::from("tests/file_io/generated")
-    . join ( example
-             .ids[0] // the primary id
-             .0      // the string part of it
-             .clone() );
+    test_dir . join ( example
+                      .ids[0] // the primary id
+                      .0      // the string part of it
+                      .clone() );
   write_node ( &example, &out_filename )
     . unwrap ();
 
@@ -30,7 +35,8 @@ fn test_node_io() {
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
 
-  let reversed_filename = "tests/file_io/generated/reversed.skg";
+  let reversed_filename : &str =
+    "/tmp/file_io_test/reversed.skg";
   write_node(&reversed, reversed_filename).unwrap();
 
   let expected_example_path = "tests/file_io/fixtures/example.skg";
@@ -71,12 +77,12 @@ fn verify_body_not_needed() {
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
   write_node(
-    &node, "tests/file_io/generated/no_unindexed.skg" ) . unwrap();
+    &node, "/tmp/file_io_test/no_unindexed.skg" ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
     serde_yaml::from_str (
       &fs::read_to_string (
-        "tests/file_io/generated/no_unindexed.skg"
+        "/tmp/file_io_test/no_unindexed.skg"
       ) . unwrap () ). unwrap ();
   let expected_yaml: serde_yaml::Value =
     serde_yaml::from_str (

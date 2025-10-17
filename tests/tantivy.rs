@@ -1,6 +1,5 @@
 // cargo test --test tantivy
 
-use std::fs;
 use std::path::Path;
 use tantivy::schema as schema;
 use skg::file_io::read_skg_files;
@@ -13,12 +12,8 @@ use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
 #[test]
 fn test_many_tantivy_things (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let index_dir: &str =
-    "tests/tantivy/generated";
-  if Path::new(index_dir).exists() {
-    // Remove any existing test artifacts
-    fs::remove_dir_all(index_dir)?; }
-  fs::create_dir_all(index_dir)?;
+  let index_dir : &str =
+    "/tmp/tantivy-test-many-things";
 
   // Define the schema
   let mut schema_builder: schema::SchemaBuilder =
@@ -33,7 +28,7 @@ fn test_many_tantivy_things (
     schema_builder.build();
 
   let index_path: &Path =
-    Path::new("tests/tantivy/generated/index.tantivy");
+    Path::new ( index_dir );
   let nodes: Vec<skg::types::SkgNode> =
     read_skg_files("tests/tantivy/fixtures")?;
 
@@ -202,10 +197,8 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
-  let index_dir = "tests/tantivy/generated_aliases";
-  if Path::new(index_dir).exists() {
-    fs::remove_dir_all(index_dir)?; }
-  fs::create_dir_all(index_dir)?;
+  let index_dir : &str =
+    "/tmp/tantivy-test-aliases";
 
   let mut schema_builder = schema::Schema::builder();
   let id_field: schema::Field =
