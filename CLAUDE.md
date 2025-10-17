@@ -8,6 +8,7 @@ Upon starting each session, automatically:
    - `coding-advice/architecture.md` - Overview of the skg knowledge graph system
    - `coding-advice/common-gotchas.md` - Important testing dependencies
    - `coding-advice/formatting.md` - Specific code formatting conventions
+   - `coding-advice/for-ai.md` - Additional coding philosophy (no legacy support, atomic functions)
 
 2. Read the linked reference files:
    - `api-and-formats.md` - TCP API specification and data formats
