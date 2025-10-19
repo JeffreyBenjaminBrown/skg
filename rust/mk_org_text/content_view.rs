@@ -39,11 +39,8 @@ pub async fn multi_root_view (
   let mut forest : Vec < Tree < OrgNode > > =
     forest_from_ids (
       root_ids, config, driver ) . await ?;
-  let rel_data : MapsFromIdForView =
-    mapsFromIdForView_from_forest (
-      & forest, config, driver ) . await ?;
   set_metadata_relationships_in_forest (
-    &mut forest, & rel_data );
+    &mut forest, config, driver ) . await ?;
   Ok ( render_forest_to_org (
     & forest )) }
 
@@ -255,10 +252,15 @@ pub struct MapsFromIdForView {
 }
 
 /// Enrich all nodes in a forest with relationship metadata.
-fn set_metadata_relationships_in_forest (
-  forest   : &mut [Tree < OrgNode >],
-  rel_data : &MapsFromIdForView,
-) {
+/// Fetches relationship data from TypeDB and applies it to the forest.
+pub async fn set_metadata_relationships_in_forest (
+  forest : &mut [Tree < OrgNode >],
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let rel_data : MapsFromIdForView =
+    mapsFromIdForView_from_forest (
+      forest, config, driver ) . await ?;
   for tree in forest {
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
@@ -266,7 +268,8 @@ fn set_metadata_relationships_in_forest (
       tree,
       root_id,
       None,
-      rel_data ); } }
+      & rel_data ); }
+  Ok (( )) }
 
 fn set_metadata_relationships_in_node_recursive (
   tree       : &mut Tree < OrgNode >,

@@ -1,7 +1,9 @@
 use crate::file_io::update_fs_from_saveinstructions;
 use crate::save::buffer_to_save_instructions;
 use crate::types::SaveError;
-use crate::mk_org_text::content_view::render_forest_to_org;
+use crate::mk_org_text::content_view::{
+  render_forest_to_org,
+  set_metadata_relationships_in_forest};
 use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
@@ -141,6 +143,10 @@ async fn update_from_and_rerender_buffer (
   completeOrgnodeForest (
     &mut orgnode_forest,
     config ) ?;
+  set_metadata_relationships_in_forest (
+    &mut orgnode_forest,
+    config,
+    typedb_driver ) . await ?;
   let regenerated_document : String =
     render_forest_to_org ( & orgnode_forest );
   Ok (regenerated_document) }
