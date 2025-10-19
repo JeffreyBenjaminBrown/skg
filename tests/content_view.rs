@@ -152,7 +152,7 @@ fn test_single_root_view_with_cycle
                               ** (skg (id b) (rels (containers 2) (contents 1))) b
                               b has a body
                               *** (skg (id c) (rels containsParent (contents 1))) c
-                              **** (skg (id b) repeated (rels containsParent (containers 2) (contents 1))) b
+                              **** (skg (id b) repeated cycle (rels containsParent (containers 2) (contents 1))) b
                               Repeated, probably above. Edit there, not here.
                               "};
       assert_eq!(result, expected,

@@ -90,6 +90,8 @@ pub async fn orgnode_tree_from_id_with_earlier_visits (
     let root_node_id : ego_tree::NodeId = (
       // Appease borrow checker: Store this before mutating 'tree'.
       tree . root () . id () );
+    let mut ancestor_path : Vec < ID > =
+      vec! [ root_pid . clone () ];
     for child_id in & skgnode . contains { // build branches
       Box::pin (
         build_tree_recursive (
@@ -98,7 +100,8 @@ pub async fn orgnode_tree_from_id_with_earlier_visits (
           child_id,
           config,
           driver,
-          visited
+          visited,
+          &mut ancestor_path
         )) . await ?; }
     Ok ( tree ) }}
 
@@ -109,28 +112,34 @@ async fn build_tree_recursive (
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
   visited         : &mut HashSet < ID >,
+  ancestor_path   : &mut Vec < ID >, // path from root to parent (for cycle detection)
 ) -> Result < (), Box<dyn Error> > {
   let child_pid : ID =
     pid_from_id (
       & config . db_name, driver, child_id ) . await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", child_id )) ?;
+  let is_cycle : bool =
+    ancestor_path . contains ( & child_pid );
   if visited . contains ( & child_pid ) {
     // for repeated nodes, return without a repeated call
-    let repeated_node : OrgNode =
+    let mut repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
         config, & child_pid ) ?;
+    repeated_node . metadata . cycle = is_cycle;
     tree . get_mut ( parent_node_id ) . unwrap ()
       . append ( repeated_node );
     return Ok (( )); }
   visited . insert ( child_pid . clone () );
-  let ( child_orgnode, child_skgnode ) : ( OrgNode, SkgNode ) =
+  let ( mut child_orgnode, child_skgnode ) : ( OrgNode, SkgNode ) =
     skgnode_and_orgnode_from_pid (
       config, & child_pid ) ?;
+  child_orgnode . metadata . cycle = is_cycle;
   let new_child_id : ego_tree::NodeId = (
     // append new child to its parent
     tree . get_mut ( parent_node_id ) . unwrap ()
     . append ( child_orgnode ) . id () );
+  ancestor_path . push ( child_pid . clone () );
   for grandchild_id in & child_skgnode . contains {
     Box::pin (
       build_tree_recursive ( // recurse
@@ -139,8 +148,10 @@ async fn build_tree_recursive (
         grandchild_id,
         config,
         driver,
-        visited
+        visited,
+        ancestor_path
       )) . await ?; }
+  ancestor_path . pop ();
   return Ok (( )) }
 
 /// Fetch a SkgNode from disk.
