@@ -23,7 +23,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Wait a moment for server to be fully ready
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Phase 1: Test invalid save (should create error buffer)
   (test-invalid-save)
@@ -31,7 +31,7 @@
   ;; Wait for completion with timeout
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 200))
-      (sleep-for 0.1)
+      (sleep-for 0.25)
       (setq timeout (1+ timeout))))
 
   ;; If we got here without completion, it's a timeout
@@ -60,7 +60,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Check if error buffer was created
   (let ((error-buffer (get-buffer "*SKG Save Errors - Inconsistencies Found*"))
@@ -122,7 +122,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Check the updated content
   (with-current-buffer "*skg-content-view*"

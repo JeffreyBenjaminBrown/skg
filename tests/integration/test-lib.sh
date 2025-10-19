@@ -42,14 +42,14 @@ send_shutdown_command() {
                   :service port
                   :family 'ipv4)))
   (process-send-string tcp-proc "((request . \"shutdown\"))\n")
-  (sleep-for 0.5)
+  (sleep-for 0.083)
   (delete-process tcp-proc))
 EOF
 
   # Run the script
   SKG_TEST_PORT=$port emacs --batch -l "$shutdown_script" 2>/dev/null || true
   rm -f "$shutdown_script"
-  sleep 1
+  sleep 0.1
 }
 
 # Function to cleanup background processes and test databases
@@ -114,7 +114,7 @@ start_skg_server() {
   echo "✓ Started skg server (PID: $CARGO_PID) with config: $TEMP_CONFIG"
   echo "  Server logs: $TEST_DIR/server.log"
   echo "Waiting for server to be ready..."
-  sleep 3
+  sleep 1
 }
 
 # Function to clean up Tantivy index contents

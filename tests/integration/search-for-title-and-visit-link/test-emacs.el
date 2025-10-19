@@ -33,7 +33,7 @@
                 (skg-visit-link)
 
                 ;; Wait a moment for the content view to be created
-                (sleep-for 2)
+                (sleep-for 0.25)
 
                 ;; Check if the content view buffer was created successfully
                 (let ((content-buffer (get-buffer "*skg-content-view*")))
@@ -75,7 +75,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Wait a moment for server to be fully ready
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Use the skg-request-title-matches function
   (message "=== PHASE 1: Requesting title matches for 'apples' ===")
@@ -83,7 +83,7 @@
   (message "Called skg-request-title-matches")
 
   ;; Wait a moment for the response to be processed
-  (sleep-for 2)
+  (sleep-for 0.25)
 
   ;; Check if the title search buffer was created and contains expected content
   (let ((search-buffer (get-buffer "*skg-title-search*")))
@@ -110,7 +110,7 @@
   ;; Wait for completion with timeout
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 50))
-      (sleep-for 0.1)
+      (sleep-for 0.25)
       (setq timeout (1+ timeout))))
 
   ;; If we got here without completion, it's a timeout

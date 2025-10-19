@@ -37,7 +37,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Wait a moment for server to be fully ready
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Send the request with our custom handler
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -49,7 +49,7 @@
   ;; Wait for response with timeout
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 50))
-      (sleep-for 0.1)
+      (sleep-for 0.25)
       (setq timeout (1+ timeout))))
 
   ;; If we got here without completion, it's a timeout

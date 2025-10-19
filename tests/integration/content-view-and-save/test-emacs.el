@@ -26,7 +26,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Wait a moment for server to be fully ready
-  (sleep-for 3)
+  (sleep-for 0.25)
 
   ;; Phase 1: Test content view creation
   (test-content-view)
@@ -34,7 +34,7 @@
   ;; Wait for completion with timeout
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 100))
-      (sleep-for 0.1)
+      (sleep-for 0.25)
       (setq timeout (1+ timeout))))
 
   ;; If we got here without completion, it's a timeout
@@ -50,7 +50,7 @@
   (message "Called skg-request-single-root-content-view-from-node")
 
   ;; Wait for the response
-  (sleep-for 2)
+  (sleep-for 0.25)
 
   ;; Check if the content view buffer was created with expected content
   (let ((content-buffer (get-buffer "*skg-content-view*")))
@@ -109,7 +109,7 @@
           (skg-request-save-buffer)
 
           ;; Wait for save response
-          (sleep-for 3)
+          (sleep-for 0.25)
 
           ;; Check the updated content
           (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
