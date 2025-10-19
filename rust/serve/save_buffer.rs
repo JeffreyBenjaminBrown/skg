@@ -116,7 +116,7 @@ fn read_length_prefixed_content (
 Steps:
 - Put the text through `buffer_to_save_instructions` to get orgnode forest and save instructions.
 - Extract root IDs from the orgnode forest.
-- Runs `update_fs_and_dbs` on the save instructions.
+- Runs `update_graph` on the save instructions.
 - Returns a multi-root content view. */
 async fn update_from_and_rerender_buffer (
   content       : &str,
@@ -133,7 +133,7 @@ async fn update_from_and_rerender_buffer (
       |e| Box::new(e) as Box<dyn Error> ) ?;
   if orgnode_forest.is_empty() {
     return Err ("No valid org nodes found in content".into()); }
-  update_fs_and_dbs (
+  update_graph (
     save_instructions,
     config.clone(),
     tantivy_index,
@@ -151,7 +151,7 @@ async fn update_from_and_rerender_buffer (
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
-pub async fn update_fs_and_dbs (
+pub async fn update_graph (
   instructions  : Vec<SaveInstruction>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
