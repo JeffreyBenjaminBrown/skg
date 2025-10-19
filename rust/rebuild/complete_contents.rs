@@ -8,23 +8,23 @@ use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 
-/// Complete a Content node's children by reconciling them
+/// Completes a Content node's children by reconciling them
 /// with the 'contains' relationships found on disk.
 ///
-/// PITFALL: This function should be called AFTER saving,
+/// ASSUMES it is called *after* saving,
 /// so the disk state is the source of truth.
 ///
-/// This function assumes the node P has been normalized
+/// ASSUMES the node P has been normalized
 /// so that its 'id' field is the PID (no need to call pid_from_id).
 ///
-/// Given a node N:
-/// - If N is indefinitive, do nothing and return
+/// METHOD: Given a node N:
+/// - If N is indefinitive, do nothing and return.
 /// - Get N's ID (error if missing)
 /// - If N's ID is in 'visited', replace N with a repeated marker and return
-/// - Add N's ID to 'visited'
+/// - Add N's ID to 'visited'.
 /// - Read N's SkgNode from disk
 /// - Categorize N's children into content/non-content
-/// - Mark invalid content children as ParentIgnores and move to non-content.
+/// - Change invalid content children to treatment=parentIgnores and move to the end of non-content.
 /// - Build completed-content list from disk, preserving order.
 /// - Reorder children: non-content first, then completed-content
 pub fn completeContents (
@@ -33,24 +33,20 @@ pub fn completeContents (
   config    : &SkgConfig,
   visited   : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  // Check if node is indefinitive
-  {
+  { // Indefinitive nodes are left unchanged.
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     if node_ref . value () . metadata . indefinitive {
       return Ok (( )); }}
-
-  // Get node's ID
   let node_pid : ID = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     node_ref . value () . metadata . id . clone ()
       . ok_or ( "Node has no ID" ) ? };
-
-  // Check if already visited - replace with repeated node if so
   if visited . contains ( & node_pid ) {
+    // If already visited, replace with repeated node and return.
     let repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
         config, & node_pid ) ?;
@@ -59,11 +55,8 @@ pub fn completeContents (
     replace_subtree_with_node (
       tree, node_id, repeated_node, has_focused ) ?;
     return Ok (( )); }
-
-  // Add to visited
-  visited . insert ( node_pid . clone () );
-
-  // Read skgnode from disk
+  visited . insert ( // Add to visited
+    node_pid . clone () );
   let skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, node_pid . clone () );
@@ -73,22 +66,11 @@ pub fn completeContents (
     . into_iter ()
     . collect ();
 
-  // Categorize children into content/non-content
-  let mut content_child_ids : Vec < NodeId > =
-    Vec::new ();
-  let mut non_content_child_ids : Vec < NodeId > =
-    Vec::new ();
-  {
-    let node_ref : ego_tree::NodeRef < OrgNode > =
-      tree . get ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    for child in node_ref . children () {
-      let child_node : &OrgNode =
-        child . value ();
-      if child_node . metadata . treatment == Treatment::Content {
-        content_child_ids . push ( child . id () );
-      } else {
-        non_content_child_ids . push ( child . id () ); }}}
+  let ( content_child_ids, mut non_content_child_ids )
+    : ( Vec < NodeId >, Vec < NodeId > )
+    = categorize_children_by_treatment (
+      tree,
+      node_id ) ?;
 
   // Validate content children have IDs
   // and build map from ID to NodeId
@@ -120,7 +102,8 @@ pub fn completeContents (
     child_mut . value () . metadata . treatment =
       Treatment::ParentIgnores;
     content_id_to_node_id . remove (
-      & child_mut . value () . metadata . id . clone () . unwrap () );
+      & child_mut . value ()
+        . metadata . id . clone () . unwrap () );
     non_content_child_ids . push ( *invalid_id ); }
 
   // Build completed-content list
@@ -139,13 +122,34 @@ pub fn completeContents (
         extend_content (
           tree, node_id, disk_id, config )? ); }}
 
-  // Reorder children: non-content, then completed-content
   reorder_children (
     tree,
     node_id,
     & non_content_child_ids,
     & completed_content_nodes ) ?;
   Ok (( )) }
+
+/// Categorize a node's children into Content and non-Content.
+/// Returns (content_child_ids, non_content_child_ids).
+fn categorize_children_by_treatment (
+  tree    : &Tree < OrgNode >,
+  node_id : NodeId,
+) -> Result < ( Vec < NodeId >, Vec < NodeId > ), Box<dyn Error> > {
+  let mut content_child_ids : Vec < NodeId > =
+    Vec::new ();
+  let mut non_content_child_ids : Vec < NodeId > =
+    Vec::new ();
+  let node_ref : ego_tree::NodeRef < OrgNode > =
+    tree . get ( node_id )
+    . ok_or ( "Node not found in tree" ) ?;
+  for child in node_ref . children () {
+    let child_node : &OrgNode =
+      child . value ();
+    if child_node . metadata . treatment == Treatment::Content {
+      content_child_ids . push ( child . id () );
+    } else {
+      non_content_child_ids . push ( child . id () ); }}
+  Ok (( content_child_ids, non_content_child_ids )) }
 
 /// Create a new Content node from disk and append it to a parent.
 fn extend_content (

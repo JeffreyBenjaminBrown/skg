@@ -119,20 +119,20 @@ Steps:
 - Runs `update_graph` on the save instructions.
 - Returns a multi-root content view. */
 async fn update_from_and_rerender_buffer (
-  content       : &str,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  tantivy_index : &TantivyIndex
+  org_buffer_text : &str,
+  typedb_driver   : &TypeDBDriver,
+  config          : &SkgConfig,
+  tantivy_index   : &TantivyIndex
 ) -> Result<String, Box<dyn Error>> {
 
   let (mut orgnode_forest, save_instructions)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
     = buffer_to_save_instructions (
-      content, config, typedb_driver )
+      org_buffer_text, config, typedb_driver )
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;
-  if orgnode_forest.is_empty() {
-    return Err ("No valid org nodes found in content".into()); }
+  if orgnode_forest.is_empty() { return Err (
+    "No valid org nodes found in org_buffer_text" . into()); }
   update_graph (
     save_instructions,
     config.clone(),
