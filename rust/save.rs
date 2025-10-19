@@ -11,6 +11,9 @@ pub use buffer_to_orgnodes::{
 };
 pub mod buffer_to_orgnodes;
 
+pub mod repeated_to_indefinitive;
+pub use repeated_to_indefinitive::change_repeated_to_indefinitive;
+
 pub use orgnodes_to_instructions::{
     orgnodes_to_save_instructions,
     orgnodes_to_dirty_save_instructions,
@@ -26,7 +29,8 @@ use typedb_driver::TypeDBDriver;
 
 
 /// Builds a forest of OrgNode2s:
-///   - Fills in information via 'add_missing_info_to_trees'
+///   - Futzes with repeated and indefinitive
+///   - Fills in information via 'add_missing_info_to_trees'.
 ///   - Reconciles duplicates via 'reconcile_dup_instructions'
 /// Outputs that plus a forest of SaveInstructions.
 pub async fn buffer_to_save_instructions (
@@ -41,6 +45,8 @@ pub async fn buffer_to_save_instructions (
   let mut orgnode_forest : Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
+  change_repeated_to_indefinitive (
+    &mut orgnode_forest );
   add_missing_info_to_trees (
     /* Do 'add_missing_info_to_trees'
     before 'find_buffer_errors_for_saving'.

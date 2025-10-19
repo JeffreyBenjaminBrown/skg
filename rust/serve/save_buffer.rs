@@ -140,16 +140,16 @@ async fn update_from_and_rerender_buffer (
     config.clone(),
     tantivy_index,
     typedb_driver ) . await ?;
-  completeOrgnodeForest (
-    &mut orgnode_forest,
-    config ) ?;
-  set_metadata_relationships_in_forest (
-    &mut orgnode_forest,
-    config,
-    typedb_driver ) . await ?;
-  let regenerated_document : String =
-    render_forest_to_org ( & orgnode_forest );
-  Ok (regenerated_document) }
+  { // modify the orgnode forest before re-rendering it
+    completeOrgnodeForest (
+      &mut orgnode_forest,
+      config ) ?;
+    set_metadata_relationships_in_forest (
+      &mut orgnode_forest,
+      config,
+      typedb_driver ) . await ?; }
+  Ok ( render_forest_to_org (
+    & orgnode_forest )) }
 
 /// Updates **everything** from the given `SaveInstruction`s, in order:
 ///   1) TypeDB
