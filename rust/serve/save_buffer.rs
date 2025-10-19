@@ -1,11 +1,12 @@
 use crate::file_io::update_fs_from_saveinstructions;
 use crate::save::buffer_to_save_instructions;
 use crate::types::SaveError;
-use crate::mk_org_text::multi_root_view;
+use crate::mk_org_text::content_view::render_forest_to_org;
+use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
 use crate::typedb::update::update_typedb_from_saveinstructions;
-use crate::types::{ID, SkgConfig, TantivyIndex, SaveInstruction, OrgNode};
+use crate::types::{SkgConfig, TantivyIndex, SaveInstruction, OrgNode};
 use crate::types::save::format_save_error_as_org;
 
 use ego_tree::Tree;
@@ -124,7 +125,7 @@ async fn update_from_and_rerender_buffer (
   tantivy_index : &TantivyIndex
 ) -> Result<String, Box<dyn Error>> {
 
-  let (orgnode_forest, save_instructions)
+  let (mut orgnode_forest, save_instructions)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
     = buffer_to_save_instructions (
       content, config, typedb_driver )
@@ -137,20 +138,11 @@ async fn update_from_and_rerender_buffer (
     config.clone(),
     tantivy_index,
     typedb_driver ) . await ?;
-  let root_focus_ids : Vec<ID> =
-    orgnode_forest . iter ()
-    . map ( |tree| {
-      let root_node : &OrgNode =
-        tree . root () . value ();
-      root_node . metadata . id . as_ref ()
-        . ok_or_else ( || format!(
-          "Root node '{}' has no ID", root_node . title ) )
-        . map ( |id| id . clone () ) } )
-    . collect::<Result<Vec<ID>, String>>() ?;
+  completeOrgnodeForest (
+    &mut orgnode_forest,
+    config ) ?;
   let regenerated_document : String =
-    multi_root_view ( typedb_driver,
-                      config,
-                      &root_focus_ids ). await ?;
+    render_forest_to_org ( & orgnode_forest );
   Ok (regenerated_document) }
 
 /// Updates **everything** from the given `SaveInstruction`s, in order:

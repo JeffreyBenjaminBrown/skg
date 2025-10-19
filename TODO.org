@@ -1,3 +1,12 @@
+* internalizing
+  cargo nextest run
+* bug
+  If a node's content is repeated,
+  saving it causes it to multiply.
+  This must be because it's not getting dedupd
+  before updating the dbs and fs.
+* rename
+  update_dbs_and_fs -> update_graph
 * TODO in serial
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
@@ -19,6 +28,8 @@
                       config,
                       &root_focus_ids ). await ?;
 **** rust/mk_org_text::format_repeated_node
+*** mightContainMore -> indefinitive
+*** rebuild traversal is top down DFS: root before children
 * ====== BELOW: SORTED, no execution order =======
 * internalize
   Ask for a refactoring plan before embarking.

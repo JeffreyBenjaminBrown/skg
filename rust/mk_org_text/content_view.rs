@@ -66,7 +66,7 @@ pub async fn forest_from_ids (
 /// Build a tree of OrgNodes from a root ID.
 /// The 'visited' argument permits cycle detection
 /// that accounts for any earlier trees in the forest.
-async fn orgnode_tree_from_id_with_earlier_visits (
+pub async fn orgnode_tree_from_id_with_earlier_visits (
   root_id : &ID,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
@@ -85,7 +85,8 @@ async fn orgnode_tree_from_id_with_earlier_visits (
   } else { // It has not been visited yet, so build normally.
     visited . insert ( root_pid . clone () );
     let ( root_orgnode, skgnode ) : ( OrgNode, SkgNode ) =
-      skgnode_and_orgnode_from_pid ( config, & root_pid, root_id ) ?;
+      skgnode_and_orgnode_from_pid (
+        config, & root_pid ) ?;
     let mut tree : Tree < OrgNode > = (
       // a tree containing only the root node
       Tree::new ( root_orgnode ) );
@@ -128,7 +129,7 @@ async fn build_tree_recursive (
   visited . insert ( child_pid . clone () );
   let ( child_orgnode, child_skgnode ) : ( OrgNode, SkgNode ) =
     skgnode_and_orgnode_from_pid (
-      config, & child_pid, child_id ) ?;
+      config, & child_pid ) ?;
   let new_child_id : ego_tree::NodeId = (
     // append new child to its parent
     tree . get_mut ( parent_node_id ) . unwrap ()
@@ -148,10 +149,9 @@ async fn build_tree_recursive (
 /// Fetch a SkgNode from disk.
 /// Make an OrgNode from it, with validated title.
 /// Return both.
-fn skgnode_and_orgnode_from_pid (
-  config    : &SkgConfig,
-  pid       : &ID,
-  source_id : &ID,
+pub fn skgnode_and_orgnode_from_pid (
+  config : &SkgConfig,
+  pid    : &ID,
 ) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
   let path : String = path_from_pid ( config, pid . clone () );
   let skgnode : SkgNode = read_node ( path ) ?;
@@ -165,12 +165,12 @@ fn skgnode_and_orgnode_from_pid (
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
       format! ( "SkgNode with ID {} has an empty title",
-                 source_id ),
+                 pid ),
     )) ); }
   Ok (( orgnode, skgnode )) }
 
 /// Make an OrgNode marked 'repeated' by fetching it from disk.
-fn mk_repeated_orgnode_from_id (
+pub fn mk_repeated_orgnode_from_id (
   config : &SkgConfig,
   id     : &ID,
 ) -> Result < OrgNode, Box<dyn Error> > {
