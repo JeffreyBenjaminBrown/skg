@@ -160,3 +160,54 @@ fn test_multiple_aliascols_in_children() {
                "Multiple_AliasCols_in_Children error should come from the parent node");
   }
 }
+
+#[test]
+fn test_duplicated_content_error() {
+  // Test input with duplicated Content children (same ID)
+  let input_with_duplicated_content: &str =
+    indoc! {"
+            * (skg (id root)) Node with duplicated content
+            ** (skg (id 1)) 1
+            ** (skg (id 1)) 1
+        "};
+
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
+  let errors: Vec<Buffer_Cannot_Be_Saved> =
+    find_buffer_errors_for_saving(&trees);
+
+  let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+    .collect();
+
+  assert_eq!(duplicated_content_errors.len(), 1,
+             "Should find exactly 1 DuplicatedContent error");
+
+  if let Buffer_Cannot_Be_Saved::DuplicatedContent(id) = duplicated_content_errors[0] {
+    assert_eq!(id.0, "1",
+               "DuplicatedContent error should report ID '1'");
+  }
+}
+
+#[test]
+fn test_no_duplicated_content_error_when_different_ids() {
+  // Test input with different Content children IDs (should be valid)
+  let input_without_duplicated_content: &str =
+    indoc! {"
+            * (skg (id root)) Node with duplicated content
+            ** (skg (id 1)) 1
+            ** (skg (id 2)) 2
+        "};
+
+  let trees: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
+  let errors: Vec<Buffer_Cannot_Be_Saved> =
+    find_buffer_errors_for_saving(&trees);
+
+  let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+    .collect();
+
+  assert_eq!(duplicated_content_errors.len(), 0,
+             "Should find no DuplicatedContent errors when IDs are different");
+}

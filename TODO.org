@@ -1,35 +1,12 @@
 * internalizing
   cargo nextest run
 * TODO unordered, unsorted
-** bug
-   If a node's content is repeated,
-   saving it causes it to multiply.
-   This must be because it's not getting dedupd
-   before updating the dbs and fs.
 ** can't run skg-request-containerward-view
 * TODO in serial
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
    but to have a good sense of how complex each stage is.
 ** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
-*** current arrangement
-**** rust/serve/save_buffer::update_from_and_rerender_buffer
-  let (orgnode_forest, save_instructions)
-    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
-    = buffer_to_save_instructions (
-      content, config, typedb_driver )
-    . await . map_err (
-      |e| Box::new(e) as Box<dyn Error> ) ?;
-
-  ...
-
-  let regenerated_document : String =
-    multi_root_view ( typedb_driver,
-                      config,
-                      &root_focus_ids ). await ?;
-**** rust/mk_org_text::format_repeated_node
-*** mightContainMore -> indefinitive
-*** rebuild traversal is top down DFS: root before children
 * ====== BELOW: SORTED, no execution order =======
 * internalize
   Ask for a refactoring plan before embarking.

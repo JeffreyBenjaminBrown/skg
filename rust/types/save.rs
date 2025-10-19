@@ -40,6 +40,7 @@ pub enum Buffer_Cannot_Be_Saved {
   Multiple_AliasCols_in_Children (OrgNode),
   Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have repeated=false and indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
+  DuplicatedContent              (ID), // A node has multiple Content children with the same ID
 }
 
 
@@ -151,6 +152,9 @@ fn format_buffer_validation_error (
     },
     Buffer_Cannot_Be_Saved::AmbiguousDeletion(id) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n", id.0)
+    },
+    Buffer_Cannot_Be_Saved::DuplicatedContent(id) => {
+      format!("Node has multiple Content children with the same ID:\n- ID: {}\n", id.0)
     },
   }
 }

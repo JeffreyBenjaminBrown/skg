@@ -1,7 +1,8 @@
 pub mod contradictory_instructions;
 
-use crate::types::{OrgNode, Treatment, Buffer_Cannot_Be_Saved};
+use crate::types::{ID, OrgNode, Treatment, Buffer_Cannot_Be_Saved};
 use ego_tree::Tree;
+use std::collections::HashSet;
 
 // Re-export the main function
 pub use contradictory_instructions::find_inconsistent_instructions;
@@ -29,14 +30,14 @@ pub fn find_buffer_errors_for_saving (
       }} }
   { // other kinds of error
     for tree in trees {
-      validate_node_and_children(
+      validate_node_and_children (
         tree.root(),
         None, // because a root has no parent
         &mut errors); }}
   errors }
 
 /// Recursively validate a node and its children for saving errors
-fn validate_node_and_children(
+fn validate_node_and_children (
   node_ref: ego_tree::NodeRef<OrgNode>,
   parent_treatment : Option<Treatment>, // that is, the treatment of the parent of what node_ref points to
   errors: &mut Vec<Buffer_Cannot_Be_Saved>
@@ -93,6 +94,21 @@ fn validate_node_and_children(
       errors.push (
         Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children (
           node.clone() )); }}
+
+  { // If a node is definitive, it should have
+    // no two treatment=Content children with the same ID.
+    if ! node . metadata . indefinitive {
+      let mut seen_content_ids : HashSet < ID > =
+        HashSet::new ();
+      for child in node_ref . children () {
+        let child_node : &OrgNode =
+          child . value ();
+        if child_node . metadata . treatment == Treatment::Content {
+          if let Some ( ref child_id ) = child_node . metadata . id {
+            if ! seen_content_ids . insert ( child_id . clone () ) {
+              errors . push (
+                Buffer_Cannot_Be_Saved::DuplicatedContent (
+                  child_id . clone () )); }} }} }}
 
   for child in node_ref.children() { // recurse
     let cloned_rel: Treatment =
