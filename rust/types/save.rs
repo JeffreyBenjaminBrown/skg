@@ -12,8 +12,8 @@ use std::io;
 pub struct NodeSaveAction {
   // PITFALL: It's nonsense if both of these are true.
   // The server will in that case delete,
-  // so the mightContainMore has no effect.
-  pub mightContainMore: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content.
+  // so the indefinitive has no effect.
+  pub indefinitive: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content.
   pub toDelete: bool,
 }
 
@@ -38,7 +38,7 @@ pub enum Buffer_Cannot_Be_Saved {
   Child_of_Alias                 (OrgNode),
   Alias_with_no_AliasCol_Parent  (OrgNode),
   Multiple_AliasCols_in_Children (OrgNode),
-  Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have repeated=false and mightContainMore=false. (Its contents are intended to define those of the node.)
+  Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have repeated=false and indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
 }
 

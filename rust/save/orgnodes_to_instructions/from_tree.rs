@@ -43,9 +43,9 @@ fn interpret_node_dfs(
   { // push another pair
     let node_data = node_ref.value();
     let save_action: NodeSaveAction = NodeSaveAction {
-      mightContainMore : ( node_data.metadata.mightContainMore ||
-                           node_data.metadata.repeat ),
-      toDelete         : node_data.metadata.toDelete, };
+      indefinitive : ( node_data.metadata.indefinitive ||
+                       node_data.metadata.repeat ),
+      toDelete     : node_data.metadata.toDelete, };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;
     result.push (( skg_node, save_action )); }

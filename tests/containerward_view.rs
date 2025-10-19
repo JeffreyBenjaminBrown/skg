@@ -50,8 +50,8 @@ async fn test_containerward_org_view (
     driver, config, &ID("111".to_string()), 2).await?;
   let expected2 = indoc! {"
     ** (skg (id 111) (rels notInParent)) 111
-    *** (skg (id 11) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 11
-    **** (skg (id 1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 1
+    *** (skg (id 11) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 11
+    **** (skg (id 1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 1
     "};
   assert_eq!(result2, expected2);
 
@@ -61,9 +61,9 @@ async fn test_containerward_org_view (
     driver, config, &ID("2".to_string()), 1).await?;
   let expected3 = indoc! {"
     * (skg (id 2) cycle (rels notInParent)) 2
-    ** (skg (id 211) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 211
-    *** (skg (id 21) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 21
-    **** (skg (id 2) (treatment parentIgnores) cycle mightContainMore (rels notInParent containsParent)) 2
+    ** (skg (id 211) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 211
+    *** (skg (id 21) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 21
+    **** (skg (id 2) (treatment parentIgnores) cycle indefinitive (rels notInParent containsParent)) 2
     "};
   assert_eq!(result3, expected3);
 
@@ -74,13 +74,13 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared".to_string()), 3).await?;
   let expected4a = indoc! {"
     *** (skg (id shared) (rels notInParent)) shared
-    **** (skg (id 1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 1
-    **** (skg (id 2) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 2
+    **** (skg (id 1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 1
+    **** (skg (id 2) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 2
     "};
   let expected4b = indoc! {"
     *** (skg (id shared) (rels notInParent)) shared
-    **** (skg (id 2) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 2
-    **** (skg (id 1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 1
+    **** (skg (id 2) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 2
+    **** (skg (id 1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 1
     "};
   assert!(result4 == expected4a ||
           result4 == expected4b,
@@ -95,17 +95,17 @@ async fn test_containerward_org_view (
     * (skg (id shared_1) (rels notInParent)) shared_1
     Some body text.
     The second line of body text.
-    ** (skg (id shared) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared
-    *** (skg (id 1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 1
-    *** (skg (id 2) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 2
+    ** (skg (id shared) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared
+    *** (skg (id 1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 1
+    *** (skg (id 2) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 2
     "};
   let expected5b = indoc! {"
     * (skg (id shared_1) (rels notInParent)) shared_1
     Some body text.
     The second line of body text.
-    ** (skg (id shared) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared
-    *** (skg (id 2) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 2
-    *** (skg (id 1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) 1
+    ** (skg (id shared) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared
+    *** (skg (id 2) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 2
+    *** (skg (id 1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) 1
     "};
   assert!(result5 == expected5a ||
           result5 == expected5b,
@@ -119,13 +119,13 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared_cyclic".to_string()), 1).await?;
   let expected6a = indoc! {"
     * (skg (id shared_cyclic) (rels notInParent)) shared_cyclic
-    ** (skg (id shared_cyclic_1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared_cyclic_1
-    ** (skg (id uncyclic_container) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) uncyclic_container
+    ** (skg (id shared_cyclic_1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared_cyclic_1
+    ** (skg (id uncyclic_container) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) uncyclic_container
     "};
   let expected6b = indoc! {"
     * (skg (id shared_cyclic) (rels notInParent)) shared_cyclic
-    ** (skg (id uncyclic_container) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) uncyclic_container
-    ** (skg (id shared_cyclic_1) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared_cyclic_1
+    ** (skg (id uncyclic_container) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) uncyclic_container
+    ** (skg (id shared_cyclic_1) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared_cyclic_1
     "};
   assert!(result6 == expected6a ||
           result6 == expected6b,
@@ -139,15 +139,15 @@ async fn test_containerward_org_view (
     driver, config, &ID("shared_cyclic_1".to_string()), 1).await?;
   let expected7a = indoc! {"
     * (skg (id shared_cyclic_1) cycle (rels notInParent)) shared_cyclic_1
-    ** (skg (id shared_cyclic) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared_cyclic
-    *** (skg (id shared_cyclic_1) (treatment parentIgnores) cycle mightContainMore (rels notInParent containsParent)) shared_cyclic_1
-    *** (skg (id uncyclic_container) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) uncyclic_container
+    ** (skg (id shared_cyclic) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared_cyclic
+    *** (skg (id shared_cyclic_1) (treatment parentIgnores) cycle indefinitive (rels notInParent containsParent)) shared_cyclic_1
+    *** (skg (id uncyclic_container) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) uncyclic_container
     "};
   let expected7b = indoc! {"
     * (skg (id shared_cyclic_1) cycle (rels notInParent)) shared_cyclic_1
-    ** (skg (id shared_cyclic) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) shared_cyclic
-    *** (skg (id uncyclic_container) (treatment parentIgnores) mightContainMore (rels notInParent containsParent)) uncyclic_container
-    *** (skg (id shared_cyclic_1) (treatment parentIgnores) cycle mightContainMore (rels notInParent containsParent)) shared_cyclic_1
+    ** (skg (id shared_cyclic) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) shared_cyclic
+    *** (skg (id uncyclic_container) (treatment parentIgnores) indefinitive (rels notInParent containsParent)) uncyclic_container
+    *** (skg (id shared_cyclic_1) (treatment parentIgnores) cycle indefinitive (rels notInParent containsParent)) shared_cyclic_1
     "};
   assert!(result7 == expected7a ||
           result7 == expected7b,

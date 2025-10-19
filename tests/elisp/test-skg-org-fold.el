@@ -16,7 +16,7 @@
 1 body
 ** 11
 *** (skg (id 1) folded) 111
-*** (skg (id 2) folded mightContainMore) 112
+*** (skg (id 2) folded indefinitive) 112
 ** 12
 12 body
 *** (skg (id 3) folded) 121
@@ -42,7 +42,7 @@
 1 body
 ** 11
 *** (skg (id 1) folded) 111
-*** (skg (id 2) mightContainMore folded) 112
+*** (skg (id 2) indefinitive folded) 112
 ** 12
 12 body
 *** (skg (id 3) folded) 121

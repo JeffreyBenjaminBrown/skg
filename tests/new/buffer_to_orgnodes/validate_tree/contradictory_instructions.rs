@@ -60,7 +60,7 @@ fn test_find_inconsistent_toDelete_instructions() {
 
 #[test]
 fn test_multiple_defining_containers() {
-  // Test input with multiple nodes having the same ID and both repeated=false, mightContainMore=false
+  // Test input with multiple nodes having the same ID and both repeated=false, indefinitive=false
   let input_with_multiple_defining_containers: &str =
     indoc! {"
             * (skg (id duplicate)) First defining container
@@ -69,8 +69,8 @@ fn test_multiple_defining_containers() {
             Another regular node with the same ID
             * (skg (id duplicate) repeated) Repeated node (not defining)
             This one is ok because repeated=true
-            * (skg (id duplicate) mightContainMore) Might contain more (not defining)
-            This one is ok because mightContainMore=true
+            * (skg (id duplicate) indefinitive) Might contain more (not defining)
+            This one is ok because indefinitive=true
             * (skg (id unique)) Unique node
             This one is fine
         "};

@@ -64,13 +64,13 @@ fn test_metadata_ordering () {
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
           treatment : Treatment::Content,
-          cycle            : true,
-          focused          : false,
-          folded           : false,
-          mightContainMore : false,
-          repeat           : true,
-          toDelete         : false,
-          relationships    : OrgnodeRelationships {
+          cycle         : true,
+          focused       : false,
+          folded        : false,
+          indefinitive  : false,
+          repeat        : true,
+          toDelete      : false,
+          relationships : OrgnodeRelationships {
             parentIsContainer : false,
             .. OrgnodeRelationships::default ()
           }, },

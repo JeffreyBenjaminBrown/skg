@@ -68,7 +68,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg (id child1) folded) child1
             Child1 body
-            * (skg (treatment parentIgnores) mightContainMore) parentIgnores node
+            * (skg (treatment parentIgnores) indefinitive) parentIgnores node
             ParentIgnores body
             * (skg cycle repeated) cycling node
             This node has cycle and repeated flags
@@ -91,7 +91,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let parentIgnores_node = trees[1].root().value();
   assert_eq!(parentIgnores_node.title, "parentIgnores node");
   assert_eq!(parentIgnores_node.metadata.treatment, Treatment::ParentIgnores);
-  assert_eq!(parentIgnores_node.metadata.mightContainMore, true);
+  assert_eq!(parentIgnores_node.metadata.indefinitive, true);
   assert_eq!(parentIgnores_node.body, Some("ParentIgnores body".to_string()));
 
   // Test cycling node
@@ -125,7 +125,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.metadata.cycle, false);
   assert_eq!(first_node.metadata.focused, false);
   assert_eq!(first_node.metadata.folded, false);
-  assert_eq!(first_node.metadata.mightContainMore, false);
+  assert_eq!(first_node.metadata.indefinitive, false);
   assert_eq!(first_node.metadata.repeat, false);
   assert_eq!(first_node.metadata.toDelete, false);
 
@@ -279,4 +279,3 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
   assert!(error_msg.contains("jumps too far between levels"));
   assert!(error_msg.contains("level 3"));
 }
-

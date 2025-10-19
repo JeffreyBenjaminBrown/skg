@@ -17,7 +17,7 @@ use std::error::Error;
 ///
 /// For each node in preorder traversal:
 /// - If treatment is AliasCol: call completeAliasCol
-/// - Otherwise, if NOT mightContainMore: call completeContents
+/// - Otherwise, if NOT indefinitive: call completeContents
 pub fn completeOrgnodeForest (
   forest : &mut Vec < Tree < OrgNode > >,
   config : &SkgConfig,
@@ -44,7 +44,7 @@ fn complete_node_preorder (
     let node : &OrgNode =
       node_ref . value ();
     ( node . metadata . treatment . clone (),
-      node . metadata . mightContainMore ) };
+      node . metadata . indefinitive ) };
   if treatment == Treatment::AliasCol {
     completeAliasCol (
       tree, node_id, config ) ?;

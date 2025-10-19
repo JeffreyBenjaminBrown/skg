@@ -145,12 +145,12 @@ fn metadata_for_element_of_path (
         // that appearance *should* (and does) get this type.
         Treatment::ParentIgnores
       },
-    cycle            : cycle_node.as_ref () == Some ( node_id ),
-    focused          : false,
-    folded           : false,
-    mightContainMore : ! is_terminus,
-    repeat           : false,
-    toDelete         : false,
-    relationships    : OrgnodeRelationships {
+    cycle         : cycle_node.as_ref () == Some ( node_id ),
+    focused       : false,
+    folded        : false,
+    indefinitive  : ! is_terminus,
+    repeat        : false,
+    toDelete      : false,
+    relationships : OrgnodeRelationships {
       parentIsContainer : false,
       .. OrgnodeRelationships::default () }, }}

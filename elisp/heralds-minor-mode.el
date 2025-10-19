@@ -156,7 +156,7 @@ Whitespace in METADATA is ignored."
     (when (member "containsParent" rel-bare-values)
       (push (propertize "⮌" 'face 'heralds-green-face) out))
 
-    ;; mightContainMore
+    ;; indefinitive
     (when (member "might_contain_more" bare-values)
       (push (propertize "+?" 'face 'heralds-blue-face) out))
 

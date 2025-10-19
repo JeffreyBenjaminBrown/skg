@@ -141,12 +141,12 @@ pub fn parse_metadata_to_orgnodemd (
         let bare_value : String =
           atom_to_string ( element ) ?;
         match bare_value . as_str () {
-          "repeated"           => result.repeat = true,
-          "folded"             => result.folded = true,
-          "focused"            => result.focused = true,
-          "cycle"              => result.cycle = true,
-          "mightContainMore"   => result.mightContainMore = true,
-          "toDelete"           => result.toDelete = true,
+          "repeated"     => result.repeat = true,
+          "folded"       => result.folded = true,
+          "focused"      => result.focused = true,
+          "cycle"        => result.cycle = true,
+          "indefinitive" => result.indefinitive = true,
+          "toDelete"     => result.toDelete = true,
           _ => {
             return Err ( format! ( "Unknown metadata value: {}",
                                     bare_value )); }} },
@@ -175,8 +175,8 @@ pub fn orgnodemd_to_string (
     parts.push ( "focused".to_string () ); }
   if metadata.cycle {
     parts.push ( "cycle".to_string () ); }
-  if metadata.mightContainMore {
-    parts.push ( "mightContainMore".to_string () ); }
+  if metadata.indefinitive {
+    parts.push ( "indefinitive".to_string () ); }
   if metadata.toDelete {
     parts.push ( "toDelete".to_string () ); }
 

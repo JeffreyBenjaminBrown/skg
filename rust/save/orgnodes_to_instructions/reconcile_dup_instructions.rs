@@ -9,8 +9,8 @@ The treatment of deletion is omitted from this comment,
 because it's simple. For the rest of this comment
 assume all SaveInstructions have toDelete = false.
 .
-Some SaveInstructions are mightContainMore and some aren't.
-If an SaveInstruction is not mightContainMore,
+Some SaveInstructions are indefinitive and some aren't.
+If an SaveInstruction is not indefinitive,
 call it a 'defining' instruction.
 There can be at most one such instruction.
 If there is, it defines the title and body.
@@ -23,10 +23,10 @@ If none of them has a body either, that is read from disk.
 .
 Similarly, the defining node defines the *initial* contents.
 If there isn't one, the initial contents are read from disk.
-But every 'mightContainMore' instruction can append to that,
+But every 'indefinitive' instruction can append to that,
 as long as it's not repeating something in the initial contents.
 .
-All of them, whether mightContainMore or not, can contribute aliases.
+All of them, whether indefinitive or not, can contribute aliases.
 If none of them mentions aliases,
 aliases are defined by what's on disk.
 .
@@ -101,7 +101,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
     if let Some(node_aliases) = &skg_node.aliases {
       aliases.extend(
         node_aliases . iter() . cloned() ); }
-    if save_action.mightContainMore {
+    if save_action.indefinitive {
       // tentative title and body, appendable contents after dedup
       append_to_content.extend(
         skg_node . contains . iter() . cloned() );
@@ -169,7 +169,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
     hides_from_its_subscriptions: vec![],
     overrides_view_of: vec![],
   }, NodeSaveAction {
-    mightContainMore: false,
+    indefinitive: false,
     toDelete: to_delete,
   } )) }
 

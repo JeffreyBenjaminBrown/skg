@@ -11,17 +11,18 @@ pub struct OrgNode {
   pub body: Option<String>,
 }
 
-/* Each org headline corresponds to a node.
-This is the metadata necessary to interpret the headline. */
+/// Each org headline corresponds to a node.
+/// This is the metadata necessary to interpret the headline.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
   pub id: Option<ID>,
   pub treatment: Treatment,
-  pub cycle: bool,
-  pub focused: bool,
+  pub cycle: bool, // True if a node is in its own org-precedessors.
+  pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool,
-  pub mightContainMore: bool,
-  pub repeat: bool,
+  pub indefinitive: bool, // When a definitive org node is saved, its content determines the content of the corresponding node in the graph. When an *in*definitive node is saved, any of its org-content not currently in the graph are appended to the graph, but no content is removed. (I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
+  pub repeat: bool, /* The node already appears elsewhere in this buffer. PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true.
+TODO : Is this ugly? I don't want to have to keep them in sync. */
   pub toDelete: bool,
   pub relationships: OrgnodeRelationships,
 }
@@ -93,7 +94,7 @@ pub fn default_metadata () -> OrgnodeMetadata {
     cycle : false,
     focused : false,
     folded : false,
-    mightContainMore : false,
+    indefinitive : false,
     repeat : false,
     toDelete : false,
     relationships : OrgnodeRelationships::default (),

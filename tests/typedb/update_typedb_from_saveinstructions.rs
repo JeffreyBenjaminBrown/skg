@@ -25,7 +25,7 @@ fn test_update_nodes_and_relationships2 (
     let org_text = indoc! {"
       * (skg (id 3) toDelete) 33
       * (skg (id 2)) 22
-      ** (skg (id 1) mightContainMore) 1
+      ** (skg (id 1) indefinitive) 1
     "};
 
     // Parse org text to uninterpreted nodes

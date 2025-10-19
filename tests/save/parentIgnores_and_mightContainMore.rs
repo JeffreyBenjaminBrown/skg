@@ -1,4 +1,4 @@
-// cargo test --test save parentIgnores_and_mightContainMore
+// cargo test --test save parentIgnores_and_indefinitive
 
 use indoc::indoc;
 use skg::file_io::{read_node_from_id, update_fs_from_saveinstructions};
@@ -12,14 +12,14 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn test_parentignores_and_mightcontainmore(
+fn test_parentignores_and_indefinitive(
 ) -> Result<(), Box<dyn Error>> {
   let fixtures_path: PathBuf =
     PathBuf::from (
-      "tests/save/parentIgnores_and_mightContainMore/fixtures" );
+      "tests/save/parentIgnores_and_indefinitive/fixtures" );
   let backup_path: PathBuf =
     PathBuf::from (
-      "tests/save/parentIgnores_and_mightContainMore/fixtures_backup" );
+      "tests/save/parentIgnores_and_indefinitive/fixtures_backup" );
 
   // Backup fixtures
   if backup_path . exists () {
@@ -30,16 +30,16 @@ fn test_parentignores_and_mightcontainmore(
   let result : Result<(), Box<dyn Error>> =
     run_with_test_db (
       "skg-test-parentignores",
-      "tests/save/parentIgnores_and_mightContainMore/fixtures",
+      "tests/save/parentIgnores_and_indefinitive/fixtures",
       "/tmp/tantivy-test-parentignores",
       | config, driver | Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which has treatment=parentIgnores and mightContainMore)
+        // Node 1 contains node 2 (which has treatment=parentIgnores and indefinitive)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
         // Node 2 should NOT affect node 1 because treatment=parentIgnores
         let org_text = indoc! {"
           * (skg (id 1)) 1
-          ** (skg (id 2) (treatment parentIgnores) mightContainMore) 2
+          ** (skg (id 2) (treatment parentIgnores) indefinitive) 2
           *** (skg (id 4)) 4
         "};
 
@@ -66,7 +66,7 @@ fn test_parentignores_and_mightcontainmore(
           config.clone(),
         )?;
 
-        { // verify mightContainMore is treated correctly
+        { // verify indefinitive is treated correctly
           let node2: SkgNode =
           read_node_from_id(
             config, driver, &ID("2".to_string() ))
@@ -75,7 +75,7 @@ fn test_parentignores_and_mightcontainmore(
           node2.contains,
           vec![ ID("3".to_string()),
                 ID("4".to_string()) ],
-          "Node 2 should contain [3, 4], because 4 was appended, due to the 'mightContainMore' in the metadata for node 2."
+          "Node 2 should contain [3, 4], because 4 was appended, due to the 'indefinitive' in the metadata for node 2."
         ); }
 
         { // verify parentIgnores is treated correctly

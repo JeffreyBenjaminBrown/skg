@@ -21,7 +21,7 @@ but another node with the same ID that has 'toDelete' false,
 that's a problem.
 .
 And if two nodes with the same ID 'define their contents'
-(identifiable if repeated=false and mightContainMore=false),
+(identifiable if repeated=false and indefinitive=false),
 that's a problem, too.
 .
 STRATEGY:
@@ -90,7 +90,7 @@ fn traverse_node_recursively_and_collect(
       . insert(delete_instruction);
 
     // Handle defining containers
-    if !node.metadata.repeat && !node.metadata.mightContainMore {
+    if !node.metadata.repeat && !node.metadata.indefinitive {
       // Increment the count for this defining container
       *id_defining_count.entry(id.clone()).or_insert(0) += 1; }}
   for child in node_ref.children() { // recurse

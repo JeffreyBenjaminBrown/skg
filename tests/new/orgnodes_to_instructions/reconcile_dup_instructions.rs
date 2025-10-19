@@ -71,7 +71,7 @@ fn test_defining_node_defines (
     "/tmp/tantivy-test-defining-node",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) mightContainMore) 1 adder
+            * (skg (id 1) indefinitive) 1 adder
             Ignored body.
             ** (skg (id 2)) 2
             * (skg (id 1)) 1 definer
@@ -101,10 +101,10 @@ fn test_adding_without_definer (
     "/tmp/tantivy-test-adding-without-definer",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) mightContainMore) 1 adder
+            * (skg (id 1) indefinitive) 1 adder
             ** (skg (id 2)) 2
             ** (skg (id 4)) 4
-            ** (skg (id 4) mightContainMore) 4 again
+            ** (skg (id 4) indefinitive) 4 again
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
@@ -116,7 +116,7 @@ fn test_adding_without_definer (
         .expect("Should have instruction for id:1");
 
       assert_eq!(
-        // even a mightContainMore will clobber the title on disk
+        // even a indefinitive will clobber the title on disk
         id1_instruction.0.title,
         "1 adder");
       assert_eq!(
@@ -125,7 +125,7 @@ fn test_adding_without_definer (
         Some("body from disk".to_string()));
       assert_eq!(
         // Since there is no defining node, contents are read from disk,
-        // and then the mightContainMore node with id 1
+        // and then the indefinitive node with id 1
         // appends its contents, with deduplication.
         id1_instruction.0.contains,
         vec![ ID::from("2"),

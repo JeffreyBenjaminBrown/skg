@@ -16,7 +16,7 @@ fn test_orgnodes_to_save_instructions_basic() {
             Root body content
             ** (skg (id child1)) child 1
             Child body
-            * (skg (id root2) mightContainMore toDelete) root node 2
+            * (skg (id root2) indefinitive toDelete) root node 2
             Root 2 body
         "};
 
@@ -33,7 +33,7 @@ fn test_orgnodes_to_save_instructions_basic() {
   assert_eq!(root1_skg.body, Some("Root body content".to_string()));
   assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
   assert_eq!(root1_skg.contains, vec![ID::from("child1")]);
-  assert_eq!(root1_action.mightContainMore, false);
+  assert_eq!(root1_action.indefinitive, false);
   assert_eq!(root1_action.toDelete, false);
 
   // Test child1
@@ -42,7 +42,7 @@ fn test_orgnodes_to_save_instructions_basic() {
   assert_eq!(child1_skg.body, Some("Child body".to_string()));
   assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
   assert_eq!(child1_skg.contains, vec![]); // No children
-  assert_eq!(child1_action.mightContainMore, false);
+  assert_eq!(child1_action.indefinitive, false);
   assert_eq!(child1_action.toDelete, false);
 
   // Test root2 with metadata flags
@@ -50,7 +50,7 @@ fn test_orgnodes_to_save_instructions_basic() {
   assert_eq!(root2_skg.title, "root node 2");
   assert_eq!(root2_skg.body, Some("Root 2 body".to_string()));
   assert_eq!(root2_skg.ids, vec![ID::from("root2")]);
-  assert_eq!(root2_action.mightContainMore, true);
+  assert_eq!(root2_action.indefinitive, true);
   assert_eq!(root2_action.toDelete, true);
 }
 
@@ -255,7 +255,7 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
 fn test_orgnodes_to_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
-            * (skg (id doc1) mightContainMore) Document 1
+            * (skg (id doc1) indefinitive) Document 1
             Document body
             ** (skg (id aliases1) (treatment aliasCol)) Doc1 Aliases
             *** (skg (id alias_a) (treatment alias)) First Document
@@ -282,14 +282,14 @@ fn test_orgnodes_to_save_instructions_complex_scenario() {
   assert_eq!(doc1_skg.aliases, Some(vec!["First Document".to_string(), "Primary Doc".to_string()]));
   assert_eq!(doc1_skg.contains,
              vec![ID::from("section1"), ID::from("section3")]);
-  assert_eq!(doc1_action.mightContainMore, true);
+  assert_eq!(doc1_action.indefinitive, true);
   assert_eq!(doc1_action.toDelete, false);
 
   // Test section2 with toDelete
   let (section2_skg, section2_action) = &instructions[3];
   assert_eq!(section2_skg.title, "Section 2");
   assert_eq!(section2_action.toDelete, true);
-  assert_eq!(section2_action.mightContainMore, false);
+  assert_eq!(section2_action.indefinitive, false);
 
   // Test that subsection1a is child of section1
   let (section1_skg, _) = &instructions[1];

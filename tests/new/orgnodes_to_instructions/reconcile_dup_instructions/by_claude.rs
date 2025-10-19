@@ -27,7 +27,7 @@ fn create_test_node(
 // Helper function to create a NodeSaveAction
 fn create_save_action(might_contain_more: bool, to_delete: bool) -> NodeSaveAction {
     NodeSaveAction {
-        mightContainMore: might_contain_more,
+        indefinitive: might_contain_more,
         toDelete: to_delete,
     }
 }
@@ -217,7 +217,7 @@ fn test_title_and_body_precedence() {
 
 #[test]
 fn test_last_instruction_defines_title_and_body() {
-    // Test that the LAST mightContainMore instruction defines title/body
+    // Test that the LAST indefinitive instruction defines title/body
     // when there's no defining instruction
 
     let instructions = vec![
@@ -237,7 +237,7 @@ fn test_last_instruction_defines_title_and_body() {
     let mut maybe_body: Option<String> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.mightContainMore {
+        if save_action.indefinitive {
             maybe_title = Some(skg_node.title.clone());
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
@@ -251,8 +251,8 @@ fn test_last_instruction_defines_title_and_body() {
 
 #[test]
 fn test_defining_instruction_takes_precedence() {
-    // Test that a defining instruction (mightContainMore=false)
-    // takes precedence over all mightContainMore instructions
+    // Test that a defining instruction (indefinitive=false)
+    // takes precedence over all indefinitive instructions
 
     let instructions = vec![
         (create_test_node("id1", "First Title",
@@ -274,7 +274,7 @@ fn test_defining_instruction_takes_precedence() {
     let mut defines_content: Option<Vec<ID>> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.mightContainMore {
+        if save_action.indefinitive {
             maybe_title = Some(skg_node.title.clone());
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
@@ -312,7 +312,7 @@ fn test_initial_content_from_disk_when_no_defining() {
     let mut append_to_content: Vec<ID> = Vec::new();
 
     for (skg_node, save_action) in &instructions {
-        if save_action.mightContainMore {
+        if save_action.indefinitive {
             append_to_content.extend(skg_node.contains.iter().cloned());
         } else {
             defines_content = Some(skg_node.contains.clone());
@@ -355,7 +355,7 @@ fn test_body_from_disk_when_no_instruction_has_body() {
     let mut defines_body: Option<String> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.mightContainMore {
+        if save_action.indefinitive {
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
             }
@@ -377,18 +377,18 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 
 #[test]
 fn test_might_contain_more_vs_definitive() {
-    // Test the distinction between mightContainMore (appendable) and definitive instructions
+    // Test the distinction between indefinitive (appendable) and definitive instructions
     let appendable_action = create_save_action(true, false);
     let definitive_action = create_save_action(false, false);
 
-    assert!(appendable_action.mightContainMore);
-    assert!(!definitive_action.mightContainMore);
+    assert!(appendable_action.indefinitive);
+    assert!(!definitive_action.indefinitive);
 
-    // In the actual function, mightContainMore=true means:
+    // In the actual function, indefinitive=true means:
     // - append to content
     // - set maybe_title and maybe_body
     //
-    // mightContainMore=false means:
+    // indefinitive=false means:
     // - set definitive content (error if already set)
     // - set definitive title and body
 }

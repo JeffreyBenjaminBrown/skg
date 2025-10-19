@@ -11,24 +11,24 @@ use skg::types::{ID, OrgNode};
 use skg::mk_org_text::content_view::render_forest_to_org;
 
 #[test]
-fn test_mightContainMore_identity_at_multiple_levels
+fn test_indefinitive_identity_at_multiple_levels
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
-    "skg-test-complete-contents-mightcontainmore",
+    "skg-test-complete-contents-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
-    "/tmp/tantivy-test-complete-contents-mightcontainmore",
+    "/tmp/tantivy-test-complete-contents-indefinitive",
     |config, _driver| Box::pin ( async move {
-      test_mightContainMore_identity_at_multiple_levels_logic (
+      test_indefinitive_identity_at_multiple_levels_logic (
         config ) . await
     } )) }
 
-async fn test_mightContainMore_identity_at_multiple_levels_logic (
+async fn test_indefinitive_identity_at_multiple_levels_logic (
   config : &skg::types::SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
     indoc! { "
-      * (skg (id a) mightContainMore) a
-      ** (skg (id c) mightContainMore) c
+      * (skg (id a) indefinitive) a
+      ** (skg (id c) indefinitive) c
       *** (skg (id d) (treatment parentIgnores)) d
     " };
 
@@ -106,25 +106,25 @@ async fn test_mightContainMore_identity_at_multiple_levels_logic (
   Ok (( )) }
 
 #[test]
-fn test_visited_and_mightContainMore
+fn test_visited_and_indefinitive
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
-    "skg-test-complete-contents-visited-mightcontainmore",
+    "skg-test-complete-contents-visited-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
-    "/tmp/tantivy-test-complete-contents-visited-mightcontainmore",
+    "/tmp/tantivy-test-complete-contents-visited-indefinitive",
     |config, _driver| Box::pin ( async move {
-      test_visited_and_mightContainMore_logic (
+      test_visited_and_indefinitive_logic (
         config ) . await
     } )) }
 
-async fn test_visited_and_mightContainMore_logic (
+async fn test_visited_and_indefinitive_logic (
   config : &skg::types::SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  // Test 1: mightContainMore with non-mightContainMore child
+  // Test 1: indefinitive with non-indefinitive child
   {
     let input_org_text : &str =
       indoc! { "
-        * (skg (id a) mightContainMore) a
+        * (skg (id a) indefinitive) a
         ** (skg (id c)) c
         *** (skg (id d) (treatment parentIgnores)) d
       " };
@@ -147,7 +147,7 @@ async fn test_visited_and_mightContainMore_logic (
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, input_org_text,
-        "mightContainMore root with empty visited should preserve tree" );
+        "indefinitive root with empty visited should preserve tree" );
     }
 
     // Test with 'a' in visited
@@ -169,7 +169,7 @@ async fn test_visited_and_mightContainMore_logic (
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, input_org_text,
-        "mightContainMore root with 'a' in visited should preserve tree" );
+        "indefinitive root with 'a' in visited should preserve tree" );
     }
   }
 
@@ -177,7 +177,7 @@ async fn test_visited_and_mightContainMore_logic (
   {
     let input_org_text_self_ref : &str =
       indoc! { "
-        * (skg (id d) mightContainMore) d
+        * (skg (id d) indefinitive) d
         ** (skg (id d)) d
         *** (skg (id d)) d
         **** (skg (id d)) d
@@ -223,7 +223,7 @@ async fn test_visited_and_mightContainMore_logic (
 
       let expected_output_from_second : &str =
         indoc! { "
-          * (skg (id d) mightContainMore) d
+          * (skg (id d) indefinitive) d
           ** (skg (id d) repeated) d
           Repeated, probably above. Edit there, not here.
         " };
@@ -238,18 +238,18 @@ async fn test_visited_and_mightContainMore_logic (
   Ok (( )) }
 
 #[test]
-fn test_visited_and_not_mightContainMore
+fn test_visited_and_not_indefinitive
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
-    "skg-test-complete-contents-visited-not-mightcontainmore",
+    "skg-test-complete-contents-visited-not-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
-    "/tmp/tantivy-test-complete-contents-visited-not-mightcontainmore",
+    "/tmp/tantivy-test-complete-contents-visited-not-indefinitive",
     |config, _driver| Box::pin ( async move {
-      test_visited_and_not_mightContainMore_logic (
+      test_visited_and_not_indefinitive_logic (
         config ) . await
     } )) }
 
-async fn test_visited_and_not_mightContainMore_logic (
+async fn test_visited_and_not_indefinitive_logic (
   config : &skg::types::SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =

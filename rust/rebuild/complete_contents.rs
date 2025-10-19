@@ -18,7 +18,7 @@ use std::error::Error;
 /// so that its 'id' field is the PID (no need to call pid_from_id).
 ///
 /// Given a node N:
-/// - If N is mightContainMore, do nothing and return
+/// - If N is indefinitive, do nothing and return
 /// - Get N's ID (error if missing)
 /// - If N's ID is in 'visited', replace N with a repeated marker and return
 /// - Add N's ID to 'visited'
@@ -33,12 +33,12 @@ pub fn completeContents (
   config    : &SkgConfig,
   visited   : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  // Check if node is mightContainMore
+  // Check if node is indefinitive
   {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    if node_ref . value () . metadata . mightContainMore {
+    if node_ref . value () . metadata . indefinitive {
       return Ok (( )); }}
 
   // Get node's ID
