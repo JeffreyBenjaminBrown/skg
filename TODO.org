@@ -1,12 +1,12 @@
 * internalizing
   cargo nextest run
-* bug
-  If a node's content is repeated,
-  saving it causes it to multiply.
-  This must be because it's not getting dedupd
-  before updating the dbs and fs.
-* rename
-  update_dbs_and_fs -> update_graph
+* TODO unordered, unsorted
+** bug
+   If a node's content is repeated,
+   saving it causes it to multiply.
+   This must be because it's not getting dedupd
+   before updating the dbs and fs.
+** can't run skg-request-containerward-view
 * TODO in serial
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
@@ -34,25 +34,6 @@
 * internalize
   Ask for a refactoring plan before embarking.
 * features
-** [[id:ba8fbc06-bb9c-4d69-bb1c-34cd1f80fdf4][multiple level-1 branches]]
-** generalize the Rust backpath rendering function
-   Takes a lambda involving (probably)
-     path_to_end_cycle_and_or_branches,
-   and a starting level.
-   The lambda can drop the first member of the path, or not.
-** link-sourceward view
-*** then eliminate further redundancy, if any
-** override the ordinary save command
-** If there is a containerward "}" herald, the "ID exists" herald can be omitted.
-** [[id:fb72f38e-bef6-4de9-a29b-00f0e46afbbb][deletion]]
-** [[id:bc8fd4c3-0566-400c-96a8-0f4632e7fd1c][merging]]
-** not pressing
-*** show binary relationship label with optional intermediating node
-    esp. nice if you can filter on those labels,
-    or on an ontology they belong to that groups them
-*** show when a link is bi-directional
-*** list which links are in a node's recursive content
-*** [[id:e6e855d9-f2e8-456e-87d7-e82379ead9f1][show co-targeters, co-ancestors]]
 * QA
 ** redundancies
 *** mk_orgnode from save/buffer_to_orgnodes/uninterpreted.rs

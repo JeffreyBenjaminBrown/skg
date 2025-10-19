@@ -26,9 +26,10 @@ Now these commands can be evaluated (here, in Emacs):
   (skg-doc-disconnect)
 ```
 
-From a skg content view buffer, edited content can be saved:
+From a skg content view buffer, these can be run:
 ```
-skg-request-save-buffer
+skg-request-save-buffer        ;; save
+skg-request-containerward-view ;; currently buggy
 ```
 
 From any link in a search results buffer, links can be visited:

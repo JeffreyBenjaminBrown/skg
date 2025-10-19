@@ -30,74 +30,36 @@ pub fn completeAliasCol (
   let parent_id : ID =
     get_aliascol_parent_id (
       tree,
-      aliascol_node_id
-    ) ?;
+      aliascol_node_id ) ?;
   let skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, parent_id . clone () );
     read_node ( path )? };
-  let aliases_from_disk : HashSet < String > = // source of truth
+  let aliases_from_disk : HashSet < String > = (
+    // source of truth
     skgnode . aliases
-    . unwrap_or_default ()
-    . into_iter ()
-    . collect ();
-
-  // Collect aliases from tree (checking for non-Alias children)
+      . unwrap_or_default ()
+      . into_iter ()
+      . collect ( ));
   let aliases_from_tree : Vec < String > =
     collect_alias_titles ( tree, aliascol_node_id ) ?;
-
-  // Compute which aliases are valid (on disk)
-  let good_aliases : HashSet < String > =
+  let good_aliases_in_tree : HashSet < String > = (
+    // aliases in tree that match aliases on disk
     aliases_from_tree
-    . iter ()
-    . filter ( |alias| aliases_from_disk . contains ( *alias ))
-    . cloned ()
-    . collect ();
-
-  // Compute missing aliases (on disk but not in tree)
-  let missing_aliases_from_disk : HashSet < String > =
+      . iter ()
+      . filter ( |alias| aliases_from_disk . contains ( *alias ))
+      . cloned ()
+      . collect ( ));
+  let missing_aliases_from_disk : HashSet < String > = (
+    // aliases on disk but not in tree
     aliases_from_disk
-    . difference ( & good_aliases )
-    . cloned ()
-    . collect ();
-
-  // Remove duplicates and invalid children in one pass
-  let mut removed_focused : bool = false;
-  {
-    let children_to_remove : Vec < NodeId > = {
-      let aliascol_ref : ego_tree::NodeRef < OrgNode > =
-        tree . get ( aliascol_node_id )
-        . ok_or ( "AliasCol node not found" ) ?;
-
-      let mut result : Vec < NodeId > =
-        Vec::new ();
-      let mut seen : HashSet < String > =
-        HashSet::new ();
-
-      for child in aliascol_ref . children () {
-        let child_node : &OrgNode =
-          child . value ();
-        let title : &String =
-          & child_node . title;
-
-        // Remove if: duplicate OR not valid
-        let is_duplicate : bool =
-          ! seen . insert ( title . clone () );
-        let is_invalid : bool =
-          ! good_aliases . contains ( title );
-
-        if is_duplicate || is_invalid {
-          result . push ( child . id () );
-          if child_node . metadata . focused {
-            removed_focused = true; }} }
-      result };
-
-    for child_id in children_to_remove {
-      let mut child_mut : ego_tree::NodeMut < OrgNode > =
-        tree . get_mut ( child_id )
-        . ok_or ( "Child node not found" ) ?;
-      child_mut . detach (); }}
-
+      . difference ( & good_aliases_in_tree )
+      . cloned ()
+      . collect ( ));
+  remove_duplicates_and_false_aliases_handling_focus (
+    tree, // PITFALL: Gets modified.
+    aliascol_node_id,
+    & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
     let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
       tree . get_mut ( aliascol_node_id )
@@ -110,13 +72,6 @@ pub fn completeAliasCol (
         metadata : md,
         title    : alias,
         body     : None, }); }}
-
-  if removed_focused {
-    // Transfer focus to AliasCol if any focused nodes were removed
-    let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
-      tree . get_mut ( aliascol_node_id )
-      . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . value () . metadata . focused = true; }
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.
@@ -142,6 +97,74 @@ fn collect_alias_titles (
       child_node . title . clone () );
   }
   Ok ( aliases_from_tree ) }
+
+/// Removes duplicate and invalid Alias children from an AliasCol,
+/// preserving focus information.
+///
+/// If a duplicate node has focus, after it is removed,
+/// the remaining node with the same title gets focus.
+///
+/// If an invalid (non-existent on disk) alias has focus,
+/// focus is transferred to the AliasCol itself.
+fn remove_duplicates_and_false_aliases_handling_focus (
+  tree             : &mut ego_tree::Tree < OrgNode >,
+  aliascol_node_id : NodeId,
+  good_aliases     : &HashSet < String >,
+) -> Result < (), Box<dyn Error> > {
+  let mut removed_focused : bool = false;
+  let mut focused_title : Option < String > = None;
+
+  let children_to_remove : Vec < NodeId > = {
+    let aliascol_ref : ego_tree::NodeRef < OrgNode >
+      = ( tree . get ( aliascol_node_id )
+          . ok_or ( "AliasCol node not found" ) ) ?;
+    let mut children_to_remove_acc : Vec < NodeId > =
+      Vec::new ();
+    let mut seen : HashSet < String > =
+      HashSet::new ();
+    for child in aliascol_ref . children () {
+      let child_node : &OrgNode =
+        child . value ();
+      let title : &String =
+        & child_node . title;
+      let is_duplicate : bool =
+        ! seen . insert ( title . clone () );
+      let is_invalid : bool =
+        ! good_aliases . contains ( title );
+      if is_duplicate || is_invalid {
+        children_to_remove_acc . push ( child . id () );
+        if child_node . metadata . focused {
+          if is_duplicate {
+            focused_title = Some ( title . clone () ); }
+          else {
+            removed_focused = true; }}} }
+    children_to_remove_acc };
+
+  for child_id in children_to_remove {
+    let mut child_mut : ego_tree::NodeMut < OrgNode > =
+      tree . get_mut ( child_id )
+      . ok_or ( "Child node not found" ) ?;
+    child_mut . detach (); }
+
+  if let Some ( title ) = focused_title {
+    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( aliascol_node_id )
+      . ok_or ( "AliasCol node not found" ) ?;
+    for child in aliascol_ref . children () {
+      if child . value () . title == title {
+        let mut child_mut : ego_tree::NodeMut < OrgNode > =
+          tree . get_mut ( child . id () )
+          . ok_or ( "Child node not found" ) ?;
+        child_mut . value () . metadata . focused = true;
+        break; }}}
+
+  if removed_focused {
+    let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
+      tree . get_mut ( aliascol_node_id )
+      . ok_or ( "AliasCol node not found" ) ?;
+    aliascol_mut . value () . metadata . focused = true; }
+
+  Ok (( )) }
 
 /// Get the parent ID of an AliasCol node.
 /// Verifies the node is an AliasCol and its parent has an ID.

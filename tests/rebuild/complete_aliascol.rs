@@ -148,3 +148,130 @@ async fn test_completeAliasCol_logic (
   );
 
   Ok (( )) }
+
+#[test]
+fn test_completeAliasCol_duplicate_aliases_different_orders
+  () -> Result < (), Box<dyn Error> > {
+  run_with_test_db (
+    "skg-test-complete-aliascol-duplicates",
+    "tests/rebuild/complete_aliascol/fixtures",
+    "/tmp/tantivy-test-complete-aliascol-duplicates",
+    |config, _driver| Box::pin ( async move {
+      test_completeAliasCol_duplicate_aliases_different_orders_logic ( config ) . await
+    } )) }
+
+async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
+  config : &skg::types::SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+
+  let org_text : &str =
+    indoc! { "
+      * (skg (id a)) a
+      ** (skg (treatment aliasCol)) aliases
+      *** (skg (treatment alias)) b
+      *** (skg (treatment alias) focused) b
+      ** (skg (treatment aliasCol)) aliases
+      *** (skg (treatment alias) focused) b
+      *** (skg (treatment alias)) b
+    " };
+
+  let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    org_to_uninterpreted_nodes ( org_text ) ?;
+
+  let tree : &mut ego_tree::Tree < OrgNode > =
+    & mut forest [ 0 ];
+
+  // Find the NodeIds for both AliasCol nodes
+  let first_aliascol_id : ego_tree::NodeId = {
+    tree . root ()
+      . first_child () . unwrap ()
+      . id ()
+  };
+  let second_aliascol_id : ego_tree::NodeId = {
+    tree . root ()
+      . first_child () . unwrap ()
+      . next_sibling () . unwrap ()
+      . id ()
+  };
+
+  // Test first AliasCol
+  completeAliasCol (
+    tree,
+    first_aliascol_id,
+    & config
+  ) ?;
+
+  {
+    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( first_aliascol_id ) . unwrap ();
+    let children : Vec < & OrgNode > =
+      aliascol_ref . children ()
+      . map ( |n| n . value () )
+      . collect ();
+
+    assert_eq! (
+      children . len (),
+      2,
+      "First AliasCol should have exactly 2 children (b focused, c)"
+    );
+    assert_eq! (
+      children [ 0 ] . title,
+      "b",
+      "First child should be 'b'"
+    );
+    assert! (
+      children [ 0 ] . metadata . focused,
+      "First child should be focused"
+    );
+    assert_eq! (
+      children [ 1 ] . title,
+      "c",
+      "Second child should be 'c'"
+    );
+    assert! (
+      ! children [ 1 ] . metadata . focused,
+      "Second child should not be focused"
+    );
+  }
+
+  // Test second AliasCol
+  completeAliasCol (
+    tree,
+    second_aliascol_id,
+    & config
+  ) ?;
+
+  {
+    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( second_aliascol_id ) . unwrap ();
+    let children : Vec < & OrgNode > =
+      aliascol_ref . children ()
+      . map ( |n| n . value () )
+      . collect ();
+
+    assert_eq! (
+      children . len (),
+      2,
+      "Second AliasCol should have exactly 2 children (b focused, c)"
+    );
+    assert_eq! (
+      children [ 0 ] . title,
+      "b",
+      "First child should be 'b'"
+    );
+    assert! (
+      children [ 0 ] . metadata . focused,
+      "First child should be focused"
+    );
+    assert_eq! (
+      children [ 1 ] . title,
+      "c",
+      "Second child should be 'c'"
+    );
+    assert! (
+      ! children [ 1 ] . metadata . focused,
+      "Second child should not be focused"
+    );
+  }
+
+  Ok (( )) }
