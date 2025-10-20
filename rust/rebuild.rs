@@ -5,7 +5,7 @@ pub mod complete_contents;
 pub use complete_contents::completeContents;
 
 pub mod integrate_backpath;
-pub use integrate_backpath::integrate_containerward_path;
+pub use integrate_backpath::{build_and_integrate_containerward_path, integrate_containerward_path};
 
 use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
 use ego_tree::Tree;

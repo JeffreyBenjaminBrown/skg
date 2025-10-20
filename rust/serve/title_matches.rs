@@ -1,7 +1,7 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{OrgNode, OrgnodeMetadata, TantivyIndex, RelToParent};
+use crate::types::{OrgNode, TantivyIndex, RelToParent};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 

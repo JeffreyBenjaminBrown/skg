@@ -176,6 +176,42 @@ pub fn compare_headlines_modulo_id(
     _ => false,  // One is headline, other is not, or they have different errors
   }}
 
+/// Compare two OrgNode trees by traversing them DFS.
+/// Compares all structure and all content including IDs.
+/// Ignores internal NodeId values.
+/// (PITFALL: Naive comparison of trees just compares NodeIds,
+/// which are nearly meaningless.)
+pub fn compare_orgnode_forests (
+  trees1 : & [ Tree < OrgNode > ],
+  trees2 : & [ Tree < OrgNode > ]
+) -> bool {
+  if trees1 . len () != trees2 . len () {
+    return false; }
+  for ( tree1, tree2 ) in trees1 . iter () . zip ( trees2 . iter () ) {
+    if ! compare_orgnode_trees (
+      tree1 . root (), tree2 . root () )
+    { return false; } }
+  true }
+
+/// Compare two nodes and their subtrees recursively.
+fn compare_orgnode_trees (
+  node1 : ego_tree::NodeRef < OrgNode >,
+  node2 : ego_tree::NodeRef < OrgNode >
+) -> bool {
+  let n1 : & OrgNode = node1 . value ();
+  let n2 : & OrgNode = node2 . value ();
+  // Compare the node values directly
+  if n1 != n2 { return false; }
+  // Compare children recursively
+  let children1 : Vec < _ > =
+    node1 . children () . collect ();
+  let children2 : Vec < _ > =
+    node2 . children () . collect ();
+  children1 . len () == children2 . len () &&
+    children1 . iter () . zip ( children2 . iter () )
+    . all ( | ( c1, c2 ) |
+                compare_orgnode_trees ( *c1, *c2 ) ) }
+
 /// Compare two tree forests modulo ID differences.
 /// Trees are considered the same if their structure and content match,
 /// ignoring ID values (but not ID presence/absence).
