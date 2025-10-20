@@ -134,6 +134,12 @@ fn metadata_for_element_of_path (
 ) -> OrgnodeMetadata {
   OrgnodeMetadata {
     id               : Some ( node_id.clone () ),
+    cycle         : cycle_node.as_ref () == Some ( node_id ),
+    focused       : false,
+    folded        : false,
+    relationships : OrgnodeRelationships {
+      parentIsContainer : false,
+      .. OrgnodeRelationships::default () },
     treatment        :
       if is_terminus {
         Treatment::Content
@@ -145,12 +151,7 @@ fn metadata_for_element_of_path (
         // that appearance *should* (and does) get this type.
         Treatment::ParentIgnores
       },
-    cycle         : cycle_node.as_ref () == Some ( node_id ),
-    focused       : false,
-    folded        : false,
     indefinitive  : ! is_terminus,
     repeat        : false,
     toDelete      : false,
-    relationships : OrgnodeRelationships {
-      parentIsContainer : false,
-      .. OrgnodeRelationships::default () }, }}
+  }}

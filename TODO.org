@@ -1,12 +1,68 @@
 * internalizing
   cargo nextest run
 * TODO unordered, unsorted
+** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
+** rebuilding containerward view code
+*** current setup
+**** pub async fn containerward_org_view (
+  driver         : &TypeDBDriver,
+  config         : &SkgConfig,
+  terminus       : &ID, // you could think of it as the origin, but everything else contains it, so I thought terminus was clearer
+  terminus_level : usize,
+) -> Result<String, Box<dyn Error>> {
+***** pub async fn path_containerward_to_end_cycle_and_or_branches (
+   db_name : &str,
+   driver  : &TypeDBDriver,
+   node    : &ID
+ ) -> Result < ( Vec<ID>,    // the path, starting with the input
+                 Option<ID>, // the first repeated node, if any
+                 HashSet<ID> // branches, if any
+***** async fn render_linear_portion_of_path (
+   config: &SkgConfig,
+   driver: &TypeDBDriver,
+   path: &[ID],
+   cycle_node: &Option<ID>,
+   terminus_level: usize,
+ ) -> Result<String, Box<dyn Error>> {
+*** desired setup
+    serial
+**** in Emacs
+***** User asks for containerward paths from a node.
+***** Emacs adds '(request containerward-view)' to its metadata.
+***** Emacs sends the entire buffer for re-rendering.
+**** Rust saves and re-renders
+***** Other nodes are re-rendered normally.
+***** for the node with the containerward view request
+****** call 'path_containerward_to_end_cycle_and_or_branches'
+****** merge that information with the node's content
+       Drop the head (terminus) of the containerward path.
+******* for as long as the path is nonempty
+        Look for the next among the node's children.
+        If it's there, drop another head of the path,
+        and recurse on what's left of the path and that new child.
+        Otherwise, prepend a new treatment=ParentIgnores child
+          (this could later be improved to use treatment=Content
+          when the child is content)
+        generating an OrgNode from that ID,
+        and similarly recurse on the tail and that child.
+******* if the path is empty
+******** If there are branches,
+         merge them all with the node's children.
+         For any that are not among its children,
+         create new treatment=ParentIgnores orgnodes,
+         and prepend them.
+******** If there are no branches, but a cycle node
+         merge the cycle node with the node's children,
+         or generate a new treatment=ParentIgnores one,
+         and prepend it.
+******** otherwise return without changes
 ** can't run skg-request-containerward-view
-* TODO in serial
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
    but to have a good sense of how complex each stage is.
-** [[id:6d031428-eea3-4019-8122-80bd5fa6f9d4][rebuild buffer in Rust with the same structure \ skg]]
+** "indefinitive nodes skip the visited-checking logic entirely"
+   when saving a buffer.
+   This is not clearly a problem.
 * ====== BELOW: SORTED, no execution order =======
 * internalize
   Ask for a refactoring plan before embarking.

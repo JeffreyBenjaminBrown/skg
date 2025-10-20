@@ -164,21 +164,12 @@ pub fn orgnodemd_to_string (
     Vec::new ();
   if let Some ( ref id ) = metadata.id {
     parts.push ( format! ( "(id {})", id.0 )); }
-  if metadata.treatment != Treatment::Content {
-    parts.push ( format! (
-      "(treatment {})", metadata.treatment )); }
-  if metadata.repeat {
-    parts.push ( "repeated".to_string () ); }
-  if metadata.folded {
-    parts.push ( "folded".to_string () ); }
-  if metadata.focused {
-    parts.push ( "focused".to_string () ); }
   if metadata.cycle {
     parts.push ( "cycle".to_string () ); }
-  if metadata.indefinitive {
-    parts.push ( "indefinitive".to_string () ); }
-  if metadata.toDelete {
-    parts.push ( "toDelete".to_string () ); }
+  if metadata.focused {
+    parts.push ( "focused".to_string () ); }
+  if metadata.folded {
+    parts.push ( "folded".to_string () ); }
 
   // Build rels s-expr (only if has non-default values)
   let mut rel_parts : Vec<String> = Vec::new ();
@@ -203,6 +194,16 @@ pub fn orgnodemd_to_string (
 
   if ! rel_parts . is_empty () {
     parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
+
+  if metadata.treatment != Treatment::Content {
+    parts.push ( format! (
+      "(treatment {})", metadata.treatment )); }
+  if metadata.indefinitive {
+    parts.push ( "indefinitive".to_string () ); }
+  if metadata.repeat {
+    parts.push ( "repeated".to_string () ); }
+  if metadata.toDelete {
+    parts.push ( "toDelete".to_string () ); }
 
   parts.join ( " " ) }
 

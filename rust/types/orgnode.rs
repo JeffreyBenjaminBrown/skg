@@ -16,15 +16,21 @@ pub struct OrgNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
   pub id: Option<ID>,
-  pub treatment: Treatment,
+
+  /* Fields that dictate only how it is shown. */
+
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
-  pub folded: bool,
+  pub folded: bool, // folded in the Emacs org-mode sense
+  pub relationships: OrgnodeRelationships,
+
+  /* Fields that determine how it is treated. */
+
+  pub treatment: Treatment,
   pub indefinitive: bool, // When a definitive org node is saved, its content determines the content of the corresponding node in the graph. When an *in*definitive node is saved, any of its org-content not currently in the graph are appended to the graph, but no content is removed. (I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
   pub repeat: bool, /* The node already appears elsewhere in this buffer. PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true.
-TODO : Is this ugly? I don't want to have to keep them in sync. */
+TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
   pub toDelete: bool,
-  pub relationships: OrgnodeRelationships,
 }
 
 /* Relationship metadata about a node's connections in the graph. */
@@ -37,6 +43,9 @@ pub struct OrgnodeRelationships {
   pub numLinksIn: Option<usize>,
 }
 
+/// 'Treatment' describes how a node relates to its parent.
+/// This influences both how the user should read it,
+/// and how Rust should treat the data when it is saved.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Treatment {
   Content, // The default relationship.
@@ -90,12 +99,12 @@ impl Default for OrgnodeRelationships {
 pub fn default_metadata () -> OrgnodeMetadata {
   OrgnodeMetadata {
     id : None,
-    treatment : Treatment::Content,
     cycle : false,
     focused : false,
     folded : false,
+    relationships : OrgnodeRelationships::default (),
+    treatment : Treatment::Content,
     indefinitive : false,
     repeat : false,
     toDelete : false,
-    relationships : OrgnodeRelationships::default (),
   }}

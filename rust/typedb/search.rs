@@ -55,9 +55,9 @@ pub async fn path_containerward_to_end_cycle_and_or_branches (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
-) -> Result < ( Vec<ID>,
-                Option<ID>,
-                HashSet<ID>
+) -> Result < ( Vec<ID>,    // the path, starting with the input
+                Option<ID>, // the first repeated node, if any
+                HashSet<ID> // branches, if any
 ), Box<dyn Error> > {
   path_to_end_cycle_and_or_branches (
     db_name,
@@ -74,9 +74,9 @@ pub async fn path_sourceward_to_end_cycle_and_or_branches (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
-) -> Result < ( Vec<ID>,
-                Option<ID>,
-                HashSet<ID>
+) -> Result < ( Vec<ID>,    // the path, starting with the input
+                Option<ID>, // the first repeated node, if any
+                HashSet<ID> // branches, if any
 ), Box<dyn Error> > {
   path_to_end_cycle_and_or_branches (
     db_name,
@@ -123,7 +123,8 @@ pub async fn find_links_to (
   until reaching a cycle and/or branches.
 The path begins with the input node.
 Following the specified relationship,
-  each time we find a single related node,
+  each time we find exactly one 'related node'
+  (meaning a node related in the specified manner),
   we append it to the path.
 The process can end in three ways:
 1 - If no related node is found, we return the path and exit.

@@ -22,7 +22,7 @@ pub fn handle_containerward_view_request (
     Ok ( (orgnode_md, level, _title) ) => {
       match orgnode_md.id {
         Some ( id ) => {
-          let content : String = block_on ( async {
+          let generated_view : String = block_on ( async {
             match containerward_org_view (
               typedb_driver,
               config,
@@ -33,7 +33,7 @@ pub fn handle_containerward_view_request (
                 "Error generating containerward view: {}", e), }} );
           send_response_with_length_prefix (
             stream,
-            & content ); },
+            & generated_view ); },
         None => {
           let error_msg : String =
             "No ID found in headline metadata".to_string ();

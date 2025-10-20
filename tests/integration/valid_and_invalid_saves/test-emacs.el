@@ -112,7 +112,7 @@
     (goto-char (point-min))
     (search-forward "** (skg (id 1)) 1")
     (replace-match "** (skg (id 1) repeated) 1")
-    (message "✓ Fixed content to use repeated"))
+    (message "✓ Amended previously invalid content to use repeated, so it is now valid"))
 
   ;; Switch to buffer to make it current
   (switch-to-buffer "*skg-content-view*")
@@ -129,16 +129,17 @@
     (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
       (message "Updated buffer content: %s" updated-content)
 
-      ;; Should contain the repeated node message
-      (if (string-match-p "Repeated, probably above. Edit there, not here." updated-content)
+      ;; Should contain cycle and indefinitive markers
+      (if (and (string-match-p "cycle" updated-content)
+               (string-match-p "indefinitive" updated-content))
           (progn
-            (message "✓ PASS: Valid save worked and showed repeated node message")
+            (message "✓ PASS: Valid save worked and showed cycle indefinitive")
             (message "✓ PASS: Integration test successful!")
             (setq integration-test-completed t)
             (kill-emacs 0))
         (progn
-          (message "✗ FAIL: Expected repeated node message not found")
-          (message "Expected to contain: 'Repeated, probably above. Edit there, not here.'")
+          (message "✗ FAIL: Expected cycle and indefinitive markers not found")
+          (message "Expected to contain: 'cycle' and 'indefinitive'")
           (message "Got: %s" updated-content)
           (kill-emacs 1))))))
 
