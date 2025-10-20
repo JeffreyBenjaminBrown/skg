@@ -44,7 +44,7 @@ fn validate_node_and_children (
 ) {
 
   let node: &OrgNode = node_ref.value();
-  match node.metadata.relToParent {
+  match node.metadata.code.relToParent {
     RelToParent::AliasCol => {
       if node.body.is_some() {
         errors.push(
@@ -87,7 +87,7 @@ fn validate_node_and_children (
     let aliasCol_children_count: usize =
       node_ref . children()
       . filter ( |child|
-                  child.value() . metadata.relToParent
+                  child.value() . metadata.code.relToParent
                   == RelToParent::AliasCol )
       . count();
     if aliasCol_children_count > 1 {
@@ -97,13 +97,13 @@ fn validate_node_and_children (
 
   { // If a node is definitive, it should have
     // no two treatment=Content children with the same ID.
-    if ! node . metadata . indefinitive {
+    if ! node . metadata . code.indefinitive {
       let mut seen_content_ids : HashSet < ID > =
         HashSet::new ();
       for child in node_ref . children () {
         let child_node : &OrgNode =
           child . value ();
-        if child_node . metadata . relToParent == RelToParent::Content {
+        if child_node . metadata . code.relToParent == RelToParent::Content {
           if let Some ( ref child_id ) = child_node . metadata . id {
             if ! seen_content_ids . insert ( child_id . clone () ) {
               errors . push (
@@ -112,7 +112,7 @@ fn validate_node_and_children (
 
   for child in node_ref.children() { // recurse
     let cloned_rel: RelToParent =
-      node.metadata.relToParent.clone();
+      node.metadata.code.relToParent.clone();
     validate_node_and_children(
       child, Some(cloned_rel), errors);
   }}

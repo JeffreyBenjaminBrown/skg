@@ -81,7 +81,7 @@ fn traverse_node_recursively_and_collect(
   if let Some(id) = &node.metadata.id {
     // Handle delete instructions
     let delete_instruction =
-      if node.metadata.toDelete {
+      if node.metadata.code.toDelete {
         WhetherToDelete::Delete
       } else { WhetherToDelete::DoNotDelete };
     id_toDelete_instructions // record delete_instruction
@@ -90,7 +90,7 @@ fn traverse_node_recursively_and_collect(
       . insert(delete_instruction);
 
     // Handle defining containers
-    if !node.metadata.repeat && !node.metadata.indefinitive {
+    if !node.metadata.code.repeat && !node.metadata.code.indefinitive {
       // Increment the count for this defining container
       *id_defining_count.entry(id.clone()).or_insert(0) += 1; }}
   for child in node_ref.children() { // recurse

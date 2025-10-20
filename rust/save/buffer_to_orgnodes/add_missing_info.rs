@@ -57,7 +57,7 @@ fn add_missing_info_dfs (
 
   let node_rel: RelToParent =
     ( // Used to process each child.
-      node_ref . value () . metadata . relToParent . clone () );
+      node_ref . value () . metadata . code.relToParent . clone () );
   { // Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
@@ -85,13 +85,13 @@ fn assign_alias_relation_if_needed(
 ) {
   if let Some(parent_rel) = parent_treatment {
     if parent_rel == RelToParent::AliasCol {
-      node.metadata.relToParent = RelToParent::Alias; }} }
+      node.metadata.code.relToParent = RelToParent::Alias; }} }
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_id_if_needed(
   node: &mut OrgNode
 ) {
-  if ( node.metadata.relToParent == RelToParent::Content
+  if ( node.metadata.code.relToParent == RelToParent::Content
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}

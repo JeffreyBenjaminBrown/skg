@@ -67,7 +67,7 @@ pub fn completeAliasCol (
     for alias in missing_aliases_from_disk {
       let mut md : OrgnodeMetadata =
         default_metadata ();
-      md . relToParent = RelToParent::Alias;
+      md . code.relToParent = RelToParent::Alias;
       aliascol_mut . append ( OrgNode {
         metadata : md,
         title    : alias,
@@ -88,10 +88,10 @@ fn collect_alias_titles (
   for child in aliascol_ref . children () {
     let child_node : &OrgNode =
       child . value ();
-    if child_node . metadata . relToParent != RelToParent::Alias {
+    if child_node . metadata . code.relToParent != RelToParent::Alias {
       return Err (
         format! ( "AliasCol has non-Alias child with relToParent: {:?}",
-                  child_node . metadata . relToParent )
+                  child_node . metadata . code.relToParent )
         . into () ); }
     aliases_from_tree . push (
       child_node . title . clone () );
@@ -133,7 +133,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         ! good_aliases . contains ( title );
       if is_duplicate || is_invalid {
         children_to_remove_acc . push ( child . id () );
-        if child_node . metadata . focused {
+        if child_node . metadata . viewData.focused {
           if is_duplicate {
             focused_title = Some ( title . clone () ); }
           else {
@@ -155,14 +155,14 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         let mut child_mut : ego_tree::NodeMut < OrgNode > =
           tree . get_mut ( child . id () )
           . ok_or ( "Child node not found" ) ?;
-        child_mut . value () . metadata . focused = true;
+        child_mut . value () . metadata . viewData.focused = true;
         break; }}}
 
   if removed_focused {
     let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . value () . metadata . focused = true; }
+    aliascol_mut . value () . metadata . viewData.focused = true; }
 
   Ok (( )) }
 
@@ -176,10 +176,10 @@ fn get_aliascol_parent_id (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
     . value ();
-  if aliascol_node . metadata . relToParent != RelToParent::AliasCol {
+  if aliascol_node . metadata . code.relToParent != RelToParent::AliasCol {
     return Err (
       format! ( "Node is not an AliasCol: {:?}",
-                 aliascol_node . metadata . relToParent )
+                 aliascol_node . metadata . code.relToParent )
         . into () ); }
   let parent_node_id : NodeId =
     tree . get ( aliascol_node_id )

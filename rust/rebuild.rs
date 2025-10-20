@@ -54,8 +54,8 @@ fn complete_node_preorder (
       . ok_or ( "Node not found in tree" ) ?;
     let node : &OrgNode =
       node_ref . value ();
-    ( node . metadata . relToParent . clone (),
-      node . metadata . indefinitive ) };
+    ( node . metadata . code.relToParent . clone (),
+      node . metadata . code.indefinitive ) };
   if treatment == RelToParent::AliasCol {
     completeAliasCol (
       tree, node_id, config ) ?;
@@ -84,9 +84,9 @@ fn complete_node_preorder (
           . ok_or ( "Child not found in tree" ) ?;
         if ancestor_path . contains ( child_pid ) {
           // Mark as a cycle
-          child_mut . value () . metadata . cycle = true;
+          child_mut . value () . metadata . viewData.cycle = true;
         } else { // Mark as not a cycle
-          child_mut . value () . metadata . cycle = false; }
+          child_mut . value () . metadata . viewData.cycle = false; }
         ancestor_path . push ( child_pid . clone () ); }
       complete_node_preorder (
         tree, child_id, config, visited, ancestor_path ) ?;

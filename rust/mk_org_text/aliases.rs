@@ -23,7 +23,7 @@ pub fn aliases_to_org (
   let aliases_header_node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.relToParent = RelToParent::AliasCol;
+                   md.code.relToParent = RelToParent::AliasCol;
                    md },
       title : "".to_string (),
       // The only child node, the 'aliases' headline, has no title.
@@ -37,7 +37,7 @@ pub fn aliases_to_org (
     let alias_node : OrgNode =
       OrgNode {
         metadata : { let mut md = default_metadata ();
-                     md.relToParent = RelToParent::Alias;
+                     md.code.relToParent = RelToParent::Alias;
                      md },
         title : alias,
         body : None, };

@@ -120,10 +120,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (id 1) (rels (containers 0))) 1
+  let expected = indoc! {"* (skg (id 1) (view (rels (containers 0)))) 1
                           1 has a body
-                          * (skg (id 2) (rels (containers 0))) 2
-                          * (skg (id 1) (rels (containers 0)) repeated) 1
+                          * (skg (id 2) (view (rels (containers 0)))) 2
+                          * (skg (id 1) (view (rels (containers 0))) (code repeated)) 1
                           Repeated, probably above. Edit there, not here.
                           "};
   assert_eq!(result, expected,
@@ -148,11 +148,11 @@ fn test_single_root_view_with_cycle
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (id a) (rels (containers 0) (contents 1))) a
-                              ** (skg (id b) (rels (containers 2) (contents 1))) b
+      let expected = indoc! {"* (skg (id a) (view (rels (containers 0) (contents 1)))) a
+                              ** (skg (id b) (view (rels (containers 2) (contents 1)))) b
                               b has a body
-                              *** (skg (id c) (rels containsParent (contents 1))) c
-                              **** (skg (id b) cycle (rels containsParent (containers 2) (contents 1)) repeated) b
+                              *** (skg (id c) (view (rels containsParent (contents 1)))) c
+                              **** (skg (id b) (view cycle (rels containsParent (containers 2) (contents 1))) (code repeated)) b
                               Repeated, probably above. Edit there, not here.
                               "};
       assert_eq!(result, expected,
@@ -181,14 +181,14 @@ fn test_multi_root_view_with_shared_nodes
 
       println!("Multi root view with shared nodes result:\n{}", result);
 
-      let expected = indoc! {"* (skg (id 1) (rels (containers 0) (contents 2))) title 1
+      let expected = indoc! {"* (skg (id 1) (view (rels (containers 0) (contents 2)))) title 1
                               This one string could span pages,
                               and it can include newlines, no problem.
-                              ** (skg (id 2) (rels (linksIn 1))) title 2
+                              ** (skg (id 2) (view (rels (linksIn 1)))) title 2
                               this one string could span pages
-                              ** (skg (id 3) (rels (linksIn 1))) title 3
+                              ** (skg (id 3) (view (rels (linksIn 1)))) title 3
                               this one string could span pages
-                              * (skg (id 2) (rels (linksIn 1)) repeated) title 2
+                              * (skg (id 2) (view (rels (linksIn 1))) (code repeated)) title 2
                               Repeated, probably above. Edit there, not here.
                               "};
       assert_eq!(result, expected,

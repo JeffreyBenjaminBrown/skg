@@ -64,13 +64,13 @@ fn test_org_to_uninterpreted_nodes2() {
 fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let input: &str =
     indoc! {"
-            * (skg (id root) focused) root
+            * (skg (id root) (view focused)) root
             Root body content
-            ** (skg (id child1) folded) child1
+            ** (skg (id child1) (view folded)) child1
             Child1 body
-            * (skg (relToParent parentIgnores) indefinitive) parentIgnores node
+            * (skg (code (relToParent parentIgnores) indefinitive)) parentIgnores node
             ParentIgnores body
-            * (skg cycle repeated) cycling node
+            * (skg (view cycle) (code repeated)) cycling node
             This node has cycle and repeated flags
         "};
 
@@ -83,22 +83,22 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let root_node = trees[0].root().value();
   assert_eq!(root_node.title, "root");
   assert_eq!(root_node.metadata.id, Some(ID::from("root")));
-  assert_eq!(root_node.metadata.focused, true);
-  assert_eq!(root_node.metadata.folded, false);
+  assert_eq!(root_node.metadata.viewData.focused, true);
+  assert_eq!(root_node.metadata.viewData.folded, false);
   assert_eq!(root_node.body, Some("Root body content".to_string()));
 
   // Test parentIgnores node
   let parentIgnores_node = trees[1].root().value();
   assert_eq!(parentIgnores_node.title, "parentIgnores node");
-  assert_eq!(parentIgnores_node.metadata.relToParent, RelToParent::ParentIgnores);
-  assert_eq!(parentIgnores_node.metadata.indefinitive, true);
+  assert_eq!(parentIgnores_node.metadata.code.relToParent, RelToParent::ParentIgnores);
+  assert_eq!(parentIgnores_node.metadata.code.indefinitive, true);
   assert_eq!(parentIgnores_node.body, Some("ParentIgnores body".to_string()));
 
   // Test cycling node
   let cycle_node = trees[2].root().value();
   assert_eq!(cycle_node.title, "cycling node");
-  assert_eq!(cycle_node.metadata.cycle, true);
-  assert_eq!(cycle_node.metadata.repeat, true);
+  assert_eq!(cycle_node.metadata.viewData.cycle, true);
+  assert_eq!(cycle_node.metadata.code.repeat, true);
   assert_eq!(cycle_node.body, Some("This node has cycle and repeated flags".to_string()));
 }
 
@@ -121,13 +121,13 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title, "simple node");
   assert_eq!(first_node.body, Some("Simple body".to_string()));
   assert_eq!(first_node.metadata.id, None);
-  assert_eq!(first_node.metadata.relToParent, RelToParent::Content);
-  assert_eq!(first_node.metadata.cycle, false);
-  assert_eq!(first_node.metadata.focused, false);
-  assert_eq!(first_node.metadata.folded, false);
-  assert_eq!(first_node.metadata.indefinitive, false);
-  assert_eq!(first_node.metadata.repeat, false);
-  assert_eq!(first_node.metadata.toDelete, false);
+  assert_eq!(first_node.metadata.code.relToParent, RelToParent::Content);
+  assert_eq!(first_node.metadata.viewData.cycle, false);
+  assert_eq!(first_node.metadata.viewData.focused, false);
+  assert_eq!(first_node.metadata.viewData.folded, false);
+  assert_eq!(first_node.metadata.code.indefinitive, false);
+  assert_eq!(first_node.metadata.code.repeat, false);
+  assert_eq!(first_node.metadata.code.toDelete, false);
 
   // Test second node - should have no body
   let second_node = trees[1].root().value();
@@ -170,7 +170,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
-            * (skg (id test) folded) simple node with metadata
+            * (skg (id test) (view folded)) simple node with metadata
             Node body
             * regular node without metadata
             Regular body
@@ -185,14 +185,14 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let meta_node = trees[0].root().value();
   assert_eq!(meta_node.title, "simple node with metadata");
   assert_eq!(meta_node.metadata.id, Some(ID::from("test")));
-  assert_eq!(meta_node.metadata.folded, true);
+  assert_eq!(meta_node.metadata.viewData.folded, true);
   assert_eq!(meta_node.body, Some("Node body".to_string()));
 
   // Test node without metadata (should have defaults)
   let regular_node = trees[1].root().value();
   assert_eq!(regular_node.title, "regular node without metadata");
   assert_eq!(regular_node.metadata.id, None);
-  assert_eq!(regular_node.metadata.folded, false);
+  assert_eq!(regular_node.metadata.viewData.folded, false);
   assert_eq!(regular_node.body, Some("Regular body".to_string()));
 }
 
@@ -229,7 +229,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * (skg invalidKey:value) invalid key
-            * (skg (relToParent invalidValue) invalid value
+            * (skg (code (relToParent invalidValue)) invalid value
             * (skg unknownFlag) unknown flag
         "};
 
@@ -240,7 +240,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
   // Test invalid relToParent value
-  let input_invalid_value = "* (skg (relToParent invalidValue)) invalid value";
+  let input_invalid_value = "* (skg (code (relToParent invalidValue))) invalid value";
   let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown relToParent value: invalidValue"));
@@ -249,7 +249,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";
   let result = org_to_uninterpreted_nodes(input_unknown_flag);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unknown metadata value: unknownFlag"));
+  assert!(result.unwrap_err().contains("Unexpected element in metadata"));
 }
 
 #[test]

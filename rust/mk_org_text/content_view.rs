@@ -126,7 +126,7 @@ async fn build_tree_recursive (
     let mut repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
         config, & child_pid ) ?;
-    repeated_node . metadata . cycle = is_cycle;
+    repeated_node . metadata . viewData.cycle = is_cycle;
     tree . get_mut ( parent_node_id ) . unwrap ()
       . append ( repeated_node );
     return Ok (( )); }
@@ -134,7 +134,7 @@ async fn build_tree_recursive (
   let ( mut child_orgnode, child_skgnode ) : ( OrgNode, SkgNode ) =
     skgnode_and_orgnode_from_pid (
       config, & child_pid ) ?;
-  child_orgnode . metadata . cycle = is_cycle;
+  child_orgnode . metadata . viewData.cycle = is_cycle;
   let new_child_id : ego_tree::NodeId = (
     // append new child to its parent
     tree . get_mut ( parent_node_id ) . unwrap ()
@@ -185,7 +185,7 @@ pub fn mk_repeated_orgnode_from_id (
   let path : String = path_from_pid ( config, id . clone () );
   let skgnode : SkgNode = read_node ( path ) ?;
   let mut md = default_metadata ();
-  md . repeat = true;
+  md . code . repeat = true;
   md . id = Some ( id . clone () );
   Ok ( OrgNode {
     metadata : md,
@@ -295,26 +295,26 @@ fn set_metadata_relationships_in_node_recursive (
   if let Some ( ref node_pid ) = node_pid_opt {
     // Update all relationship fields
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . relationships . numContainers =
+      . metadata . viewData . relationships . numContainers =
       rel_data . num_containers . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . relationships . numContents =
+      . metadata . viewData . relationships . numContents =
       rel_data . num_contents . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . relationships . numLinksIn =
+      . metadata . viewData . relationships . numLinksIn =
       rel_data . num_links_in . get ( node_pid ) . copied ();
     if let Some ( parent_id ) = parent_pid {
       // Set parent relationship flags if we have a parent.
       // TODO | PITFALL: If there is no parent,
       // these fields are meaningless.
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . metadata . relationships . parentIsContainer =
+        . metadata . viewData . relationships . parentIsContainer =
         rel_data . content_to_containers
         . get ( node_pid )
         . map_or ( false, | containers |
                    containers . contains ( parent_id ));
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . metadata . relationships . parentIsContent =
+        . metadata . viewData . relationships . parentIsContent =
         rel_data . container_to_contents
         . get ( node_pid )
         . map_or ( false, | contents |
@@ -343,7 +343,7 @@ pub fn render_forest_to_org (
     let node : &OrgNode = node_ref . value ();
     let mut out : String =
       render_org_node_from_text ( level, node );
-    if ! node . metadata . repeat {
+    if ! node . metadata . code.repeat {
       for child in node_ref . children () {
         out . push_str (
           & render_node_subtree_to_org (

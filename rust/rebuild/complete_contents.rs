@@ -37,7 +37,7 @@ pub fn completeContents (
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    if node_ref . value () . metadata . indefinitive {
+    if node_ref . value () . metadata . code.indefinitive {
       return Ok (( )); }}
   let node_pid : ID = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
@@ -99,7 +99,7 @@ pub fn completeContents (
     let mut child_mut : NodeMut < OrgNode > =
       tree . get_mut ( *invalid_id )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . metadata . relToParent =
+    child_mut . value () . metadata . code.relToParent =
       RelToParent::ParentIgnores;
     content_id_to_node_id . remove (
       & child_mut . value ()
@@ -145,7 +145,7 @@ fn categorize_children_by_treatment (
   for child in node_ref . children () {
     let child_node : &OrgNode =
       child . value ();
-    if child_node . metadata . relToParent == RelToParent::Content {
+    if child_node . metadata . code.relToParent == RelToParent::Content {
       content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}
@@ -177,7 +177,7 @@ fn subtree_contains_focused (
     match tree . get ( node_id ) {
       Some ( n ) => n,
       None => return false, };
-  if node_ref . value () . metadata . focused {
+  if node_ref . value () . metadata . viewData.focused {
     return true; }
   for child in node_ref . children () {
     if subtree_contains_focused ( tree, child . id () ) {
@@ -193,7 +193,7 @@ fn replace_subtree_with_node (
   transfer_focus : bool,
 ) -> Result < (), Box<dyn Error> > {
   if transfer_focus {
-    new_node . metadata . focused = true; }
+    new_node . metadata . viewData.focused = true; }
   // Collect child IDs before mutating
   let child_ids : Vec < NodeId > = {
     let node_ref : ego_tree::NodeRef < OrgNode > =

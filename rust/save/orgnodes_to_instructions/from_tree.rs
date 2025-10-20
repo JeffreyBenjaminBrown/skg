@@ -43,15 +43,15 @@ fn interpret_node_dfs(
   { // push another pair
     let node_data = node_ref.value();
     let save_action: NodeSaveAction = NodeSaveAction {
-      indefinitive : ( node_data.metadata.indefinitive ||
-                       node_data.metadata.repeat ),
-      toDelete     : node_data.metadata.toDelete, };
+      indefinitive : ( node_data.metadata.code.indefinitive ||
+                       node_data.metadata.code.repeat ),
+      toDelete     : node_data.metadata.code.toDelete, };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;
     result.push (( skg_node, save_action )); }
   { // Recurse into everything except aliases.
     for child in node_ref.children() {
-      let child_rel = &child.value().metadata.relToParent;
+      let child_rel = &child.value().metadata.code.relToParent;
       match child_rel {
         RelToParent::AliasCol | RelToParent::Alias => {
           // These are ignored.
@@ -98,10 +98,10 @@ fn collect_aliases (
 ) -> Option<Vec<String>> {
   let mut aliases: Vec<String> = Vec::new();
   for alias_col_child in node_ref.children()
-  { if ( alias_col_child . value() . metadata . relToParent
+  { if ( alias_col_child . value() . metadata . code.relToParent
          == RelToParent::AliasCol ) // child of interest
     { for alias_child in alias_col_child.children() {
-      if ( alias_child . value() . metadata . relToParent
+      if ( alias_child . value() . metadata . code.relToParent
            == RelToParent::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
@@ -118,9 +118,9 @@ fn collect_contents (
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if ( child . value() . metadata . relToParent
+    if ( child . value() . metadata . code.relToParent
          == RelToParent::Content
-         && ! child . value() . metadata . toDelete ) {
+         && ! child . value() . metadata . code.toDelete ) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone());
       }} }

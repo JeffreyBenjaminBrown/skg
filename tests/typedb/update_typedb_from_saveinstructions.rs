@@ -23,9 +23,9 @@ fn test_update_nodes_and_relationships2 (
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
-      * (skg (id 3) toDelete) 33
+      * (skg (id 3) (code toDelete)) 33
       * (skg (id 2)) 22
-      ** (skg (id 1) indefinitive) 1
+      ** (skg (id 1) (code indefinitive)) 1
     "};
 
     // Parse org text to uninterpreted nodes

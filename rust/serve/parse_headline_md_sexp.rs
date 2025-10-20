@@ -1,7 +1,7 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, ID, RelToParent};
+use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent};
 use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
@@ -44,8 +44,118 @@ pub fn find_sexp_end (
   None // Unbalanced parentheses
 }
 
+/// Parse the (view ...) s-expression and update viewData.
+fn parse_view_sexp (
+  items : &[Sexp],
+  view_data : &mut OrgnodeViewData
+) -> Result<(), String> {
+  for view_element in items {
+    match view_element {
+      Sexp::List ( subitems ) if subitems . len () >= 2 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        if key == "rels" {
+          parse_rels_sexp ( &subitems[1..], &mut view_data . relationships ) ?;
+        } else {
+          return Err ( format! ( "Unknown view key: {}", key )); }
+      },
+      Sexp::Atom ( _ ) => {
+        let bare_value : String =
+          atom_to_string ( view_element ) ?;
+        match bare_value . as_str () {
+          "cycle"   => view_data . cycle = true,
+          "focused" => view_data . focused = true,
+          "folded"  => view_data . folded = true,
+          _ => {
+            return Err ( format! ( "Unknown view value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in view"
+                           . to_string () ); }} }
+  Ok (( )) }
+
+/// Parse the (rels ...) s-expression and update relationships.
+fn parse_rels_sexp (
+  items : &[Sexp],
+  relationships : &mut OrgnodeRelationships
+) -> Result<(), String> {
+  for rel_element in items {
+    match rel_element {
+      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
+        let rel_key : String =
+          atom_to_string ( &kv_pair[0] ) ?;
+        let rel_value : String =
+          atom_to_string ( &kv_pair[1] ) ?;
+        match rel_key . as_str () {
+          "containers" => {
+            relationships . numContainers = Some (
+              rel_value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid containers value: {}", rel_value )) ? ); },
+          "contents" => {
+            relationships . numContents = Some (
+              rel_value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid contents value: {}", rel_value )) ? ); },
+          "linksIn" => {
+            relationships . numLinksIn = Some (
+              rel_value.parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid linksIn value: {}", rel_value )) ? ); },
+          _ => { return Err ( format! ( "Unknown rels key: {}",
+                                         rel_key )); }} },
+      Sexp::Atom ( _ ) => {
+        let bare_value : String =
+          atom_to_string ( rel_element ) ?;
+        match bare_value . as_str () {
+          "notInParent"    => relationships . parentIsContainer = false,
+          "containsParent" => relationships . parentIsContent   = true,
+          _ => {
+            return Err ( format! ( "Unknown rels value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in rels"
+                           . to_string () ); }} }
+  Ok (( )) }
+
+/// Parse the (code ...) s-expression and update code.
+fn parse_code_sexp (
+  items : &[Sexp],
+  code : &mut OrgnodeCode
+) -> Result<(), String> {
+  for code_element in items {
+    match code_element {
+      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
+        let key : String =
+          atom_to_string ( &kv_pair[0] ) ?;
+        let value : String =
+          atom_to_string ( &kv_pair[1] ) ?;
+        match key . as_str () {
+          "relToParent" => {
+            code . relToParent = match value . as_str () {
+              "alias"         => RelToParent::Alias,
+              "aliasCol"      => RelToParent::AliasCol,
+              "content"       => RelToParent::Content,
+              "parentIgnores" => RelToParent::ParentIgnores,
+              _ => return Err (
+                format! ( "Unknown relToParent value: {}", value )),
+            }; },
+          _ => { return Err ( format! ( "Unknown code key: {}",
+                                         key )); }} },
+      Sexp::Atom ( _ ) => {
+        let bare_value : String =
+          atom_to_string ( code_element ) ?;
+        match bare_value . as_str () {
+          "indefinitive" => code . indefinitive = true,
+          "repeated"     => code . repeat = true,
+          "toDelete"     => code . toDelete = true,
+          _ => {
+            return Err ( format! ( "Unknown code value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in code"
+                           . to_string () ); }} }
+  Ok (( )) }
+
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
-/// Format: "(skg (id xyz) repeated folded (treatment parentIgnores))"
+/// Format: "(skg (id xyz) (view ...) (code ...))"
 /// Now uses the sexp crate for proper s-expression parsing.
 /// Takes the full s-expression including the "(skg ...)" wrapper.
 pub fn parse_metadata_to_orgnodemd (
@@ -78,132 +188,84 @@ pub fn parse_metadata_to_orgnodemd (
         let first : String =
           atom_to_string ( &items[0] ) ?;
         match first . as_str () {
-          "rels" => {
-            // Parse nested rels s-expr
-            for rel_element in &items[1..] {
-              match rel_element {
-                Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
-                  let key : String =
-                    atom_to_string ( &kv_pair[0] ) ?;
-                  let value : String =
-                    atom_to_string ( &kv_pair[1] ) ?;
-                  match key . as_str () {
-                    "containers" => {
-                      result.relationships.numContainers = Some (
-                        value.parse::<usize>()
-                          . map_err ( |_| format! (
-                            "Invalid containers value: {}", value )) ? ); },
-                    "contents" => {
-                      result.relationships.numContents = Some (
-                        value.parse::<usize>()
-                          . map_err ( |_| format! (
-                            "Invalid contents value: {}", value )) ? ); },
-                    "linksIn" => {
-                      result.relationships.numLinksIn = Some (
-                        value.parse::<usize>()
-                          . map_err ( |_| format! (
-                            "Invalid linksIn value: {}", value )) ? ); },
-                    _ => { return Err ( format! ( "Unknown rels key: {}",
-                                                   key )); }} },
-                Sexp::Atom ( _ ) => {
-                  let bare_value : String =
-                    atom_to_string ( rel_element ) ?;
-                  match bare_value . as_str () {
-                    "notInParent"    => result.relationships.parentIsContainer = false,
-                    "containsParent" => result.relationships.parentIsContent   = true,
-                    _ => {
-                      return Err ( format! ( "Unknown rels value: {}",
-                                              bare_value )); }} },
-                _ => { return Err ( "Unexpected element in rels"
-                                     . to_string () ); }} }},
           "id" => {
             if items . len () != 2 {
               return Err ( "id requires exactly one value".to_string () ); }
             let value : String =
               atom_to_string ( &items[1] ) ?;
             result.id = Some ( ID::from ( value )); },
-          "relToParent" => {
-            if items . len () != 2 {
-              return Err ( "relToParent requires exactly one value".to_string () ); }
-            let value : String =
-              atom_to_string ( &items[1] ) ?;
-            result.relToParent = match value . as_str () {
-              "alias"         => RelToParent::Alias,
-              "aliasCol"      => RelToParent::AliasCol,
-              "content"       => RelToParent::Content,
-              "parentIgnores" => RelToParent::ParentIgnores,
-              _ => return Err (
-                format! ( "Unknown relToParent value: {}", value )),
-            }; },
+          "view" => {
+            parse_view_sexp ( &items[1..], &mut result . viewData ) ?; },
+          "code" => {
+            parse_code_sexp ( &items[1..], &mut result . code ) ?; },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
-      Sexp::Atom ( _ ) => { // This is a bare value
-        let bare_value : String =
-          atom_to_string ( element ) ?;
-        match bare_value . as_str () {
-          "repeated"     => result.repeat = true,
-          "folded"       => result.folded = true,
-          "focused"      => result.focused = true,
-          "cycle"        => result.cycle = true,
-          "indefinitive" => result.indefinitive = true,
-          "toDelete"     => result.toDelete = true,
-          _ => {
-            return Err ( format! ( "Unknown metadata value: {}",
-                                    bare_value )); }} },
       _ => { return Err ( "Unexpected element in metadata"
                            . to_string () ); }} }
   Ok ( result ) }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_orgnodemd.
-/// Returns string like "(id abc123) repeated focused" etc.
+/// Returns string like "(id abc123) (view ...) (code ...)" etc.
 pub fn orgnodemd_to_string (
   metadata : &OrgnodeMetadata
 ) -> String {
   let mut parts : Vec<String> =
     Vec::new ();
+
   if let Some ( ref id ) = metadata.id {
     parts.push ( format! ( "(id {})", id.0 )); }
-  if metadata.cycle {
-    parts.push ( "cycle".to_string () ); }
-  if metadata.focused {
-    parts.push ( "focused".to_string () ); }
-  if metadata.folded {
-    parts.push ( "folded".to_string () ); }
+
+  // Build view s-expr
+  let mut view_parts : Vec<String> = Vec::new ();
+  if metadata.viewData.cycle {
+    view_parts.push ( "cycle".to_string () ); }
+  if metadata.viewData.focused {
+    view_parts.push ( "focused".to_string () ); }
+  if metadata.viewData.folded {
+    view_parts.push ( "folded".to_string () ); }
 
   // Build rels s-expr (only if has non-default values)
   let mut rel_parts : Vec<String> = Vec::new ();
   // Only emit if not default (default is true)
-  if ! metadata.relationships.parentIsContainer {
+  if ! metadata.viewData.relationships.parentIsContainer {
     rel_parts.push ( "notInParent".to_string () ); }
   // Only emit if not default (default is false)
-  if metadata.relationships.parentIsContent {
+  if metadata.viewData.relationships.parentIsContent {
     rel_parts.push ( "containsParent".to_string () ); }
   // Only emit if not default (default is Some(1))
-  if metadata.relationships.numContainers != Some ( 1 ) {
-    if let Some ( count ) = metadata.relationships.numContainers {
+  if metadata.viewData.relationships.numContainers != Some ( 1 ) {
+    if let Some ( count ) = metadata.viewData.relationships.numContainers {
       rel_parts.push ( format! ( "(containers {})", count )); } }
   // Only emit if not default (default is Some(0))
-  if metadata.relationships.numContents != Some ( 0 ) {
-    if let Some ( count ) = metadata.relationships.numContents {
+  if metadata.viewData.relationships.numContents != Some ( 0 ) {
+    if let Some ( count ) = metadata.viewData.relationships.numContents {
       rel_parts.push ( format! ( "(contents {})", count )); } }
   // Only emit if not default (default is Some(0))
-  if metadata.relationships.numLinksIn != Some ( 0 ) {
-    if let Some ( count ) = metadata.relationships.numLinksIn {
+  if metadata.viewData.relationships.numLinksIn != Some ( 0 ) {
+    if let Some ( count ) = metadata.viewData.relationships.numLinksIn {
       rel_parts.push ( format! ( "(linksIn {})", count )); } }
 
   if ! rel_parts . is_empty () {
-    parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
+    view_parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
 
-  if metadata.relToParent != RelToParent::Content {
-    parts.push ( format! (
-      "(relToParent {})", metadata.relToParent )); }
-  if metadata.indefinitive {
-    parts.push ( "indefinitive".to_string () ); }
-  if metadata.repeat {
-    parts.push ( "repeated".to_string () ); }
-  if metadata.toDelete {
-    parts.push ( "toDelete".to_string () ); }
+  if ! view_parts . is_empty () {
+    parts.push ( format! ( "(view {})", view_parts . join ( " " ))); }
+
+  // Build code s-expr
+  let mut code_parts : Vec<String> = Vec::new ();
+  if metadata.code.relToParent != RelToParent::Content {
+    code_parts.push ( format! (
+      "(relToParent {})", metadata.code.relToParent )); }
+  if metadata.code.indefinitive {
+    code_parts.push ( "indefinitive".to_string () ); }
+  if metadata.code.repeat {
+    code_parts.push ( "repeated".to_string () ); }
+  if metadata.code.toDelete {
+    code_parts.push ( "toDelete".to_string () ); }
+
+  if ! code_parts . is_empty () {
+    parts.push ( format! ( "(code {})", code_parts . join ( " " ))); }
 
   parts.join ( " " ) }
 

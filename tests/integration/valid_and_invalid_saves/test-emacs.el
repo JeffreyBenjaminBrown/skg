@@ -111,7 +111,7 @@
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg (id 1)) 1")
-    (replace-match "** (skg (id 1) repeated) 1")
+    (replace-match "** (skg (id 1) (code repeated)) 1")
     (message "✓ Amended previously invalid content to use repeated, so it is now valid"))
 
   ;; Switch to buffer to make it current
@@ -130,8 +130,9 @@
       (message "Updated buffer content: %s" updated-content)
 
       ;; Should contain cycle and indefinitive markers
-      (if (and (string-match-p "cycle" updated-content)
-               (string-match-p "indefinitive" updated-content))
+      ;; Note: cycle appears within (view ...), indefinitive within (code ...)
+      (if (and (string-match-p "(view.*cycle" updated-content)
+               (string-match-p "(code.*indefinitive" updated-content))
           (progn
             (message "✓ PASS: Valid save worked and showed cycle indefinitive")
             (message "✓ PASS: Integration test successful!")
@@ -139,7 +140,7 @@
             (kill-emacs 0))
         (progn
           (message "✗ FAIL: Expected cycle and indefinitive markers not found")
-          (message "Expected to contain: 'cycle' and 'indefinitive'")
+          (message "Expected to contain: '(view cycle)' and '(code indefinitive)'")
           (message "Got: %s" updated-content)
           (kill-emacs 1))))))
 

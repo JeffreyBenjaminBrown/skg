@@ -112,7 +112,7 @@ fn format_matches_as_org_mode (
   let search_root_node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.relToParent = RelToParent::ParentIgnores;
+                   md.code.relToParent = RelToParent::ParentIgnores;
                    md },
       title : search_terms.to_string (),
       // The unique level-1 headline states the search terms.

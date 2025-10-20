@@ -14,7 +14,7 @@ use std::error::Error;
 fn test_inconsistent_delete() {
   let input = indoc! {"
         * (skg (id 1)) 1
-        * (skg (id 1) toDelete) 2
+        * (skg (id 1) (code toDelete)) 2
     "};
 
   let trees = org_to_uninterpreted_nodes(input).unwrap();
@@ -41,7 +41,7 @@ fn test_deletions_excluded (
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
             * (skg (id 1)) 1
-            ** (skg (id 2) toDelete) 2
+            ** (skg (id 2) (code toDelete)) 2
             ** (skg (id 3)) 3
         "};
 
@@ -71,7 +71,7 @@ fn test_defining_node_defines (
     "/tmp/tantivy-test-defining-node",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) indefinitive) 1 adder
+            * (skg (id 1) (code indefinitive)) 1 adder
             Ignored body.
             ** (skg (id 2)) 2
             * (skg (id 1)) 1 definer
@@ -101,10 +101,10 @@ fn test_adding_without_definer (
     "/tmp/tantivy-test-adding-without-definer",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) indefinitive) 1 adder
+            * (skg (id 1) (code indefinitive)) 1 adder
             ** (skg (id 2)) 2
             ** (skg (id 4)) 4
-            ** (skg (id 4) indefinitive) 4 again
+            ** (skg (id 4) (code indefinitive)) 4 again
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;

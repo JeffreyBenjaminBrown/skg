@@ -27,16 +27,16 @@ async fn test_completeAliasCol_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (relToParent aliasCol)) aliases 1
-      *** (skg (relToParent alias)) c
-      *** (skg (relToParent alias)) d
-      *** (skg (relToParent alias)) c
-      *** (skg (relToParent alias)) d
-      ** (skg (relToParent aliasCol)) aliases 2
-      *** (skg (relToParent alias)) b
-      *** (skg (relToParent alias) focused) d
-      * (skg (relToParent aliasCol)) aliases 3
-      ** (skg (relToParent alias)) the above should break
+      ** (skg (code (relToParent aliasCol))) aliases 1
+      *** (skg (code (relToParent alias))) c
+      *** (skg (code (relToParent alias))) d
+      *** (skg (code (relToParent alias))) c
+      *** (skg (code (relToParent alias))) d
+      ** (skg (code (relToParent aliasCol))) aliases 2
+      *** (skg (code (relToParent alias))) b
+      *** (skg (view focused) (code (relToParent alias))) d
+      * (skg (code (relToParent aliasCol))) aliases 3
+      ** (skg (code (relToParent alias))) the above should break
     " };
 
   let mut forest : Vec < ego_tree::Tree < OrgNode > > =
@@ -124,7 +124,7 @@ async fn test_completeAliasCol_logic (
       "Second child should be 'c'"
     );
     assert! (
-      aliascol_2_node . metadata . focused,
+      aliascol_2_node . metadata . viewData.focused,
       "AliasCol 2 should have gained focus"
     );
   }
@@ -167,12 +167,12 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (relToParent aliasCol)) aliases
-      *** (skg (relToParent alias)) b
-      *** (skg (relToParent alias) focused) b
-      ** (skg (relToParent aliasCol)) aliases
-      *** (skg (relToParent alias) focused) b
-      *** (skg (relToParent alias)) b
+      ** (skg (code (relToParent aliasCol))) aliases
+      *** (skg (code (relToParent alias))) b
+      *** (skg (view focused) (code (relToParent alias))) b
+      ** (skg (code (relToParent aliasCol))) aliases
+      *** (skg (view focused) (code (relToParent alias))) b
+      *** (skg (code (relToParent alias))) b
     " };
 
   let mut forest : Vec < ego_tree::Tree < OrgNode > > =
@@ -220,7 +220,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . metadata . focused,
+      children [ 0 ] . metadata . viewData.focused,
       "First child should be focused"
     );
     assert_eq! (
@@ -229,7 +229,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . metadata . focused,
+      ! children [ 1 ] . metadata . viewData.focused,
       "Second child should not be focused"
     );
   }
@@ -260,7 +260,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . metadata . focused,
+      children [ 0 ] . metadata . viewData.focused,
       "First child should be focused"
     );
     assert_eq! (
@@ -269,7 +269,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . metadata . focused,
+      ! children [ 1 ] . metadata . viewData.focused,
       "Second child should not be focused"
     );
   }
