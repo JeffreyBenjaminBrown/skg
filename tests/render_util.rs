@@ -3,6 +3,7 @@
 use skg::mk_org_text::orgnode::render_org_node_from_text;
 use skg::types::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, ID};
 use skg::types::orgnode::default_metadata;
+use std::collections::HashSet;
 
 #[test]
 fn test_render_org_node_from_text_no_metadata () {
@@ -74,7 +75,8 @@ fn test_metadata_ordering () {
             relToParent : RelToParent::Content,
             indefinitive : false,
             repeat       : true,
-            toDelete     : false, }, },
+            toDelete     : false,
+            nodeRequests : HashSet::new (), }, },
       title : "Test".to_string (),
       body : None, };
   let result : String =

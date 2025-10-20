@@ -1,4 +1,5 @@
 use super::{ID, SkgNode, NodeSaveAction};
+use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
@@ -50,6 +51,7 @@ pub struct OrgnodeCode {
 PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true. But the only time it is marked as 'repeat' is when Rust builds a content view and discovers the node has already been rendered. By contrast, when a node marked 'repeat' is saved, since the user may have edited it, the 'repeat' label is replaced with 'indefinitive'. And 'repeat' detection is skipped entirely for 'indefinitive' nodes, so it will thereafter appear without the 'repeat' marker.
 TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
   pub toDelete: bool,
+  pub nodeRequests: HashSet<NodeRequest>,
 }
 
 /// 'RelToParent' describes how a node relates to its parent.
@@ -63,6 +65,12 @@ pub enum RelToParent {
   AliasCol, // The node collects aliases for its parent.
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
+}
+
+/// Requests for additional information or views related to a node.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum NodeRequest {
+  ContainerwardView,
 }
 
 //
@@ -97,6 +105,28 @@ impl FromStr for RelToParent {
       _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
     }} }
 
+impl fmt::Display for NodeRequest {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>
+  ) -> fmt::Result {
+    let s : &str =
+      match self {
+        NodeRequest::ContainerwardView => "containerwardView",
+      };
+    write! ( f, "{}", s ) } }
+
+impl FromStr for NodeRequest {
+  type Err = String;
+
+  fn from_str (
+    s : &str
+  ) -> Result<Self, Self::Err> {
+    match s {
+      "containerwardView" => Ok ( NodeRequest::ContainerwardView ),
+      _ => Err ( format! ( "Unknown NodeRequest value: {}", s )),
+    }} }
+
 impl Default for OrgnodeRelationships {
   fn default () -> Self {
     OrgnodeRelationships {
@@ -123,6 +153,7 @@ impl Default for OrgnodeCode {
       indefinitive : false,
       repeat : false,
       toDelete : false,
+      nodeRequests : HashSet::new (),
     }} }
 
 pub fn default_metadata () -> OrgnodeMetadata {

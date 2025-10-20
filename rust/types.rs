@@ -11,7 +11,8 @@ pub use orgnode::{ SaveInstruction,
                    OrgnodeViewData,
                    OrgnodeCode,
                    OrgnodeRelationships,
-                   RelToParent, };
+                   RelToParent,
+                   NodeRequest, };
 pub use crate::serve::parse_headline_md_sexp::orgnodemd_to_string;
 pub mod skgnode;
 pub use skgnode::{ SkgNode,

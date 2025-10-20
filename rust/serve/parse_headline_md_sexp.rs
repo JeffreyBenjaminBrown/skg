@@ -1,10 +1,12 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent};
+use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent, NodeRequest};
 use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
+use std::collections::HashSet;
+use std::str::FromStr;
 
 
 /// Helper function to extract string value from any Sexp atom.
@@ -126,10 +128,10 @@ fn parse_code_sexp (
       Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
         let key : String =
           atom_to_string ( &kv_pair[0] ) ?;
-        let value : String =
-          atom_to_string ( &kv_pair[1] ) ?;
         match key . as_str () {
           "relToParent" => {
+            let value : String =
+              atom_to_string ( &kv_pair[1] ) ?;
             code . relToParent = match value . as_str () {
               "alias"         => RelToParent::Alias,
               "aliasCol"      => RelToParent::AliasCol,
@@ -138,6 +140,8 @@ fn parse_code_sexp (
               _ => return Err (
                 format! ( "Unknown relToParent value: {}", value )),
             }; },
+          "requests" => {
+            parse_requests_sexp ( &kv_pair[1..], &mut code . nodeRequests ) ?; },
           _ => { return Err ( format! ( "Unknown code key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => {
@@ -154,8 +158,27 @@ fn parse_code_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
+/// Parse the (requests ...) s-expression and update nodeRequests.
+fn parse_requests_sexp (
+  items : &[Sexp],
+  requests : &mut HashSet<NodeRequest>
+) -> Result<(), String> {
+  for request_element in items {
+    match request_element {
+      Sexp::Atom ( _ ) => {
+        let request_str : String =
+          atom_to_string ( request_element ) ?;
+        let request : NodeRequest =
+          NodeRequest::from_str ( &request_str )
+          . map_err ( | e | format! ( "Invalid request: {}", e ) ) ?;
+        requests . insert ( request ); },
+      _ => {
+        return Err ( "Unexpected element in requests (expected atoms only)"
+                      . to_string () ); }} }
+  Ok (( )) }
+
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
-/// Format: "(skg (id xyz) (view ...) (code ...))"
+/// Format: "(skg (id xyz) (view ...) (code (requests ...) ...))"
 /// Now uses the sexp crate for proper s-expression parsing.
 /// Takes the full s-expression including the "(skg ...)" wrapper.
 pub fn parse_metadata_to_orgnodemd (
@@ -263,6 +286,15 @@ pub fn orgnodemd_to_string (
     code_parts.push ( "repeated".to_string () ); }
   if metadata.code.toDelete {
     code_parts.push ( "toDelete".to_string () ); }
+
+  // Build requests s-expr (inside code)
+  if ! metadata.code.nodeRequests . is_empty () {
+    let mut request_strings : Vec<String> =
+      metadata.code.nodeRequests . iter ()
+      . map ( | req | req . to_string () )
+      . collect ();
+    request_strings . sort (); // Ensure consistent ordering
+    code_parts.push ( format! ( "(requests {})", request_strings . join ( " " ))); }
 
   if ! code_parts . is_empty () {
     parts.push ( format! ( "(code {})", code_parts . join ( " " ))); }

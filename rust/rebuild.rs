@@ -4,6 +4,9 @@ pub use complete_aliascol::completeAliasCol;
 pub mod complete_contents;
 pub use complete_contents::completeContents;
 
+pub mod integrate_backpath;
+pub use integrate_backpath::integrate_containerward_path;
+
 use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
 use ego_tree::Tree;
 use std::collections::HashSet;
