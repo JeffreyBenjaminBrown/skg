@@ -369,19 +369,3 @@ pub async fn orgnode_tree_from_id (
   let mut visited : HashSet < ID > = HashSet::new ();
   orgnode_tree_from_id_with_earlier_visits (
     root_id, config, driver, &mut visited ) . await }
-
-/// Mark an existing node 'repeated'
-/// and remove its children in the tree.
-pub fn prune_repeated_orgnode (
-  tree    : &mut ego_tree::Tree < OrgNode >,
-  node_id : ego_tree::NodeId, )
-{ { // Modify the OrgNode data
-  let mut node_mut = tree . get_mut ( node_id ) . unwrap ();
-    node_mut . value () . metadata . repeat = true;
-    node_mut . value () . body = Some (
-      "Repeated, probably above. Edit there, not here."
-        . to_string () ); }
-  { // Remove all children
-    let mut node_mut = tree . get_mut ( node_id ) . unwrap ();
-    while let Some ( mut child ) = node_mut . first_child () {
-      child . detach (); }} }
