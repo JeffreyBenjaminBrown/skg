@@ -4,7 +4,7 @@ pub use complete_aliascol::completeAliasCol;
 pub mod complete_contents;
 pub use complete_contents::completeContents;
 
-use crate::types::{ID, OrgNode, SkgConfig, Treatment};
+use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
@@ -48,15 +48,15 @@ fn complete_node_preorder (
   visited       : &mut HashSet < ID >,
   ancestor_path : &mut Vec < ID >, // path from root to current node (for cycle detection)
 ) -> Result < (), Box<dyn Error> > {
-  let (treatment, might_contain_more) : (Treatment, bool) = {
+  let (treatment, might_contain_more) : (RelToParent, bool) = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     let node : &OrgNode =
       node_ref . value ();
-    ( node . metadata . treatment . clone (),
+    ( node . metadata . relToParent . clone (),
       node . metadata . indefinitive ) };
-  if treatment == Treatment::AliasCol {
+  if treatment == RelToParent::AliasCol {
     completeAliasCol (
       tree, node_id, config ) ?;
     // Don't recurse - completeAliasCol handles the whole subtree

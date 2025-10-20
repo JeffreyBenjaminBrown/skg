@@ -2,7 +2,7 @@ use crate::file_io::read_node;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_pid};
-use crate::types::{ID, OrgNode, SkgConfig, SkgNode, Treatment};
+use crate::types::{ID, SkgConfig, SkgNode, OrgNode, RelToParent};
 use crate::util::path_from_pid;
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashSet, HashMap};
@@ -99,8 +99,8 @@ pub fn completeContents (
     let mut child_mut : NodeMut < OrgNode > =
       tree . get_mut ( *invalid_id )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . metadata . treatment =
-      Treatment::ParentIgnores;
+    child_mut . value () . metadata . relToParent =
+      RelToParent::ParentIgnores;
     content_id_to_node_id . remove (
       & child_mut . value ()
         . metadata . id . clone () . unwrap () );
@@ -145,7 +145,7 @@ fn categorize_children_by_treatment (
   for child in node_ref . children () {
     let child_node : &OrgNode =
       child . value ();
-    if child_node . metadata . treatment == Treatment::Content {
+    if child_node . metadata . relToParent == RelToParent::Content {
       content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}

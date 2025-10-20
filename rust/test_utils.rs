@@ -258,8 +258,8 @@ mod tests {
 
     // Test headlines with same other metadata but different IDs
     assert!(compare_headlines_modulo_id(
-      "* (skg (id abc) (treatment content)) Title",
-      "* (skg (id xyz) (treatment content)) Title"
+      "* (skg (id abc) (relToParent content)) Title",
+      "* (skg (id xyz) (relToParent content)) Title"
     ));
 
     // Test headlines that differ by title

@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, Treatment};
+use crate::types::{OrgNode, RelToParent};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 
@@ -23,7 +23,7 @@ pub fn aliases_to_org (
   let aliases_header_node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.treatment = Treatment::AliasCol;
+                   md.relToParent = RelToParent::AliasCol;
                    md },
       title : "".to_string (),
       // The only child node, the 'aliases' headline, has no title.
@@ -37,7 +37,7 @@ pub fn aliases_to_org (
     let alias_node : OrgNode =
       OrgNode {
         metadata : { let mut md = default_metadata ();
-                     md.treatment = Treatment::Alias;
+                     md.relToParent = RelToParent::Alias;
                      md },
         title : alias,
         body : None, };

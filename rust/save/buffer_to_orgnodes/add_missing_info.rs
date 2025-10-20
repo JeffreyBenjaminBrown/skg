@@ -4,7 +4,7 @@ Namely, make it so when treatment should be Alias,
 and add missing IDs where treatment is Content.
 */
 
-use crate::types::{OrgNode, Treatment, ID};
+use crate::types::{OrgNode, RelToParent, ID};
 use crate::typedb::util::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
 use ego_tree::Tree;
 use std::boxed::Box;
@@ -47,7 +47,7 @@ pub async fn add_missing_info_to_trees(
 
 fn add_missing_info_dfs (
   mut node_ref: ego_tree::NodeMut < OrgNode >,
-  parent_treatment: Option < Treatment >
+  parent_treatment: Option < RelToParent >
 ) {
   // Process current node
   assign_alias_relation_if_needed (
@@ -55,9 +55,9 @@ fn add_missing_info_dfs (
   assign_id_if_needed (
     node_ref . value () );
 
-  let node_rel: Treatment =
+  let node_rel: RelToParent =
     ( // Used to process each child.
-      node_ref . value () . metadata . treatment . clone () );
+      node_ref . value () . metadata . relToParent . clone () );
   { // Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
@@ -81,17 +81,17 @@ fn add_missing_info_dfs (
 /// to nodes whose parent has treatment=AliasCol
 fn assign_alias_relation_if_needed(
   node: &mut OrgNode,
-  parent_treatment: Option<Treatment>
+  parent_treatment: Option<RelToParent>
 ) {
   if let Some(parent_rel) = parent_treatment {
-    if parent_rel == Treatment::AliasCol {
-      node.metadata.treatment = Treatment::Alias; }} }
+    if parent_rel == RelToParent::AliasCol {
+      node.metadata.relToParent = RelToParent::Alias; }} }
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_id_if_needed(
   node: &mut OrgNode
 ) {
-  if ( node.metadata.treatment == Treatment::Content
+  if ( node.metadata.relToParent == RelToParent::Content
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}

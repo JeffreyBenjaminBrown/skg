@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, Treatment, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
+use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
 use crate::save::reconcile_dup_instructions;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
@@ -51,9 +51,9 @@ fn interpret_node_dfs(
     result.push (( skg_node, save_action )); }
   { // Recurse into everything except aliases.
     for child in node_ref.children() {
-      let child_rel = &child.value().metadata.treatment;
+      let child_rel = &child.value().metadata.relToParent;
       match child_rel {
-        Treatment::AliasCol | Treatment::Alias => {
+        RelToParent::AliasCol | RelToParent::Alias => {
           // These are ignored.
         },
         _ => {
@@ -98,11 +98,11 @@ fn collect_aliases (
 ) -> Option<Vec<String>> {
   let mut aliases: Vec<String> = Vec::new();
   for alias_col_child in node_ref.children()
-  { if ( alias_col_child . value() . metadata . treatment
-         == Treatment::AliasCol ) // child of interest
+  { if ( alias_col_child . value() . metadata . relToParent
+         == RelToParent::AliasCol ) // child of interest
     { for alias_child in alias_col_child.children() {
-      if ( alias_child . value() . metadata . treatment
-           == Treatment::Alias ) // grandchild of interest
+      if ( alias_child . value() . metadata . relToParent
+           == RelToParent::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
   if aliases.is_empty() { None
@@ -118,8 +118,8 @@ fn collect_contents (
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if ( child . value() . metadata . treatment
-         == Treatment::Content
+    if ( child . value() . metadata . relToParent
+         == RelToParent::Content
          && ! child . value() . metadata . toDelete ) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone());

@@ -26,7 +26,7 @@ pub struct OrgnodeMetadata {
 
   /* Fields that determine how it is treated. */
 
-  pub treatment: Treatment,
+  pub relToParent: RelToParent,
   pub indefinitive: bool, // When a definitive org node is saved, its content determines the content of the corresponding node in the graph. When an *in*definitive node is saved, any of its org-content not currently in the graph are appended to the graph, but no content is removed. (I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
   pub repeat: bool, /* The node already appears elsewhere in this buffer. PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true.
 TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
@@ -43,12 +43,14 @@ pub struct OrgnodeRelationships {
   pub numLinksIn: Option<usize>,
 }
 
-/// 'Treatment' describes how a node relates to its parent.
-/// This influences both how the user should read it,
+/// 'RelToParent' describes how a node relates to its parent.
+/// It influences both how the user should read it,
 /// and how Rust should treat the data when it is saved.
+/// PITFALL: It does not describe every potential relationship
+/// between the node and its parent.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Treatment {
-  Content, // The default relationship.
+pub enum RelToParent {
+  Content, // The default relationship: parents 'contain' most children.
   AliasCol, // The node collects aliases for its parent.
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
@@ -58,32 +60,32 @@ pub enum Treatment {
 // Implementations
 //
 
-impl fmt::Display for Treatment {
+impl fmt::Display for RelToParent {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     let s : &str =
       match self {
-        Treatment::Content => "content",
-        Treatment::AliasCol => "aliasCol",
-        Treatment::Alias => "alias",
-        Treatment::ParentIgnores => "parentIgnores",
+        RelToParent::Content => "content",
+        RelToParent::AliasCol => "aliasCol",
+        RelToParent::Alias => "alias",
+        RelToParent::ParentIgnores => "parentIgnores",
       };
     write! ( f, "{}", s ) } }
 
-impl FromStr for Treatment {
+impl FromStr for RelToParent {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "content" => Ok ( Treatment::Content ),
-      "aliasCol" => Ok ( Treatment::AliasCol ),
-      "alias" => Ok ( Treatment::Alias ),
-      "parentIgnores" => Ok ( Treatment::ParentIgnores ),
-      _ => Err ( format! ( "Unknown Treatment value: {}", s )),
+      "content"       => Ok ( RelToParent::Content ),
+      "aliasCol"      => Ok ( RelToParent::AliasCol ),
+      "alias"         => Ok ( RelToParent::Alias ),
+      "parentIgnores" => Ok ( RelToParent::ParentIgnores ),
+      _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
     }} }
 
 impl Default for OrgnodeRelationships {
@@ -103,7 +105,7 @@ pub fn default_metadata () -> OrgnodeMetadata {
     focused : false,
     folded : false,
     relationships : OrgnodeRelationships::default (),
-    treatment : Treatment::Content,
+    relToParent : RelToParent::Content,
     indefinitive : false,
     repeat : false,
     toDelete : false,

@@ -1,5 +1,5 @@
 use crate::file_io::read_node;
-use crate::types::{ID, OrgNode, OrgnodeMetadata, SkgConfig, SkgNode, Treatment};
+use crate::types::{ID, SkgConfig, SkgNode, OrgNode, OrgnodeMetadata, RelToParent};
 use crate::types::orgnode::default_metadata;
 use crate::util::path_from_pid;
 use ego_tree::NodeId;
@@ -67,7 +67,7 @@ pub fn completeAliasCol (
     for alias in missing_aliases_from_disk {
       let mut md : OrgnodeMetadata =
         default_metadata ();
-      md . treatment = Treatment::Alias;
+      md . relToParent = RelToParent::Alias;
       aliascol_mut . append ( OrgNode {
         metadata : md,
         title    : alias,
@@ -88,10 +88,10 @@ fn collect_alias_titles (
   for child in aliascol_ref . children () {
     let child_node : &OrgNode =
       child . value ();
-    if child_node . metadata . treatment != Treatment::Alias {
+    if child_node . metadata . relToParent != RelToParent::Alias {
       return Err (
-        format! ( "AliasCol has non-Alias child with treatment: {:?}",
-                  child_node . metadata . treatment )
+        format! ( "AliasCol has non-Alias child with relToParent: {:?}",
+                  child_node . metadata . relToParent )
         . into () ); }
     aliases_from_tree . push (
       child_node . title . clone () );
@@ -176,10 +176,10 @@ fn get_aliascol_parent_id (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
     . value ();
-  if aliascol_node . metadata . treatment != Treatment::AliasCol {
+  if aliascol_node . metadata . relToParent != RelToParent::AliasCol {
     return Err (
       format! ( "Node is not an AliasCol: {:?}",
-                 aliascol_node . metadata . treatment )
+                 aliascol_node . metadata . relToParent )
         . into () ); }
   let parent_node_id : NodeId =
     tree . get ( aliascol_node_id )

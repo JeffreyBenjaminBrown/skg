@@ -29,7 +29,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     indoc! { "
       * (skg (id a) indefinitive) a
       ** (skg (id c) indefinitive) c
-      *** (skg (id d) (treatment parentIgnores)) d
+      *** (skg (id d) (relToParent parentIgnores)) d
     " };
 
   { // Test running on root with empty visited
@@ -126,7 +126,7 @@ async fn test_visited_and_indefinitive_logic (
       indoc! { "
         * (skg (id a) indefinitive) a
         ** (skg (id c)) c
-        *** (skg (id d) (treatment parentIgnores)) d
+        *** (skg (id d) (relToParent parentIgnores)) d
       " };
 
     // Test with empty visited
@@ -256,7 +256,7 @@ async fn test_visited_and_not_indefinitive_logic (
     indoc! { "
       * (skg (id a)) a
       ** (skg (id c)) c
-      ** (skg (id d) (treatment parentIgnores)) d
+      ** (skg (id d) (relToParent parentIgnores)) d
     " };
 
   // Test with 'a' in visited
@@ -308,7 +308,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a)) a
-        ** (skg (id d) (treatment parentIgnores)) d
+        ** (skg (id d) (relToParent parentIgnores)) d
         ** (skg (id b)) b
         ** (skg (id c)) c
       " };
@@ -328,7 +328,7 @@ async fn test_visited_and_not_indefinitive_logic (
       indoc! { "
         * (skg (id a)) a
         ** (skg (id b)) b
-        ** (skg (id d) (treatment parentIgnores)) d
+        ** (skg (id d) (relToParent parentIgnores)) d
       " };
 
     let mut forest : Vec < ego_tree::Tree < OrgNode > > =
@@ -346,7 +346,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a)) a
-        ** (skg (id d) (treatment parentIgnores)) d
+        ** (skg (id d) (relToParent parentIgnores)) d
         ** (skg (id b)) b
         ** (skg (id c)) c
       " };
@@ -396,7 +396,7 @@ async fn test_false_content_logic (
   let expected_output : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (id d) (treatment parentIgnores)) d
+      ** (skg (id d) (relToParent parentIgnores)) d
       ** (skg (id b)) b
       ** (skg (id c)) c
     " };

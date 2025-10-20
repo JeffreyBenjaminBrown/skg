@@ -27,16 +27,16 @@ async fn test_completeAliasCol_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (treatment aliasCol)) aliases 1
-      *** (skg (treatment alias)) c
-      *** (skg (treatment alias)) d
-      *** (skg (treatment alias)) c
-      *** (skg (treatment alias)) d
-      ** (skg (treatment aliasCol)) aliases 2
-      *** (skg (treatment alias)) b
-      *** (skg (treatment alias) focused) d
-      * (skg (treatment aliasCol)) aliases 3
-      ** (skg (treatment alias)) the above should break
+      ** (skg (relToParent aliasCol)) aliases 1
+      *** (skg (relToParent alias)) c
+      *** (skg (relToParent alias)) d
+      *** (skg (relToParent alias)) c
+      *** (skg (relToParent alias)) d
+      ** (skg (relToParent aliasCol)) aliases 2
+      *** (skg (relToParent alias)) b
+      *** (skg (relToParent alias) focused) d
+      * (skg (relToParent aliasCol)) aliases 3
+      ** (skg (relToParent alias)) the above should break
     " };
 
   let mut forest : Vec < ego_tree::Tree < OrgNode > > =
@@ -167,12 +167,12 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (treatment aliasCol)) aliases
-      *** (skg (treatment alias)) b
-      *** (skg (treatment alias) focused) b
-      ** (skg (treatment aliasCol)) aliases
-      *** (skg (treatment alias) focused) b
-      *** (skg (treatment alias)) b
+      ** (skg (relToParent aliasCol)) aliases
+      *** (skg (relToParent alias)) b
+      *** (skg (relToParent alias) focused) b
+      ** (skg (relToParent aliasCol)) aliases
+      *** (skg (relToParent alias) focused) b
+      *** (skg (relToParent alias)) b
     " };
 
   let mut forest : Vec < ego_tree::Tree < OrgNode > > =

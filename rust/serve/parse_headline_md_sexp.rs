@@ -1,7 +1,7 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, ID, Treatment};
+use crate::types::{OrgnodeMetadata, ID, RelToParent};
 use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
@@ -122,18 +122,18 @@ pub fn parse_metadata_to_orgnodemd (
             let value : String =
               atom_to_string ( &items[1] ) ?;
             result.id = Some ( ID::from ( value )); },
-          "treatment" => {
+          "relToParent" => {
             if items . len () != 2 {
-              return Err ( "treatment requires exactly one value".to_string () ); }
+              return Err ( "relToParent requires exactly one value".to_string () ); }
             let value : String =
               atom_to_string ( &items[1] ) ?;
-            result.treatment = match value . as_str () {
-              "alias"         => Treatment::Alias,
-              "aliasCol"      => Treatment::AliasCol,
-              "content"       => Treatment::Content,
-              "parentIgnores" => Treatment::ParentIgnores,
+            result.relToParent = match value . as_str () {
+              "alias"         => RelToParent::Alias,
+              "aliasCol"      => RelToParent::AliasCol,
+              "content"       => RelToParent::Content,
+              "parentIgnores" => RelToParent::ParentIgnores,
               _ => return Err (
-                format! ( "Unknown treatment value: {}", value )),
+                format! ( "Unknown relToParent value: {}", value )),
             }; },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
@@ -195,9 +195,9 @@ pub fn orgnodemd_to_string (
   if ! rel_parts . is_empty () {
     parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
 
-  if metadata.treatment != Treatment::Content {
+  if metadata.relToParent != RelToParent::Content {
     parts.push ( format! (
-      "(treatment {})", metadata.treatment )); }
+      "(relToParent {})", metadata.relToParent )); }
   if metadata.indefinitive {
     parts.push ( "indefinitive".to_string () ); }
   if metadata.repeat {

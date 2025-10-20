@@ -11,15 +11,15 @@ fn test_find_buffer_errors_for_saving() {
   let input_with_errors: &str =
     indoc! {"
             * (skg (id root)) Valid root node
-            ** (skg (treatment aliasCol)) AliasCol with body problem
+            ** (skg (relToParent aliasCol)) AliasCol with body problem
             This body should not exist on AliasCol
             *** (skg (id bad_child)) Child of AliasCol with ID
             *** Regular child without ID
-            ** (skg (treatment alias)) Alias with body problem and orphaned
+            ** (skg (relToParent alias)) Alias with body problem and orphaned
             This body should not exist on Alias
             *** Any child of Alias (bad)
-            ** (skg (treatment alias)) Alias under non-AliasCol parent
-            * (skg (treatment alias)) Root level Alias (bad)
+            ** (skg (relToParent alias)) Alias under non-AliasCol parent
+            * (skg (relToParent alias)) Root level Alias (bad)
             * (skg (id conflict) toDelete) Node with deletion conflict
             * (skg (id conflict)) Same ID but no toDelete flag
         "};
@@ -106,10 +106,10 @@ fn test_find_buffer_errors_for_saving_valid_input() {
   let valid_input: &str =
     indoc! {"
             * (skg (id root)) Valid root node
-            ** (skg (treatment aliasCol)) AliasCol without body
+            ** (skg (relToParent aliasCol)) AliasCol without body
             *** Regular child without ID
             *** Another child without ID
-            *** (skg (treatment alias)) Alias without body
+            *** (skg (relToParent alias)) Alias without body
             ** (skg (id normal)) Normal node with body
             This body is allowed on normal nodes
         "};
@@ -136,10 +136,10 @@ fn test_multiple_aliascols_in_children() {
   let input_with_multiple_aliascols: &str =
     indoc! {"
             * (skg (id root)) Node with multiple AliasCol children
-            ** (skg (treatment aliasCol)) First AliasCol
-            *** (skg (treatment alias)) First alias
-            ** (skg (treatment aliasCol)) Second AliasCol
-            *** (skg (treatment alias)) Second alias
+            ** (skg (relToParent aliasCol)) First AliasCol
+            *** (skg (relToParent alias)) First alias
+            ** (skg (relToParent aliasCol)) Second AliasCol
+            *** (skg (relToParent alias)) Second alias
             ** Normal child
         "};
 
