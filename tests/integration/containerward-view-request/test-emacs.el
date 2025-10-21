@@ -1,8 +1,9 @@
 ;;; Integration test for containerward-view request functionality
 ;;; This script tests:
-;;; 1. Creating a content view for node "1"
-;;; 2. Adding (requests containerward-view) to node "12"
-;;; 3. Saving and verifying containerward path is integrated
+;;; 1. Creating initial buffer structure and saving to establish relationships
+;;; 2. Creating new buffer without root node
+;;; 3. Adding containerward-view request to node 12
+;;; 4. Verifying containerward path [1, 0] is integrated under node 12
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -12,6 +13,25 @@
 ;; Test result tracking
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
+
+(defun strip-all-metadata (text)
+  "Remove all (skg ...) metadata from TEXT, leaving only stars and titles."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (let ((result ""))
+      ;; Process each line
+      (while (not (eobp))
+        (let ((line (buffer-substring-no-properties
+                     (line-beginning-position)
+                     (line-end-position))))
+          ;; Extract stars and title from each line
+          (when (string-match "^\\(\\*+\\) .*?\\([^ ]+\\)$" line)
+            (let ((stars (match-string 1 line))
+                  (title (match-string 2 line)))
+              (setq result (concat result stars " " title "\n")))))
+        (forward-line 1))
+      result)))
 
 (defun run-all-tests ()
   "Main orchestrator function that runs all integration tests."
@@ -26,8 +46,8 @@
   ;; Wait a moment for server to be fully ready
   (sleep-for 0.25)
 
-  ;; Phase 1: Get initial content view
-  (test-initial-content-view)
+  ;; Phase 1: Create initial buffer and save to establish relationships
+  (test-establish-relationships)
 
   ;; Wait for completion with timeout
   (let ((timeout 0))
@@ -41,91 +61,106 @@
     (message "Last phase: %s" integration-test-phase)
     (kill-emacs 1)))
 
-(defun test-initial-content-view ()
-  "Request initial content view for node 1."
-  (message "=== PHASE 1: Requesting content view for node '1' ===")
-  (skg-request-single-root-content-view-from-node "1")
+(defun test-establish-relationships ()
+  "Create initial buffer with full structure and save to establish relationships."
+  (message "=== PHASE 1: Establishing relationships on disk ===")
 
-  ;; Wait for the response
-  (sleep-for 0.25)
+  ;; Create buffer with structure including node 0
+  (let ((buffer (get-buffer-create "*skg-content-view*")))
+    (with-current-buffer buffer
+      (erase-buffer)
+      (org-mode)
+      (insert "* (skg (id 0)) 0\n")
+      (insert "** (skg (id 1)) 1\n")
+      (insert "*** (skg (id 11)) 11\n")
+      (insert "*** (skg (id 12)) 12\n")
+      (insert "**** (skg (id 121)) 121\n")
+      (insert "*** (skg (id 13)) 13\n")
+      (message "✓ Created initial buffer with full structure")
 
-  (let ((content-buffer (get-buffer "*skg-content-view*")))
-    (if content-buffer
-        (with-current-buffer content-buffer
-          (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-            (message "Content view received")
-            (message "Content: %s" content)
+      ;; Save to establish relationships
+      (message "Saving initial buffer to establish relationships...")
+      (skg-request-save-buffer)
 
-            ;; The content should show node 1 with its children 11, 12->121, 13
-            (if (string-match-p "\\* (skg (id 1)" content)
-                (progn
-                  (message "✓ PASS: Found node 1 in content view")
-                  (setq integration-test-phase "initial-view-complete")
-                  (test-add-containerward-request))
-              (progn
-                (message "✗ FAIL: Node 1 not found in content view")
-                (kill-emacs 1)))))
-      (progn
-        (message "✗ FAIL: No *skg-content-view* buffer was created")
-        (kill-emacs 1)))))
+      ;; Wait for save to complete
+      (sleep-for 0.5)
 
-(defun test-add-containerward-request ()
-  "Add containerward-view request to node 12 and save."
-  (message "=== PHASE 2: Adding containerward-view request to node 12 ===")
+      (message "✓ Relationships established on disk")
+      (setq integration-test-phase "relationships-established")
+
+      ;; Now create new buffer without node 0
+      (test-create-new-buffer))))
+
+(defun test-create-new-buffer ()
+  "Obliterate buffer and create new one without node 0."
+  (message "=== PHASE 2: Creating new buffer without node 0 ===")
+
+  (let ((buffer (get-buffer "*skg-content-view*")))
+    (when buffer
+      (with-current-buffer buffer
+        (erase-buffer)
+        (insert "* (skg (id 1)) 1\n")
+        (insert "** (skg (id 11)) 11\n")
+        (insert "** (skg (id 12)) 12\n")
+        (insert "*** (skg (id 121)) 121\n")
+        (insert "** (skg (id 13)) 13\n")
+        (message "✓ Created new buffer without node 0")
+
+        ;; Position on line 3 (** (skg (id 12)) 12)
+        (goto-char (point-min))
+        (forward-line 2)
+        (message "✓ Positioned on node 12 (line 3)")
+
+        (setq integration-test-phase "new-buffer-created")
+
+        ;; Call containerward view request
+        (test-request-containerward-view)))))
+
+(defun test-request-containerward-view ()
+  "Call skg-request-containerward-view2 on node 12."
+  (message "=== PHASE 3: Requesting containerward view for node 12 ===")
 
   (with-current-buffer "*skg-content-view*"
-    ;; Find the line with "** (skg (id 12)" and position on it
-    (goto-char (point-min))
-    (if (re-search-forward "^\\*\\* (skg (id 12)" nil t)
-        (progn
-          (beginning-of-line)
-          (message "✓ Positioned on node 12")
+    (message "Calling skg-request-containerward-view2...")
+    (skg-request-containerward-view2)
 
-          ;; Insert containerward path request and save
-          (message "Calling skg-request-containerward-view2...")
-          (skg-request-containerward-view2)
+    ;; Wait for response
+    (sleep-for 0.5)
 
-          ;; Wait for response
-          (sleep-for 0.25)
+    (setq integration-test-phase "containerward-request-complete")
+    (test-verify-result)))
 
-          (setq integration-test-phase "save-with-request-complete")
-          (test-verify-containerward-path))
-      (progn
-        (message "✗ FAIL: Could not find node 12 in buffer")
-        (kill-emacs 1)))))
-
-(defun test-verify-containerward-path ()
-  "Verify that the containerward path was integrated."
-  (message "=== PHASE 3: Verifying containerward path integration ===")
+(defun test-verify-result ()
+  "Strip metadata and verify result matches expected structure."
+  (message "=== PHASE 4: Verifying result structure ===")
 
   (with-current-buffer "*skg-content-view*"
-    (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-      (message "Updated buffer content: %s" content)
+    (let* ((content (buffer-substring-no-properties
+                     (point-min) (point-max)))
+           (stripped (strip-all-metadata content))
+           (expected (concat
+                      "* 1\n"
+                      "** 11\n"
+                      "** 12\n" ;; backpath was requested here
+                      "*** 1\n" ;; its first element
+                      "**** 0\n" ;; its second element
+                      "*** 121\n"
+                      "** 13\n")))
 
-      ;; The containerward path should show:
-      ;; ** 12
-      ;; *** 1 (with parentIgnores and indefinitive)
-      ;; **** 0 (with parentIgnores and indefinitive)
-      ;; *** 121 (the original child of 12)
+      (message "Content with metadata: %s" content)
+      (message "Stripped content: %s" stripped)
+      (message "Expected content: %s" expected)
 
-      ;; Check for node 1 under node 12
-      (if (string-match-p "\\*\\*\\* (skg (id 1).*indefinitive.*1\n\\*\\*\\*\\* (skg (id 0)" content)
+      (if (string= stripped expected)
           (progn
-            (message "✓ PASS: Found containerward path (1->0) under node 12")
-
-            ;; Verify the request was stripped
-            (if (not (string-match-p "requests containerwardView" content))
-                (progn
-                  (message "✓ PASS: containerward-view request was stripped from metadata")
-                  (message "✓ PASS: Integration test successful!")
-                  (setq integration-test-completed t)
-                  (kill-emacs 0))
-              (progn
-                (message "✗ FAIL: containerward-view request was not stripped")
-                (kill-emacs 1))))
+            (message "✓ PASS: Stripped content matches expected structure")
+            (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12")
+            (message "✓ PASS: Integration test successful!")
+            (setq integration-test-completed t)
+            (kill-emacs 0))
         (progn
-          (message "✗ FAIL: Containerward path not found in expected location")
-          (message "Expected to find node 1 (indefinitive) and node 0 under node 12")
+          (message "✗ FAIL: Stripped content does not match expected")
+          (message "Expected containerward path [1, 0] under node 12")
           (kill-emacs 1))))))
 
 (progn ;; Run the test with a timeout in case things hang.
