@@ -25,6 +25,7 @@ TEST_DIRS=(
   "search-for-title-and-visit-link"
   "content-view-and-save"
   "valid_and_invalid_saves"
+  "focus-and-folded-markers"
 )
 
 # Function to run a single test in its directory

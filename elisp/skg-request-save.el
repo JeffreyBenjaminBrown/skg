@@ -25,7 +25,11 @@ which will replace the current buffer contents."
           skg-lp--bytes-left nil
           skg-doc--response-handler
           (lambda (tcp-proc chunk)
-            (skg-handle-save-chunk tcp-proc chunk)))
+            (skg-lp-handle-generic-chunk
+             (lambda (_tcp-proc payload)
+               (skg-handle-save-sexp payload)
+               (setq skg-doc--response-handler nil))
+             tcp-proc chunk)))
 
     ;; Send the request line first
     (process-send-string tcp-proc request-s-exp)
@@ -34,56 +38,30 @@ which will replace the current buffer contents."
     (process-send-string tcp-proc header)
     (process-send-string tcp-proc buffer-contents)))
 
-(defun skg-handle-save-chunk (tcp-proc chunk)
-  "Handle save response chunks with new format: success/failure indicator followed by optional length-prefixed content."
-  ;; Append to buffer
-  (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk))
-
-  ;; Check if we have enough data to determine success or failure
-  (cond
-   ((string-prefix-p "save: success\n" (decode-coding-string skg-lp--buf 'utf-8 t))
-    ;; Success case - extract the length-prefixed content after "save: success\n"
-    (let ((remaining (substring (decode-coding-string skg-lp--buf 'utf-8 t) 13)))
-      ;; Reset LP state and handle the remaining as length-prefixed
-      (setq skg-lp--buf (encode-coding-string remaining 'utf-8)
-            skg-lp--bytes-left nil)
-      (skg-lp-handle-generic-chunk
-       (lambda (tcp-proc payload)
-         (skg-replace-buffer-with-new-content tcp-proc payload)
-         (setq skg-doc--response-handler nil))
-       tcp-proc ""))) ; Empty chunk since we're processing buffered data
-
-   ((string-prefix-p "save: failure\n" (decode-coding-string skg-lp--buf 'utf-8 t))
-    ;; Failure case - extract the length-prefixed content after "save: failure\n"
-    (let ((remaining (substring (decode-coding-string skg-lp--buf 'utf-8 t) 13)))
-      ;; Reset LP state and handle the remaining as length-prefixed
-      (setq skg-lp--buf (encode-coding-string remaining 'utf-8)
-            skg-lp--bytes-left nil)
-      (skg-lp-handle-generic-chunk
-       (lambda (tcp-proc payload)
-         (skg-show-save-errors payload)
-         (setq skg-doc--response-handler nil))
-       tcp-proc ""))) ; Empty chunk since we're processing buffered data
-
-   ;; Not enough data yet or old format - wait for more
-   (t nil)))
-
-(defun skg-handle-save-response (_tcp-proc new-content)
-  "Handle response from save buffer request, routing to success or error handling."
-  (cond
-   ((string-prefix-p "save: success\n" new-content)
-    ;; Extract the actual content after the success prefix
-    (let ((actual-content (substring new-content 13))) ; "save: success\n" is 13 chars
-      (skg-replace-buffer-with-new-content _tcp-proc actual-content)))
-   ((string-prefix-p "save: failure\n" new-content)
-    ;; Extract the error content after the failure prefix
-    (let ((error-content (substring new-content 13))) ; "save: failure\n" is 13 chars
-      (skg-show-save-errors error-content)))
-   (t
-    ;; Fallback for old format - check for error content pattern
-    (if (string-prefix-p "* NOTHING WAS SAVED" new-content)
-        (skg-show-save-errors new-content)
-      (skg-replace-buffer-with-new-content _tcp-proc new-content)))))
+(defun skg-handle-save-sexp (sexp-string)
+  "Parse and handle save response s-exp: ((content ...) (errors ...))."
+  (condition-case err
+      (let* ((response (read sexp-string))
+             (content-pair (assoc 'content response))
+             (errors-pair (assoc 'errors response))
+             (content-value (cadr content-pair))
+             (errors-list (cadr errors-pair)))
+        ;; If content is not nil, update the buffer
+        (when content-value
+          (skg-replace-buffer-with-new-content nil content-value))
+        ;; If there are errors, show them
+        (when errors-list
+          (let ((errors-text (if (listp errors-list)
+                                 (mapconcat 'identity errors-list "\n\n")
+                               errors-list)))
+            (if content-value
+                ;; Success with warnings
+                (skg-show-save-warnings errors-text)
+              ;; Failure with errors
+              (skg-show-save-errors errors-text)))))
+    (error
+     (message "ERROR parsing save response: %S" err)
+     (message "Sexp string was: %S" sexp-string))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content)
   "Replace the current buffer contents with NEW-CONTENT from Rust."
@@ -109,5 +87,18 @@ which will replace the current buffer contents."
         (goto-char (point-min)))
       (display-buffer error-buffer-name)
       (message "Save failed - errors shown in %s" error-buffer-name))))
+
+(defun skg-show-save-warnings (warning-content)
+  "Show save warnings in a new buffer."
+  (let ((warning-buffer-name "*SKG Save Warnings*"))
+    (with-current-buffer (get-buffer-create warning-buffer-name)
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert warning-content)
+        (org-mode)
+        (set-buffer-modified-p nil)
+        (goto-char (point-min)))
+      (display-buffer warning-buffer-name)
+      (message "Save succeeded with warnings - see %s" warning-buffer-name))))
 
 (provide 'skg-request-save)

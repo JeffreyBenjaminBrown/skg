@@ -41,7 +41,7 @@
            :service skg-port
            :filter ;; handles the response
            #'skg-handle-rust-response
-           :coding 'utf-8
+           :coding 'binary
            :nowait nil )) )
   skg-rust-tcp-proc)
 

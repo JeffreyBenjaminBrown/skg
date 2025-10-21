@@ -13,11 +13,37 @@ use crate::types::save::format_save_error_as_org;
 
 use ego_tree::Tree;
 use futures::executor::block_on;
+use sexp::{Sexp, Atom};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::Path;
 use typedb_driver::TypeDBDriver;
+
+/// Response from a save operation.
+/// Contains the regenerated buffer content and any warnings/errors.
+struct SaveResponse {
+  content : String,
+  errors  : Vec < String >,
+}
+
+impl SaveResponse {
+  /// Format the response as an s-expression.
+  /// Format: ((content "...") (errors ("error1" "error2" ...)))
+  fn to_sexp ( &self ) -> String {
+    Sexp::List ( vec! [
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S ( "content" . to_string () )),
+        Sexp::Atom ( Atom::S ( self . content . clone () )) ] ),
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S ( "errors" . to_string () )),
+        Sexp::List (
+          self . errors
+            . iter ()
+            . map ( |e| Sexp::Atom (
+              Atom::S ( e . clone () )) )
+            . collect () ) ] ) ] )
+      . to_string () }}
 
 /* Handles save buffer requests from Emacs.
 .
@@ -39,17 +65,15 @@ pub fn handle_save_buffer_request (
           // Most of the work happens here.
           & initial_buffer_content,
           typedb_driver, config, tantivy_index ))
-      { Ok (regenerated_buffer_content) =>
-        { // Send success indicator followed by length-prefixed content
-          let success_header : &str =
-            "save: success\n";
+      { Ok (save_response) =>
+        { // Format response as s-exp: ((content "...") (errors (...)))
+          let response_sexp : String =
+            save_response . to_sexp ();
           let header : String =
-            format!("Content-Length: {}\r\n\r\n",
-                    regenerated_buffer_content.len());
+            format! ( "Content-Length: {}\r\n\r\n",
+                      response_sexp . len () );
           let full_response : String =
-            format!("{}{}{}",
-                    success_header, header,
-                    regenerated_buffer_content);
+            format! ( "{}{}", header, response_sexp );
           stream . write_all(
             full_response . as_bytes () ). unwrap ();
           stream . flush() . unwrap (); }
@@ -58,15 +82,23 @@ pub fn handle_save_buffer_request (
           if let Some(save_error) = err.downcast_ref::<SaveError>() {
             let error_buffer_content : String =
               format_save_error_as_org(save_error);
-            // Send failure indicator followed by length-prefixed error content
-            let failure_header : &str =
-              "save: failure\n";
+            // Create an s-exp with nil content and the error message
+            let response : Sexp =
+              Sexp::List ( vec! [
+                Sexp::List ( vec! [
+                  Sexp::Atom ( Atom::S ( "content" . to_string () ) ),
+                  Sexp::Atom ( Atom::S ( "nil" . to_string () ) ) ] ),
+                Sexp::List ( vec! [
+                  Sexp::Atom ( Atom::S ( "errors" . to_string () ) ),
+                  Sexp::List ( vec! [
+                    Sexp::Atom ( Atom::S ( error_buffer_content ) ) ] ) ] ) ] );
+            let response_sexp : String =
+              response . to_string ();
             let header : String =
-              format!("Content-Length: {}\r\n\r\n",
-                      error_buffer_content.len());
+              format! ( "Content-Length: {}\r\n\r\n",
+                        response_sexp . len () );
             let full_response : String =
-              format!("{}{}{}",
-                      failure_header, header, error_buffer_content);
+              format! ( "{}{}", header, response_sexp );
             stream.write_all(full_response.as_bytes()).unwrap();
             stream.flush().unwrap();
           } else {
@@ -125,7 +157,7 @@ async fn update_from_and_rerender_buffer (
   typedb_driver   : &TypeDBDriver,
   config          : &SkgConfig,
   tantivy_index   : &TantivyIndex
-) -> Result<String, Box<dyn Error>> {
+) -> Result<SaveResponse, Box<dyn Error>> {
 
   let (mut orgnode_forest, save_instructions)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
@@ -140,6 +172,9 @@ async fn update_from_and_rerender_buffer (
     config.clone(),
     tantivy_index,
     typedb_driver ) . await ?;
+
+  let errors : Vec < String > = Vec::new ();
+
   { // modify the orgnode forest before re-rendering it
     completeOrgnodeForest (
       &mut orgnode_forest,
@@ -148,8 +183,11 @@ async fn update_from_and_rerender_buffer (
       &mut orgnode_forest,
       config,
       typedb_driver ) . await ?; }
-  Ok ( render_forest_to_org (
-    & orgnode_forest )) }
+
+  let content : String =
+    render_forest_to_org ( & orgnode_forest );
+
+  Ok ( SaveResponse { content, errors } ) }
 
 /// Updates **everything** from the given `SaveInstruction`s, in order:
 ///   1) TypeDB
