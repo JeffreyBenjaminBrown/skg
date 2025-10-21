@@ -35,7 +35,7 @@ if needed. If metadata already contains 'folded' in the view section, no change.
       (beginning-of-line)
       (when (and (org-at-heading-p)
                  (invisible-p (point)))
-        (skg-merge-metadata-at-point '(skg (view folded))))
+        (skg-edit-metadata-at-point '(skg (view folded))))
       (forward-line 1))))
 
 (defun skg-fold-marked-headlines ()

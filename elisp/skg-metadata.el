@@ -84,10 +84,10 @@ Moves to beginning of line, deletes the line, and inserts NEW-CONTENT."
                  (line-end-position))
   (insert new-content))
 
-(defun skg-merge-metadata-at-point (new-content)
-  "Merge NEW-CONTENT into the metadata of the headline at point.
+(defun skg-edit-metadata-at-point (edits)
+  "Use EDITS to edit the metadata of the headline at point.
 If there is metadata, merges it with existing metadata.
-If there is no metadata, creates new metadata from NEW-CONTENT.
+If there is no metadata, creates new metadata from EDITS.
 If the current line is not a headline, no effect."
   (when (org-at-heading-p) ;; otherwise this does nothing
     (let* ((headline-text (skg-get-current-headline-text))
@@ -100,7 +100,7 @@ If the current line is not a headline, no effect."
                  (title (nth 2 match-result))
                  (host-sexp (read (concat "(skg " inner ")")))
                  (merged-sexp (skg-edit-nested-sexp
-                               host-sexp new-content)))
+                               host-sexp edits)))
             (let ((new-inner (substring-no-properties
                               (format "%S" merged-sexp)
                               5 -1)))
@@ -111,7 +111,7 @@ If the current line is not a headline, no effect."
           (let* ((stars (match-string 1 headline-text))
                  (title (match-string 2 headline-text))
                  (metadata (substring-no-properties
-                               (format "%S" new-content)
+                               (format "%S" edits)
                                5 -1)))
             (skg-replace-current-line
              (skg-format-headline stars metadata title)))))))))
