@@ -1,10 +1,16 @@
 (require 'skg-length-prefix)
+(require 'skg-org-fold)
+(require 'skg-focus)
 
 (defun skg-request-save-buffer ()
   "Send the current buffer contents to Rust for processing.
+Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
 Rust will prepend a line and send the modified content back,
 which will replace the current buffer contents."
   (interactive)
+  ;; Add metadata markers before capturing buffer contents
+  (skg-add-folded-markers)
+  (skg-add-focused-marker)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (buffer-contents (buffer-string))
          (request-s-exp (concat (prin1-to-string
