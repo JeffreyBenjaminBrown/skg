@@ -1,5 +1,7 @@
 ;; Utilities for finding s-expression boundaries in text
 
+(require 'skg-edit-sexpr)
+
 (defun skg-find-sexp-end (text &optional start-pos)
   "Find the position after the closing paren of the first s-expression in TEXT.
 START-POS defaults to 0. Returns the position (1-based index) after the closing paren,

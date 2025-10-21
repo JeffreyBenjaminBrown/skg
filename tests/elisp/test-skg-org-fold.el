@@ -37,17 +37,17 @@
       (let*
           ((expected
             ;; Every sibling of a folded node should be folded
-            ;; and folded should be last in every metadata string.
+            ;; and folded should be nested under view.
             "* 1
 1 body
 ** 11
-*** (skg (id 1) folded) 111
-*** (skg (id 2) indefinitive folded) 112
+*** (skg (id 1) (view folded)) 111
+*** (skg (id 2) indefinitive (view folded)) 112
 ** 12
 12 body
-*** (skg (id 3) folded) 121
+*** (skg (id 3) (view folded)) 121
 121 body
-*** (skg folded) 122
+*** (skg (view folded)) 122
 ** 13")
            (actual (buffer-substring-no-properties (point-min)
                                                    (point-max))))

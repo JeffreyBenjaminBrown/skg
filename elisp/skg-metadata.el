@@ -28,7 +28,8 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
 If the current line is not a headline, or has no metadata, no effect."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-match-headline-with-metadata headline-text)))
+           (match-result (skg-split-as-stars-metadata-title
+                          headline-text)))
       (when (and match-result
                  (string-match-p "(skg" headline-text))
         (let* ((stars (nth 0 match-result))
@@ -54,7 +55,8 @@ If the current line is not a headline, or has no metadata, no effect."
 If the current line is not a headline, or has no metadata, no effect."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-match-headline-with-metadata headline-text)))
+           (match-result (skg-split-as-stars-metadata-title
+                          headline-text)))
       (when (and match-result
                  (string-match-p "(skg" headline-text))
         (let* ((stars (nth 0 match-result))
@@ -74,77 +76,47 @@ If the current line is not a headline, or has no metadata, no effect."
                          (line-end-position))
           (insert (skg-format-headline stars new-inner title)))))))
 
-(defun skg-insert-bare-value-into-metadata
-    (value)
-  "Insert VALUE into the metadata of the headline at point.
-If there is metadata, appends it at the end unless already present.
-If there is no metadata, creates '(skg VALUE)'.
-If the current line is not a headline, no effect.
-Does nothing if VALUE already exists in metadata."
-  (when (org-at-heading-p)
-    (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-match-headline-with-metadata headline-text)))
-      (if match-result
-          (let* ((stars (nth 0 match-result))
-                 (inner (nth 1 match-result))
-                 (title (nth 2 match-result))
-                 (parsed (skg-parse-metadata-inner inner))
-                 (alist (car parsed))
-                 (bare-values (cadr parsed)))
-            (unless (member value bare-values)
-              (let* ((new-bare-values
-                      (append bare-values (list value)))
-                     (new-inner (skg-reconstruct-metadata-inner
-                                 alist new-bare-values)))
-                (beginning-of-line)
-                (delete-region (line-beginning-position)
-                               (line-end-position))
-                (insert (skg-format-headline stars new-inner title)))))
-        (when (string-match "^\\(\\*+\\s-+\\)\\(.*\\)" headline-text)
-          (let* ((stars (match-string 1 headline-text))
-                 (title (match-string 2 headline-text)))
-            (beginning-of-line)
-            (delete-region (line-beginning-position)
-                           (line-end-position))
-            (insert (skg-format-headline stars value title))))))))
+(defun skg-replace-current-line (new-content)
+  "Replace the current line with NEW-CONTENT.
+Moves to beginning of line, deletes the line, and inserts NEW-CONTENT."
+  (beginning-of-line)
+  (delete-region (line-beginning-position)
+                 (line-end-position))
+  (insert new-content))
 
-(defun skg-insert-kv-pair-into-metadata
-    (key value)
-  "Insert (KEY VALUE) into the metadata of the headline at point.
-If there is metadata, appends it at the end unless KEY already exists.
-If there is no metadata, creates '(skg (KEY VALUE))'.
-If the current line is not a headline, no effect.
-Does nothing if KEY already exists in metadata."
-  (when (org-at-heading-p)
+(defun skg-merge-metadata-at-point (new-content)
+  "Merge NEW-CONTENT into the metadata of the headline at point.
+If there is metadata, merges it with existing metadata.
+If there is no metadata, creates new metadata from NEW-CONTENT.
+If the current line is not a headline, no effect."
+  (when (org-at-heading-p) ;; otherwise this does nothing
     (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-match-headline-with-metadata headline-text)))
+           (match-result ;; could be nil
+            (skg-split-as-stars-metadata-title
+             headline-text)))
       (if match-result
           (let* ((stars (nth 0 match-result))
                  (inner (nth 1 match-result))
                  (title (nth 2 match-result))
-                 (parsed (skg-parse-metadata-inner inner))
-                 (alist (car parsed))
-                 (bare-values (cadr parsed)))
-            (unless (assoc key alist)
-              (let* ((new-alist
-                      (append alist (list (cons key value))))
-                     (new-inner
-                      (skg-reconstruct-metadata-inner
-                       new-alist bare-values)))
-                (beginning-of-line)
-                (delete-region (line-beginning-position)
-                               (line-end-position))
-                (insert (skg-format-headline stars new-inner title)))))
-        (when (string-match "^\\(\\*+\\s-+\\)\\(.*\\)" headline-text)
+                 (host-sexp (read (concat "(skg " inner ")")))
+                 (merged-sexp (skg-edit-nested-sexp
+                               host-sexp new-content)))
+            (let ((new-inner (substring-no-properties
+                              (format "%S" merged-sexp)
+                              5 -1)))
+              (skg-replace-current-line
+               (skg-format-headline stars new-inner title))))
+        (progn ;; Headline has no metadata.
+          (when (string-match "^\\(\\*+\\s-+\\)\\(.*\\)" headline-text)
           (let* ((stars (match-string 1 headline-text))
                  (title (match-string 2 headline-text))
-                 (kv-pair (format "(%s %s)" key value)))
-            (beginning-of-line)
-            (delete-region (line-beginning-position)
-                           (line-end-position))
-            (insert (skg-format-headline stars kv-pair title))))))))
+                 (metadata (substring-no-properties
+                               (format "%S" new-content)
+                               5 -1)))
+            (skg-replace-current-line
+             (skg-format-headline stars metadata title)))))))))
 
-(defun skg-match-headline-with-metadata (headline-text)
+(defun skg-split-as-stars-metadata-title (headline-text)
   "Match HEADLINE-TEXT and extract stars, metadata inner, and title.
 Returns (STARS INNER TITLE) or nil if no match.
 Handles nested parentheses in metadata correctly."

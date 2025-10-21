@@ -8,7 +8,10 @@
           (or load-file-name buffer-file-name)) )) ))
   (add-to-list
    'load-path
-   (expand-file-name "elisp" project-root)) )
+   (expand-file-name "elisp" project-root))
+  (add-to-list
+   'load-path
+   (expand-file-name "elisp/skg-sexpr" project-root)) )
 
 (require 'skg-client)
 (require 'skg-id-search)

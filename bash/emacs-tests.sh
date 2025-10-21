@@ -49,6 +49,8 @@ cat > "$TEMP_TEST_FILE" << 'EOF'
 (add-to-list 'load-path default-directory)
 ;; Add elisp directory to load path for project files
 (add-to-list 'load-path (expand-file-name "../../elisp" default-directory))
+;; Add elisp subdirectories to load path
+(add-to-list 'load-path (expand-file-name "../../elisp/skg-sexpr" default-directory))
 
 ;; Load test files and collect all tests
 (let ((test-files 

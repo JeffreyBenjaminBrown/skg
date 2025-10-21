@@ -26,21 +26,16 @@ Returns the newly created buffer."
     buf))
 
 (defun skg-add-folded-markers ()
-  "Add 'folded' to metadata of all invisible headlines in the buffer.
-- If a headline has no <skg<...>> metadata,
-  prefix the title with '<skg<folded>>'.
-- If it has empty metadata (e.g. '<skg<>>' or '<skg< >>'),
-  replace with '<skg<folded>>'.
-- If it has metadata without 'folded',
-  append ',folded' to the existing metadata.
-- If metadata already contains 'folded', do nothing."
+  "Add 'folded' to (view ...) metadata of all invisible headlines in the buffer.
+Merges '(skg (view folded))' into existing metadata, creating nested structure
+if needed. If metadata already contains 'folded' in the view section, no change."
   (save-excursion
     (goto-char (point-min))
     (while (not (eobp))
       (beginning-of-line)
       (when (and (org-at-heading-p)
                  (invisible-p (point)))
-        (skg-insert-bare-value-into-metadata "folded"))
+        (skg-merge-metadata-at-point '(skg (view folded))))
       (forward-line 1))))
 
 (defun skg-fold-marked-headlines ()
@@ -104,7 +99,8 @@ Works on all text including invisible regions."
                  (eol (line-end-position))
                  (headline-text (buffer-substring-no-properties bol eol)))
             (when (string-match-p "(skg" headline-text)
-              (let* ((match-result (skg-match-headline-with-metadata headline-text)))
+              (let* ((match-result (skg-split-as-stars-metadata-title
+                                    headline-text)))
                 (when match-result
                   (let* ((stars (nth 0 match-result))
                          (inner (nth 1 match-result))
