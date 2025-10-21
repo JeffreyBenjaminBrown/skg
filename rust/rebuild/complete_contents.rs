@@ -236,15 +236,11 @@ fn reorder_children (
       . ok_or ( "Child not found for detaching" ) ?;
     child_mut . detach (); }
 
-  // Re-append in desired order
   for child_id in & desired_order {
-    let child_node : OrgNode = {
-      let child_ref : ego_tree::NodeRef < OrgNode > =
-        tree . get ( *child_id )
-        . ok_or ( "Child not found for re-appending" ) ?;
-      child_ref . value () . clone () };
+    // Re-append in desired order,
+    // using append_id, which preserves entire subtrees.
     let mut parent_mut : NodeMut < OrgNode > =
       tree . get_mut ( parent_id )
       . ok_or ( "Parent not found" ) ?;
-    parent_mut . append ( child_node ); }
+    parent_mut . append_id ( *child_id ); }
   Ok (( )) }

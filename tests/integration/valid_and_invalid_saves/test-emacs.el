@@ -78,19 +78,19 @@
                   (message "✗ FAIL: Error buffer does not contain expected content")
                   (kill-emacs 1)))))
 
-          ;; Check that original buffer still exists and has original content
+          ;; Check that buffer has focused marker added (from point position)
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* (skg (id 1)) 1\n** (skg (id 1)) 1")
+                  (if (string= content "* (skg (id 1) (view focused)) 1\n** (skg (id 1)) 1")
                       (progn
-                        (message "✓ PASS: Original *skg-content-view* buffer preserved")
+                        (message "✓ PASS: Buffer has focused marker as expected")
                         (setq integration-test-phase "invalid-save-complete")
                         ;; Proceed to valid save test
                         (test-valid-save))
                     (progn
-                      (message "✗ FAIL: Original buffer content was modified")
-                      (message "Expected: %S" "* (skg (id 1)) 1\n** (skg (id 1)) 1")
+                      (message "✗ FAIL: Buffer content does not match expected")
+                      (message "Expected: %S" "* (skg (id 1) (view focused)) 1\n** (skg (id 1)) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn
