@@ -135,31 +135,48 @@
   (message "=== PHASE 4: Verifying result structure ===")
 
   (with-current-buffer "*skg-content-view*"
-    (let* ((content (buffer-substring-no-properties
+    (let* ((buffer-content (buffer-substring-no-properties
                      (point-min) (point-max)))
-           (stripped (strip-all-metadata content))
-           (expected (concat
-                      "* 1\n"
-                      "** 11\n"
-                      "** 12\n" ;; backpath was requested here
-                      "*** 1\n" ;; its first element
-                      "**** 0\n" ;; its second element
-                      "*** 121\n"
-                      "** 13\n")))
+           (stripped-buffer-content (strip-all-metadata buffer-content))
+           (expected-without-metadata
+            ;; It's easier to read this way, without metadata.
+            (concat "* 1\n"
+                    "** 11\n"
+                    "** 12\n" ;; backpath was requested here
+                    "*** 1\n" ;; its first element
+                    "**** 0\n" ;; its second element
+                    "*** 121\n"
+                    "** 13\n"))
+           (expected
+            (concat "* (skg (id 1)) 1\n"
+                    "** (skg (id 11)) 11\n"
+                    "** (skg (id 12)) 12\n"
+                    "*** (skg (id 1) (code (relToParent parentIgnores) indefinitive)) 1\n"
+                    "**** (skg (id 0) (code (relToParent parentIgnores) indefinitive)) 0\n"
+                    "*** (skg (id 121)) 121\n"
+                    "** (skg (id 13)) 13\n")))
 
-      (message "Content with metadata: %s" content)
-      (message "Stripped content: %s" stripped)
-      (message "Expected content: %s" expected)
+      (message "Buffer-Content with metadata: %s" buffer-content)
+      (message "Expected buffer-content with metadata: %s" expected)
+      (message "Stripped buffer-content: %s" stripped-buffer-content)
+      (message "Expected buffer-content without metadata: %s"
+               expected-without-metadata)
 
-      (if (string= stripped expected)
+      (if (string= buffer-content expected)
           (progn
-            (message "✓ PASS: Stripped content matches expected structure")
-            (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12")
-            (message "✓ PASS: Integration test successful!")
-            (setq integration-test-completed t)
-            (kill-emacs 0))
+            (message "✓ PASS: Buffer-Content matches expected (with metadata)")
+            (if (string= stripped-buffer-content expected-without-metadata)
+                (progn
+                  (message "✓ PASS: Stripped buffer-content matches expected structure")
+                  (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12")
+                  (message "✓ PASS: Integration test successful!")
+                  (setq integration-test-completed t)
+                  (kill-emacs 0))
+              (progn
+                (message "✗ FAIL: Stripped buffer-content does not match expected without metadata")
+                (kill-emacs 1))))
         (progn
-          (message "✗ FAIL: Stripped content does not match expected")
+          (message "✗ FAIL: Buffer-Content does not match expected (with metadata)")
           (message "Expected containerward path [1, 0] under node 12")
           (kill-emacs 1))))))
 
