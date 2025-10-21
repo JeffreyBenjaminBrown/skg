@@ -40,7 +40,7 @@ Returns the newly created buffer."
       (beginning-of-line)
       (when (and (org-at-heading-p)
                  (invisible-p (point)))
-        (skg-insert-bare-value-into-metadata "folded"))
+        (skg-merge-metadata-at-point '(skg folded)))
       (forward-line 1))))
 
 (defun skg-fold-marked-headlines ()
@@ -104,7 +104,8 @@ Works on all text including invisible regions."
                  (eol (line-end-position))
                  (headline-text (buffer-substring-no-properties bol eol)))
             (when (string-match-p "(skg" headline-text)
-              (let* ((match-result (skg-match-headline-with-metadata headline-text)))
+              (let* ((match-result (skg-split-as-stars-metadata-title
+                                    headline-text)))
                 (when match-result
                   (let* ((stars (nth 0 match-result))
                          (inner (nth 1 match-result))
