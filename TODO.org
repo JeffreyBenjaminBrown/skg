@@ -2,7 +2,14 @@
 ** cargo nextest run
 ** claude --dangerously-skip-permissions
 ** Ask for a refactoring plan before embarking.
+** Don't do anything you don't have permission to do.
+   I'm going to be away so I can't grant it.
 * TODO unordered, unsorted
+** LIES
+   This test is opaque,
+   and the containerward path integration it tests is not working.
+
+   tests/integration/containerward-view-request/test-emacs.el
 ** read ahead in plans, estimate duration
    Do it not just for the durations,
    but to have a good sense of how complex each stage is.

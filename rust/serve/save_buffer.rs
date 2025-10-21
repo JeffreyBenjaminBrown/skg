@@ -173,12 +173,14 @@ async fn update_from_and_rerender_buffer (
     tantivy_index,
     typedb_driver ) . await ?;
 
-  let errors : Vec < String > = Vec::new ();
+  let mut errors : Vec < String > = Vec::new ();
 
   { // modify the orgnode forest before re-rendering it
     completeOrgnodeForest (
       &mut orgnode_forest,
-      config ) ?;
+      config,
+      typedb_driver,
+      &mut errors ) . await ?;
     set_metadata_relationships_in_forest (
       &mut orgnode_forest,
       config,
