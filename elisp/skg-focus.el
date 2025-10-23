@@ -2,6 +2,7 @@
 
 (require 'org)
 (require 'skg-metadata)
+(require 'skg-sexpr)
 
 (defun skg-headline-has-focused-in-view-p ()
   "Return t if the current headline has 'focused' in its (view ...) metadata.
@@ -11,15 +12,10 @@ Verifies the structure is (skg ... (view ... focused ...) ...)."
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title headline-text)))
       (when match-result
-        (let* ((inner (nth 1 match-result))
-               (parsed (skg-parse-metadata-inner inner))
-               (alist (car parsed))
-               (view-entry (assoc "view" alist)))
-          (when view-entry
-            (let* ((view-inner (cdr view-entry))
-                   (view-parsed (skg-parse-metadata-inner view-inner))
-                   (view-bare-values (cadr view-parsed)))
-              (member "focused" view-bare-values))))))))
+        (let ((inner (nth 1 match-result)))
+          (skg-sexp-subtree-p
+           (read inner)
+           '(skg (view focused))))))))
 
 (defun skg-add-focused-marker ()
   "Add 'focused' to (view ...) metadata of the current headline.
