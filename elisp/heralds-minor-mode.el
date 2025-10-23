@@ -76,8 +76,7 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
           (when sexp-end-pos
             (let* ((end (+ start sexp-end-pos -1))
                    (skg-sexp (buffer-substring-no-properties start (1+ end)))
-                   (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp)))))
-                   (heralds (heralds-from-metadata inner)))
+                   (heralds (heralds-from-metadata skg-sexp)))
               (when heralds
                 (let ((ov (make-overlay start (1+ end))))
                   (overlay-put ov 'display heralds)
@@ -110,10 +109,9 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
 Returns an alist of key-value pairs from the rels."
   (let ((rel-entry (assoc "rels" alist)))
     (if rel-entry
-        ;; The cdr is a string like "parentContainsIt (contents 3)"
-        ;; We need to parse it
-        (let* ((rel-string (cdr rel-entry))
-               (parsed (skg-parse-metadata-inner rel-string)))
+        (let* ((rel-sexp ;; the (rels ...) s-exp, as a string
+                (cdr rel-entry))
+               (parsed (skg-parse-metadata-sexp rel-sexp)))
           (car parsed)) ;; Return the alist part
       '())))
 
@@ -122,16 +120,16 @@ Returns an alist of key-value pairs from the rels."
 Returns a list of bare value strings from the rels."
   (let ((rel-entry (assoc "rels" alist)))
     (if rel-entry
-        (let* ((rel-string (cdr rel-entry))
-               (parsed (skg-parse-metadata-inner rel-string)))
+        (let* ((rel-sexp (cdr rel-entry))
+               (parsed (skg-parse-metadata-sexp rel-sexp)))
           (cadr parsed)) ;; Return the bare-values part
       '())))
 
 (defun heralds-from-metadata
-    (metadata) ;; line's first text inside (not including) (skg and )
+    (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
   "Returns a propertized space-separated string of heralds.
-Whitespace in METADATA is ignored."
-  (let* ((parsed (skg-parse-metadata-inner metadata))
+METADATA-SEXP should be the complete (skg ...) s-expression."
+  (let* ((parsed (skg-parse-metadata-sexp metadata-sexp))
          (alist (car parsed))
          (bare-values (cadr parsed))
          (out '())

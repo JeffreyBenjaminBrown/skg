@@ -17,9 +17,7 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
                  (title (string-trim (if (< title-start len)
                                          (substring trimmed title-start)
                                        "")))
-                 ;; Extract content between "(skg" and final ")"
-                 (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp)))))
-                 (parsed (skg-parse-metadata-inner inner)))
+                 (parsed (skg-parse-metadata-sexp skg-sexp)))
             (list (car parsed) (cadr parsed) title)))))))
 
 (defun skg-delete-kv-pair-from-metadata-by-key
@@ -33,21 +31,21 @@ If the current line is not a headline, or has no metadata, no effect."
       (when (and match-result
                  (string-match-p "(skg" headline-text))
         (let* ((stars (nth 0 match-result))
-               (inner (nth 1 match-result))
+               (metadata-sexp (nth 1 match-result))
                (title (nth 2 match-result))
-               (parsed (skg-parse-metadata-inner inner))
+               (parsed (skg-parse-metadata-sexp metadata-sexp))
                (alist (car parsed))
                (bare-values (cadr parsed))
                (filtered-alist (seq-filter
                                 (lambda (kv)
                                   (not (string-equal (car kv) key)))
                                 alist))
-               (new-inner (skg-reconstruct-metadata-inner
-                           filtered-alist bare-values)))
+               (new-metadata-sexp (skg-reconstruct-metadata-sexp
+                                   filtered-alist bare-values)))
           (beginning-of-line)
           (delete-region (line-beginning-position)
                          (line-end-position))
-          (insert (skg-format-headline stars new-inner title)))))))
+          (insert (skg-format-headline stars new-metadata-sexp title)))))))
 
 (defun skg-delete-value-from-metadata
     (value)
@@ -60,21 +58,21 @@ If the current line is not a headline, or has no metadata, no effect."
       (when (and match-result
                  (string-match-p "(skg" headline-text))
         (let* ((stars (nth 0 match-result))
-               (inner (nth 1 match-result))
+               (metadata-sexp (nth 1 match-result))
                (title (nth 2 match-result))
-               (parsed (skg-parse-metadata-inner inner))
+               (parsed (skg-parse-metadata-sexp metadata-sexp))
                (alist (car parsed))
                (bare-values (cadr parsed))
                (filtered-values
                 (seq-filter (lambda (v)
                               (not (string-equal v value)))
                             bare-values))
-               (new-inner (skg-reconstruct-metadata-inner
-                           alist filtered-values)))
+               (new-metadata-sexp (skg-reconstruct-metadata-sexp
+                                   alist filtered-values)))
           (beginning-of-line)
           (delete-region (line-beginning-position)
                          (line-end-position))
-          (insert (skg-format-headline stars new-inner title)))))))
+          (insert (skg-format-headline stars new-metadata-sexp title)))))))
 
 (defun skg-replace-current-line (new-content)
   "Replace the current line with NEW-CONTENT.
@@ -94,31 +92,31 @@ If the current line is not a headline, no effect."
            (match-result ;; could be nil
             (skg-split-as-stars-metadata-title
              headline-text)))
-      (if match-result
+      (if (and match-result
+               (not (string-empty-p (nth 1 match-result))))
           (let* ((stars (nth 0 match-result))
-                 (inner (nth 1 match-result))
+                 (metadata-sexp (nth 1 match-result))
                  (title (nth 2 match-result))
-                 (host-sexp (read (concat "(skg " inner ")")))
+                 (host-sexp (read metadata-sexp))
                  (merged-sexp (skg-edit-nested-sexp
                                host-sexp edits)))
-            (let ((new-inner (substring-no-properties
-                              (format "%S" merged-sexp)
-                              5 -1)))
+            (let ((new-metadata-sexp (substring-no-properties
+                                      (format "%S" merged-sexp))))
               (skg-replace-current-line
-               (skg-format-headline stars new-inner title))))
+               (skg-format-headline stars new-metadata-sexp title))))
         (progn ;; Headline has no metadata.
           (when (string-match "^\\(\\*+\\s-+\\)\\(.*\\)" headline-text)
           (let* ((stars (match-string 1 headline-text))
                  (title (match-string 2 headline-text))
-                 (metadata (substring-no-properties
-                               (format "%S" edits)
-                               5 -1)))
+                 (metadata-sexp (substring-no-properties
+                                 (format "%S" edits))))
             (skg-replace-current-line
-             (skg-format-headline stars metadata title)))))))))
+             (skg-format-headline stars metadata-sexp title)))))))))
 
 (defun skg-split-as-stars-metadata-title (headline-text)
-  "Match HEADLINE-TEXT and extract stars, metadata inner, and title.
-Returns (STARS INNER TITLE) or nil if no match.
+  "Match HEADLINE-TEXT and extract stars, metadata sexp, and title.
+Returns (STARS METADATA-SEXP TITLE) or nil if no match.
+METADATA-SEXP is the complete (skg ...) s-expression, or empty string if no metadata.
 Handles nested parentheses in metadata correctly."
   (let ((trimmed (string-trim-left headline-text)))
     (when (string-match "^\\(\\*+\\s-+\\)" trimmed)
@@ -133,9 +131,8 @@ Handles nested parentheses in metadata correctly."
                        (len (length after-stars))
                        (title (string-trim (if (< title-start len)
                                                (substring after-stars title-start)
-                                             "")))
-                       (inner (string-trim (substring skg-sexp 4 (1- (length skg-sexp))))))
-                  (list stars inner title))))
+                                             ""))))
+                  (list stars skg-sexp title))))
           ;; No metadata
           (list stars "" after-stars))))))
 
@@ -151,61 +148,69 @@ including asterisks and metadata, but not the trailing newline."
       (end-of-line)
       (buffer-substring-no-properties start (point)))))
 
-(defun skg-parse-metadata-inner (inner)
-  "Parse metadata INNER string containing s-expressions and bare values.
+(defun skg-parse-metadata-sexp (metadata-sexp)
+  "Parse METADATA-SEXP string containing (skg ...) s-expression.
 Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare values."
   (let ((alist '())
-        (set '())
-        (input (concat "(" inner ")"))
-        (pos 0))
-    (with-temp-buffer
-      (insert input)
-      (goto-char (point-min))
-      (condition-case nil
-          (let ((elements (read (current-buffer))))
-            (dolist (element elements)
-              (cond
-               (;; (key value) pair
-                (and (listp element)
-                     (= (length element) 2))
-                (let ((key (format "%s" (car element)))
-                      (val (format "%s" (cadr element))))
-                  (push (cons key val) alist)))
-               (;; Special case: (rels ...) sub-s-expr
-                (and (listp element)
-                     (> (length element) 2)
-                     (eq (car element) 'rels))
-                ;; Store as a special entry with the inner content as a string
-                (let ((rel-inner (mapconcat
-                                  (lambda (x) (format "%s" x))
-                                  (cdr element)
-                                  " ")))
-                  (push (cons "rels" rel-inner) alist)))
-               (t ;; Bare value (symbol or other atom)
-                (let ((bare-val (format "%s" element)))
-                  (push bare-val set))))))
-        (error nil)))
+        (set '()))
+    (when (and metadata-sexp
+               (not (string-empty-p metadata-sexp)))
+      (with-temp-buffer
+        (insert metadata-sexp)
+        (goto-char (point-min))
+        (condition-case nil
+            (let* ((sexp (read (current-buffer)))
+                   (elements (cdr sexp))) ;; Skip 'skg symbol
+              (dolist (element elements)
+                (cond
+                 (;; (key value) pair
+                  (and (listp element)
+                       (= (length element) 2))
+                  (let ((key (format "%s" (car element)))
+                        (val (format "%s" (cadr element))))
+                    (push (cons key val) alist)))
+                 (;; Special case: (rels ...) sub-s-expr
+                  (and (listp element)
+                       (> (length element) 2)
+                       (eq (car element) 'rels))
+                  ;; Store the complete (rels ...) s-expression as a string
+                  (let ((rel-sexp (format "%S" element)))
+                    (push (cons "rels" rel-sexp) alist)))
+                 (t ;; Bare value (symbol or other atom)
+                  (let ((bare-val (format "%s" element)))
+                    (push bare-val set))))))
+          (error nil))))
     (list (nreverse alist) (nreverse set))))
 
-(defun skg-reconstruct-metadata-inner
+(defun skg-reconstruct-metadata-sexp
     (alist bare-values)
-  "Reconstruct metadata inner string from ALIST and BARE-VALUES.
-Returns a whitespace-separated string suitable for use inside (skg ...).
-Key-value pairs are formatted as (key value)."
+  "Reconstruct complete (skg ...) metadata s-expression from ALIST and BARE-VALUES.
+Returns a string containing the complete s-expression.
+Key-value pairs are formatted as (key value),
+except 'rels' which is already a complete s-expression."
   (let ((parts '()))
     (dolist (kv alist)
-      (push (format "(%s %s)" (car kv) (cdr kv))
-            parts))
+      (if (string-equal (car kv) "rels")
+          ;; rels value is already a complete (rels ...) sexp string
+          (push (cdr kv) parts)
+        ;; Regular key-value pair
+        (push (format "(%s %s)" (car kv) (cdr kv))
+              parts)))
     (dolist (val bare-values)
       (push val parts))
-    (mapconcat #'identity (nreverse parts) " ")))
+    (if (null parts)
+        "(skg)"
+      (format "(skg %s)"
+              (mapconcat #'identity (nreverse parts) " ")))))
 
 (defun skg-format-headline
-    (stars metadata-inner title)
-  "Format a headline with STARS, METADATA-INNER, and TITLE.
+    (stars metadata-sexp title)
+  "Format a headline with STARS, METADATA-SEXP, and TITLE.
+METADATA-SEXP should be the complete (skg ...) s-expression,
+OR the empty string.
 Handles empty metadata correctly."
-  (if (string-empty-p metadata-inner)
+  (if (string-empty-p metadata-sexp)
       (format "%s(skg) %s" stars title)
-    (format "%s(skg %s) %s" stars metadata-inner title)))
+    (format "%s%s %s" stars metadata-sexp title)))
 
 (provide 'skg-metadata)

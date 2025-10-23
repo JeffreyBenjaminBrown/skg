@@ -13,13 +13,6 @@
 ** these integration tests could be merged
 focus-and-folded-markers
 fold-preservation
-** don't use 'inner' in those metadata functions
-   just keep the whole metadata expression.
-   Otherwise the matching function from
-     elisp/skg-sexpr/skg-compare-sexpr.el
-   could fail.
-** [[id:25bea258-98e5-4154-b787-98acf64e8ff6][retain focus, folding on save]]
-*** strip folded and focused after replacing buffer in Emacs
 ** containerward path seems buggy
    This integration test works:
      tests/integration/containerward-view-request/test-emacs.el
