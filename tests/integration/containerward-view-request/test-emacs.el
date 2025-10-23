@@ -151,7 +151,7 @@
            (expected
             (concat "* (skg (id 1) (view (rels (contents 3)))) 1\n"
                     "** (skg (id 11)) 11\n"
-                    "** (skg (id 12) (view focused (rels (contents 1)))) 12\n"
+                    "** (skg (id 12) (view (rels (contents 1)))) 12\n"
                     "*** (skg (id 1) (view (rels notInParent containsParent (contents 3))) (code (relToParent parentIgnores) indefinitive)) 1\n"
                     "**** (skg (id 0) (view (rels notInParent containsParent (containers 0) (contents 1))) (code (relToParent parentIgnores) indefinitive)) 0\n"
                     "*** (skg (id 121)) 121\n"

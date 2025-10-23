@@ -15,11 +15,11 @@
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
-*** (skg (id 1) folded) 111
-*** (skg (id 2) folded indefinitive) 112
+*** (skg (id 1) (view folded)) 111
+*** (skg (id 2) (view folded) indefinitive) 112
 ** 12
 12 body
-*** (skg (id 3) folded) 121
+*** (skg (id 3) (view folded)) 121
 121 body
 *** 122
 ** 13")
@@ -42,7 +42,7 @@
 1 body
 ** 11
 *** (skg (id 1) (view folded)) 111
-*** (skg (id 2) indefinitive (view folded)) 112
+*** (skg (id 2) (view folded) indefinitive) 112
 ** 12
 12 body
 *** (skg (id 3) (view folded)) 121
@@ -60,20 +60,20 @@
   (let ((buf (generate-new-buffer "*test-remove-folded*")))
     (with-current-buffer buf
       (org-mode)
-      (insert "* (skg folded) only folded
-* (skg folded other) folded first
+      (insert "* (skg (view folded)) only folded
+* (skg (view folded) other) folded first
 Body text.
-* (skg (key value) folded) folded last
-* (skg (k v) folded other) folded middle
+* (skg (key value) (view folded)) folded last
+* (skg (k v) (view folded) other) folded middle
 * (skg other) no folded")
       (skg-remove-folded-markers)
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* (skg) only folded
-* (skg other) folded first
+                     "* (skg (view)) only folded
+* (skg (view) other) folded first
 Body text.
-* (skg (key value)) folded last
-* (skg (k v) other) folded middle
+* (skg (key value) (view)) folded last
+* (skg (k v) (view) other) folded middle
 * (skg other) no folded")))
     (kill-buffer buf)))
 

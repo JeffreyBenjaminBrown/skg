@@ -9,34 +9,7 @@
 
 (require 'org)
 (require 'skg-metadata)
-
-(defun skg-create-org-buffer-with-folds (content)
-  "Create an org-mode buffer from CONTENT string.
-First inserts all content unchanged, then folds headlines marked with
-'folded' by backtracking to their parents, then removes the fold markers.
-Returns the newly created buffer."
-  (let ((buf (generate-new-buffer "*org-backtracking-fold*")))
-    (with-current-buffer buf
-      (org-mode)
-      (insert content)
-      (goto-char (point-min))
-      (skg-fold-marked-headlines)
-      (skg-remove-folded-markers)
-      (goto-char (point-min)))
-    buf))
-
-(defun skg-add-folded-markers ()
-  "Add 'folded' to (view ...) metadata of all invisible headlines in the buffer.
-Merges '(skg (view folded))' into existing metadata, creating nested structure
-if needed. If metadata already contains 'folded' in the view section, no change."
-  (save-excursion
-    (goto-char (point-min))
-    (while (not (eobp))
-      (beginning-of-line)
-      (when (and (org-at-heading-p)
-                 (invisible-p (point)))
-        (skg-edit-metadata-at-point '(skg (view folded))))
-      (forward-line 1))))
+(require 'skg-sexpr)
 
 (defun skg-fold-marked-headlines ()
   "PURPOSE:
@@ -61,9 +34,7 @@ Then process the buffer from the top, via this loop:
           (beginning-of-line)
           (when (and (looking-at org-heading-regexp)
                      (not (invisible-p (point)))
-                     (save-excursion
-                       (beginning-of-line)
-                       (looking-at ".*(skg.*\\<folded\\>.*)")))
+                     (skg-headline-has-folded-in-view-p))
             (setq found (point)))
           (forward-line 1)))
       (when found
@@ -74,59 +45,80 @@ Then process the buffer from the top, via this loop:
 
 (defun skg-remove-folded-markers ()
   "Remove 'folded' from all (skg ...) metadata markers.
-Handles all cases:
-folded as only value, first value, middle value, or last value.
-Works on all text including invisible regions."
+Re-folds headlines that had folded children using org-mode functions."
+  (save-excursion
+    (let ((inhibit-read-only t)
+          (parent-markers
+           ;; This processes the entire buffer.
+           (skg-collect-parent-markers-of-folded-headlines)))
+      (org-show-all) ;; so that text editing works
+      (progn ;; Remove "folded" from metadata using DELETE operation.
+        ;; This also processes the entire buffer.
+        (goto-char (point-min))
+        (while (not (eobp))
+          (beginning-of-line)
+          (when (and (org-at-heading-p)
+                     (skg-headline-has-folded-in-view-p))
+            (skg-edit-metadata-at-point
+             '(skg (view (DELETE folded)))))
+          (forward-line 1)))
+      (progn;; This is a third pass through the entire buffer.
+        (dolist (parent-marker parent-markers)
+          (goto-char parent-marker)
+          (when (org-at-heading-p)
+            (org-fold-hide-subtree))
+          (set-marker parent-marker nil))))))
+
+(defun skg-add-folded-markers ()
+  "Add 'folded' to (view ...) metadata of all invisible headlines in the buffer.
+Merges '(skg (view folded))' into existing metadata, creating nested structure
+if needed. If metadata already contains 'folded' in the view section, no change."
   (save-excursion
     (goto-char (point-min))
-    (let ((inhibit-read-only t)
-          (saved-invisibility-spec buffer-invisibility-spec)
-          (invisible-markers '()))
-      ;; First pass: record which headlines are invisible
-      (while (not (eobp))
-        (beginning-of-line)
-        (when (and (org-at-heading-p)
-                   (invisible-p (point)))
-          (push (point-marker) invisible-markers))
-        (forward-line 1))
-      ;; Second pass: remove folded markers, making text temporarily visible
-      (setq buffer-invisibility-spec nil)
+    (while (not (eobp))
+      (beginning-of-line)
+      (when (and (org-at-heading-p)
+                 (invisible-p (point)))
+        (skg-edit-metadata-at-point '(skg (view folded))))
+      (forward-line 1))))
+
+(defun skg-collect-parent-markers-of-folded-headlines ()
+  "Collect markers for parent headlines of all headlines with folded markers.
+Returns a list of markers pointing to parent headlines.
+Duplicates are removed - each parent appears only once in the list.
+Caller is responsible for freeing the markers with set-marker."
+  (let ((parent-markers '()))
+    (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
         (beginning-of-line)
-        (when (org-at-heading-p)
-          (let* ((bol (line-beginning-position))
-                 (eol (line-end-position))
-                 (headline-text (buffer-substring-no-properties bol eol)))
-            (when (string-match-p "(skg" headline-text)
-              (let* ((match-result (skg-split-as-stars-metadata-title
-                                    headline-text)))
-                (when match-result
-                  (let* ((stars (nth 0 match-result))
-                         (inner (nth 1 match-result))
-                         (title (nth 2 match-result))
-                         (parsed (skg-parse-metadata-inner inner))
-                         (alist (car parsed))
-                         (bare-values (cadr parsed))
-                         (filtered-values
-                          (seq-filter (lambda (v)
-                                        (not (string-equal v "folded")))
-                                      bare-values))
-                         (new-inner (skg-reconstruct-metadata-inner
-                                     alist filtered-values))
-                         (new-headline (skg-format-headline stars new-inner title)))
-                    (delete-region bol eol)
-                    (goto-char bol)
-                    (insert new-headline)))))))
-        (forward-line 1))
-      ;; Third pass: restore invisibility for marked headlines
-      (setq buffer-invisibility-spec saved-invisibility-spec)
-      (dolist (marker invisible-markers)
-        (goto-char marker)
-        (when (org-at-heading-p)
-          ;; Make this headline invisible again using an overlay
-          (let ((ov (make-overlay (line-beginning-position) (line-end-position))))
-            (overlay-put ov 'invisible 'outline)))
-        (set-marker marker nil)))))
+        (when (and (org-at-heading-p)
+                   (skg-headline-has-folded-in-view-p))
+          ;; This headline has "folded" marker, so record its parent
+          (save-excursion
+            (when (org-up-heading-safe)
+              (let ((parent-pos (point)))
+                ;; Check if already in list by position (deduplicate)
+                (unless (cl-some (lambda (m) (= (marker-position m) parent-pos))
+                                 parent-markers)
+                  (push (point-marker) parent-markers))))))
+        (forward-line 1)))
+    parent-markers))
+
+(defun skg-headline-has-folded-in-view-p ()
+  "Return t if the current headline has 'folded' in its (view ...) metadata.
+Assumes point is at the beginning of a headline.
+Verifies the structure is (skg ... (view ... folded ...) ...)."
+  (when (org-at-heading-p)
+    (let* ((headline-text (skg-get-current-headline-text))
+           (match-result (skg-split-as-stars-metadata-title headline-text)))
+      (when match-result
+        (let* ((inner (nth 1 match-result))
+               ;; Parse all s-expressions from inner by wrapping in parens
+               (all-sexps (read (concat "(" inner ")"))))
+          ;; Search for (view ... folded ...) in the list of s-expressions
+          (cl-some (lambda (sexp)
+                     (skg-sexp-subtree-p sexp '(view folded)))
+                   all-sexps))))))
 
 (provide 'skg-org-fold)

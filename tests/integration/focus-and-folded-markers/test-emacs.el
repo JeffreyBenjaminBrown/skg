@@ -1,10 +1,11 @@
 ;;; Integration test for focus and folded markers functionality
-;;; This script tests:
-;;; 1. Creating a buffer with 6 headlines
-;;; 2. Folding headline 3 (which contains headlines 4 and 5)
-;;; 3. Positioning point on headline 2
-;;; 4. Saving with skg-request-save-buffer
-;;; 5. Verifying that headline 2 gets (view focused) and headlines 4 and 5 get (view folded)
+;;; This script tests, in order:
+;;; - Creating a buffer with 6 headlines
+;;; - Folding headline 3 (which contains headlines 4 and 5)
+;;; - Positioning point on headline 2
+;;; - Saving with skg-request-save-buffer
+;;; - Verifying that after save, the markers are removed but the folding is preserved
+;;;   and point is on the focused headline
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -127,28 +128,40 @@
         (message "✓ Saved result buffer state to result.log")
         (message "Result content:\n%s" result-content)
 
-        ;; Verify the expected markers
-        (let ((has-focused-on-2 (string-match-p "\\*\\* (skg (id 2).*\\(view focused\\)" result-content))
-              (has-folded-on-4 (string-match-p "\\*\\*\\* (skg (id 4).*\\(view folded\\)" result-content))
-              (has-folded-on-5 (string-match-p "\\*\\*\\* (skg (id 5).*\\(view folded\\)" result-content)))
+        ;; Verify the markers are REMOVED (not present in buffer)
+        (let ((has-focused-marker (string-match-p "\\<focused\\>" result-content))
+              (has-folded-marker (string-match-p "\\<folded\\>" result-content))
+              (current-line (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
+              (line-4-invisible (save-excursion
+                                  (goto-char (point-min))
+                                  (forward-line 3)
+                                  (invisible-p (point))))
+              (line-5-invisible (save-excursion
+                                  (goto-char (point-min))
+                                  (forward-line 4)
+                                  (invisible-p (point)))))
 
-          (if (and has-focused-on-2 has-folded-on-4 has-folded-on-5)
+          (if (and (not has-focused-marker)
+                   (not has-folded-marker)
+                   (string-match-p "(id 2)" current-line)
+                   line-4-invisible
+                   line-5-invisible)
               (progn
-                (message "✓ PASS: Headline 2 has (view focused)")
-                (message "✓ PASS: Headline 4 has (view folded)")
-                (message "✓ PASS: Headline 5 has (view folded)")
+                (message "✓ PASS: Focused marker removed from buffer")
+                (message "✓ PASS: Folded markers removed from buffer")
+                (message "✓ PASS: Point is on headline 2 (focused headline)")
+                (message "✓ PASS: Headline 4 is invisible (folded)")
+                (message "✓ PASS: Headline 5 is invisible (folded)")
                 (message "✓ PASS: Integration test successful!")
                 (setq integration-test-completed t)
                 (kill-emacs 0))
             (progn
-              (message "✗ FAIL: Expected markers not found")
-              (message "  has-focused-on-2: %s" has-focused-on-2)
-              (message "  has-folded-on-4: %s" has-folded-on-4)
-              (message "  has-folded-on-5: %s" has-folded-on-5)
-              (message "Expected:")
-              (message "  ** (skg (id 2) (view focused)) 2")
-              (message "  *** (skg (id 4) (view folded)) 4")
-              (message "  *** (skg (id 5) (view folded)) 5")
+              (message "✗ FAIL: Expected behavior not found")
+              (message "  has-focused-marker (should be nil): %s" has-focused-marker)
+              (message "  has-folded-marker (should be nil): %s" has-folded-marker)
+              (message "  current-line: %s" current-line)
+              (message "  line-4-invisible (should be non-nil): %s" line-4-invisible)
+              (message "  line-5-invisible (should be non-nil): %s" line-5-invisible)
               (kill-emacs 1))))))))
 
 (progn ;; Run the test with a timeout in case things hang.

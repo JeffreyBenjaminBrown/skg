@@ -12,10 +12,13 @@ Verifies the structure is (skg ... (view ... focused ...) ...)."
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title headline-text)))
       (when match-result
-        (let ((inner (nth 1 match-result)))
-          (skg-sexp-subtree-p
-           (read inner)
-           '(skg (view focused))))))))
+        (let* ((inner (nth 1 match-result))
+               ;; Parse all s-expressions from inner by wrapping in parens
+               (all-sexps (read (concat "(" inner ")"))))
+          ;; Search for (view ... focused ...) in the list of s-expressions
+          (cl-some (lambda (sexp)
+                     (skg-sexp-subtree-p sexp '(view focused)))
+                   all-sexps))))))
 
 (defun skg-add-focused-marker ()
   "Add 'focused' to (view ...) metadata of the current headline.
