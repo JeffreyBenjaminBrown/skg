@@ -3,6 +3,7 @@
 /**/index.tantivy
 /.bash_history
 /.claude*
+/.codex
 /.config
 /.emacs*
 /.lesshst

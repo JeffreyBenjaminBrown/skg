@@ -6,16 +6,16 @@ docker exec -it $CONTAINER_NAME bash
 
 # The DNS bits, somehow, permit Claude Code to
 # work through my phone's mobile hotspot.
+# --newtowrk host binds each port to the host's port of the same number --
+# e.g. 1729=1729 (TypeDB).
 NATIVE=/home/jeff/hodal/skg
-docker run --name $CONTAINER_NAME -it -d \
-  -v $NATIVE:/home/ubuntu                \
-  -p 1729:1729                           \
-  -p 1730:1730                           \
-  --platform linux/amd64                 \
-  --user 1000:1000                       \
-  --dns 8.8.8.8                          \
-  --dns 1.1.1.1                          \
-  jeffreybbrown/hode:latest # CAREFUL! new? latest?
+docker run --name "$CONTAINER_NAME" -it -d \
+  --network host                           \
+  --platform linux/amd64                   \
+  --user 1000:1000                         \
+  --dns 8.8.8.8 --dns 1.1.1.1              \
+  -v "$NATIVE":/home/ubuntu                \
+  jeffreybbrown/hode:latest
 
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
 
