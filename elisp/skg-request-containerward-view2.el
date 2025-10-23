@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;;; skg-request-containerward-view2.el --- Request containerward view via save
 
 ;;; Commentary:

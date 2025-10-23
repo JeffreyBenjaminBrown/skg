@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;; ABANDONED. Too hard.
 ;; Instead I just changed the spec --
 ;; an ID *can* be `contained` in more than one place.

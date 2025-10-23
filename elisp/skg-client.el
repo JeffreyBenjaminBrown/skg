@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 ;; For instructions see USAGE.md, in this same folder.
 
 (require 'cl-lib)

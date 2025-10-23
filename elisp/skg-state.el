@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;; TODO: Can these globals be avoided?
 
 (defvar skg-rust-tcp-proc nil

@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (point) ;; if point is just after the ), it is at 8
 (point) ;; if point is just after the ), it is at 60
 

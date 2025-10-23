@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (defun skg-lp-handle-generic-chunk (completion-handler tcp-proc chunk)
   "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
 COMPLETION-HANDLER is called with the final payload when parsing completes."

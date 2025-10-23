@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-length-prefix)

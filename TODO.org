@@ -10,9 +10,6 @@
 ** Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it.
 * TODO unordered, unsorted
-** these integration tests could be merged
-focus-and-folded-markers
-fold-preservation
 ** containerward path seems buggy
    This integration test works:
      tests/integration/containerward-view-request/test-emacs.el
@@ -23,6 +20,9 @@ fold-preservation
    This is not clearly a problem.
 * ====== BELOW: SORTED, no execution order =======
 * QA
+** these integration tests could be merged
+focus-and-folded-markers
+fold-preservation
 ** redundancies
 *** mk_orgnode from save/buffer_to_orgnodes/uninterpreted.rs
     does something already done in mk_org_text/

@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
 (require 'skg-focus)

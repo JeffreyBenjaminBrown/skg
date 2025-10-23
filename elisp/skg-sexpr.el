@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;; Utilities for finding s-expression boundaries in text
 
 (require 'skg-edit-sexpr)

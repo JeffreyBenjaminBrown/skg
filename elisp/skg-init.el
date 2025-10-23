@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;;; init.el --- Project-specific Emacs configuration
 
 ;; Add project directories to load-path

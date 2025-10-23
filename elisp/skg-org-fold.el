@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 ;; BACKGROUND:
 ;; If a node's branches are folded,
 ;; they are marked folded, but the node they belong to is not.

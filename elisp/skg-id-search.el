@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 ;;;###autoload
 (defun skg-copy-id-at-point ()
   "RETURNS: This line's ID, or nil.

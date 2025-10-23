@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 ;; PURPOSE
 ;; See the comment for 'heralds-minor-mode' below.
 ;;

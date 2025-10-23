@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (defun skg-request-title-matches (search-terms)
   "Request title matches from the Rust server."
   (interactive "sSearch terms: ")

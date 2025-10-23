@@ -1,4 +1,5 @@
-;; Utilities for managing focus metadata on org headlines
+;;; -*- lexical-binding: t; -*-
+;;; Utilities for managing focus metadata on org headlines.
 
 (require 'org)
 (require 'skg-metadata)

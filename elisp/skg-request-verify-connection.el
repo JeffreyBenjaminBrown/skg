@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (defun skg-verify-connection ()
   "Verify connection to the Rust server."
   (interactive)
