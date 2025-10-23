@@ -10,8 +10,6 @@
 ** Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it.
 * TODO unordered, unsorted
-** rewrite skg-headline-has-focused-in-view-p
-   to use a more general subtree test function
 ** [[id:25bea258-98e5-4154-b787-98acf64e8ff6][retain focus, folding on save]]
 *** strip folded and focused after replacing buffer in Emacs
 ** containerward path seems buggy

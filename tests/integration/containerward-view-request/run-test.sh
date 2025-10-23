@@ -19,7 +19,57 @@ echo "=== SKG Containerward View Request Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 
+# Backup and reset functions
+backup_and_reset_test_data() {
+    echo "=== Backing up and resetting test data ==="
+
+    # Backup and reset each of the 6 files
+    for file in 0 1 11 12 121 13; do
+        if [ -f "$TEST_DIR/data/skg-data/$file.skg" ]; then
+            BACKUP_FILE="$TEST_DIR/data/skg-data/$file.skg.backup.$(date +%s)"
+            cp "$TEST_DIR/data/skg-data/$file.skg" "$BACKUP_FILE"
+            echo "✓ Backed up $file.skg to $(basename "$BACKUP_FILE")"
+        fi
+
+        # Reset to clean state (no containment)
+        cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
+title: '$file'
+ids:
+- '$file'
+contains: []
+EOF
+        echo "✓ Reset $file.skg to clean state"
+    done
+}
+
+cleanup_test_data() {
+    echo "=== Cleaning up test data ==="
+
+    # Clean up Tantivy index contents but keep the directory
+    cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+
+    # Restore original files if backups exist
+    for file in 0 1 11 12 121 13; do
+        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
+        if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
+            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$file.skg"
+            rm -f "$BACKUP_FILE"
+            echo "✓ Restored $file.skg from backup"
+        fi
+    done
+}
+
+# Enhanced cleanup function
+enhanced_cleanup() {
+    cleanup_test_data
+    cleanup  # Call original cleanup from test-lib.sh
+}
+
+trap enhanced_cleanup EXIT
+
 # Setup test environment
+backup_and_reset_test_data
+
 check_typedb_server
 
 # Find available port and create dynamic config
