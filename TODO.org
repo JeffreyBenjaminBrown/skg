@@ -10,11 +10,6 @@
 ** Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it.
 * TODO unordered, unsorted
-** containerward path seems buggy
-   This integration test works:
-     tests/integration/containerward-view-request/test-emacs.el
-   and it's clear.
-   But when I run it interactively I get strange results.
 ** "indefinitive nodes skip the visited-checking logic entirely"
    when saving a buffer.
    This is not clearly a problem.

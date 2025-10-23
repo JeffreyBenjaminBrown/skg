@@ -117,12 +117,12 @@
         (test-request-containerward-view)))))
 
 (defun test-request-containerward-view ()
-  "Call skg-request-containerward-view2 on node 12."
+  "Call skg-request-containerward-view on node 12."
   (message "=== PHASE 3: Requesting containerward view for node 12 ===")
 
   (with-current-buffer "*skg-content-view*"
-    (message "Calling skg-request-containerward-view2...")
-    (skg-request-containerward-view2)
+    (message "Calling skg-request-containerward-view...")
+    (skg-request-containerward-view)
 
     ;; Wait for response
     (sleep-for 0.5)
