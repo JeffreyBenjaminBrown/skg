@@ -8,6 +8,9 @@
 
 ;;; Code:
 
+(require 'skg-metadata)
+(require 'skg-request-save)
+
 (defun skg-request-containerward-view ()
   "Add containerward-view request to current headline's metadata and save.
 If point is in a headline body, navigates to the owning headline.
