@@ -27,6 +27,7 @@ TEST_DIRS=(
   "valid_and_invalid_saves"
   "focus-and-folded-markers"
   "containerward-view-request"
+  "fold-preservation"
 )
 
 # Function to run a single test in its directory

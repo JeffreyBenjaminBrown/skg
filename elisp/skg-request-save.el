@@ -1,6 +1,7 @@
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
 (require 'skg-focus)
+(require 'skg-metadata)
 
 (defun skg-request-save-buffer ()
   "Send the current buffer contents to Rust for processing.
@@ -64,7 +65,9 @@ which will replace the current buffer contents."
      (message "Sexp string was: %S" sexp-string))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content)
-  "Replace the current buffer contents with NEW-CONTENT from Rust."
+  "Replace the current buffer contents with NEW-CONTENT from Rust.
+After inserting content, folds marked headlines, removes fold markers,
+moves point to focused headline, and removes focus marker."
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert new-content)
@@ -72,7 +75,12 @@ which will replace the current buffer contents."
       ;; TODO: Use this in other places, too.
       ;; TODO: Don't call this here, but at the call site, because from the call site we can see whether the content was just saved (in which case buffer-modified should be nil) or perhaps was changed in some other way for which it should be t instead of nil.
       )
-    (goto-char (point-min))
+    ;; Process folding markers
+    (skg-fold-marked-headlines)
+    (skg-remove-folded-markers)
+    ;; Process focus marker
+    (skg-goto-focused-headline)
+    (skg-remove-focused-marker)
     (message "Buffer updated with processed content from Rust")))
 
 (defun skg-show-save-errors (error-content)

@@ -3,22 +3,22 @@
 (defun skg-edit-nested-sexp (target instructions)
   "Edit TARGET s-expression according to INSTRUCTIONS.
 TARGET and INSTRUCTIONS are s-expressions (may start with different symbols).
-
+.
 INSTRUCTIONS can contain four types of operations:
 1. DELETE: (DELETE elem1 elem2 ...) - removes specified elements
 2. REPLACE: (REPLACE old new) - replaces old with new
 3. ENSURE: (ENSURE elem) - replaces if found, inserts if not
 4. Merge: any other list/atom - recursively merges into target
-
+.
 For DELETE/REPLACE patterns:
 - Atom: matches exact atom
 - List (x): matches any list whose car is x
-
+.
 Special cases:
 - If target is nil: ignore DELETE/REPLACE, ENSURE works normally, merge rest
 - If target is empty list: ignore DELETE/REPLACE, ENSURE works normally, merge rest
 - If target and instructions have different cars: return target unchanged
-
+.
 Returns the edited s-expression."
   (cond
    ;; Case 1: nil target - transform instructions into pure merge
