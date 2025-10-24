@@ -1,4 +1,3 @@
-pub mod containerward_view;
 pub mod node_aliases;
 pub mod parse_headline_md_sexp;
 pub use parse_headline_md_sexp::parse_headline_from_sexp;
@@ -9,7 +8,6 @@ pub mod title_matches;
 pub mod util;
 
 use crate::file_io::read_skg_files;
-use crate::serve::containerward_view::handle_containerward_view_request;
 use crate::serve::node_aliases::handle_node_aliases_request;
 use crate::serve::save_buffer::handle_save_buffer_request;
 use crate::serve::single_root_view::handle_single_root_view_request;
@@ -150,12 +148,6 @@ fn handle_emacs (
             handle_node_aliases_request(
               &mut stream,
               &request,
-              config);
-          } else if request_type == "containerward view" {
-            handle_containerward_view_request(
-              &mut stream,
-              &request,
-              &typedb_driver,
               config);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(

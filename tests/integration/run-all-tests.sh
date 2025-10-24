@@ -27,6 +27,7 @@ TEST_DIRS=(
   "valid_and_invalid_saves"
   "focus-and-folded-markers"
   "containerward-view-request"
+  "sourceward-view-request"
   "fold-preservation"
 )
 

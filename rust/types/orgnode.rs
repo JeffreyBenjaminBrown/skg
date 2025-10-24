@@ -71,6 +71,7 @@ pub enum RelToParent {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NodeRequest {
   ContainerwardView,
+  SourcewardView,
 }
 
 //
@@ -113,6 +114,7 @@ impl fmt::Display for NodeRequest {
     let s : &str =
       match self {
         NodeRequest::ContainerwardView => "containerwardView",
+        NodeRequest::SourcewardView => "sourcewardView",
       };
     write! ( f, "{}", s ) } }
 
@@ -124,6 +126,7 @@ impl FromStr for NodeRequest {
   ) -> Result<Self, Self::Err> {
     match s {
       "containerwardView" => Ok ( NodeRequest::ContainerwardView ),
+      "sourcewardView"    => Ok ( NodeRequest::SourcewardView ),
       _ => Err ( format! ( "Unknown NodeRequest value: {}", s )),
     }} }
 

@@ -1,9 +1,16 @@
-/// PURPOSE: Integrate a containerward path into an OrgNode tree.
-/// I say 'integrate' rather than 'insert' because some of the path,
-/// even all of it, might already be there.
+/// PURPOSE: "Integrate" a "path" into an OrgNode tree.
+/// PITFALL: Both of those terms are tricky.
+/// - The 'path' is actually more general than that:
+///   If at the end it forks, it includes the first layer of branches,
+///   and if it cycles,
+///   the first node to cycle is duplicated at the end.
+/// - I say 'integrate' rather than 'insert' because some of the path,
+///   maybe even all of it, might already be there.
 
 use crate::mk_org_text::content_view::skgnode_and_orgnode_from_pid;
-use crate::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use crate::typedb::search::{
+  path_containerward_to_end_cycle_and_or_branches,
+  path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
 
 use ego_tree::Tree;
@@ -30,12 +37,34 @@ pub async fn build_and_integrate_containerward_path (
       & config . db_name,
       driver,
       & terminus_pid ) . await ?;
-  integrate_containerward_path (
+  integrate_path_that_might_fork_or_cycle (
     tree, node_id, path, branches, cycle_node, config ) }
 
-/// Integrate a containerward path into an OrgNode tree,
+/// Integrate a sourceward path into an OrgNode tree.
+/// TODO ? Can this be dedup'd w/r/t
+///   'build_and_integrate_containerward_path'?
+pub async fn build_and_integrate_sourceward_path (
+  tree      : &mut Tree < OrgNode >,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let terminus_pid : ID =
+    tree . get ( node_id ) . unwrap ()
+    . value () . metadata . id . clone ()
+    . ok_or ( "Node has no ID" ) ?;
+  let ( path, cycle_node, branches )
+    : ( Vec < ID >, Option < ID >, HashSet < ID > )
+    = path_sourceward_to_end_cycle_and_or_branches (
+      & config . db_name,
+      driver,
+      & terminus_pid ) . await ?;
+  integrate_path_that_might_fork_or_cycle (
+    tree, node_id, path, branches, cycle_node, config ) }
+
+/// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
 /// using provided backpath data.
-pub fn integrate_containerward_path (
+pub fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree < OrgNode >,
   node_id     : ego_tree::NodeId, // where to integrate
   mut path    : Vec < ID >,     // part of the computed path

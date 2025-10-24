@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- integrate_backpath
 
 use indoc::indoc;
-use skg::rebuild::integrate_containerward_path;
+use skg::rebuild::integrate_path_that_might_fork_or_cycle;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::test_utils::compare_orgnode_forests;
 use skg::types::{ID, OrgNode, SkgConfig};
@@ -46,7 +46,7 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
-  integrate_containerward_path(
+  integrate_path_that_might_fork_or_cycle(
     tree,
     root_id,
     path,
@@ -127,7 +127,7 @@ fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
   let cycle_node = None;
 
   // Integrate the path
-  integrate_containerward_path(
+  integrate_path_that_might_fork_or_cycle(
     tree,
     node_1_id,
     path,
@@ -210,7 +210,7 @@ fn test_path_with_branches_with_cycle() -> Result<(), Box<dyn Error>> {
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
-  integrate_containerward_path(
+  integrate_path_that_might_fork_or_cycle(
     tree,
     node_1_id,
     path,

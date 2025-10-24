@@ -17,4 +17,5 @@
 (require 'skg-client)
 (require 'skg-id-search)
 (require 'skg-request-containerward-view)
+(require 'skg-request-sourceward-view)
 (require 'skg-request-title-matches)

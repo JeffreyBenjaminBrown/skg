@@ -30,6 +30,7 @@ From a skg content view buffer, these can be run:
 ```
 skg-request-save-buffer
 skg-request-containerward-view
+skg-request-sourceward-view
 ```
 
 From any link in a search results buffer, links can be visited:
