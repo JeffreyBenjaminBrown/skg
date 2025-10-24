@@ -1,20 +1,27 @@
-* internalizing
-** ask it to research and present options before implementing
-   And clear its context before doing that.
-   This guides me,
-   and also loads up its context with good stuff,
-   for when it finally implements the chosen path.
+* most plans are online
+  e.g. here:
+  github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+* internalize
+** ask AI to research and present options before implementing
+*** Clear its context before doing that.
+*** Includes even asking for refactoring plan.
+*** why : helps me
+*** why : helps the AI
+    Loads up its context with good stuff,
+    for when it finally implements the chosen path.
 ** cargo nextest run
 ** claude --dangerously-skip-permissions
-** Ask for a refactoring plan before embarking.
-** Don't do anything you don't have permission to do.
-   I'm going to be away so I can't grant it.
-* TODO unordered, unsorted
-** "indefinitive nodes skip the visited-checking logic entirely"
+   Less ergonomically, can say:
+   "Don't do anything you don't have permission to do.
+   I'm going to be away so I can't grant it."
+* populate ./TODO/
+  and then order links to them here like this:
+  [[./TODO/sharing-and-privacy.org][sharing and privacy]]
+* QA
+** Indefinitive nodes skip the visited-checking logic
    when saving a buffer.
    This is not clearly a problem.
-* ====== BELOW: SORTED, no execution order =======
-* QA
+** Maybe indefinitive nodes and repeated nodes should be merged.
 ** these integration tests could be merged
 focus-and-folded-markers
 fold-preservation

@@ -10,7 +10,6 @@
 (require 'skg-request-node-aliases)
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
-(require 'skg-request-title-matches)
 (require 'skg-request-verify-connection)
 (require 'skg-state)
 
