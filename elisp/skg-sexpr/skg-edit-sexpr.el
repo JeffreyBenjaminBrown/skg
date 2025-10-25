@@ -132,30 +132,26 @@ Merge operations work normally."
 Dispatches to appropriate handler based on instruction type.
 Returns the modified target-elements."
   (cond
-   ;; DELETE operation: (DELETE spec1 spec2 ...)
-   ((and (listp instruction-elem)
+   (;; DELETE operation: (DELETE spec1 spec2 ...)
+    (and (listp instruction-elem)
          (eq (car instruction-elem) 'DELETE))
     (skg-edit--apply-delete-operations
      target-elements
      (cdr instruction-elem)))
-
-   ;; REPLACE operation: (REPLACE old-spec new-value)
-   ((and (listp instruction-elem)
+   ( ;; REPLACE operation: (REPLACE old-spec new-value)
+    (and (listp instruction-elem)
          (eq (car instruction-elem) 'REPLACE))
     (skg-edit--apply-replace-operation
      target-elements
      (nth 1 instruction-elem)  ; old-spec
      (nth 2 instruction-elem))) ; new-value
-
-   ;; ENSURE operation: (ENSURE spec)
-   ((and (listp instruction-elem)
+   ( ;; ENSURE operation: (ENSURE spec)
+    (and (listp instruction-elem)
          (eq (car instruction-elem) 'ENSURE))
     (skg-edit--apply-ensure-operation
      target-elements
      (nth 1 instruction-elem))) ; spec
-
-   ;; Merge operation: any other element
-   (t
+   (t ;; Merge operation: any other element
     (skg-edit--apply-merge-operation
      target-elements
      instruction-elem))))
@@ -259,25 +255,36 @@ Returns the modified target-elements."
                                (eq (car elem) key-to-match)))
                         target-elements)))
         (if found-matching-list
-            ;; Found matching list - recursively edit it
-            (mapcar (lambda (elem)
-                      (if (and (listp elem)
-                               (eq (car elem) key-to-match))
-                          ;; Recursively edit this nested element
-                          ;; Wrap both in 'skg for recursion, then unwrap result
-                          (let ((recursed-result
-                                 (skg-edit-nested-sexp
-                                  (cons 'skg (cdr elem))
-                                  (cons 'skg (cdr merge-elem)))))
-                            ;; Result is (skg ...), so cons key back on
-                            (cons key-to-match (cdr recursed-result)))
-                        elem))
-                    target-elements)
+            (let ;; Recursively edit the matching list
+                ((result
+                  (mapcar (lambda (elem)
+                            (if (and (listp elem)
+                                     (eq (car elem) key-to-match))
+                                (skg-edit-nested-sexp ;; recurse
+                                 elem merge-elem)
+                              elem))
+                          target-elements)))
+              ;; Remove any singleton lists created by deletions
+              (skg-edit--remove-empty-sections result))
           ;; No matching list found - append merge-elem
           (append target-elements (list merge-elem))))
     ;; Atom: add if not already present (avoid duplicates)
     (if (member merge-elem target-elements)
         target-elements
       (append target-elements (list merge-elem)))))
+
+(defun skg-edit--remove-empty-sections
+  (elements)
+  "Remove singleton lists (lists with only a label, no content) from ELEMENTS.
+This cleans up empty sections like (view) or (code) that have no data.
+Returns the filtered list of elements."
+  (seq-filter
+    (lambda
+      (elem)
+      (not
+        (and
+          (listp elem)
+          (= (length elem) 1))))
+    elements))
 
 (provide 'skg-edit-sexpr)

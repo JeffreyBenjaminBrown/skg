@@ -207,7 +207,7 @@ pub fn parse_metadata_to_orgnodemd (
   // Process each element
   for element in elements {
     match element {
-      Sexp::List ( items ) if items . len () >= 2 => {
+      Sexp::List ( items ) if items . len () >= 1 => {
         let first : String =
           atom_to_string ( &items[0] ) ?;
         match first . as_str () {
@@ -223,8 +223,9 @@ pub fn parse_metadata_to_orgnodemd (
             parse_code_sexp ( &items[1..], &mut result . code ) ?; },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
-      _ => { return Err ( "Unexpected element in metadata"
-                           . to_string () ); }} }
+      _ => { return Err ( format! (
+        "Unexpected element '{}' in metadata sexp: {}",
+        element, sexp_str )); }} }
   Ok ( result ) }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.

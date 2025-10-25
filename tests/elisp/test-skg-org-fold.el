@@ -16,7 +16,7 @@
 1 body
 ** 11
 *** (skg (id 1) (view folded)) 111
-*** (skg (id 2) (view folded) indefinitive) 112
+*** (skg (id 2) (view folded) (code indefinitive)) 112
 ** 12
 12 body
 *** (skg (id 3) (view folded)) 121
@@ -38,11 +38,12 @@
           ((expected
             ;; Every sibling of a folded node should be folded
             ;; and folded should be nested under view.
+            ;; Note: order of (code...) and (view...) may vary after editing
             "* 1
 1 body
 ** 11
 *** (skg (id 1) (view folded)) 111
-*** (skg (id 2) (view folded) indefinitive) 112
+*** (skg (id 2) (code indefinitive) (view folded)) 112
 ** 12
 12 body
 *** (skg (id 3) (view folded)) 121
@@ -69,11 +70,11 @@ Body text.
       (skg-remove-folded-markers)
       (should (equal (buffer-substring-no-properties (point-min)
                                                      (point-max))
-                     "* (skg (view)) only folded
-* (skg (view) other) folded first
+                     "* (skg) only folded
+* (skg other) folded first
 Body text.
-* (skg (key value) (view)) folded last
-* (skg (k v) (view) other) folded middle
+* (skg (key value)) folded last
+* (skg (k v) other) folded middle
 * (skg other) no folded")))
     (kill-buffer buf)))
 

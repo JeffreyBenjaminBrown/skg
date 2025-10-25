@@ -9,16 +9,20 @@
 (require 'skg-sexpr)
 
 (ert-deftest test-edit-sexp-delete-from-top ()
-  "Delete from top: (skg a b c d) + (skg (DELETE b c)) -> (skg a d)."
   (let ((target '(skg a b c d))
         (instructions '(skg (DELETE b c)))
         (expected '(skg a d)))
     (should (equal (skg-edit-nested-sexp target instructions)
                    expected))))
 
+(ert-deftest test-edit-sexp-delete-need-not-start-with-skg ()
+  (let ((target '(smurf a b c d))
+        (instructions '(smurf (DELETE b c)))
+        (expected '(smurf a d)))
+    (should (equal (skg-edit-nested-sexp target instructions)
+                   expected))))
+
 (ert-deftest test-edit-sexp-delete-nesting-matters ()
-  "For delete, nesting and parens matter:
-(skg a (b c) (d e) f) + (skg (DELETE (b) d e f)) -> (skg a (d e))."
   (let ((target '(skg a (b c) (d e) f))
         (instructions '(skg (DELETE (b) d e f)))
         (expected '(skg a (d e))))
@@ -26,8 +30,6 @@
                    expected))))
 
 (ert-deftest test-edit-sexp-delete-and-merge ()
-  "Delete and merge something at top:
-(skg a b (c d)) + (skg (DELETE b) (c e)) -> (skg a (c d e))."
   (let ((target '(skg a b (c d)))
         (instructions '(skg (DELETE b) (c e)))
         (expected '(skg a (c d e))))
@@ -35,17 +37,20 @@
                    expected))))
 
 (ert-deftest test-edit-sexp-replace-bare ()
-  "Replace something bare:
-(skg a b c) + (skg (REPLACE b x)) -> (skg a x c)."
   (let ((target '(skg a b c))
         (instructions '(skg (REPLACE b x)))
         (expected '(skg a x c)))
     (should (equal (skg-edit-nested-sexp target instructions)
                    expected))))
 
+(ert-deftest test-edit-sexp-replace-bare-need-not-start-with-skg ()
+  (let ((target '(smurf a b c))
+        (instructions '(smurf (REPLACE b x)))
+        (expected '(smurf a x c)))
+    (should (equal (skg-edit-nested-sexp target instructions)
+                   expected))))
+
 (ert-deftest test-edit-sexp-replace-nested ()
-  "Replace something nested:
-(skg (a b) (c d) (e f)) + (skg (REPLACE (c) (c x))) -> (skg (a b) (c x) (e f))."
   (let ((target '(skg (a b) (c d) (e f)))
         (instructions '(skg (REPLACE (c) (c x))))
         (expected '(skg (a b) (c x) (e f))))
@@ -53,7 +58,6 @@
                    expected))))
 
 (ert-deftest test-edit-sexp-multiple-operations ()
-  "Multiple deletes, replaces, ensures and merges."
   (let ((target '(skg (a a1 a2 (a3 a31 a32) (a4 a41 a42))
                       (b b1 b2 (b3 b31 b32) (b4 b41 b42))
                       (c c1 c2 (c3 c31 c32) (c4 c41 c42))

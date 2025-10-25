@@ -74,7 +74,7 @@ LINE-NUMBER is zero-based."
         (expected-line2
          (concat "* (skg (id 1) (view (rels (containers 0) (contents 2)))) 1\n"
                  "** (skg (id 11) (view (rels (linksIn 1)))) 11\n"
-                 "** (skg (id 12) (view)) 12\n"))
+                 "** (skg (id 12)) 12\n"))
         (expected-changed
          (concat "* (skg (id 1) (view (rels (containers 0) (contents 2)))) 1\n"
                  "** (skg (id 11) (view (rels (linksIn 1)))) 11\n"

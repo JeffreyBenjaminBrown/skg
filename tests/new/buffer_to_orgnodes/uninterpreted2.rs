@@ -249,7 +249,9 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";
   let result = org_to_uninterpreted_nodes(input_unknown_flag);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unexpected element in metadata"));
+  // Error message now includes the problematic element and full sexp
+  let err_msg = result.unwrap_err();
+  assert!(err_msg.contains("Unexpected element") && err_msg.contains("unknownFlag"));
 }
 
 #[test]
