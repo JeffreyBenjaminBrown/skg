@@ -5,7 +5,7 @@
 (require 'cl-lib)
 
 (defun skg-transform-sexp-flat
-  ( object rules )
+  (object rules)
   "Applies 'rules' to 'object' to generate an output expression.
 Has no side effects.
 The test suite demonstrates how rules are interpreted,
@@ -67,7 +67,147 @@ A leaf-list in a rule can be vacuous, a singleton label.
 This is just to demonstrate that the possibility has been considered,
 and does not affect the output.
 Such singleton leaf-lists can be omitted from the rule to no effect."
-  ;; TODO: Implement
-  nil )
+  (if
+      (or
+        (not (listp object))
+        (not (listp rules))
+        (not (equal (car object) (car rules))))
+      '()
+    (skg--transform-sexp-flat-from object rules)))
+
+(defun skg--transform-sexp-flat-from
+  (object
+    rule)
+  (let
+      ((results '()))
+    (dolist
+        (rule-child (cdr rule))
+      (setq results
+            (nconc results
+                   (skg--transform-sexp-flat-dispatch
+                    object rule-child))))
+    results))
+
+(defun skg--transform-sexp-flat-dispatch
+  (object
+    rule-child)
+  (cond
+    ((not (listp rule-child)) '())
+    ((skg--rule-any-leaf-p rule-child)
+      (skg--apply-any-leaf object rule-child))
+    ((skg--rule-leaf-p rule-child)
+      (skg--apply-ordinary-leaf object rule-child))
+    (t
+      (skg--apply-non-leaf object rule-child))))
+
+(defun skg--rule-leaf-p
+  (rule-child)
+  (not
+    (cl-some #'listp (cdr rule-child))))
+
+(defun skg--rule-any-leaf-p
+  (rule-child)
+  (and
+    (eq (car rule-child) 'ANY)
+    (skg--rule-leaf-p rule-child)))
+
+(defun skg--apply-non-leaf
+  (object
+    rule-child)
+  (let
+      ((matches
+          (skg--object-children-with-label object (car rule-child)))
+        (results '()))
+    (dolist
+        (match matches)
+      (setq results
+            (nconc results
+                   (skg--transform-sexp-flat-from
+                    match rule-child))))
+    results))
+
+(defun skg--apply-ordinary-leaf
+  (object
+    rule-child)
+  (let
+      ((label (car rule-child))
+        (tokens (cdr rule-child))
+        (matches
+          (skg--object-atomic-matches object (car rule-child)))
+        (results '()))
+    (when tokens
+      (dolist
+          (_ matches)
+        (setq results
+              (nconc results
+                      (list (skg--tokens->symbol tokens))))))
+    results))
+
+(defun skg--apply-any-leaf
+  (object
+    rule-child)
+  (let
+      ((tokens (cdr rule-child))
+        (tail-values (cdr object))
+        (results '()))
+    (cond
+      ((null tokens) '())
+      ((memq 'IT tokens)
+        (dolist
+            (tail-value tail-values)
+          (setq results
+                (nconc results
+                        (list
+                          (skg--tokens->symbol
+                            (skg--replace-it tokens tail-value))))))
+        results)
+      (t
+        (list (skg--tokens->symbol tokens))))))
+
+(defun skg--replace-it
+  (tokens
+    tail-value)
+  (mapcar
+    (lambda
+      (token)
+      (if
+          (eq token 'IT)
+          tail-value
+        token))
+    tokens))
+
+(defun skg--object-children-with-label
+  (object
+    label)
+  (cl-loop
+    for element in (cdr object)
+    when
+    (and
+      (listp element)
+      (equal (car element) label))
+    collect element))
+
+(defun skg--object-atomic-matches
+  (object
+    label)
+  (cl-loop
+    for element in (cdr object)
+    when
+    (and
+      (not (listp element))
+      (equal element label))
+    collect element))
+
+(defun skg--tokens->symbol
+  (tokens)
+  (intern
+    (mapconcat #'skg--token->string tokens ":")))
+
+(defun skg--token->string
+  (token)
+  (cond
+    ((symbolp token) (symbol-name token))
+    ((stringp token) token)
+    (t (format "%s" token))))
 
 (provide 'skg-lens)

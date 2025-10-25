@@ -1,10 +1,13 @@
-I format code unusually. If you are a human I won't force you to adhere to these conventions, but if you are an AI, please do.
+I format code unusually.
+If you are a human I won't ask you to adhere to these conventions,
+because they are annoying --
+but if you are an AI, it's pretty much costless, so please do.
 
 * across functions
   If they are in the same module, put callers before callees.
 * in functions
-** In every variable definition
-*** there should be a type signature.
+** In every variable definition:
+*** There should be a type signature.
 *** After the equals sign should follow a newline.
 ** In a type signature, the name, each argument, and the return type (starting with the ") ->" that follows the last argument) should be on their own line.
 * comments
@@ -16,10 +19,6 @@ I format code unusually. If you are a human I won't force you to adhere to these
    If you rewrite a function that included a comment, do not remove the comment unless it no longer applies. (TODO items, for instance, might be rendered obsolete and deserve deletion.)
 * whitespace
 ** Trailing brackets should be on the last line of whatever they close, rather than the next line(s). (I do like a quiet diff, but more important than that is for the code itself to be readable.)
-** Put whitespace around all punctuation
-   by which I mean all of the following, and anything similar:
-   < > ( ) [ ] { } . ; + - * / :: ? &
-   (unless the / is part of a path -- that would be silly).
 ** Group adjacent punctuation marks.
    In a sequence of brackets, commas and semicolons, group neighboring pairs of brackets, adjoining neighboring commas, semicolons and question marks if they appear. So, for instance:
    (()) -> (( ))

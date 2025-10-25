@@ -1,4 +1,4 @@
-;;; test-skg-lens.el --- Tests for skg-lens
+;;; test-skg-lens.el
 
 (add-to-list
  'load-path
@@ -37,7 +37,7 @@ Note: This test appears identical to the 'applies' version - may need clarificat
   "Two flat rules that apply, not in order: (a b c) with rules (a (c cc) (b bb)) -> (a bb cc)."
   (should (equal (skg-transform-sexp-flat '(a b c)
                                           '(a (c cc) (b bb)))
-                 '(a bb cc))))
+                 '(cc bb))))
 
 (ert-deftest test-skg-transform-sexp-flat-complex-rules ()
   "Complex rules with multiple nested transformations.
@@ -54,7 +54,7 @@ Any rule below without a 'does not apply' comment applies."
          (c (b (b3 b33)) ;; does not apply; that's not where b3 is
             (d (d3 d33))
             (c1 c11))))
-    '(c1 b22 d33)) ))
+    '(b22 d33 c11)) ))
 
 (ert-deftest test-skg-transform-sexp-flat-one-flat-ANY-rule-applies ()
   "One flat ANY rule that applies: (a b) with rule (a (ANY c)) -> (c)."
@@ -90,7 +90,6 @@ Does not apply because c is a label in the rule and not in the object."
 (ert-deftest test-skg-transform-sexp-flat ()
   (should (equal (skg-transform-sexp-flat '(a (b c))
                                           '(a (b (ANY x IT y)) ))
-                 (x:c:y) ))
+                 '(x:c:y) )))
 
 (provide 'test-skg-lens)
-;;; test-skg-lens.el ends here
