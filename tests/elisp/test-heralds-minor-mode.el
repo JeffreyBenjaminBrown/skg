@@ -13,8 +13,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (id 123) repeated (type aliases)) herald\n")
-      (insert "Another line (skg (id 456) (blue test)) more text\n")
+      (insert "Test line with (skg (id 123) (view (cycle) (relationships (numContents 2))) (code (relToParent aliasCol))) herald\n")
+      (insert "Another line (skg (id 456) (view (relationships (numContainers 1) (numLinksIn 3))) (code (toDelete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -42,7 +42,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (id 123) repeated) text")
+    (insert "Line with (skg (id 123) (view (cycle) (rels notInParent (containers 3) (linksIn 1))) (code toDelete)) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -59,8 +59,11 @@
         (should ( stringp ( overlay-get display-overlay 'display )) )
         (let ;; The display should contain our herald symbols
             ( ( display-text ( overlay-get display-overlay 'display )) )
-          ( should ( string-match "⅄" display-text ))
-          ( should ( string-match "REP" display-text )) )) )
+          ( should ( string-match "⟳" display-text ))
+          ( should ( string-match "!{" display-text ))
+          ( should ( string-match "3:{" display-text ))
+          ( should ( string-match "1:→" display-text ))
+          ( should ( string-match "delete" display-text )) )) )
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1) ;; disable
       (let* ;; Check that no display overlays remain

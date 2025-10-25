@@ -6,24 +6,65 @@
 ;; TESTING
 ;; Try it on the sample text at the end of the file.
 
-(require 'skg-metadata)
+(require 'cl-lib)
 (require 'skg-sexpr)
+
+(defconst heralds--transform-rules
+  '(skg (id (ANY "ID"))
+        (view (cycle (ANY "⟳"))
+              (folded) ;; ignored
+              (focused) ;; ignored
+              (rels
+                (notInParent "!{")
+                (containsParent "}")
+                (containers (ANY IT "{"))
+                (contents (ANY "{" IT))
+                (linksIn (ANY IT "→"))))
+        (code (relToParent
+                (content) ;; ignored
+                (aliasCol "aliases")
+                (alias "alias")
+                (parentIgnores "!{"))
+              (indefinitive "indef")
+              (toDelete "delete")
+              (nodeRequests
+                (containerwardView "req:containers")
+                (sourcewardView "req:sources"))))
+  "Rules to convert metadata sexps into herald tokens.")
+
+(defun heralds--read-metadata (metadata-sexp)
+  "Read METADATA-SEXP string into a Lisp object.
+Returns nil if parsing fails."
+  (condition-case nil
+      (car (read-from-string metadata-sexp))
+    (error nil)))
+
+(defun heralds--tokens->text (tokens)
+  "Convert list of TOKENS (symbols) to plain text display string.
+Each token is a symbol whose name becomes a string in the output.
+Multiple tokens are separated by spaces.
+Hide ID if there are other tokens present."
+  (when tokens
+    (let* ((token-strings
+            (mapcar (lambda (token) (symbol-name token)) tokens))
+           (non-id-tokens
+            (cl-remove-if
+             (lambda (s) (string= s "ID"))
+             token-strings)))
+      (mapconcat #'identity
+                 (if non-id-tokens non-id-tokens token-strings)
+                 " "))))
 
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
-  "When Rust sends a view of the graph to Emacs,
-each line (after the org-bullet) begins with some metadata.
-The API is in flux -- see api.md -- but might look something like
-(skg (id long-string) repeated (key value) another-value)
-This minor mode changes how such things are displayed:
-.
-The id becomes a single '⅄' character. (It looks graphy to me.)
-The 'type' key with values 'aliases' or 'searchResult' are displayed
-on a blue background, the 'id' key is displayed as '⅄' on a green background,
-and the unkeyed value 'repeated' displays as a white 'REP'
-on a red background. Those displayed symbols are called 'heralds'.
-Whitespace separates each herald from the next.
-The metadata is otherwise not displayed."
+  "Display skg metadata as a short list of \"herald\" markers.
+Each org headline the server sends starts with `(skg ...)` metadata.
+This mode lenses that tree via `skg-transform-sexp-flat`,
+producing colored tokens that summarise view and code information.
+View-related heralds render blue, code heralds green,
+while problem markers such as `!{` and `delete` render red.
+The primary id is hidden whenever any other herald is present.
+Whitespace separates the heralds; the raw metadata is otherwise hidden."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
       (progn
@@ -106,93 +147,15 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
             (push ov keep)))))
     (setq heralds-overlays (nreverse keep))))
 
-(defun skg--parse-relationships-from-alist (alist)
-  "Extract and parse the rels sub-s-expr from ALIST.
-Returns an alist of key-value pairs from the rels."
-  (let ((rel-entry (assoc "rels" alist)))
-    (if rel-entry
-        (let* ((rel-sexp ;; the (rels ...) s-exp, as a string
-                (cdr rel-entry))
-               (parsed (skg-parse-metadata-sexp rel-sexp)))
-          (car parsed)) ;; Return the alist part
-      '())))
-
-(defun skg--parse-relationships-bare-values-from-alist (alist)
-  "Extract and parse bare values from the rels sub-s-expr in ALIST.
-Returns a list of bare value strings from the rels."
-  (let ((rel-entry (assoc "rels" alist)))
-    (if rel-entry
-        (let* ((rel-sexp (cdr rel-entry))
-               (parsed (skg-parse-metadata-sexp rel-sexp)))
-          (cadr parsed)) ;; Return the bare-values part
-      '())))
-
 (defun heralds-from-metadata
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
-  "Returns a propertized space-separated string of heralds.
+  "Returns a space-separated string of herald markers.
 METADATA-SEXP should be the complete (skg ...) s-expression."
-  (let* ((parsed (skg-parse-metadata-sexp metadata-sexp))
-         (alist (car parsed))
-         (bare-values (cadr parsed))
-         (out '())
-         (id-val (cdr (assoc "id" alist)))
-         (type-val (cdr (assoc "type" alist)))
-         ;; Parse rels sub-s-expr
-         (rel-alist (skg--parse-relationships-from-alist alist))
-         (rel-bare-values (skg--parse-relationships-bare-values-from-alist alist))
-         (num-containers-val (cdr (assoc "containers" rel-alist)))
-         (num-contents-val (cdr (assoc "contents" rel-alist)))
-         (num-links-in-val (cdr (assoc "linksIn" rel-alist))))
-
-    ;; Build heralds in a particular order.
-    (when id-val ;; ID
-      (push (propertize "⅄" 'face 'heralds-green-face) out))
-
-    ;; ! (if NOT contained by parent)
-    (when (member "notInParent" rel-bare-values)
-      (push (propertize "!" 'face 'heralds-blue-face) out))
-
-    ;; containsParent
-    (when (member "containsParent" rel-bare-values)
-      (push (propertize "⮌" 'face 'heralds-green-face) out))
-
-    ;; indefinitive
-    (when (member "might_contain_more" bare-values)
-      (push (propertize "+?" 'face 'heralds-blue-face) out))
-
-    ;; cycle
-    (when (member "cycle" bare-values)
-      (push (propertize "CYCLE" 'face 'heralds-yellow-face) out))
-
-    ;; REP (repeated)
-    (when (member "repeated" bare-values)
-      (push (propertize "REP" 'face 'heralds-red-face) out))
-
-    ;; aliases
-    (when (and type-val (string-equal type-val "aliases"))
-      (push (propertize "aliases" 'face 'heralds-blue-face) out))
-
-    ;; searchResult
-    (when (and type-val (string-equal type-val "searchResult"))
-      (push (propertize "title matches" 'face 'heralds-blue-face) out))
-
-    ;; container count (N})
-    (when num-containers-val
-      (push (propertize (format "%d}" (string-to-number num-containers-val))
-                        'face 'heralds-green-face) out))
-
-    ;; links in (N→)
-    (when num-links-in-val
-      (push (propertize (format "%d→" (string-to-number num-links-in-val))
-                        'face 'heralds-green-face) out))
-
-    ;; content count ({N)
-    (when num-contents-val
-      (push (propertize (format "{%d" (string-to-number num-contents-val))
-                        'face 'heralds-green-face) out))
-
-    (when out
-      (mapconcat #'identity (nreverse out) " "))))
+  (let* ((sexp (heralds--read-metadata metadata-sexp))
+         (tokens (when (and (listp sexp)
+                            (eq (car sexp) 'skg))
+                   (skg-transform-sexp-flat sexp heralds--transform-rules))))
+    (heralds--tokens->text tokens)))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."
@@ -220,10 +183,11 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
 ;; TESTING, interactive:
 ;; `M-x heralds-minor-mode` should change how the text below looks.
 ;;
-;; Here is some example text (skg (id 123) repeated (other ignored)) and more text.
-;; Another example: (skg (id 456) repeated (type searchResult)) end of line.
-;; (skg (id 789)) A second batch of similarly-formatted data should render normally: (skg (id yeah) repeated)
-;; Type aliases test: (skg (id test) (type aliases) (other ignored)) should show blue "aliases".
-;; (skg (foo Azure) (bar Forest) bazoo) Metadata with unrecognized keys and values is not rendered at all.
+;; ID only: (skg (id 123)) should show "ID".
+;; View with cycle: (skg (id 456) (view (cycle) (relationships (numContents 3)))) should show "⟳ {3".
+;; Code markers: (skg (id 789) (code (relToParent aliasCol))) should show "aliases".
+;; Delete marker: (skg (id abc) (code (toDelete))) should show red "delete".
+;; Not in parent: (skg (id def) (view (relationships (notInParent)))) should show red "!{".
+;; Multiple heralds: (skg (id xyz) (view (cycle) (relationships (numContainers 2) (numLinksIn 5)))) should show "⟳ 2{ 5→".
 
 (provide 'heralds-minor-mode)
