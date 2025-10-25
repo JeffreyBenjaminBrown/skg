@@ -47,6 +47,26 @@ When writing or modifying code:
 
 The script `run-servers.sh` persists those things. Only one TypeDB server should be running at a time, but many Skg servers (`cargo run --bash skg`) can run at the same time. Config files like the one at `data/skgconfig.toml` can be used to change TCP ports, database names and data folders,, so that different instances of Skg don't collide.
 
+## Running Tests
+
+There are three ways to test the code:
+
+1. **Emacs Lisp tests**: `bash/emacs-tests.sh`
+   - Runs all automated Emacs tests in `tests/elisp/`
+   - Uses Emacs batch mode with ERT (Emacs Lisp Regression Testing)
+   - Some tests require `cargo run` to be running
+
+2. **Rust unit/integration tests**: `cargo nextest run`
+   - Runs Rust tests in parallel
+   - Requires `typedb server` to be running
+   - Tests use separate database names to avoid race conditions
+
+3. **Integration tests**: `bash/integration-tests.sh`
+   - Runs end-to-end tests that exercise both Rust and Emacs components
+   - Tests run in parallel with isolated configurations
+   - Requires both `typedb server` and `cargo run` to be running
+   - Individual tests located in `tests/integration/*/run-test.sh`
+
 ## Handling Reverted Edits
 
 If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this means the user or linter has rejected those changes. **DO NOT re-apply those edits**. The reversion is intentional and indicates the changes were not wanted. Move on without attempting to restore the reverted changes.

@@ -11,22 +11,22 @@
 
 (defconst heralds--transform-rules
   '(skg (id (ANY "ID"))
-        (view (cycle (ANY "⟳"))
+        (BLUE view (cycle (ANY "⟳"))
               (folded) ;; ignored
               (focused) ;; ignored
               (rels
-                (notInParent "!{")
+                (RED notInParent "!{")
                 (containsParent "}")
                 (containers (ANY IT "{"))
                 (contents (ANY "{" IT))
                 (linksIn (ANY IT "→"))))
-        (code (relToParent
+        (GREEN code (relToParent
                 (content) ;; ignored
                 (aliasCol "aliases")
                 (alias "alias")
-                (parentIgnores "!{"))
+                (RED parentIgnores "!{"))
               (indefinitive "indef")
-              (toDelete "delete")
+              (RED toDelete "delete")
               (nodeRequests
                 (containerwardView "req:containers")
                 (sourcewardView "req:sources"))))
@@ -39,9 +39,18 @@ Returns nil if parsing fails."
       (car (read-from-string metadata-sexp))
     (error nil)))
 
+(defun heralds--color-to-face
+  (color-keyword)
+  "Map COLOR-KEYWORD (RED, GREEN, BLUE) to a face."
+  (cond
+    ((eq color-keyword 'RED) 'heralds-red-face)
+    ((eq color-keyword 'GREEN) 'heralds-green-face)
+    ((eq color-keyword 'BLUE) 'heralds-blue-face)
+    (t nil)))
+
 (defun heralds--tokens->text (tokens)
-  "Convert list of TOKENS (symbols) to plain text display string.
-Tokens are symbols created by skg-transform-sexp-flat.
+  "Convert list of TOKENS (propertized strings) to display string.
+Tokens are propertized strings created by skg-transform-sexp-flat.
 Colons between letters are preserved (like 'req:containers'),
 but structural colons added by the transform are removed (like '3:{' -> '3{').
 We detect this by checking if both sides of a colon are alphanumeric.
@@ -51,16 +60,24 @@ Hide ID if there are other tokens present."
     (let* ((token-strings
             (mapcar
              (lambda (token)
-               (let ((s (symbol-name token)))
-                 ;; Remove colons unless they're between alphanumeric chars
-                 (replace-regexp-in-string
-                  "\\([^[:alnum:]]\\):\\|:\\([^[:alnum:]]\\)"
-                  "\\1\\2"
-                  s)))
+               (let* ((s token)
+                      (cleaned
+                        (replace-regexp-in-string
+                          "\\([^[:alnum:]]\\):\\|:\\([^[:alnum:]]\\)"
+                          "\\1\\2"
+                          s))
+                      (color (get-text-property 0 'skg-color token)))
+                 (when color
+                   (put-text-property
+                     0 (length cleaned)
+                     'face (heralds--color-to-face color)
+                     cleaned))
+                 cleaned))
              tokens))
            (non-id-tokens
             (cl-remove-if
-             (lambda (s) (string= s "ID"))
+             (lambda (s)
+               (string= (substring-no-properties s) "ID"))
              token-strings)))
       (mapconcat #'identity
                  (if non-id-tokens non-id-tokens token-strings)
@@ -158,6 +175,36 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
             (push ov keep)))))
     (setq heralds-overlays (nreverse keep))))
 
+(defun heralds--post-process-text
+  (text)
+  "Some post-processing rules to for heralds:
+- Remove ID if other tokens are present
+- Remove duplicate '!{' symbol if it appears twice"
+  (when text
+    (let*
+        ((parts (split-string text " " t))
+          (processed-parts
+            (if (and (> (length parts) 1)
+                     (cl-some (lambda (part)
+                                (string=
+                                 (substring-no-properties part)
+                                 "ID"))
+                      parts))
+              (cl-remove-if (lambda (part)
+                              (string=
+                               (substring-no-properties part) "ID"))
+                            parts)
+              parts))
+          (joined (mapconcat #'identity processed-parts " "))
+          (first-brace-pos (string-match "!{" joined))
+          (second-brace-pos
+            (when first-brace-pos
+              (string-match "!{" joined (+ first-brace-pos 2)))))
+      (if second-brace-pos
+        (concat (substring joined 0 second-brace-pos)
+                (substring joined (+ second-brace-pos 2)))
+        joined))))
+
 (defun heralds-from-metadata
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
   "Returns a space-separated string of herald markers.
@@ -165,8 +212,10 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
          (tokens (when (and (listp sexp)
                             (eq (car sexp) 'skg))
-                   (skg-transform-sexp-flat sexp heralds--transform-rules))))
-    (heralds--tokens->text tokens)))
+                   (skg-transform-sexp-flat
+                    sexp heralds--transform-rules)))
+         (raw-text (heralds--tokens->text tokens)))
+    (heralds--post-process-text raw-text)))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."
