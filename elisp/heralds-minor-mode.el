@@ -41,12 +41,23 @@ Returns nil if parsing fails."
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (symbols) to plain text display string.
-Each token is a symbol whose name becomes a string in the output.
+Tokens are symbols created by skg-transform-sexp-flat.
+Colons between letters are preserved (like 'req:containers'),
+but structural colons added by the transform are removed (like '3:{' -> '3{').
+We detect this by checking if both sides of a colon are alphanumeric.
 Multiple tokens are separated by spaces.
 Hide ID if there are other tokens present."
   (when tokens
     (let* ((token-strings
-            (mapcar (lambda (token) (symbol-name token)) tokens))
+            (mapcar
+             (lambda (token)
+               (let ((s (symbol-name token)))
+                 ;; Remove colons unless they're between alphanumeric chars
+                 (replace-regexp-in-string
+                  "\\([^[:alnum:]]\\):\\|:\\([^[:alnum:]]\\)"
+                  "\\1\\2"
+                  s)))
+             tokens))
            (non-id-tokens
             (cl-remove-if
              (lambda (s) (string= s "ID"))
