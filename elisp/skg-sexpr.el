@@ -5,6 +5,7 @@
 
 (require 'skg-edit-sexpr)
 (require 'skg-compare-sexpr)
+(require 'skg-lens)
 
 (defun skg-find-sexp-end (text &optional start-pos)
   "Find the position after the closing paren of the first s-expression in TEXT.

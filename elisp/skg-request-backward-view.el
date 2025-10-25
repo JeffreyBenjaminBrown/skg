@@ -32,6 +32,5 @@
        `(skg (code (requests ,view-token)))) )
     (skg-request-save-buffer)))
 
-(provide 'skg-request-containerward-view)
-(provide 'skg-request-sourceward-view)
+(provide 'skg-request-backward-view)
 ;;; skg-request-containerward-view.el ends here

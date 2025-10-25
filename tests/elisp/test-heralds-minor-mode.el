@@ -1,4 +1,12 @@
 (require 'ert)
+(add-to-list
+ 'load-path
+ (expand-file-name "../../elisp"
+                   (file-name-directory load-file-name)))
+(add-to-list
+ 'load-path
+ (expand-file-name "../../elisp/skg-sexpr"
+                   (file-name-directory load-file-name)))
 (require 'heralds-minor-mode)
 
 (ert-deftest test-heralds-minor-mode-toggle ()
