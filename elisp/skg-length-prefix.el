@@ -1,4 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; PURPOSE: Read length-prefixed messages from the server.
+;;; (This file does not handle adding length prefixes to outgoing
+;;; messages. That's easier, and done inline where messages are sent,
+;;; e.g., in skg-request-save.el.)
+
 (defun skg-lp-handle-generic-chunk (completion-handler tcp-proc chunk)
   "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
 COMPLETION-HANDLER is called with the final payload when parsing completes."

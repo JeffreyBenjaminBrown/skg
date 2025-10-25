@@ -3,7 +3,6 @@
 ;; The test suite uses one of these functions.
 ;; The library uses none of them.
 
-
 ;; `M-x pp-28` pretty-prints a highlighted s-exp.
 
 (defun skg-props ()

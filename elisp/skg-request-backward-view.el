@@ -1,5 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;;; skg-request-containerward-view.el --- Request containerward or sourceward view via save
 
 ;;; Commentary:
 ;; This function adds a containerward-view request to the current headline's

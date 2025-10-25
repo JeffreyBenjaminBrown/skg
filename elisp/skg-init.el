@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
-;;; init.el --- Project-specific Emacs configuration
+;;
+;; PURPOSE: Load everything the skg client needs.
 
 ;; Add project directories to load-path
 (let ((project-root
@@ -16,6 +17,6 @@
 
 (require 'skg-client)
 (require 'skg-id-search)
-(require 'skg-request-containerward-view)
+(require 'skg-request-backward-view)
 (require 'skg-request-sourceward-view)
 (require 'skg-request-title-matches)

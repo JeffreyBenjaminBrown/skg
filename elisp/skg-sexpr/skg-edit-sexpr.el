@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
-;; Utilities for editing s-expressions with DELETE, REPLACE, ENSURE, and merge operations
+;;;
+;;; PURPOSE: Edit s-expressions with 'DELETE', 'REPLACE', 'ENSURE',
+;;; and (the default, so no keyword) merge operations.
 
 (defun skg-edit-nested-sexp (target instructions)
   "Edit TARGET s-expression according to INSTRUCTIONS.

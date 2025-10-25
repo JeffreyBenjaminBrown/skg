@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
-
+;;
+;; PURPOSE: Read, act on, and edit 'folded' metadata.
+;;
 ;; BACKGROUND:
 ;; If a node's branches are folded,
 ;; they are marked folded, but the node they belong to is not.

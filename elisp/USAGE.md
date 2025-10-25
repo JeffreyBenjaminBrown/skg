@@ -17,7 +17,7 @@ by evaluating the following (here, in Emacs):
 
 Now these commands can be evaluated (here, in Emacs):
 ```
-  (skg-request-single-root-content-view-from-node "1")
+  (skg-request-single-root-content-view-from-id "1")
     ;; try 1, 1a, or a
   (skg-request-title-matches "second")
     ;; try match, title, or second

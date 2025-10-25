@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
-;;; Utilities for managing focus metadata on org headlines.
+;;;
+;;; PURPOSE: Read, edit and act on
+;;; (by moving point to the focused heading) 'focus' metadata.
 
 (require 'org)
 (require 'skg-metadata)

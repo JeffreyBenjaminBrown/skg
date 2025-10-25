@@ -1,6 +1,6 @@
 ;;; Integration test for skg content view and save functionality
 ;;; This script tests:
-;;; 1. skg-request-single-root-content-view-from-node "1"
+;;; 1. skg-request-single-root-content-view-from-id "1"
 ;;; 2. Adding content and skg-request-save-buffer
 ;;; 3. Verifying UUID generation and content persistence
 ;;;
@@ -46,8 +46,8 @@
 (defun test-content-view ()
   "Test content view creation and proceed to save test if successful."
   (message "=== PHASE 1: Requesting content view for node '1' ===")
-  (skg-request-single-root-content-view-from-node "1")
-  (message "Called skg-request-single-root-content-view-from-node")
+  (skg-request-single-root-content-view-from-id "1")
+  (message "Called skg-request-single-root-content-view-from-id")
 
   ;; Wait for the response
   (sleep-for 0.25)

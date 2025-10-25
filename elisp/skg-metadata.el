@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
-;;; Utilities to parse and edit skg headline metadata
+;;;
+;;; PURPOSE: Utilities to parse and edit skg headline metadata.
 
 (require 'org)
 (require 'skg-sexpr)

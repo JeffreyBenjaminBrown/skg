@@ -1,9 +1,6 @@
-;;; skg-compare-sexpr.el --- Structural comparison of s-expressions -*- lexical-binding: t; -*-
-
-;;; Commentary:
-;; Provides functions for comparing s-expression structures.
-
-;;; Code:
+;;; -*- lexical-binding: t; -*-
+;;;
+;;; PURPOSE: Compare s-expressions
 
 (require 'cl-lib)
 

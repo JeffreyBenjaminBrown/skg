@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
-;; Utilities for finding s-expression boundaries in text
+;;
+;; PURPOSE: Generic utilities that
+;; read, compare, edit and transform s-exps.
 
 (require 'skg-edit-sexpr)
 (require 'skg-compare-sexpr)

@@ -1,4 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
+
 ;;;###autoload
 (defun skg-copy-id-at-point ()
   "RETURNS: This line's ID, or nil.
@@ -102,7 +105,7 @@ If point is not on a link, print a message and do nothing."
         (progn
           (message "Visiting node: %s" link-id)
           (require 'skg-request-single-root-content-view)
-          (skg-request-single-root-content-view-from-node link-id))
+          (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
 (provide 'skg-id-search)
