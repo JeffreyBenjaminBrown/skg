@@ -1,5 +1,6 @@
 pub mod file_io;
 pub mod hyperlinks;
+pub mod merge;
 pub mod mk_org_text;
 pub mod rebuild;
 pub mod save;
