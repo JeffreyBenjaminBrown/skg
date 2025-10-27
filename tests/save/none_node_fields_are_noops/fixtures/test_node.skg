@@ -4,3 +4,12 @@ title: Title from disk
 aliases:
 - alias 1 on disk
 - alias 2 on disk
+subscribes_to:
+- sub_1_on_disk
+- sub_2_on_disk
+hides_from_its_subscriptions:
+- hide_1_on_disk
+overrides_view_of:
+- override_1_on_disk
+- override_2_on_disk
+- override_3_on_disk

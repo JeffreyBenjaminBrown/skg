@@ -56,21 +56,21 @@ pub async fn create_relationships_from_node (
     tx ). await ?;
   insert_relationship_from_list (
     primary_id,
-    &node.subscribes_to,
+    node.subscribes_to.as_ref().unwrap_or(&vec![]),
     "subscribes",
     "subscriber",
     "subscribee",
     tx ). await ?;
   insert_relationship_from_list (
     primary_id,
-    &node.hides_from_its_subscriptions,
+    node.hides_from_its_subscriptions.as_ref().unwrap_or(&vec![]),
     "hides_from_its_subscriptions",
     "hider",
     "hidden",
     tx ). await ?;
   insert_relationship_from_list(
     primary_id,
-    &node.overrides_view_of,
+    node.overrides_view_of.as_ref().unwrap_or(&vec![]),
     "overrides_view_of",
     "replacement",
     "replaced",

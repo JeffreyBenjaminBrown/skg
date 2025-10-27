@@ -83,7 +83,7 @@ fn create_merged_node(acquiree: &SkgNode) -> SkgNode {
     ids: vec![ID(uuid::Uuid::new_v4().to_string())],
     body: acquiree.body.clone(),
     contains: vec![],
-    subscribes_to: vec![],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![],
+    subscribes_to: None,
+    hides_from_its_subscriptions: None,
+    overrides_view_of: None,
   }}
