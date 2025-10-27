@@ -83,19 +83,16 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 assert!(!merged_action.indefinitive, "MERGED node should not be indefinitive");
                 assert!(!merged_action.toDelete, "MERGED node should not be marked for deletion");
                 assert_eq!(merged_node.contains.len(), 0, "MERGED node should have no contents");
-                assert_eq!(
-                    merged_node.subscribes_to.len(),
-                    0,
+                assert!(
+                    merged_node.subscribes_to.is_none(),
                     "MERGED node should have no subscriptions"
                 );
-                assert_eq!(
-                    merged_node.hides_from_its_subscriptions.len(),
-                    0,
+                assert!(
+                    merged_node.hides_from_its_subscriptions.is_none(),
                     "MERGED node should hide nothing"
                 );
-                assert_eq!(
-                    merged_node.overrides_view_of.len(),
-                    0,
+                assert!(
+                    merged_node.overrides_view_of.is_none(),
                     "MERGED node should override nothing"
                 );
 

@@ -6,10 +6,11 @@ use super::misc::ID;
 pub struct SkgNode {
   // There is a 1-to-1 correspondence between SkgNodes and actual .skg files -- a file can be read to a SkgNode, and a SkgNode can be written to a file. The files are the only permanent data. SkgNode is the format used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
+  // PITFALL: In the Optional lists, it is important to recognize how None differs from Some( [] ). A SkgNode can be built from an OrgNode. The OrgNode might say something about the relevant field, or it might not. If the OrgNode says "this field should be empty", then we use 'Some([])'. But if the OrgNode did not mention it, we use None. Those None values will later be clobbered by whatever was on disk, via the function 'clobber_none_fields_with_data_from_disk'.
 
   pub title: String,
 
-  #[serde(default, skip_serializing_if = "aliases_is_empty_or_none")]
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub aliases: Option<Vec<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
 
   pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
@@ -21,24 +22,24 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub subscribes_to: Vec<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
+  pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub hides_from_its_subscriptions: Vec<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
+  pub hides_from_its_subscriptions: Option<Vec<ID>>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub overrides_view_of: Vec<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
+  pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
 }
 
 //
 // Helper functions
 //
 
-fn aliases_is_empty_or_none (
-  aliases: &Option<Vec<String>>
+fn option_vec_is_empty_or_none<T> (
+  option_vec: &Option<Vec<T>>
 ) -> bool {
-  match aliases {
+  match option_vec {
     None => true,
     Some(vec) => vec.is_empty(), }}
 
@@ -56,11 +57,11 @@ It better be okay with newlines."# . to_string() ),
     contains: vec![ ID::new("1"),
                     ID::new("2"),
                     ID::new("3")],
-    subscribes_to: vec![ID::new("11"),
-                        ID::new("12"),
-                        ID::new("13")],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![], }}
+    subscribes_to: Some(vec![ID::new("11"),
+                             ID::new("12"),
+                             ID::new("13")]),
+    hides_from_its_subscriptions: None,
+    overrides_view_of: None, }}
 
 /// Useful for making tests more readable.
 pub fn empty_skgnode () -> SkgNode {
@@ -70,7 +71,7 @@ pub fn empty_skgnode () -> SkgNode {
     ids                          : vec![],
     body                         : None,
     contains                     : vec![],
-    subscribes_to                : vec![],
-    hides_from_its_subscriptions : vec![],
-    overrides_view_of            : vec![],
+    subscribes_to                : None,
+    hides_from_its_subscriptions : None,
+    overrides_view_of            : None,
   }}
