@@ -61,12 +61,33 @@ cleanup() {
   if [ -n "$CARGO_PID" ]; then
     # Check if process is still running
     if kill -0 $CARGO_PID 2>/dev/null; then
-      # For tests, just kill the process directly to avoid hanging on shutdown commands
       echo "Stopping server process (PID: $CARGO_PID)"
-      kill -9 $CARGO_PID 2>/dev/null || true
+
+      # Use SIGINT (not SIGTERM) for graceful shutdown
+      # The Rust server only handles SIGINT (Ctrl+C), not SIGTERM
+      # This triggers the delete_on_quit cleanup code
+      kill -INT $CARGO_PID 2>/dev/null || true
+
+      # Wait for graceful shutdown (delete_on_quit needs time to clean up database)
+      local wait_count=0
+      while [ $wait_count -lt 20 ] && kill -0 $CARGO_PID 2>/dev/null; do
+        sleep 0.1
+        wait_count=$((wait_count + 1))
+      done
+
+      # If still running after 2 seconds, force kill
+      if kill -0 $CARGO_PID 2>/dev/null; then
+        echo "Force killing server process (PID: $CARGO_PID)"
+        kill -9 $CARGO_PID 2>/dev/null || true
+      fi
+
       wait $CARGO_PID 2>/dev/null || true
     fi
   fi
+
+  # Do NOT manually delete test databases here - it causes TypeDB to crash
+  # when it tries to checkpoint deleted databases. The delete_on_quit flag
+  # in the test config handles cleanup during graceful shutdown (via SIGINT).
 }
 
 # Function to find available port by trying random ports in range

@@ -200,6 +200,11 @@ fn perform_shutdown_cleanup (
     println! (
       "Deleting database '{}' before shutdown...",
       config . db_name );
+
+    // Wait briefly to allow any pending operations to complete
+    // This helps ensure the database isn't marked as "in use"
+    std::thread::sleep ( std::time::Duration::from_millis ( 100 ) );
+
     futures::executor::block_on ( async {
       if let Err ( e ) =
         delete_database (

@@ -18,6 +18,14 @@ TESTS_LOG="$INTEGRATION_DIR/tests.log"
 echo "=== SKG Integration Test Suite ==="
 echo "Integration directory: $INTEGRATION_DIR"
 echo "Results will be written to: $TESTS_LOG"
+echo ""
+
+# Clean up any straggler test databases from previous runs
+# Uses TypeDB's API for safe deletion (doesn't require stopping TypeDB)
+echo "Cleaning up straggler test databases..."
+PROJECT_ROOT="$(cd "$INTEGRATION_DIR/../.." && pwd)"
+"$PROJECT_ROOT/target/debug/cleanup-test-dbs"
+echo ""
 
 # List of test directories to run
 TEST_DIRS=(
