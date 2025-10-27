@@ -46,8 +46,8 @@ send_shutdown_command() {
   (delete-process tcp-proc))
 EOF
 
-  # Run the script
-  SKG_TEST_PORT=$port emacs --batch -l "$shutdown_script" 2>/dev/null || true
+  # Run the script with a timeout to prevent hanging
+  timeout 2 env SKG_TEST_PORT=$port emacs --batch -l "$shutdown_script" 2>/dev/null || true
   rm -f "$shutdown_script"
   sleep 0.1
 }
@@ -58,17 +58,14 @@ cleanup() {
   echo "Cleaning up..."
   rm -f "$TEMP_CONFIG"
 
-  if [ -n "$CARGO_PID" ] && [ -n "$AVAILABLE_PORT" ]; then
-    # Send shutdown command to gracefully stop server and clean up database
-    send_shutdown_command "$AVAILABLE_PORT"
-
-    # Wait for process to exit
-    wait $CARGO_PID 2>/dev/null || true
-  elif [ -n "$CARGO_PID" ]; then
-    # Fallback: kill if we don't have the port
-    echo "Stopping cargo process (PID: $CARGO_PID)"
-    kill $CARGO_PID 2>/dev/null || true
-    wait $CARGO_PID 2>/dev/null || true
+  if [ -n "$CARGO_PID" ]; then
+    # Check if process is still running
+    if kill -0 $CARGO_PID 2>/dev/null; then
+      # For tests, just kill the process directly to avoid hanging on shutdown commands
+      echo "Stopping server process (PID: $CARGO_PID)"
+      kill -9 $CARGO_PID 2>/dev/null || true
+      wait $CARGO_PID 2>/dev/null || true
+    fi
   fi
 }
 
@@ -83,8 +80,8 @@ find_available_port() {
     # Generate random port in the range 1000-9000
     local port=$(( min_port + RANDOM % (max_port - min_port + 1) ))
 
-    # Check if port is available
-    if ! netstat -tln 2>/dev/null | grep -q ":$port "; then
+    # Check if port is available using ss (socket statistics)
+    if ! ss -tln 2>/dev/null | grep -q ":$port "; then
       echo $port
       return 0
     fi
@@ -107,14 +104,33 @@ generate_db_name() {
 # Function to start skg server with test config
 start_skg_server() {
   echo ""
-  echo "Starting skg server (cargo run) with test config..."
+  echo "Starting skg server (direct binary) with test config..."
   cd "$PROJECT_ROOT"
-  cargo run --bin skg "$TEMP_CONFIG" > "$TEST_DIR/server.log" 2>&1 &
+  # Use the pre-built binary directly instead of cargo run to avoid lock contention
+  target/debug/skg "$TEMP_CONFIG" > "$TEST_DIR/server.log" 2>&1 &
   CARGO_PID=$!
   echo "✓ Started skg server (PID: $CARGO_PID) with config: $TEMP_CONFIG"
   echo "  Server logs: $TEST_DIR/server.log"
   echo "Waiting for server to be ready..."
-  sleep 1
+
+  # Wait for server to actually start listening on the port
+  # This is especially important when tests run in parallel and compete for cargo locks
+  local max_attempts=100
+  local attempt=0
+  while [ $attempt -lt $max_attempts ]; do
+    # Use ss (socket statistics) which is more commonly available than netstat
+    if ss -tln 2>/dev/null | grep -q ":$AVAILABLE_PORT "; then
+      echo "✓ Server is listening on port $AVAILABLE_PORT"
+      return 0
+    fi
+    sleep 0.2
+    attempt=$(( attempt + 1 ))
+  done
+
+  echo "ERROR: Server failed to start listening on port $AVAILABLE_PORT after 20 seconds"
+  echo "Last 30 lines of server log:"
+  tail -30 "$TEST_DIR/server.log"
+  return 1
 }
 
 # Function to clean up Tantivy index contents

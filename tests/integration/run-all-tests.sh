@@ -25,6 +25,7 @@ TEST_DIRS=(
   "search-for-title-and-visit-link"
   "content-view-and-save"
   "valid_and_invalid_saves"
+  "empty-content-save"
   "focus-and-folded-markers"
   "containerward-view-request"
   "sourceward-view-request"
@@ -153,5 +154,10 @@ fi
 
 echo ""
 echo "Complete results available in: $TESTS_LOG"
+
+# PITFALL: Manual DB deletion here# would cause TypeDB to crash
+# (when it tries to checkpoint deleted databases).
+# But test DBs *should* be cleaned up by each test server,
+# due to delete_on_quit = true in their configs.
 
 exit $overall_result

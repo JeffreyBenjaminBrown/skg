@@ -17,6 +17,7 @@
 
 (require 'skg-client)
 (require 'skg-id-search)
+(require 'skg-buffer)
 (require 'skg-request-backward-view)
 (require 'skg-request-title-matches)
 (require 'skg-sexpr)
