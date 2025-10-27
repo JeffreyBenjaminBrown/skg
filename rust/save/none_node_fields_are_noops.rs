@@ -44,8 +44,9 @@ pub fn clobber_none_fields_with_data_from_disk (
       let mut result : SkgNode =
         from_user;
       if result.aliases.is_none () {
-        // TODO: Include subscription and override relationships.
-        // This will require making them optionals in SkgNode,
-        // like aliases already is.
+        // TODO: Include subscription, override and hide relationships.
+        // (See schema.tql and the SkgNode typedef.)
+        // This will require making those fields Optional in SkgNode,
+        // like 'aliases' already is.
         result.aliases = disk_node.aliases; }
       Ok (result) }} }
