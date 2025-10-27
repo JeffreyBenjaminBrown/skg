@@ -4,13 +4,9 @@
 
 Upon starting each session, automatically:
 
-1. Read all files in `coding-advice/` directory to understand project context:
-   - `coding-advice/architecture.md` - Overview of the skg knowledge graph system
-   - `coding-advice/common-gotchas.md` - Important testing dependencies
-   - `coding-advice/formatting.md` - Specific code formatting conventions
-   - `coding-advice/for-ai.md` - Additional coding philosophy (no legacy support, atomic functions)
+1. Read all files in `coding-advice/` directory to understand project context.
 
-2. Read the linked reference files:
+2. Also read:
    - `api-and-formats.md` - TCP API specification and data formats
    - `schema.tql` - TypeDB schema definition
    - `glossary.md` - Project terminology and abbreviations
@@ -21,23 +17,23 @@ Upon starting each session, automatically:
 
 This is the **skg** project - a knowledge graph manipulation system with:
 - **Rust server** (`rust/`) handling core logic with TypeDB and Tantivy
-  - TypeDB is now on version 3, which has so far been after the cutoff date for training data for Claude, so bear in mind that your instincts might conflict with the current syntax.
+  - TypeDB is now on version 3, which might be after your training data cutoff date, so bear in mind that your instincts might conflict with the latest syntax.
 - **Emacs client** (`elisp/`) providing org-mode interface
 - **YAML data storage** in `.skg` files
 - **TCP communication** between components:
   - Port 1730 (default): Rust-Emacs API communication (configurable)
   - Port 1729: Rust-TypeDB database connection (TypeDB server)
 
-## Critical Formatting Rules
+## Formatting Rules
 
 When writing or modifying code:
 - **Type signatures**: Name, each argument, and return type on separate lines
 - **Variable definitions**: Type signature required, newline after equals sign
 - **Function order**: Callers before callees within same module
-- **Whitespace**: Around all punctuation `< > ( ) [ ] { } . ; + - * / :: ? &`
+- **Whitespace**: Honestly, hard to describe, but try to follow the precedents you find in the code. My (this is Jeff speaking) goal is readability.
 - **Bracket grouping**: Adjacent punctuation grouped `(( ))` not `(())`
 - **Comments**: Inside code blocks they apply to, preserve existing comments
-- **No empty lines** in function definitions unless necessary for comment clarity
+- **No empty lines** in function definitions unless necessary for comment clarity.
 - **Don't reformat existing code** - only apply rules to new/modified code
 
 ## Testing Dependencies
@@ -67,6 +63,6 @@ There are three ways to test the code:
    - Requires both `typedb server` and `cargo run` to be running
    - Individual tests located in `tests/integration/*/run-test.sh`
 
-## Handling Reverted Edits
+## Disregard Reverted Edits
 
-If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this means the user or linter has rejected those changes. **DO NOT re-apply those edits**. The reversion is intentional and indicates the changes were not wanted. Move on without attempting to restore the reverted changes.
+If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this means the user has rejected those changes. **DO NOT re-apply those edits**. The reversion is intentional and indicates the changes were not wanted. Move on without attempting to restore the reverted changes.

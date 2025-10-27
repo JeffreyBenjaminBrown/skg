@@ -1,7 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
-;; PURPOSE: Mostly for interactive experimentation.
-;; The test suite uses one of these functions.
-;; The library uses none of them.
+;; PURPOSE: Utilities I found useful during initial development.
 
 ;; `M-x pp-28` pretty-prints a highlighted s-exp.
 

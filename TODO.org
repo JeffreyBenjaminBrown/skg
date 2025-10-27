@@ -14,10 +14,16 @@
    Less ergonomically, can say:
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
-* populate ./TODO/
+* ? populate ./TODO/
   and then order links to them here like this:
   [[./TODO/sharing-and-privacy.org][sharing and privacy]]
 * QA
+** in elisp/skg-sexpr/skg-lens.el, rather than concatenate with ":"
+   (that's done by skg--tokens->string)
+
+   Instead of returning a :-separated string,
+   return a list of lists of propertized strings,
+   which the calling function can decide how to concatenate.
 ** Indefinitive nodes skip the visited-checking logic
    when saving a buffer.
    This is not clearly a problem.
