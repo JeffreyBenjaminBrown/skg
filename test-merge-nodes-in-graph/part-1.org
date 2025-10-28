@@ -1,0 +1,98 @@
+* overview
+Great! Let's make another function stub and failing unit test now.
+
+The new function is 'merge_nodes_in_graph'.
+Just like update_graph, it will call these three functions,
+in this order:
+
+  merge_nodes_in_typedb
+  merge_nodes_in_fs
+  merge_nodes_in_tantivy
+
+Our new test will be at tests/merge/merge_nodes_in_graph.rs
+Like many of the other tests, it will have some .skg file fixtures,
+at tests/merge/mere_nodes_in_graph/fixtures/.
+
+This specification is incomplete, as you'll see when you reach the end. Rather than implementing these tests, first write the rest of the spec. Save that last part (don't repeat what I've written here) in 'test-mere-nodes-in-graph.md'.
+* the data
+** 1.skg
+   id: 1
+   title: 1
+   body: "[[id:1-links-to][a link to 1-links-to]]"
+   contains: [11,12]
+   subscribes: [1-subscribes-to]
+   hides_from_its_subscriptions:
+     [hidden-from-1s-subscriptions,
+     hidden-from-subscriptions-of-1-but-in-content-of-2]
+   overrides_view_of: [1-overrides-view-of]
+** 2.skg
+   ids: [2, 2-extra-id]
+   title: 2
+   body: "2 body"
+   contains: [
+     21,
+     22,
+     hidden-from-subscriptions-of-1-but-in-content-of-2]
+** 11,12,21,22
+   each just has id=title
+** links-to-1.skg
+   id: 'links-to-1'
+   title: [[id:1][links-to-1]]
+** 1-links-to.skg
+   id: '1-links-to'
+   title: '1-links-to'
+** 1-subscribes-to
+   id: 1-subscribes-to
+   title: 1-subscribes-to
+** subscribes-to-1
+   id: subscribes-to-1
+   title: subscribes-to-1
+   subscribes: [1]
+** hides-1-from-subscriptions
+   id: hides-1-from-subscriptions
+   title: hides-1-from-subscriptions
+   hides_from_its_subscriptions: [1,11]
+** hidden-from-subscriptions-of-1
+   id: hidden-from-subscriptions-of-1
+   title: hidden-from-1s-subscriptions
+** hidden-from-subscriptions-of-1-but-in-content-of-2
+   id: hidden-from-subscriptions-of-1-but-in-content-of-2
+   title: hidden-from-subscriptions-of-1-but-in-content-of-2
+** overrides-view-of-1
+   id: overrides-view-of-1
+   title: overrides-view-of-1
+   overrides_view_of: [1]
+** 1-overrides-view-of
+   id: 1-overrides-view-of
+   title: 1-overrides-view-of
+* the tests
+** merging 2 into 1
+*** change the data
+Use 'saveinstructions_from_the_merges_in_an_orgnode_forest'
+on an appropriate forest
+(all it needs is a single node, node 1,
+with an appropriate merge instruction)
+to generate the SaveInstructions.
+
+Run 'merge_node_into_graph'.
+*** then verify
+**** in typedb
+     2 is gone
+     1 has two single extra_ids, '2' and '2-extra-id'
+     1 now contains five things
+**** on disk
+     2.skg is gone
+     1 has three ids: [1,2,2-extra-id]
+     1 has five contents: [x,11,12,21,22], in that order
+       we can't anticipate what 'x' is -- it's a random UUID.
+     the new file x.skg exists, where x is that random UUID,
+       with the right title and body
+**** in tantivy
+     "1" will turn up in search results,
+     but "2" will not. (If, when we search for "2",
+     "21" or "22" or something else
+     for which "2" is a substraing shows up, that's fine,
+     but "2" itself should not.)
+** merging 1 into 2
+   You tell me!
+   I think you can work it out from the rest of this spec.

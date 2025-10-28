@@ -51,8 +51,7 @@ pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
             // Update IDs: start with acquirer's current ids, add acquiree_id
             updated_acquirer.ids = acquirer_from_disk.ids.clone();
             if !updated_acquirer.ids.contains(&acquiree_id) {
-              updated_acquirer.ids.push(acquiree_id.clone());
-            }
+              updated_acquirer.ids.push(acquiree_id.clone()); }
 
             // Update contains: [MERGED] + acquirer's old + acquiree's old
             let mut new_contains = vec![merged_id.clone()];
@@ -63,16 +62,16 @@ pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
             // Add the three SaveInstructions
             instructions.push((
               merged_node,
-              NodeSaveAction { indefinitive: false, toDelete: false }
-            ));
+              NodeSaveAction { indefinitive: false,
+                               toDelete: false } ));
             instructions.push((
               updated_acquirer,
-              NodeSaveAction { indefinitive: false, toDelete: false }
-            ));
+              NodeSaveAction {
+                indefinitive: false, toDelete: false } ));
             instructions.push((
               acquiree_from_disk,
-              NodeSaveAction { indefinitive: false, toDelete: true }
-            )); }} }} }
+              NodeSaveAction {
+                indefinitive: false, toDelete: true } )); }} }} }
   Ok(instructions) }
 
 /// Create a MERGED node from the acquiree's data
@@ -87,3 +86,70 @@ fn create_merged_node(acquiree: &SkgNode) -> SkgNode {
     hides_from_its_subscriptions: None,
     overrides_view_of: None,
   }}
+
+/// Merges nodes in the graph by applying merge SaveInstructions.
+/// Updates three systems in order:
+///   1) TypeDB
+///   2) Filesystem
+///   3) Tantivy
+/// PITFALL: If any but the first step fails,
+///   the resulting system state is invalid.
+pub async fn merge_nodes_in_graph (
+  instructions  : Vec<SaveInstruction>,
+  config        : SkgConfig,
+  tantivy_index : &tantivy::Index,
+  driver        : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+
+  println!(
+    "Merging nodes in TypeDB, FS, and Tantivy, in that order ..." );
+  let db_name : &str = &config.db_name;
+  { println!( "1) Merging in TypeDB database '{}' ...", db_name );
+    merge_nodes_in_typedb (
+      db_name,
+      driver,
+      &instructions ). await ?;
+    println!( "   TypeDB merge complete." ); }
+  { println!( "2) Merging in filesystem ..." );
+    merge_nodes_in_fs (
+      instructions.clone (), config.clone () ) ?;
+    println!( "   Filesystem merge complete." ); }
+  { println!( "3) Merging in Tantivy ..." );
+    merge_nodes_in_tantivy (
+      &instructions, tantivy_index ) ?;
+    println!( "   Tantivy merge complete." ); }
+  Ok (( )) }
+
+/// Merges nodes in TypeDB by applying merge SaveInstructions.
+async fn merge_nodes_in_typedb (
+  _db_name      : &str,
+  _driver       : &TypeDBDriver,
+  _instructions : &[SaveInstruction],
+) -> Result < (), Box<dyn Error> > {
+  // TODO: Implement TypeDB merge operations:
+  // - Add extra_ids from acquiree to acquirer
+  // - Reroute relationships according to merge rules
+  // - Delete acquiree node
+  todo!("merge_nodes_in_typedb not yet implemented") }
+
+/// Merges nodes in filesystem by applying merge SaveInstructions.
+fn merge_nodes_in_fs (
+  _instructions : Vec<SaveInstruction>,
+  _config       : SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+  // TODO: Implement filesystem merge operations:
+  // - Create MERGED node .skg file
+  // - Update acquirer .skg file with new IDs and contents
+  // - Delete acquiree .skg file
+  todo!("merge_nodes_in_fs not yet implemented") }
+
+/// Merges nodes in Tantivy by applying merge SaveInstructions.
+fn merge_nodes_in_tantivy (
+  _instructions : &[SaveInstruction],
+  _index        : &tantivy::Index,
+) -> Result < (), Box<dyn Error> > {
+  // TODO: Implement Tantivy merge operations:
+  // - Remove acquiree from search index
+  // - Update acquirer in search index
+  // - Add MERGED node to search index
+  todo!("merge_nodes_in_tantivy not yet implemented") }
