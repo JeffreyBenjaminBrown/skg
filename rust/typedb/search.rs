@@ -21,6 +21,34 @@ use crate::types::ID;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
 
 
+/// Query extra_ids for a given node ID.
+/// Returns a vector of extra IDs associated with this node.
+pub async fn extra_ids_from_pid(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &ID,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let tx: Transaction = driver.transaction(
+    db_name, TransactionType::Read ). await?;
+  let query = format!(
+    r#"match $node isa node, has id "{}";
+       $e isa extra_id;
+       $rel isa has_extra_id (node: $node, extra_id: $e);
+       $e has id $extra_id_value;
+       select $extra_id_value;"#,
+    node_id.0 );
+  let answer: QueryAnswer = tx.query(query).await?;
+  let mut extra_ids = Vec::new();
+  let mut stream = answer.into_rows();
+  while let Some(row_result) = stream.next().await {
+    let row = row_result?;
+    if let Some(concept) = row.get("extra_id_value")? {
+      let extra_id_str = extract_payload_from_typedb_string_rep(
+        &concept.to_string());
+      extra_ids.push(
+        ID(extra_id_str)); }}
+  Ok(extra_ids) }
+
 /* Searches containerward recursively until reaching the first node
 which is either uncontained or multiply contained. Returns that node's ID.
 So for instance, if the input is uncontained, it just returns the input.

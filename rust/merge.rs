@@ -19,13 +19,13 @@ pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
   config: &SkgConfig,
   _driver: &TypeDBDriver,
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
-  let mut instructions = Vec::new();
+  let mut instructions: Vec<SaveInstruction> = Vec::new();
 
   // Walk the forest to find nodes with merge requests
   for tree in forest {
     for edge in tree.root().traverse() {
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
-        let node = node_ref.value();
+        let node: &OrgNode = node_ref.value();
 
         // Check if this node has merge requests
         for request in &node.metadata.code.nodeRequests {
@@ -34,27 +34,26 @@ pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
               .ok_or("Node with merge request must have an ID")?;
 
             // Fetch acquirer and acquiree from disk
-            let acquirer_from_disk =
+            let acquirer_from_disk: SkgNode =
               read_node(&path_from_pid(config, acquirer_id.clone()))?;
-            let acquiree_from_disk =
+            let acquiree_from_disk: SkgNode =
               read_node(&path_from_pid(config, acquiree_id.clone()))?;
 
             // Create MERGED node
-            let merged_node = create_merged_node(&acquiree_from_disk);
-            let merged_id = &merged_node.ids[0];
+            let merged_node: SkgNode = create_merged_node(
+              &acquiree_from_disk);
+            let merged_id: &ID = &merged_node.ids[0];
 
-            // Create updated acquirer with:
-            // - ids: [acquirer_id, acquiree_id] (plus any extra_ids from both)
-            // - contains: [MERGED_ID] + acquirer's old contains + acquiree's contains
-            let mut updated_acquirer = acquirer_from_disk.clone();
-
-            // Update IDs: start with acquirer's current ids, add acquiree_id
+            // Append acquiree's IDs to acquirer's
+            let mut updated_acquirer: SkgNode =
+              acquirer_from_disk.clone();
             updated_acquirer.ids = acquirer_from_disk.ids.clone();
-            if !updated_acquirer.ids.contains(&acquiree_id) {
-              updated_acquirer.ids.push(acquiree_id.clone()); }
+            for id in &acquiree_from_disk.ids {
+              if !updated_acquirer.ids.contains(id) {
+                updated_acquirer.ids.push(id.clone( )); }}
 
             // Update contains: [MERGED] + acquirer's old + acquiree's old
-            let mut new_contains = vec![merged_id.clone()];
+            let mut new_contains: Vec<ID> = vec![merged_id.clone()];
             new_contains.extend(acquirer_from_disk.contains.clone());
             new_contains.extend(acquiree_from_disk.contains.clone());
             updated_acquirer.contains = new_contains;
@@ -66,12 +65,12 @@ pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
                                toDelete: false } ));
             instructions.push((
               updated_acquirer,
-              NodeSaveAction {
-                indefinitive: false, toDelete: false } ));
+              NodeSaveAction { indefinitive: false,
+                               toDelete: false } ));
             instructions.push((
               acquiree_from_disk,
-              NodeSaveAction {
-                indefinitive: false, toDelete: true } )); }} }} }
+              NodeSaveAction { indefinitive: false,
+                               toDelete: true } )); }} }} }
   Ok(instructions) }
 
 /// Create a MERGED node from the acquiree's data
