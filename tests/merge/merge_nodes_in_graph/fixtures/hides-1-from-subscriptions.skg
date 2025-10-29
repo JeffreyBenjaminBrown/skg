@@ -1,0 +1,6 @@
+ids:
+- hides-1-from-subscriptions
+title: "hides-1-from-subscriptions"
+hides_from_its_subscriptions:
+- "1"
+- "11"

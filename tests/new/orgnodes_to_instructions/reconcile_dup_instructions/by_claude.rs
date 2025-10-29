@@ -18,9 +18,9 @@ fn create_test_node(
         ids: vec![ID::from(id)],
         body,
         contains,
-        subscribes_to: vec![],
-        hides_from_its_subscriptions: vec![],
-        overrides_view_of: vec![],
+        subscribes_to: None,
+        hides_from_its_subscriptions: None,
+        overrides_view_of: None,
     }
 }
 

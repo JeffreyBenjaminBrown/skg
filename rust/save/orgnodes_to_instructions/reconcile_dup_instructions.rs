@@ -165,9 +165,9 @@ pub async fn reconcile_dup_instructions_for_one_id(
               || from_disk . as_ref() . ok() . and_then(
                 |node| node.body.clone() )) } ),
     contains: final_contents,
-    subscribes_to: vec![],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![],
+    subscribes_to: None,
+    hides_from_its_subscriptions: None,
+    overrides_view_of: None,
   }, NodeSaveAction {
     indefinitive: false,
     toDelete: to_delete,

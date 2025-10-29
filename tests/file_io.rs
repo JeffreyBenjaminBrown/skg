@@ -105,9 +105,10 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     let mut reversed_contains =
         node.contains.clone();
     reversed_contains.reverse();
-    let mut reversed_subscribes_to =
-        node.subscribes_to.clone();
-    reversed_subscribes_to.reverse();
+    let reversed_subscribes_to =
+        node.subscribes_to.clone().map(|mut v| {
+            v.reverse();
+            v });
 
   SkgNode {
     contains          : reversed_contains,
