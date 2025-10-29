@@ -27,11 +27,11 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 assert_eq!(
                     instructions.len(),
                     3,
-                    "Expected 3 SaveInstructions (MERGED node, acquirer update, acquiree deletion)"
+                    "Expected 3 SaveInstructions (acquiree_text_preserver, acquirer update, acquiree deletion)"
                 );
 
                 // Collect instructions by their characteristics
-                let mut merged_node_instruction: Option<&SaveInstruction> = None;
+                let mut acquiree_text_preserver_instruction: Option<&SaveInstruction> = None;
                 let mut node1_instruction: Option<&SaveInstruction> = None;
                 let mut node2_instruction: Option<&SaveInstruction> = None;
 
@@ -46,12 +46,12 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                         );
                         node2_instruction = Some(instruction);
                     } else if node.title.starts_with("MERGED:") {
-                        // This is the synthetic MERGED node
+                        // This is the synthetic acquiree_text_preserver
                         assert!(
-                            merged_node_instruction.is_none(),
-                            "Found multiple MERGED nodes"
+                            acquiree_text_preserver_instruction.is_none(),
+                            "Found multiple acquiree_text_preservers"
                         );
-                        merged_node_instruction = Some(instruction);
+                        acquiree_text_preserver_instruction = Some(instruction);
                     } else if node.ids.contains(&ID::from("1")) {
                         // This is the updated acquirer (node 1)
                         node1_instruction = Some(instruction);
@@ -60,8 +60,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
                 // Verify we found all three
                 assert!(
-                    merged_node_instruction.is_some(),
-                    "Missing MERGED node instruction"
+                    acquiree_text_preserver_instruction.is_some(),
+                    "Missing acquiree_text_preserver instruction"
                 );
                 assert!(
                     node1_instruction.is_some(),
@@ -72,28 +72,31 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                     "Missing node 2 (acquiree) instruction"
                 );
 
-                // Verify MERGED node properties
-                let (merged_node, merged_action) = merged_node_instruction.unwrap();
-                assert_eq!(merged_node.title, "MERGED: 2", "MERGED node title incorrect");
+                // Verify acquiree_text_preserver properties
+                let (acquiree_text_preserver, acquiree_text_preserver_action) = acquiree_text_preserver_instruction.unwrap();
+                assert_eq!(acquiree_text_preserver.title, "MERGED: 2", "acquiree_text_preserver title incorrect");
                 assert_eq!(
-                    merged_node.body,
+                    acquiree_text_preserver.body,
                     Some("2 body".to_string()),
-                    "MERGED node body incorrect"
+                    "acquiree_text_preserver body incorrect"
                 );
-                assert!(!merged_action.indefinitive, "MERGED node should not be indefinitive");
-                assert!(!merged_action.toDelete, "MERGED node should not be marked for deletion");
-                assert_eq!(merged_node.contains.len(), 0, "MERGED node should have no contents");
-                assert!(
-                    merged_node.subscribes_to.is_none(),
-                    "MERGED node should have no subscriptions"
+                assert!(!acquiree_text_preserver_action.indefinitive, "acquiree_text_preserver should not be indefinitive");
+                assert!(!acquiree_text_preserver_action.toDelete, "acquiree_text_preserver should not be marked for deletion");
+                assert_eq!(acquiree_text_preserver.contains.len(), 0, "acquiree_text_preserver should have no contents");
+                assert_eq!(
+                    acquiree_text_preserver.subscribes_to,
+                    Some(vec![]),
+                    "acquiree_text_preserver should have empty subscriptions"
                 );
-                assert!(
-                    merged_node.hides_from_its_subscriptions.is_none(),
-                    "MERGED node should hide nothing"
+                assert_eq!(
+                    acquiree_text_preserver.hides_from_its_subscriptions,
+                    Some(vec![]),
+                    "acquiree_text_preserver should have empty hides"
                 );
-                assert!(
-                    merged_node.overrides_view_of.is_none(),
-                    "MERGED node should override nothing"
+                assert_eq!(
+                    acquiree_text_preserver.overrides_view_of,
+                    Some(vec![]),
+                    "acquiree_text_preserver should have empty overrides"
                 );
 
                 // Verify node 1 (acquirer) properties
@@ -114,17 +117,17 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 assert!(!action1.indefinitive, "Node 1 should not be indefinitive");
                 assert!(!action1.toDelete, "Node 1 should not be marked for deletion");
 
-                // Verify node 1's contents: [MERGED node ID, original node 1 contents, node 2 contents]
-                // In this case: [MERGED node ID] (since both started with empty contents)
-                let merged_id = &merged_node.ids[0];
+                // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
+                // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
+                let acquiree_text_preserver_id = &acquiree_text_preserver.ids[0];
                 assert_eq!(
                     node1.contains.len(),
                     1,
-                    "Node 1 should contain exactly the MERGED node"
+                    "Node 1 should contain exactly the acquiree_text_preserver"
                 );
                 assert_eq!(
-                    &node1.contains[0], merged_id,
-                    "Node 1's first content should be the MERGED node"
+                    &node1.contains[0], acquiree_text_preserver_id,
+                    "Node 1's first content should be the acquiree_text_preserver"
                 );
 
                 // Verify node 2 (acquiree) deletion instruction
