@@ -23,18 +23,21 @@ pub struct SkgNode {
   pub contains: Vec<ID>, // See schema.tql.
 
   #[serde(
+    default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
     skip_serializing_if = "option_vec_is_empty_or_none"
   )]
   pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
 
   #[serde(
+    default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
     skip_serializing_if = "option_vec_is_empty_or_none"
   )]
   pub hides_from_its_subscriptions: Option<Vec<ID>>, // See schema.tql.
 
   #[serde(
+    default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
     skip_serializing_if = "option_vec_is_empty_or_none"
   )]
@@ -65,6 +68,7 @@ fn deserialize_optional_vec_as_some_empty<'de, D, T>(
   let opt: Option<Vec<T>> = Option::deserialize(
     deserializer )? ;
   Ok ( Some ( opt.unwrap_or_else(Vec::new )) ) }
+
 
 //
 // Functions

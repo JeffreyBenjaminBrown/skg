@@ -1,3 +1,5 @@
+* mk_skgnode is wrong
+  It sets a lot of SkgNode list fields to None.
 * most plans are online
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
