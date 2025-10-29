@@ -1,12 +1,11 @@
-use crate::file_io::{write_node};
+use crate::file_io::write_node;
 use crate::types::{SaveInstruction, SkgConfig, SkgNode, ID};
 use crate::util::path_from_pid;
 use std::collections::HashSet;
 use std::error::Error;
-use std::fs;
 
 /// Merges nodes in filesystem by applying merge SaveInstructions.
-pub(crate) fn merge_nodes_in_fs (
+pub(super) fn merge_nodes_in_fs (
   _instructions : Vec<SaveInstruction>,
   config       : SkgConfig,
   acquiree_text_preservers : Vec<&SaveInstruction>,
@@ -74,7 +73,8 @@ pub(crate) fn merge_nodes_in_fs (
     // Delete acquiree from disk
     let acquiree_path : String =
       path_from_pid(&config, acquiree.ids[0].clone());
-    fs::remove_file(&acquiree_path)?;
+    std::fs::remove_file(&acquiree_path)
+      .map_err(|e| format!("Failed to delete acquiree file '{}': {}", acquiree_path, e))?;
   }
 
   Ok(())

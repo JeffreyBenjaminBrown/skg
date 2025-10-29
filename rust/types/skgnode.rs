@@ -25,21 +25,21 @@ pub struct SkgNode {
   #[serde(
     default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_empty_or_none"
+    skip_serializing_if = "option_vec_is_none"
   )]
   pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
 
   #[serde(
     default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_empty_or_none"
+    skip_serializing_if = "option_vec_is_none"
   )]
   pub hides_from_its_subscriptions: Option<Vec<ID>>, // See schema.tql.
 
   #[serde(
     default,
     deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_empty_or_none"
+    skip_serializing_if = "option_vec_is_none"
   )]
   pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
 }
@@ -54,6 +54,11 @@ fn option_vec_is_empty_or_none<T> (
   match option_vec {
     None => true,
     Some(vec) => vec.is_empty(), }}
+
+fn option_vec_is_none<T> (
+  option_vec: &Option<Vec<T>>
+) -> bool {
+  option_vec.is_none() }
 
 /// Custom deserializer that converts missing fields to Some([]) instead of None.
 /// This is used when reading SkgNodes from disk, where absence of a field

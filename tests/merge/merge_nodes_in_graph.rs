@@ -23,18 +23,33 @@ use typedb_driver::TypeDBDriver;
 #[test]
 fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
   let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_graph/fixtures");
+  let temp_fixtures_path = PathBuf::from("/tmp/merge-test-2-into-1-fixtures");
+  let tantivy_path = PathBuf::from("/tmp/tantivy-test-merge-2-into-1");
+
+  // Clean up temp directories if they exist from a previous run
+  if temp_fixtures_path.exists() {
+    fs::remove_dir_all(&temp_fixtures_path)?;
+  }
+  if tantivy_path.exists() {
+    fs::remove_dir_all(&tantivy_path)?;
+  }
+
+  // Copy fixtures to temp directory
+  copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
 
   let result = run_with_test_db(
     "skg-test-merge-2-into-1",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/merge-test-2-into-1-fixtures",
     "/tmp/tantivy-test-merge-2-into-1",
     |config, driver| Box::pin(async move {
       test_merge_2_into_1_impl(config, driver).await?;
       Ok(( ))
     } ));
 
-  // Clean up any acquiree_text_preserver files (UUID-named .skg files) created during test
-  cleanup_acquiree_text_preserver_files(&fixtures_path)?;
+  // Clean up temp directory
+  if temp_fixtures_path.exists() {
+    fs::remove_dir_all(&temp_fixtures_path)?;
+  }
 
   result
 }
@@ -137,7 +152,10 @@ async fn verify_typedb_after_merge_2_into_1 (
           "Node 1 should have extra_id '2-extra-id'");
 
   // Node 1 should contain 6 things: [acquiree_text_preserver_id, 11, 12, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
-  let input_pids: Vec<ID> = vec![ID::from("1")];
+  // IMPORTANT: contains_from_pids only returns relationships where BOTH nodes are in the input list,
+  // so we must include all the child nodes we want to check for. We query with all nodes in the DB.
+  let all_node_ids: HashSet<ID> = all_pids_from_typedb(db_name, driver).await?;
+  let input_pids: Vec<ID> = all_node_ids.into_iter().collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
     = contains_from_pids(
@@ -226,8 +244,8 @@ fn verify_filesystem_after_merge_2_into_1(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path )) ?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
-  assert_eq!(acquiree_text_preserver.title, "MERGED: 2");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED-"));
+  assert_eq!(acquiree_text_preserver.title, "MERGED-2");
   assert_eq!(acquiree_text_preserver.body, Some("2 body".to_string()));
   assert_eq!(acquiree_text_preserver.contains.len(), 0,
              "acquiree_text_preserver should have no contents");
@@ -263,7 +281,7 @@ fn verify_tantivy_after_merge_2_into_1(
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID = &instructions[0].0.ids[0];
   let found_acquiree_text_preserver: bool =
-    tantivy_contains_id(tantivy_index, "MERGED: 2", &acquiree_text_preserver_id.0)?;
+    tantivy_contains_id(tantivy_index, "MERGED-2", &acquiree_text_preserver_id.0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
   Ok (( )) }
 
@@ -275,18 +293,33 @@ fn verify_tantivy_after_merge_2_into_1(
 #[test]
 fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
   let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_graph/fixtures");
+  let temp_fixtures_path = PathBuf::from("/tmp/merge-test-1-into-2-fixtures");
+  let tantivy_path = PathBuf::from("/tmp/tantivy-test-merge-1-into-2");
+
+  // Clean up temp directories if they exist from a previous run
+  if temp_fixtures_path.exists() {
+    fs::remove_dir_all(&temp_fixtures_path)?;
+  }
+  if tantivy_path.exists() {
+    fs::remove_dir_all(&tantivy_path)?;
+  }
+
+  // Copy fixtures to temp directory
+  copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
 
   let result = run_with_test_db(
     "skg-test-merge-1-into-2",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/merge-test-1-into-2-fixtures",
     "/tmp/tantivy-test-merge-1-into-2",
     |config, driver| Box::pin(async move {
       test_merge_1_into_2_impl(config, driver).await?;
       Ok(( ))
     } ));
 
-  // Clean up any acquiree_text_preserver files (UUID-named .skg files) created during test
-  cleanup_acquiree_text_preserver_files(&fixtures_path)?;
+  // Clean up temp directory
+  if temp_fixtures_path.exists() {
+    fs::remove_dir_all(&temp_fixtures_path)?;
+  }
 
   result
 }
@@ -385,7 +418,12 @@ async fn verify_typedb_after_merge_1_into_2 (
   assert!(node_2_extra_ids.contains(&ID::from("1")),
           "Node 2 should have extra_id '1'");
 
-  let input_pids: Vec<ID> = vec![ID::from("2")];
+  // IMPORTANT: contains_from_pids only returns
+  // relationships where BOTH nodes are in the input list,
+  // so we query with all nodes in the DB.
+  let all_node_ids: HashSet<ID> =
+    all_pids_from_typedb(db_name, driver).await?;
+  let input_pids: Vec<ID> = all_node_ids.into_iter().collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
     = contains_from_pids(
@@ -439,7 +477,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2
   let node_2_subscribes_to: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("2"),
-    "subscribes", "subscriber", "subscribed_to" ). await ?;
+    "subscribes", "subscriber", "subscribee" ). await ?;
   assert!(node_2_subscribes_to.contains(&ID::from("1-subscribes-to")),
           "Node 2 should subscribe to 1-subscribes-to");
 
@@ -447,7 +485,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // should now subscribe to [2]
   let subscribes_to_1_targets: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("subscribes-to-1"),
-    "subscribes", "subscriber", "subscribed_to" ). await ?;
+    "subscribes", "subscriber", "subscribee" ). await ?;
   assert!(subscribes_to_1_targets.contains(&ID::from("2")),
           "subscribes-to-1 should subscribe to 2 (rerouted from 1)");
   assert!(!subscribes_to_1_targets.contains(&ID::from("1")),
@@ -477,7 +515,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Overrides relationships should be processed correctly
   // - Node 1's overrides [1-overrides-view-of] should transfer to node 2
   let node_2_overrides: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("2"), "overrides_view_of", "overrider", "overridden"
+    db_name, driver, &ID::from("2"), "overrides_view_of", "replacement", "replaced"
   ).await?;
   assert!(node_2_overrides.contains(&ID::from("1-overrides-view-of")),
           "Node 2 should override view of 1-overrides-view-of (transferred from node 1)");
@@ -485,7 +523,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - overrides-view-of-1 that overrode [1] should have that relationship DROPPED (1 no longer exists to be replaced)
   let overrides_view_of_1_targets: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("overrides-view-of-1"),
-    "overrides_view_of", "overrider", "overridden" ). await ?;
+    "overrides_view_of", "replacement", "replaced" ). await ?;
   assert!(!overrides_view_of_1_targets.contains(&ID::from("1")) &&
           !overrides_view_of_1_targets.contains(&ID::from("2")),
           "overrides-view-of-1 should NOT override 1 or 2 (relationship to merged node is DROPPED)");
@@ -553,8 +591,8 @@ fn verify_filesystem_after_merge_1_into_2(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path))?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
-  assert_eq!(acquiree_text_preserver.title, "MERGED: 1");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED-"));
+  assert_eq!(acquiree_text_preserver.title, "MERGED-1");
   assert_eq!(acquiree_text_preserver.body,
              Some ( "[[id:1-links-to][a link to 1-links-to]]"
                        .to_string() ));
@@ -593,7 +631,7 @@ fn verify_tantivy_after_merge_1_into_2(
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID = &instructions[0] . 0 . ids[0];
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
-    tantivy_index, "MERGED: 1", &acquiree_text_preserver_id.0 )?;
+    tantivy_index, "MERGED-1", &acquiree_text_preserver_id.0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
 
   Ok (( )) }
@@ -618,16 +656,15 @@ fn cleanup_acquiree_text_preserver_files(fixtures_path: &PathBuf) -> std::io::Re
           && parts[2].len() == 4
           && parts[3].len() == 4
           && parts[4].len() == 12
-          && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_hexdigit()))
-        {
-          println!("Cleaning up acquiree_text_preserver file: {}", filename);
-          fs::remove_file(&path)?;
-        }
-      }
-    }
-  }
-  Ok(())
-}
+          && parts.iter().all(
+            |p| p.chars().all(
+              |c| c.is_ascii_hexdigit()))
+        { println!("Cleaning up acquiree_text_preserver file: {}",
+                   filename);
+          if let Err(e) = fs::remove_file(&path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+              return Err(e.into()); }} }} }}
+  Ok (( )) }
 
 /// Recursively copy a directory
 fn copy_dir_all(
