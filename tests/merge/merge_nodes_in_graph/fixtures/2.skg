@@ -2,7 +2,7 @@ ids:
 - "2"
 - 2-extra-id
 title: "2"
-body: "2 body"
+body: 2 body
 contains:
 - "21"
 - "22"

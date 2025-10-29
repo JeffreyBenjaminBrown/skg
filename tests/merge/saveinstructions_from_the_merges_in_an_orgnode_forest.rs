@@ -45,7 +45,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                             "Found multiple deletion instructions"
                         );
                         node2_instruction = Some(instruction);
-                    } else if node.title.starts_with("MERGED:") {
+                    } else if node.title.starts_with("MERGED-") {
                         // This is the synthetic acquiree_text_preserver
                         assert!(
                             acquiree_text_preserver_instruction.is_none(),
@@ -74,7 +74,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
                 // Verify acquiree_text_preserver properties
                 let (acquiree_text_preserver, acquiree_text_preserver_action) = acquiree_text_preserver_instruction.unwrap();
-                assert_eq!(acquiree_text_preserver.title, "MERGED: 2", "acquiree_text_preserver title incorrect");
+                assert_eq!(acquiree_text_preserver.title, "MERGED-2", "acquiree_text_preserver title incorrect");
                 assert_eq!(
                     acquiree_text_preserver.body,
                     Some("2 body".to_string()),

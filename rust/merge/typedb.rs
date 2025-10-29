@@ -1,5 +1,6 @@
 use crate::types::{SaveInstruction, SkgNode, ID};
 use crate::typedb::nodes::create_node;
+use crate::typedb::relationships::create_relationships_from_node;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -9,7 +10,7 @@ use typedb_driver::answer::QueryAnswer;
 
 /// Merges nodes in TypeDB by applying merge SaveInstructions.
 /// All merges are batched in a single transaction.
-pub(crate) async fn merge_nodes_in_typedb (
+pub(super) async fn merge_nodes_in_typedb (
   db_name      : &str,
   driver       : &TypeDBDriver,
   _instructions : &[SaveInstruction],
@@ -47,6 +48,7 @@ async fn process_merge_in_typedb(
     tx, acquirer_id, acquiree_id,
     &updated_acquirer.contains.iter().cloned().collect()
   ). await ?;
+  reroute_hyperlinks(tx, acquirer_id, acquiree_id).await?;
 
   // Delete acquiree's extra_ids BEFORE deleting the node
   delete_extra_ids_for_node(tx, acquiree_id).await?;
@@ -56,10 +58,15 @@ async fn process_merge_in_typedb(
          $node isa node, has id "{}";
        delete $node;"#,
     acquiree_id.as_str()
-  )) .await?;
+  )) .await
+    .map_err(|e| format!("Failed to delete acquiree node '{}': {}", acquiree_id.as_str(), e))?;
 
   // Create the node that saves the acquiree's text
   create_node(acquiree_text_preserver, tx).await?;
+
+  // Create relationships for the acquiree_text_preserver (including hyperlinks from its body)
+  create_relationships_from_node(acquiree_text_preserver, tx).await
+    .map_err(|e| format!("Failed to create relationships for acquiree_text_preserver: {}", e))?;
 
   // Acquirer should contain acquiree_text_preserver
   let acquiree_text_preserver_id : &ID =
@@ -314,6 +321,34 @@ async fn reroute_hides(
       }
     }
   }
+
+  Ok(())
+}
+
+/// Reroute hyperlinks_to relationships (incoming only).
+/// IMPORTANT: We do NOT reroute outbound hyperlinks (where acquiree is source) because
+/// those come from the acquiree's body text, which goes to acquiree_text_preserver.
+/// We only reroute incoming hyperlinks (where acquiree is dest).
+async fn reroute_hyperlinks(
+  tx: &Transaction,
+  acquirer_id: &ID,
+  acquiree_id: &ID,
+) -> Result<(), Box<dyn Error>> {
+
+  // Acquiree was dest → acquirer is now dest (incoming hyperlinks)
+  let query : String = format!(
+    r#"match
+         $acquiree isa node, has id "{}";
+         $acquirer isa node, has id "{}";
+         $source isa node;
+         $hyperlink_rel isa hyperlinks_to (source: $source, dest: $acquiree);
+       delete $hyperlink_rel;
+       insert
+         $new_hyperlink_rel isa hyperlinks_to (source: $source, dest: $acquirer);"#,
+    acquiree_id.as_str(),
+    acquirer_id.as_str()
+  );
+  tx.query(query).await?;
 
   Ok(())
 }
