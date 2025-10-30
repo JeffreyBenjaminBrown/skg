@@ -200,18 +200,18 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!(&node_1.ids[2], &ID::from("2-extra-id"));
 
   // Should have [acquiree_text_preserver_id, 11, 12, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
-  assert_eq!( node_1.contains.len(), 6,
+  assert_eq!( node_1.contains.as_ref().unwrap().len(), 6,
               "Node 1 should contain 6 items");
 
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
-  assert_eq!(&node_1.contains[0], acquiree_text_preserver_id,
+  assert_eq!(&node_1.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
-  assert_eq!(&node_1.contains[1], &ID::from("11"));
-  assert_eq!(&node_1.contains[2], &ID::from("12"));
-  assert_eq!(&node_1.contains[3], &ID::from("21"));
-  assert_eq!(&node_1.contains[4], &ID::from("22"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[1], &ID::from("11"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[2], &ID::from("12"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[3], &ID::from("21"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[4], &ID::from("22"));
   assert_eq!(
-    &node_1.contains[5],
+    &node_1.contains.as_ref().unwrap()[5],
     &ID::from(
       "hidden-from-subscriptions-of-1-but-in-content-of-2"));
 
@@ -246,8 +246,8 @@ fn verify_filesystem_after_merge_2_into_1(
   assert!(acquiree_text_preserver.title.starts_with("MERGED_"));
   assert_eq!(acquiree_text_preserver.title, "MERGED_2");
   assert_eq!(acquiree_text_preserver.body, Some("2 body".to_string()));
-  assert_eq!(acquiree_text_preserver.contains.len(), 0,
-             "acquiree_text_preserver should have no contents");
+  assert_eq!(acquiree_text_preserver.contains, None,
+             "acquiree_text_preserver should have no contents (None when empty on disk)");
 
   // acquiree_text_preserver should have None for relationship fields
   // (when read from disk, missing fields are None)
@@ -547,17 +547,17 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(&node_2.ids[2], &ID::from("1"));
 
   // Should have [acquiree_text_preserver_id, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2, 11, 12]
-  assert_eq!( node_2.contains.len(), 6,
+  assert_eq!( node_2.contains.as_ref().unwrap().len(), 6,
               "Node 2 should contain 6 items");
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
-  assert_eq!(&node_2.contains[0], acquiree_text_preserver_id,
+  assert_eq!(&node_2.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
-  assert_eq!(&node_2.contains[1], &ID::from("21"));
-  assert_eq!(&node_2.contains[2], &ID::from("22"));
-  assert_eq!(&node_2.contains[3], &ID::from(
+  assert_eq!(&node_2.contains.as_ref().unwrap()[1], &ID::from("21"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[2], &ID::from("22"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[3], &ID::from(
     "hidden-from-subscriptions-of-1-but-in-content-of-2"));
-  assert_eq!(&node_2.contains[4], &ID::from("11"));
-  assert_eq!(&node_2.contains[5], &ID::from("12"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[4], &ID::from("11"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[5], &ID::from("12"));
 
   // Verify subscribes_to: should have node 1's subscribes_to transferred
   assert_eq!(node_2.subscribes_to.as_ref().map(|v| v.len()), Some(1),
@@ -595,8 +595,8 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(acquiree_text_preserver.body,
              Some ( "[[id:1-links-to][a link to 1-links-to]]"
                        .to_string() ));
-  assert_eq!(acquiree_text_preserver.contains.len(), 0,
-             "acquiree_text_preserver should have no contents");
+  assert_eq!(acquiree_text_preserver.contains, None,
+             "acquiree_text_preserver should have no contents (None when empty on disk)");
 
   // acquiree_text_preserver should have None for relationship fields
   // (when read from disk, missing fields are None)

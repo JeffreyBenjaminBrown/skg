@@ -103,8 +103,9 @@ pub async fn reconcile_dup_instructions_for_one_id(
         node_aliases . iter() . cloned() ); }
     if save_action.indefinitive {
       // tentative title and body, appendable contents after dedup
-      append_to_content.extend(
-        skg_node . contains . iter() . cloned() );
+      if let Some(contents) = &skg_node.contains {
+        append_to_content.extend(
+          contents . iter() . cloned() ); }
       // TODO ? The treatment of title and body here is inefficient.
       // Once we find one we can stop looking, but this implementation
       // keeps overwriting when it finds a new one.
@@ -114,7 +115,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
     } else { // definitive title, body; initial content without dedup
       if definer_content.is_some() {
         return Err("Multiple definitive content definitions for same ID" . into()); }
-      definer_content = Some(skg_node.contains.clone());
+      definer_content = skg_node.contains.clone();
       definer_title = Some(skg_node.title.clone());
       definer_body = skg_node.body.clone(); }}
   aliases.sort(); aliases.dedup(); // dedup aliases
@@ -127,7 +128,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
         aliases = disk_aliases.clone(); }} }
   if definer_content.is_none() {
     if let Ok(disk_node) = &from_disk {
-      definer_content = Some(disk_node.contains.clone() ); }}
+      definer_content = disk_node.contains.clone(); }}
 
   // Remove from appendToContent anything that's in definesContent
   let definer_content: Vec<ID> =
@@ -164,7 +165,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
             else { maybe_body.or_else(
               || from_disk . as_ref() . ok() . and_then(
                 |node| node.body.clone() )) } ),
-    contains: final_contents,
+    contains: Some(final_contents),
     subscribes_to: None,
     hides_from_its_subscriptions: None,
     overrides_view_of: None,

@@ -59,7 +59,7 @@ fn test_deletions_excluded (
       assert_eq!(id1_instruction.1.toDelete, false);
       assert_eq!(id2_instruction.1.toDelete, true);
       assert_eq!( // id 1 should contain 3 and not 2 (which is being deleted)
-        id1_instruction.0.contains, vec![ID::from("3")]);
+        id1_instruction.0.contains, Some(vec![ID::from("3")]));
       Ok (( )) } ) ) }
 
 #[test]
@@ -89,7 +89,7 @@ fn test_defining_node_defines (
       assert_eq!(id1_instruction.0.title, "1 definer");
       // Defining instruction should define body completely, even if None
       assert_eq!(id1_instruction.0.body, None);
-      assert_eq!(id1_instruction.0.contains, vec![ID::from("3"), ID::from("2")]);
+      assert_eq!(id1_instruction.0.contains, Some(vec![ID::from("3"), ID::from("2")]));
       Ok (( )) } ) ) }
 
 #[test]
@@ -128,7 +128,7 @@ fn test_adding_without_definer (
         // and then the indefinitive node with id 1
         // appends its contents, with deduplication.
         id1_instruction.0.contains,
-        vec![ ID::from("2"),
-              ID::from("3"),
-              ID::from("4"), ]);
+        Some(vec![ ID::from("2"),
+                   ID::from("3"),
+                   ID::from("4"), ]));
       Ok (( )) } ) ) }

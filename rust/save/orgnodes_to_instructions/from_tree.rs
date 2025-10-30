@@ -79,7 +79,7 @@ fn mk_skgnode (
     aliases: collect_aliases(noderef),
     ids: ids,
     body: body,
-    contains: collect_contents(noderef),
+    contains: Some(collect_contents(noderef)),
     subscribes_to: None,
     hides_from_its_subscriptions: None,
     overrides_view_of: None,

@@ -41,7 +41,7 @@ pub async fn create_relationships_from_node (
     node . ids [0] . as_str ();
   insert_relationship_from_list (
     primary_id,
-    &node.contains,
+    node.contains.as_ref().unwrap_or(&vec![]),
     "contains",
     "container",
     "contained",

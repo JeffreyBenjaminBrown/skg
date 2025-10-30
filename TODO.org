@@ -1,7 +1,12 @@
 * merge nodes
 ** SEE ALSO ask.org and merge-temp-docs/
    the latter is in in branch merge-nodes
+** ONGOING reviewing code
 ** TODO
+*** definitive orgnodes have Some contents; indefinitive ones, None
+Your note on indefinitive nodes reminds me: Now that we've clarified how Some([]) and None work in the SkgNode type, we should make its 'contains' field an Optional vector too. And then, in the 'save buffer' process, when a SkgNode is generated from an indefinitive OrgNode, it should have contains = None, whereas if it is generated from a definitive one, it has contains = Some (maybe Some([]), maybe not).
+
+This change will probably ripple through a lot of the codebase, at least tests.
 *** expand validation
 **** to self
  If a is being merged with b, for now,
@@ -13,7 +18,34 @@
    in branch merge-nodes
    (added in b0eb35811b37cd38766898b1c48dfbcaf72954dd)
 **** prompt
-*** a definitive orgnode has Some contents; an indefinitive one, None
+Very cool. I've moved that report to
+/home/rust/skg/validation-for-merge/how-save-buffer-works.md
+
+Please review that document (in case you've forgotten anything),
+and then review all the docs in 'merge-temp-docs',
+which is not available in this branch,
+but exists in branch merge-nodes.
+Those were our initial plans for
+implementing the new 'merge' functionality.
+I believe in those docs at least one of us talked about how
+validation will need to be expanded to account for the new 'merge'
+instruction. For the moment, thinking de-novo,
+only the following rules occur to me:
+
+[moved]
+
+But I suspect we might need more policies.
+So read that stuff, think about the OrgnodeCode type,
+and tell me what additional incoherencies, if any,
+a user might request on saving a buffer,
+now that 'merge' is one of the possible instructions.
+**** rules
+***** Alias/AliasCol nodes can't merge
+***** monogamy
+      If a is being merged with b,
+      we don't want a or b to be involved in any other merges.
+***** no self-merge
+***** neither partner can be toDelete
 *** use them
 **** use these
      saveinstructions_from_the_merges_in_an_orgnode_forest
