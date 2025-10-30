@@ -360,6 +360,34 @@ pub async fn all_pids_from_typedb(
       node_ids.insert(ID(node_id_str)); }}
   Ok (node_ids) }
 
+/// Query all extra_ids for a given primary node ID from TypeDB.
+/// Returns a Vec of all extra_ids associated with the node.
+pub async fn extra_ids_from_pid(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &ID,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let tx: Transaction = driver.transaction(
+    db_name, TransactionType::Read ). await?;
+  let query = format!(
+    r#"match $node isa node, has id "{}";
+       $e isa extra_id;
+       $rel isa has_extra_id (node: $node, extra_id: $e);
+       $e has id $extra_id_value;
+       select $extra_id_value;"#,
+    node_id.0 );
+  let answer: QueryAnswer = tx.query(query).await?;
+  let mut extra_ids = Vec::new();
+  let mut stream = answer.into_rows();
+  while let Some(row_result) = stream.next().await {
+    let row = row_result?;
+    if let Some(concept) = row.get("extra_id_value")? {
+      let extra_id_str = extract_payload_from_typedb_string_rep(
+        &concept.to_string());
+      extra_ids.push(
+        ID(extra_id_str)); }}
+  Ok(extra_ids) }
+
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.
 pub fn tantivy_contains_id(
