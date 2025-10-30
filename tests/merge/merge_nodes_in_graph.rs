@@ -3,13 +3,12 @@
 use skg::merge::{
   saveinstructions_from_the_merges_in_an_orgnode_forest,
   merge_nodes_in_graph};
-use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id};
+use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, Merge3SaveInstructions};
 use skg::file_io::read_node;
 use skg::util::path_from_pid;
 use skg::typedb::search::{
   contains_from_pids,
-  extra_ids_from_pid,
   find_related_nodes};
 use skg::types::TantivyIndex;
 
