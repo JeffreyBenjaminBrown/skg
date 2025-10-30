@@ -118,9 +118,9 @@ fn compute_updated_acquirer(
   updated_acquirer.subscribes_to = Some(
     acquirer_from_disk.subscribes_to.clone().unwrap_or_default()
       .into_iter()
-      .chain(acquiree_from_disk.subscribes_to.clone().unwrap_or_default())
-      .collect()
-  );
+      .chain ( acquiree_from_disk.subscribes_to
+               .clone().unwrap_or_default())
+      .collect() );
 
   // Combine hides_from_its_subscriptions (with filtering)
   let mut combined_hides: Vec<ID> = Vec::new();
@@ -130,23 +130,17 @@ fn compute_updated_acquirer(
       for hidden_id in hides_list {
         if !acquirer_final_contains.contains(hidden_id)
            && !combined_hides.contains(hidden_id) {
-          combined_hides.push(hidden_id.clone());
-        }
-      }
-    }
-  }
+             combined_hides.push(hidden_id.clone()); }} }}
   updated_acquirer.hides_from_its_subscriptions = Some(combined_hides);
 
   // Combine overrides_view_of
   updated_acquirer.overrides_view_of = Some(
     acquirer_from_disk.overrides_view_of.clone().unwrap_or_default()
       .into_iter()
-      .chain(acquiree_from_disk.overrides_view_of.clone().unwrap_or_default())
-      .collect()
-  );
-
-  updated_acquirer
-}
+      .chain( acquiree_from_disk.overrides_view_of
+              . clone().unwrap_or_default())
+      .collect() );
+  updated_acquirer }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
