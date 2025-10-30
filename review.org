@@ -1,0 +1,51 @@
+* TODO reading history
+  reading upward in the git log as shown by magit
+** TODO last file completely read
+   rust/rebuild.rs
+* changes since main
+** Add Merge(ID) constructor to NodeRequest
+pub enum NodeRequest {
+  ContainerwardView,
+  SourcewardView,
+  Merge(ID),  // Request to merge another node into this one
+}
+** Add 'extra_ids_from_pid' in typedb::search
+   +pub async fn extra_ids_from_pid(
+   +  db_name: &str,
+   +  driver: &TypeDBDriver,
+   +  node_id: &ID,
+   +) -> Result<Vec<ID>, Box<dyn Error>> {
+** the merge algorithm
+* TODO
+** The SkgNodes in the three SaveInstruction should have all the relevant information
+   This way, will only need in the TypeDB to compute the in-links,
+   and the FS portion won't need to compute any relationships.
+** Don't detect text!
+**Recognition pattern:** Later phases identify merge instructions by detecting nodes with titles starting with "MERGED-", then treating the next two instructions as the updated_acquirer and deleted_acquiree.
+** document in comments
+*** three saveinstructions per merge
+    a merge produces three SaveInstructions:
+      create, update, delete
+    rather than just updating two nodes.
+*** fix documented and implemented SkgNode field interpretations
+    None = "This skgnode has no opinion regarding what should be there."
+    Some(x) = "This skgnode believes x should be there."
+*** justify these rules
+**** Acquiree as replaced → DROP
+**** Acquiree as hidden → DROP
+*** // Merge requests are handled during save, not rebuild/view
+    this comment probably needs rewording
+*** merge requests are ignored in 'complete_node_preorder', and thus in its (more meaningfully-named) caller 'completeOrgnodeForest'
+** extra_ids_from_pid
+*** test it
+*** move it to rust/test-utils.rs
+** reconcile_dup_instructions_for_one_id
+   must handle the other optional lists
+** be sure this is tested
+   if A is merged into B and A had a link to C,
+   now the first child of B has a link to C.
+** Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization
+** Title Format - Changed acquiree_text_preserver title from "MERGED: " to "MERGED-" to avoid Tantivy query syntax conflicts with colons
+* complex code elsewhere
+** What does 'reconcile_dup_instructions_for_one_id' do?
+** Is reconcile_dup_instructions_for_one_id called only after IDs are replaced with PIDs?

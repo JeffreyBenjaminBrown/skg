@@ -173,9 +173,10 @@ pub async fn reconcile_dup_instructions_for_one_id(
     toDelete: to_delete,
   } )) }
 
-/// Extracts consistent toDelete value from instructions,
-/// verifying they all match.
-/// (This check is redundant given validate_tree.)
+/// Extracts 'the' toDelete value from some instructions,
+/// if they are all equal. Otherwise borks,
+/// because you can't delete something and also not delete it.
+/// This check is redundant given validate_tree.
 fn to_delete_if_consistent(
   instructions: &[SaveInstruction]
 ) -> Result<bool, Box<dyn Error>> {
