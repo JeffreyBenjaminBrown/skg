@@ -1,3 +1,7 @@
+* TODO see also review.org, ask.org, and
+  merge-temp-docs/
+  in branch merge-nodes
+  (added in b0eb35811b37cd38766898b1c48dfbcaf72954dd)
 * u
 ** reconcile_dup_instructions_for_one_id
 *** It must handle the other optional lists.
