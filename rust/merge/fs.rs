@@ -1,27 +1,24 @@
 use crate::file_io::write_node;
-use crate::types::{SaveInstruction, SkgConfig, SkgNode, ID};
+use crate::types::{Merge3SaveInstructions, SkgConfig, SkgNode, ID};
 use crate::util::path_from_pid;
 use std::collections::HashSet;
 use std::error::Error;
 
-/// Merges nodes in filesystem by applying merge SaveInstructions.
+/// Merges nodes in filesystem by applying Merge3SaveInstructions.
 pub(super) fn merge_nodes_in_fs (
-  _instructions : Vec<SaveInstruction>,
-  config       : SkgConfig,
-  acquiree_text_preservers : Vec<&SaveInstruction>,
-  updated_acquirers : Vec<&SaveInstruction>,
-  deleted_acquirees : Vec<&SaveInstruction>,
+  config             : SkgConfig,
+  merge_instructions : &[Merge3SaveInstructions],
 ) -> Result < (), Box<dyn Error> > {
 
-  if acquiree_text_preservers.is_empty() {
+  if merge_instructions.is_empty() {
     return Ok(());
   }
 
   // Process each merge
-  for i in 0..acquiree_text_preservers.len() {
-    let acquiree_text_preserver : &SkgNode = &acquiree_text_preservers[i].0;
-    let updated_acquirer : &SkgNode = &updated_acquirers[i].0;
-    let acquiree : &SkgNode = &deleted_acquirees[i].0;
+  for merge in merge_instructions {
+    let acquiree_text_preserver : &SkgNode = &merge.acquiree_text_preserver.0;
+    let updated_acquirer : &SkgNode = &merge.updated_acquirer.0;
+    let acquiree : &SkgNode = &merge.deleted_acquiree.0;
 
     // Write acquiree_text_preserver to disk
     let acquiree_text_preserver_path : String =

@@ -5,6 +5,44 @@ use std::str::FromStr;
 
 pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
+/// Represents a complete merge operation involving three SaveInstructions.
+/// When node A merges with node B (acquires B):
+/// - acquiree_text_preserver: new node preserving B's original text
+/// - updated_acquirer: A with B's IDs, contents, and relationships merged in
+/// - deleted_acquiree: B marked for deletion
+#[derive(Debug, Clone)]
+pub struct Merge3SaveInstructions {
+  pub acquiree_text_preserver : SaveInstruction,
+  pub updated_acquirer : SaveInstruction,
+  pub deleted_acquiree : SaveInstruction,
+}
+
+impl Merge3SaveInstructions {
+  pub fn to_vec (
+    &self
+  ) -> Vec<SaveInstruction> {
+    vec![
+      self.acquiree_text_preserver.clone(),
+      self.updated_acquirer.clone(),
+      self.deleted_acquiree.clone(),
+    ] }
+
+  pub fn acquirer_id (
+    &self
+  ) -> &ID {
+    &self.updated_acquirer.0.ids[0] }
+
+  pub fn acquiree_id (
+    &self
+  ) -> &ID {
+    &self.deleted_acquiree.0.ids[0] }
+
+  pub fn preserver_id (
+    &self
+  ) -> &ID {
+    &self.acquiree_text_preserver.0.ids[0] }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgNode {
   pub metadata: OrgnodeMetadata,

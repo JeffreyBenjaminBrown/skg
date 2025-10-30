@@ -1,4 +1,4 @@
-use crate::types::{SaveInstruction, SkgNode, ID};
+use crate::types::{Merge3SaveInstructions, SkgNode, ID};
 use crate::typedb::nodes::create_node;
 use crate::typedb::relationships::create_relationships_from_node;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
@@ -8,26 +8,23 @@ use std::error::Error;
 use typedb_driver::{TypeDBDriver, Transaction, TransactionType};
 use typedb_driver::answer::QueryAnswer;
 
-/// Merges nodes in TypeDB by applying merge SaveInstructions.
+/// Merges nodes in TypeDB by applying Merge3SaveInstructions.
 /// All merges are batched in a single transaction.
 pub(super) async fn merge_nodes_in_typedb (
-  db_name      : &str,
-  driver       : &TypeDBDriver,
-  _instructions : &[SaveInstruction],
-  acquiree_text_preservers : Vec<&SaveInstruction>,
-  updated_acquirers : Vec<&SaveInstruction>,
-  deleted_acquirees : Vec<&SaveInstruction>,
+  db_name            : &str,
+  driver             : &TypeDBDriver,
+  merge_instructions : &[Merge3SaveInstructions],
 ) -> Result < (), Box<dyn Error> > {
-  if acquiree_text_preservers.is_empty() {
+  if merge_instructions.is_empty() {
     return Ok (( )); }
   let tx : Transaction = driver.transaction(
     db_name, TransactionType::Write).await?;
-  for i in 0..acquiree_text_preservers.len() {
+  for merge in merge_instructions {
     process_merge_in_typedb(
       &tx,
-      &acquiree_text_preservers[i].0,
-      &updated_acquirers[i].0,
-      &deleted_acquirees[i].0,
+      &merge.acquiree_text_preserver.0,
+      &merge.updated_acquirer.0,
+      &merge.deleted_acquiree.0,
     ).await?; }
   tx.commit().await?;
   Ok (( )) }

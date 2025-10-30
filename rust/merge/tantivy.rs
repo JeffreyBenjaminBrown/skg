@@ -1,23 +1,27 @@
 use crate::tantivy::update_index_from_saveinstructions;
-use crate::types::{SaveInstruction, TantivyIndex};
+use crate::types::{Merge3SaveInstructions, SaveInstruction, TantivyIndex};
 use std::error::Error;
 use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::{Schema, Field};
 
-/// Merges nodes in Tantivy by applying merge SaveInstructions.
+/// Merges nodes in Tantivy by applying Merge3SaveInstructions.
 pub(super) fn merge_nodes_in_tantivy (
-  instructions : &[SaveInstruction],
-  index        : &Index,
+  merge_instructions : &[Merge3SaveInstructions],
+  index              : &Index,
 ) -> Result < (), Box<dyn Error> > {
 
-  // The tantivy module already has a function that handles SaveInstructions!
+  // Convert Merge3SaveInstructions to flat Vec<SaveInstruction>
+  // for the existing update_index_from_saveinstructions function.
   // It will:
   // - Delete all IDs from the index (including the acquiree)
   // - Add back non-deleted nodes (acquiree_text_preserver and updated acquirer)
   // - Skip deleted nodes (acquiree)
+  let flat_instructions : Vec<SaveInstruction> = merge_instructions
+    .iter()
+    .flat_map(|m| m.to_vec())
+    .collect();
 
-  // Let me look at the schema - it should have "id" and "title_or_alias" fields
   let schema : Schema = index.schema();
   let id_field : Field =
     schema.get_field("id")
@@ -32,7 +36,7 @@ pub(super) fn merge_nodes_in_tantivy (
     title_or_alias_field,
   };
 
-  update_index_from_saveinstructions(instructions, &tantivy_index)?;
+  update_index_from_saveinstructions(&flat_instructions, &tantivy_index)?;
 
   Ok(())
 }
