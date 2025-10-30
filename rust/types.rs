@@ -6,6 +6,7 @@ pub use misc::{ ID,
                 HyperlinkParseError, };
 pub mod orgnode;
 pub use orgnode::{ SaveInstruction,
+                   Merge3SaveInstructions,
                    OrgNode,
                    OrgnodeMetadata,
                    OrgnodeViewData,

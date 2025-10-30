@@ -4,7 +4,7 @@ use skg::merge::{
   saveinstructions_from_the_merges_in_an_orgnode_forest,
   merge_nodes_in_graph};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id};
-use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, NodeSaveAction};
+use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, Merge3SaveInstructions};
 use skg::file_io::read_node;
 use skg::util::path_from_pid;
 use skg::typedb::search::{
@@ -77,18 +77,18 @@ async fn test_merge_2_into_1_impl(
   let forest: Vec<Tree<OrgNode>> =
     vec![Tree::new(org_node_1)];
 
-  // Generate SaveInstructions from merge request
-  let instructions: Vec<(SkgNode, NodeSaveAction)> =
+  // Generate Merge3SaveInstructions from merge request
+  let merge_instructions: Vec<Merge3SaveInstructions> =
     saveinstructions_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
   ).await?;
 
-  // Expect acquiree_text_preserver, updated acquirer, deleted acquiree
-  assert_eq!(instructions.len(),
-             3,
-             "Should have 3 SaveInstructions");
+  // Expect 1 Merge3SaveInstructions (containing 3 SaveInstructions)
+  assert_eq!(merge_instructions.len(),
+             1,
+             "Should have 1 Merge3SaveInstructions");
 
   // Create a temporary Tantivy index for testing,
   // in the same directory that 'run_with_test_db' uses.
@@ -114,7 +114,7 @@ async fn test_merge_2_into_1_impl(
     title_or_alias_field, };
 
   merge_nodes_in_graph(
-    instructions.clone(),
+    merge_instructions.clone(),
     config.clone(),
     &tantivy_index,
     driver,
@@ -124,9 +124,9 @@ async fn test_merge_2_into_1_impl(
   verify_typedb_after_merge_2_into_1(
     config, driver).await?;
   verify_filesystem_after_merge_2_into_1(
-    config, &instructions)?;
+    config, &merge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
-    &tantivy_index_wrapper, &instructions )?;
+    &tantivy_index_wrapper, &merge_instructions )?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_2_into_1 (
@@ -185,7 +185,7 @@ async fn verify_typedb_after_merge_2_into_1 (
 
 fn verify_filesystem_after_merge_2_into_1(
   config: &SkgConfig,
-  instructions: &[(SkgNode, NodeSaveAction)],
+  merge_instructions: &[Merge3SaveInstructions],
 ) -> Result<(), Box<dyn Error>> {
   let node_2_path: String = path_from_pid ( config,
                                             ID::from("2"));
@@ -204,7 +204,7 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!( node_1.contains.len(), 6,
               "Node 1 should contain 6 items");
 
-  let acquiree_text_preserver_id: &ID = &instructions[0].0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   assert_eq!(&node_1.contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1.contains[1], &ID::from("11"));
@@ -244,8 +244,8 @@ fn verify_filesystem_after_merge_2_into_1(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path )) ?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED-"));
-  assert_eq!(acquiree_text_preserver.title, "MERGED-2");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED_"));
+  assert_eq!(acquiree_text_preserver.title, "MERGED_2");
   assert_eq!(acquiree_text_preserver.body, Some("2 body".to_string()));
   assert_eq!(acquiree_text_preserver.contains.len(), 0,
              "acquiree_text_preserver should have no contents");
@@ -263,7 +263,7 @@ fn verify_filesystem_after_merge_2_into_1(
 
 fn verify_tantivy_after_merge_2_into_1(
   tantivy_index: &TantivyIndex,
-  instructions: &[(SkgNode, NodeSaveAction)],
+  merge_instructions: &[Merge3SaveInstructions],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 2 - should NOT find it (it was merged and deleted)
@@ -279,9 +279,9 @@ fn verify_tantivy_after_merge_2_into_1(
           "Node 1 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &instructions[0].0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let found_acquiree_text_preserver: bool =
-    tantivy_contains_id(tantivy_index, "MERGED-2", &acquiree_text_preserver_id.0)?;
+    tantivy_contains_id(tantivy_index, "MERGED_2", &acquiree_text_preserver_id.0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
   Ok (( )) }
 
@@ -347,18 +347,18 @@ async fn test_merge_1_into_2_impl(
   let forest: Vec<Tree<OrgNode>> =
     vec![Tree::new(org_node_2)];
 
-  // Generate SaveInstructions from merge request
-  let instructions: Vec<(SkgNode, NodeSaveAction)> =
+  // Generate Merge3SaveInstructions from merge request
+  let merge_instructions: Vec<Merge3SaveInstructions> =
     saveinstructions_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
   ).await?;
 
-  // Expect acquiree_text_preserver, updated acquirer, deleted acquiree
-  assert_eq!(instructions.len(),
-             3,
-             "Should have 3 SaveInstructions");
+  // Expect 1 Merge3SaveInstructions (containing 3 SaveInstructions)
+  assert_eq!(merge_instructions.len(),
+             1,
+             "Should have 1 Merge3SaveInstructions");
 
   // Create a temporary Tantivy index for testing
   fs::create_dir_all(&config.tantivy_folder)?;
@@ -383,7 +383,7 @@ async fn test_merge_1_into_2_impl(
     title_or_alias_field, };
 
   merge_nodes_in_graph(
-    instructions.clone(),
+    merge_instructions.clone(),
     config.clone(),
     &tantivy_index,
     driver,
@@ -391,17 +391,17 @@ async fn test_merge_1_into_2_impl(
 
   // Verify results
   verify_typedb_after_merge_1_into_2(
-    config, driver, &instructions).await?;
+    config, driver, &merge_instructions).await?;
   verify_filesystem_after_merge_1_into_2(
-    config, &instructions)?;
+    config, &merge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
-    &tantivy_index_wrapper, &instructions)?;
+    &tantivy_index_wrapper, &merge_instructions)?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_1_into_2 (
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: &[(SkgNode, NodeSaveAction)],
+  merge_instructions: &[Merge3SaveInstructions],
 ) -> Result<(), Box<dyn Error>> {
   let db_name: &String = &config.db_name;
 
@@ -446,7 +446,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Hyperlinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
-  let acquiree_text_preserver_id: &ID = &instructions[0].0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let acquiree_text_preserver_hyperlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, acquiree_text_preserver_id,
     "hyperlinks_to", "source", "dest" ). await ?;
@@ -531,7 +531,7 @@ async fn verify_typedb_after_merge_1_into_2 (
 
 fn verify_filesystem_after_merge_1_into_2(
   config: &SkgConfig,
-  instructions: &[(SkgNode, NodeSaveAction)],
+  merge_instructions: &[Merge3SaveInstructions],
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String = path_from_pid(config, ID::from("1"));
   assert!( !Path::new(&node_1_path).exists(),
@@ -550,7 +550,7 @@ fn verify_filesystem_after_merge_1_into_2(
   // Should have [acquiree_text_preserver_id, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2, 11, 12]
   assert_eq!( node_2.contains.len(), 6,
               "Node 2 should contain 6 items");
-  let acquiree_text_preserver_id: &ID = &instructions[0].0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   assert_eq!(&node_2.contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2.contains[1], &ID::from("21"));
@@ -591,8 +591,8 @@ fn verify_filesystem_after_merge_1_into_2(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path))?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED-"));
-  assert_eq!(acquiree_text_preserver.title, "MERGED-1");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED_"));
+  assert_eq!(acquiree_text_preserver.title, "MERGED_1");
   assert_eq!(acquiree_text_preserver.body,
              Some ( "[[id:1-links-to][a link to 1-links-to]]"
                        .to_string() ));
@@ -613,7 +613,7 @@ fn verify_filesystem_after_merge_1_into_2(
 
 fn verify_tantivy_after_merge_1_into_2(
   tantivy_index: &TantivyIndex,
-  instructions: &[(SkgNode, NodeSaveAction)],
+  merge_instructions: &[Merge3SaveInstructions],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 1 - should NOT find it (it was merged and deleted)
@@ -629,9 +629,9 @@ fn verify_tantivy_after_merge_1_into_2(
           "Node 2 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &instructions[0] . 0 . ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
-    tantivy_index, "MERGED-1", &acquiree_text_preserver_id.0 )?;
+    tantivy_index, "MERGED_1", &acquiree_text_preserver_id.0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
 
   Ok (( )) }

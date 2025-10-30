@@ -17,11 +17,13 @@ pub enum NodeRequest {
    +) -> Result<Vec<ID>, Box<dyn Error>> {
 ** the merge algorithm
 * TODO
+** ONGOING Don't detect text!
+You write that the string 'MERGED-' is used to classify nodes. That's dangerous. Instead, would it be feasible to define a struct 'Merge_3_SaveInstructions', with fields that specify which is the 'acquirer', which the 'acquiree', and which the 'preserver' (of the acquiree's text)?
+*** Title Format - Changed acquiree_text_preserver title from "MERGED: " to "MERGED-" to avoid Tantivy query syntax conflicts with colons
+** Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization.
 ** The SkgNodes in the three SaveInstruction should have all the relevant information
    This way, will only need in the TypeDB to compute the in-links,
    and the FS portion won't need to compute any relationships.
-** Don't detect text!
-**Recognition pattern:** Later phases identify merge instructions by detecting nodes with titles starting with "MERGED-", then treating the next two instructions as the updated_acquirer and deleted_acquiree.
 ** document in comments
 *** three saveinstructions per merge
     a merge produces three SaveInstructions:
@@ -39,13 +41,11 @@ pub enum NodeRequest {
 ** extra_ids_from_pid
 *** test it
 *** move it to rust/test-utils.rs
-** reconcile_dup_instructions_for_one_id
-   must handle the other optional lists
 ** be sure this is tested
    if A is merged into B and A had a link to C,
    now the first child of B has a link to C.
-** Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization
-** Title Format - Changed acquiree_text_preserver title from "MERGED: " to "MERGED-" to avoid Tantivy query syntax conflicts with colons
 * complex code elsewhere
 ** What does 'reconcile_dup_instructions_for_one_id' do?
 ** Is reconcile_dup_instructions_for_one_id called only after IDs are replaced with PIDs?
+** reconcile_dup_instructions_for_one_id
+   must handle the other optional lists

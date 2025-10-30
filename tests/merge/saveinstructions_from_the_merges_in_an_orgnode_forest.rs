@@ -2,7 +2,7 @@ use indoc::indoc;
 use skg::merge::saveinstructions_from_the_merges_in_an_orgnode_forest;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
-use skg::types::{ID, SaveInstruction};
+use skg::types::ID;
 use std::error::Error;
 
 #[test]
@@ -19,62 +19,25 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 "};
 
                 let trees = org_to_uninterpreted_nodes(input)?;
-                let instructions =
+                let merge_instructions =
                     saveinstructions_from_the_merges_in_an_orgnode_forest(&trees, config, driver)
                         .await?;
 
-                // Should produce exactly 3 SaveInstructions
+                // Should produce exactly 1 Merge3SaveInstructions
                 assert_eq!(
-                    instructions.len(),
-                    3,
-                    "Expected 3 SaveInstructions (acquiree_text_preserver, acquirer update, acquiree deletion)"
+                    merge_instructions.len(),
+                    1,
+                    "Expected 1 Merge3SaveInstructions"
                 );
 
-                // Collect instructions by their characteristics
-                let mut acquiree_text_preserver_instruction: Option<&SaveInstruction> = None;
-                let mut node1_instruction: Option<&SaveInstruction> = None;
-                let mut node2_instruction: Option<&SaveInstruction> = None;
-
-                for instruction in &instructions {
-                    let (node, action) = instruction;
-
-                    if action.toDelete {
-                        // This should be node 2 (acquiree marked for deletion)
-                        assert!(
-                            node2_instruction.is_none(),
-                            "Found multiple deletion instructions"
-                        );
-                        node2_instruction = Some(instruction);
-                    } else if node.title.starts_with("MERGED-") {
-                        // This is the synthetic acquiree_text_preserver
-                        assert!(
-                            acquiree_text_preserver_instruction.is_none(),
-                            "Found multiple acquiree_text_preservers"
-                        );
-                        acquiree_text_preserver_instruction = Some(instruction);
-                    } else if node.ids.contains(&ID::from("1")) {
-                        // This is the updated acquirer (node 1)
-                        node1_instruction = Some(instruction);
-                    }
-                }
-
-                // Verify we found all three
-                assert!(
-                    acquiree_text_preserver_instruction.is_some(),
-                    "Missing acquiree_text_preserver instruction"
-                );
-                assert!(
-                    node1_instruction.is_some(),
-                    "Missing node 1 (acquirer) instruction"
-                );
-                assert!(
-                    node2_instruction.is_some(),
-                    "Missing node 2 (acquiree) instruction"
-                );
+                // Get the single merge instruction
+                let merge = &merge_instructions[0];
+                let (acquiree_text_preserver, acquiree_text_preserver_action) = &merge.acquiree_text_preserver;
+                let (node1, action1) = &merge.updated_acquirer;
+                let (node2, action2) = &merge.deleted_acquiree;
 
                 // Verify acquiree_text_preserver properties
-                let (acquiree_text_preserver, acquiree_text_preserver_action) = acquiree_text_preserver_instruction.unwrap();
-                assert_eq!(acquiree_text_preserver.title, "MERGED-2", "acquiree_text_preserver title incorrect");
+                assert_eq!(acquiree_text_preserver.title, "MERGED_2", "acquiree_text_preserver title incorrect");
                 assert_eq!(
                     acquiree_text_preserver.body,
                     Some("2 body".to_string()),
@@ -100,7 +63,6 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 );
 
                 // Verify node 1 (acquirer) properties
-                let (node1, action1) = node1_instruction.unwrap();
                 assert!(
                     node1.ids.contains(&ID::from("1")),
                     "Node 1 should have ID '1'"
@@ -131,7 +93,6 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 );
 
                 // Verify node 2 (acquiree) deletion instruction
-                let (node2, action2) = node2_instruction.unwrap();
                 assert!(
                     node2.ids.contains(&ID::from("2")),
                     "Node 2 should have ID '2'"
