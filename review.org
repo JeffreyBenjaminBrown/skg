@@ -71,11 +71,11 @@ Great! Next, can you look through the tests and make sure the following two prop
 
 - If A is merged into B and A was hyperlinked to C, now the first child of B is hyperlinked to C.
 - If A is merged into B and C was hyperlinked to A, now C is hyperlinked to B.
-** DONE Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization.
+** DONE SkgNode serialization
 Next let's work on how SkgNodes are interpreted. Currently a SkgNode's optional list fields are not written to disk if they are None, but they *are* written if they are Some([]). I want them not written to disk either way. And when they are read from disk, if they are absent, they should be read as None values.
 
 This means writing and reading is not an isomorphism. That's fine -- a SkgNode might or might not have something to say about any of its optional lists. That's why there exists code (reconcile_dup_instructions and clobber_none_fields_with_data_from_disk) for joining what multiple SkgNodes have to say about a field.
-** ONGOING move extra_ids_from_pid to rust/test-utils.rs
+** DONE move extra_ids_from_pid to rust/test-utils.rs
 ** document in comments
 *** three saveinstructions per merge
     a merge produces three SaveInstructions:
