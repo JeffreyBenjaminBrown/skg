@@ -17,13 +17,56 @@ pub enum NodeRequest {
    +) -> Result<Vec<ID>, Box<dyn Error>> {
 ** the merge algorithm
 * TODO
-** ONGOING Don't detect text!
+** DONE Don't detect text!
 You write that the string 'MERGED-' is used to classify nodes. That's dangerous. Instead, would it be feasible to define a struct 'Merge_3_SaveInstructions', with fields that specify which is the 'acquirer', which the 'acquiree', and which the 'preserver' (of the acquiree's text)?
 *** Title Format - Changed acquiree_text_preserver title from "MERGED: " to "MERGED-" to avoid Tantivy query syntax conflicts with colons
+** ONGOING The SkgNodes in the three SaveInstruction should have all the relevant information.
+*** 1
+Great!
+
+Next: The information computed here:
+```
+    // Compute final relationship fields for acquirer
+    let acquirer_final_contains : HashSet<ID> =
+      updated_acquirer.contains.iter().cloned().collect();
+
+    let mut acquirer_to_write : SkgNode = updated_acquirer.clone();
+
+    // Combine hides_from_its_subscriptions (with filtering)
+    let mut combined_hides : Vec<ID> = Vec::new();
+    for list in [&updated_acquirer.hides_from_its_subscriptions,
+                 &acquiree.hides_from_its_subscriptions] {
+      if let Some(hides_list) = list {
+        for hidden_id in hides_list {
+          if !acquirer_final_contains.contains(hidden_id)
+             && !combined_hides.contains(hidden_id) {
+            combined_hides.push(hidden_id.clone());
+          }
+        }
+      }
+    }
+    acquirer_to_write.hides_from_its_subscriptions = Some(combined_hides);
+
+    // Combine subscribes_to
+    acquirer_to_write.subscribes_to = Some(
+      updated_acquirer.subscribes_to.clone().unwrap_or_default()
+        .into_iter()
+        .chain(acquiree.subscribes_to.clone().unwrap_or_default())
+        .collect()
+    );
+
+    // Combine overrides_view_of
+    acquirer_to_write.overrides_view_of = Some(
+      updated_acquirer.overrides_view_of.clone().unwrap_or_default()
+        .into_iter()
+        .chain(acquiree.overrides_view_of.clone().unwrap_or_default())
+        .collect()
+    );
+```
+should be calculated earlier, in 'saveinstructions_from_the_merge_in_a_node'.
+*** 2
+Can you move the SaveInstruction-creating functions in rust/merge.rs to a new file, rust/merge/merge3saveinstructions.rs? And move the code that defines the acquirer's fields to a standalone function?
 ** Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization.
-** The SkgNodes in the three SaveInstruction should have all the relevant information
-   This way, will only need in the TypeDB to compute the in-links,
-   and the FS portion won't need to compute any relationships.
 ** document in comments
 *** three saveinstructions per merge
     a merge produces three SaveInstructions:
