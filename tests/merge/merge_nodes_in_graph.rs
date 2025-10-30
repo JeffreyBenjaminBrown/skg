@@ -250,14 +250,14 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!(acquiree_text_preserver.contains.len(), 0,
              "acquiree_text_preserver should have no contents");
 
-  // acquiree_text_preserver should have Some([]) for relationship fields
-  // (when read from disk, missing fields become Some([]), not None)
-  assert_eq!(acquiree_text_preserver.subscribes_to, Some(vec![]),
-             "acquiree_text_preserver should have empty subscribes_to");
-  assert_eq!(acquiree_text_preserver.hides_from_its_subscriptions, Some(vec![]),
-             "acquiree_text_preserver should have empty hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver.overrides_view_of, Some(vec![]),
-             "acquiree_text_preserver should have empty overrides_view_of");
+  // acquiree_text_preserver should have None for relationship fields
+  // (when read from disk, missing fields are None)
+  assert_eq!(acquiree_text_preserver.subscribes_to, None,
+             "acquiree_text_preserver should have None for subscribes_to");
+  assert_eq!(acquiree_text_preserver.hides_from_its_subscriptions, None,
+             "acquiree_text_preserver should have None for hides_from_its_subscriptions");
+  assert_eq!(acquiree_text_preserver.overrides_view_of, None,
+             "acquiree_text_preserver should have None for overrides_view_of");
 
   Ok(( )) }
 
@@ -599,15 +599,15 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(acquiree_text_preserver.contains.len(), 0,
              "acquiree_text_preserver should have no contents");
 
-  // acquiree_text_preserver should have Some([]) for relationship fields
-  // (when read from disk, missing fields become Some([]), not None)
+  // acquiree_text_preserver should have None for relationship fields
+  // (when read from disk, missing fields are None)
   // (these relationships stay with the acquirer, not the acquiree_text_preserver)
-  assert_eq!(acquiree_text_preserver.subscribes_to, Some(vec![]),
-             "acquiree_text_preserver should have empty subscribes_to");
-  assert_eq!(acquiree_text_preserver.hides_from_its_subscriptions, Some(vec![]),
-             "acquiree_text_preserver should have empty hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver.overrides_view_of, Some(vec![]),
-             "acquiree_text_preserver should have empty overrides_view_of");
+  assert_eq!(acquiree_text_preserver.subscribes_to, None,
+             "acquiree_text_preserver should have None for subscribes_to");
+  assert_eq!(acquiree_text_preserver.hides_from_its_subscriptions, None,
+             "acquiree_text_preserver should have None for hides_from_its_subscriptions");
+  assert_eq!(acquiree_text_preserver.overrides_view_of, None,
+             "acquiree_text_preserver should have None for overrides_view_of");
 
   Ok(( )) }
 

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize, Deserializer};
+use serde::{Serialize, Deserialize};
 
 use super::misc::ID;
 
@@ -6,7 +6,9 @@ use super::misc::ID;
 pub struct SkgNode {
   // There is a 1-to-1 correspondence between SkgNodes and actual .skg files -- a file can be read to a SkgNode, and a SkgNode can be written to a file. The files are the only permanent data. SkgNode is the format used to initialize the TypeDB and Tantivy databases.
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
-  // PITFALL: In the Optional lists, it is important to recognize how None differs from Some( [] ). A SkgNode can be built from an OrgNode. The OrgNode might say something about the relevant field, or it might not. If the OrgNode says "this field should be empty", then we use 'Some([])'. But if the OrgNode did not mention it, we use None. Those None values will later be clobbered by whatever was on disk, via the function 'clobber_none_fields_with_data_from_disk'.
+  // PITFALL: Some([]) vs. None in the Optional lists:
+  // - On disk the distinction is not needed. Both Some([]) and None are both rendered on disk as a missing field.
+  // - When multiple SkgNodes need to be reconciled (as in reconcile_dup_instructions or clobber_none_fields_with_data_from_disk), the distinction matters. This is because a SkgNode can be built from an OrgNode, which might or might not say something about the relevant field. If the OrgNode intends to convey "this field *should* be empty", then it reads 'Some([])'. If instead the OrgNode did not say anything about that field, we use None -- and later clobber it with whatever was on disk for that field, via 'clobber_none_fields_with_data_from_disk'.
 
   pub title: String,
 
@@ -22,25 +24,13 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>, // See schema.tql.
 
-  #[serde(
-    default,
-    deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_none"
-  )]
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
 
-  #[serde(
-    default,
-    deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_none"
-  )]
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub hides_from_its_subscriptions: Option<Vec<ID>>, // See schema.tql.
 
-  #[serde(
-    default,
-    deserialize_with = "deserialize_optional_vec_as_some_empty",
-    skip_serializing_if = "option_vec_is_none"
-  )]
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
 }
 
@@ -54,25 +44,6 @@ fn option_vec_is_empty_or_none<T> (
   match option_vec {
     None => true,
     Some(vec) => vec.is_empty(), }}
-
-fn option_vec_is_none<T> (
-  option_vec: &Option<Vec<T>>
-) -> bool {
-  option_vec.is_none() }
-
-/// Custom deserializer that converts missing fields to Some([]) instead of None.
-/// This is used when reading SkgNodes from disk, where absence of a field
-/// means "definitely empty" (Some([])), not "unspecified" (None).
-fn deserialize_optional_vec_as_some_empty<'de, D, T>(
-  deserializer: D
-) -> Result<Option<Vec<T>>,
-            D::Error> where
-  D: Deserializer<'de>,
-  T: Deserialize<'de>, {
-
-  let opt: Option<Vec<T>> = Option::deserialize(
-    deserializer )? ;
-  Ok ( Some ( opt.unwrap_or_else(Vec::new )) ) }
 
 
 //

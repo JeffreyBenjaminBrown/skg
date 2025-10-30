@@ -1,4 +1,7 @@
 * u
+** reconcile_dup_instructions_for_one_id
+*** It must handle the other optional lists.
+*** Is it called only after IDs are replaced with PIDs?
 ** make sure we can't merge more than 1 node into another per save
 ** mk_skgnode is wrong
    It sets a lot of SkgNode list fields to None.
