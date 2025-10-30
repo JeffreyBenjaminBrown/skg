@@ -43,8 +43,9 @@ async fn process_merge_in_typedb(
   reroute_overrides(tx, acquirer_id, acquiree_id).await?;
   reroute_hides(
     tx, acquirer_id, acquiree_id,
-    &updated_acquirer.contains.iter().cloned().collect()
-  ). await ?;
+    ( &updated_acquirer.contains.as_ref().map(
+      |v| v.iter().cloned().collect()).unwrap_or_default()
+    )) . await ?;
   reroute_hyperlinks(tx, acquirer_id, acquiree_id).await?;
 
   // Delete acquiree's extra_ids BEFORE deleting the node

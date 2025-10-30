@@ -106,13 +106,15 @@ fn compute_updated_acquirer(
 
   // Update contains: [acquiree_text_preserver] + acquirer's old + acquiree's old
   let mut new_contains: Vec<ID> = vec![acquiree_text_preserver_id.clone()];
-  new_contains.extend(acquirer_from_disk.contains.clone());
-  new_contains.extend(acquiree_from_disk.contains.clone());
-  updated_acquirer.contains = new_contains;
+  if let Some(acquirer_contains) = &acquirer_from_disk.contains {
+    new_contains.extend(acquirer_contains.clone()); }
+  if let Some(acquiree_contains) = &acquiree_from_disk.contains {
+    new_contains.extend(acquiree_contains.clone()); }
+  updated_acquirer.contains = Some(new_contains.clone());
 
   // Compute acquirer_final_contains for filtering hides_from_its_subscriptions
   let acquirer_final_contains: HashSet<ID> =
-    updated_acquirer.contains.iter().cloned().collect();
+    new_contains.iter().cloned().collect();
 
   // Combine subscribes_to
   updated_acquirer.subscribes_to = Some(
@@ -149,8 +151,8 @@ fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
     aliases: None,
     ids: vec![ID(uuid::Uuid::new_v4().to_string())],
     body: acquiree.body.clone(),
-    contains: vec![],
-    subscribes_to: Some(vec![]),
-    hides_from_its_subscriptions: Some(vec![]),
-    overrides_view_of: Some(vec![]),
+    contains                     : Some(vec![]),
+    subscribes_to                : Some(vec![]),
+    hides_from_its_subscriptions : Some(vec![]),
+    overrides_view_of            : Some(vec![]),
   }}

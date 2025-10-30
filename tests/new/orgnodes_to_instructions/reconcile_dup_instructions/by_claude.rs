@@ -17,7 +17,7 @@ fn create_test_node(
         aliases,
         ids: vec![ID::from(id)],
         body,
-        contains,
+        contains: Some(contains),
         subscribes_to: None,
         hides_from_its_subscriptions: None,
         overrides_view_of: None,
@@ -284,7 +284,7 @@ fn test_defining_instruction_takes_precedence() {
             if defines_content.is_some() {
                 panic!("Multiple defining instructions");
             }
-            defines_content = Some(skg_node.contains.clone());
+            defines_content = skg_node.contains.clone();
             defines_title = Some(skg_node.title.clone());
             defines_body = skg_node.body.clone();
         }
@@ -302,22 +302,22 @@ fn test_initial_content_from_disk_when_no_defining() {
     // This tests the logic but doesn't actually call the async function
 
     let instructions = vec![
-        (create_test_node("id1", "Title 1", None, None, vec![ID::from("append1")]),
+      (create_test_node("id1", "Title 1",
+                        None, None, vec![ID::from("append1")]),
          create_save_action(true, false)),
-        (create_test_node("id1", "Title 2", None, None, vec![ID::from("append2")]),
-         create_save_action(true, false)),
-    ];
+      (create_test_node("id1", "Title 2",
+                        None, None, vec![ID::from("append2")]),
+         create_save_action(true, false)), ];
 
     let mut defines_content: Option<Vec<ID>> = None;
     let mut append_to_content: Vec<ID> = Vec::new();
 
     for (skg_node, save_action) in &instructions {
-        if save_action.indefinitive {
-            append_to_content.extend(skg_node.contains.iter().cloned());
-        } else {
-            defines_content = Some(skg_node.contains.clone());
-        }
-    }
+      if save_action.indefinitive {
+        if let Some(contents) = &skg_node.contains {
+          append_to_content.extend(contents.iter().cloned()); }
+      } else {
+        defines_content = skg_node.contains.clone(); }}
 
     // No defining instruction, so defines_content should be None
     assert!(defines_content.is_none());

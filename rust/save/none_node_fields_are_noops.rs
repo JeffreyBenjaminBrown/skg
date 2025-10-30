@@ -45,6 +45,8 @@ pub fn clobber_none_fields_with_data_from_disk (
         from_user;
       if result.aliases.is_none () {
         result.aliases = disk_node.aliases; }
+      if result.contains.is_none () {
+        result.contains = disk_node.contains; }
       if result.subscribes_to.is_none () {
         result.subscribes_to = disk_node.subscribes_to; }
       if result.hides_from_its_subscriptions.is_none () {

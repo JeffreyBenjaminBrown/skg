@@ -32,7 +32,7 @@ fn test_orgnodes_to_save_instructions_basic() {
   assert_eq!(root1_skg.title, "root node 1");
   assert_eq!(root1_skg.body, Some("Root body content".to_string()));
   assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
-  assert_eq!(root1_skg.contains, vec![ID::from("child1")]);
+  assert_eq!(root1_skg.contains, Some(vec![ID::from("child1")]));
   assert_eq!(root1_action.indefinitive, false);
   assert_eq!(root1_action.toDelete, false);
 
@@ -41,7 +41,7 @@ fn test_orgnodes_to_save_instructions_basic() {
   assert_eq!(child1_skg.title, "child 1");
   assert_eq!(child1_skg.body, Some("Child body".to_string()));
   assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
-  assert_eq!(child1_skg.contains, vec![]); // No children
+  assert_eq!(child1_skg.contains, Some(vec![])); // No children
   assert_eq!(child1_action.indefinitive, false);
   assert_eq!(child1_action.toDelete, false);
 
@@ -80,7 +80,7 @@ fn test_orgnodes_to_save_instructions_with_aliases() {
   let (main_skg, _) = &instructions[0];
   assert_eq!(main_skg.title, "main node");
   assert_eq!(main_skg.ids, vec![ID::from("main")]);
-  assert_eq!(main_skg.contains, vec![ID::from("content_child")]);
+  assert_eq!(main_skg.contains, Some(vec![ID::from("content_child")]));
 
   // Test aliases collection
   assert_eq!(main_skg.aliases, Some(vec!["first alias".to_string(), "second alias".to_string()]));
@@ -111,7 +111,7 @@ fn test_orgnodes_to_save_instructions_no_aliases() {
 
   let (node1_skg, _) = &instructions[0];
   assert_eq!(node1_skg.aliases, None, "Should have no aliases");
-  assert_eq!(node1_skg.contains, vec![ID::from("child1")]);
+  assert_eq!(node1_skg.contains, Some(vec![ID::from("child1")]));
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
 
   let (main_skg, _) = &instructions[0];
   assert_eq!(main_skg.aliases, Some(vec!["alias one".to_string(), "alias two".to_string(), "alias three".to_string()]));
-  assert_eq!(main_skg.contains, vec![ID::from("content1")]);
+  assert_eq!(main_skg.contains, Some(vec![ID::from("content1")]));
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
   let (root_skg, _) = &instructions[0];
   assert_eq!(root_skg.title, "root node");
   assert_eq!(root_skg.aliases, Some(vec!["my alias".to_string()]));
-  assert_eq!(root_skg.contains, vec![ID::from("content1"), ID::from("content2")]); // Only Content relations
+  assert_eq!(root_skg.contains, Some(vec![ID::from("content1"), ID::from("content2")])); // Only Content relations
 }
 
 #[test]
@@ -187,19 +187,19 @@ fn test_orgnodes_to_save_instructions_deep_nesting() {
 
   // Check contains relationships
   let (level1_skg, _) = &instructions[0];
-  assert_eq!(level1_skg.contains, vec![ID::from("level2a"), ID::from("level2b")]);
+  assert_eq!(level1_skg.contains, Some(vec![ID::from("level2a"), ID::from("level2b")]));
 
   let (level2a_skg, _) = &instructions[1];
-  assert_eq!(level2a_skg.contains, vec![ID::from("level3a")]);
+  assert_eq!(level2a_skg.contains, Some(vec![ID::from("level3a")]));
 
   let (level3a_skg, _) = &instructions[2];
-  assert_eq!(level3a_skg.contains, vec![ID::from("level4")]);
+  assert_eq!(level3a_skg.contains, Some(vec![ID::from("level4")]));
 
   let (level4_skg, _) = &instructions[3];
-  assert_eq!(level4_skg.contains, vec![]); // Leaf node
+  assert_eq!(level4_skg.contains, Some(vec![])); // Leaf node
 
   let (level2b_skg, _) = &instructions[4];
-  assert_eq!(level2b_skg.contains, vec![]); // Leaf node
+  assert_eq!(level2b_skg.contains, Some(vec![])); // Leaf node
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
 
   let (main_skg, _) = &instructions[0];
   assert_eq!(main_skg.aliases, Some(vec!["alias one".to_string(), "alias two".to_string()]));
-  assert_eq!(main_skg.contains, vec![]); // No content children
+  assert_eq!(main_skg.contains, Some(vec![])); // No content children
 }
 
 #[test]
@@ -281,7 +281,8 @@ fn test_orgnodes_to_save_instructions_complex_scenario() {
   assert_eq!(doc1_skg.title, "Document 1");
   assert_eq!(doc1_skg.aliases, Some(vec!["First Document".to_string(), "Primary Doc".to_string()]));
   assert_eq!(doc1_skg.contains,
-             vec![ID::from("section1"), ID::from("section3")]);
+             Some(vec![ID::from("section1"), ID::from("section3")]),
+             "Indefinitive node still collects contents (to be appended during reconciliation)");
   assert_eq!(doc1_action.indefinitive, true);
   assert_eq!(doc1_action.toDelete, false);
 
@@ -293,5 +294,5 @@ fn test_orgnodes_to_save_instructions_complex_scenario() {
 
   // Test that subsection1a is child of section1
   let (section1_skg, _) = &instructions[1];
-  assert_eq!(section1_skg.contains, vec![ID::from("subsection1a")]);
+  assert_eq!(section1_skg.contains, Some(vec![ID::from("subsection1a")]));
 }

@@ -21,8 +21,8 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub contains: Vec<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
+  pub contains: Option<Vec<ID>>, // See schema.tql.
 
   #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
@@ -57,9 +57,9 @@ pub fn skgnode_example () -> SkgNode {
     ids: vec![ ID::new("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: vec![ ID::new("1"),
-                    ID::new("2"),
-                    ID::new("3")],
+    contains: Some(vec![ ID::new("1"),
+                         ID::new("2"),
+                         ID::new("3")]),
     subscribes_to: Some(vec![ID::new("11"),
                              ID::new("12"),
                              ID::new("13")]),
@@ -73,7 +73,7 @@ pub fn empty_skgnode () -> SkgNode {
     aliases                      : None,
     ids                          : vec![],
     body                         : None,
-    contains                     : vec![],
+    contains                     : None,
     subscribes_to                : None,
     hides_from_its_subscriptions : None,
     overrides_view_of            : None,

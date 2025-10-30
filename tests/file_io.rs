@@ -102,9 +102,10 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     // This is only for testing purposes,
     // to show reading from and writing to disk work;
     // there's no other reason anyone would want to do this.
-    let mut reversed_contains =
-        node.contains.clone();
-    reversed_contains.reverse();
+    let reversed_contains =
+        node.contains.clone().map(|mut v| {
+            v.reverse();
+            v });
     let reversed_subscribes_to =
         node.subscribes_to.clone().map(|mut v| {
             v.reverse();

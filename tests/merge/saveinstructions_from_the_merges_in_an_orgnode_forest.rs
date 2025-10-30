@@ -45,7 +45,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 );
                 assert!(!acquiree_text_preserver_action.indefinitive, "acquiree_text_preserver should not be indefinitive");
                 assert!(!acquiree_text_preserver_action.toDelete, "acquiree_text_preserver should not be marked for deletion");
-                assert_eq!(acquiree_text_preserver.contains.len(), 0, "acquiree_text_preserver should have no contents");
+                assert_eq!(acquiree_text_preserver.contains.as_ref().unwrap().len(), 0, "acquiree_text_preserver should have no contents");
                 assert_eq!(
                     acquiree_text_preserver.subscribes_to,
                     Some(vec![]),
@@ -83,12 +83,12 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
                 let acquiree_text_preserver_id = &acquiree_text_preserver.ids[0];
                 assert_eq!(
-                    node1.contains.len(),
+                    node1.contains.as_ref().unwrap().len(),
                     1,
                     "Node 1 should contain exactly the acquiree_text_preserver"
                 );
                 assert_eq!(
-                    &node1.contains[0], acquiree_text_preserver_id,
+                    &node1.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
                     "Node 1's first content should be the acquiree_text_preserver"
                 );
 
