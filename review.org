@@ -20,7 +20,7 @@ pub enum NodeRequest {
 ** DONE Don't detect text!
 You write that the string 'MERGED-' is used to classify nodes. That's dangerous. Instead, would it be feasible to define a struct 'Merge_3_SaveInstructions', with fields that specify which is the 'acquirer', which the 'acquiree', and which the 'preserver' (of the acquiree's text)?
 *** Title Format - Changed acquiree_text_preserver title from "MERGED: " to "MERGED-" to avoid Tantivy query syntax conflicts with colons
-** ONGOING The SkgNodes in the three SaveInstruction should have all the relevant information.
+** DONE The SkgNodes in the three SaveInstruction should have all the relevant information.
 *** 1
 Great!
 
@@ -66,7 +66,15 @@ Next: The information computed here:
 should be calculated earlier, in 'saveinstructions_from_the_merge_in_a_node'.
 *** 2
 Can you move the SaveInstruction-creating functions in rust/merge.rs to a new file, rust/merge/merge3saveinstructions.rs? And move the code that defines the acquirer's fields to a standalone function?
-** Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization.
+** DONE be sure this is tested
+Great! Next, can you look through the tests and make sure the following two properties are being tested somewhere?
+
+- If A is merged into B and A was hyperlinked to C, now the first child of B is hyperlinked to C.
+- If A is merged into B and C was hyperlinked to A, now C is hyperlinked to B.
+** ONGOING Serialization - Updated SkgNode serialization to write Some([]) as empty arrays instead of omitting them, ensuring proper deserialization.
+Next let's work on how SkgNodes are interpreted. Currently a SkgNode's optional list fields are not written to disk if they are None, but they *are* written if they are Some([]). I want them not written to disk either way. And when they are read from disk, if they are absent, they should be read as None values.
+
+This means writing and reading is not an isomorphism. That's fine -- a SkgNode might or might not have something to say about any of its optional lists. That's why there exists code (reconcile_dup_instructions and clobber_none_fields_with_data_from_disk) for joining what multiple SkgNodes have to say about a field.
 ** document in comments
 *** three saveinstructions per merge
     a merge produces three SaveInstructions:
@@ -84,11 +92,5 @@ Can you move the SaveInstruction-creating functions in rust/merge.rs to a new fi
 ** extra_ids_from_pid
 *** test it
 *** move it to rust/test-utils.rs
-** be sure this is tested
-   if A is merged into B and A had a link to C,
-   now the first child of B has a link to C.
 * complex code elsewhere
 ** What does 'reconcile_dup_instructions_for_one_id' do?
-** Is reconcile_dup_instructions_for_one_id called only after IDs are replaced with PIDs?
-** reconcile_dup_instructions_for_one_id
-   must handle the other optional lists
