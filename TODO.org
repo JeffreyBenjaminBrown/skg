@@ -1,4 +1,5 @@
 * u
+** make sure we can't merge more than 1 node into another per save
 ** mk_skgnode is wrong
    It sets a lot of SkgNode list fields to None.
 ** Does anything fail silently?
