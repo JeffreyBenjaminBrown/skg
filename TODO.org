@@ -3,17 +3,35 @@
 *** ask.org
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
-*** new validation rules
-**** Alias/AliasCol nodes can't merge
-     Note that this check is not necessary,
-     because the restriction that they need IDs will have this effect,
-     but it's the "ethical" thing to do.
-**** both exist
-**** monogamy
-     If a is being merged with b,
-     we don't want a or b to be involved in any other merges.
-**** no self-merge
-**** neither partner can be toDelete
+*** merge validation process
+    serial
+**** walk tree, building some collections
+***** A vec of acquirer OrgNodes (ones with mrege requests).
+***** A map from acquirer to a set of acquirees.
+***** A map from acquiree to a set of acquirers.
+***** A map from every OrgNode to a set of toDelete values.
+      If an orgnode maps to both 'true' and 'false',
+      that's invalid, but we're not actually checking that here.
+      This will be useful not just as a map,
+      but the keyset is a the set of each OrgNode's IDs,
+      which is useful even apart from the values it maps to.
+**** walk the vec of acquirer OrgNodes, checking rules
+***** the acquirer is not an Alias or AliasCol
+***** both acquirer and acquiree's IDs are in the graph
+      And use pid_from_id to get the PID for each.
+***** no self-merge
+      The acquirer's merge request must state
+      an ID distinct from that of the acquirer's.
+      Run this test on the PIDs we found in the previous step,
+      so that synonym IDs cannot fool the algorithm.
+***** In the orgnode tree, neither partner can map to toDelete.
+***** monogamy
+      If a is being merged with b,
+      we don't want a or b to be involved in any other merges.
+      Do this by validating that neither of the two maps
+      acquirer-acquiree maps contains a value of cardinality > 1.
+**** return a list of errors, or () for success
+     errors as plain text, specifying what went wrong, with IDs
 *** use them
 **** use these
      instructiontriples_from_the_merges_in_an_orgnode_forest
