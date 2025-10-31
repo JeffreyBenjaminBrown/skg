@@ -150,9 +150,8 @@ async fn verify_typedb_after_merge_2_into_1 (
   assert!(node_1_extra_ids.contains(&ID::from("2-extra-id")),
           "Node 1 should have extra_id '2-extra-id'");
 
-  // Node 1 should contain 6 things: [acquiree_text_preserver_id, 11, 12, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
-  // IMPORTANT: contains_from_pids only returns relationships where BOTH nodes are in the input list,
-  // so we must include all the child nodes we want to check for. We query with all nodes in the DB.
+  // Node 1 should contain 7 things: [acquiree_text_preserver_id, 11, 12, overlap, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
+  // IMPORTANT: contains_from_pids only returns relationships where BOTH nodes are in the input list, so we must include all the child nodes we want to check for. We query with all nodes in the DB.
   let all_node_ids: HashSet<ID> = all_pids_from_typedb(db_name, driver).await?;
   let input_pids: Vec<ID> = all_node_ids.into_iter().collect();
   let (container_to_contents, _content_to_containers)
@@ -165,16 +164,19 @@ async fn verify_typedb_after_merge_2_into_1 (
       &ID::from("1"))
     . ok_or("Node 1 should have contains relationships")?;
 
-  assert_eq!(node_1_contents.len(), 6,
-             "Node 1 should contain 6 items after merge");
+  assert_eq!(node_1_contents.len(), 7,
+             "Node 1 should contain 7 items after merge (with overlap deduplicated)");
   // acquiree_text_preserver_id is a UUID we don't know, but it should be in the set.
-  // We can, however, test for the other five:
+  // We can, however, test for the other six:
   assert!(node_1_contents.contains(&ID::from("11")));
   assert!(node_1_contents.contains(&ID::from("12")));
+  assert!(node_1_contents.contains(&ID::from("overlap")),
+          "overlap should be present (deduplicated)");
   assert!(node_1_contents.contains(&ID::from("21")));
   assert!(node_1_contents.contains(&ID::from("22")));
   assert!(node_1_contents.contains(
     &ID::from("hidden-from-subscriptions-of-1-but-in-content-of-2")));
+  // Note that the second 'overlap' was stripped.
 
   // In this test,
   // relationships beyond contains and extra_id are ignored,
@@ -199,21 +201,33 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!(&node_1.ids[1], &ID::from("2"));
   assert_eq!(&node_1.ids[2], &ID::from("2-extra-id"));
 
-  // Should have [acquiree_text_preserver_id, 11, 12, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
-  assert_eq!( node_1.contains.as_ref().unwrap().len(), 6,
-              "Node 1 should contain 6 items");
+  // Should have [acquiree_text_preserver_id, 11, 12, overlap, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
+  // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
+  assert_eq!( node_1.contains.as_ref().unwrap().len(), 7,
+              "Node 1 should contain 7 items (with overlap deduplicated)");
 
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   assert_eq!(&node_1.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1.contains.as_ref().unwrap()[1], &ID::from("11"));
   assert_eq!(&node_1.contains.as_ref().unwrap()[2], &ID::from("12"));
-  assert_eq!(&node_1.contains.as_ref().unwrap()[3], &ID::from("21"));
-  assert_eq!(&node_1.contains.as_ref().unwrap()[4], &ID::from("22"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[3], &ID::from("overlap"),
+             "overlap should appear in position 3 (from acquirer's original contents)");
+  assert_eq!(&node_1.contains.as_ref().unwrap()[4], &ID::from("21"));
+  assert_eq!(&node_1.contains.as_ref().unwrap()[5], &ID::from("22"));
   assert_eq!(
-    &node_1.contains.as_ref().unwrap()[5],
+    &node_1.contains.as_ref().unwrap()[6],
     &ID::from(
       "hidden-from-subscriptions-of-1-but-in-content-of-2"));
+  // Note that the second 'overlap' was stripped.
+
+  // Verify overlap appears only once (not duplicated)
+  let overlap_count: usize = node_1.contains.as_ref().unwrap()
+    .iter()
+    .filter(|id| *id == &ID::from("overlap"))
+    .count();
+  assert_eq!(overlap_count, 1,
+             "overlap should appear exactly once (deduplicated), not twice");
 
   // Verify that node 1 keeps its original relationships
   // (node 2 had no relationships to transfer)
@@ -431,16 +445,19 @@ async fn verify_typedb_after_merge_1_into_2 (
     container_to_contents.get(&ID::from("2"))
     .ok_or("Node 2 should have contains relationships")?;
 
-  assert_eq!(node_2_contents.len(), 6,
-             "Node 2 should contain 6 items after merge");
+  assert_eq!(node_2_contents.len(), 7,
+             "Node 2 should contain 7 items after merge (4 + 4 - the duplicated node called 'overlap')");
   // acquiree_text_preserver_id is a UUID we don't know, but it should be in the set.
-  // We can test for the other five:
+  // We can test for the other six:
   assert!(node_2_contents.contains(&ID::from("11")));
   assert!(node_2_contents.contains(&ID::from("12")));
+  assert!(node_2_contents.contains(&ID::from("overlap")),
+          "overlap should be present (deduplicated)");
   assert!(node_2_contents.contains(&ID::from("21")));
   assert!(node_2_contents.contains(&ID::from("22")));
   assert!(node_2_contents.contains(
     &ID::from("hidden-from-subscriptions-of-1-but-in-content-of-2")));
+  // Note that the would-be second 'overlap' node was removed.
 
   // Hyperlinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
@@ -546,9 +563,10 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(&node_2.ids[1], &ID::from("2-extra-id"));
   assert_eq!(&node_2.ids[2], &ID::from("1"));
 
-  // Should have [acquiree_text_preserver_id, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2, 11, 12]
-  assert_eq!( node_2.contains.as_ref().unwrap().len(), 6,
-              "Node 2 should contain 6 items");
+  // Should have [acquiree_text_preserver_id, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2, overlap, 11, 12]
+  // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
+  assert_eq!( node_2.contains.as_ref().unwrap().len(), 7,
+              "Node 2 should contain 7 items (with overlap deduplicated)");
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   assert_eq!(&node_2.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
@@ -556,8 +574,18 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(&node_2.contains.as_ref().unwrap()[2], &ID::from("22"));
   assert_eq!(&node_2.contains.as_ref().unwrap()[3], &ID::from(
     "hidden-from-subscriptions-of-1-but-in-content-of-2"));
-  assert_eq!(&node_2.contains.as_ref().unwrap()[4], &ID::from("11"));
-  assert_eq!(&node_2.contains.as_ref().unwrap()[5], &ID::from("12"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[4], &ID::from("overlap"),
+             "overlap should appear in position 4 (from acquirer's original contents)");
+  assert_eq!(&node_2.contains.as_ref().unwrap()[5], &ID::from("11"));
+  assert_eq!(&node_2.contains.as_ref().unwrap()[6], &ID::from("12"));
+
+  // Verify overlap appears only once (not duplicated)
+  let overlap_count: usize = node_2.contains.as_ref().unwrap()
+    .iter()
+    .filter(|id| *id == &ID::from("overlap"))
+    .count();
+  assert_eq!(overlap_count, 1,
+             "overlap should appear exactly once (deduplicated), not twice");
 
   // Verify subscribes_to: should have node 1's subscribes_to transferred
   assert_eq!(node_2.subscribes_to.as_ref().map(|v| v.len()), Some(1),

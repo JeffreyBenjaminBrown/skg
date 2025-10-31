@@ -1,47 +1,45 @@
 * merge nodes
-** SEE ALSO ask.org and merge-temp-docs/
-   the latter is in in branch merge-nodes
-** ONGOING reviewing code
+** see also
+*** ask.org
+*** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
-*** expand validation
-**** to self
- If a is being merged with b, for now,
- we don't want a or b to be involved in any other merges.
- If a is part of a merge (either side),
- that orgnode can't be marked toDelete.
+*** ONGOING dedup on merge
+**** ONGOING test first
+     Thanks for mentioning dedup!
+     Let's write a failing test for that.
 
-   merge-temp-docs/
-   in branch merge-nodes
-   (added in b0eb35811b37cd38766898b1c48dfbcaf72954dd)
-**** prompt
-Very cool. I've moved that report to
-/home/rust/skg/validation-for-merge/how-save-buffer-works.md
+     Please extend the fixtures used in merge_nodes_in_graph,
+     such that the two nodes that are merged contain a new node,
+     with title = id = 'overlap' and no other interesting properties.
+     And extend the tests so that when they are merged,
+     the first appearance of 'overlap' is present,
+     but what would be the second appearance (if we naively --
+     as we currently do -- appended the two sequences)
+     is not present.
 
-Please review that document (in case you've forgotten anything),
-and then review all the docs in 'merge-temp-docs',
-which is not available in this branch,
-but exists in branch merge-nodes.
-Those were our initial plans for
-implementing the new 'merge' functionality.
-I believe in those docs at least one of us talked about how
-validation will need to be expanded to account for the new 'merge'
-instruction. For the moment, thinking de-novo,
-only the following rules occur to me:
-
-[moved]
-
-But I suspect we might need more policies.
-So read that stuff, think about the OrgnodeCode type,
-and tell me what additional incoherencies, if any,
-a user might request on saving a buffer,
-now that 'merge' is one of the possible instructions.
-**** rules
-***** Alias/AliasCol nodes can't merge
-***** monogamy
-      If a is being merged with b,
-      we don't want a or b to be involved in any other merges.
-***** no self-merge
-***** neither partner can be toDelete
+     If you need clarification, please ask; otherwise, go!
+**** implement
+     In merge_nodes_in graph, we need deduplication.
+     Sufficient would be the following:
+     Recall that we generate a Merge3SaveInstructions for each merge.
+     When we do that, the SkgNode representing the acquiree
+     should have stripped from its contents
+     any node in the acquirer's contents.
+     The natural algorithm, I believe,
+     would make a set out of the acquirer's contents,
+     and then filter the vector that is the acquiree's contents
+     based on membership of that set.
+*** new validation rules
+**** Alias/AliasCol nodes can't merge
+     Note that this check is not necessary,
+     because the restriction that they need IDs will have this effect,
+     but it's the "ethical" thing to do.
+**** both exist
+**** monogamy
+     If a is being merged with b,
+     we don't want a or b to be involved in any other merges.
+**** no self-merge
+**** neither partner can be toDelete
 *** use them
 **** use these
      saveinstructions_from_the_merges_in_an_orgnode_forest
