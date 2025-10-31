@@ -149,7 +149,7 @@ fn merge_three_skgnodes(
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
   SkgNode {
-    title: format!("MERGED_{}", acquiree.title),
+    title: format!("MERGED: {}", acquiree.title),
     aliases: None,
     ids: vec![ID(uuid::Uuid::new_v4().to_string())],
     body: acquiree.body.clone(),

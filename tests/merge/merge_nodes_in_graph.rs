@@ -257,8 +257,8 @@ fn verify_filesystem_after_merge_2_into_1(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path )) ?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED_"));
-  assert_eq!(acquiree_text_preserver.title, "MERGED_2");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
+  assert_eq!(acquiree_text_preserver.title, "MERGED: 2");
   assert_eq!(acquiree_text_preserver.body, Some("2 body".to_string()));
   assert_eq!(acquiree_text_preserver.contains, None,
              "acquiree_text_preserver should have no contents (None when empty on disk)");
@@ -294,7 +294,7 @@ fn verify_tantivy_after_merge_2_into_1(
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let found_acquiree_text_preserver: bool =
-    tantivy_contains_id(tantivy_index, "MERGED_2", &acquiree_text_preserver_id.0)?;
+    tantivy_contains_id(tantivy_index, "\"MERGED: 2\"", &acquiree_text_preserver_id.0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
   Ok (( )) }
 
@@ -618,8 +618,8 @@ fn verify_filesystem_after_merge_1_into_2(
 
   let acquiree_text_preserver: SkgNode = read_node(
     &Path::new(&acquiree_text_preserver_path))?;
-  assert!(acquiree_text_preserver.title.starts_with("MERGED_"));
-  assert_eq!(acquiree_text_preserver.title, "MERGED_1");
+  assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
+  assert_eq!(acquiree_text_preserver.title, "MERGED: 1");
   assert_eq!(acquiree_text_preserver.body,
              Some ( "[[id:1-links-to][a link to 1-links-to]]"
                        .to_string() ));
@@ -658,7 +658,7 @@ fn verify_tantivy_after_merge_1_into_2(
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
-    tantivy_index, "MERGED_1", &acquiree_text_preserver_id.0 )?;
+    tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id.0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
 
   Ok (( )) }
