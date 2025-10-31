@@ -1,6 +1,6 @@
 use crate::file_io::read_node;
 use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
-use crate::util::path_from_pid;
+use crate::util::{path_from_pid, extend_vec_with_novel_from_other_vec};
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
@@ -108,19 +108,11 @@ fn merge_three_skgnodes(
       new_contains.extend(
         acquirer_contains.clone()); }
 
-  { // Filter out acquiree contents already in acquirer's.
-    let acquirer_contains_set: HashSet<ID> = (
-      acquirer_from_disk . contains . as_ref()
-        . map( |v| v.iter().cloned().collect() )
-        . unwrap_or_default () );
-    if let Some(acquiree_contains) = &acquiree_from_disk.contains {
-      let filtered_acquiree_contents: Vec<ID> = acquiree_contains
-        .iter()
-        .filter(|id| !acquirer_contains_set.contains(id))
-        .cloned()
-        .collect();
-      new_contains.extend(filtered_acquiree_contents); }
-    updated_acquirer.contains = Some(new_contains.clone() ); }
+  // Filter out acquiree contents already in acquirer's.
+  extend_vec_with_novel_from_other_vec(
+    &mut new_contains,
+    acquiree_from_disk.contains.as_ref());
+  updated_acquirer.contains = Some(new_contains.clone());
 
   // Compute acquirer_final_contains for filtering hides_from_its_subscriptions
   let acquirer_final_contains: HashSet<ID> =
