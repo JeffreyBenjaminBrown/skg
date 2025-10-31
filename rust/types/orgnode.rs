@@ -11,13 +11,13 @@ pub type SaveInstruction = (SkgNode, NodeSaveAction);
 /// - updated_acquirer: A with B's IDs, contents, and relationships merged in
 /// - deleted_acquiree: B marked for deletion
 #[derive(Debug, Clone)]
-pub struct Merge3SaveInstructions {
+pub struct MergeInstructionTriple {
   pub acquiree_text_preserver : SaveInstruction,
   pub updated_acquirer : SaveInstruction,
   pub deleted_acquiree : SaveInstruction,
 }
 
-impl Merge3SaveInstructions {
+impl MergeInstructionTriple {
   pub fn to_vec (
     &self
   ) -> Vec<SaveInstruction> {

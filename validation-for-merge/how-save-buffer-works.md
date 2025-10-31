@@ -19,7 +19,7 @@ handle_save_buffer_request (serve/save_buffer.rs:53)
           │   └─> reconcile_dup_instructions ★ VALIDATION POINT 2 ★
           │       └─> reconcile_dup_instructions_for_one_id
           │           └─> to_delete_if_consistent ★ VALIDATION POINT 3 ★
-          └─> clobber_none_fields_with_data_from_disk (fill None fields)
+          └─> clobber_none_fields_with_data_from_disk
 ```
 
 ---

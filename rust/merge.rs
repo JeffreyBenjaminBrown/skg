@@ -3,14 +3,14 @@ mod fs;
 mod tantivy;
 mod merge3saveinstructions;
 
-pub use merge3saveinstructions::saveinstructions_from_the_merges_in_an_orgnode_forest;
+pub use merge3saveinstructions::instructiptriples_from_the_merges_in_an_orgnode_forest;
 
-use crate::types::{Merge3SaveInstructions, SkgConfig};
+use crate::types::{MergeInstructionTriple, SkgConfig};
 use std::error::Error;
 use ::tantivy::Index;
 use typedb_driver::TypeDBDriver;
 
-/// Merges nodes in the graph by applying Merge3SaveInstructions.
+/// Merges nodes in the graph by applying MergeInstructionTriple.
 /// Updates three systems in order:
 ///   1) TypeDB
 ///   2) Filesystem
@@ -18,7 +18,7 @@ use typedb_driver::TypeDBDriver;
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn merge_nodes_in_graph (
-  merge_instructions : Vec<Merge3SaveInstructions>,
+  merge_instructions : Vec<MergeInstructionTriple>,
   config             : SkgConfig,
   tantivy_index      : &Index,
   driver             : &TypeDBDriver,

@@ -1,17 +1,17 @@
 use crate::tantivy::update_index_from_saveinstructions;
-use crate::types::{Merge3SaveInstructions, SaveInstruction, TantivyIndex};
+use crate::types::{MergeInstructionTriple, SaveInstruction, TantivyIndex};
 use std::error::Error;
 use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::{Schema, Field};
 
-/// Merges nodes in Tantivy by applying Merge3SaveInstructions.
+/// Merges nodes in Tantivy by applying MergeInstructionTriple.
 pub(super) fn merge_nodes_in_tantivy (
-  merge_instructions : &[Merge3SaveInstructions],
+  merge_instructions : &[MergeInstructionTriple],
   index              : &Index,
 ) -> Result < (), Box<dyn Error> > {
 
-  // Convert Merge3SaveInstructions to flat Vec<SaveInstruction>
+  // Convert MergeInstructionTriple to flat Vec<SaveInstruction>
   // for the existing update_index_from_saveinstructions function.
   // It will:
   // - Delete all IDs from the index (including the acquiree)
