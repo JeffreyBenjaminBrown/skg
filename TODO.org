@@ -3,10 +3,6 @@
    the latter is in in branch merge-nodes
 ** ONGOING reviewing code
 ** TODO
-*** definitive orgnodes have Some contents; indefinitive ones, None
-Your note on indefinitive nodes reminds me: Now that we've clarified how Some([]) and None work in the SkgNode type, we should make its 'contains' field an Optional vector too. And then, in the 'save buffer' process, when a SkgNode is generated from an indefinitive OrgNode, it should have contains = None, whereas if it is generated from a definitive one, it has contains = Some (maybe Some([]), maybe not).
-
-This change will probably ripple through a lot of the codebase, at least tests.
 *** expand validation
 **** to self
  If a is being merged with b, for now,
