@@ -19,9 +19,8 @@
      instructiontriples_from_the_merges_in_an_orgnode_forest
      merge_nodes_in_graph
 **** here
-     in buffer_to_save_instructions,
-     right before the end,
-     using the clobbered Saveinstructions.
+     in buffer_to_save_instructions
+     right before the end.
 *** document in comments
 **** three saveinstructions per merge
      a merge produces three SaveInstructions:
@@ -105,7 +104,7 @@
  ```
  should be calculated earlier, in 'saveinstructions_from_the_merge_in_a_node'.
 **** 2
- Can you move the SaveInstruction-creating functions in rust/merge.rs to a new file, rust/merge/merge3saveinstructions.rs? And move the code that defines the acquirer's fields to a standalone function?
+ Can you move the SaveInstruction-creating functions in rust/merge.rs to a new file, rust/merge/mergeInstructionTriple.rs? And move the code that defines the acquirer's fields to a standalone function?
 *** be sure this is tested
  Great! Next, can you look through the tests and make sure the following two properties are being tested somewhere?
 
