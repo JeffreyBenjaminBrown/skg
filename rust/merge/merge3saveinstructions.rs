@@ -15,7 +15,7 @@ use typedb_driver::TypeDBDriver;
 ///
 /// TODO: This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
-pub async fn instructiptriples_from_the_merges_in_an_orgnode_forest(
+pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
   _driver: &TypeDBDriver,
