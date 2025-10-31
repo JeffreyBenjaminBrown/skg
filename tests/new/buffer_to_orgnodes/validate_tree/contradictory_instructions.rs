@@ -4,6 +4,8 @@ use ego_tree::Tree;
 use indoc::indoc;
 use skg::types::{OrgNode, ID, Buffer_Cannot_Be_Saved};
 use skg::save::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
+use skg::test_utils::run_with_test_db;
+use std::error::Error;
 
 #[test]
 fn test_find_inconsistent_toDelete_instructions() {
@@ -59,37 +61,45 @@ fn test_find_inconsistent_toDelete_instructions() {
 }
 
 #[test]
-fn test_multiple_defining_containers() {
-  // Test input with multiple nodes having the same ID and both repeated=false, indefinitive=false
-  let input_with_multiple_defining_containers: &str =
-    indoc! {"
-            * (skg (id duplicate)) First defining container
-            Regular node with shared ID
-            * (skg (id duplicate)) Second defining container
-            Another regular node with the same ID
-            * (skg (id duplicate) (code repeated)) Repeated node (not defining)
-            This one is ok because repeated=true
-            * (skg (id duplicate) (code indefinitive)) Might contain more (not defining)
-            This one is ok because indefinitive=true
-            * (skg (id unique)) Unique node
-            This one is fine
-        "};
+fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-multiple-def",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-multiple-def",
+    |config, driver| Box::pin(async move {
+      // Test input with multiple nodes having the same ID and both repeated=false, indefinitive=false
+      let input_with_multiple_defining_containers: &str =
+        indoc! {"
+                * (skg (id duplicate)) First defining container
+                Regular node with shared ID
+                * (skg (id duplicate)) Second defining container
+                Another regular node with the same ID
+                * (skg (id duplicate) (code repeated)) Repeated node (not defining)
+                This one is ok because repeated=true
+                * (skg (id duplicate) (code indefinitive)) Might contain more (not defining)
+                This one is ok because indefinitive=true
+                * (skg (id unique)) Unique node
+                This one is fine
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-  let multiple_defining_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(_)))
-    .collect();
+      let multiple_defining_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(_)))
+        .collect();
 
-  assert_eq!(multiple_defining_errors.len(), 1,
-             "Should find exactly 1 Multiple_DefiningContainers error for the problematic ID");
+      assert_eq!(multiple_defining_errors.len(), 1,
+                 "Should find exactly 1 Multiple_DefiningContainers error for the problematic ID");
 
-  // Check that the error points to the correct ID
-  if let Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
-    assert_eq!(id.0, "duplicate",
-               "Multiple_DefiningContainers error should come from the duplicate ID");
-  }
+      // Check that the error points to the correct ID
+      if let Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
+        assert_eq!(id.0, "duplicate",
+                   "Multiple_DefiningContainers error should come from the duplicate ID");
+      }
+      Ok(())
+    })
+  )
 }

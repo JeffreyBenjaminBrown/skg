@@ -12,13 +12,12 @@ struct MergeValidationData<'a> {
   to_delete_ids: HashSet<ID>, }
 
 /// Validates merge requests in an orgnode forest.
-/// Returns Ok(()) if all merge requests are valid,
-/// or Err with a list of validation errors.
+/// Returns a vector of validation error messages (empty if all valid).
 pub async fn validate_merge_requests(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let collections = collect_merge_validation_data(forest);
   for node in collections.acquirer_nodes {
@@ -44,9 +43,7 @@ pub async fn validate_merge_requests(
     &collections.acquirer_to_acquirees,
     &collections.acquiree_to_acquirers );
   errors.extend(monogamy_errors);
-  if errors.is_empty() { Ok(()) }
-  else { Err(
-    errors . join("\n") .into()) }}
+  Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
   forest: &'a [Tree<OrgNode>],

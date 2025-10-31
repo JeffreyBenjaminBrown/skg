@@ -54,7 +54,9 @@ pub async fn buffer_to_save_instructions (
     & mut orgnode_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
   let validation_errors : Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving ( & orgnode_forest );
+    find_buffer_errors_for_saving (
+      & orgnode_forest, config, driver
+    ) . await . map_err ( SaveError::DatabaseError ) ?;
   if ! validation_errors . is_empty () {
     return Err ( SaveError::BufferValidationErrors (
       validation_errors ) ); }

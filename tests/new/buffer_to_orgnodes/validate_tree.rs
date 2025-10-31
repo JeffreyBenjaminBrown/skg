@@ -4,31 +4,38 @@ use indoc::indoc;
 use ego_tree::Tree;
 use skg::types::{OrgNode, Buffer_Cannot_Be_Saved};
 use skg::save::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving};
+use skg::test_utils::run_with_test_db;
+use std::error::Error;
 
 #[test]
-fn test_find_buffer_errors_for_saving() {
-  // Test input with various validation errors
-  let input_with_errors: &str =
-    indoc! {"
-            * (skg (id root)) Valid root node
-            ** (skg (code (relToParent aliasCol))) AliasCol with body problem
-            This body should not exist on AliasCol
-            *** (skg (id bad_child)) Child of AliasCol with ID
-            *** Regular child without ID
-            ** (skg (code (relToParent alias))) Alias with body problem and orphaned
-            This body should not exist on Alias
-            *** Any child of Alias (bad)
-            ** (skg (code (relToParent alias))) Alias under non-AliasCol parent
-            * (skg (code (relToParent alias))) Root level Alias (bad)
-            * (skg (id conflict) (code toDelete)) Node with deletion conflict
-            * (skg (id conflict)) Same ID but no toDelete flag
-        "};
+fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-errors",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-errors",
+    |config, driver| Box::pin(async move {
+      // Test input with various validation errors
+      let input_with_errors: &str =
+        indoc! {"
+                * (skg (id root)) Valid root node
+                ** (skg (code (relToParent aliasCol))) AliasCol with body problem
+                This body should not exist on AliasCol
+                *** (skg (id bad_child)) Child of AliasCol with ID
+                *** Regular child without ID
+                ** (skg (code (relToParent alias))) Alias with body problem and orphaned
+                This body should not exist on Alias
+                *** Any child of Alias (bad)
+                ** (skg (code (relToParent alias))) Alias under non-AliasCol parent
+                * (skg (code (relToParent alias))) Root level Alias (bad)
+                * (skg (id conflict) (code toDelete)) Node with deletion conflict
+                * (skg (id conflict)) Same ID but no toDelete flag
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(
-      input_with_errors).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(
+          input_with_errors).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
 
   assert_eq!(errors.len(), 9,
              "Should find exactly 9 validation errors (8 original + 1 Multiple_DefiningContainers)");
@@ -98,116 +105,159 @@ fn test_find_buffer_errors_for_saving() {
     = multiple_defining_errors[0] {
       assert_eq!(id.0, "conflict",
                  "Multiple_DefiningContainers error should come from conflicting ID"); } }
+      Ok(())
+    })
+  )
 }
 
 #[test]
-fn test_find_buffer_errors_for_saving_valid_input() {
-  // Test input with no validation errors
-  let valid_input: &str =
-    indoc! {"
-            * (skg (id root)) Valid root node
-            ** (skg (code (relToParent aliasCol))) AliasCol without body
-            *** Regular child without ID
-            *** Another child without ID
-            *** (skg (code (relToParent alias))) Alias without body
-            ** (skg (id normal)) Normal node with body
-            This body is allowed on normal nodes
-        "};
+fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-valid",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-valid",
+    |config, driver| Box::pin(async move {
+      // Test input with no validation errors
+      let valid_input: &str =
+        indoc! {"
+                * (skg (id root)) Valid root node
+                ** (skg (code (relToParent aliasCol))) AliasCol without body
+                *** Regular child without ID
+                *** Another child without ID
+                *** (skg (code (relToParent alias))) Alias without body
+                ** (skg (id normal)) Normal node with body
+                This body is allowed on normal nodes
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(valid_input).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(valid_input).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-  assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
+      assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
+      Ok(())
+    })
+  )
 }
 
 #[test]
-fn test_find_buffer_errors_for_saving_empty_input() {
-  // Test empty input
-  let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
-  let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&empty_trees);
+fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-empty",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-empty",
+    |config, driver| Box::pin(async move {
+      // Test empty input
+      let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
+      let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&empty_trees, config, driver).await?;
 
-  assert_eq!(errors.len(), 0, "Should find no errors in empty input");
+      assert_eq!(errors.len(), 0, "Should find no errors in empty input");
+      Ok(())
+    })
+  )
 }
 
 #[test]
-fn test_multiple_aliascols_in_children() {
-  // Test input with multiple AliasCol children
-  let input_with_multiple_aliascols: &str =
-    indoc! {"
-            * (skg (id root)) Node with multiple AliasCol children
-            ** (skg (code (relToParent aliasCol))) First AliasCol
-            *** (skg (code (relToParent alias))) First alias
-            ** (skg (code (relToParent aliasCol))) Second AliasCol
-            *** (skg (code (relToParent alias))) Second alias
-            ** Normal child
-        "};
+fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-aliascols",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-aliascols",
+    |config, driver| Box::pin(async move {
+      // Test input with multiple AliasCol children
+      let input_with_multiple_aliascols: &str =
+        indoc! {"
+                * (skg (id root)) Node with multiple AliasCol children
+                ** (skg (code (relToParent aliasCol))) First AliasCol
+                *** (skg (code (relToParent alias))) First alias
+                ** (skg (code (relToParent aliasCol))) Second AliasCol
+                *** (skg (code (relToParent alias))) Second alias
+                ** Normal child
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-  let multiple_aliascols_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(_)))
-    .collect();
+      let multiple_aliascols_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(_)))
+        .collect();
 
-  assert_eq!(multiple_aliascols_errors.len(), 1,
-             "Should find exactly 1 Multiple_AliasCols_in_Children error");
+      assert_eq!(multiple_aliascols_errors.len(), 1,
+                 "Should find exactly 1 Multiple_AliasCols_in_Children error");
 
-  if let Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) = multiple_aliascols_errors[0] {
-    assert_eq!(node.title, "Node with multiple AliasCol children",
-               "Multiple_AliasCols_in_Children error should come from the parent node");
-  }
+      if let Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) = multiple_aliascols_errors[0] {
+        assert_eq!(node.title, "Node with multiple AliasCol children",
+                   "Multiple_AliasCols_in_Children error should come from the parent node");
+      }
+      Ok(())
+    })
+  )
 }
 
 #[test]
-fn test_duplicated_content_error() {
-  // Test input with duplicated Content children (same ID)
-  let input_with_duplicated_content: &str =
-    indoc! {"
-            * (skg (id root)) Node with duplicated content
-            ** (skg (id 1)) 1
-            ** (skg (id 1)) 1
-        "};
+fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-duplicate",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-duplicate",
+    |config, driver| Box::pin(async move {
+      // Test input with duplicated Content children (same ID)
+      let input_with_duplicated_content: &str =
+        indoc! {"
+                * (skg (id root)) Node with duplicated content
+                ** (skg (id 1)) 1
+                ** (skg (id 1)) 1
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-  let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
-    .collect();
+      let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+        .collect();
 
-  assert_eq!(duplicated_content_errors.len(), 1,
-             "Should find exactly 1 DuplicatedContent error");
+      assert_eq!(duplicated_content_errors.len(), 1,
+                 "Should find exactly 1 DuplicatedContent error");
 
-  if let Buffer_Cannot_Be_Saved::DuplicatedContent(id) = duplicated_content_errors[0] {
-    assert_eq!(id.0, "1",
-               "DuplicatedContent error should report ID '1'");
-  }
+      if let Buffer_Cannot_Be_Saved::DuplicatedContent(id) = duplicated_content_errors[0] {
+        assert_eq!(id.0, "1",
+                   "DuplicatedContent error should report ID '1'");
+      }
+      Ok(())
+    })
+  )
 }
 
 #[test]
-fn test_no_duplicated_content_error_when_different_ids() {
-  // Test input with different Content children IDs (should be valid)
-  let input_without_duplicated_content: &str =
-    indoc! {"
-            * (skg (id root)) Node with duplicated content
-            ** (skg (id 1)) 1
-            ** (skg (id 2)) 2
-        "};
+fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-no-dup",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-validate-tree-no-dup",
+    |config, driver| Box::pin(async move {
+      // Test input with different Content children IDs (should be valid)
+      let input_without_duplicated_content: &str =
+        indoc! {"
+                * (skg (id root)) Node with duplicated content
+                ** (skg (id 1)) 1
+                ** (skg (id 2)) 2
+            "};
 
-  let trees: Vec<Tree<OrgNode>> =
-    org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
-  let errors: Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving(&trees);
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
+      let errors: Vec<Buffer_Cannot_Be_Saved> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-  let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
-    .collect();
+      let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
+        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+        .collect();
 
-  assert_eq!(duplicated_content_errors.len(), 0,
-             "Should find no DuplicatedContent errors when IDs are different");
+      assert_eq!(duplicated_content_errors.len(), 0,
+                 "Should find no DuplicatedContent errors when IDs are different");
+      Ok(())
+    })
+  )
 }
