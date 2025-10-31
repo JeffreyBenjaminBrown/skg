@@ -3,7 +3,7 @@ mod fs;
 mod tantivy;
 mod merge3saveinstructions;
 
-pub use merge3saveinstructions::instructiptriples_from_the_merges_in_an_orgnode_forest;
+pub use merge3saveinstructions::instructiontriples_from_the_merges_in_an_orgnode_forest;
 
 use crate::types::{MergeInstructionTriple, SkgConfig};
 use std::error::Error;

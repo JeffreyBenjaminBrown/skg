@@ -1,7 +1,7 @@
 // cargo test merge::merge_nodes_in_graph
 
 use skg::merge::{
-  instructiptriples_from_the_merges_in_an_orgnode_forest,
+  instructiontriples_from_the_merges_in_an_orgnode_forest,
   merge_nodes_in_graph};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, MergeInstructionTriple};
@@ -78,7 +78,7 @@ async fn test_merge_2_into_1_impl(
 
   // Generate MergeInstructionTriple from merge request
   let merge_instructions: Vec<MergeInstructionTriple> =
-    instructiptriples_from_the_merges_in_an_orgnode_forest(
+    instructiontriples_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
@@ -362,7 +362,7 @@ async fn test_merge_1_into_2_impl(
 
   // Generate MergeInstructionTriple from merge request
   let merge_instructions: Vec<MergeInstructionTriple> =
-    instructiptriples_from_the_merges_in_an_orgnode_forest(
+    instructiontriples_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
