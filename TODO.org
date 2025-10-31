@@ -6,7 +6,7 @@
 *** test validate_merge_requests
 *** use them
 **** use these
-***** ONGOING validate_merge_requests
+***** validate_merge_requests
 ***** instructiontriples_from_the_merges_in_an_orgnode_forest
 ***** merge_nodes_in_graph
 **** use them here

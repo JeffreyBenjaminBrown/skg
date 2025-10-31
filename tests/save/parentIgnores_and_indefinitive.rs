@@ -44,7 +44,7 @@ fn test_parentignores_and_indefinitive(
         "};
 
         // Get save instructions
-        let (_orgnode_forest, save_instructions) =
+        let (_orgnode_forest, save_instructions, _merge_instructions) =
           buffer_to_save_instructions(
             org_text,
             config,

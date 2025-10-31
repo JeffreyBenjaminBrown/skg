@@ -4,11 +4,12 @@ use crate::types::SaveError;
 use crate::mk_org_text::content_view::{
   render_forest_to_org,
   set_metadata_relationships_in_forest};
+use crate::merge::merge_nodes_in_graph;
 use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
 use crate::typedb::update::update_typedb_from_saveinstructions;
-use crate::types::{SkgConfig, TantivyIndex, SaveInstruction, OrgNode};
+use crate::types::{SkgConfig, TantivyIndex, SaveInstruction, OrgNode, MergeInstructionTriple};
 use crate::types::save::format_save_error_as_org;
 
 use ego_tree::Tree;
@@ -159,8 +160,8 @@ async fn update_from_and_rerender_buffer (
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
 
-  let (mut orgnode_forest, save_instructions)
-    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>)
+  let (mut orgnode_forest, save_instructions, mergeInstructions)
+    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>, Vec<MergeInstructionTriple>)
     = buffer_to_save_instructions (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
@@ -171,6 +172,12 @@ async fn update_from_and_rerender_buffer (
     save_instructions,
     config.clone(),
     tantivy_index,
+    typedb_driver ) . await ?;
+
+  merge_nodes_in_graph (
+    mergeInstructions,
+    config.clone(),
+    &tantivy_index.index,
     typedb_driver ) . await ?;
 
   let mut errors : Vec < String > = Vec::new ();
