@@ -37,7 +37,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 let (node2, action2) = &merge.deleted_acquiree;
 
                 // Verify acquiree_text_preserver properties
-                assert_eq!(acquiree_text_preserver.title, "MERGED_2", "acquiree_text_preserver title incorrect");
+                assert_eq!(acquiree_text_preserver.title, "MERGED: 2", "acquiree_text_preserver title incorrect");
                 assert_eq!(
                     acquiree_text_preserver.body,
                     Some("2 body".to_string()),

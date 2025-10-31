@@ -17,9 +17,8 @@ by evaluating the following (here, in Emacs):
 
 Now these commands can be evaluated (here, in Emacs):
 ```
-  (skg-request-single-root-content-view-from-id "1")
-    ;; try 1, 1a, or a
-  (skg-request-title-matches "second")
+  (skg-request-single-root-content-view-from-id "root")
+  (skg-request-title-matches "2")
     ;; try match, title, or second
   (skg-verify-connection)
     ;; test connection to server
