@@ -19,10 +19,10 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
   _driver: &TypeDBDriver,
-) -> Result<Vec<MergeInstructionTriple>, Box<dyn Error>> {
-  let mut merge_instructions: Vec<MergeInstructionTriple> = Vec::new();
-
-  // Walk the forest to find nodes with merge requests
+) -> Result<Vec<MergeInstructionTriple>,
+            Box<dyn Error>> {
+  let mut merge_instructions: Vec<MergeInstructionTriple> =
+    Vec::new();
   for tree in forest {
     for edge in tree.root().traverse() {
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
@@ -37,35 +37,29 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 fn saveinstructions_from_the_merge_in_a_node(
   node: &OrgNode,
   config: &SkgConfig,
-) -> Result<Vec<MergeInstructionTriple>, Box<dyn Error>> {
-  let mut merge_instructions: Vec<MergeInstructionTriple> = Vec::new();
-
-  // Check if this node has merge requests
+) -> Result<Vec<MergeInstructionTriple>,
+            Box<dyn Error>> {
+  let mut merge_instructions: Vec<MergeInstructionTriple> =
+    Vec::new();
   for request in &node.metadata.code.nodeRequests {
     if let NodeRequest::Merge(acquiree_id) = request {
       let acquirer_id = node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
-
-      // Fetch acquirer and acquiree from disk
       let acquirer_from_disk: SkgNode =
+        // TODO: If this fails, it should report how.
         read_node(&path_from_pid(config, acquirer_id.clone()))?;
       let acquiree_from_disk: SkgNode =
+        // TODO: If this fails, it should report how.
         read_node(&path_from_pid(config, acquiree_id.clone()))?;
-
-      // Create acquiree_text_preserver node
       let acquiree_text_preserver: SkgNode =
         create_acquiree_text_preserver(
           &acquiree_from_disk);
-
-      // Compute updated acquirer with all fields properly merged
       let updated_acquirer: SkgNode =
-        compute_updated_acquirer(
+        merge_three_skgnodes(
           &acquirer_from_disk,
           &acquiree_from_disk,
           &acquiree_text_preserver);
-
-      { // Create MergeInstructionTriple struct
-        merge_instructions.push(
+      { merge_instructions.push(
           MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
@@ -89,7 +83,7 @@ fn saveinstructions_from_the_merge_in_a_node(
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
 /// - Filtered hides_from_its_subscriptions (can't hide your own content)
-fn compute_updated_acquirer(
+fn merge_three_skgnodes(
   acquirer_from_disk: &SkgNode,
   acquiree_from_disk: &SkgNode,
   acquiree_text_preserver: &SkgNode,
@@ -99,17 +93,20 @@ fn compute_updated_acquirer(
   let acquiree_text_preserver_id: &ID =
     &acquiree_text_preserver.ids[0];
 
-  // Append acquiree's IDs to acquirer's
-  updated_acquirer.ids = acquirer_from_disk.ids.clone();
-  for id in &acquiree_from_disk.ids {
-    if !updated_acquirer.ids.contains(id) {
-      updated_acquirer.ids.push(id.clone( )); }}
+  { // Append acquiree's IDs to acquirer's
+    updated_acquirer.ids = acquirer_from_disk.ids.clone();
+    for id in &acquiree_from_disk.ids {
+      if !updated_acquirer.ids.contains(id) {
+        updated_acquirer.ids.push(id.clone( )); }} }
 
   // Update contains: [acquiree_text_preserver] + acquirer's old + (filtered) acquiree's old
   // Filtered: remove from acquiree's contents anything already in acquirer's contents
-  let mut new_contains: Vec<ID> = vec![acquiree_text_preserver_id.clone()];
-  if let Some(acquirer_contains) = &acquirer_from_disk.contains {
-    new_contains.extend(acquirer_contains.clone()); }
+  let mut new_contains: Vec<ID> =
+    vec![acquiree_text_preserver_id.clone()];
+  if let Some(acquirer_contains) =
+    &acquirer_from_disk.contains {
+      new_contains.extend(
+        acquirer_contains.clone()); }
 
   { // Filter out acquiree contents already in acquirer's.
     let acquirer_contains_set: HashSet<ID> = (
