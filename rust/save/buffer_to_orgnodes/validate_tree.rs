@@ -1,8 +1,10 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, RelToParent, Buffer_Cannot_Be_Saved};
+use crate::types::{ID, OrgNode, RelToParent, Buffer_Cannot_Be_Saved, SkgConfig};
+use crate::merge::validate_merge_requests;
 use ego_tree::Tree;
 use std::collections::HashSet;
+use typedb_driver::TypeDBDriver;
 
 // Re-export the main function
 pub use contradictory_instructions::find_inconsistent_instructions;
@@ -13,9 +15,11 @@ pub use contradictory_instructions::find_inconsistent_instructions;
 /// ASSUMES: IDs have been replaced with PIDs.
 /// Otherwise two org nodes might refer to the same skg node,
 /// yet appear not to.
-pub fn find_buffer_errors_for_saving (
-  trees: &[Tree<OrgNode>]
-) -> Vec<Buffer_Cannot_Be_Saved> {
+pub async fn find_buffer_errors_for_saving (
+  trees: &[Tree<OrgNode>],
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<Vec<Buffer_Cannot_Be_Saved>, Box<dyn std::error::Error>> {
   let mut errors: Vec<Buffer_Cannot_Be_Saved> = Vec::new();
   { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_ids, problematic_defining_ids) =
@@ -28,13 +32,19 @@ pub fn find_buffer_errors_for_saving (
         errors.push(
           Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id));
       }} }
+  { // merge validation
+    let merge_errors: Vec<String> =
+      validate_merge_requests(trees, config, driver).await?;
+    for error_msg in merge_errors {
+      errors.push(
+        Buffer_Cannot_Be_Saved::Other(error_msg)); }}
   { // other kinds of error
     for tree in trees {
       validate_node_and_children (
         tree.root(),
         None, // because a root has no parent
         &mut errors); }}
-  errors }
+  Ok(errors) }
 
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children (
