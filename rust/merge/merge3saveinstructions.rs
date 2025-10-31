@@ -1,44 +1,44 @@
 use crate::file_io::read_node;
-use crate::types::{Merge3SaveInstructions, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
+use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
 use crate::util::path_from_pid;
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Creates Merge3SaveInstructions for merge operations from an orgnode forest.
+/// Creates MergeInstructionTriples from an orgnode forest.
 ///
-/// For each node with a merge instruction, this creates a Merge3SaveInstructions:
+/// For each node with a merge instruction, this creates a MergeInstructionTriple:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - deleted_acquiree: acquiree marked for deletion
 ///
 /// TODO: This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
-pub async fn saveinstructions_from_the_merges_in_an_orgnode_forest(
+pub async fn instructiptriples_from_the_merges_in_an_orgnode_forest(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
   _driver: &TypeDBDriver,
-) -> Result<Vec<Merge3SaveInstructions>, Box<dyn Error>> {
-  let mut merge_instructions: Vec<Merge3SaveInstructions> = Vec::new();
+) -> Result<Vec<MergeInstructionTriple>, Box<dyn Error>> {
+  let mut merge_instructions: Vec<MergeInstructionTriple> = Vec::new();
 
   // Walk the forest to find nodes with merge requests
   for tree in forest {
     for edge in tree.root().traverse() {
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let node: &OrgNode = node_ref.value();
-        let node_merge_instructions : Vec<Merge3SaveInstructions> =
+        let node_merge_instructions : Vec<MergeInstructionTriple> =
           saveinstructions_from_the_merge_in_a_node(
             node, config)?;
         merge_instructions.extend(node_merge_instructions); }} }
   Ok(merge_instructions) }
 
-/// Processes merge requests in a single OrgNode and returns Merge3SaveInstructions.
+/// Processes merge requests in a single OrgNode and returns MergeInstructionTriple.
 fn saveinstructions_from_the_merge_in_a_node(
   node: &OrgNode,
   config: &SkgConfig,
-) -> Result<Vec<Merge3SaveInstructions>, Box<dyn Error>> {
-  let mut merge_instructions: Vec<Merge3SaveInstructions> = Vec::new();
+) -> Result<Vec<MergeInstructionTriple>, Box<dyn Error>> {
+  let mut merge_instructions: Vec<MergeInstructionTriple> = Vec::new();
 
   // Check if this node has merge requests
   for request in &node.metadata.code.nodeRequests {
@@ -64,9 +64,9 @@ fn saveinstructions_from_the_merge_in_a_node(
           &acquiree_from_disk,
           &acquiree_text_preserver);
 
-      { // Create Merge3SaveInstructions struct
+      { // Create MergeInstructionTriple struct
         merge_instructions.push(
-          Merge3SaveInstructions {
+          MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
               NodeSaveAction { indefinitive: false,
@@ -85,7 +85,8 @@ fn saveinstructions_from_the_merge_in_a_node(
 /// Computes the updated acquirer node with all fields properly merged.
 /// Returns a new SkgNode with:
 /// - Combined IDs from both nodes
-/// - contains: [acquiree_text_preserver] + acquirer's + acquiree's contents
+/// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
+///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
 /// - Filtered hides_from_its_subscriptions (can't hide your own content)
 fn compute_updated_acquirer(
@@ -104,13 +105,25 @@ fn compute_updated_acquirer(
     if !updated_acquirer.ids.contains(id) {
       updated_acquirer.ids.push(id.clone( )); }}
 
-  // Update contains: [acquiree_text_preserver] + acquirer's old + acquiree's old
+  // Update contains: [acquiree_text_preserver] + acquirer's old + (filtered) acquiree's old
+  // Filtered: remove from acquiree's contents anything already in acquirer's contents
   let mut new_contains: Vec<ID> = vec![acquiree_text_preserver_id.clone()];
   if let Some(acquirer_contains) = &acquirer_from_disk.contains {
     new_contains.extend(acquirer_contains.clone()); }
-  if let Some(acquiree_contains) = &acquiree_from_disk.contains {
-    new_contains.extend(acquiree_contains.clone()); }
-  updated_acquirer.contains = Some(new_contains.clone());
+
+  { // Filter out acquiree contents already in acquirer's.
+    let acquirer_contains_set: HashSet<ID> = (
+      acquirer_from_disk . contains . as_ref()
+        . map( |v| v.iter().cloned().collect() )
+        . unwrap_or_default () );
+    if let Some(acquiree_contains) = &acquiree_from_disk.contains {
+      let filtered_acquiree_contents: Vec<ID> = acquiree_contains
+        .iter()
+        .filter(|id| !acquirer_contains_set.contains(id))
+        .cloned()
+        .collect();
+      new_contains.extend(filtered_acquiree_contents); }
+    updated_acquirer.contains = Some(new_contains.clone() ); }
 
   // Compute acquirer_final_contains for filtering hides_from_its_subscriptions
   let acquirer_final_contains: HashSet<ID> =

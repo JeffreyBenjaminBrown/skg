@@ -1,4 +1,4 @@
-use crate::types::{Merge3SaveInstructions, SkgNode, ID};
+use crate::types::{MergeInstructionTriple, SkgNode, ID};
 use crate::typedb::nodes::create_node;
 use crate::typedb::relationships::create_relationships_from_node;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
@@ -8,12 +8,12 @@ use std::error::Error;
 use typedb_driver::{TypeDBDriver, Transaction, TransactionType};
 use typedb_driver::answer::QueryAnswer;
 
-/// Merges nodes in TypeDB by applying Merge3SaveInstructions.
+/// Merges nodes in TypeDB by applying MergeInstructionTriple.
 /// All merges are batched in a single transaction.
 pub(super) async fn merge_nodes_in_typedb (
   db_name            : &str,
   driver             : &TypeDBDriver,
-  merge_instructions : &[Merge3SaveInstructions],
+  merge_instructions : &[MergeInstructionTriple],
 ) -> Result < (), Box<dyn Error> > {
   if merge_instructions.is_empty() {
     return Ok (( )); }

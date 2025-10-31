@@ -8,7 +8,7 @@ This commit implements node merging functionality for the skg knowledge graph sy
 ### New Module: rust/merge.rs
 - Main merge module with three submodules: typedb.rs, fs.rs, tantivy.rs
 - Entry point function: `merge_nodes_in_graph` - coordinates merging across all three systems
-- Helper function: `saveinstructions_from_the_merges_in_an_orgnode_forest` - generates SaveInstructions from merge requests
+- Helper function: `instructiptriples_from_the_merges_in_an_orgnode_forest` - generates SaveInstructions from merge requests
 
 ### Type System Changes (rust/types/skgnode.rs)
 

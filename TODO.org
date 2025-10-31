@@ -4,7 +4,7 @@
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
 *** ONGOING dedup on merge
-**** ONGOING test first
+**** DONE test first
      Thanks for mentioning dedup!
      Let's write a failing test for that.
 
@@ -18,10 +18,10 @@
      is not present.
 
      If you need clarification, please ask; otherwise, go!
-**** implement
+**** ONGOING implement
      In merge_nodes_in graph, we need deduplication.
      Sufficient would be the following:
-     Recall that we generate a Merge3SaveInstructions for each merge.
+     Recall that we generate a MergeInstructionTriple for each merge.
      When we do that, the SkgNode representing the acquiree
      should have stripped from its contents
      any node in the acquirer's contents.
@@ -42,7 +42,7 @@
 **** neither partner can be toDelete
 *** use them
 **** use these
-     saveinstructions_from_the_merges_in_an_orgnode_forest
+     instructiptriples_from_the_merges_in_an_orgnode_forest
      merge_nodes_in_graph
 *** document in comments
 **** three saveinstructions per merge

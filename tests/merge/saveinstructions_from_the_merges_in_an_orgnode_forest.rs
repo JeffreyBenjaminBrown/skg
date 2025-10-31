@@ -1,5 +1,5 @@
 use indoc::indoc;
-use skg::merge::saveinstructions_from_the_merges_in_an_orgnode_forest;
+use skg::merge::instructiptriples_from_the_merges_in_an_orgnode_forest;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::ID;
@@ -20,14 +20,14 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
                 let trees = org_to_uninterpreted_nodes(input)?;
                 let merge_instructions =
-                    saveinstructions_from_the_merges_in_an_orgnode_forest(&trees, config, driver)
+                    instructiptriples_from_the_merges_in_an_orgnode_forest(&trees, config, driver)
                         .await?;
 
-                // Should produce exactly 1 Merge3SaveInstructions
+                // Should produce exactly 1 MergeInstructionTriple
                 assert_eq!(
                     merge_instructions.len(),
                     1,
-                    "Expected 1 Merge3SaveInstructions"
+                    "Expected 1 MergeInstructionTriple"
                 );
 
                 // Get the single merge instruction

@@ -1,12 +1,12 @@
 use crate::file_io::write_node;
-use crate::types::{Merge3SaveInstructions, SkgConfig, SkgNode};
+use crate::types::{MergeInstructionTriple, SkgConfig, SkgNode};
 use crate::util::path_from_pid;
 use std::error::Error;
 
-/// Merges nodes in filesystem by applying Merge3SaveInstructions.
+/// Merges nodes in filesystem by applying MergeInstructionTriple.
 pub(super) fn merge_nodes_in_fs (
   config             : SkgConfig,
-  merge_instructions : &[Merge3SaveInstructions],
+  merge_instructions : &[MergeInstructionTriple],
 ) -> Result < (), Box<dyn Error> > {
   if merge_instructions.is_empty() {
     return Ok (( )); }
