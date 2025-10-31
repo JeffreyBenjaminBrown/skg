@@ -2,8 +2,10 @@ mod typedb;
 mod fs;
 mod tantivy;
 mod mergeInstructionTriple;
+mod validate_merge;
 
 pub use mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
+pub use validate_merge::validate_merge_requests;
 
 use crate::types::{MergeInstructionTriple, SkgConfig};
 use std::error::Error;
