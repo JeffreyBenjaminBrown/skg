@@ -41,7 +41,8 @@ async fn merge_one_node_in_typedb(
 
   { // Reroute relationships.
     reroute_contains(tx, acquirer_id, acquiree_id).await?;
-    reroute_hyperlinks(tx, acquirer_id, acquiree_id).await?;
+    reroute_hyperlinks(
+      tx, acquirer_id, acquiree_id, acquiree_text_preserver).await?;
     reroute_subscribes(tx, acquirer_id, acquiree_id).await?;
     reroute_hides(
       // PITFALL: Must happen after rerouting 'contains',
@@ -325,30 +326,48 @@ async fn reroute_hides(
   Ok(())
 }
 
-/// Reroute hyperlinks_to relationships (incoming only).
-/// IMPORTANT: We do NOT reroute outbound hyperlinks (where acquiree is source) because
-/// those come from the acquiree's body text, which goes to acquiree_text_preserver.
-/// We only reroute incoming hyperlinks (where acquiree is dest).
+/// Reroute hyperlinks_to relationships.
+/// - Links from (sourced from) acquiree are now from preserver
+/// - Links to (targeting) acquiree are now to acquirer
 async fn reroute_hyperlinks(
   tx: &Transaction,
   acquirer_id: &ID,
   acquiree_id: &ID,
+  acquiree_text_preserver: &SkgNode,
 ) -> Result<(), Box<dyn Error>> {
+  let preserver_id : &ID =
+    &acquiree_text_preserver.ids[0];
 
-  // Acquiree was dest → acquirer is now dest (incoming hyperlinks)
-  let query : String = format!(
+  // Links FROM acquiree → now FROM preserver (outbound hyperlinks)
+  let change_source_to_preserver : String = format!(
+    r#"match
+         $acquiree isa node, has id "{}";
+         $preserver isa node, has id "{}";
+         $dest isa node;
+         $hyperlink_rel isa hyperlinks_to (source: $acquiree,
+                                           dest: $dest);
+       delete $hyperlink_rel;
+       insert
+         $new_hyperlink_rel isa hyperlinks_to (source: $preserver,
+                                               dest: $dest);"#,
+    acquiree_id.as_str(),
+    preserver_id.as_str() );
+
+  // Links TO acquiree → now TO acquirer (incoming hyperlinks)
+  let change_target_to_acquirer : String = format!(
     r#"match
          $acquiree isa node, has id "{}";
          $acquirer isa node, has id "{}";
          $source isa node;
-         $hyperlink_rel isa hyperlinks_to (source: $source, dest: $acquiree);
+         $hyperlink_rel isa hyperlinks_to (source: $source,
+                                           dest: $acquiree);
        delete $hyperlink_rel;
        insert
-         $new_hyperlink_rel isa hyperlinks_to (source: $source, dest: $acquirer);"#,
+         $new_hyperlink_rel isa hyperlinks_to (source: $source,
+                                               dest: $acquirer);"#,
     acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(query).await?;
+    acquirer_id.as_str() );
 
-  Ok(())
-}
+  tx.query(change_source_to_preserver).await?;
+  tx.query(change_target_to_acquirer).await?;
+  Ok (( )) }
