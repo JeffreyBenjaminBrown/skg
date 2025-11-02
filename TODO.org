@@ -4,21 +4,14 @@
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
 *** test validate_merge_requests
-*** use them
-**** use these
-***** validate_merge_requests
-***** instructiontriples_from_the_merges_in_an_orgnode_forest
-***** merge_nodes_in_graph
-**** use them here
-     in buffer_to_save_instructions
 *** document in comments
 **** three saveinstructions per merge
      a merge produces three SaveInstructions:
        create, update, delete
      rather than just updating two nodes.
 **** justify these rules
-***** Acquiree as replaced → DROP
-***** Acquiree as hidden → DROP
+***** Acquiree as replaced -> DROP
+***** Acquiree as hidden -> DROP
 **** when merge requests are processed
 ***** // Merge requests are handled during save, not rebuild/view
       this comment probably needs rewording
@@ -26,6 +19,13 @@
       in 'complete_node_preorder',
       and thus in its (more meaningfully-named) caller
       'completeOrgnodeForest'
+*** DONE use them
+**** use these
+***** validate_merge_requests
+***** instructiontriples_from_the_merges_in_an_orgnode_forest
+***** merge_nodes_in_graph
+**** use them here
+     in buffer_to_save_instructions
 ** AWAITS reading history
    reading upward in the git log as shown by magit
 *** TODO last file completely read
