@@ -20,7 +20,7 @@ pub(super) async fn merge_nodes_in_typedb (
   let tx : Transaction = driver.transaction(
     db_name, TransactionType::Write).await?;
   for merge in merge_instructions {
-    process_merge_in_typedb(
+    merge_one_node_in_typedb (
       &tx,
       &merge.acquiree_text_preserver.0,
       &merge.updated_acquirer.0,
@@ -30,23 +30,27 @@ pub(super) async fn merge_nodes_in_typedb (
   Ok (( )) }
 
 /// Adds the processing for a single merge to the transaction.
-async fn process_merge_in_typedb(
+async fn merge_one_node_in_typedb(
   tx: &Transaction,
-  acquiree_text_preserver: &SkgNode,
-  updated_acquirer: &SkgNode,
-  acquiree: &SkgNode,
+  acquiree_text_preserver : &SkgNode,
+  updated_acquirer        : &SkgNode,
+  acquiree                : &SkgNode,
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id : &ID = &updated_acquirer.ids[0];
   let acquiree_id : &ID = &acquiree.ids[0];
-  reroute_contains(tx, acquirer_id, acquiree_id).await?;
-  reroute_subscribes(tx, acquirer_id, acquiree_id).await?;
-  reroute_overrides(tx, acquirer_id, acquiree_id).await?;
-  reroute_hides(
-    tx, acquirer_id, acquiree_id,
-    ( &updated_acquirer.contains.as_ref().map(
-      |v| v.iter().cloned().collect()).unwrap_or_default()
-    )) . await ?;
-  reroute_hyperlinks(tx, acquirer_id, acquiree_id).await?;
+
+  { // Reroute relationships.
+    reroute_contains(tx, acquirer_id, acquiree_id).await?;
+    reroute_hyperlinks(tx, acquirer_id, acquiree_id).await?;
+    reroute_subscribes(tx, acquirer_id, acquiree_id).await?;
+    reroute_hides(
+      // PITFALL: Must happen after rerouting 'contains',
+      // to know which hide relatinoships to filter out.
+      tx, acquirer_id, acquiree_id,
+      ( &updated_acquirer.contains.as_ref().map(
+        |v| v.iter().cloned().collect()).unwrap_or_default()
+      )) . await ?;
+    reroute_overrides(tx, acquirer_id, acquiree_id).await?; }
 
   // Delete acquiree's extra_ids BEFORE deleting the node
   delete_extra_ids_for_node(tx, acquiree_id).await?;
@@ -57,16 +61,18 @@ async fn process_merge_in_typedb(
        delete $node;"#,
     acquiree_id.as_str()
   )) .await
-    .map_err(|e| format!("Failed to delete acquiree node '{}': {}", acquiree_id.as_str(), e))?;
+    .map_err(|e| format!("Failed to delete acquiree node '{}': {}",
+                         acquiree_id.as_str(), e))?;
 
   // Create the node that saves the acquiree's text
   create_node(acquiree_text_preserver, tx).await?;
 
   // Create relationships for the acquiree_text_preserver (including hyperlinks from its body)
-  create_relationships_from_node(acquiree_text_preserver, tx).await
-    .map_err(|e| format!("Failed to create relationships for acquiree_text_preserver: {}", e))?;
+  create_relationships_from_node( acquiree_text_preserver, tx )
+    . await
+    . map_err ( |e| format!("Failed to create relationships for acquiree_text_preserver: {}", e ))?;
 
-  // Acquirer should contain acquiree_text_preserver
+  // Add acquiree_text_preserver to acquirer's contents.
   let acquiree_text_preserver_id : &ID =
     &acquiree_text_preserver.ids[0];
   let contains_query : String = format!(
@@ -102,7 +108,7 @@ async fn delete_extra_ids_for_node(
   tx: &Transaction,
   node_id: &ID,
 ) -> Result<(), Box<dyn Error>> {
-  // find all extra_ids (as strings) associated with the node
+  // Find all extra_ids (as strings) associated with the node.
   let extra_ids_query : String = format!(
     r#"match
          $node isa node, has id "{}";
@@ -111,7 +117,8 @@ async fn delete_extra_ids_for_node(
          $e has id $extra_id_value;
        select $extra_id_value;"#,
     node_id.as_str() );
-  let answer : QueryAnswer = tx.query(extra_ids_query).await?;
+  let answer : QueryAnswer =
+    tx.query ( extra_ids_query ). await ?;
   let mut extra_id_values : Vec<String> = Vec::new();
   let mut rows = answer.into_rows();
   while let Some(row_res) = rows.next().await {
@@ -122,13 +129,13 @@ async fn delete_extra_ids_for_node(
           &concept.to_string());
       extra_id_values.push(extra_id_value); }}
   for extra_id_value in extra_id_values {
+    // Delete each extra_id
     let delete_extra_id_query : String = format!(
-      // Delete each extra_id
       r#"match
            $e isa extra_id, has id "{}";
          delete $e;"#,
       extra_id_value );
-    tx.query(delete_extra_id_query).await?; }
+    tx . query(delete_extra_id_query) . await?; }
   Ok(( )) }
 
 /// Reroute contains relationships (bilateral transfer).
@@ -137,39 +144,34 @@ async fn reroute_contains(
   acquirer_id: &ID,
   acquiree_id: &ID,
 ) -> Result<(), Box<dyn Error>> {
-
-  // Acquiree was container → acquirer is now container
-  let query1 : String = format!(
+  let transferAcquireeContents : String = format!(
     r#"match
          $acquiree isa node, has id "{}";
          $acquirer isa node, has id "{}";
          $c isa node;
-         $contains_rel isa contains (container: $acquiree, contained: $c);
+         $contains_rel isa contains (container: $acquiree,
+                                     contained: $c);
        delete $contains_rel;
        insert
-         $new_contains_rel isa contains (container: $acquirer, contained: $c);"#,
+         $new_contains_rel isa contains (container: $acquirer,
+                                         contained: $c);"#,
     acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(query1).await?;
-
-  // Acquiree was contained → acquirer is now contained
-  let query2 : String = format!(
+    acquirer_id.as_str() );
+  let transferAcquireeContainers : String = format!(
     r#"match
-         $acquiree2 isa node, has id "{}";
-         $acquirer2 isa node, has id "{}";
+         $acquiree isa node, has id "{}";
+         $acquirer isa node, has id "{}";
          $container isa node;
-         $contains_rel2 isa contains (container: $container, contained: $acquiree2);
-       delete $contains_rel2;
+         $contains_rel isa contains (container: $container, contained: $acquiree);
+       delete $contains_rel;
        insert
-         $new_contains_rel2 isa contains (container: $container, contained: $acquirer2);"#,
+         $new_contains_rel isa contains (container: $container, contained: $acquirer);"#,
     acquiree_id.as_str(),
     acquirer_id.as_str()
   );
-  tx.query(query2).await?;
-
-  Ok(())
-}
+  tx.query(transferAcquireeContents).await?;
+  tx.query(transferAcquireeContainers).await?;
+  Ok (( )) }
 
 /// Reroute subscribes relationships (bilateral transfer).
 async fn reroute_subscribes(

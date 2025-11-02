@@ -12,7 +12,7 @@ use std::error::Error;
 use ::tantivy::Index;
 use typedb_driver::TypeDBDriver;
 
-/// Merges nodes in the graph by applying MergeInstructionTriple.
+/// Applies the MergeInstructionTriples to the graph.
 /// Updates three systems in order:
 ///   1) TypeDB
 ///   2) Filesystem
@@ -25,11 +25,9 @@ pub async fn merge_nodes_in_graph (
   tantivy_index      : &Index,
   driver             : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-
   println!(
     "Merging nodes in TypeDB, FS, and Tantivy, in that order ..." );
   let db_name : &str = &config.db_name;
-
   { println!( "1) Merging in TypeDB database '{}' ...", db_name );
     typedb::merge_nodes_in_typedb (
       db_name,

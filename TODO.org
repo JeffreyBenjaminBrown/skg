@@ -3,6 +3,31 @@
 *** ask.org
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
+*** reroute_hyperlinks is buggy
+    Should be: Links from acquiree are now from preserver.
+    Links to acquiree are now to acquirer.
+*** write some functions to generalize these
+    reroute_contains
+    reroute_subscribes
+    reroute_overrides
+    reroute_hides
+
+    One function would be 'transfer', the other 'drop'.
+
+    Both should take a few novel arguments: relation name,
+    acquirer role, other role.
+    Each of the above consists of two phases.
+    This new function can substitute for most of them.
+
+    Style it like reroute_contains, which I've updated the names in.
+*** bug in merge_one_node_in_typedb
+    'for extra_id_value in &acquiree.ids {'
+    is adding every id as an extra id.
+    It should skip the first.
+*** merge_nodes_in_tantivy has to mutate, not clone, the index
+    Maybe this means TantivyIndex needs an address
+    rather than a tantivy::Index.
+*** three_merged_skgnodes should dedup all merged lists
 *** test validate_merge_requests
 *** document in comments
 **** three saveinstructions per merge
@@ -19,6 +44,10 @@
       in 'complete_node_preorder',
       and thus in its (more meaningfully-named) caller
       'completeOrgnodeForest'
+*** remove
+    claude-thoughts/
+    validation-for-merge/
+    review.org
 *** DONE use them
 **** use these
 ***** validate_merge_requests

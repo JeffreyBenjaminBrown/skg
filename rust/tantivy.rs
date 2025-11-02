@@ -164,7 +164,9 @@ pub fn update_index_from_saveinstructions (
 
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-  { // Delete all IDs from the index. (Some will come back next.)
+  { // Delete all IDs in the SaveInstructions from the index --
+    // be they toDelete or otherwise.
+    // (Those that aren't will come back in the next step.)
     for (node, _action) in instructions {
       if !node.ids.is_empty() {
         let primary_id: &ID = &node.ids[0];
@@ -181,10 +183,10 @@ pub fn update_index_from_saveinstructions (
             node, tantivy_index )?;
         for document in documents {
           writer.add_document (document)?;
-          processed_count += 1; } } }
+          processed_count += 1; }} }
     commit_with_status(
       &mut writer, processed_count, "Updated")?;
-    Ok (processed_count) } }
+    Ok (processed_count) }}
 
 
 /* -------------------- Private helpers -------------------- */

@@ -663,36 +663,6 @@ fn verify_tantivy_after_merge_1_into_2(
 
   Ok (( )) }
 
-/// Clean up acquiree_text_preserver files (UUID-named .skg files) from fixtures directory
-fn cleanup_acquiree_text_preserver_files(fixtures_path: &PathBuf) -> std::io::Result<()> {
-  // UUID pattern: 8-4-4-4-12 hex digits (e.g., "384a7a6a-6f5d-4d7d-b523-1b459bc1463a.skg")
-  for entry in fs::read_dir(fixtures_path)? {
-    let entry = entry?;
-    let path = entry.path();
-
-    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-      // Check if filename matches UUID pattern: 8-4-4-4-12.skg
-      if filename.ends_with(".skg") {
-        let stem = filename.trim_end_matches(".skg");
-        let parts: Vec<&str> = stem.split('-').collect();
-
-        // UUID has exactly 5 parts with specific lengths: 8-4-4-4-12
-        if parts.len() == 5
-          && parts[0].len() == 8
-          && parts[1].len() == 4
-          && parts[2].len() == 4
-          && parts[3].len() == 4
-          && parts[4].len() == 12
-          && parts.iter().all(
-            |p| p.chars().all(
-              |c| c.is_ascii_hexdigit()))
-        { println!("Cleaning up acquiree_text_preserver file: {}",
-                   filename);
-          if let Err(e) = fs::remove_file(&path) {
-            if e.kind() != std::io::ErrorKind::NotFound {
-              return Err(e.into()); }} }} }}
-  Ok (( )) }
-
 /// Recursively copy a directory
 fn copy_dir_all(
   src: &PathBuf,

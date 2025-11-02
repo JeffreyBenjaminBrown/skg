@@ -12,7 +12,8 @@ struct MergeValidationData<'a> {
   to_delete_ids: HashSet<ID>, }
 
 /// Validates merge requests in an orgnode forest.
-/// Returns a vector of validation error messages (empty if all valid).
+/// Returns a vector of validation error messages,
+/// which is empty if all are valid.
 pub async fn validate_merge_requests(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
