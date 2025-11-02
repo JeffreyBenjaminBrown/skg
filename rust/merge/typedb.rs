@@ -53,9 +53,8 @@ async fn merge_one_node_in_typedb(
       )) . await ?;
     reroute_overrides(tx, acquirer_id, acquiree_id).await?; }
 
-  // Delete acquiree's extra_ids BEFORE deleting the node
-  delete_extra_ids_for_node(tx, acquiree_id).await?;
-
+  delete_extra_ids_for_node(
+    tx, acquiree_id).await?;
   tx.query( format!( // Delete acquiree node
     r#"match
          $node isa node, has id "{}";
@@ -88,8 +87,9 @@ async fn merge_one_node_in_typedb(
   tx.query(contains_query).await?;
 
   for extra_id_value in &acquiree.ids {
-    // Add extra_ids to acquirer (all acquiree IDs become extra_ids).
-    // This must happen AFTER deleting the acquiree's extra_ids.
+    // Add extra_ids to acquirer.
+    // PITFALL: Even the acquiree's PID becomomes an acquirer extra_id.
+    // PITFALL: Should happen after deleting acquiree's extra_ids.
     let query : String = format!(
       r#"
       match

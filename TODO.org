@@ -3,7 +3,6 @@
 *** ask.org
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
-*** rust/types/orgnode.rs has types declared after implementations
 *** write some functions to generalize these
     reroute_contains
     reroute_subscribes
@@ -18,10 +17,6 @@
     This new function can substitute for most of them.
 
     Style it like reroute_contains, which I've updated the names in.
-*** bug in merge_one_node_in_typedb
-    'for extra_id_value in &acquiree.ids {'
-    is adding every id as an extra id.
-    It should skip the first.
 *** merge_nodes_in_tantivy has to mutate, not clone, the index
     Maybe this means TantivyIndex needs an address
     rather than a tantivy::Index.
