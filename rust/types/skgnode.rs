@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 use super::misc::ID;
+use crate::util::option_vec_is_empty_or_none;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SkgNode {
@@ -33,18 +34,6 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
 }
-
-//
-// Helper functions
-//
-
-fn option_vec_is_empty_or_none<T> (
-  option_vec: &Option<Vec<T>>
-) -> bool {
-  match option_vec {
-    None => true,
-    Some(vec) => vec.is_empty(), }}
-
 
 //
 // Functions

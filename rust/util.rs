@@ -3,6 +3,13 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
 
+pub fn option_vec_is_empty_or_none<T> (
+  option_vec: &Option<Vec<T>>
+) -> bool {
+  match option_vec {
+    None => true,
+    Some(vec) => vec.is_empty(), }}
+
 pub fn path_from_pid (
   config : &SkgConfig,
   pid    : ID,

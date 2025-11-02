@@ -1,44 +1,7 @@
-use super::{ID, SkgNode, NodeSaveAction};
+use super::ID;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
-
-pub type SaveInstruction = (SkgNode, NodeSaveAction);
-
-/// When an 'acquiree' merges into an 'acquirer',
-/// we need three SaveInstructions.
-#[derive(Debug, Clone)]
-pub struct MergeInstructionTriple {
-  pub acquiree_text_preserver : SaveInstruction, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveInstruction, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
-  pub acquiree_to_delete      : SaveInstruction,
-}
-
-impl MergeInstructionTriple {
-  pub fn to_vec (
-    &self
-  ) -> Vec<SaveInstruction> {
-    vec![
-      self.acquiree_text_preserver.clone(),
-      self.updated_acquirer.clone(),
-      self.acquiree_to_delete.clone(),
-    ] }
-
-  pub fn acquirer_id (
-    &self
-  ) -> &ID {
-    &self.updated_acquirer.0.ids[0] }
-
-  pub fn acquiree_id (
-    &self
-  ) -> &ID {
-    &self.acquiree_to_delete.0.ids[0] }
-
-  pub fn preserver_id (
-    &self
-  ) -> &ID {
-    &self.acquiree_text_preserver.0.ids[0] }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgNode {
@@ -109,6 +72,7 @@ pub enum NodeRequest {
   SourcewardView,
   Merge(ID),  // Request to merge another node into this one
 }
+
 
 //
 // Implementations
