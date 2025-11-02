@@ -48,7 +48,8 @@ fn saveinstructions_from_the_merge_in_a_node(
     Vec::new();
   for request in &node.metadata.code.nodeRequests {
     if let NodeRequest::Merge(acquiree_id) = request {
-      let acquirer_id = node.metadata.id.as_ref()
+      let acquirer_id : &ID =
+        node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
       let acquirer_from_disk: SkgNode =
         // TODO: If this fails, it should report how.

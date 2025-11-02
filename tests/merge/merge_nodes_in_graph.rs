@@ -36,7 +36,8 @@ fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
   // Copy fixtures to temp directory
   copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
 
-  let result = run_with_test_db(
+  let result : Result<(), Box<dyn Error>> =
+    run_with_test_db(
     "skg-test-merge-2-into-1",
     "/tmp/merge-test-2-into-1-fixtures",
     "/tmp/tantivy-test-merge-2-into-1",
@@ -320,7 +321,8 @@ fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
   // Copy fixtures to temp directory
   copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
 
-  let result = run_with_test_db(
+  let result : Result<(), Box<dyn Error>> =
+    run_with_test_db(
     "skg-test-merge-1-into-2",
     "/tmp/merge-test-1-into-2-fixtures",
     "/tmp/tantivy-test-merge-1-into-2",
@@ -670,8 +672,8 @@ fn copy_dir_all(
 ) -> std::io::Result<()> {
   fs::create_dir_all(dst)?;
   for entry in fs::read_dir(src)? {
-    let entry = entry?;
-    let ty = entry.file_type()?;
+    let entry : fs::DirEntry = entry?;
+    let ty : fs::FileType = entry.file_type()?;
     if ty.is_dir() {
       copy_dir_all(
         &entry.path(),

@@ -6,6 +6,7 @@
 *** reroute_hyperlinks is buggy
     Should be: Links from acquiree are now from preserver.
     Links to acquiree are now to acquirer.
+*** rust/types/orgnode.rs has types declared after implementations
 *** write some functions to generalize these
     reroute_contains
     reroute_subscribes

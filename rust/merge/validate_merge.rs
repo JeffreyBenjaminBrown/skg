@@ -1,3 +1,14 @@
+/* Validation rules:
+     - Both merge partners must have IDs.
+       - Those two IDs must represent distinct nodes.
+       - Those two IDs must already be in the DB.
+     - Neither merge partner can be marked for deletion.
+     - Neither merge partner can be an Alias or AliasCol.
+     - Monogamy:
+       - No node can be an acquirer and an acquiree.
+       - No node can be involved in more than one merge.
+*/
+
 use crate::types::{OrgNode, RelToParent, ID, NodeRequest, SkgConfig};
 use crate::typedb::util::pid_from_id;
 use ego_tree::Tree;
@@ -6,10 +17,10 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 struct MergeValidationData<'a> {
-  acquirer_nodes: Vec<&'a OrgNode>,
-  acquirer_to_acquirees: HashMap<ID, HashSet<ID>>,
-  acquiree_to_acquirers: HashMap<ID, HashSet<ID>>,
-  to_delete_ids: HashSet<ID>, }
+  acquirer_orgnodes     : Vec<&'a OrgNode>,
+  acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
+  acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
+  to_delete_ids         : HashSet<ID>, }
 
 /// Validates merge requests in an orgnode forest.
 /// Returns a vector of validation error messages,
@@ -20,9 +31,11 @@ pub async fn validate_merge_requests(
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
-  let collections = collect_merge_validation_data(forest);
-  for node in collections.acquirer_nodes {
-    let acquirer_id = node.metadata.id.as_ref()
+  let collections : MergeValidationData =
+    collect_merge_validation_data ( forest );
+  for node in collections.acquirer_orgnodes {
+    let acquirer_id : &ID =
+      node.metadata.id.as_ref()
       .ok_or("Acquirer node must have an ID")?;
     if node.metadata.code.relToParent == RelToParent::Alias
       || node.metadata.code.relToParent == RelToParent::AliasCol {
@@ -33,23 +46,25 @@ pub async fn validate_merge_requests(
         continue; }
     for request in &node.metadata.code.nodeRequests {
       if let NodeRequest::Merge(acquiree_id) = request {
-        let pair_errors = validate_merge_pair(
-          config,
-          driver,
-          acquirer_id,
-          acquiree_id,
-          &collections.to_delete_ids ). await?;
+        let pair_errors : Vec<String> =
+          validate_merge_pair(
+            config,
+            driver,
+            acquirer_id,
+            acquiree_id,
+            &collections.to_delete_ids ). await?;
         errors.extend(pair_errors); } }}
-  let monogamy_errors = validate_monogamy(
-    &collections.acquirer_to_acquirees,
-    &collections.acquiree_to_acquirers );
+  let monogamy_errors : Vec<String> =
+    validate_monogamy(
+      &collections.acquirer_to_acquirees,
+      &collections.acquiree_to_acquirers );
   errors.extend(monogamy_errors);
   Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
   forest: &'a [Tree<OrgNode>],
 ) -> MergeValidationData<'a> {
-  let mut acquirer_nodes: Vec<&OrgNode> =
+  let mut acquirer_orgnodes: Vec<&OrgNode> =
     Vec::new();
   let mut acquirer_to_acquirees: HashMap<ID, HashSet<ID>> =
     HashMap::new();
@@ -69,7 +84,7 @@ fn collect_merge_validation_data<'a>(
           for request in &orgnode.metadata.code.nodeRequests {
             if let NodeRequest::Merge(acquiree_id) = request {
               if let Some(ref acquirer_id) = orgnode.metadata.id {
-                acquirer_nodes.push( // Mutate!
+                acquirer_orgnodes.push( // Mutate!
                   orgnode);
                 acquirer_to_acquirees // Mutate!
                   .entry(acquirer_id.clone())
@@ -79,11 +94,10 @@ fn collect_merge_validation_data<'a>(
                   .entry(acquiree_id.clone())
                   .or_insert_with(HashSet::new)
                   .insert(acquirer_id.clone()); }} }} }} }
-  MergeValidationData {
-    acquirer_nodes,
-    acquirer_to_acquirees,
-    acquiree_to_acquirers,
-    to_delete_ids, }}
+  MergeValidationData { acquirer_orgnodes,
+                        acquirer_to_acquirees,
+                        acquiree_to_acquirers,
+                        to_delete_ids, }}
 
 /// Validates a single merge pair (acquirer + acquiree).
 /// Returns a vector of validation errors for this pair.
@@ -96,24 +110,25 @@ async fn validate_merge_pair(
   to_delete_ids: &HashSet<ID>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
-  let acquirer_pid = match pid_from_id(
-    &config.db_name, driver, acquirer_id).await?
-  { Some(pid) => pid,
-    None => {
-      errors.push(format!(
-        "Acquirer ID '{}' not found in database",
-        acquirer_id.as_str() ));
-      return Ok(errors);
-    }};
-  let acquiree_pid = match pid_from_id(
-    &config.db_name, driver, acquiree_id).await?
-  { Some(pid) => pid,
-    None => {
-      errors.push(format!(
-        "Acquiree ID '{}' (requested by '{}') not found in database",
-        acquiree_id.as_str(),
-        acquirer_id.as_str() ));
-      return Ok(errors); }};
+  let acquirer_pid : ID = (
+    match pid_from_id (
+      &config.db_name, driver, acquirer_id).await?
+    { Some(pid) => pid,
+      None      => {
+        errors.push(format!(
+          "Acquirer ID '{}' not found in database",
+          acquirer_id.as_str() ));
+        return Ok(errors); }} );
+  let acquiree_pid : ID = (
+    match pid_from_id(
+      &config.db_name, driver, acquiree_id).await?
+    { Some(pid) => pid,
+      None => {
+        errors.push(format!(
+          "Acquiree ID '{}' (requested by '{}') not found in database",
+          acquiree_id.as_str(),
+          acquirer_id.as_str() ));
+        return Ok(errors); }} );
   if acquirer_pid == acquiree_pid {
     errors.push(format!(
       "Self-merge detected: acquirer '{}' and acquiree '{}' resolve to the same node (PID: '{}')",
