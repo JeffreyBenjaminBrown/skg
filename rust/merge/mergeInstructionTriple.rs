@@ -10,7 +10,7 @@ use typedb_driver::TypeDBDriver;
 /// this creates a MergeInstructionTriple:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
-/// - deleted_acquiree: acquiree marked for deletion
+/// - acquiree_to_delete: acquiree marked for deletion
 ///
 /// TODO ? This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
@@ -73,7 +73,7 @@ fn saveinstructions_from_the_merge_in_a_node(
               updated_acquirer,
               NodeSaveAction { indefinitive: false,
                                toDelete: false } ),
-            deleted_acquiree : (
+            acquiree_to_delete : (
               acquiree_from_disk,
               NodeSaveAction { indefinitive: false,
                                toDelete: true } ), } ); }} }

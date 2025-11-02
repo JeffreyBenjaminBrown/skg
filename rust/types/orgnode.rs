@@ -5,16 +5,13 @@ use std::str::FromStr;
 
 pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
-/// Represents a complete merge operation involving three SaveInstructions.
-/// When node A merges with node B (acquires B):
-/// - acquiree_text_preserver: new node preserving B's original text
-/// - updated_acquirer: A with B's IDs, contents, and relationships merged in
-/// - deleted_acquiree: B marked for deletion
+/// When an 'acquiree' merges into an 'acquirer',
+/// we need three SaveInstructions.
 #[derive(Debug, Clone)]
 pub struct MergeInstructionTriple {
-  pub acquiree_text_preserver : SaveInstruction,
-  pub updated_acquirer : SaveInstruction,
-  pub deleted_acquiree : SaveInstruction,
+  pub acquiree_text_preserver : SaveInstruction, // new node with acquiree's title and body
+  pub updated_acquirer        : SaveInstruction, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
+  pub acquiree_to_delete      : SaveInstruction,
 }
 
 impl MergeInstructionTriple {
@@ -24,7 +21,7 @@ impl MergeInstructionTriple {
     vec![
       self.acquiree_text_preserver.clone(),
       self.updated_acquirer.clone(),
-      self.deleted_acquiree.clone(),
+      self.acquiree_to_delete.clone(),
     ] }
 
   pub fn acquirer_id (
@@ -35,7 +32,7 @@ impl MergeInstructionTriple {
   pub fn acquiree_id (
     &self
   ) -> &ID {
-    &self.deleted_acquiree.0.ids[0] }
+    &self.acquiree_to_delete.0.ids[0] }
 
   pub fn preserver_id (
     &self

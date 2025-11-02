@@ -39,7 +39,7 @@ When merge request is found in orgnode:
 1. **Generate SaveInstructions** (3 per merge):
    - acquiree_text_preserver: new node containing acquiree's title and body
    - updated_acquirer: acquirer with extra IDs and combined contents
-   - deleted_acquiree: acquiree marked for deletion
+   - acquiree_to_delete: acquiree marked for deletion
 
 2. **Execute in 3 phases** (order matters!):
    - Phase 1: TypeDB - update graph relationships and entities
@@ -63,7 +63,7 @@ PITFALL: If phase 2 or 3 fails after phase 1 succeeds, system state is invalid.
 - hides_from_its_subscriptions: combined later in fs.rs (with filtering)
 - overrides_view_of: combined later in fs.rs
 
-#### deleted_acquiree
+#### acquiree_to_delete
 - Original acquiree node with toDelete flag set
 
 ## TypeDB Merge Algorithm (rust/merge/typedb.rs)
@@ -196,7 +196,7 @@ Test fixtures in tests/merge/merge_nodes_in_graph/fixtures/:
 
 4. **Categorization pattern**:
    - SaveInstructions identified by acquiree_text_preserver having title starting with "MERGED-"
-   - Then next two instructions are updated_acquirer and deleted_acquiree
+   - Then next two instructions are updated_acquirer and acquiree_to_delete
    - This pattern repeated for multiple merges
 
 ## Questions/Potential Issues

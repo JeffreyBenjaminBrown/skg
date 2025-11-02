@@ -19,7 +19,7 @@ pub(super) fn merge_nodes_in_fs (
     let updated_acquirer : &SkgNode =
       &merge.updated_acquirer.0;
     let acquiree : &SkgNode =
-      &merge.deleted_acquiree.0;
+      &merge.acquiree_to_delete.0;
 
     { // Write acquiree_text_preserver to disk
       let acquiree_text_preserver_path : String =

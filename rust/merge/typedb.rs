@@ -24,7 +24,7 @@ pub(super) async fn merge_nodes_in_typedb (
       &tx,
       &merge.acquiree_text_preserver.0,
       &merge.updated_acquirer.0,
-      &merge.deleted_acquiree.0,
+      &merge.acquiree_to_delete.0,
     ).await?; }
   tx.commit().await?;
   Ok (( )) }

@@ -31,10 +31,6 @@
 *** three_merged_skgnodes should dedup all merged lists
 *** test validate_merge_requests
 *** document in comments
-**** three saveinstructions per merge
-     a merge produces three SaveInstructions:
-       create, update, delete
-     rather than just updating two nodes.
 **** justify these rules
 ***** Acquiree as replaced -> DROP
 ***** Acquiree as hidden -> DROP
