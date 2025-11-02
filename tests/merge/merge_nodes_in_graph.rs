@@ -109,14 +109,14 @@ async fn test_merge_2_into_1_impl(
     tantivy::Index::create_in_dir(
       &config.tantivy_folder, tantivy_schema)?;
   let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
-    index: std::sync::Arc::new(tantivy_index.clone()),
+    index: std::sync::Arc::new(tantivy_index),
     id_field,
     title_or_alias_field, };
 
   merge_nodes_in_graph(
     merge_instructions.clone(),
     config.clone(),
-    &tantivy_index,
+    &tantivy_index_wrapper,
     driver,
   ).await?;
 
@@ -393,14 +393,14 @@ async fn test_merge_1_into_2_impl(
     tantivy::Index::create_in_dir(
       &config.tantivy_folder, tantivy_schema)?;
   let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
-    index: std::sync::Arc::new(tantivy_index.clone()),
+    index: std::sync::Arc::new(tantivy_index),
     id_field,
     title_or_alias_field, };
 
   merge_nodes_in_graph(
     merge_instructions.clone(),
     config.clone(),
-    &tantivy_index,
+    &tantivy_index_wrapper,
     driver,
   ).await?;
 

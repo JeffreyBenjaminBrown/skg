@@ -177,7 +177,7 @@ async fn update_from_and_rerender_buffer (
   merge_nodes_in_graph (
     mergeInstructions,
     config.clone(),
-    &tantivy_index.index,
+    tantivy_index,
     typedb_driver ) . await ?;
 
   let mut errors : Vec < String > = Vec::new ();

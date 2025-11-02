@@ -7,9 +7,8 @@ mod validate_merge;
 pub use mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 pub use validate_merge::validate_merge_requests;
 
-use crate::types::{MergeInstructionTriple, SkgConfig};
+use crate::types::{MergeInstructionTriple, SkgConfig, TantivyIndex};
 use std::error::Error;
-use ::tantivy::Index;
 use typedb_driver::TypeDBDriver;
 
 /// Applies the MergeInstructionTriples to the graph.
@@ -22,7 +21,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn merge_nodes_in_graph (
   merge_instructions : Vec<MergeInstructionTriple>,
   config             : SkgConfig,
-  tantivy_index      : &Index,
+  tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   println!(

@@ -17,11 +17,8 @@
     This new function can substitute for most of them.
 
     Style it like reroute_contains, which I've updated the names in.
-*** merge_nodes_in_tantivy has to mutate, not clone, the index
-    Maybe this means TantivyIndex needs an address
-    rather than a tantivy::Index.
 *** three_merged_skgnodes should dedup all merged lists
-*** test validate_merge_requests
+*** ? test validate_merge_requests
 *** document in comments
 **** justify these rules
 ***** Acquiree as replaced -> DROP
