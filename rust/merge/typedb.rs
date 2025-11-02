@@ -36,22 +36,53 @@ async fn merge_one_node_in_typedb(
   updated_acquirer        : &SkgNode,
   acquiree                : &SkgNode,
 ) -> Result<(), Box<dyn Error>> {
-  let acquirer_id : &ID = &updated_acquirer.ids[0];
-  let acquiree_id : &ID = &acquiree.ids[0];
+  let acquirer_id  : &ID = &updated_acquirer        . ids[0];
+  let acquiree_id  : &ID = &acquiree                . ids[0];
+  let preserver_id : &ID = &acquiree_text_preserver . ids[0];
 
   { // Reroute relationships.
-    reroute_contains(tx, acquirer_id, acquiree_id).await?;
-    reroute_hyperlinks(
-      tx, acquirer_id, acquiree_id, acquiree_text_preserver).await?;
-    reroute_subscribes(tx, acquirer_id, acquiree_id).await?;
-    reroute_hides(
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "contains", "container", "contained" ). await ?;
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "contains", "contained", "container" ). await ?;
+    reroute_relationships_for_merge (
+      tx, acquiree_id, preserver_id,
+      "hyperlinks_to", "source", "dest" ). await ?;
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "hyperlinks_to", "dest", "source" ). await ?;
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "subscribes", "subscriber", "subscribee" ). await ?;
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "subscribes", "subscribee", "subscriber" ). await ?;
+    drop_relationships_for_merge (
+      // Whether the acquiree was hidden from N says nothing about
+      // whether the acquirer should be hidden from N,
+      // since it has information the acquiree did not.
+      // We assume it should not be so hidden.
+      tx, acquiree_id,
+      "hides_from_its_subscriptions", "hidden", "hider" ). await ?;
+    reroute_what_acquiree_hides (
       // PITFALL: Must happen after rerouting 'contains',
       // to know which hide relatinoships to filter out.
       tx, acquirer_id, acquiree_id,
       ( &updated_acquirer.contains.as_ref().map(
         |v| v.iter().cloned().collect()).unwrap_or_default()
       )) . await ?;
-    reroute_overrides(tx, acquirer_id, acquiree_id).await?; }
+    reroute_relationships_for_merge (
+      tx, acquiree_id, acquirer_id,
+      "overrides_view_of", "replacement", "replaced" ). await ?;
+    drop_relationships_for_merge (
+      // If the acquiree was replaced by something else,
+      // we don't know whether the acquirer should be.
+      // It probably shouldn't, since if it were,
+      // the user probably would not be editing it.
+      tx, acquiree_id,
+      "overrides_view_of", "replaced", "replacement" ). await ?; }
 
   delete_extra_ids_for_node(
     tx, acquiree_id).await?;
@@ -64,15 +95,11 @@ async fn merge_one_node_in_typedb(
     .map_err(|e| format!("Failed to delete acquiree node '{}': {}",
                          acquiree_id.as_str(), e))?;
 
-  // Create the node that saves the acquiree's text
   create_node(acquiree_text_preserver, tx).await?;
-
-  // Create relationships for the acquiree_text_preserver (including hyperlinks from its body)
-  create_relationships_from_node( acquiree_text_preserver, tx )
+  create_relationships_from_node(
+    acquiree_text_preserver, tx )
     . await
     . map_err ( |e| format!("Failed to create relationships for acquiree_text_preserver: {}", e ))?;
-
-  // Add acquiree_text_preserver to acquirer's contents.
   let acquiree_text_preserver_id : &ID =
     &acquiree_text_preserver.ids[0];
   let contains_query : String = format!(
@@ -139,160 +166,93 @@ async fn delete_extra_ids_for_node(
     tx . query(delete_extra_id_query) . await?; }
   Ok(( )) }
 
-/// Reroute contains relationships (bilateral transfer).
-async fn reroute_contains(
-  tx: &Transaction,
-  acquirer_id: &ID,
-  acquiree_id: &ID,
-) -> Result<(), Box<dyn Error>> {
-  let transferAcquireeContents : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $acquirer isa node, has id "{}";
-         $c isa node;
-         $contains_rel isa contains (container: $acquiree,
-                                     contained: $c);
-       delete $contains_rel;
-       insert
-         $new_contains_rel isa contains (container: $acquirer,
-                                         contained: $c);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str() );
-  let transferAcquireeContainers : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $acquirer isa node, has id "{}";
-         $container isa node;
-         $contains_rel isa contains (container: $container, contained: $acquiree);
-       delete $contains_rel;
-       insert
-         $new_contains_rel isa contains (container: $container, contained: $acquirer);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(transferAcquireeContents).await?;
-  tx.query(transferAcquireeContainers).await?;
+/// Drops relationships where old_id plays old_role.
+/// This is used when the old node is being merged and we don't want
+/// to preserve certain relationships.
+async fn drop_relationships_for_merge (
+  tx            : &Transaction,
+  old_id        : &ID,
+  relation_name : &str,
+  old_role      : &str,
+  other_role    : &str,
+) -> Result < (), Box<dyn Error> > {
+  let query : String =
+    format! (
+      r#"match
+           $old_node isa node, has id "{}";
+           $other isa node;
+           $rel isa {} ({}: $old_node, {}: $other);
+         delete $rel;"#,
+      old_id.as_str (),
+      relation_name,
+      old_role,
+      other_role );
+  tx.query ( query ). await ?;
   Ok (( )) }
 
-/// Reroute subscribes relationships (bilateral transfer).
-async fn reroute_subscribes(
-  tx: &Transaction,
-  acquirer_id: &ID,
-  acquiree_id: &ID,
-) -> Result<(), Box<dyn Error>> {
+/// Reroutes relationships where old_id plays old_role
+/// to have new_id play that role instead.
+/// Deletes the old relationship and creates a new one.
+async fn reroute_relationships_for_merge (
+  tx            : &Transaction,
+  old_id        : &ID,
+  new_id        : &ID,
+  relation_name : &str,
+  old_role      : &str,
+  other_role    : &str,
+) -> Result < (), Box<dyn Error> > {
+  let query : String =
+    format! (
+      r#"match
+           $old_node isa node, has id "{}";
+           $new_node isa node, has id "{}";
+           $other isa node;
+           $old_rel isa {} ({}: $old_node, {}: $other);
+         delete $old_rel;
+         insert
+           $new_rel isa {} ({}: $new_node, {}: $other);"#,
+      old_id.as_str (),
+      new_id.as_str (),
+      relation_name,
+      old_role,
+      other_role,
+      relation_name,
+      old_role,
+      other_role );
+  tx.query ( query ). await ?;
+  Ok (( )) }
 
-  // Acquiree was subscriber → acquirer is now subscriber
-  let query1 : String = format!(
-    r#"match
-         $acquiree_sub isa node, has id "{}";
-         $acquirer_sub isa node, has id "{}";
-         $s isa node;
-         $sub_rel isa subscribes (subscriber: $acquiree_sub, subscribee: $s);
-       delete $sub_rel;
-       insert
-         $new_sub_rel isa subscribes (subscriber: $acquirer_sub, subscribee: $s);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(query1).await?;
-
-  // Acquiree was subscribee → acquirer is now subscribee
-  let query2 : String = format!(
-    r#"match
-         $acquiree_subee isa node, has id "{}";
-         $acquirer_subee isa node, has id "{}";
-         $s2 isa node;
-         $subee_rel isa subscribes (subscriber: $s2, subscribee: $acquiree_subee);
-       delete $subee_rel;
-       insert
-         $new_subee_rel isa subscribes (subscriber: $s2, subscribee: $acquirer_subee);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(query2).await?;
-
-  Ok(())
-}
-
-/// Reroute overrides_view_of relationships (conditional).
-async fn reroute_overrides(
-  tx: &Transaction,
-  acquirer_id: &ID,
-  acquiree_id: &ID,
-) -> Result<(), Box<dyn Error>> {
-
-  // Acquiree was replacement → acquirer is now replacement (TRANSFER)
-  let query1 : String = format!(
+/// Reroute what the acquiree hides.
+/// Transfer if hidden node not in acquirer's contents.
+/// Otherwise just drop the relationship.
+async fn reroute_what_acquiree_hides (
+  tx                       : &Transaction,
+  acquirer_id              : &ID,
+  acquiree_id              : &ID,
+  acquirer_final_contains  : &HashSet<ID>,
+) -> Result < (), Box<dyn Error> > {
+  drop_relationships_for_merge (
+    tx, acquiree_id,
+    "hides_from_its_subscriptions", "hidden", "hider" ). await ?;
+  let what_acquiree_hides : String = format!(
     r#"match
          $acquiree isa node, has id "{}";
-         $acquirer isa node, has id "{}";
-         $replaced_node isa node;
-         $rel_old isa overrides_view_of (replacement: $acquiree, replaced: $replaced_node);
-       delete $rel_old;
-       insert
-         $rel_new isa overrides_view_of (replacement: $acquirer, replaced: $replaced_node);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str()
-  );
-  tx.query(query1).await?;
-
-  // Acquiree was replaced → DROP (do not recreate)
-  let query2 : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $replacement_node isa node;
-         $rel_drop isa overrides_view_of (replacement: $replacement_node, replaced: $acquiree);
-       delete $rel_drop;"#,
-    acquiree_id.as_str()
-  );
-  tx.query(query2).await?;
-
-  Ok(())
-}
-
-/// Reroute hides_from_its_subscriptions relationships (most complex).
-async fn reroute_hides(
-  tx: &Transaction,
-  acquirer_id: &ID,
-  acquiree_id: &ID,
-  acquirer_final_contains: &HashSet<ID>,
-) -> Result<(), Box<dyn Error>> {
-
-  // Acquiree is hidden → DROP (do not recreate)
-  let query1 : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $h isa node;
-         $r isa hides_from_its_subscriptions (hider: $h, hidden: $acquiree);
-       delete $r;"#,
-    acquiree_id.as_str()
-  );
-  tx.query(query1).await?;
-
-  // Acquiree is hider → transfer ONLY if hidden node NOT in acquirer's contains
-  // First, query all hidden nodes
-  let query_hidden : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
+         $r isa hides_from_its_subscriptions (hider: $acquiree,
+                                              hidden: $hidden);
          $hidden has id $hidden_id;
        select $hidden_id;"#,
-    acquiree_id.as_str()
-  );
-
-  let answer : QueryAnswer = tx.query(query_hidden).await?;
+    acquiree_id.as_str() );
+  let answer : QueryAnswer = tx.query(what_acquiree_hides).await?;
   let mut stream = answer.into_rows();
-
   while let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("hidden_id")? {
       let hidden_id_str : String =
         extract_payload_from_typedb_string_rep(&concept.to_string());
       let hidden_id : ID = ID(hidden_id_str);
-
-      // Check if this ID is in acquirer's final contains
       if !acquirer_final_contains.contains(&hidden_id) {
-        // Transfer this relationship
+        // If this ID is not in acquirer's final contains,
+        // then transfer the relationship.
         let transfer_query : String = format!(
           r#"match
                $acquirer isa node, has id "{}";
@@ -304,11 +264,10 @@ async fn reroute_hides(
                $new_r isa hides_from_its_subscriptions (hider: $acquirer, hidden: $hidden);"#,
           acquirer_id.as_str(),
           hidden_id.as_str(),
-          acquiree_id.as_str()
-        );
+          acquiree_id.as_str() );
         tx.query(transfer_query).await?;
       } else {
-        // Just delete (do not recreate - can't hide your own content)
+        // Just delete, b/c acquirer shouldn't hite its own content.
         let delete_query : String = format!(
           r#"match
                $acquiree isa node, has id "{}";
@@ -316,58 +275,6 @@ async fn reroute_hides(
                $old_r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
              delete $old_r;"#,
           acquiree_id.as_str(),
-          hidden_id.as_str()
-        );
-        tx.query(delete_query).await?;
-      }
-    }
-  }
-
-  Ok(())
-}
-
-/// Reroute hyperlinks_to relationships.
-/// - Links from (sourced from) acquiree are now from preserver
-/// - Links to (targeting) acquiree are now to acquirer
-async fn reroute_hyperlinks(
-  tx: &Transaction,
-  acquirer_id: &ID,
-  acquiree_id: &ID,
-  acquiree_text_preserver: &SkgNode,
-) -> Result<(), Box<dyn Error>> {
-  let preserver_id : &ID =
-    &acquiree_text_preserver.ids[0];
-
-  // Links FROM acquiree → now FROM preserver (outbound hyperlinks)
-  let change_source_to_preserver : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $preserver isa node, has id "{}";
-         $dest isa node;
-         $hyperlink_rel isa hyperlinks_to (source: $acquiree,
-                                           dest: $dest);
-       delete $hyperlink_rel;
-       insert
-         $new_hyperlink_rel isa hyperlinks_to (source: $preserver,
-                                               dest: $dest);"#,
-    acquiree_id.as_str(),
-    preserver_id.as_str() );
-
-  // Links TO acquiree → now TO acquirer (incoming hyperlinks)
-  let change_target_to_acquirer : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $acquirer isa node, has id "{}";
-         $source isa node;
-         $hyperlink_rel isa hyperlinks_to (source: $source,
-                                           dest: $acquiree);
-       delete $hyperlink_rel;
-       insert
-         $new_hyperlink_rel isa hyperlinks_to (source: $source,
-                                               dest: $acquirer);"#,
-    acquiree_id.as_str(),
-    acquirer_id.as_str() );
-
-  tx.query(change_source_to_preserver).await?;
-  tx.query(change_target_to_acquirer).await?;
+          hidden_id.as_str() );
+        tx.query ( delete_query ). await ?; }} }
   Ok (( )) }

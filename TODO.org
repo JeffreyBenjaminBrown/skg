@@ -3,33 +3,15 @@
 *** ask.org
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
-*** write some functions to generalize these
-    reroute_contains
-    reroute_subscribes
-    reroute_overrides
-    reroute_hides
-
-    One function would be 'transfer', the other 'drop'.
-
-    Both should take a few novel arguments: relation name,
-    acquirer role, other role.
-    Each of the above consists of two phases.
-    This new function can substitute for most of them.
-
-    Style it like reroute_contains, which I've updated the names in.
 *** three_merged_skgnodes should dedup all merged lists
 *** ? test validate_merge_requests
 *** document in comments
-**** justify these rules
-***** Acquiree as replaced -> DROP
-***** Acquiree as hidden -> DROP
-**** when merge requests are processed
-***** // Merge requests are handled during save, not rebuild/view
-      this comment probably needs rewording
-***** merge requests are ignored
-      in 'complete_node_preorder',
-      and thus in its (more meaningfully-named) caller
-      'completeOrgnodeForest'
+**** // Merge requests are handled during save, not rebuild/view
+     this comment probably needs rewording
+**** merge requests are ignored
+     in 'complete_node_preorder',
+     and thus in its (more meaningfully-named) caller
+     'completeOrgnodeForest'
 *** remove
     claude-thoughts/
     validation-for-merge/
