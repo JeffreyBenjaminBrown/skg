@@ -34,6 +34,27 @@ pub async fn read_node_from_id (
     )) ); }
   Ok (node) }
 
+/// Reads a node from disk, returning None if not found
+/// (either in DB or on filesystem).
+/// Other errors are propagated.
+pub async fn read_node_from_id_optional(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  node_id: &ID
+) -> Result<Option<SkgNode>, Box<dyn Error>> {
+  match read_node_from_id(config, driver, node_id).await {
+    Ok(node) => Ok(Some(node)),
+    Err(e)   => {
+      let error_msg: String = e.to_string();
+      // Check if this is a "not found" error
+      if error_msg.contains("not found")
+        || error_msg.contains("No such file")
+        || error_msg.contains("does not exist") {
+          Ok(None)
+        } else {
+          // Propagate other errors
+          Err(e) }} }}
+
 /// If there's no such .skg file at path,
 /// returns the empty vector.
 pub fn fetch_aliases_from_file (

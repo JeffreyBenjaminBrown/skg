@@ -1,12 +1,17 @@
-/* THE IDEA
+/* PITFALL: ASSUMES IDs have been replaced by PIDs
+in the 'id' field of every OrgNode.
+(Currently, 'add_missing_info_to_trees' does this.)
+.
+THE IDEA
 Different SaveInstruction can have the same ID.
 And there might be information on disk
 that conflicts or supplements information in
 the buffer text that a user is trying to save.
 Those conflicts must be resolved.
 .
-The treatment of deletion is omitted from this comment,
-because it's simple. For the rest of this comment
+If two OrgNodes referring to the same node
+have distinct toDelete values, the save is not permitted.
+For the rest of this comment, then,
 assume all SaveInstructions have toDelete = false.
 .
 Some SaveInstructions are indefinitive and some aren't.
@@ -35,9 +40,11 @@ Extra IDs are appended from disk.
 
 use crate::types::{
   ID, SkgNode, SaveInstruction, NodeSaveAction, SkgConfig};
-use crate::file_io::read_node_from_id;
+use crate::file_io::read_node_from_id_optional;
+use crate::util::dedup_vector;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::iter::once;
 use typedb_driver::TypeDBDriver;
 
 
@@ -80,115 +87,232 @@ pub async fn reconcile_dup_instructions_for_one_id(
   driver: &TypeDBDriver,
   instructions: Vec<SaveInstruction>
 ) -> Result<SaveInstruction, Box<dyn Error>> {
-  // todo ? Break into smaller functions.
   if instructions.is_empty() {
     return Err("Cannot reduce empty instruction list".into()); }
-  let to_delete: bool =
-    to_delete_if_consistent (&instructions)?;
-  let primary_id: ID =
-    instructions[0] . 0 . ids . first()
-    . ok_or("No primary ID found") ?. clone();
+  let (definer, indefinitives)
+    : (Option<SaveInstruction>, Vec<SaveInstruction>)
+    = extract_definer(instructions)?;
+  let from_disk: Option<SkgNode> = {
+    let primary_id: ID =
+      if let Some((ref node, _)) = definer {
+        node.ids.first()
+      } else { indefinitives[0].0.ids.first()
+      } . ok_or("No primary ID found")?.clone();
+    read_node_from_id_optional(
+      config, driver, &primary_id).await? };
 
-  let mut aliases           : Vec<String>     = Vec::new();
-  let mut append_to_content : Vec<ID>         = Vec::new();
-  let mut maybe_title       : Option<String>  = None;
-  let mut maybe_body        : Option<String>  = None;
-  let mut definer_content   : Option<Vec<ID>> = None;
-  let mut definer_title     : Option<String>  = None;
-  let mut definer_body      : Option<String>  = None;
+  let reconciled_node: SkgNode = SkgNode {
+    title                        : reconciled_title(
+      definer.as_ref(), &from_disk)?,
+    aliases                      : reconciled_aliases(
+      &indefinitives, definer.as_ref(), &from_disk),
+    ids                          : reconciled_ids(
+      &indefinitives, definer.as_ref(), &from_disk),
+    body                         : reconciled_body(
+      definer.as_ref(), &from_disk),
+    contains                     : reconciled_contains(
+      &indefinitives, definer.as_ref(), &from_disk),
+    subscribes_to                : reconciled_subscribes_to(
+      &indefinitives, definer.as_ref(), &from_disk),
+    hides_from_its_subscriptions : reconciled_hides(
+      &indefinitives, definer.as_ref(), &from_disk),
+    overrides_view_of            : reconciled_overrides(
+      &indefinitives, definer.as_ref(), &from_disk), };
+  let reconciled_action: NodeSaveAction = NodeSaveAction {
+    indefinitive : false,
+    toDelete     : to_delete_if_consistent(
+      &indefinitives, definer.as_ref())?, };
+  Ok((reconciled_node, reconciled_action)) }
 
-  for (skg_node, save_action) in &instructions {
-    if let Some(node_aliases) = &skg_node.aliases {
-      aliases.extend(
-        node_aliases . iter() . cloned() ); }
-    if save_action.indefinitive {
-      // tentative title and body, appendable contents after dedup
-      if let Some(contents) = &skg_node.contains {
-        append_to_content.extend(
-          contents . iter() . cloned() ); }
-      // TODO ? The treatment of title and body here is inefficient.
-      // Once we find one we can stop looking, but this implementation
-      // keeps overwriting when it finds a new one.
-      maybe_title = Some (skg_node . title.clone() );
-      if skg_node . body . is_some() {
-        maybe_body = skg_node . body . clone(); }
-    } else { // definitive title, body; initial content without dedup
-      if definer_content.is_some() {
-        return Err("Multiple definitive content definitions for same ID" . into()); }
-      definer_content = skg_node.contains.clone();
-      definer_title = Some(skg_node.title.clone());
-      definer_body = skg_node.body.clone(); }}
-  aliases.sort(); aliases.dedup(); // dedup aliases
-  let from_disk: Result<SkgNode, Box<dyn Error>> =
-    read_node_from_id(
-      config, driver, &primary_id).await;
-  if aliases.is_empty() {
-    if let Ok(disk_node) = &from_disk {
-      if let Some(disk_aliases) = &disk_node.aliases {
-        aliases = disk_aliases.clone(); }} }
-  if definer_content.is_none() {
-    if let Ok(disk_node) = &from_disk {
-      definer_content = disk_node.contains.clone(); }}
+/// Returns (definer, indefinitives),
+/// where 'indefinitives' is 'instructions' without 'definer'.
+/// If there is no definer, then the two lists are equal.
+/// Returns Err if multiple definers found.
+fn extract_definer(
+  instructions: Vec<SaveInstruction>
+) -> Result<(Option<SaveInstruction>, // definer, if exactly one exists
+             Vec<SaveInstruction>), // indefinitive instructions
+            Box<dyn Error>> {
+  let mut definer: Option<SaveInstruction> = None;
+  let mut indefinitives: Vec<SaveInstruction> = Vec::new();
+  for instr in instructions {
+    if !instr.1.indefinitive {
+      if definer.is_some() {
+        return Err(
+          "Multiple definitive content definitions for same ID"
+            . into()); }
+      definer = Some(instr);
+    } else {
+      indefinitives.push(instr); }}
+  Ok((definer, indefinitives)) }
 
-  // Remove from appendToContent anything that's in definesContent
-  let definer_content: Vec<ID> =
-    definer_content.unwrap_or_default();
-  let definer_content_set: HashSet<ID> =
-    definer_content.iter().cloned().collect();
-  { // 'append_to_content' should not repeat itself,
-    // and it should not overlap 'definer_content_set'.
-    append_to_content.sort();
-    append_to_content.dedup();
-    append_to_content.retain(
-      |id| !definer_content_set.contains(id)); }
-
-  // Build final contents
-  let mut final_contents: Vec<ID> =
-    definer_content;
-  final_contents.extend(append_to_content);
-
-  // Get all IDs (original + from disk)
-  let mut final_ids: Vec<ID> =
-    instructions[0] . 0 . ids . clone();
-  if let Ok(disk_node) = &from_disk {
-    // TODO ? inefficient
+/// Reconciles the ids field.
+/// Starts with definer's or first indefinitive's IDs,
+/// then appends any extra IDs from disk.
+fn reconciled_ids(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Vec<ID> {
+  let mut final_ids: Vec<ID> = if let Some((node, _)) = definer {
+    node.ids.clone()
+  } else {
+    indefinitives[0].0.ids.clone() };
+  if let Some(disk_node) = from_disk {
     for disk_id in &disk_node.ids {
       if !final_ids.contains(disk_id) {
-        final_ids.push(disk_id.clone() ); }} }
+        final_ids.push(disk_id.clone()); }} }
+  final_ids }
 
-  let has_definer_instruction = definer_title.is_some();
-  Ok (( SkgNode {
-    title: definer_title . or(maybe_title) . unwrap_or_default(),
-    aliases: Some(aliases),
-    ids: final_ids,
-    body: ( if has_definer_instruction { definer_body }
-            else { maybe_body.or_else(
-              || from_disk . as_ref() . ok() . and_then(
-                |node| node.body.clone() )) } ),
-    contains: Some(final_contents),
-    subscribes_to: None,
-    hides_from_its_subscriptions: None,
-    overrides_view_of: None,
-  }, NodeSaveAction {
-    indefinitive: false,
-    toDelete: to_delete,
-  } )) }
+/// Reconciles the title field.
+/// Definer's title takes precedence, then disk's title.
+/// If neither exists, that's an error.
+fn reconciled_title(
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Result<String, Box<dyn Error>> {
+  if let Some((node, _)) = definer {
+    return Ok(node.title.clone()); }
+  if let Some(disk_node) = from_disk {
+    return Ok(disk_node.title.clone()); }
+  Err("No title found for node (neither from definer nor disk)"
+      . into()) }
 
-/// Extracts 'the' toDelete value from some instructions,
+/// Reconciles the body field.
+/// Definer's body takes precedence, then disk's body, then None.
+fn reconciled_body(
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<String> {
+  if let Some((node, _)) = definer {
+    return node.body.clone(); }
+  from_disk . as_ref() . and_then (|node|
+                                   node.body.clone()) }
+
+/// Reconciles the aliases field.
+/// Collects all aliases from definer and indefinitives.
+/// If none found, uses disk's aliases.
+fn reconciled_aliases(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<String>> {
+  reconcile_collected_field(
+    indefinitives,
+    definer,
+    from_disk,
+    |node| &node.aliases,
+    |disk_node| disk_node.aliases.clone() ) }
+
+/// Reconciles the contains field.
+/// Initial contents come from definer, or barring that, from disk.
+/// Indefinitive contents are appended.
+/// Last, everything is deduplicated.
+fn reconciled_contains(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<ID>> {
+  let initial_contents: Vec<ID> = if let Some((node, _)) = definer {
+    node . contains . clone() . unwrap_or_default()
+  } else { from_disk . as_ref()
+           . and_then (|node|
+                       node.contains.clone())
+           . unwrap_or_default() };
+  let mut final_contents: Vec<ID> = initial_contents;
+  for (node, _) in indefinitives {
+    if let Some(contents) = &node.contains {
+      final_contents.extend(contents.iter().cloned()); }}
+  Some(dedup_vector(final_contents)) }
+
+/// Reconciles the subscribes_to field.
+/// Collects all subscribes_to IDs from definer and indefinitives, then deduplicates.
+/// If none found, uses disk's subscribes_to.
+fn reconciled_subscribes_to(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<ID>> {
+  reconcile_collected_field(
+    indefinitives,
+    definer,
+    from_disk,
+    |node| &node.subscribes_to,
+    |disk_node| disk_node.subscribes_to.clone() ) }
+
+/// Reconciles the hides_from_its_subscriptions field.
+/// Collects all hides_from_its_subscriptions IDs from definer and indefinitives, then deduplicates.
+/// If none found, uses disk's hides_from_its_subscriptions.
+fn reconciled_hides(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<ID>> {
+  reconcile_collected_field(
+    indefinitives,
+    definer,
+    from_disk,
+    |node| &node.hides_from_its_subscriptions,
+    |disk_node| disk_node.hides_from_its_subscriptions.clone() ) }
+
+/// Reconciles the overrides_view_of field.
+/// Collects all overrides_view_of IDs from definer and indefinitives, then deduplicates.
+/// If none found, uses disk's overrides_view_of.
+fn reconciled_overrides(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<ID>> {
+  reconcile_collected_field(
+    indefinitives,
+    definer,
+    from_disk,
+    |node| &node.overrides_view_of,
+    |disk_node| disk_node.overrides_view_of.clone() ) }
+
+/// Generic reconciliation for fields that collect items from all instructions.
+/// Collects items from both definer and indefinitives.
+/// If any instruction had Some(_) for the field, returns the deduplicated collection.
+/// Only falls back to disk if no instruction specified the field (all were None).
+fn reconcile_collected_field<T, F>(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>,
+  extract_from_node: F,
+  extract_from_disk: fn(&SkgNode) -> Option<Vec<T>>
+) -> Option<Vec<T>>
+where
+  T: Clone + Eq + std::hash::Hash,
+  F: Fn(&SkgNode) -> &Option<Vec<T>>
+{
+  let mut collected: Vec<T> = Vec::new();
+  let mut any_specified = false;
+  for (node, _) in
+    once(definer).flatten().chain(indefinitives.iter()) {
+      if let Some(items) = extract_from_node(node) {
+        any_specified = true;
+        collected.extend(items.iter().cloned()); }}
+  if any_specified { Some(dedup_vector(collected)) }
+  else { // No instruction specified it. Use disk value.
+    from_disk . as_ref() . and_then (extract_from_disk) }}
+
+/// Extracts 'the' toDelete value from definer and indefinitives,
 /// if they are all equal. Otherwise borks,
 /// because you can't delete something and also not delete it.
 /// This check is redundant given validate_tree.
 fn to_delete_if_consistent(
-  instructions: &[SaveInstruction]
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>
 ) -> Result<bool, Box<dyn Error>> {
-  let to_delete_values: HashSet<bool> =
-    instructions . iter ()
-    . map ( |(_, action)| action . toDelete)
-    . collect ();
+  let mut to_delete_values: HashSet<bool> =
+    HashSet::new();
+  for (_, action) in
+    once(definer) . flatten() . chain (indefinitives.iter())
+  { // Collect toDelete values from definer and indefinitives.
+    to_delete_values.insert(action.toDelete); }
   if to_delete_values.len() > 1 {
     return Err(
       "Inconsistent toDelete values for same ID".into()); }
   let to_delete: bool =
     *to_delete_values.iter().next().unwrap();
-  Ok(to_delete)
-}
+  Ok(to_delete) }

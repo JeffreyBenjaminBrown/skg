@@ -116,9 +116,9 @@ fn test_adding_without_definer (
         .expect("Should have instruction for id:1");
 
       assert_eq!(
-        // even a indefinitive will clobber the title on disk
+        // With no definer, title comes from disk (indefinitives are ignored)
         id1_instruction.0.title,
-        "1 adder");
+        "title from disk");
       assert_eq!(
         // Body comes from disk since no instruction provides one.
         id1_instruction.0.body,

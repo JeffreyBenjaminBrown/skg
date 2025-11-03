@@ -7,6 +7,7 @@
 pub mod one_node;
 pub use one_node::{
     read_node_from_id,
+    read_node_from_id_optional,
     fetch_aliases_from_file,
     read_node,
     write_node,
