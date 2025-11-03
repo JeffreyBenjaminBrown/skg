@@ -1,8 +1,7 @@
 use crate::file_io::read_node;
 use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
-use crate::util::{path_from_pid, extend_vec_with_novel_from_other_vec};
+use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
-use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -97,53 +96,59 @@ fn three_merged_skgnodes(
     &acquiree_text_preserver.ids[0];
 
   { // Append acquiree's IDs to acquirer's.
-    updated_acquirer.ids = acquirer_from_disk.ids.clone();
-    for id in &acquiree_from_disk.ids {
-      if !updated_acquirer.ids.contains(id) {
-        updated_acquirer.ids.push(id.clone( )); }} }
+    let mut combined_ids : Vec<ID> =
+      acquirer_from_disk.ids.clone();
+    combined_ids.extend(
+      acquiree_from_disk.ids.clone() );
+    updated_acquirer.ids = (
+      // this dedup is kind of absurdly defensive, but cheap
+      dedup_vector(combined_ids) ); }
 
-  let mut new_contains: Vec<ID> =
-    vec![acquiree_text_preserver_id.clone()];
-  { // Update contains = [acquiree_text_preserver] + acquirer's old contents + acquiree's old contents that are novel to the acquirer.
-    if let Some(acquirer_contains) = &acquirer_from_disk.contains {
-      new_contains.extend ( acquirer_contains.clone() ); }
-    extend_vec_with_novel_from_other_vec(
-      &mut new_contains,
-      acquiree_from_disk.contains.as_ref());
-    updated_acquirer.contains = Some(new_contains.clone()); }
+  let new_contains : Vec<ID> = {
+    // [preserver] + acquirer's old content + acquiree's old content
+    let mut combined : Vec<ID> =
+      vec![acquiree_text_preserver_id.clone()];
+    combined.extend(
+      acquirer_from_disk.contains.clone().unwrap_or_default() );
+    combined.extend(
+      acquiree_from_disk.contains.clone().unwrap_or_default() );
+    dedup_vector(combined) };
+  updated_acquirer.contains = // update 'contains'
+    Some(new_contains.clone());
 
   { // Combine subscribes_to
-    updated_acquirer.subscribes_to = Some(
-      // TODO : dedup
-      acquirer_from_disk . subscribes_to.clone()
-        . unwrap_or_default() . into_iter()
-        . chain ( acquiree_from_disk . subscribes_to
-                  . clone() . unwrap_or_default())
-        .collect() ); }
+    let mut combined : Vec<ID> =
+      acquirer_from_disk.subscribes_to.clone().unwrap_or_default();
+    combined.extend(
+      acquiree_from_disk.subscribes_to.clone().unwrap_or_default() );
+    updated_acquirer.subscribes_to = Some(dedup_vector(combined)); }
 
   { // Combine hides_from_its_subscriptions,
-    // with filtering to hide nothing that the acquirer contains.
-    let acquirer_final_contains: HashSet<ID> = (
-      new_contains.iter().cloned().collect() );
-    let mut combined_hides: Vec<ID> = Vec::new();
-    for list in [&acquirer_from_disk.hides_from_its_subscriptions,
-                 &acquiree_from_disk.hides_from_its_subscriptions] {
-      if let Some(hides_list) = list {
-        for hidden_id in hides_list {
-          if !acquirer_final_contains.contains(hidden_id)
-            && !combined_hides.contains(hidden_id) {
-              combined_hides.push(hidden_id.clone()); }} }}
-    updated_acquirer.hides_from_its_subscriptions = (
-      // TODO : dedup
-      Some(combined_hides) ); }
+    // filtering to hide nothing that the acquirer contains.
+    let mut combined : Vec<ID> =
+      acquirer_from_disk . hides_from_its_subscriptions
+      . clone() . unwrap_or_default();
+    combined.extend(
+      acquiree_from_disk . hides_from_its_subscriptions
+        . clone() . unwrap_or_default() );
+    let deduped_and_filtered : Vec<ID> =
+      // if it's in 'new_contains', then it's not here
+      setlike_vector_subtraction(
+        dedup_vector(combined),
+        &new_contains);
+    updated_acquirer . hides_from_its_subscriptions =
+      Some(deduped_and_filtered); }
 
   { // Combine overrides_view_of
-    updated_acquirer.overrides_view_of = Some(
-      acquirer_from_disk . overrides_view_of . clone()
-        . unwrap_or_default() . into_iter()
-        . chain( acquiree_from_disk.overrides_view_of
-                 . clone().unwrap_or_default())
-        . collect() ); }
+    let mut combined : Vec<ID> =
+      acquirer_from_disk . overrides_view_of
+      . clone() . unwrap_or_default();
+    combined.extend(
+      acquiree_from_disk . overrides_view_of
+        . clone() . unwrap_or_default() );
+    updated_acquirer . overrides_view_of =
+      Some(dedup_vector(combined)); }
+
   updated_acquirer }
 
 /// Create an acquiree_text_preserver from the acquiree's data
