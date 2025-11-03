@@ -99,7 +99,8 @@ fn complete_node_preorder<'a> (
           wrapped_build_and_integrate_sourceward_view (
             tree, node_id, config, typedb_driver, errors ) . await ?; },
         NodeRequest::Merge(_) => {
-          // Merge requests are handled during save, not rebuild/view
+          // A merge request requests a graph change,
+          // not a view change. This function ignores it.
         }, }}
     Ok (( )) }) }
 

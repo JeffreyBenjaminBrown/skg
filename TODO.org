@@ -4,14 +4,36 @@
 *** merge-temp-docs/ (in branch merge-nodes)
 ** TODO
 *** three_merged_skgnodes should dedup all merged lists
+The function 'three_merged_skgnodes' needs a change.
+Currently there's some dedup logic for the 'contains' field,
+but not the other three ('hides', 'subscribes' and 'overrides').
+It would be better if we made a standalone function,
+'dedup_vector', and ran it on all four fields,
+*after* they have been constructed (rather than, as 'contains'
+currently does, kind of interleaving the dedup and construction).
+That should simplify the logic for 'contains'.
+
+The logic for 'dedup_vector' should walk the vector,
+building a set as it does, and discarding any element
+already in the set.
+
+The other field with somewhat complex logic is 'hides',
+which ensures that nothing is hidden which the acquiree contains.
+This could be simplified by introducing a second helper function,
+'setlike_vector_subtraction',
+with two arguments 'subtracting_from' and 'subtracting'.
+It makes a set out of 'subtracting', then walks 'subtracting_from'
+and removes anything it finds in 'subtracting_set'.
+
+Both utilities should go in 'rust/util.rs'.
+
+The second utility lets us simplify the 'hides' logic,
+by first simply appending *all* of the acquiree's hidden IDs
+to the acquirer's, and then subtracting *all* of the acquirer's
+(new, so including the acquiree's old) contents from that list.
+
+If any of this is confusing or problematic, please say so; otherwise, go!
 *** ? test validate_merge_requests
-*** document in comments
-**** // Merge requests are handled during save, not rebuild/view
-     this comment probably needs rewording
-**** merge requests are ignored
-     in 'complete_node_preorder',
-     and thus in its (more meaningfully-named) caller
-     'completeOrgnodeForest'
 *** remove
     claude-thoughts/
     validation-for-merge/
