@@ -44,7 +44,7 @@ fn test_parentignores_and_indefinitive(
         "};
 
         // Get save instructions
-        let (_orgnode_forest, save_instructions) =
+        let (_orgnode_forest, save_instructions, _merge_instructions) =
           buffer_to_save_instructions(
             org_text,
             config,
@@ -73,8 +73,8 @@ fn test_parentignores_and_indefinitive(
           .await?;
         assert_eq!(
           node2.contains,
-          vec![ ID("3".to_string()),
-                ID("4".to_string()) ],
+          Some(vec![ ID("3".to_string()),
+                     ID("4".to_string()) ]),
           "Node 2 should contain [3, 4], because 4 was appended, due to the 'indefinitive' in the metadata for node 2."
         ); }
 
@@ -84,8 +84,8 @@ fn test_parentignores_and_indefinitive(
             .await?;
         assert_eq!(
           node1.contains,
-          vec![],
-          "Node 1 should, like before it was saved, have empty contents, because its child 2 has 'treatment=parentIgnores' in its metadata." ); }
+          None,
+          "Node 1 should have empty contents (None when read from disk), because its child 2 has 'treatment=parentIgnores' in its metadata." ); }
 
         Ok (( )) } )
     );

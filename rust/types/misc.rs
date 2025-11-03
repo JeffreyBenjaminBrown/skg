@@ -1,5 +1,4 @@
 use serde::{Serialize, Deserialize};
-use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -46,12 +45,6 @@ pub struct Hyperlink {
   // Hyperlinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
   pub id: ID,
   pub label: String,
-}
-
-#[derive(Debug)]
-pub enum HyperlinkParseError {
-  InvalidFormat,
-  MissingDivider,
 }
 
 
@@ -106,10 +99,11 @@ impl fmt::Display for Hyperlink {
     write! ( f, "[[id:{}][{}]]", self.id, self.label ) }}
 
 impl FromStr for Hyperlink {
-  type Err = HyperlinkParseError;
+  type Err = super::errors::HyperlinkParseError;
 
   fn from_str ( text: &str )
                 -> Result <Self, Self::Err> {
+    use super::errors::HyperlinkParseError;
     if ( !text.starts_with("[[id:") ||
           !text.ends_with("]]") ) {
       return Err(HyperlinkParseError::InvalidFormat); }
@@ -126,18 +120,3 @@ impl FromStr for Hyperlink {
     } else {
       Err ( HyperlinkParseError::MissingDivider )
     } } }
-
-impl fmt::Display for HyperlinkParseError {
-  fn fmt ( &self,
-            f: &mut fmt::Formatter <'_>)
-            -> fmt::Result {
-    match self {
-      HyperlinkParseError::InvalidFormat =>
-        write! (
-          f, "Invalid hyperlink format. Expected [[id:ID][LABEL]]" ),
-      HyperlinkParseError::MissingDivider =>
-        write! (
-          f, "Missing divider between ID and label. Expected ][" ),
-    } } }
-
-impl Error for HyperlinkParseError {}

@@ -20,7 +20,6 @@ use typedb_driver::{
 use crate::types::ID;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
 
-
 /* Searches containerward recursively until reaching the first node
 which is either uncontained or multiply contained. Returns that node's ID.
 So for instance, if the input is uncontained, it just returns the input.

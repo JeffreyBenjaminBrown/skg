@@ -63,6 +63,7 @@ pub fn completeContents (
     read_node ( path ) ? };
   let content_from_disk : HashSet < ID > =
     skgnode . contains . clone ()
+    . unwrap_or_default ()
     . into_iter ()
     . collect ();
 
@@ -110,17 +111,18 @@ pub fn completeContents (
   // preserving order from disk
   let mut completed_content_nodes : Vec < NodeId > =
     Vec::new ();
-  for disk_id in & skgnode . contains {
-    if let Some ( existing_node_id ) =
-      content_id_to_node_id . get ( disk_id ) {
-      // Content already exists in tree
-      completed_content_nodes . push ( *existing_node_id );
-    } else
-    { // PITFALL: A preorder DFS traversal for completeOrgnodeTree
-      // lets us add a child without considering grandchildren yet.
-      completed_content_nodes . push (
-        extend_content (
-          tree, node_id, disk_id, config )? ); }}
+  if let Some(contains) = & skgnode . contains {
+    for disk_id in contains {
+      if let Some ( existing_node_id ) =
+        content_id_to_node_id . get ( disk_id ) {
+        // Content already exists in tree
+        completed_content_nodes . push ( *existing_node_id );
+      } else
+      { // PITFALL: A preorder DFS traversal for completeOrgnodeTree
+        // lets us add a child without considering grandchildren yet.
+        completed_content_nodes . push (
+          extend_content (
+            tree, node_id, disk_id, config )? ); }}}
 
   reorder_children (
     tree,

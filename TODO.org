@@ -1,5 +1,11 @@
-* Even repeated nodes should be marked as cyclic.
-  tests/integration/valid_and_invalid_saves/test-emacs.el
+* u
+** reconcile_dup_instructions_for_one_id
+*** It must handle the other optional lists.
+*** Is it called only after IDs are replaced with PIDs?
+** make sure we can't merge more than 1 node into another per save
+** mk_skgnode is wrong
+   It sets a lot of SkgNode list fields to None.
+** Does anything fail silently?
 * most plans are online
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
@@ -20,6 +26,7 @@
   and then order links to them here like this:
   [[./TODO/sharing-and-privacy.org][sharing and privacy]]
 * QA
+** test validate_merge_requests
 ** in elisp/skg-sexpr/skg-lens.el, rather than concatenate with ":"
    (that's done by skg--tokens->string)
 

@@ -97,18 +97,19 @@ fn verify_body_not_needed() {
 }
 
 pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
-    // Create a new SkgNode reversing two of its lists,
-    // `contains` and `subscribes_to`.
-    // This is only for testing purposes,
-    // to show reading from and writing to disk work;
-    // there's no other reason anyone would want to do this.
-    let mut reversed_contains =
-        node.contains.clone();
-    reversed_contains.reverse();
-    let mut reversed_subscribes_to =
-        node.subscribes_to.clone();
-    reversed_subscribes_to.reverse();
-
+  // Create a new SkgNode reversing two of its lists,
+  // `contains` and `subscribes_to`.
+  // This is only for testing purposes,
+  // to show reading from and writing to disk work;
+  // there's no other reason anyone would want to do this.
+  let reversed_contains =
+    node.contains.clone().map(|mut v| {
+      v.reverse();
+      v });
+  let reversed_subscribes_to =
+    node.subscribes_to.clone().map(|mut v| {
+      v.reverse();
+      v });
   SkgNode {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
@@ -120,7 +121,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     hides_from_its_subscriptions :
       node.hides_from_its_subscriptions        .clone(),
     overrides_view_of : node.overrides_view_of .clone(),
-  } }
+  }}
 
 #[test]
 fn test_hyperlinks_extracted_during_read() -> std::io::Result<()> {

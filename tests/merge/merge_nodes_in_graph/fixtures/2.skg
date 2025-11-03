@@ -1,0 +1,10 @@
+ids:
+- "2"
+- 2-extra-id
+title: "2"
+body: 2 body
+contains:
+- "21"
+- "22"
+- hidden-from-subscriptions-of-1-but-in-content-of-2
+- "overlap"

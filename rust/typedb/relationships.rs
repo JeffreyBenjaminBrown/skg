@@ -25,8 +25,11 @@ pub async fn create_all_relationships (
   println! ( "Creating relationships ..." );
   for node in nodes {
     create_relationships_from_node (node, &tx)
-      . await ?; }
-  tx . commit () . await ?;
+      . await
+      . map_err(|e| format!("Failed to create relationships for node '{}': {}",
+                           node.ids[0].as_str(), e))? ; }
+  tx . commit () . await
+    . map_err(|e| format!("Failed to commit relationships transaction: {}", e))?;
   Ok (()) }
 
 pub async fn create_relationships_from_node (
@@ -38,11 +41,12 @@ pub async fn create_relationships_from_node (
     node . ids [0] . as_str ();
   insert_relationship_from_list (
     primary_id,
-    &node.contains,
+    node.contains.as_ref().unwrap_or(&vec![]),
     "contains",
     "container",
     "contained",
-    tx ) . await ?;
+    tx ) . await
+    . map_err(|e| format!("Failed to create 'contains' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id,
     & ( hyperlinks_from_node ( &node )
@@ -53,28 +57,32 @@ pub async fn create_relationships_from_node (
     "hyperlinks_to",
     "source",
     "dest",
-    tx ). await ?;
+    tx ). await
+    . map_err(|e| format!("Failed to create 'hyperlinks_to' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id,
-    &node.subscribes_to,
+    node.subscribes_to.as_ref().unwrap_or(&vec![]),
     "subscribes",
     "subscriber",
     "subscribee",
-    tx ). await ?;
+    tx ). await
+    . map_err(|e| format!("Failed to create 'subscribes' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id,
-    &node.hides_from_its_subscriptions,
+    node.hides_from_its_subscriptions.as_ref().unwrap_or(&vec![]),
     "hides_from_its_subscriptions",
     "hider",
     "hidden",
-    tx ). await ?;
+    tx ). await
+    . map_err(|e| format!("Failed to create 'hides_from_its_subscriptions' relationships: {}", e))?;
   insert_relationship_from_list(
     primary_id,
-    &node.overrides_view_of,
+    node.overrides_view_of.as_ref().unwrap_or(&vec![]),
     "overrides_view_of",
     "replacement",
     "replaced",
-    tx ). await ?;
+    tx ). await
+    . map_err(|e| format!("Failed to create 'overrides_view_of' relationships: {}", e))?;
   Ok (()) }
 
 async fn insert_relationship_from_list (
@@ -88,8 +96,7 @@ async fn insert_relationship_from_list (
 ) -> Result<(), Box<dyn Error>> {
 
   for target_id in id_list {
-    tx.query (
-      format! ( r#"
+    let query = format! ( r#"
                 match
                   $from isa node, has id "{}";
                   {{ $to isa node, has id "{}"; }} or
@@ -106,8 +113,13 @@ async fn insert_relationship_from_list (
                 target_id.as_str(),
                 relation_name,
                 from_role,
-                to_role ) ).await?; }
-  Ok (()) }
+                to_role );
+
+    tx.query(query.clone()).await
+      .map_err(|e| format!(
+        "TypeQL query failed for relationship '{}' from '{}' to '{}': {}\nQuery was: {}",
+        relation_name, primary_id, target_id.as_str(), e, query))?; }
+  Ok (( )) }
 
 /// Delete every instance of `relation`
 /// where one of the ipnut IDs plays `role`.

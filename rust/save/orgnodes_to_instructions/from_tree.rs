@@ -79,10 +79,10 @@ fn mk_skgnode (
     aliases: collect_aliases(noderef),
     ids: ids,
     body: body,
-    contains: collect_contents(noderef),
-    subscribes_to: vec![],
-    hides_from_its_subscriptions: vec![],
-    overrides_view_of: vec![],
+    contains: Some(collect_contents(noderef)),
+    subscribes_to: None,
+    hides_from_its_subscriptions: None,
+    overrides_view_of: None,
   } ) }
 
 /* Collect aliases for a node using a double-loop:

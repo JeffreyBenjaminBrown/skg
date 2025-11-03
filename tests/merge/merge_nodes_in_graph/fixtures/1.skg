@@ -1,0 +1,15 @@
+ids:
+- "1"
+title: "1"
+body: "[[id:1-links-to][a link to 1-links-to]]"
+contains:
+- "11"
+- "12"
+- "overlap"
+subscribes_to:
+- 1-subscribes-to
+hides_from_its_subscriptions:
+- hidden-from-1s-subscriptions
+- hidden-from-subscriptions-of-1-but-in-content-of-2
+overrides_view_of:
+- 1-overrides-view-of

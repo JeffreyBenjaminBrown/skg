@@ -92,20 +92,21 @@ pub async fn orgnode_tree_from_id_with_earlier_visits (
       tree . root () . id () );
     let mut ancestor_path : Vec < ID > =
       vec! [ root_pid . clone () ];
-    for child_id in & skgnode . contains { // build branches
-      Box::pin (
-        build_tree_recursive (
-          &mut tree,
-          root_node_id,
-          child_id,
-          config,
-          driver,
-          visited,
-          &mut ancestor_path
-        )) . await ?; }
+    if let Some(contains) = & skgnode . contains { // build branches
+      for child_id in contains {
+        Box::pin (
+          build_orgnode_tree_recursive (
+            &mut tree,
+            root_node_id,
+            child_id,
+            config,
+            driver,
+            visited,
+            &mut ancestor_path
+          )) . await ?; }}
     Ok ( tree ) }}
 
-async fn build_tree_recursive (
+async fn build_orgnode_tree_recursive (
   tree            : &mut Tree < OrgNode >,
   parent_node_id  : ego_tree::NodeId, // where to insert
   child_id        : &ID, // what to insert, and recurse into
@@ -140,17 +141,18 @@ async fn build_tree_recursive (
     tree . get_mut ( parent_node_id ) . unwrap ()
     . append ( child_orgnode ) . id () );
   ancestor_path . push ( child_pid . clone () );
-  for grandchild_id in & child_skgnode . contains {
-    Box::pin (
-      build_tree_recursive ( // recurse
-        tree,
-        new_child_id,
-        grandchild_id,
-        config,
-        driver,
-        visited,
-        ancestor_path
-      )) . await ?; }
+  if let Some(contains) = & child_skgnode . contains {
+    for grandchild_id in contains {
+      Box::pin (
+        build_orgnode_tree_recursive ( // recurse
+          tree,
+          new_child_id,
+          grandchild_id,
+          config,
+          driver,
+          visited,
+          ancestor_path
+        )) . await ?; }}
   ancestor_path . pop ();
   return Ok (( )) }
 

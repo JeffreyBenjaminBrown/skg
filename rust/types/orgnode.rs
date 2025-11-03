@@ -1,9 +1,7 @@
-use super::{ID, SkgNode, NodeSaveAction};
+use super::ID;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
-
-pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgNode {
@@ -72,7 +70,9 @@ pub enum RelToParent {
 pub enum NodeRequest {
   ContainerwardView,
   SourcewardView,
+  Merge(ID),  // Request to merge another node into this one
 }
+
 
 //
 // Implementations
@@ -111,12 +111,11 @@ impl fmt::Display for NodeRequest {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    let s : &str =
-      match self {
-        NodeRequest::ContainerwardView => "containerwardView",
-        NodeRequest::SourcewardView => "sourcewardView",
-      };
-    write! ( f, "{}", s ) } }
+    match self {
+      NodeRequest::ContainerwardView => write!(f, "containerwardView"),
+      NodeRequest::SourcewardView    => write!(f, "sourcewardView"),
+      NodeRequest::Merge(id)         => write!(f, "(merge {})", id.0),
+    } } }
 
 impl FromStr for NodeRequest {
   type Err = String;
@@ -127,8 +126,13 @@ impl FromStr for NodeRequest {
     match s {
       "containerwardView" => Ok ( NodeRequest::ContainerwardView ),
       "sourcewardView"    => Ok ( NodeRequest::SourcewardView ),
-      _ => Err ( format! ( "Unknown NodeRequest value: {}", s )),
-    }} }
+      _ => {
+        // Try to parse as "merge <id>"
+        if let Some(id_str) = s.strip_prefix("merge ") {
+          Ok ( NodeRequest::Merge ( ID::from(id_str) ) )
+        } else {
+          Err ( format! ( "Unknown NodeRequest value: {}", s ))
+        }} }} }
 
 impl Default for OrgnodeRelationships {
   fn default () -> Self {

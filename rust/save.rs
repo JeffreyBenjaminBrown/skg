@@ -21,7 +21,8 @@ pub use orgnodes_to_instructions::{
 };
 pub mod orgnodes_to_instructions;
 
-use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved};
+use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
+use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved, MergeInstructionTriple};
 use ego_tree::Tree;
 
 use std::io;
@@ -32,14 +33,15 @@ use typedb_driver::TypeDBDriver;
 ///   - Futzes with repeated and indefinitive
 ///   - Fills in information via 'add_missing_info_to_trees'.
 ///   - Reconciles duplicates via 'reconcile_dup_instructions'
-/// Outputs that plus a forest of SaveInstructions.
+/// Outputs that plus a forest of SaveInstructions, plus MergeInstructionTriples.
 pub async fn buffer_to_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver
 ) -> Result<
     ( Vec<Tree<OrgNode>>,
-      Vec<SaveInstruction>
+      Vec<SaveInstruction>,
+      Vec<MergeInstructionTriple>
     ), SaveError> {
 
   let mut orgnode_forest : Vec<Tree<OrgNode>> =
@@ -54,7 +56,9 @@ pub async fn buffer_to_save_instructions (
     & mut orgnode_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
   let validation_errors : Vec<Buffer_Cannot_Be_Saved> =
-    find_buffer_errors_for_saving ( & orgnode_forest );
+    find_buffer_errors_for_saving (
+      & orgnode_forest, config, driver
+    ) . await . map_err ( SaveError::DatabaseError ) ?;
   if ! validation_errors . is_empty () {
     return Err ( SaveError::BufferValidationErrors (
       validation_errors ) ); }
@@ -71,4 +75,8 @@ pub async fn buffer_to_save_instructions (
       Ok ((clobbered_node, action)) } )
     . collect::<io::Result<Vec<SaveInstruction>>>()
     . map_err ( SaveError::IoError ) ?;
-  Ok ((orgnode_forest, clobbered_instructions)) }
+  let mergeInstructions : Vec<MergeInstructionTriple> =
+    instructiontriples_from_the_merges_in_an_orgnode_forest (
+      & orgnode_forest, config, driver
+    ) . await . map_err ( SaveError::DatabaseError ) ?;
+  Ok ((orgnode_forest, clobbered_instructions, mergeInstructions)) }

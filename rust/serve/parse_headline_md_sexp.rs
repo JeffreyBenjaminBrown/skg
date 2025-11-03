@@ -170,11 +170,21 @@ fn parse_requests_sexp (
           atom_to_string ( request_element ) ?;
         let request : NodeRequest =
           NodeRequest::from_str ( &request_str )
-          . map_err ( | e | format! ( "Invalid request: {}", e ) ) ?;
+          . map_err ( | e | format! ( "Invalid request: {}", e )) ?;
         requests . insert ( request ); },
-      _ => {
-        return Err ( "Unexpected element in requests (expected atoms only)"
-                      . to_string () ); }} }
+      Sexp::List ( list_items ) if list_items . len () == 2 => {
+        let command : String =
+          atom_to_string ( &list_items[0] ) ?;
+        if command == "merge" {
+          let id_str : String =
+            atom_to_string ( &list_items[1] ) ?;
+          requests . insert ( NodeRequest::Merge ( ID::from ( id_str )) );
+        } else {
+          return Err ( format! ( "Unknown request command: {}",
+                                  command )); }},
+      _ => { return Err (
+        "Unexpected element in requests (expected atoms or (merge id))"
+          . to_string () ); }} }
   Ok (( )) }
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.

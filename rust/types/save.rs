@@ -1,11 +1,11 @@
-use super::{ID, OrgNode};
-use std::error::Error;
-use std::io;
+use super::{ID, SkgNode, SaveError, Buffer_Cannot_Be_Saved};
 
 
 /////////////////
 /// Types
 /////////////////
+
+pub type SaveInstruction = (SkgNode, NodeSaveAction);
 
 /// Tells Rust what to do with a node.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -17,30 +17,13 @@ pub struct NodeSaveAction {
   pub toDelete: bool,
 }
 
-#[derive(Debug)]
-pub enum SaveError {
-  ParseError(String),
-  DatabaseError(Box<dyn Error>),
-  IoError(io::Error),
-  InconsistentInstructions {
-    inconsistent_deletions: Vec<ID>,
-    multiple_definers: Vec<ID>, },
-  BufferValidationErrors ( Vec<Buffer_Cannot_Be_Saved> ), }
-
-/// If the user attempts to save a buffer
-/// with any of these properties,, the server should refuse.
-#[derive(Debug, Clone, PartialEq)]
-#[allow(non_camel_case_types)]
-pub enum Buffer_Cannot_Be_Saved {
-  Body_of_AliasCol               (OrgNode),
-  Child_of_AliasCol_with_ID      (OrgNode),
-  Body_of_Alias                  (OrgNode),
-  Child_of_Alias                 (OrgNode),
-  Alias_with_no_AliasCol_Parent  (OrgNode),
-  Multiple_AliasCols_in_Children (OrgNode),
-  Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have repeated=false and indefinitive=false. (Its contents are intended to define those of the node.)
-  AmbiguousDeletion              (ID),
-  DuplicatedContent              (ID), // A node has multiple Content children with the same ID
+/// When an 'acquiree' merges into an 'acquirer',
+/// we need three SaveInstructions.
+#[derive(Debug, Clone)]
+pub struct MergeInstructionTriple {
+  pub acquiree_text_preserver : SaveInstruction, // new node with acquiree's title and body
+  pub updated_acquirer        : SaveInstruction, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
+  pub acquiree_to_delete      : SaveInstruction,
 }
 
 
@@ -156,5 +139,31 @@ fn format_buffer_validation_error (
     Buffer_Cannot_Be_Saved::DuplicatedContent(id) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n", id.0)
     },
-  }
+    Buffer_Cannot_Be_Saved::Other(msg) => {
+      format!("{}\n", msg) }, }}
+
+impl MergeInstructionTriple {
+  pub fn to_vec (
+    &self
+  ) -> Vec<SaveInstruction> {
+    vec![
+      self.acquiree_text_preserver.clone(),
+      self.updated_acquirer.clone(),
+      self.acquiree_to_delete.clone(),
+    ] }
+
+  pub fn acquirer_id (
+    &self
+  ) -> &ID {
+    &self.updated_acquirer.0.ids[0] }
+
+  pub fn acquiree_id (
+    &self
+  ) -> &ID {
+    &self.acquiree_to_delete.0.ids[0] }
+
+  pub fn preserver_id (
+    &self
+  ) -> &ID {
+    &self.acquiree_text_preserver.0.ids[0] }
 }

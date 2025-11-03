@@ -98,8 +98,10 @@ fn complete_node_preorder<'a> (
         NodeRequest::SourcewardView => {
           wrapped_build_and_integrate_sourceward_view (
             tree, node_id, config, typedb_driver, errors ) . await ?; },
-      }}
-
+        NodeRequest::Merge(_) => {
+          // A merge request requests a graph change,
+          // not a view change. This function ignores it.
+        }, }}
     Ok (( )) }) }
 
 /// Recurse to children, marking cycles and calling complete_node_preorder.

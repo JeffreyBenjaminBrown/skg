@@ -1,17 +1,22 @@
 use crate::save::{headline_to_triple, HeadlineInfo};
-use crate::types::{OrgNode, OrgnodeMetadata, SkgNode, SkgConfig};
+use crate::types::{OrgNode, OrgnodeMetadata, SkgNode, SkgConfig, ID, TantivyIndex};
 use crate::file_io::read_skg_files;
 use crate::typedb::init::{overwrite_new_empty_db, define_schema};
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
-use ego_tree::Tree;
+use crate::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::tantivy::search_index;
+use ego_tree::{Tree, NodeRef};
 use futures::executor::block_on;
+use futures::StreamExt;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType};
+use typedb_driver::answer::QueryAnswer;
 
 /// Run tests with automatic database setup and cleanup.
 ///
@@ -195,8 +200,8 @@ pub fn compare_orgnode_forests (
 
 /// Compare two nodes and their subtrees recursively.
 fn compare_orgnode_trees (
-  node1 : ego_tree::NodeRef < OrgNode >,
-  node2 : ego_tree::NodeRef < OrgNode >
+  node1 : NodeRef < OrgNode >,
+  node2 : NodeRef < OrgNode >
 ) -> bool {
   let n1 : & OrgNode = node1 . value ();
   let n2 : & OrgNode = node2 . value ();
@@ -229,8 +234,8 @@ pub fn compare_two_forests_modulo_id(
 
 /// Compare two nodes and their subtrees modulo ID differences.
 fn compare_two_orgnodes_recursively_modulo_id (
-  node1: ego_tree::NodeRef<OrgNode>,
-  node2: ego_tree::NodeRef<OrgNode>
+  node1: NodeRef<OrgNode>,
+  node2: NodeRef<OrgNode>
 ) -> bool {
   let n1 : &OrgNode = node1.value();
   let n2 : &OrgNode = node2.value();
@@ -330,7 +335,72 @@ mod tests {
     // Test mixed (one headline, one not)
     assert!(!compare_headlines_modulo_id(
       "* Title",
-      "Body text"
-    ));
-  }
-}
+      "Body text" )); }}
+
+/// Query all primary node IDs from TypeDB.
+/// Returns a HashSet of all IDs belonging to primary nodes (not extra_ids).
+pub async fn all_pids_from_typedb(
+  db_name: &str,
+  driver: &TypeDBDriver,
+) -> Result<HashSet<ID>, Box<dyn Error>> {
+  let tx: Transaction = driver.transaction(
+    db_name, TransactionType::Read ). await ?;
+  let query: String =
+    "match $node isa node, has id $node_id; select $node_id;"
+    .to_string();
+  let answer: QueryAnswer = tx.query(query).await?;
+  let mut node_ids: HashSet<ID> = HashSet::new();
+  let mut stream = answer.into_rows();
+  while let Some(row_result) = stream.next().await {
+    let row = row_result?;
+    if let Some(concept) = row.get("node_id")? {
+      let node_id_str: String =
+        extract_payload_from_typedb_string_rep(
+          &concept.to_string());
+      node_ids.insert(ID(node_id_str)); }}
+  Ok (node_ids) }
+
+/// Query all extra_ids for a given primary node ID from TypeDB.
+/// Returns a Vec of all extra_ids associated with the node.
+pub async fn extra_ids_from_pid(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &ID,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let tx: Transaction = driver.transaction(
+    db_name, TransactionType::Read ). await?;
+  let query = format!(
+    r#"match $node isa node, has id "{}";
+       $e isa extra_id;
+       $rel isa has_extra_id (node: $node, extra_id: $e);
+       $e has id $extra_id_value;
+       select $extra_id_value;"#,
+    node_id.0 );
+  let answer: QueryAnswer = tx.query(query).await?;
+  let mut extra_ids = Vec::new();
+  let mut stream = answer.into_rows();
+  while let Some(row_result) = stream.next().await {
+    let row = row_result?;
+    if let Some(concept) = row.get("extra_id_value")? {
+      let extra_id_str = extract_payload_from_typedb_string_rep(
+        &concept.to_string());
+      extra_ids.push(
+        ID(extra_id_str)); }}
+  Ok(extra_ids) }
+
+/// Check if a specific ID exists in Tantivy search results.
+/// Searches for the given query and checks if any result has the exact ID.
+pub fn tantivy_contains_id(
+  tantivy_index: &TantivyIndex,
+  query: &str,
+  expected_id: &str,
+) -> Result<bool, Box<dyn Error>> {
+  let (matches, searcher) = search_index(tantivy_index, query)?;
+  for (_score, doc_address) in matches {
+    let doc: tantivy::Document = searcher.doc(doc_address)?;
+    let id_value: Option<String> =
+      doc.get_first(tantivy_index.id_field)
+      .and_then(|v| v.as_text().map(String::from));
+    if id_value == Some(expected_id.to_string()) {
+      return Ok(true); }}
+  Ok(false) }

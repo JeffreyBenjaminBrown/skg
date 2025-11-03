@@ -2,11 +2,13 @@ pub mod misc;
 pub use misc::{ ID,
                 SkgConfig,
                 TantivyIndex,
-                Hyperlink,
-                HyperlinkParseError, };
+                Hyperlink, };
+pub mod errors;
+pub use errors::{ HyperlinkParseError,
+                  SaveError,
+                  Buffer_Cannot_Be_Saved, };
 pub mod orgnode;
-pub use orgnode::{ SaveInstruction,
-                   OrgNode,
+pub use orgnode::{ OrgNode,
                    OrgnodeMetadata,
                    OrgnodeViewData,
                    OrgnodeCode,
@@ -20,5 +22,5 @@ pub use skgnode::{ SkgNode,
                    empty_skgnode, };
 pub mod save;
 pub use save::{ NodeSaveAction,
-                SaveError,
-                Buffer_Cannot_Be_Saved, };
+                SaveInstruction,
+                MergeInstructionTriple, };
