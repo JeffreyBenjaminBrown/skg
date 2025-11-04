@@ -1,3 +1,13 @@
+* architecture to fix
+** 'merge' should be encodeable in 'Nodesaveaction'
+   Then I wouldn't need to parse the action twice,
+   in two different ways.
+* TypeDB should report constraint violations.
+  Yet succeed.
+** good constraints
+*** Each extra_id should be in at most one has_extra_id relationship.
+*** Each id value should belong to only one entity.
+    where entity = node | extra_id
 * mk_skgnode is wrong
   It sets a lot of SkgNode list fields to None.
 * most plans are online

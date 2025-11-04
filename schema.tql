@@ -12,17 +12,17 @@ define
     relates container,
     relates contained;
 
-  # These are not stored to disk,
-  # but rather inferred by Rust from a node's text content
-  # and from there loaded into TypeDB.
-  # Hyperlinks are org-roam style plain text,
+  # these are not stored to disk,
+  # but rather inferred by rust from a node's text content
+  # and from there loaded into typedb.
+  # hyperlinks are org-roam style plain text,
   # which look like
   #  [[id:id] [label:string]]
   relation hyperlinks_to,
     relates source,
     relates dest;
 
-  # To understand the relations
+  # to understand the relations
   #   subscribes,
   #   hides_from_its_subscriptions, and
   #   overrides_view_of,
@@ -37,7 +37,7 @@ define
     relates replacement,
     relates replaced;
 
-  # "The graph" is made of nodes, which resemble org-headlines.
+  # "the graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
     plays contains:container,
@@ -53,7 +53,7 @@ define
     plays has_extra_id:node;
 
   entity extra_id,
-    # A typical node only has one ID, its primary key. But when nodes are merged, `extra_id` is used to associate more than one ID with the merge result. The naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field. (If attributes could be members of relationships, the `extra_id` entity would not be needed.)
+    # a typical node only has one id, its primary key. but when nodes are merged, `extra_id` is used to associate more than one id with the merge result. the naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field. (if attributes could be members of relationships, the `extra_id` entity would not be needed.)
     owns id @key,
     plays has_extra_id:extra_id;
 

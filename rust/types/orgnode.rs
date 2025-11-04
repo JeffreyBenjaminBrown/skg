@@ -14,7 +14,6 @@ pub struct OrgNode {
 /// This is the metadata necessary to interpret the headline.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
-  // TODO ? These fields could be absorbed into the definition of OrgNode. On the other hand, it's nice to be able to talk about 'the metadata'.
   pub id: Option<ID>,
   pub viewData: OrgnodeViewData,
   pub code: OrgnodeCode,
