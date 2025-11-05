@@ -2,7 +2,7 @@
 // Testing the logic for collecting and reducing duplicate instructions
 
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::collect_dup_instructions;
-use skg::types::{ID, SkgNode, NodeSaveAction};
+use skg::types::{ID, SkgNode, NodeSaveAction_ExcludingMerge};
 
 // Helper function to create a basic SkgNode for testing
 fn create_test_node(
@@ -24,12 +24,14 @@ fn create_test_node(
     }
 }
 
-// Helper function to create a NodeSaveAction
-fn create_save_action(might_contain_more: bool, to_delete: bool) -> NodeSaveAction {
-    NodeSaveAction {
-        indefinitive: might_contain_more,
-        toDelete: to_delete,
-    }
+// Helper function to create a NodeSaveAction_ExcludingMerge
+fn create_save_action( might_contain_more: bool,
+                       to_delete: bool
+) -> NodeSaveAction_ExcludingMerge {
+  NodeSaveAction_ExcludingMerge {
+    indefinitive: might_contain_more,
+    toDelete: to_delete,
+  }
 }
 
 #[test]
@@ -88,14 +90,15 @@ fn test_collect_dup_instructions_empty_input() {
 
 #[test]
 fn test_reconcile_dup_instructions_for_one_id_error_empty() {
-    // Test that we get the expected error for empty instructions
-    // This doesn't require async since we return early
-    let instructions: Vec<(SkgNode, NodeSaveAction)> = vec![];
+  // Test that we get the expected error for empty instructions
+  // This doesn't require async since we return early
+  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+    vec![];
 
-    // The function should return an error for empty instructions
-    // We can't directly test the async function here without TypeDB setup,
-    // but we can verify the logic structure
-    assert!(instructions.is_empty());
+  // The function should return an error for empty instructions
+  // We can't directly test the async function here without TypeDB setup,
+  // but we can verify the logic structure
+  assert!(instructions.is_empty());
 }
 
 #[test]

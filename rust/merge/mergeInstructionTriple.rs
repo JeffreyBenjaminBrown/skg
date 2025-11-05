@@ -1,5 +1,5 @@
 use crate::file_io::read_node;
-use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, EditRequest};
+use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction_ExcludingMerge, ID, EditRequest};
 use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
@@ -66,16 +66,17 @@ fn saveinstructions_from_the_merge_in_a_node(
           MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: false } ),
+              NodeSaveAction_ExcludingMerge { indefinitive: false,
+                                              toDelete: false } ),
             updated_acquirer : (
               updated_acquirer,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: false } ),
+              NodeSaveAction_ExcludingMerge { indefinitive: false,
+                                              toDelete: false } ),
             acquiree_to_delete : (
               acquiree_from_disk,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: true } ), } ); }}
+              NodeSaveAction_ExcludingMerge { indefinitive: false,
+                                              toDelete: true } ),
+          } ); }}
   Ok(merge_instructions) }
 
 /// Computes the updated acquirer node with all fields properly merged.

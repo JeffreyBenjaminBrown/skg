@@ -5,15 +5,14 @@ use super::{ID, SkgNode, SaveError, Buffer_Cannot_Be_Saved};
 /// Types
 /////////////////
 
-pub type SaveInstruction = (SkgNode, NodeSaveAction);
+pub type SaveInstruction = (SkgNode, NodeSaveAction_ExcludingMerge);
 
 /// Tells Rust what to do with a node.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NodeSaveAction {
-  // PITFALL: It's nonsense if both of these are true.
-  // The server will in that case delete,
-  // so the indefinitive has no effect.
-  pub indefinitive: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content.
+pub struct NodeSaveAction_ExcludingMerge {
+  // PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NodeSaveAction_ExcludingMerge will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.
+  // PITFALL: It's nonsense if both of these fields are true. The server will in that case delete, so the indefinitive has no effect.
+  pub indefinitive: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content. Moreover, it is not used to define that node's content, but anything it contains that is not already in the node's contents will be appended to those contents.
   pub toDelete: bool,
 }
 

@@ -7,7 +7,7 @@ use crate::typedb::relationships::create_all_relationships;
 use crate::typedb::relationships::delete_out_links;
 use crate::types::{SkgNode, ID, SaveInstruction};
 
-/// Update the DB from a batch of `(SkgNode, NodeSaveAction)` pairs:
+/// Update the DB from a batch of `(SkgNode, NodeSaveAction_ExcludingMerge)` pairs:
 /// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids
 /// 2) Remove deleted nodes from further processing
 /// 3) Create only nodes whose IDs are not present, via

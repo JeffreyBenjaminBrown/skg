@@ -39,7 +39,7 @@ Extra IDs are appended from disk.
 */
 
 use crate::types::{
-  ID, SkgNode, SaveInstruction, NodeSaveAction, SkgConfig};
+  ID, SkgNode, SaveInstruction, NodeSaveAction_ExcludingMerge, SkgConfig};
 use crate::file_io::read_node_from_id_optional;
 use crate::util::dedup_vector;
 use std::collections::{HashMap, HashSet};
@@ -118,7 +118,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
       &indefinitives, definer.as_ref(), &from_disk),
     overrides_view_of            : reconciled_overrides(
       &indefinitives, definer.as_ref(), &from_disk), };
-  let reconciled_action: NodeSaveAction = NodeSaveAction {
+  let reconciled_action: NodeSaveAction_ExcludingMerge = NodeSaveAction_ExcludingMerge {
     indefinitive : false,
     toDelete     : to_delete_if_consistent(
       &indefinitives, definer.as_ref())?, };

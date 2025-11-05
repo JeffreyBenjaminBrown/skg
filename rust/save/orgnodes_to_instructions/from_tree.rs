@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction, EditRequest};
+use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction_ExcludingMerge, SkgConfig, SaveInstruction, EditRequest};
 use crate::save::reconcile_dup_instructions;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
@@ -28,7 +28,7 @@ pub async fn orgnodes_to_save_instructions (
 pub fn orgnodes_to_dirty_save_instructions (
   trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
-  let mut result: Vec<(SkgNode, NodeSaveAction)> =
+  let mut result: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
     Vec::new();
   for tree in trees {
     interpret_node_dfs ( tree.root(),
@@ -38,15 +38,16 @@ pub fn orgnodes_to_dirty_save_instructions (
 /// Appends another pair to 'result' and recurses.
 fn interpret_node_dfs(
   node_ref: NodeRef<OrgNode>,
-  result: &mut Vec<(SkgNode, NodeSaveAction)>
+  result: &mut Vec<(SkgNode, NodeSaveAction_ExcludingMerge)>
 ) -> Result<(), String> {
   { // push another pair
     let node_data = node_ref.value();
-    let save_action: NodeSaveAction = NodeSaveAction {
-      indefinitive : ( node_data.metadata.code.indefinitive ||
-                       node_data.metadata.viewData.repeat ),
-      toDelete     : matches!(node_data.metadata.code.editRequest,
-                              Some(EditRequest::Delete)), };
+    let save_action: NodeSaveAction_ExcludingMerge =
+      NodeSaveAction_ExcludingMerge {
+        indefinitive : ( node_data.metadata.code.indefinitive ||
+                         node_data.metadata.viewData.repeat ),
+        toDelete     : matches!(node_data.metadata.code.editRequest,
+                                Some(EditRequest::Delete)), };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;
     result.push (( skg_node, save_action )); }
