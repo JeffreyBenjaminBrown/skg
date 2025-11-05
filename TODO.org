@@ -1,8 +1,5 @@
 * architecture to change
-** comment : ViewData combines what to display with how to display.
-   folded and focused are instructions to emacs,
-   the rest, glyphs
-** refactor
+** refactor completeContents and neighbors
 *** check_and_mark_repetition
     it seems to mix concerns
 *** completeContents
@@ -11,7 +8,7 @@
    It would need both a relation and a number of levels.
    (RelToParent would translate to 1 level; to grandparent, 2; etc.)
 ** nah
-*** 'merge' should be encodeable in 'Nodesaveaction'
+*** 'merge' should be encodeable in NodeSaveAction
     Then I wouldn't need to parse the action twice,
     in two different ways.
 * TypeDB should report constraint violations.

@@ -22,6 +22,8 @@ pub struct OrgnodeMetadata {
 /* View-related metadata: fields that dictate only how the node is shown. */
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeViewData {
+  // PITFALL: One could reasonably describe 'focused' and 'folded' as code rather than data. They tell Emacs what to do. Once Emacs has done that, it deletes them from the metadata. The other fields in this type are only acted on to the extent that Emacs displays them.
+
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool, // folded in the Emacs org-mode sense
