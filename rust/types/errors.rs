@@ -13,9 +13,6 @@ pub enum SaveError {
   ParseError(String),
   DatabaseError(Box<dyn Error>),
   IoError(io::Error),
-  InconsistentInstructions {
-    inconsistent_deletions: Vec<ID>,
-    multiple_definers: Vec<ID>, },
   BufferValidationErrors ( Vec<BufferValidationError> ), }
 
 /// If the user attempts to save a buffer
