@@ -188,6 +188,7 @@ pub fn mk_repeated_orgnode_from_id (
   let skgnode : SkgNode = read_node ( path ) ?;
   let mut md = default_metadata ();
   md . viewData . repeat = true;
+  md . code . indefinitive = true; // Any repeated node is indefinitive, but not vice-versa.
   md . id = Some ( id . clone () );
   Ok ( OrgNode {
     metadata : md,

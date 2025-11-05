@@ -2,7 +2,7 @@ pub mod complete_aliascol;
 pub use complete_aliascol::completeAliasCol;
 
 pub mod complete_contents;
-pub use complete_contents::completeContents;
+pub use complete_contents::{completeContents, check_and_mark_repetition};
 
 pub mod integrate_backpath;
 pub use integrate_backpath::{
@@ -64,7 +64,7 @@ fn complete_node_preorder<'a> (
   errors        : &'a mut Vec < String >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let (treatment, might_contain_more) : (RelToParent, bool) = {
+    let (treatment, indefinitive) : (RelToParent, bool) = {
       let node_ref : ego_tree::NodeRef < OrgNode > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
@@ -75,12 +75,17 @@ fn complete_node_preorder<'a> (
     if treatment == RelToParent::AliasCol {
       completeAliasCol (
         tree, node_id, config ) ?;
-      // Don't recurse - completeAliasCol handles the whole subtree
-    } else {
-      if ! might_contain_more {
+      // Don't recurse; completeAliasCol handles the whole subtree.
+    } else { // Check for repetition and update visited set.
+      let is_repeat : bool =
+        check_and_mark_repetition (
+          tree, node_id, config, visited ) ?;
+      if (! is_repeat && // repeat should imply indefinitive, so this is redundant, but harmless.
+          ! indefinitive ) {
         completeContents (
           tree, node_id, config, visited ) ?; }
       map_complete_node_preorder_over_children (
+        // Always recurse to children -- even for repeated nodes, since they may have children from view requests.
         tree, node_id, config, typedb_driver,
         visited, ancestor_path, errors ) . await ?; }
 

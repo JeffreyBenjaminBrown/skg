@@ -18,27 +18,23 @@ use std::error::Error;
 /// so that its 'id' field is the PID (no need to call pid_from_id).
 ///
 /// METHOD: Given a node N:
-/// - If N is indefinitive, do nothing and return.
 /// - Get N's ID (error if missing)
 /// - If N's ID is in 'visited', replace N with a repeated marker and return
 /// - Add N's ID to 'visited'.
+/// - If N is indefinitive, do nothing and return (but repetition was still checked).
 /// - Read N's SkgNode from disk
 /// - Categorize N's children into content/non-content
 /// - Change invalid content children to treatment=parentIgnores and move to the end of non-content.
 /// - Build completed-content list from disk, preserving order.
 /// - Reorder children: non-content first, then completed-content
-pub fn completeContents (
+/// Check for repetition and mark node if it's a repeat.
+/// Returns true if node was marked as repeated (and should not be processed further).
+pub fn check_and_mark_repetition (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
   visited   : &mut HashSet < ID >,
-) -> Result < (), Box<dyn Error> > {
-  { // Indefinitive nodes are left unchanged.
-    let node_ref : ego_tree::NodeRef < OrgNode > =
-      tree . get ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    if node_ref . value () . metadata . code.indefinitive {
-      return Ok (( )); }}
+) -> Result < bool, Box<dyn Error> > {
   let node_pid : ID = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
@@ -46,7 +42,7 @@ pub fn completeContents (
     node_ref . value () . metadata . id . clone ()
       . ok_or ( "Node has no ID" ) ? };
   if visited . contains ( & node_pid ) {
-    // If already visited, replace with repeated node and return.
+    // If already visited, replace with repeated node and return true.
     let repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
         config, & node_pid ) ?;
@@ -54,9 +50,27 @@ pub fn completeContents (
       subtree_contains_focused ( tree, node_id );
     replace_subtree_with_node (
       tree, node_id, repeated_node, has_focused ) ?;
-    return Ok (( )); }
-  visited . insert ( // Add to visited
-    node_pid . clone () );
+    return Ok ( true ); }
+  visited . insert ( node_pid );
+  Ok ( false ) }
+
+pub fn completeContents (
+  tree      : &mut Tree < OrgNode >,
+  node_id   : NodeId,
+  config    : &SkgConfig,
+  visited   : &mut HashSet < ID >,
+) -> Result < (), Box<dyn Error> > {
+  // ASSUMES: check_and_mark_repetition has already been called
+  // Get node_pid and check if indefinitive
+  let (node_pid, is_indefinitive) : (ID, bool) = {
+    let node_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    ( node_ref . value () . metadata . id . clone ()
+        . ok_or ( "Node has no ID" ) ?,
+      node_ref . value () . metadata . code.indefinitive ) };
+  // Indefinitive nodes are not completed (though their children might be).
+  if is_indefinitive { return Ok (( )); }
   let skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, node_pid . clone () );

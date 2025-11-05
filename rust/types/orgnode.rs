@@ -25,9 +25,8 @@ pub struct OrgnodeViewData {
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool, // folded in the Emacs org-mode sense
-  pub repeat: bool, /* Implies that the node already appears elsewhere in this buffer.
-PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true. But the only time it is marked as 'repeat' is when Rust builds a content view and discovers the node has already been rendered. By contrast, when a node marked 'repeat' is saved, since the user may have edited it, the 'repeat' label is replaced with 'indefinitive'. And 'repeat' detection is skipped entirely for 'indefinitive' nodes, so it will thereafter appear without the 'repeat' marker.
-TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
+  pub repeat: bool, // Implies that the node already appears elsewhere in this buffer.
+    // PITFALL: repeated => indefinitive. (At least it should, and I think the code adheres to that.)
   pub relationships: OrgnodeRelationships,
 }
 
@@ -48,7 +47,8 @@ pub struct OrgnodeRelationships {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeCode {
   pub relToParent: RelToParent,
-  pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. Then the indefinitive nodes can append content. (Omitting the body of an indefinitive node can help economize on screen space.)
+  pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. The indefinitive nodes can append content, if they have any novel contents (where novel = not already contained by the target node).
+  // Thus 'indefinitive' defines, among other things, a node's relationship to its children -- at least, to those children that are content (i.e. with relToParent=Content). (Any orgnode, indefinitive or otherwise, can define aliases. I haven't decided whether that will be true of the three sharing relationsips -- subscription, hides and overrides.)
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
   pub editRequest: Option<EditRequest>,
   pub viewRequests: HashSet<ViewRequest>,

@@ -1,13 +1,12 @@
 * architecture to change
-** indefinitive
-*** If repeated, don't display indefinitive too.
-*** ? rename indefinitive -> definesNeitherTextNorContents
-*** comment : 'indefinitive' should go wherever 'repeated' does.
-    But not the reverse.
-*** comment : 'indef' is about the relationship to children.
 ** comment : ViewData combines what to display with how to display.
    folded and focused are instructions to emacs,
    the rest, glyphs
+** refactor
+*** check_and_mark_repetition
+    it seems to mix concerns
+*** completeContents
+    it's just too long
 ** RelToParent could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
    (RelToParent would translate to 1 level; to grandparent, 2; etc.)
