@@ -8,13 +8,15 @@ pub use errors::{ HyperlinkParseError,
                   SaveError,
                   Buffer_Cannot_Be_Saved, };
 pub mod orgnode;
-pub use orgnode::{ OrgNode,
-                   OrgnodeMetadata,
-                   OrgnodeViewData,
-                   OrgnodeCode,
-                   OrgnodeRelationships,
-                   RelToParent,
-                   NodeRequest, };
+pub use orgnode::{
+  OrgNode, // metadata, title, body
+    OrgnodeMetadata, // id, viewdata, code
+      OrgnodeViewData, // cycle, focused, folded, relationships
+        OrgnodeRelationships, // 2 bools, 3 ints
+      OrgnodeCode, // relToParent, indef, repeat, toDelete, nodeReqs
+        RelToParent, // content, for aliases, or ignored
+        NodeRequest, // what's asked for: views, merge
+};
 pub use crate::serve::parse_headline_md_sexp::orgnodemd_to_string;
 pub mod skgnode;
 pub use skgnode::{ SkgNode,

@@ -1,4 +1,4 @@
-# Claude Code Configuration
+First check out [the project overview](OVERVIEW.org).
 
 ## Initialization Instructions
 

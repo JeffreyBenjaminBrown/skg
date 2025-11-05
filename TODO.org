@@ -1,7 +1,53 @@
-* architecture to fix
+* architecture to change
+** chnage OrgnodeMetadata
+OrgnodeMetadata, // id, viewdata, code
+  OrgnodeViewData, // focused, folded, repeated, cycle, relationships
+    OrgnodeRelationships, // 2 bools, 3 ints
+  OrgnodeCode, // relToParent, indef, editRequest (singular, optional), viewRequests (plural, set)
+    RelToParent, // content | for aliases | ignored
+    EditRequest, // merge | delete
+    ViewRequest, // containerward | sourceward
+** TypeDB is probably better for finding constraint violations.
+*** Some states are invalid or redundant.
+**** IDs should be unique.
+**** Redundant state is possible.
+***** A node can 'hide from subscriptions' something it contains.
+      'contains' should imply 'hides from subscriptions'.
+      (That is, the server should not display
+      in one of a node's subscriptions
+      something already shown in the node's content.)
+** Code should render before viewdata
+   and among code, first should be relToParent.
+** dividing code
+   Some is about save interpretation.
+     Here, 'indef' should only be found where relToParent=content
+   Some requests special edits: Delete, merge.
+   Some requests views.
+** 'indef' only makes sense if reltoparent = content
+** merge and delete should be among an enum, 'graphActions'
+   serial
+*** make an invalid state impossible
+    An orgnode has only one field for it, not a set,
+    so they can't conflict with each other.
+*** nodeRequests -> nodeViewRequests
+** RelToParent seems better as RelToAncestor
+   with two fields:
+** rename Hyperlink -> TextLink
+** merge the two Save errors
+** rename indefinitive -> definesNotTextNorContents
 ** 'merge' should be encodeable in 'Nodesaveaction'
    Then I wouldn't need to parse the action twice,
    in two different ways.
+** ViewData combines what to display with how to display.
+   folded and focused are instructions to emacs,
+   the rest, glyphs
+** OrgnodeCode is unreasonable.
+   Deletion is represented as a bool,
+   but merge as an enum among view requests.
+** If repeated, don't display indefinitive too.
+** 'repeated' is view data, not code.
+** 'indefinitive' should go wherever 'repeated' does.
+   But not the reverse.
 * TypeDB should report constraint violations.
   Yet succeed.
 ** good constraints
