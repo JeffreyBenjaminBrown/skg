@@ -10,7 +10,7 @@ pub use integrate_backpath::{
   build_and_integrate_sourceward_path,
   integrate_path_that_might_fork_or_cycle};
 
-use crate::types::{ID, SkgConfig, OrgNode, RelToParent, NodeRequest};
+use crate::types::{ID, SkgConfig, OrgNode, RelToParent, ViewRequest};
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
@@ -84,24 +84,22 @@ fn complete_node_preorder<'a> (
         tree, node_id, config, typedb_driver,
         visited, ancestor_path, errors ) . await ?; }
 
-    let node_requests : Vec < NodeRequest > = {
+    let view_requests : Vec < ViewRequest > = {
       let node_ref : ego_tree::NodeRef < OrgNode > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
-      node_ref . value () . metadata . code . nodeRequests
+      node_ref . value () . metadata . code . viewRequests
         . iter () . cloned () . collect () };
-    for request in node_requests {
+    for request in view_requests {
       match request {
-        NodeRequest::ContainerwardView => {
+        ViewRequest::ContainerwardView => {
           wrapped_build_and_integrate_containerward_view (
-            tree, node_id, config, typedb_driver, errors ) . await ?; },
-        NodeRequest::SourcewardView => {
+            tree, node_id, config, typedb_driver, errors )
+            . await ?; },
+        ViewRequest::SourcewardView => {
           wrapped_build_and_integrate_sourceward_view (
-            tree, node_id, config, typedb_driver, errors ) . await ?; },
-        NodeRequest::Merge(_) => {
-          // A merge request requests a graph change,
-          // not a view change. This function ignores it.
-        }, }}
+            tree, node_id, config, typedb_driver, errors )
+            . await ?; }, }}
     Ok (( )) }) }
 
 /// Recurse to children, marking cycles and calling complete_node_preorder.
@@ -172,8 +170,8 @@ async fn wrapped_build_and_integrate_containerward_view (
     let mut node_mut : ego_tree::NodeMut < OrgNode > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    node_mut . value () . metadata . code . nodeRequests
-      . remove ( &NodeRequest::ContainerwardView ); }
+    node_mut . value () . metadata . code . viewRequests
+      . remove ( &ViewRequest::ContainerwardView ); }
   Ok (( )) }
 
 async fn wrapped_build_and_integrate_sourceward_view (
@@ -197,6 +195,6 @@ async fn wrapped_build_and_integrate_sourceward_view (
     let mut node_mut : ego_tree::NodeMut < OrgNode > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    node_mut . value () . metadata . code . nodeRequests
-      . remove ( &NodeRequest::SourcewardView ); }
+    node_mut . value () . metadata . code . viewRequests
+      . remove ( &ViewRequest::SourcewardView ); }
   Ok (( )) }

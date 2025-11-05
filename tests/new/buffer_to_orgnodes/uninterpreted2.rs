@@ -127,7 +127,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.metadata.viewData.folded, false);
   assert_eq!(first_node.metadata.viewData.repeat, false);
   assert_eq!(first_node.metadata.code.indefinitive, false);
-  assert_eq!(first_node.metadata.code.toDelete, false);
+  assert_eq!(first_node.metadata.code.editRequest, None);
 
   // Test second node - should have no body
   let second_node = trees[1].root().value();

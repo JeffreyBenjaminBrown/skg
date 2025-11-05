@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction};
+use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction, SkgConfig, SaveInstruction, EditRequest};
 use crate::save::reconcile_dup_instructions;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
@@ -45,7 +45,8 @@ fn interpret_node_dfs(
     let save_action: NodeSaveAction = NodeSaveAction {
       indefinitive : ( node_data.metadata.code.indefinitive ||
                        node_data.metadata.viewData.repeat ),
-      toDelete     : node_data.metadata.code.toDelete, };
+      toDelete     : matches!(node_data.metadata.code.editRequest,
+                              Some(EditRequest::Delete)), };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;
     result.push (( skg_node, save_action )); }
@@ -120,8 +121,8 @@ fn collect_contents (
   for child in node_ref.children() {
     if ( child . value() . metadata . code.relToParent
          == RelToParent::Content
-         && ! child . value() . metadata . code.toDelete ) {
+         && ! matches!(child . value() . metadata . code . editRequest,
+                       Some(EditRequest::Delete)) ) {
       if let Some(id) = &child.value().metadata.id {
-        contents.push(id.clone());
-      }} }
+        contents.push(id.clone()); }} }
   contents }

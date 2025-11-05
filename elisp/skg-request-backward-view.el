@@ -29,7 +29,7 @@
     (save-excursion
       (org-back-to-heading t)
       (skg-edit-metadata-at-point
-       `(skg (code (requests ,view-token)))) )
+       `(skg (code (viewRequests ,view-token)))) )
     (skg-request-save-buffer)))
 
 (provide 'skg-request-backward-view)

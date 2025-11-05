@@ -9,7 +9,7 @@
        - No node can be involved in more than one merge.
 */
 
-use crate::types::{OrgNode, RelToParent, ID, NodeRequest, SkgConfig};
+use crate::types::{OrgNode, RelToParent, ID, EditRequest, SkgConfig};
 use crate::typedb::util::pid_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -44,8 +44,8 @@ pub async fn validate_merge_requests(
             "Acquirer node '{}' cannot be an Alias or AliasCol",
             acquirer_id.as_str() ));
         continue; }
-    for request in &node.metadata.code.nodeRequests {
-      if let NodeRequest::Merge(acquiree_id) = request {
+    if let Some(EditRequest::Merge(acquiree_id))
+      = &node.metadata.code.editRequest {
         let pair_errors : Vec<String> =
           validate_merge_pair(
             config,
@@ -53,7 +53,7 @@ pub async fn validate_merge_requests(
             acquirer_id,
             acquiree_id,
             &collections.to_delete_ids ). await?;
-        errors.extend(pair_errors); } }}
+        errors.extend(pair_errors); }}
   let monogamy_errors : Vec<String> =
     validate_monogamy(
       &collections.acquirer_to_acquirees,
@@ -76,24 +76,24 @@ fn collect_merge_validation_data<'a>(
     for edge in tree.root().traverse() {
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let orgnode: &OrgNode = node_ref.value();
-        if orgnode.metadata.code.toDelete {
+        if matches!(orgnode.metadata.code.editRequest,
+                    Some(EditRequest::Delete)) {
           if let Some(ref id) = orgnode.metadata.id {
             to_delete_ids.insert( // Mutate!
               id.clone()); }}
-        if !orgnode.metadata.code.nodeRequests.is_empty() {
-          for request in &orgnode.metadata.code.nodeRequests {
-            if let NodeRequest::Merge(acquiree_id) = request {
-              if let Some(ref acquirer_id) = orgnode.metadata.id {
-                acquirer_orgnodes.push( // Mutate!
-                  orgnode);
-                acquirer_to_acquirees // Mutate!
-                  .entry(acquirer_id.clone())
-                  .or_insert_with(HashSet::new)
-                  .insert(acquiree_id.clone());
-                acquiree_to_acquirers // Mutate!
-                  .entry(acquiree_id.clone())
-                  .or_insert_with(HashSet::new)
-                  .insert(acquirer_id.clone()); }} }} }} }
+        if let Some(EditRequest::Merge(acquiree_id))
+          = &orgnode.metadata.code.editRequest {
+            if let Some(ref acquirer_id) = orgnode.metadata.id {
+              acquirer_orgnodes.push( // Mutate!
+                orgnode);
+              acquirer_to_acquirees // Mutate!
+                .entry(acquirer_id.clone())
+                .or_insert_with(HashSet::new)
+                .insert(acquiree_id.clone());
+              acquiree_to_acquirers // Mutate!
+                .entry(acquiree_id.clone())
+                .or_insert_with(HashSet::new)
+                .insert(acquirer_id.clone()); }} }} }
   MergeValidationData { acquirer_orgnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,

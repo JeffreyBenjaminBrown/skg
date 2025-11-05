@@ -4,7 +4,7 @@ use skg::merge::{
   instructiontriples_from_the_merges_in_an_orgnode_forest,
   merge_nodes_in_graph};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
-use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, MergeInstructionTriple};
+use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
 use skg::file_io::read_node;
 use skg::util::path_from_pid;
 use skg::typedb::search::{
@@ -59,9 +59,6 @@ async fn test_merge_2_into_1_impl(
   driver: &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 1 requesting to merge node 2
-  let mut node_requests: HashSet<NodeRequest> = HashSet::new();
-  node_requests.insert(NodeRequest::Merge(ID::from("2")));
-
   let org_node_1: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("1")),
@@ -69,8 +66,8 @@ async fn test_merge_2_into_1_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        toDelete: false,
-        nodeRequests: node_requests, }, },
+        editRequest: Some(EditRequest::Merge(ID::from("2"))),
+        viewRequests: HashSet::new(), }, },
     title: "1".to_string(),
     body: None, };
   let forest: Vec<Tree<OrgNode>> =
@@ -343,9 +340,6 @@ async fn test_merge_1_into_2_impl(
   driver: &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 2 requesting to merge node 1
-  let mut node_requests: HashSet<NodeRequest> = HashSet::new();
-  node_requests.insert(NodeRequest::Merge(ID::from("1")));
-
   let org_node_2: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("2")),
@@ -353,8 +347,8 @@ async fn test_merge_1_into_2_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        toDelete: false,
-        nodeRequests: node_requests, }, },
+        editRequest: Some(EditRequest::Merge(ID::from("1"))),
+        viewRequests: HashSet::new(), }, },
     title: "2".to_string(),
     body: None, };
   let forest: Vec<Tree<OrgNode>> =

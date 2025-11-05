@@ -1,5 +1,5 @@
 use crate::file_io::read_node;
-use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
+use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, EditRequest};
 use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
@@ -45,8 +45,8 @@ fn saveinstructions_from_the_merge_in_a_node(
             Box<dyn Error>> {
   let mut merge_instructions: Vec<MergeInstructionTriple> =
     Vec::new();
-  for request in &node.metadata.code.nodeRequests {
-    if let NodeRequest::Merge(acquiree_id) = request {
+  if let Some(EditRequest::Merge(acquiree_id))
+    = &node.metadata.code.editRequest {
       let acquirer_id : &ID =
         node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
@@ -75,7 +75,7 @@ fn saveinstructions_from_the_merge_in_a_node(
             acquiree_to_delete : (
               acquiree_from_disk,
               NodeSaveAction { indefinitive: false,
-                               toDelete: true } ), } ); }} }
+                               toDelete: true } ), } ); }}
   Ok(merge_instructions) }
 
 /// Computes the updated acquirer node with all fields properly merged.

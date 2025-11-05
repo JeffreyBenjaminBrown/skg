@@ -28,7 +28,8 @@
                 (RED parentIgnores "!{"))
               (indefinitive "indef")
               (RED toDelete "delete")
-              (nodeRequests
+              (RED merge (ANY "merge:" IT))
+              (viewRequests
                 (containerwardView "req:containers")
                 (sourcewardView "req:sources"))))
   "Rules to convert metadata sexps into herald tokens.")

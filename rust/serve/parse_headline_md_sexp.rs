@@ -1,7 +1,7 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent, NodeRequest};
+use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent, EditRequest, ViewRequest};
 use crate::types::orgnode::default_metadata;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
@@ -141,8 +141,14 @@ fn parse_code_sexp (
               _ => return Err (
                 format! ( "Unknown relToParent value: {}", value )),
             }; },
-          "requests" => {
-            parse_requests_sexp ( &kv_pair[1..], &mut code . nodeRequests ) ?; },
+          "merge" => {
+            // (merge id) sets editRequest to Merge(id)
+            let id_str : String = atom_to_string ( &kv_pair[1] ) ?;
+            code . editRequest = Some (
+              EditRequest::Merge ( ID::from ( id_str ))); },
+          "viewRequests" => {
+            parse_viewrequests_sexp (
+              &kv_pair[1..], &mut code . viewRequests ) ?; },
           _ => { return Err ( format! ( "Unknown code key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => {
@@ -150,40 +156,31 @@ fn parse_code_sexp (
           atom_to_string ( code_element ) ?;
         match bare_value . as_str () {
           "indefinitive" => code . indefinitive = true,
-          "toDelete"     => code . toDelete = true,
-          _ => {
-            return Err ( format! ( "Unknown code value: {}",
-                                    bare_value )); }} },
+          "toDelete"     => code . editRequest =
+            Some ( EditRequest::Delete ),
+          _ => { return Err ( format! ( "Unknown code value: {}",
+                                         bare_value )); }} },
       _ => { return Err ( "Unexpected element in code"
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Parse the (requests ...) s-expression and update nodeRequests.
-fn parse_requests_sexp (
+/// Parse the (viewRequests ...) s-expression and update viewRequests.
+fn parse_viewrequests_sexp (
   items : &[Sexp],
-  requests : &mut HashSet<NodeRequest>
+  requests : &mut HashSet<ViewRequest>
 ) -> Result<(), String> {
   for request_element in items {
     match request_element {
       Sexp::Atom ( _ ) => {
         let request_str : String =
           atom_to_string ( request_element ) ?;
-        let request : NodeRequest =
-          NodeRequest::from_str ( &request_str )
-          . map_err ( | e | format! ( "Invalid request: {}", e )) ?;
+        let request : ViewRequest =
+          ViewRequest::from_str ( &request_str )
+          . map_err (
+            | e | format! ( "Invalid view request: {}", e )) ?;
         requests . insert ( request ); },
-      Sexp::List ( list_items ) if list_items . len () == 2 => {
-        let command : String =
-          atom_to_string ( &list_items[0] ) ?;
-        if command == "merge" {
-          let id_str : String =
-            atom_to_string ( &list_items[1] ) ?;
-          requests . insert ( NodeRequest::Merge ( ID::from ( id_str )) );
-        } else {
-          return Err ( format! ( "Unknown request command: {}",
-                                  command )); }},
       _ => { return Err (
-        "Unexpected element in requests (expected atoms or (merge id))"
+        "Unexpected element in viewRequests (expected atoms)"
           . to_string () ); }} }
   Ok (( )) }
 
@@ -271,22 +268,27 @@ pub fn orgnodemd_to_string (
     rel_parts.push ( "containsParent".to_string () ); }
   // Only emit if not default (default is Some(1))
   if metadata.viewData.relationships.numContainers != Some ( 1 ) {
-    if let Some ( count ) = metadata.viewData.relationships.numContainers {
-      rel_parts.push ( format! ( "(containers {})", count )); } }
+    if let Some ( count )
+      = metadata.viewData.relationships.numContainers {
+        rel_parts.push ( format! ( "(containers {})", count )); }}
   // Only emit if not default (default is Some(0))
   if metadata.viewData.relationships.numContents != Some ( 0 ) {
-    if let Some ( count ) = metadata.viewData.relationships.numContents {
-      rel_parts.push ( format! ( "(contents {})", count )); } }
+    if let Some ( count )
+      = metadata.viewData.relationships.numContents {
+        rel_parts.push ( format! ( "(contents {})", count )); }}
   // Only emit if not default (default is Some(0))
   if metadata.viewData.relationships.numLinksIn != Some ( 0 ) {
-    if let Some ( count ) = metadata.viewData.relationships.numLinksIn {
-      rel_parts.push ( format! ( "(linksIn {})", count )); } }
+    if let Some ( count )
+      = metadata.viewData.relationships.numLinksIn {
+        rel_parts.push ( format! ( "(linksIn {})", count )); }}
 
   if ! rel_parts . is_empty () {
-    view_parts.push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
+    view_parts.push ( format! ( "(rels {})",
+                                  rel_parts . join ( " " ))); }
 
   if ! view_parts . is_empty () {
-    parts.push ( format! ( "(view {})", view_parts . join ( " " ))); }
+    parts.push ( format! ( "(view {})",
+                             view_parts . join ( " " ))); }
 
   // Build code s-expr
   let mut code_parts : Vec<String> = Vec::new ();
@@ -295,21 +297,24 @@ pub fn orgnodemd_to_string (
       "(relToParent {})", metadata.code.relToParent )); }
   if metadata.code.indefinitive {
     code_parts.push ( "indefinitive".to_string () ); }
-  if metadata.code.toDelete {
-    code_parts.push ( "toDelete".to_string () ); }
 
-  // Build requests s-expr (inside code)
-  if ! metadata.code.nodeRequests . is_empty () {
+  // Handle editRequest (toDelete or merge)
+  if let Some(ref edit_req) = metadata.code.editRequest {
+    code_parts.push ( edit_req . to_string () ); }
+
+  // Build viewRequests s-expr (inside code)
+  if ! metadata.code.viewRequests . is_empty () {
     let mut request_strings : Vec<String> =
-      metadata.code.nodeRequests . iter ()
+      metadata.code.viewRequests . iter ()
       . map ( | req | req . to_string () )
       . collect ();
     request_strings . sort (); // Ensure consistent ordering
-    code_parts.push ( format! ( "(requests {})", request_strings . join ( " " ))); }
+    code_parts.push ( format! ( "(viewRequests {})",
+                                  request_strings . join ( " " ))); }
 
   if ! code_parts . is_empty () {
-    parts.push ( format! ( "(code {})", code_parts . join ( " " ))); }
-
+    parts.push ( format! ( "(code {})",
+                             code_parts . join ( " " ))); }
   parts.join ( " " ) }
 
 pub fn parse_headline_from_sexp (

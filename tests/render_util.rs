@@ -75,8 +75,8 @@ fn test_metadata_ordering () {
           code : OrgnodeCode {
             relToParent : RelToParent::Content,
             indefinitive : false,
-            toDelete     : false,
-            nodeRequests : HashSet::new (), }, },
+            editRequest  : None,
+            viewRequests : HashSet::new (), }, },
       title : "Test".to_string (),
       body : None, };
   let result : String =

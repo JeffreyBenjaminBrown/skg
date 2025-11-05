@@ -50,8 +50,8 @@ pub struct OrgnodeCode {
   pub relToParent: RelToParent,
   pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. Then the indefinitive nodes can append content. (Omitting the body of an indefinitive node can help economize on screen space.)
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
-  pub toDelete: bool,
-  pub nodeRequests: HashSet<NodeRequest>,
+  pub editRequest: Option<EditRequest>,
+  pub viewRequests: HashSet<ViewRequest>,
 }
 
 /// 'RelToParent' describes how a node relates to its parent.
@@ -67,12 +67,20 @@ pub enum RelToParent {
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
 }
 
-/// Requests for additional information or views related to a node.
+/// Requests for editing operations on a node.
+/// Only one edit request is allowed per node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditRequest {
+  Merge(ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
+  Delete, // request to delete this node
+}
+
+/// Requests for additional views related to a node.
+/// Multiple view requests can be active simultaneously.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum NodeRequest {
+pub enum ViewRequest {
   ContainerwardView,
   SourcewardView,
-  Merge(ID), // to merge the node with that ID (as acquiree, deleted) into this one (as acquirer)
 }
 
 
@@ -108,33 +116,53 @@ impl FromStr for RelToParent {
       _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
     }} }
 
-impl fmt::Display for NodeRequest {
+impl fmt::Display for EditRequest {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      NodeRequest::ContainerwardView => write!(f, "containerwardView"),
-      NodeRequest::SourcewardView    => write!(f, "sourcewardView"),
-      NodeRequest::Merge(id)         => write!(f, "(merge {})", id.0),
+      EditRequest::Merge(id) => write!(f, "(merge {})", id.0),
+      EditRequest::Delete    => write!(f, "toDelete"),
     } } }
 
-impl FromStr for NodeRequest {
+impl FromStr for EditRequest {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "containerwardView" => Ok ( NodeRequest::ContainerwardView ),
-      "sourcewardView"    => Ok ( NodeRequest::SourcewardView ),
+      "toDelete" => Ok ( EditRequest::Delete ),
       _ => {
         // Try to parse as "merge <id>"
         if let Some(id_str) = s.strip_prefix("merge ") {
-          Ok ( NodeRequest::Merge ( ID::from(id_str) ) )
+          Ok ( EditRequest::Merge ( ID::from(id_str) ) )
         } else {
-          Err ( format! ( "Unknown NodeRequest value: {}", s ))
+          Err ( format! ( "Unknown EditRequest value: {}", s ))
         }} }} }
+
+impl fmt::Display for ViewRequest {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>
+  ) -> fmt::Result {
+    match self {
+      ViewRequest::ContainerwardView => write!(f, "containerwardView"),
+      ViewRequest::SourcewardView    => write!(f, "sourcewardView"),
+    } } }
+
+impl FromStr for ViewRequest {
+  type Err = String;
+
+  fn from_str (
+    s : &str
+  ) -> Result<Self, Self::Err> {
+    match s {
+      "containerwardView" => Ok ( ViewRequest::ContainerwardView ),
+      "sourcewardView"    => Ok ( ViewRequest::SourcewardView ),
+      _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),
+    }} }
 
 impl Default for OrgnodeRelationships {
   fn default () -> Self {
@@ -161,8 +189,8 @@ impl Default for OrgnodeCode {
     OrgnodeCode {
       relToParent : RelToParent::Content,
       indefinitive : false,
-      toDelete : false,
-      nodeRequests : HashSet::new (),
+      editRequest : None,
+      viewRequests : HashSet::new (),
     }} }
 
 pub fn default_metadata () -> OrgnodeMetadata {
