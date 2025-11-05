@@ -1,6 +1,6 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, RelToParent, Buffer_Cannot_Be_Saved, SkgConfig};
+use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig};
 use crate::merge::validate_merge_requests;
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -19,25 +19,25 @@ pub async fn find_buffer_errors_for_saving (
   trees: &[Tree<OrgNode>],
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<Buffer_Cannot_Be_Saved>, Box<dyn std::error::Error>> {
-  let mut errors: Vec<Buffer_Cannot_Be_Saved> = Vec::new();
+) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
+  let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_ids, problematic_defining_ids) =
       find_inconsistent_instructions(trees);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
         errors.push (
-          Buffer_Cannot_Be_Saved::AmbiguousDeletion(id)); }
+          BufferValidationError::AmbiguousDeletion(id)); }
       for id in problematic_defining_ids {
         errors.push(
-          Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id));
+          BufferValidationError::Multiple_DefiningContainers(id));
       }} }
   { // merge validation
     let merge_errors: Vec<String> =
       validate_merge_requests(trees, config, driver).await?;
     for error_msg in merge_errors {
       errors.push(
-        Buffer_Cannot_Be_Saved::Other(error_msg)); }}
+        BufferValidationError::Other(error_msg)); }}
   { // other kinds of error
     for tree in trees {
       validate_node_and_children (
@@ -50,7 +50,7 @@ pub async fn find_buffer_errors_for_saving (
 fn validate_node_and_children (
   node_ref: ego_tree::NodeRef<OrgNode>,
   parent_treatment : Option<RelToParent>, // that is, the treatment of the parent of what node_ref points to
-  errors: &mut Vec<Buffer_Cannot_Be_Saved>
+  errors: &mut Vec<BufferValidationError>
 ) {
 
   let node: &OrgNode = node_ref.value();
@@ -58,23 +58,23 @@ fn validate_node_and_children (
     RelToParent::AliasCol => {
       if node.body.is_some() {
         errors.push(
-          Buffer_Cannot_Be_Saved::Body_of_AliasCol(
+          BufferValidationError::Body_of_AliasCol(
             node.clone() )); }},
 
     RelToParent::Alias => {
       if node.body.is_some() {
         errors.push(
-          Buffer_Cannot_Be_Saved::Body_of_Alias(
+          BufferValidationError::Body_of_Alias(
             node.clone() )); }
       if let Some(ref parent_rel) = parent_treatment {
         if *parent_rel != RelToParent::AliasCol {
           errors.push(
-            Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(
+            BufferValidationError::Alias_with_no_AliasCol_Parent(
               node.clone() )); }
       } else {
         // Root level Alias is also invalid
         errors.push(
-          Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(
+          BufferValidationError::Alias_with_no_AliasCol_Parent(
             node.clone() )); }},
     _ => {} }
 
@@ -84,12 +84,12 @@ fn validate_node_and_children (
         // Children of AliasCol should not have IDs
         if node.metadata.id.is_some() {
           errors.push(
-            Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(
+            BufferValidationError::Child_of_AliasCol_with_ID(
               node.clone() )); }},
       RelToParent::Alias => {
         // Children of Alias should not exist at all
         errors.push(
-          Buffer_Cannot_Be_Saved::Child_of_Alias(
+          BufferValidationError::Child_of_Alias(
             node.clone() )); },
         _ => {} }}
 
@@ -102,7 +102,7 @@ fn validate_node_and_children (
       . count();
     if aliasCol_children_count > 1 {
       errors.push (
-        Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children (
+        BufferValidationError::Multiple_AliasCols_in_Children (
           node.clone() )); }}
 
   { // If a node is definitive, it should have
@@ -117,7 +117,7 @@ fn validate_node_and_children (
           if let Some ( ref child_id ) = child_node . metadata . id {
             if ! seen_content_ids . insert ( child_id . clone () ) {
               errors . push (
-                Buffer_Cannot_Be_Saved::DuplicatedContent (
+                BufferValidationError::DuplicatedContent (
                   child_id . clone () )); }} }} }}
 
   for child in node_ref.children() { // recurse

@@ -1,32 +1,13 @@
 * architecture to change
-** DONE chnage OrgnodeMetadata
-OrgnodeMetadata, // id, viewdata, code
-  OrgnodeViewData, // focused, folded, repeated, cycle, relationships
-    OrgnodeRelationships, // 2 bools, 3 ints
-  OrgnodeCode, // relToParent, indef, editRequest (singular, optional), viewRequests (plural, set)
-    RelToParent, // content | for aliases | ignored
-    EditRequest, // merge | delete
-    ViewRequest, // containerward | sourceward
 ** indefinitive
 *** If repeated, don't display indefinitive too.
-*** rename indefinitive -> definesNeitherTextNorContents
+*** ? rename indefinitive -> definesNeitherTextNorContents
 *** comment : 'indefinitive' should go wherever 'repeated' does.
     But not the reverse.
 *** comment : 'indef' is about the relationship to children.
 ** comment : ViewData combines what to display with how to display.
    folded and focused are instructions to emacs,
    the rest, glyphs
-** merge the two Save errors
-** rename TextLink -> TextLink
-** TypeDB is probably better for finding constraint violations.
-*** Some states are invalid or redundant.
-**** IDs should be unique.
-**** Redundant state is possible.
-***** A node can 'hide from subscriptions' something it contains.
-      'contains' should imply 'hides from subscriptions'.
-      (That is, the server should not display
-      in one of a node's subscriptions
-      something already shown in the node's content.)
 ** RelToParent could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
    (RelToParent would translate to 1 level; to grandparent, 2; etc.)
@@ -40,6 +21,15 @@ OrgnodeMetadata, // id, viewdata, code
 *** Each extra_id should be in at most one has_extra_id relationship.
 *** Each id value should belong to only one entity.
     where entity = node | extra_id
+** TypeDB is probably better for finding them.
+** Some states are invalid or redundant.
+*** IDs should be unique.
+*** Redundant state is possible.
+**** A node can 'hide from subscriptions' something it contains.
+     'contains' should imply 'hides from subscriptions'.
+     (That is, the server should not display
+     in one of a node's subscriptions
+     something already shown in the node's content.)
 * mk_skgnode is wrong
   It sets a lot of SkgNode list fields to None.
 * most plans are online

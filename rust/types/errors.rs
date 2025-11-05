@@ -16,13 +16,13 @@ pub enum SaveError {
   InconsistentInstructions {
     inconsistent_deletions: Vec<ID>,
     multiple_definers: Vec<ID>, },
-  BufferValidationErrors ( Vec<Buffer_Cannot_Be_Saved> ), }
+  BufferValidationErrors ( Vec<BufferValidationError> ), }
 
 /// If the user attempts to save a buffer
 /// with any of these properties,, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
-pub enum Buffer_Cannot_Be_Saved {
+pub enum BufferValidationError {
   Body_of_AliasCol               (OrgNode),
   Child_of_AliasCol_with_ID      (OrgNode),
   Body_of_Alias                  (OrgNode),

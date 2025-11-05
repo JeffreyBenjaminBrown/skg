@@ -1,4 +1,4 @@
-use super::{ID, SkgNode, SaveError, Buffer_Cannot_Be_Saved};
+use super::{ID, SkgNode, SaveError, BufferValidationError};
 
 
 /////////////////
@@ -109,37 +109,37 @@ pub fn format_save_error_as_org (
       content }} }
 
 fn format_buffer_validation_error (
-  error : &Buffer_Cannot_Be_Saved
+  error : &BufferValidationError
 ) -> String {
   match error {
-    Buffer_Cannot_Be_Saved::Body_of_AliasCol(node) => {
+    BufferValidationError::Body_of_AliasCol(node) => {
       format!("AliasCol node has a body (not allowed):\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(node) => {
+    BufferValidationError::Child_of_AliasCol_with_ID(node) => {
       format!("Child of AliasCol has an ID (not allowed):\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Body_of_Alias(node) => {
+    BufferValidationError::Body_of_Alias(node) => {
       format!("Alias node has a body (not allowed):\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Child_of_Alias(node) => {
+    BufferValidationError::Child_of_Alias(node) => {
       format!("Alias node has children (not allowed):\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(node) => {
+    BufferValidationError::Alias_with_no_AliasCol_Parent(node) => {
       format!("Alias node must have an AliasCol parent:\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) => {
+    BufferValidationError::Multiple_AliasCols_in_Children(node) => {
       format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n", node.title)
     },
-    Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id) => {
+    BufferValidationError::Multiple_DefiningContainers(id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n", id.0)
     },
-    Buffer_Cannot_Be_Saved::AmbiguousDeletion(id) => {
+    BufferValidationError::AmbiguousDeletion(id) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n", id.0)
     },
-    Buffer_Cannot_Be_Saved::DuplicatedContent(id) => {
+    BufferValidationError::DuplicatedContent(id) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n", id.0)
     },
-    Buffer_Cannot_Be_Saved::Other(msg) => {
+    BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 
 impl MergeInstructionTriple {

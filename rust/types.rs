@@ -6,7 +6,7 @@ pub use misc::{ ID,
 pub mod errors;
 pub use errors::{ TextLinkParseError,
                   SaveError,
-                  Buffer_Cannot_Be_Saved, };
+                  BufferValidationError, };
 pub mod orgnode;
 pub use orgnode::{
   OrgNode, // metadata, title, body

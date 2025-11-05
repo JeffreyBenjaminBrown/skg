@@ -22,7 +22,7 @@ pub use orgnodes_to_instructions::{
 pub mod orgnodes_to_instructions;
 
 use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
-use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, Buffer_Cannot_Be_Saved, MergeInstructionTriple};
+use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, BufferValidationError, MergeInstructionTriple};
 use ego_tree::Tree;
 
 use std::io;
@@ -55,7 +55,7 @@ pub async fn buffer_to_save_instructions (
     See the latter's header comment for why. */
     & mut orgnode_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
-  let validation_errors : Vec<Buffer_Cannot_Be_Saved> =
+  let validation_errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (
       & orgnode_forest, config, driver
     ) . await . map_err ( SaveError::DatabaseError ) ?;
