@@ -224,7 +224,7 @@ async fn test_visited_and_indefinitive_logic (
       let expected_output_from_second : &str =
         indoc! { "
           * (skg (id d) (code indefinitive)) d
-          ** (skg (id d) (code repeated)) d
+          ** (skg (id d) (view repeated)) d
           Repeated, probably above. Edit there, not here.
         " };
       let output_org_text : String =
@@ -278,7 +278,7 @@ async fn test_visited_and_not_indefinitive_logic (
 
     let expected_output : &str =
       indoc! { "
-        * (skg (id a) (code repeated)) a
+        * (skg (id a) (view repeated)) a
         Repeated, probably above. Edit there, not here.
       " };
     let output_org_text : String =

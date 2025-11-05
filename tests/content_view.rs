@@ -123,7 +123,7 @@ async fn test_multi_root_view_logic (
   let expected = indoc! {"* (skg (id 1) (view (rels (containers 0)))) 1
                           1 has a body
                           * (skg (id 2) (view (rels (containers 0)))) 2
-                          * (skg (id 1) (view (rels (containers 0))) (code repeated)) 1
+                          * (skg (id 1) (view repeated (rels (containers 0)))) 1
                           Repeated, probably above. Edit there, not here.
                           "};
   assert_eq!(result, expected,
@@ -152,7 +152,7 @@ fn test_single_root_view_with_cycle
                               ** (skg (id b) (view (rels (containers 2) (contents 1)))) b
                               b has a body
                               *** (skg (id c) (view (rels containsParent (contents 1)))) c
-                              **** (skg (id b) (view cycle (rels containsParent (containers 2) (contents 1))) (code repeated)) b
+                              **** (skg (id b) (view cycle repeated (rels containsParent (containers 2) (contents 1)))) b
                               Repeated, probably above. Edit there, not here.
                               "};
       assert_eq!(result, expected,
@@ -188,7 +188,7 @@ fn test_multi_root_view_with_shared_nodes
                               this one string could span pages
                               ** (skg (id 3) (view (rels (linksIn 1)))) title 3
                               this one string could span pages
-                              * (skg (id 2) (view (rels (linksIn 1))) (code repeated)) title 2
+                              * (skg (id 2) (view repeated (rels (linksIn 1)))) title 2
                               Repeated, probably above. Edit there, not here.
                               "};
       assert_eq!(result, expected,

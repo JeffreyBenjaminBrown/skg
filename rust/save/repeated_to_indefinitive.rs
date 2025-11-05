@@ -25,9 +25,9 @@ fn change_repeated_to_indefinitive_recursive (
   { // Process current node
     let mut node_mut : ego_tree::NodeMut < OrgNode > =
       tree . get_mut ( node_id ) . unwrap ();
-    if node_mut . value () . metadata . code.repeat {
+    if node_mut . value () . metadata . viewData.repeat {
       node_mut . value () . metadata . code.indefinitive = true;
-      node_mut . value () . metadata . code.repeat = false; }}
+      node_mut . value () . metadata . viewData.repeat = false; }}
   { // Recurse to children
     let child_ids : Vec < ego_tree::NodeId > =
       tree . get ( node_id ) . unwrap ()

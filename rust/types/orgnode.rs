@@ -25,6 +25,9 @@ pub struct OrgnodeViewData {
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool, // folded in the Emacs org-mode sense
+  pub repeat: bool, /* Implies that the node already appears elsewhere in this buffer.
+PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true. But the only time it is marked as 'repeat' is when Rust builds a content view and discovers the node has already been rendered. By contrast, when a node marked 'repeat' is saved, since the user may have edited it, the 'repeat' label is replaced with 'indefinitive'. And 'repeat' detection is skipped entirely for 'indefinitive' nodes, so it will thereafter appear without the 'repeat' marker.
+TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
   pub relationships: OrgnodeRelationships,
 }
 
@@ -47,9 +50,6 @@ pub struct OrgnodeCode {
   pub relToParent: RelToParent,
   pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. Then the indefinitive nodes can append content. (Omitting the body of an indefinitive node can help economize on screen space.)
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
-  pub repeat: bool, /* Implies the same treatment as 'indefinitive', but also implies that the node already appears elsewhere in this buffer.
-PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true. But the only time it is marked as 'repeat' is when Rust builds a content view and discovers the node has already been rendered. By contrast, when a node marked 'repeat' is saved, since the user may have edited it, the 'repeat' label is replaced with 'indefinitive'. And 'repeat' detection is skipped entirely for 'indefinitive' nodes, so it will thereafter appear without the 'repeat' marker.
-TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
   pub toDelete: bool,
   pub nodeRequests: HashSet<NodeRequest>,
 }
@@ -152,6 +152,7 @@ impl Default for OrgnodeViewData {
       cycle : false,
       focused : false,
       folded : false,
+      repeat : false,
       relationships : OrgnodeRelationships::default (),
     }} }
 
@@ -160,7 +161,6 @@ impl Default for OrgnodeCode {
     OrgnodeCode {
       relToParent : RelToParent::Content,
       indefinitive : false,
-      repeat : false,
       toDelete : false,
       nodeRequests : HashSet::new (),
     }} }

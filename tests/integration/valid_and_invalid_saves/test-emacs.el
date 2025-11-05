@@ -111,7 +111,7 @@
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg (id 1)) 1")
-    (replace-match "** (skg (id 1) (code repeated)) 1")
+    (replace-match "** (skg (id 1) (view repeated)) 1")
     (message "✓ Amended previously invalid content to use repeated, so it is now valid"))
 
   ;; Switch to buffer to make it current

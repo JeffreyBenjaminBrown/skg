@@ -44,7 +44,7 @@ fn interpret_node_dfs(
     let node_data = node_ref.value();
     let save_action: NodeSaveAction = NodeSaveAction {
       indefinitive : ( node_data.metadata.code.indefinitive ||
-                       node_data.metadata.code.repeat ),
+                       node_data.metadata.viewData.repeat ),
       toDelete     : node_data.metadata.code.toDelete, };
     let skg_node: SkgNode =
       mk_skgnode(node_data, &node_ref)?;

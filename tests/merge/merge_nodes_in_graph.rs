@@ -69,7 +69,6 @@ async fn test_merge_2_into_1_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        repeat: false,
         toDelete: false,
         nodeRequests: node_requests, }, },
     title: "1".to_string(),
@@ -354,7 +353,6 @@ async fn test_merge_1_into_2_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        repeat: false,
         toDelete: false,
         nodeRequests: node_requests, }, },
     title: "2".to_string(),

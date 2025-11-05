@@ -187,7 +187,7 @@ pub fn mk_repeated_orgnode_from_id (
   let path : String = path_from_pid ( config, id . clone () );
   let skgnode : SkgNode = read_node ( path ) ?;
   let mut md = default_metadata ();
-  md . code . repeat = true;
+  md . viewData . repeat = true;
   md . id = Some ( id . clone () );
   Ok ( OrgNode {
     metadata : md,
@@ -345,7 +345,7 @@ pub fn render_forest_to_org (
     let node : &OrgNode = node_ref . value ();
     let mut out : String =
       render_org_node_from_text ( level, node );
-    if ! node . metadata . code.repeat {
+    if ! node . metadata . viewData.repeat {
       for child in node_ref . children () {
         out . push_str (
           & render_node_subtree_to_org (

@@ -90,7 +90,7 @@ fn traverse_node_recursively_and_collect(
       . insert(delete_instruction);
 
     // Handle defining containers
-    if !node.metadata.code.repeat && !node.metadata.code.indefinitive {
+    if !node.metadata.viewData.repeat && !node.metadata.code.indefinitive {
       // Increment the count for this defining container
       *id_defining_count.entry(id.clone()).or_insert(0) += 1; }}
   for child in node_ref.children() { // recurse

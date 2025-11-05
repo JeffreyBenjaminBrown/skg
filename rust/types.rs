@@ -11,9 +11,9 @@ pub mod orgnode;
 pub use orgnode::{
   OrgNode, // metadata, title, body
     OrgnodeMetadata, // id, viewdata, code
-      OrgnodeViewData, // cycle, focused, folded, relationships
+      OrgnodeViewData, // cycle, focused, folded, repeat, relationships
         OrgnodeRelationships, // 2 bools, 3 ints
-      OrgnodeCode, // relToParent, indef, repeat, toDelete, nodeReqs
+      OrgnodeCode, // relToParent, indef, toDelete, nodeReqs
         RelToParent, // content, for aliases, or ignored
         NodeRequest, // what's asked for: views, merge
 };

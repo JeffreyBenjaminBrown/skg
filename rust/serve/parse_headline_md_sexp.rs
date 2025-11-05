@@ -65,9 +65,10 @@ fn parse_view_sexp (
         let bare_value : String =
           atom_to_string ( view_element ) ?;
         match bare_value . as_str () {
-          "cycle"   => view_data . cycle = true,
-          "focused" => view_data . focused = true,
-          "folded"  => view_data . folded = true,
+          "cycle"    => view_data . cycle = true,
+          "focused"  => view_data . focused = true,
+          "folded"   => view_data . folded = true,
+          "repeated" => view_data . repeat = true,
           _ => {
             return Err ( format! ( "Unknown view value: {}",
                                     bare_value )); }} },
@@ -149,7 +150,6 @@ fn parse_code_sexp (
           atom_to_string ( code_element ) ?;
         match bare_value . as_str () {
           "indefinitive" => code . indefinitive = true,
-          "repeated"     => code . repeat = true,
           "toDelete"     => code . toDelete = true,
           _ => {
             return Err ( format! ( "Unknown code value: {}",
@@ -258,6 +258,8 @@ pub fn orgnodemd_to_string (
     view_parts.push ( "focused".to_string () ); }
   if metadata.viewData.folded {
     view_parts.push ( "folded".to_string () ); }
+  if metadata.viewData.repeat {
+    view_parts.push ( "repeated".to_string () ); }
 
   // Build rels s-expr (only if has non-default values)
   let mut rel_parts : Vec<String> = Vec::new ();
@@ -293,8 +295,6 @@ pub fn orgnodemd_to_string (
       "(relToParent {})", metadata.code.relToParent )); }
   if metadata.code.indefinitive {
     code_parts.push ( "indefinitive".to_string () ); }
-  if metadata.code.repeat {
-    code_parts.push ( "repeated".to_string () ); }
   if metadata.code.toDelete {
     code_parts.push ( "toDelete".to_string () ); }
 
