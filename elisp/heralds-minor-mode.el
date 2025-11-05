@@ -14,6 +14,7 @@
         (BLUE view (cycle (ANY "⟳"))
               (folded) ;; ignored
               (focused) ;; ignored
+              (RED repeated "REP")
               (rels
                 (RED notInParent "!{")
                 (containsParent "}")
@@ -245,6 +246,7 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
 ;;
 ;; ID only: (skg (id 123)) should show "ID".
 ;; View with cycle: (skg (id 456) (view (cycle) (relationships (numContents 3)))) should show "⟳ {3".
+;; View with repeated: (skg (id 111) (view repeated)) should show red "REP".
 ;; Code markers: (skg (id 789) (code (relToParent aliasCol))) should show "aliases".
 ;; Delete marker: (skg (id abc) (code (toDelete))) should show red "delete".
 ;; Not in parent: (skg (id def) (view (relationships (notInParent)))) should show red "!{".
