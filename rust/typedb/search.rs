@@ -81,7 +81,7 @@ pub async fn path_sourceward_to_end_cycle_and_or_branches (
     db_name,
     driver,
     node,
-    "hyperlinks_to",
+    "textlinks_to",
     "dest",
     "source"
   ). await }
@@ -113,7 +113,7 @@ pub async fn find_links_to (
     db_name,
     driver,
     node,
-    "hyperlinks_to",
+    "textlinks_to",
     "dest",
     "source"
   ). await }

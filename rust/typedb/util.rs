@@ -83,8 +83,8 @@ pub fn conjugate_binary_role (
   match ( relation, role ) {
     ( "contains", "container" )            => Ok ( "contained" ),
     ( "contains", "contained" )            => Ok ( "container" ),
-    ( "hyperlinks_to", "source" )          => Ok ( "dest" ),
-    ( "hyperlinks_to", "dest" )            => Ok ( "source" ),
+    ( "textlinks_to", "source" )          => Ok ( "dest" ),
+    ( "textlinks_to", "dest" )            => Ok ( "source" ),
     ( "subscribes", "subscriber" )         => Ok ( "subscribee" ),
     ( "subscribes", "subscribee" )         => Ok ( "subscriber" ),
     ( "overrides_view_of", "replacement" ) => Ok ( "replaced" ),

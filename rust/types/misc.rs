@@ -41,8 +41,8 @@ pub struct TantivyIndex {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Hyperlink {
-  // Hyperlinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
+pub struct TextLink {
+  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
   pub id: ID,
   pub label: String,
 }
@@ -82,15 +82,15 @@ impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s.to_string () ) }}
 
-impl Hyperlink {
+impl TextLink {
   pub fn new ( id     : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
-    Hyperlink { id    : ID ( id.into () ),
+    TextLink { id    : ID ( id.into () ),
                 label : label.into (),
     }} }
 
-impl fmt::Display for Hyperlink {
+impl fmt::Display for TextLink {
   // Format: [[id:ID][LABEL]], where allcaps terms are variables.
   // This is the same format org-roam uses.
   fn fmt ( &self,
@@ -98,25 +98,25 @@ impl fmt::Display for Hyperlink {
             -> fmt::Result {
     write! ( f, "[[id:{}][{}]]", self.id, self.label ) }}
 
-impl FromStr for Hyperlink {
-  type Err = super::errors::HyperlinkParseError;
+impl FromStr for TextLink {
+  type Err = super::errors::TextLinkParseError;
 
   fn from_str ( text: &str )
                 -> Result <Self, Self::Err> {
-    use super::errors::HyperlinkParseError;
+    use super::errors::TextLinkParseError;
     if ( !text.starts_with("[[id:") ||
           !text.ends_with("]]") ) {
-      return Err(HyperlinkParseError::InvalidFormat); }
+      return Err(TextLinkParseError::InvalidFormat); }
 
     let interior : &str = &text [5 .. text.len () - 2];
 
     if let Some ( idx ) = interior.find ( "][" ) {
       let id    : &str = &interior [0..idx];
       let label : &str = &interior [idx+2..];
-      Ok ( Hyperlink {
+      Ok ( TextLink {
         id    : ID ( id.to_string () ),
         label : label.to_string (),
       } )
     } else {
-      Err ( HyperlinkParseError::MissingDivider )
+      Err ( TextLinkParseError::MissingDivider )
     } } }

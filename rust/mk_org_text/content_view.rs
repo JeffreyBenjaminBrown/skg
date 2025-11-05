@@ -259,7 +259,7 @@ async fn fetch_relationship_data (
 pub struct MapsFromIdForView {
   num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
   num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
-  num_links_in : HashMap < ID, usize >, // number of hyperlinks relationship for which the node plays the 'target' role
+  num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
   container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
   content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
 }

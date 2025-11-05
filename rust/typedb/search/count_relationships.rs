@@ -51,7 +51,7 @@ pub async fn count_contents (
   ). await }
 
 /// PURPOSE: Count how many nodes link to each node
-/// in a 'hyperlinks_to' relationship.
+/// in a 'textlinks_to' relationship.
 /// Takes a vector of IDs and returns a map from each ID to its count.
 /// IDs with count 0 are included in the result.
 pub async fn count_link_sources (
@@ -63,7 +63,7 @@ pub async fn count_link_sources (
   count_relations ( db_name,
                     driver,
                     ids,
-                    "hyperlinks_to",
+                    "textlinks_to",
                     "dest"
   ). await }
 

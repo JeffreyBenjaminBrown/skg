@@ -3,7 +3,7 @@ use std::error::Error;
 use std::io;
 
 #[derive(Debug)]
-pub enum HyperlinkParseError {
+pub enum TextLinkParseError {
   InvalidFormat,
   MissingDivider,
 }
@@ -40,18 +40,18 @@ pub enum Buffer_Cannot_Be_Saved {
 // Implementations
 //
 
-impl std::fmt::Display for HyperlinkParseError {
+impl std::fmt::Display for TextLinkParseError {
   fn fmt (
     &self,
     f: &mut std::fmt::Formatter <'_>
   ) -> std::fmt::Result {
     match self {
-      HyperlinkParseError::InvalidFormat =>
+      TextLinkParseError::InvalidFormat =>
         write! (
-          f, "Invalid hyperlink format. Expected [[id:ID][LABEL]]" ),
-      HyperlinkParseError::MissingDivider =>
+          f, "Invalid textlink format. Expected [[id:ID][LABEL]]" ),
+      TextLinkParseError::MissingDivider =>
         write! (
           f, "Missing divider between ID and label. Expected ][" ),
     } } }
 
-impl Error for HyperlinkParseError {}
+impl Error for TextLinkParseError {}

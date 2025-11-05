@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::types::{ID, SkgNode};
-use crate::hyperlinks::hyperlinks_from_node;
+use crate::textlinks::textlinks_from_node;
 
 use typedb_driver::{
   Transaction,
@@ -49,16 +49,16 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'contains' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id,
-    & ( hyperlinks_from_node ( &node )
+    & ( textlinks_from_node ( &node )
         . iter ()
-        . map ( |hyperlink|
-                 ID::from ( hyperlink.id.clone() ) )
+        . map ( |textlink|
+                 ID::from ( textlink.id.clone() ) )
         . collect::<Vec<ID>>() ),
-    "hyperlinks_to",
+    "textlinks_to",
     "source",
     "dest",
     tx ). await
-    . map_err(|e| format!("Failed to create 'hyperlinks_to' relationships: {}", e))?;
+    . map_err(|e| format!("Failed to create 'textlinks_to' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id,
     node.subscribes_to.as_ref().unwrap_or(&vec![]),

@@ -8,6 +8,7 @@ use super::{ID, SkgNode, SaveError, Buffer_Cannot_Be_Saved};
 pub type SaveInstruction = (SkgNode, NodeSaveAction_ExcludingMerge);
 
 /// Tells Rust what to do with a node.
+#[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NodeSaveAction_ExcludingMerge {
   // PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NodeSaveAction_ExcludingMerge will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.

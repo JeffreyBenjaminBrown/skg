@@ -13,12 +13,12 @@ The `contains` relationship forms a simple tree:
 
 Note: Files 4 and 5 are islands w/r/t the `contains` relationship.
 
-### Hyperlinks
-- **5.skg** contains hyperlinks to:
-  - `[[id:22][hyperlink to another file]]` → 2.skg (via alias 22)
+### TextLinks
+- **5.skg** contains textlinks to:
+  - `[[id:22][textlink to another file]]` → 2.skg (via alias 22)
   - `[[id:33][to the third]]` → 3.skg (via alias 33)
   - `[[id:55][even to itself]]` → 5.skg (via alias 55, self-link)
-- **4.skg** contains a hyperlink to something not in these fixtures:
+- **4.skg** contains a textlink to something not in these fixtures:
   - `[[id:shgulasdghu][test]]`
 
 ### Subscription Relationships

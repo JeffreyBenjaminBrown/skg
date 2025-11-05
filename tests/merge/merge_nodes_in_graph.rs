@@ -453,35 +453,35 @@ async fn verify_typedb_after_merge_1_into_2 (
     &ID::from("hidden-from-subscriptions-of-1-but-in-content-of-2")));
   // Note that the would-be second 'overlap' node was removed.
 
-  // Hyperlinks should be rerouted
+  // TextLinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
-  let acquiree_text_preserver_hyperlink_dests: HashSet<ID> = find_related_nodes(
+  let acquiree_text_preserver_textlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, acquiree_text_preserver_id,
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(
-    acquiree_text_preserver_hyperlink_dests.contains(&ID::from("1-links-to")),
-    "acquiree_text_preserver should hyperlink to 1-links-to");
+    acquiree_text_preserver_textlink_dests.contains(&ID::from("1-links-to")),
+    "acquiree_text_preserver should textlink to 1-links-to");
 
-  // - Node 2 should NOT have the outbound hyperlink from node 1
-  //   (the hyperlink is in the text, which went to acquiree_text_preserver)
-  let node_2_hyperlink_dests: HashSet<ID> = find_related_nodes(
+  // - Node 2 should NOT have the outbound textlink from node 1
+  //   (the textlink is in the text, which went to acquiree_text_preserver)
+  let node_2_textlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("2"),
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(
-    !node_2_hyperlink_dests.contains(&ID::from("1-links-to")),
-    "Node 2 should NOT hyperlink to 1-links-to");
+    !node_2_textlink_dests.contains(&ID::from("1-links-to")),
+    "Node 2 should NOT textlink to 1-links-to");
 
-  // - The hyperlink from links-to-1 to 1 should now be from links-to-1 to 2
-  //   (inbound hyperlinks target the acquirer because acquiree's ID becomes an extra_id)
+  // - The textlink from links-to-1 to 1 should now be from links-to-1 to 2
+  //   (inbound textlinks target the acquirer because acquiree's ID becomes an extra_id)
   let links_to_1_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("links-to-1"),
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(links_to_1_dests.contains(&ID::from("2")),
-          "links-to-1 should hyperlink to 2 (rerouted from 1)");
+          "links-to-1 should textlink to 2 (rerouted from 1)");
   assert!(!links_to_1_dests.contains(&ID::from("1")),
-          "links-to-1 should NOT hyperlink to 1 (1 was merged)");
+          "links-to-1 should NOT textlink to 1 (1 was merged)");
 
   // Subscribes relationships should be rerouted
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2

@@ -1,8 +1,5 @@
 * architecture to change
-** 'merge' should be encodeable in 'Nodesaveaction'
-   Then I wouldn't need to parse the action twice,
-   in two different ways.
-** ONGOING chnage OrgnodeMetadata
+** DONE chnage OrgnodeMetadata
 OrgnodeMetadata, // id, viewdata, code
   OrgnodeViewData, // focused, folded, repeated, cycle, relationships
     OrgnodeRelationships, // 2 bools, 3 ints
@@ -20,7 +17,7 @@ OrgnodeMetadata, // id, viewdata, code
    folded and focused are instructions to emacs,
    the rest, glyphs
 ** merge the two Save errors
-** rename Hyperlink -> TextLink
+** rename TextLink -> TextLink
 ** TypeDB is probably better for finding constraint violations.
 *** Some states are invalid or redundant.
 **** IDs should be unique.
@@ -30,7 +27,13 @@ OrgnodeMetadata, // id, viewdata, code
       (That is, the server should not display
       in one of a node's subscriptions
       something already shown in the node's content.)
-** RelToParent seems better as RelToAncestor
+** RelToParent could be generalized as RelToAncestor.
+   It would need both a relation and a number of levels.
+   (RelToParent would translate to 1 level; to grandparent, 2; etc.)
+** nah
+*** 'merge' should be encodeable in 'Nodesaveaction'
+    Then I wouldn't need to parse the action twice,
+    in two different ways.
 * TypeDB should report constraint violations.
   Yet succeed.
 ** good constraints
@@ -119,8 +122,8 @@ fold-preservation
 ** the dangers of repeated nodes to the user
    The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
 ** find where to put this comment
- // Titles can include hyperlinks,
- // but can be searched for as if each hyperlink
+ // Titles can include textlinks,
+ // but can be searched for as if each textlink
  // was equal to its label, thanks to replace_each_link_with_its_label.
 ** change graph -> web
 ** drop [[../docs/progress.md][progress.md]]

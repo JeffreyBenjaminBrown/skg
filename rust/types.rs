@@ -2,9 +2,9 @@ pub mod misc;
 pub use misc::{ ID,
                 SkgConfig,
                 TantivyIndex,
-                Hyperlink, };
+                TextLink, };
 pub mod errors;
-pub use errors::{ HyperlinkParseError,
+pub use errors::{ TextLinkParseError,
                   SaveError,
                   Buffer_Cannot_Be_Saved, };
 pub mod orgnode;

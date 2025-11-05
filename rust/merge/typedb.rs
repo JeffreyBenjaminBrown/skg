@@ -49,10 +49,10 @@ async fn merge_one_node_in_typedb(
       "contains", "contained", "container" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, preserver_id,
-      "hyperlinks_to", "source", "dest" ). await ?;
+      "textlinks_to", "source", "dest" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
-      "hyperlinks_to", "dest", "source" ). await ?;
+      "textlinks_to", "dest", "source" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
       "subscribes", "subscriber", "subscribee" ). await ?;
