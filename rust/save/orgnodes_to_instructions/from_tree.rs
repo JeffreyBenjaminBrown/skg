@@ -1,45 +1,16 @@
-use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction_ExcludingMerge, SkgConfig, SaveInstruction, EditRequest};
-use crate::save::reconcile_dup_instructions;
-use crate::save::clobber_none_fields_with_data_from_disk;
+use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction_ExcludingMerge, SaveInstruction, EditRequest};
 use ego_tree::{NodeRef, Tree};
-use typedb_driver::TypeDBDriver;
-use std::error::Error;
-use std::io;
 
-/// Converts a forest of OrgNode2s to SaveInstructions,
-/// reconciling duplicates via 'reconcile_dup_instructions',
-/// and clobbering None fields with data from disk.
-pub async fn orgnodes_to_reconciled_save_instructions (
-  forest  : &Vec<Tree<OrgNode>>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver
-) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
-  let instructions : Vec<SaveInstruction> =
-    orgnodes_to_dirty_save_instructions (
-      forest . clone () ) ?;
-  let reconciled_instructions : Vec<SaveInstruction> =
-    reconcile_dup_instructions (
-      config, driver, instructions ) . await ?;
-  let clobbered_instructions : Vec<SaveInstruction> =
-    reconciled_instructions . into_iter ()
-    . map ( |(node, action)| {
-      let clobbered_node : SkgNode =
-        clobber_none_fields_with_data_from_disk (
-          config, node ) ?;
-      Ok ((clobbered_node, action)) } )
-    . collect::<io::Result<Vec<SaveInstruction>>>() ?;
-  Ok (clobbered_instructions) }
-
-/// PITFALL: Leaves important work undone,
-/// which orgnodes_to_reconciled_save_instructions does.
-/// This is only public for testing.
-///
 /// Converts a forest of OrgNode2s to SaveInstructions,
 /// taking them all at face value.
+///
+/// PITFALL: Only public for testing. Leaves important work undone,
+/// which its caller 'orgnodes_to_reconciled_save_instructions'
+/// does after calling it.
 pub fn orgnodes_to_dirty_save_instructions (
   trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
-  let mut result: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let mut result: Vec<SaveInstruction> =
     Vec::new();
   for tree in trees {
     interpret_node_dfs ( tree.root(),
@@ -47,31 +18,31 @@ pub fn orgnodes_to_dirty_save_instructions (
   Ok(result) }
 
 /// Appends another pair to 'result' and recurses.
+/// Skips AliasCol and Alias nodes. (Aliases are handled by
+/// 'collect_aliases' in 'mk_skgnode', when 'interpret_node_dfs'
+/// is called on the orgnode ancestor they describe.)
 fn interpret_node_dfs(
   node_ref: NodeRef<OrgNode>,
-  result: &mut Vec<(SkgNode, NodeSaveAction_ExcludingMerge)>
+  result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
+  let node_data = node_ref.value();
+  let rel_to_parent = &node_data.metadata.code.relToParent;
+  if matches!(rel_to_parent, ( RelToParent::AliasCol |
+                               RelToParent::Alias )) {
+    // Skip. Should never execute, because an ancestor should have already processed any alias node.
+    return Ok(( )); }
   { // push another pair
-    let node_data = node_ref.value();
-    let save_action: NodeSaveAction_ExcludingMerge =
+    let save_action : NodeSaveAction_ExcludingMerge =
       NodeSaveAction_ExcludingMerge {
         indefinitive : ( node_data.metadata.code.indefinitive ||
                          node_data.metadata.viewData.repeat ),
         toDelete     : matches!(node_data.metadata.code.editRequest,
                                 Some(EditRequest::Delete)), };
     let skg_node: SkgNode =
-      mk_skgnode(node_data, &node_ref)?;
+      mk_skgnode ( node_data, &node_ref )?;
     result.push (( skg_node, save_action )); }
-  { // Recurse into everything except aliases.
-    for child in node_ref.children() {
-      let child_rel = &child.value().metadata.code.relToParent;
-      match child_rel {
-        RelToParent::AliasCol | RelToParent::Alias => {
-          // These are ignored.
-        },
-        _ => {
-          interpret_node_dfs(
-            child, result)?; }} } }
+  for child in node_ref.children() { // recurse over children
+    interpret_node_dfs( child, result)?; }
   Ok (( )) }
 
 fn mk_skgnode (
@@ -103,7 +74,7 @@ fn mk_skgnode (
   - for each child A of CA such that A has treatment=Alias,
     - collect A into the list of aliases for N.
 This is programmed defensively:
-  'validate_tree' will not currently permit multiple AliasCol
+  'validate_tree' will not currently permit multiple 'AliasCol'
   children under the same node,
   but this function will work even if there are. */
 fn collect_aliases (
@@ -118,8 +89,8 @@ fn collect_aliases (
            == RelToParent::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
-  if aliases.is_empty() { None
-  } else { Some(aliases) }}
+  if aliases.is_empty() { None }
+  else { Some (aliases) }}
 
 /// Returns IDs of all children for which treatment = Content.
 /// Excludes children for which metadata.toDelete is true.
@@ -131,10 +102,11 @@ fn collect_contents (
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if ( child . value() . metadata . code.relToParent
-         == RelToParent::Content
-         && ! matches!(child . value() . metadata . code . editRequest,
-                       Some(EditRequest::Delete)) ) {
+    if (( child . value() . metadata . code.relToParent
+          == RelToParent::Content )
+        && ( ! matches!(
+          child . value() . metadata . code . editRequest,
+          Some(EditRequest::Delete)) )) {
       if let Some(id) = &child.value().metadata.id {
         contents.push(id.clone()); }} }
   contents }

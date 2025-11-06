@@ -118,10 +118,11 @@ pub async fn reconcile_dup_instructions_for_one_id(
       &indefinitives, definer.as_ref(), &from_disk),
     overrides_view_of            : reconciled_overrides(
       &indefinitives, definer.as_ref(), &from_disk), };
-  let reconciled_action: NodeSaveAction_ExcludingMerge = NodeSaveAction_ExcludingMerge {
-    indefinitive : false,
-    toDelete     : to_delete_if_consistent(
-      &indefinitives, definer.as_ref())?, };
+  let reconciled_action: NodeSaveAction_ExcludingMerge =
+    NodeSaveAction_ExcludingMerge {
+      indefinitive : false,
+      toDelete     : to_delete_if_consistent(
+        &indefinitives, definer.as_ref())?, };
   Ok((reconciled_node, reconciled_action)) }
 
 /// Returns (definer, indefinitives),
