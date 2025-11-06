@@ -2,7 +2,7 @@ use crate::save::{headline_to_triple, HeadlineInfo};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, ID, TantivyIndex};
-use crate::file_io::more::read_skg_files;
+use crate::file_io::multiple_nodes::read_skg_files;
 use crate::typedb::init::{overwrite_new_empty_db, define_schema};
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;

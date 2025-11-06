@@ -17,6 +17,16 @@ use std::io;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
+/// Each of these describes some kind of relationship,
+/// for each of a view's nodes.
+struct MapsFromIdForView {
+  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
+  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
+  num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
+  container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
+  content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
+}
+
 /// Build a tree from a root ID and render it to org text.
 /// Tree-based implementation with cycle detection.
 pub async fn single_root_view (
@@ -37,7 +47,7 @@ pub async fn multi_root_view (
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> > {
   let mut forest : Vec < Tree < OrgNode > > =
-    forest_from_ids (
+    forest_from_root_ids (
       root_ids, config, driver ) . await ?;
   set_metadata_relationships_in_forest (
     &mut forest, config, driver ) . await ?;
@@ -46,7 +56,7 @@ pub async fn multi_root_view (
 
 /// Build a forest of OrgNode trees from multiple root IDs.
 /// Uses a shared visited set across all trees for cycle detection.
-pub async fn forest_from_ids (
+pub async fn forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
@@ -60,6 +70,17 @@ pub async fn forest_from_ids (
         root_id, config, driver, &mut visited ) . await ?;
     forest . push ( tree ); }
   Ok ( forest ) }
+
+/// Build a tree of OrgNodes from a root ID.
+/// Performs cycle detection with a fresh visited set.
+pub async fn orgnode_tree_from_id (
+  root_id : &ID,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < Tree < OrgNode >, Box<dyn Error> > {
+  let mut visited : HashSet < ID > = HashSet::new ();
+  orgnode_tree_from_id_with_earlier_visits (
+    root_id, config, driver, &mut visited ) . await }
 
 /// Build a tree of OrgNodes from a root ID.
 /// The 'visited' argument permits cycle detection
@@ -189,7 +210,7 @@ pub fn mk_repeated_orgnode_from_id (
   let skgnode : SkgNode = read_node ( path ) ?;
   let mut md = default_metadata ();
   md . viewData . repeat = true;
-  md . code . indefinitive = true; // Any repeated node is indefinitive, but not vice-versa.
+  md . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.
   md . id = Some ( id . clone () );
   Ok ( OrgNode {
     metadata : md,
@@ -201,7 +222,7 @@ pub fn mk_repeated_orgnode_from_id (
 /// Build MapsFromIdForView from a forest of OrgNode trees.
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
-pub async fn mapsFromIdForView_from_forest (
+async fn mapsFromIdForView_from_forest (
   forest : &[Tree < OrgNode >],
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -209,7 +230,7 @@ pub async fn mapsFromIdForView_from_forest (
   let pids : Vec < ID > = (
     // This function just collects IDs,
     // but in this context we know they are specifically PIDs,
-    // because they all came from 'forest_from_ids'.
+    // because they all came from 'forest_from_root_ids'.
     collect_ids_from_forest ( forest ));
   fetch_relationship_data (
     driver,
@@ -255,16 +276,6 @@ async fn fetch_relationship_data (
     container_to_contents,
     content_to_containers,
   }) }
-
-/// Each of these describes some kind of relationship,
-/// for each of a view's nodes.
-pub struct MapsFromIdForView {
-  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
-  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
-  num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
-  container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
-  content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
-}
 
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
@@ -362,14 +373,3 @@ pub fn render_forest_to_org (
         tree . root (),
         1 )); }
   result }
-
-/// Build a tree of OrgNodes from a root ID.
-/// Performs cycle detection with a fresh visited set.
-pub async fn orgnode_tree_from_id (
-  root_id : &ID,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
-) -> Result < Tree < OrgNode >, Box<dyn Error> > {
-  let mut visited : HashSet < ID > = HashSet::new ();
-  orgnode_tree_from_id_with_earlier_visits (
-    root_id, config, driver, &mut visited ) . await }

@@ -1,43 +1,31 @@
-use crate::file_io::one_node::write_node;
-use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::SaveInstruction;
+use crate::file_io::one_node::{read_node, write_node};
+use crate::types::misc::{SkgConfig, ID};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid;
 
 use std::io;
-use std::path::Path;
-use std::fs;
+use std::path::{Path, PathBuf};
+use std::fs::{self, DirEntry, ReadDir};
 
-pub fn update_fs_from_saveinstructions (
-  instructions : Vec<SaveInstruction>,
-  config       : SkgConfig,
-) -> io::Result<(usize, usize)> { // (deleted, written)
-  let ( to_delete, to_write ) // functional; no IO
-    : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
-    instructions . into_iter ()
-    . partition (|(_, action)|
-                 action . toDelete );
-  let delete_nodes : Vec<SkgNode> = // functional; no IO
-    to_delete . into_iter ()
-    . map ( |(node, _)| node )
-    . collect ();
-  let write_nodes : Vec<SkgNode> = // functional; no IO
-    to_write . into_iter ()
-    . map ( |(node, _)| node )
-    . collect ();
+pub fn read_skg_files
+  <P : AsRef<Path> > (
+    dir_path : P )
+  -> io::Result < Vec<SkgNode> >
+{ // Reads all relevant files from the path.
 
-  { // Modify the FS.
-    let deleted : usize =
-      if ! delete_nodes . is_empty () {
-        delete_all_nodes_from_fs (
-          delete_nodes, config . clone () ) ?
-      } else { 0 };
-    let written : usize =
-      if ! write_nodes . is_empty () {
-        write_all_nodes_to_fs (
-          write_nodes, config ) ?
-      } else { 0 };
-    Ok ( (deleted, written) ) }}
+  let mut nodes : Vec<SkgNode> = Vec::new ();
+  let entries : ReadDir = // an iterator
+    fs::read_dir (dir_path) ?;
+  for entry in entries {
+    let entry : DirEntry = entry ?;
+    let path : PathBuf = entry.path () ;
+    if ( path.is_file () &&
+         path . extension () . map_or (
+           false,                // None => no extension found
+           |ext| ext == "skg") ) // Some
+    { let node = read_node (&path) ?;
+      nodes.push (node); }}
+  Ok (nodes) }
 
 /// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.

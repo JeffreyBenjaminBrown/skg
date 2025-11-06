@@ -1,12 +1,5 @@
 * TODO RESUME READING at
   rust/mk_org_text/content_view.rs
-* reorganize
-** shuffle file_io::*
-   In ::update_fs
-     update_fs_from_saveinstructions goes to save::
-     The others go to file_io::more.
-   Move ::more::load_config to a new ::misc.
-   Rename ::more to ::multiple_nodes.
 * aliases_to_org should rebuild the whole buffer
   like request containerward view
 * most plans are online

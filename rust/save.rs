@@ -21,8 +21,15 @@ pub use orgnodes_to_instructions::{
 };
 pub mod orgnodes_to_instructions;
 
+pub mod update_fs;
+pub use update_fs::update_fs_from_saveinstructions;
+
 use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
-use crate::types::{SkgConfig, SkgNode, SaveInstruction, OrgNode, SaveError, BufferValidationError, MergeInstructionTriple};
+use crate::types::misc::SkgConfig;
+use crate::types::skgnode::SkgNode;
+use crate::types::save::{SaveInstruction, MergeInstructionTriple};
+use crate::types::orgnode::OrgNode;
+use crate::types::errors::{SaveError, BufferValidationError};
 use ego_tree::Tree;
 
 use std::io;
