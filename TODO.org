@@ -1,33 +1,3 @@
-* architecture to change
-** refactor completeContents and neighbors
-*** check_and_mark_repetition
-    it seems to mix concerns
-*** completeContents
-    it's just too long
-** RelToParent could be generalized as RelToAncestor.
-   It would need both a relation and a number of levels.
-   (RelToParent would translate to 1 level; to grandparent, 2; etc.)
-** nah
-*** 'merge' should be encodeable in NodeSaveAction
-    Then I wouldn't need to parse the action twice,
-    in two different ways.
-* TypeDB should report constraint violations.
-  Yet succeed.
-** good constraints
-*** Each extra_id should be in at most one has_extra_id relationship.
-*** Each id value should belong to only one entity.
-    where entity = node | extra_id
-** TypeDB is probably better for finding them.
-** Some states are invalid or redundant.
-*** IDs should be unique.
-*** Redundant state is possible.
-**** A node can 'hide from subscriptions' something it contains.
-     'contains' should imply 'hides from subscriptions'.
-     (That is, the server should not display
-     in one of a node's subscriptions
-     something already shown in the node's content.)
-* mk_skgnode is wrong
-  It sets a lot of SkgNode list fields to None.
 * most plans are online
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
@@ -44,10 +14,19 @@
    Less ergonomically, can say:
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
-* ? populate ./TODO/
-  and then order links to them here like this:
-  [[./TODO/sharing-and-privacy.org][sharing and privacy]]
 * QA
+** refactor completeContents and neighbors
+*** check_and_mark_repetition
+    it seems to mix concerns
+*** completeContents
+    it's just too long
+** RelToParent could be generalized as RelToAncestor.
+   It would need both a relation and a number of levels.
+   (RelToParent would translate to 1 level; to grandparent, 2; etc.)
+** nah
+*** 'merge' should be encodeable in NodeSaveAction
+    Then I wouldn't need to parse the action twice,
+    in two different ways.
 ** test validate_merge_requests
 ** in elisp/skg-sexpr/skg-lens.el, rather than concatenate with ":"
    (that's done by skg--tokens->string)

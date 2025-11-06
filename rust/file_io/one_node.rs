@@ -21,17 +21,8 @@ pub async fn read_node_from_id (
       "ID '{}' not found in database", node_id ) ) ?;
   let node_file_path : String =
     path_from_pid ( config, pid );
-  let node : SkgNode = read_node (node_file_path) ?;
-  if node.title.is_empty() {
-    return Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::InvalidData,
-      format!("SkgNode with ID {} has an empty title", node_id),
-    )) ); }
-  if node.ids.is_empty() {
-    return Err(Box::new(std::io::Error::new(
-      std::io::ErrorKind::InvalidData,
-      format!("SkgNode with ID {} has no IDs", node_id),
-    )) ); }
+  let node : SkgNode =
+    read_node (node_file_path) ?;
   Ok (node) }
 
 /// Reads a node from disk, returning None if not found
@@ -84,6 +75,16 @@ pub fn read_node
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
         e.to_string () )) ?;
+  if node.title.is_empty() {
+    return Err(io::Error::new(
+      io::ErrorKind::InvalidData,
+      format!("SkgNode at {:?} has an empty title", file_path),
+    )); }
+  if node.ids.is_empty() {
+    return Err(io::Error::new(
+      io::ErrorKind::InvalidData,
+      format!(".skg file at {:?} has no IDs", file_path),
+    )); }
   Ok ( node ) }
 
 pub fn write_node
