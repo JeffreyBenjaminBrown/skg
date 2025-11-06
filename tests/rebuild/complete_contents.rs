@@ -24,7 +24,7 @@ fn check_and_complete (
       tree, node_id, config, visited ) ?;
   if ! is_repeat {
     completeContents (
-      tree, node_id, config, visited ) ?; }
+      tree, node_id, config ) ?; }
   Ok (( )) }
 
 #[test]

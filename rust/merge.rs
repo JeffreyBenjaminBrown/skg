@@ -37,8 +37,7 @@ pub async fn merge_nodes_in_graph (
   { println!( "2) Merging in filesystem ..." );
     fs::merge_nodes_in_fs (
       config.clone (),
-      &merge_instructions
-    ) ?;
+      &merge_instructions ) ?;
     println!( "   Filesystem merge complete." ); }
   { println!( "3) Merging in Tantivy ..." );
     tantivy::merge_nodes_in_tantivy (

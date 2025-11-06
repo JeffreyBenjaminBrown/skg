@@ -83,7 +83,7 @@ fn complete_node_preorder<'a> (
       if (! is_repeat && // repeat should imply indefinitive, so this is redundant, but harmless.
           ! indefinitive ) {
         completeContents (
-          tree, node_id, config, visited ) ?; }
+          tree, node_id, config ) ?; }
       map_complete_node_preorder_over_children (
         // Always recurse to children -- even for repeated nodes, since they may have children from view requests.
         tree, node_id, config, typedb_driver,

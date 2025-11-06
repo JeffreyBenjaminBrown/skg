@@ -58,7 +58,6 @@ pub fn completeContents (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
-  visited   : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   // ASSUMES: check_and_mark_repetition has already been called
   // Get node_pid and check if indefinitive
