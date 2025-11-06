@@ -19,6 +19,7 @@ use crate::serve::title_matches::handle_title_matches_request;
 use crate::serve::util::{request_type_from_request, send_response};
 use crate::tantivy::initialize_tantivy_from_nodes;
 use crate::typedb::init::initialize_typedb_from_nodes;
+use crate::typedb::util::delete_database;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::skgnode::SkgNode;
 
@@ -218,13 +219,3 @@ fn perform_shutdown_cleanup (
         }} ); }
   println! ( "Shutdown complete." );
   std::process::exit (0); }
-
-async fn delete_database (
-  driver  : &TypeDBDriver,
-  db_name : &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-  let databases = driver . databases ();
-  if databases . contains ( db_name ) . await ? {
-    databases . get ( db_name ) . await ? . delete () . await ?;
-    println! ( "Database '{}' deleted successfully", db_name ); }
-  Ok (( )) }

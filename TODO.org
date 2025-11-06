@@ -1,6 +1,12 @@
 * TODO RESUME READING at
-  rust/save*
+  rust/serve*
     (have not read any of them yet)
+* "points" seems a better name than "nodes"
+* + rust/typedb/init.rs
+move
+  initialize_typedb_from_nodes
+  initialize_dbs
+and probably others to it.
 * TODO move buffer_to_save_instructions
   from
     rust/save.rs

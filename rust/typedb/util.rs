@@ -21,6 +21,15 @@ use futures::StreamExt;
 
 use crate::types::ID;
 
+pub async fn delete_database (
+  driver  : &TypeDBDriver,
+  db_name : &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+  let databases = driver . databases ();
+  if databases . contains ( db_name ) . await ? {
+    databases . get ( db_name ) . await ? . delete () . await ?;
+    println! ( "Database '{}' deleted successfully", db_name ); }
+  Ok (( )) }
 
 /// Runs a single TypeDB query.
 /// Returns the PID associated with that ID, or None if not found.
