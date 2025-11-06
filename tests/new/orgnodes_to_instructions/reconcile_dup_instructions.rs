@@ -4,7 +4,7 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_dirty_save_instructions, find_inconsistent_instructions};
+use skg::save::{org_to_uninterpreted_nodes, interpret, find_inconsistent_instructions};
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::ID;
@@ -23,7 +23,7 @@ fn test_inconsistent_delete() {
           "Should detect inconsistent toDelete");
 
   let instructions =
-    orgnodes_to_dirty_save_instructions(trees)
+    interpret(trees)
     . unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
@@ -46,7 +46,7 @@ fn test_deletions_excluded (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
+      let instructions = interpret(trees)?;
       let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
@@ -79,7 +79,7 @@ fn test_defining_node_defines (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
+      let instructions = interpret(trees)?;
       let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -108,8 +108,9 @@ fn test_adding_without_definer (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = orgnodes_to_dirty_save_instructions(trees)?;
-      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
+      let instructions = interpret(trees)?;
+      let reduced = reconcile_dup_instructions(
+        config, driver, instructions).await?;
 
       let id1_instruction = reduced.iter()
         .find(|(node, _)| node.ids.contains(&ID::from("1")))

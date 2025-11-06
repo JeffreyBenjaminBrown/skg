@@ -7,7 +7,7 @@ use ego_tree::{NodeRef, Tree};
 /// PITFALL: Only public for testing. Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
-pub fn orgnodes_to_dirty_save_instructions (
+pub fn interpret (
   trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =

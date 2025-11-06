@@ -16,7 +16,7 @@ pub use repeated_to_indefinitive::change_repeated_to_indefinitive;
 
 pub use orgnodes_to_instructions::{
     orgnodes_to_reconciled_save_instructions,
-    orgnodes_to_dirty_save_instructions,
+    interpret,
     reconcile_dup_instructions,
 };
 pub mod orgnodes_to_instructions;

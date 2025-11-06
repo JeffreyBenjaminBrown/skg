@@ -1,7 +1,7 @@
-pub mod from_tree;
+pub mod to_dirty_instructions;
 pub mod reconcile_dup_instructions;
 
-pub use from_tree::orgnodes_to_dirty_save_instructions;
+pub use to_dirty_instructions::interpret;
 pub use reconcile_dup_instructions::reconcile_dup_instructions;
 
 use crate::types::{SkgNode, SkgConfig, SaveInstruction};
@@ -21,7 +21,7 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
   let instructions : Vec<SaveInstruction> =
-    orgnodes_to_dirty_save_instructions (
+    interpret (
       forest . clone () ) ?;
   let instructions_without_dups : Vec<SaveInstruction> =
     reconcile_dup_instructions (
