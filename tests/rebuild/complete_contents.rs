@@ -4,14 +4,14 @@ use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
 
-use skg::rebuild::{completeContents, check_and_mark_repetition};
+use skg::rebuild::{completeContents, check_for_and_modify_if_repeated};
 use skg::save::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, OrgNode, SkgConfig};
 use skg::mk_org_text::content_view::render_forest_to_org;
 use ego_tree::{Tree, NodeId};
 
-/// Helper to call check_and_mark_repetition followed by completeContents
+/// Helper to call check_for_and_modify_if_repeated followed by completeContents
 /// (matches the pattern used in complete_node_preorder)
 fn check_and_complete (
   tree    : &mut Tree < OrgNode >,
@@ -20,7 +20,7 @@ fn check_and_complete (
   visited : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let is_repeat : bool =
-    check_and_mark_repetition (
+    check_for_and_modify_if_repeated (
       tree, node_id, config, visited ) ?;
   if ! is_repeat {
     completeContents (

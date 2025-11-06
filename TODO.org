@@ -1,5 +1,7 @@
 * TODO RESUME READING at
-  rust/mk_org_text/content_view.rs
+  rust/save*
+    (have not read any of them yet)
+* TODO buy statins, etc.
 * aliases_to_org should rebuild the whole buffer
   like request containerward view
 * most plans are online
@@ -19,11 +21,7 @@
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
 * QA
-** refactor completeContents and neighbors
-*** check_and_mark_repetition
-    it seems to mix concerns
-*** completeContents
-    it's just too long
+** completeContents seems too long
 ** RelToParent could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
    (RelToParent would translate to 1 level; to grandparent, 2; etc.)
