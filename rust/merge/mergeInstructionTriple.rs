@@ -26,7 +26,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let node: &OrgNode = node_ref.value();
         let node_triples : Vec<MergeInstructionTriple> =
-          saveinstructions_from_the_merge_in_a_node(
+          saveinstructions_from_the_merge_in_an_orgnode(
             node, config)?;
         triples.extend(node_triples); }} }
   Ok(triples) }
@@ -38,7 +38,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// nothing can merge with more than one other node per save.
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
-fn saveinstructions_from_the_merge_in_a_node(
+fn saveinstructions_from_the_merge_in_an_orgnode(
   node: &OrgNode,
   config: &SkgConfig,
 ) -> Result<Vec<MergeInstructionTriple>,

@@ -55,7 +55,7 @@ pub async fn validate_merge_requests(
             &collections.to_delete_ids ). await?;
         errors.extend(pair_errors); }}
   let monogamy_errors : Vec<String> =
-    validate_monogamy(
+    validate_monogamy_for_all_merges(
       &collections.acquirer_to_acquirees,
       &collections.acquiree_to_acquirers );
   errors.extend(monogamy_errors);
@@ -149,7 +149,7 @@ async fn validate_merge_pair(
 /// Validates monogamy rules for all merges.
 /// Returns a vector of validation errors.
 /// The error text explains what each passage does.
-fn validate_monogamy(
+fn validate_monogamy_for_all_merges(
   acquirer_to_acquirees: &HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers: &HashMap<ID, HashSet<ID>>,
 ) -> Vec<String> {
