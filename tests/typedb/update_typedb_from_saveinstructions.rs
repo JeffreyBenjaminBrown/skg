@@ -4,7 +4,7 @@ use skg::test_utils::run_with_test_db;
 use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::typedb::search::find_related_nodes;
 use skg::typedb::nodes::which_ids_exist;
-use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_save_instructions, find_inconsistent_instructions};
+use skg::save::{org_to_uninterpreted_nodes, orgnodes_to_reconciled_save_instructions, find_inconsistent_instructions};
 use skg::types::{ID, OrgNode, SaveInstruction};
 use ego_tree::Tree;
 use indoc::indoc;
@@ -44,7 +44,7 @@ fn test_update_nodes_and_relationships2 (
 
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<SaveInstruction> =
-      orgnodes_to_save_instructions (
+      orgnodes_to_reconciled_save_instructions (
         & trees, & config, & driver ) . await ?;
 
     // Apply the update

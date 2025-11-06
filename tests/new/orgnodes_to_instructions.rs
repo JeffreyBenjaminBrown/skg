@@ -9,7 +9,7 @@ use skg::types::{OrgNode, ID, SkgNode, NodeSaveAction_ExcludingMerge};
 use ego_tree::Tree;
 
 #[test]
-fn test_orgnodes_to_save_instructions_basic() {
+fn test_orgnodes_to_reconciled_save_instructions_basic() {
   let input: &str =
     indoc! {"
             * (skg (id root1)) root node 1
@@ -55,7 +55,7 @@ fn test_orgnodes_to_save_instructions_basic() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_with_aliases() {
+fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
             * (skg (id main)) main node
@@ -93,7 +93,7 @@ fn test_orgnodes_to_save_instructions_with_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_no_aliases() {
+fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
             * (skg (id node1)) node without aliases
@@ -115,7 +115,7 @@ fn test_orgnodes_to_save_instructions_no_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
+fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
             * (skg (id main)) main node
@@ -140,7 +140,7 @@ fn test_orgnodes_to_save_instructions_multiple_alias_cols() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_mixed_relations() {
+fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (id root)) root node
@@ -168,7 +168,7 @@ fn test_orgnodes_to_save_instructions_mixed_relations() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_deep_nesting() {
+fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
             * (skg (id level1)) level 1
@@ -203,7 +203,7 @@ fn test_orgnodes_to_save_instructions_deep_nesting() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_error_missing_id() {
+fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
             * (skg (id good_node)) good node
@@ -221,7 +221,7 @@ fn test_orgnodes_to_save_instructions_error_missing_id() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_empty_input() {
+fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
   let trees: Vec<Tree<OrgNode>> = vec![];
   let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
     orgnodes_to_dirty_save_instructions(trees).unwrap();
@@ -230,7 +230,7 @@ fn test_orgnodes_to_save_instructions_empty_input() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_only_aliases() {
+fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (id main)) main node
@@ -252,7 +252,7 @@ fn test_orgnodes_to_save_instructions_only_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_save_instructions_complex_scenario() {
+fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
             * (skg (id doc1) (code indefinitive)) Document 1

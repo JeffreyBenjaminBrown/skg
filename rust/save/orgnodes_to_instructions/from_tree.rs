@@ -1,12 +1,15 @@
 use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction_ExcludingMerge, SkgConfig, SaveInstruction, EditRequest};
 use crate::save::reconcile_dup_instructions;
+use crate::save::clobber_none_fields_with_data_from_disk;
 use ego_tree::{NodeRef, Tree};
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
+use std::io;
 
 /// Converts a forest of OrgNode2s to SaveInstructions,
-/// reconciling duplicates via 'reconcile_dup_instructions'.
-pub async fn orgnodes_to_save_instructions (
+/// reconciling duplicates via 'reconcile_dup_instructions',
+/// and clobbering None fields with data from disk.
+pub async fn orgnodes_to_reconciled_save_instructions (
   forest  : &Vec<Tree<OrgNode>>,
   config : &SkgConfig,
   driver : &TypeDBDriver
@@ -17,10 +20,18 @@ pub async fn orgnodes_to_save_instructions (
   let reconciled_instructions : Vec<SaveInstruction> =
     reconcile_dup_instructions (
       config, driver, instructions ) . await ?;
-  Ok (reconciled_instructions) }
+  let clobbered_instructions : Vec<SaveInstruction> =
+    reconciled_instructions . into_iter ()
+    . map ( |(node, action)| {
+      let clobbered_node : SkgNode =
+        clobber_none_fields_with_data_from_disk (
+          config, node ) ?;
+      Ok ((clobbered_node, action)) } )
+    . collect::<io::Result<Vec<SaveInstruction>>>() ?;
+  Ok (clobbered_instructions) }
 
 /// PITFALL: Leaves important work undone,
-/// which orgnodes_to_save_instructions does.
+/// which orgnodes_to_reconciled_save_instructions does.
 /// This is only public for testing.
 ///
 /// Converts a forest of OrgNode2s to SaveInstructions,
