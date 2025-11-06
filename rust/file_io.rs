@@ -3,6 +3,10 @@
 // As noted in types.rs, there is a 1-to-1 correspondence
 // between the SkgNode type and each (path, file) pair,
 // which makes this pretty simple.
+// .
+// DON'T IMPORT these re-exports. They are for documentation.
+// INSTEAD, imports in the codebase should use the original,
+// longer definition path. That makes it easier to find definitions.
 
 pub mod one_node;
 pub use one_node::{

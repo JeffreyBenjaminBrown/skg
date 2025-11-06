@@ -1,6 +1,9 @@
-use crate::types::{ID, SkgNode, SkgConfig, SaveInstruction};
+use crate::file_io::one_node::write_node;
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::save::SaveInstruction;
+use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid;
-use crate::file_io::write_node;
+
 use std::io;
 use std::path::Path;
 use std::fs;

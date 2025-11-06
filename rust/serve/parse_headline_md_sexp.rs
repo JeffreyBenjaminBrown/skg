@@ -1,8 +1,8 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, ID, RelToParent, EditRequest, ViewRequest};
-use crate::types::orgnode::default_metadata;
+use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, EditRequest, ViewRequest, default_metadata};
+use crate::types::misc::ID;
 use crate::serve::util::extract_v_from_kv_pair_in_sexp;
 use sexp::{Sexp, Atom};
 use std::collections::HashSet;

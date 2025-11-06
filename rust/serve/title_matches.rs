@@ -1,8 +1,8 @@
 use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
 use crate::tantivy::search_index;
-use crate::types::{OrgNode, TantivyIndex, RelToParent};
-use crate::types::orgnode::default_metadata;
+use crate::types::orgnode::{OrgNode, RelToParent, default_metadata};
+use crate::types::misc::TantivyIndex;
 use crate::mk_org_text::orgnode::render_org_node_from_text;
 
 use std::collections::HashMap;

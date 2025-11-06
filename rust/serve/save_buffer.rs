@@ -1,6 +1,6 @@
-use crate::file_io::update_fs_from_saveinstructions;
+use crate::file_io::update_fs::update_fs_from_saveinstructions;
 use crate::save::buffer_to_save_instructions;
-use crate::types::SaveError;
+use crate::types::errors::SaveError;
 use crate::mk_org_text::content_view::{
   render_forest_to_org,
   set_metadata_relationships_in_forest};
@@ -9,8 +9,9 @@ use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
 use crate::tantivy::update_index_from_saveinstructions;
 use crate::typedb::update::update_typedb_from_saveinstructions;
-use crate::types::{SkgConfig, TantivyIndex, SaveInstruction, OrgNode, MergeInstructionTriple};
-use crate::types::save::format_save_error_as_org;
+use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
+use crate::types::orgnode::OrgNode;
 
 use ego_tree::Tree;
 use futures::executor::block_on;

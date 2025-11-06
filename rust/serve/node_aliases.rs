@@ -1,9 +1,9 @@
-use crate::file_io::fetch_aliases_from_file;
-use crate::mk_org_text::aliases_to_org;
+use crate::file_io::one_node::fetch_aliases_from_file;
+use crate::mk_org_text::aliases::aliases_to_org;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::serve::parse_headline_from_sexp;
-use crate::types::SkgConfig;
+use crate::serve::parse_headline_md_sexp::parse_headline_from_sexp;
+use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
 

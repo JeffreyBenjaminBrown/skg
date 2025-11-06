@@ -1,8 +1,8 @@
-use crate::mk_org_text::single_root_view;
+use crate::mk_org_text::content_view::single_root_view;
 use crate::serve::util::node_id_from_single_root_view_request;
 use crate::serve::util::send_response;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::types::SkgConfig;
+use crate::types::misc::SkgConfig;
 
 use futures::executor::block_on;
 use std::net::TcpStream; // handles two-way communication

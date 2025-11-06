@@ -1,5 +1,6 @@
-use crate::types::{SkgNode, SkgConfig};
-use crate::file_io::read_node;
+use crate::file_io::one_node::read_node;
+use crate::types::misc::SkgConfig;
+use crate::types::skgnode::SkgNode;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};

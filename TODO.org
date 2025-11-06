@@ -1,3 +1,19 @@
+* TODO RESUME READING at
+  rust/mk_org_text/content_view.rs
+* reorganize
+** shuffle file_io::*
+   In ::update_fs
+     update_fs_from_saveinstructions goes to save::
+     The others go to file_io::more.
+   Move ::more::load_config to a new ::misc.
+   Rename ::more to ::multiple_nodes.
+** rename
+   saveinstructions_from_the_merge_in_a_node
+     -> saveinstructions_from_the_merge_in_an_orgnode
+   validate_monogamy
+     -> validate_monogamy_for_all_merges
+* aliases_to_org should rebuild the whole buffer
+  like request containerward view
 * most plans are online
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org

@@ -11,7 +11,8 @@ use crate::mk_org_text::content_view::skgnode_and_orgnode_from_pid;
 use crate::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
-use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{OrgNode, RelToParent};
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};

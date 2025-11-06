@@ -1,3 +1,7 @@
+// DON'T IMPORT these re-exports. They are for documentation.
+// INSTEAD, imports in the codebase should use the original,
+// longer definition path. That makes it easier to find definitions.
+
 pub mod node_aliases;
 pub mod parse_headline_md_sexp;
 pub use parse_headline_md_sexp::parse_headline_from_sexp;
@@ -7,7 +11,7 @@ pub use title_matches::generate_title_matches_response;
 pub mod title_matches;
 pub mod util;
 
-use crate::file_io::read_skg_files;
+use crate::file_io::more::read_skg_files;
 use crate::serve::node_aliases::handle_node_aliases_request;
 use crate::serve::save_buffer::handle_save_buffer_request;
 use crate::serve::single_root_view::handle_single_root_view_request;
@@ -15,7 +19,8 @@ use crate::serve::title_matches::handle_title_matches_request;
 use crate::serve::util::{request_type_from_request, send_response};
 use crate::tantivy::initialize_tantivy_from_nodes;
 use crate::typedb::init::initialize_typedb_from_nodes;
-use crate::types::{SkgConfig, TantivyIndex, SkgNode};
+use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::skgnode::SkgNode;
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;

@@ -50,7 +50,8 @@ pub async fn forest_from_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < Tree < OrgNode > >, Box<dyn Error> > {
+) -> Result < Vec < Tree < OrgNode > >,
+              Box<dyn Error> > {
   let mut forest : Vec < Tree < OrgNode > > = Vec::new ();
   let mut visited : HashSet < ID > = HashSet::new ();
   for root_id in root_ids {

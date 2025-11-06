@@ -1,8 +1,10 @@
-use crate::file_io::read_node;
+use crate::file_io::one_node::read_node;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_pid};
-use crate::types::{ID, SkgConfig, SkgNode, OrgNode, RelToParent};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::skgnode::SkgNode;
+use crate::types::orgnode::{OrgNode, RelToParent};
 use crate::util::path_from_pid;
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashSet, HashMap};

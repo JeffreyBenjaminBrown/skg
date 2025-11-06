@@ -1,3 +1,7 @@
+// DON'T IMPORT these re-exports. They are for documentation.
+// INSTEAD, imports in the codebase should use the original,
+// longer definition path. That makes it easier to find definitions.
+
 pub mod complete_aliascol;
 pub use complete_aliascol::completeAliasCol;
 
@@ -10,7 +14,8 @@ pub use integrate_backpath::{
   build_and_integrate_sourceward_path,
   integrate_path_that_might_fork_or_cycle};
 
-use crate::types::{ID, SkgConfig, OrgNode, RelToParent, ViewRequest};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
