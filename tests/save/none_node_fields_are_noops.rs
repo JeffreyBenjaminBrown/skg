@@ -3,7 +3,8 @@
 use std::io;
 use std::path::PathBuf;
 
-use skg::save::none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
+use skg::save::orgnodes_to_instructions::none_node_fields_are_noops::
+  clobber_none_fields_with_data_from_disk;
 use skg::types::{ ID, SkgConfig, SkgNode, empty_skgnode };
 
 #[test]

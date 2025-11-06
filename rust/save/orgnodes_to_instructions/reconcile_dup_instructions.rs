@@ -18,22 +18,16 @@ Some SaveInstructions are indefinitive and some aren't.
 If an SaveInstruction is not indefinitive,
 call it a 'defining' instruction.
 There can be at most one such instruction.
-If there is, it defines the title and body.
+If there is, it defines the title, body and first contents.
 (If it has no body, neither will the result.)
 .
-If there is no defining instruction,
-then the last instruction defines the title.
-The last with a body (if any) defines the body.
-If none of them has a body either, that is read from disk.
-.
-Similarly, the defining node defines the *initial* contents.
-If there isn't one, the initial contents are read from disk.
-But every 'indefinitive' instruction can append to that,
-as long as it's not repeating something in the initial contents.
+If there is no defining instruction for a node in the tree,
+its initial contents are read from disk.
+But every 'indefinitive' instruction can append novel contents,
+where 'novel' = 'not already in its contents'.
 .
 All of them, whether indefinitive or not, can contribute aliases.
-If none of them mentions aliases,
-aliases are defined by what's on disk.
+If none of them mentions aliases, aliases come from disk.
 .
 Extra IDs are appended from disk.
 */

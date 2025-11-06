@@ -1,6 +1,3 @@
-pub mod none_node_fields_are_noops;
-pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
-
 pub use buffer_to_orgnodes::{
     org_to_uninterpreted_nodes,
     headline_to_triple,
@@ -18,6 +15,7 @@ pub use orgnodes_to_instructions::{
     orgnodes_to_reconciled_save_instructions,
     interpret,
     reconcile_dup_instructions,
+    clobber_none_fields_with_data_from_disk,
 };
 pub mod orgnodes_to_instructions;
 

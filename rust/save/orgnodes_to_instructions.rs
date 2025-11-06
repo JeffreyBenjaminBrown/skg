@@ -1,12 +1,13 @@
 pub mod to_dirty_instructions;
 pub mod reconcile_dup_instructions;
+pub mod none_node_fields_are_noops;
 
-pub use to_dirty_instructions::interpret;
+pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 pub use reconcile_dup_instructions::reconcile_dup_instructions;
+pub use to_dirty_instructions::interpret;
 
 use crate::types::{SkgNode, SkgConfig, SaveInstruction};
 use crate::types::orgnode::OrgNode;
-use crate::save::clobber_none_fields_with_data_from_disk;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
