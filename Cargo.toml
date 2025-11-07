@@ -18,6 +18,10 @@ path = "introspect/skg_filenames_match_pids.rs"
 name = "cleanup-test-dbs"
 path = "rust/bin/cleanup-test-dbs.rs"
 
+[[bin]]
+name = "smsn-keywords"
+path = "discoveries/smsn/find-keywords.rs"
+
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }
 ctrlc = "3.4"

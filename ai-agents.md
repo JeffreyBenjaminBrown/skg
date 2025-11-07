@@ -1,5 +1,11 @@
 First check out [the project overview](OVERVIEW.org).
 
+## Don't change anything in git.
+
+That includes my credentials (which, as the git history reveals,
+an earlier version of you you once did).
+You'll get plenty of credit, don't worry.
+
 ## Initialization Instructions
 
 Upon starting each session, automatically:
