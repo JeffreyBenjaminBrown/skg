@@ -1,11 +1,11 @@
-use crate::file_io::read_node;
+use crate::media::file_io::read_node;
 use crate::util::path_from_pid;
-use crate::typedb::search::{
+use crate::media::typedb::search::{
   contains_from_pids,
   count_containers,
   count_contents,
   count_link_sources};
-use crate::typedb::util::pid_from_id;
+use crate::media::typedb::util::pid_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::util::newline_to_space;

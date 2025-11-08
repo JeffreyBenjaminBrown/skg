@@ -2,12 +2,7 @@
   rust/serve*
     (have not read any of them yet)
 * Is there a lot of code duplication for tantivy?
-* shuffle (*after* reading through!)
-** media/{tantivy, typedb, file_io, textlinks}
-** function 'cleanup_and_shutdown' to its own file
-** group handlers in handler/
-   and rename so handler isn't restated
-** Are there sexp functions that should be grouped?
+* Are there sexp functions that should be grouped?
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * Appending from indef nodes moght be a misfeature.
 * "points" seems a better name than "nodes"

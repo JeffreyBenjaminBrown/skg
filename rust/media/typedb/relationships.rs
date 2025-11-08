@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::types::{ID, SkgNode};
-use crate::textlinks::textlinks_from_node;
+use crate::media::textlinks::textlinks_from_node;
 
 use typedb_driver::{
   Transaction,

@@ -1,6 +1,6 @@
 // PURPOSE: Update Tantivy index from SaveInstructions.
 
-use crate::textlinks::replace_each_link_with_its_label;
+use crate::media::textlinks::replace_each_link_with_its_label;
 use crate::types::{ID, SkgNode, TantivyIndex, SaveInstruction};
 
 use tantivy::{IndexWriter, doc, Term, Document};

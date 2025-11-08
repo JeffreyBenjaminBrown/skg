@@ -17,7 +17,7 @@ use std::io;
 use std::path::Path;
 
 use crate::types::{ ID, SkgConfig, SkgNode };
-use crate::file_io::read_node;
+use crate::media::file_io::read_node;
 use crate::util::path_from_pid;
 
 pub fn clobber_none_fields_with_data_from_disk (

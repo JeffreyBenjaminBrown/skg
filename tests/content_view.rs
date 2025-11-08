@@ -5,7 +5,7 @@ use std::error::Error;
 
 use skg::mk_org_text::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::typedb::search::{
+use skg::media::typedb::search::{
   climb_containerward_and_fetch_rootish_context,
   path_containerward_to_end_cycle_and_or_branches, };
 use skg::types::ID;

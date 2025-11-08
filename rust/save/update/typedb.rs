@@ -1,10 +1,10 @@
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-use crate::typedb::nodes::create_only_nodes_with_no_ids_present;
-use crate::typedb::nodes::delete_nodes_from_pids;
-use crate::typedb::relationships::create_all_relationships;
-use crate::typedb::relationships::delete_out_links;
+use crate::media::typedb::nodes::create_only_nodes_with_no_ids_present;
+use crate::media::typedb::nodes::delete_nodes_from_pids;
+use crate::media::typedb::relationships::create_all_relationships;
+use crate::media::typedb::relationships::delete_out_links;
 use crate::types::{SkgNode, ID, SaveInstruction};
 
 /// Update the DB from a batch of `(SkgNode, NodeSaveAction_ExcludingMerge)` pairs:

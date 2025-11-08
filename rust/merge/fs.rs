@@ -1,4 +1,4 @@
-use crate::file_io::write_node;
+use crate::media::file_io::write_node;
 use crate::types::{MergeInstructionTriple, SkgConfig, SkgNode};
 use crate::util::path_from_pid;
 use std::error::Error;

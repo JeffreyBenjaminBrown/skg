@@ -4,7 +4,7 @@
 // GLOSSARY:
 // See the Tantivy section in glossary.md.
 
-use crate::textlinks::replace_each_link_with_its_label;
+use crate::media::textlinks::replace_each_link_with_its_label;
 use crate::types::{ID, SkgNode, TantivyIndex};
 
 use tantivy::{IndexWriter, doc, Term, IndexReader, Searcher, Document};

@@ -34,7 +34,7 @@ Extra IDs are appended from disk.
 
 use crate::types::{
   ID, SkgNode, SaveInstruction, NodeSaveAction_ExcludingMerge, SkgConfig};
-use crate::file_io::read_node_from_id_optional;
+use crate::media::file_io::read_node_from_id_optional;
 use crate::util::dedup_vector;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;

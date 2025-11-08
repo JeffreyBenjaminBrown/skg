@@ -15,10 +15,10 @@ use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
-use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
-use skg::typedb::relationships::delete_out_links;
-use skg::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::typedb::util::pid_from_id;
+use skg::media::typedb::nodes::create_only_nodes_with_no_ids_present;
+use skg::media::typedb::relationships::delete_out_links;
+use skg::media::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::media::typedb::util::pid_from_id;
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;

@@ -1,9 +1,9 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
-use crate::file_io::multiple_nodes::read_skg_files;
-use crate::tantivy::update_index_with_nodes;
-use crate::typedb::nodes::create_all_nodes;
-use crate::typedb::relationships::create_all_relationships;
+use crate::media::file_io::multiple_nodes::read_skg_files;
+use crate::media::tantivy::update_index_with_nodes;
+use crate::media::typedb::nodes::create_all_nodes;
+use crate::media::typedb::relationships::create_all_relationships;
 use crate::types::{SkgNode, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;

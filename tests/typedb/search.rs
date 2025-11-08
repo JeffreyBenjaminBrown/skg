@@ -4,8 +4,8 @@ pub mod contains_from_pids;
 pub mod count_relationships;
 
 use skg::test_utils::run_with_test_db;
-use skg::typedb::search::find_containers_of;
-use skg::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::media::typedb::search::find_containers_of;
+use skg::media::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::{ID, SkgConfig};
 
 use std::collections::HashSet;

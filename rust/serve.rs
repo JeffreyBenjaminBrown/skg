@@ -2,22 +2,25 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
-pub mod node_aliases;
+pub mod handlers;
 pub mod parse_headline_md_sexp;
 pub use parse_headline_md_sexp::parse_headline_from_sexp;
-pub mod save_buffer;
-pub mod single_root_view;
-pub use title_matches::generate_title_matches_response;
-pub mod title_matches;
 pub mod util;
 
+// Re-export handlers for backwards compatibility
+pub use handlers::node_aliases;
+pub use handlers::save_buffer;
+pub use handlers::single_root_view;
+pub use handlers::title_matches;
+pub use title_matches::generate_title_matches_response;
+
+use crate::cleanup::cleanup_and_shutdown;
 use crate::init::initialize_dbs;
-use crate::serve::node_aliases::handle_node_aliases_request;
-use crate::serve::save_buffer::handle_save_buffer_request;
-use crate::serve::single_root_view::handle_single_root_view_request;
-use crate::serve::title_matches::handle_title_matches_request;
+use crate::serve::handlers::node_aliases::handle_node_aliases_request;
+use crate::serve::handlers::save_buffer::handle_save_buffer_request;
+use crate::serve::handlers::single_root_view::handle_single_root_view_request;
+use crate::serve::handlers::title_matches::handle_title_matches_request;
 use crate::serve::util::{request_type_from_request, send_response};
-use crate::typedb::util::delete_database;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use std::io::{BufRead, BufReader};
@@ -39,23 +42,24 @@ pub fn serve (
     : (Arc<TypeDBDriver>, TantivyIndex)
     = initialize_dbs ( &config );
 
-  // Set up signal handler for Ctrl+C and SIGTERM,
-  // for graceful shutdown with database cleanup.
-  let driver_for_signal = Arc::clone ( &typedb_driver );
-  let config_for_signal = config . clone ();
-  ctrlc::set_handler ( move || {
-    println! ( "\nReceived shutdown signal..." );
-    cleanup_and_shutdown (
-      &driver_for_signal,
-      &config_for_signal );
-  } ) . expect ( "Error setting Ctrl+C handler" );
+  { // Set up signal handler for Ctrl+C and SIGTERM,
+    // for graceful shutdown with database cleanup.
+    let driver_for_signal = Arc::clone ( &typedb_driver );
+    let config_for_signal = config . clone ();
+    ctrlc::set_handler ( move || {
+      println! ( "\nReceived shutdown signal..." );
+      cleanup_and_shutdown (
+        &driver_for_signal,
+        &config_for_signal );
+    } ) . expect ( "Error setting Ctrl+C handler" ); }
 
   // Bind to TCP port for Rust-Emacs API communication.
   let bind_addr : String =
     format!("0.0.0.0:{}", config.port);
   let emacs_listener : TcpListener =
     TcpListener::bind ( &bind_addr )?;
-  println!("Listening on port {} for Emacs connections...", config.port);
+  println!("Listening on port {} for Emacs connections...",
+           config.port);
 
   for stream_res in emacs_listener.incoming() { // the loop
     match stream_res {
@@ -168,29 +172,3 @@ fn handle_shutdown_request (
                   "Server shutting down..." );
   cleanup_and_shutdown (
     typedb_driver, config ); }
-
-/// Performs cleanup before server shutdown.
-/// Deletes the database if delete_on_quit is configured, then exits.
-fn cleanup_and_shutdown (
-  typedb_driver : &Arc<TypeDBDriver>,
-  config        : &SkgConfig,
-) {
-  if config . delete_on_quit {
-    println! (
-      "Deleting database '{}' before shutdown...",
-      config . db_name );
-
-    // Wait briefly to allow any pending operations to complete.
-    // This helps ensure the database isn't marked as "in use".
-    std::thread::sleep (
-      std::time::Duration::from_millis ( 100 ) );
-
-    futures::executor::block_on ( async {
-      if let Err ( e ) =
-        delete_database (
-          typedb_driver, & config . db_name )
-        . await {
-          eprintln! ( "Failed to delete database: {}", e );
-        }} ); }
-  println! ( "Shutdown complete." );
-  std::process::exit (0); }

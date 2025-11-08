@@ -2,9 +2,9 @@
 
 use std::path::Path;
 use tantivy::schema as schema;
-use skg::file_io::read_skg_files;
+use skg::media::file_io::read_skg_files;
 use skg::init::in_fs_wipe_index_then_create_it;
-use skg::tantivy::{search_index, update_index_with_nodes};
+use skg::media::tantivy::{search_index, update_index_with_nodes};
 use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
 
 #[test]

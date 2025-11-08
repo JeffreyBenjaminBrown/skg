@@ -8,7 +8,7 @@
 ///   maybe even all of it, might already be there.
 
 use crate::mk_org_text::content_view::skgnode_and_orgnode_from_pid;
-use crate::typedb::search::{
+use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};

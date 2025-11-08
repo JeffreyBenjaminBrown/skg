@@ -10,7 +10,7 @@
 */
 
 use crate::types::{OrgNode, RelToParent, ID, EditRequest, SkgConfig};
-use crate::typedb::util::pid_from_id;
+use crate::media::typedb::util::pid_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
