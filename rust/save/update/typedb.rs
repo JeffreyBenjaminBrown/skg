@@ -33,13 +33,6 @@ pub async fn update_typedb_from_saveinstructions (
     instructions . iter ()
     . cloned ()
     . partition ( |(_, action)| action . toDelete );
-  let to_delete_pids : Vec<ID> =
-    to_delete_instructions . iter ()
-    . filter_map ( |(node, _)|
-                    node . ids
-                    . get(0)
-                    . cloned() )
-    . collect ();
   let to_write_skgnodes : Vec<SkgNode> =
     to_write_instructions . iter ()
     . map ( |(node, _)| node . clone () )
@@ -48,6 +41,13 @@ pub async fn update_typedb_from_saveinstructions (
     to_write_skgnodes . iter ()
     . filter_map ( |n|
                     n . ids
+                    . get(0)
+                    . cloned() )
+    . collect ();
+  let to_delete_pids : Vec<ID> =
+    to_delete_instructions . iter ()
+    . filter_map ( |(node, _)|
+                    node . ids
                     . get(0)
                     . cloned() )
     . collect ();

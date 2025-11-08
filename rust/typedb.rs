@@ -30,9 +30,6 @@ pub use search::{
     count_link_sources,
 };
 
-pub mod update;
-pub use update::update_typedb_from_saveinstructions;
-
 pub mod util;
 pub use util::{
   pid_from_id,

@@ -1,5 +1,5 @@
-use crate::save::update_fs::update_fs_from_saveinstructions;
 use crate::save::buffer_to_save_instructions;
+use crate::save::update_graph;
 use crate::types::errors::SaveError;
 use crate::mk_org_text::content_view::{
   render_forest_to_org,
@@ -7,8 +7,6 @@ use crate::mk_org_text::content_view::{
 use crate::merge::merge_nodes_in_graph;
 use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
-use crate::tantivy::update_index_from_saveinstructions;
-use crate::typedb::update::update_typedb_from_saveinstructions;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
@@ -19,10 +17,9 @@ use sexp::{Sexp, Atom};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
-use std::path::Path;
 use typedb_driver::TypeDBDriver;
 
-/// Response from a save operation.
+/// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
 struct SaveResponse {
   content : String,
@@ -88,20 +85,20 @@ pub fn handle_save_buffer_request (
             let response : Sexp =
               Sexp::List ( vec! [
                 Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "content" . to_string () ) ),
-                  Sexp::Atom ( Atom::S ( "nil" . to_string () ) ) ] ),
+                  Sexp::Atom ( Atom::S ( "content" . to_string ( )) ),
+                  Sexp::Atom ( Atom::S ( "nil" . to_string ( )) ) ] ),
                 Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "errors" . to_string () ) ),
+                  Sexp::Atom ( Atom::S ( "errors" . to_string ( )) ),
                   Sexp::List ( vec! [
-                    Sexp::Atom ( Atom::S ( error_buffer_content ) ) ] ) ] ) ] );
+                    Sexp::Atom ( Atom::S ( error_buffer_content )) ] ) ] ) ] );
             let response_sexp : String =
               response . to_string ();
             let header : String =
               format! ( "Content-Length: {}\r\n\r\n",
-                        response_sexp . len () );
+                        response_sexp . len ( ));
             let full_response : String =
               format! ( "{}{}", header, response_sexp );
-            stream.write_all(full_response.as_bytes()).unwrap();
+            stream.write_all(full_response.as_bytes( )).unwrap();
             stream.flush().unwrap();
           } else {
             let error_msg : String =
@@ -138,7 +135,7 @@ fn read_length_prefixed_content (
       if line.starts_with("Content-Length: ")
       { line.strip_prefix("Content-Length: ")
         . and_then ( |s|
-                      s.trim() . parse::<usize> () . ok() )
+                      s.trim() . parse::<usize> () . ok( ))
       } else { None }} )
     . ok_or ("Content-Length header not found") ?;
   let mut buffer : Vec<u8> = // Read content_length bytes.
@@ -168,7 +165,7 @@ async fn update_from_and_rerender_buffer (
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;
   if orgnode_forest.is_empty() { return Err (
-    "No valid org nodes found in org_buffer_text" . into()); }
+    "No valid org nodes found in org_buffer_text" . into( )); }
   update_graph (
     save_instructions,
     config.clone(),
@@ -198,48 +195,3 @@ async fn update_from_and_rerender_buffer (
     render_forest_to_org ( & orgnode_forest );
 
   Ok ( SaveResponse { content, errors } ) }
-
-/// Updates **everything** from the given `SaveInstruction`s, in order:
-///   1) TypeDB
-///   2) Filesystem
-///   3) Tantivy
-/// PITFALL: If any but the first step fails,
-///   the resulting system state is invalid.
-pub async fn update_graph (
-  instructions  : Vec<SaveInstruction>,
-  config        : SkgConfig,
-  tantivy_index : &TantivyIndex,
-  driver        : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
-
-  let db_name : &str = &config.db_name;
-
-  { println!( "1) Updating TypeDB database '{}' ...", db_name );
-    update_typedb_from_saveinstructions (
-      db_name,
-      driver,
-      &instructions ). await ?;
-    println!( "   TypeDB update complete." ); }
-
-  { // filesystem
-    let total_input : usize = instructions.len ();
-    let target_dir  : &Path = &config.skg_folder;
-    println!( "2) Writing {} instruction(s) to disk at {:?} ...",
-               total_input, target_dir );
-    let (deleted_count, written_count) : (usize, usize) =
-      update_fs_from_saveinstructions (
-        instructions.clone (), config.clone () ) ?;
-    println!( "   Deleted {} file(s), wrote {} file(s).",
-              deleted_count, written_count ); }
-
-  { // Tantivy
-    println!( "3) Updating Tantivy index ..." );
-    let indexed_count : usize =
-      update_index_from_saveinstructions (
-        &instructions, tantivy_index )?;
-    println!( "   Tantivy updated for {} document(s).",
-                  indexed_count ); }
-
-  println!( "All updates finished successfully." );
-  Ok (( )) }

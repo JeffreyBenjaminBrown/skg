@@ -163,8 +163,6 @@ pub fn wipe_fs_then_create_index_there (
                               & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
-/* -------------------- Helper functions -------------------- */
-
 pub async fn overwrite_new_empty_db (
   // Destroys the db named `db_name` if it exists,
   // then makes a new, empty one.

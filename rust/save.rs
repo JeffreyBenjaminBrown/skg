@@ -19,15 +19,19 @@ pub use orgnodes_to_instructions::{
 };
 pub mod orgnodes_to_instructions;
 
-pub mod update_fs;
-pub use update_fs::update_fs_from_saveinstructions;
+pub mod update;
+pub use update::update_fs_from_saveinstructions;
+pub use update::update_index_from_saveinstructions;
+pub use update::update_typedb_from_saveinstructions;
 
 use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
-use crate::types::misc::SkgConfig;
+use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple};
 use crate::types::orgnode::OrgNode;
 use crate::types::errors::{SaveError, BufferValidationError};
 use ego_tree::Tree;
+use std::error::Error;
+use std::path::Path;
 
 use typedb_driver::TypeDBDriver;
 
@@ -78,3 +82,48 @@ pub async fn buffer_to_save_instructions (
   Ok ((orgnode_forest,
        instructions,
        mergeInstructions)) }
+
+/// Updates **everything** from the given `SaveInstruction`s, in order:
+///   1) TypeDB
+///   2) Filesystem
+///   3) Tantivy
+/// PITFALL: If any but the first step fails,
+///   the resulting system state is invalid.
+pub async fn update_graph (
+  instructions  : Vec<SaveInstruction>,
+  config        : SkgConfig,
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
+
+  let db_name : &str = &config.db_name;
+
+  { println!( "1) Updating TypeDB database '{}' ...", db_name );
+    update_typedb_from_saveinstructions (
+      db_name,
+      driver,
+      &instructions ). await ?;
+    println!( "   TypeDB update complete." ); }
+
+  { // filesystem
+    let total_input : usize = instructions.len ();
+    let target_dir  : &Path = &config.skg_folder;
+    println!( "2) Writing {} instruction(s) to disk at {:?} ...",
+               total_input, target_dir );
+    let (deleted_count, written_count) : (usize, usize) =
+      update_fs_from_saveinstructions (
+        instructions.clone (), config.clone ()) ?;
+    println!( "   Deleted {} file(s), wrote {} file(s).",
+              deleted_count, written_count ); }
+
+  { // Tantivy
+    println!( "3) Updating Tantivy index ..." );
+    let indexed_count : usize =
+      update_index_from_saveinstructions (
+        &instructions, tantivy_index )?;
+    println!( "   Tantivy updated for {} document(s).",
+                  indexed_count ); }
+
+  println!( "All updates finished successfully." );
+  Ok (( )) }

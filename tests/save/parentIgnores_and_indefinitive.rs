@@ -2,9 +2,9 @@
 
 use skg::file_io::one_node::read_node_from_id;
 use skg::save::buffer_to_save_instructions;
-use skg::save::update_fs::update_fs_from_saveinstructions;
+use skg::save::update::fs::update_fs_from_saveinstructions;
+use skg::save::update::typedb::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
-use skg::typedb::update::update_typedb_from_saveinstructions;
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
 
