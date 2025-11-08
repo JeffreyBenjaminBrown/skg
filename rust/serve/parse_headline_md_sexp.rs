@@ -1,10 +1,11 @@
 /// PURPOSE: Parse headlines:
 /// the bullet, the title, and the (s-expr) metadata.
 
-use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, EditRequest, ViewRequest, default_metadata};
+use crate::media::sexp::{extract_v_from_kv_pair_in_sexp, find_sexp_end, atom_to_string};
 use crate::types::misc::ID;
-use crate::serve::util::extract_v_from_kv_pair_in_sexp;
-use sexp::{Sexp, Atom};
+use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, EditRequest, ViewRequest, default_metadata};
+
+use sexp::Sexp;
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -181,31 +182,6 @@ fn parse_separating_metadata_and_title (
 
 
 /* -------- Level 2: Dependencies of level 1 -------- */
-
-/// Find the end position of an s-expression in a string.
-/// Uses simple parenthesis matching to locate the closing paren.
-/// Returns the byte position immediately after the closing paren,
-/// or None if parentheses are unbalanced.
-pub fn find_sexp_end (
-  text : &str
-) -> Option<usize> {
-  let mut depth : i32 = 0;
-
-  for ( i, ch ) in text . char_indices () {
-    match ch {
-      '(' => depth += 1,
-      ')' => {
-        depth -= 1;
-        if depth == 0 {
-          return Some ( i + 1 ); // Return position after closing paren
-        }
-      },
-      _ => {}
-    }
-  }
-
-  None // Unbalanced parentheses
-}
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
 /// Format: "(skg (id xyz) (view ...) (code (requests ...) ...))"
@@ -401,18 +377,3 @@ fn parse_viewrequests_sexp (
         "Unexpected element in viewRequests (expected atoms)"
           . to_string () ); }} }
   Ok (( )) }
-
-
-/* -------- Helper functions -------- */
-
-/// Helper function to extract string value from any Sexp atom.
-/// Converts integers and floats to strings as needed.
-fn atom_to_string (
-  atom : &Sexp
-) -> Result<String, String> {
-  match atom {
-    Sexp::Atom ( Atom::S ( s ) ) => Ok ( s . clone () ),
-    Sexp::Atom ( Atom::I ( i ) ) => Ok ( i . to_string () ),
-    Sexp::Atom ( Atom::F ( f ) ) => Ok ( f . to_string () ),
-    _ => Err ( "Expected atom (string, integer, or float)".to_string () ),
-  } }
