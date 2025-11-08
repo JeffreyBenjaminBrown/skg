@@ -42,9 +42,7 @@ use typedb_driver::answer::QueryAnswer;
 ///       test_function_1(config, driver).await?;
 ///       test_function_2(config, driver).await?;
 ///       Ok(())
-///     })
-///   )
-/// }
+///     } )) }
 /// ```
 pub fn run_with_test_db<F>(
   db_name: &str,

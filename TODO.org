@@ -2,7 +2,11 @@
   rust/serve*
     (have not read any of them yet)
 * Is there a lot of code duplication for tantivy?
-* Are there sexp functions that should be grouped?
+* 'NodeSaveAction_ExcludingMerge' feels unnatural
+pub struct NodeSaveAction_ExcludingMerge {
+  pub indefinitive: bool,
+  pub toDelete: bool,
+}
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * Appending from indef nodes moght be a misfeature.
 * "points" seems a better name than "nodes"
@@ -26,6 +30,8 @@
     Loads up its context with good stuff,
     for when it finally implements the chosen path.
 ** cargo nextest run
+** cargo test --doc
+   runs 'doctests', which ensure code in documentation works.
 ** claude --dangerously-skip-permissions
    Less ergonomically, can say:
    "Don't do anything you don't have permission to do.
