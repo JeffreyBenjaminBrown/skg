@@ -89,7 +89,7 @@ fn add_documents_to_writer (
       indexed_count += 1; }}
   Ok (indexed_count) }
 
-fn create_documents_from_node (
+pub fn create_documents_from_node (
   node: &SkgNode,
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < Document >,
@@ -115,7 +115,7 @@ fn create_documents_from_node (
     documents_acc.push (doc); }
   Ok ( documents_acc ) }
 
-fn commit_with_status (
+pub fn commit_with_status (
   writer: &mut IndexWriter,
   indexed_count: usize,
   operation: &str,

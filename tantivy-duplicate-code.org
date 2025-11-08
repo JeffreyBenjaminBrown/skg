@@ -1,0 +1,147 @@
+* Duplicated Code in Tantivy Functions
+
+** MAJOR DUPLICATION: Identical helper functions
+
+*** create_documents_from_node (EXACT DUPLICATE)
+
+Location 1: rust/media/tantivy.rs:92-116
+Location 2: rust/save/update/tantivy.rs:48-72
+
+These functions are COMPLETELY IDENTICAL (25 lines):
+- Both check if node.ids.is_empty()
+- Both extract primary_id from node.ids[0]
+- Both build titles_and_aliases from node.title + node.aliases
+- Both create Documents with the same structure:
+  - tantivy_index.id_field => primary_id.as_str()
+  - tantivy_index.title_or_alias_field => replace_each_link_with_its_label(title_or_alias)
+- Both return Vec<Document>
+
+*** commit_with_status (EXACT DUPLICATE)
+
+Location 1: rust/media/tantivy.rs:118-129
+Location 2: rust/save/update/tantivy.rs:74-85
+
+These functions are COMPLETELY IDENTICAL (12 lines):
+- Both check if indexed_count > 0
+- Both print the same message format: "{} {} documents. Committing changes..."
+- Both call writer.commit()
+- Both return Ok(()) with the same error handling
+
+
+** PATTERN DUPLICATION: IndexWriter creation and deletion loop
+
+*** IndexWriter creation pattern
+
+rust/media/tantivy.rs:54-55:
+  let mut writer: IndexWriter =
+    tantivy_index.index.writer(50_000_000)?;
+
+rust/save/update/tantivy.rs:19-20:
+  let mut writer: IndexWriter =
+    tantivy_index.index.writer(50_000_000)?;
+
+IDENTICAL: Both use the same buffer size (50_000_000 bytes = 50MB)
+
+
+*** ID deletion loop pattern
+
+rust/media/tantivy.rs:56-63:
+  { // Delete those IDs from the index. (They'll come back.)
+    for node in nodes {
+      if !node.ids.is_empty() {
+        let primary_id: &ID = &node.ids[0];
+        let term: Term = Term::from_field_text(
+          tantivy_index.id_field,
+          primary_id.as_str() );
+        writer.delete_term(term); } } }
+
+rust/save/update/tantivy.rs:21-30:
+  { // Delete all IDs in the SaveInstructions from the index --
+    // be they toDelete or otherwise.
+    // (Those that aren't will come back in the next step.)
+    for (node, _action) in instructions {
+      if !node.ids.is_empty() {
+        let primary_id: &ID = &node.ids[0];
+        let term: Term = Term::from_field_text(
+          tantivy_index.id_field,
+          primary_id.as_str() );
+        writer.delete_term(term); } } }
+
+NEARLY IDENTICAL:
+- Same logic: iterate, check if ids empty, extract primary_id, create term, delete
+- Only difference:
+  - First iterates over nodes directly
+  - Second iterates over (node, _action) tuples and ignores _action
+- Comments differ but convey same meaning
+
+
+** CONCEPTUAL DUPLICATION: Document addition patterns
+
+*** add_documents_to_writer vs inline document addition
+
+rust/media/tantivy.rs:64-66 calls add_documents_to_writer:
+  let processed_count: usize =
+    add_documents_to_writer (
+      nodes, &mut writer, tantivy_index)?;
+
+Then add_documents_to_writer:74-90:
+  let mut indexed_count: usize = 0;
+  for node in nodes {
+    if node.ids.is_empty() {
+      return Err ( "SkgNode has no IDs".into () ); }
+    let documents: Vec<Document> =
+      create_documents_from_node(
+        node, tantivy_index )?;
+    for document in documents {
+      writer.add_document (document)?;
+      indexed_count += 1; }}
+  Ok (indexed_count)
+
+rust/save/update/tantivy.rs:31-43 does it inline:
+  { // Add documents only for non-deleted instructions.
+    let mut processed_count: usize = 0;
+    for (node, action) in instructions {
+      if ! action . toDelete {
+        let documents : Vec < Document > =
+          create_documents_from_node (
+            node, tantivy_index )?;
+        for document in documents {
+          writer.add_document (document)?;
+          processed_count += 1; }} }
+    commit_with_status(
+      &mut writer, processed_count, "Updated")?;
+    Ok (processed_count) }
+
+STRUCTURALLY SIMILAR:
+- Both loop through items
+- Both call create_documents_from_node
+- Both add documents with writer.add_document
+- Both count processed documents
+- Both call commit_with_status with "Updated"
+- Main difference: second one filters by !action.toDelete inline
+
+
+** SUMMARY
+
+*** Exact duplicates (can be deduplicated immediately):
+1. create_documents_from_node (25 lines) - appears in 2 files
+2. commit_with_status (12 lines) - appears in 2 files
+
+*** Near duplicates (could be deduplicated with minor refactoring):
+1. IndexWriter creation pattern - same magic number 50_000_000
+2. ID deletion loop - same structure, different iteration source
+3. Document addition pattern - same logic, one has filter, one doesn't
+
+*** Potential consolidation opportunity:
+Both rust/media/tantivy.rs and rust/save/update/tantivy.rs follow
+the same update pattern:
+  1. Create writer
+  2. Delete all relevant IDs
+  3. Add back (filtered) documents
+  4. Commit with status message
+
+The only differences are:
+- Input type (Vec<SkgNode> vs Vec<SaveInstruction>)
+- Filtering logic (none vs checking !action.toDelete)
+
+These could potentially share a common implementation.

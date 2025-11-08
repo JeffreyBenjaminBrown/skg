@@ -2,6 +2,18 @@
   rust/serve*
     (have not read any of them yet)
 * Is there a lot of code duplication for tantivy?
+** Claude's inlined report
+  1. DONE : EXACT duplicates (should be deduplicated):
+    - create_documents_from_node - 25 identical lines in 2 files
+    - commit_with_status - 12 identical lines in 2 files
+  2. Pattern duplicates:
+    - IndexWriter creation (same 50MB buffer size)
+    - ID deletion loops (nearly identical structure)
+    - Document addition patterns (similar flow, minor differences)
+  3. Consolidation opportunity: Both main files follow the same update pattern (create writer →
+  delete IDs → add documents → commit), just with different input types and filtering logic.
+** the full report
+   ./tantivy-duplicate-code.org
 * 'NodeSaveAction_ExcludingMerge' feels unnatural
 pub struct NodeSaveAction_ExcludingMerge {
   pub indefinitive: bool,
