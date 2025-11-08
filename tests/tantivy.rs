@@ -3,10 +3,8 @@
 use std::path::Path;
 use tantivy::schema as schema;
 use skg::file_io::read_skg_files;
-use skg::tantivy::{
-  wipe_fs_then_create_index_there,
-  search_index,
-  update_index_with_nodes};
+use skg::init::wipe_fs_then_create_index_there;
+use skg::tantivy::{search_index, update_index_with_nodes};
 use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
 
 #[test]

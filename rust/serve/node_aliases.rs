@@ -29,7 +29,8 @@ pub fn handle_node_aliases_request (
             & org_content ); },
         None => {
           let error_msg : String =
-            "No ID found in headline metadata".to_string ();
+            "No ID found in headline metadata"
+            . to_string ();
           println! ( "{}", error_msg ) ;
           send_response ( stream, &error_msg ); }}
     }, Err ( err ) => {

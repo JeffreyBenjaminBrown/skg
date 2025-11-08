@@ -1,4 +1,5 @@
 pub mod file_io;
+pub mod init;
 pub mod textlinks;
 pub mod merge;
 pub mod mk_org_text;

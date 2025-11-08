@@ -5,13 +5,11 @@
 // See the Tantivy section in glossary.md.
 
 use crate::textlinks::replace_each_link_with_its_label;
-use crate::types::{ID, SkgNode, SkgConfig, TantivyIndex, SaveInstruction};
+use crate::types::{ID, SkgNode, TantivyIndex, SaveInstruction};
 
-use tantivy::{Index, IndexWriter, doc, schema, Term, IndexReader, Searcher, Document};
+use tantivy::{IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
-use std::path::Path;
-use std::sync::Arc;
 use std::error::Error;
 
 
@@ -43,89 +41,6 @@ pub fn search_index (
     searcher.search (
       &query, &TopDocs::with_limit (10) )?;
   Ok (( best_matches, searcher )) }
-
-/// Build a schema,
-/// then run `wipe_fs_then_create_index_there`.
-pub fn initialize_tantivy_from_nodes (
-  config : & SkgConfig,
-  nodes  : & [SkgNode],
-) -> TantivyIndex {
-  println!("Initializing Tantivy index...");
-
-  // Define the schema.
-  let mut schema_builder = schema::Schema::builder();
-  let id_field: schema::Field =
-    schema_builder.add_text_field(
-      "id", schema::STRING | schema::STORED);
-  let title_or_alias_field: schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias", schema::TEXT | schema::STORED);
-  let schema: schema::Schema =
-    schema_builder.build();
-
-  let index_path : &Path =
-    Path::new ( & config . tantivy_folder );
-  let (tantivy_index, indexed_count) : ( TantivyIndex, usize ) =
-    wipe_fs_then_create_index_there (
-      nodes,
-      index_path,
-      schema,
-      id_field,
-      title_or_alias_field )
-    . unwrap_or_else(|e| {
-      eprintln!("Failed to create Tantivy index: {}", e);
-      std::process::exit(1);
-    } );
-  println!(
-    "Tantivy index initialized successfully. Indexed {} files.",
-    indexed_count);
-  tantivy_index }
-
-/// Removes any existing index at given path.
-/// creates a new one there,
-/// and populates it.
-///
-/// PITFALL: The index is not the data it indexes.
-/// This only deletes the former.
-pub fn wipe_fs_then_create_index_there (
-  nodes                : &[SkgNode],
-  index_path           : &Path,
-  schema               : schema::Schema,
-  id_field             : schema::Field,
-  title_or_alias_field : schema::Field,
-) -> Result<(TantivyIndex,
-             usize), // number of documents indexed
-            Box<dyn Error>> {
-
-  if index_path.exists() {
-    std::fs::remove_dir_all (index_path) ?; }
-  std::fs::create_dir_all ( index_path )?;
-  let index : Index =
-    Index::create_in_dir ( index_path, schema )?;
-  let tantivy_index : TantivyIndex = TantivyIndex {
-    index: Arc::new(index),
-    id_field: id_field,
-    title_or_alias_field, };
-  let indexed_count: usize = // populate it
-    empty_then_populate_index (
-      nodes, &tantivy_index )?;
-  Ok (( tantivy_index, indexed_count )) }
-
-/// Creates a fresh index from the provided SkgNodes.
-/// Returns the number of documents indexed.
-pub fn empty_then_populate_index (
-  nodes         : &[SkgNode],
-  tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
-  { // Empty the index.
-    let mut writer: IndexWriter =
-      tantivy_index.index.writer(50_000_000)?;
-    writer.delete_all_documents()?;
-    writer.commit () ?; }
-  // Outside the above block, the writer it created is dropped,
-  // which permits this next command to use a different one.
-  update_index_with_nodes (
-    nodes, tantivy_index ) }
 
 /// Updates the index with the provided SkgNodes.
 ///   For existing IDs, updates the title.

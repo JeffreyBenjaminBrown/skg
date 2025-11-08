@@ -1,12 +1,24 @@
-* TODO RESUME READING at
+* TODO RESUME READING / EDITING at
   rust/serve*
     (have not read any of them yet)
-* "points" seems a better name than "nodes"
+* rename wipe_fs_then_create_index_there
+  to
+    in_fs_wipe_index_then_create_it
+* reorder rust/serve/parse_headline_md_sexp.rs
+  to put callers first.
+  (if there's mutual recursion,
+  the order within the mutual recursive functions doesn't matter,
+  unless one is clearly an entry point,
+  in which case it should be first).
 * + rust/typedb/init.rs
 move
   initialize_typedb_from_nodes
+  initialize_tantivy_from_nodes
   initialize_dbs
 and probably others to it.
+* [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
+* Appending from indef nodes moght be a misfeature.
+* "points" seems a better name than "nodes"
 * TODO move buffer_to_save_instructions
   from
     rust/save.rs

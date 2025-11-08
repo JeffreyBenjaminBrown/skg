@@ -1,6 +1,3 @@
-pub mod init;
-pub use init::initialize_typedb_from_nodes;
-
 pub mod nodes;
 pub use nodes::{
     create_all_nodes,

@@ -3,7 +3,7 @@ use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, ID, TantivyIndex};
 use crate::file_io::multiple_nodes::read_skg_files;
-use crate::typedb::init::{overwrite_new_empty_db, define_schema};
+use crate::init::{overwrite_new_empty_db, define_schema};
 use crate::typedb::nodes::create_all_nodes;
 use crate::typedb::relationships::create_all_relationships;
 use crate::typedb::util::extract_payload_from_typedb_string_rep;
