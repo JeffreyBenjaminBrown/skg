@@ -22,8 +22,8 @@ use typedb_driver::TypeDBDriver;
 /// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
 struct SaveResponse {
-  content : String,
-  errors  : Vec < String >,
+  buffer_content : String,
+  errors         : Vec < String >,
 }
 
 impl SaveResponse {
@@ -33,7 +33,7 @@ impl SaveResponse {
     Sexp::List ( vec! [
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S ( "content" . to_string () )),
-        Sexp::Atom ( Atom::S ( self . content . clone () )) ] ),
+        Sexp::Atom ( Atom::S ( self . buffer_content . clone () )) ] ),
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S ( "errors" . to_string () )),
         Sexp::List (
@@ -191,7 +191,7 @@ async fn update_from_and_rerender_buffer (
       config,
       typedb_driver ) . await ?; }
 
-  let content : String =
+  let buffer_content : String =
     render_forest_to_org ( & orgnode_forest );
 
-  Ok ( SaveResponse { content, errors } ) }
+  Ok ( SaveResponse { buffer_content, errors } ) }
