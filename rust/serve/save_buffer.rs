@@ -29,7 +29,7 @@ struct SaveResponse {
 impl SaveResponse {
   /// Format the response as an s-expression.
   /// Format: ((content "...") (errors ("error1" "error2" ...)))
-  fn to_sexp ( &self ) -> String {
+  fn to_sexp_string ( &self ) -> String {
     Sexp::List ( vec! [
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S ( "content" . to_string () )),
@@ -65,32 +65,23 @@ pub fn handle_save_buffer_request (
           & initial_buffer_content,
           typedb_driver, config, tantivy_index ))
       { Ok (save_response) =>
-        { // Format response as s-exp: ((content "...") (errors (...)))
+        { // S-exp response format: ((content "...") (errors (...)))
           let response_sexp : String =
-            save_response . to_sexp ();
+            save_response . to_sexp_string ();
           let header : String =
             format! ( "Content-Length: {}\r\n\r\n",
                       response_sexp . len () );
-          let full_response : String =
-            format! ( "{}{}", header, response_sexp );
-          stream . write_all(
-            full_response . as_bytes () ). unwrap ();
+          stream . write_all (
+            format! ( "{}{}", header, response_sexp )
+              . as_bytes () ). unwrap ();
           stream . flush() . unwrap (); }
         Err (err) => {
           // Check if this is a SaveError that should be formatted for the client
           if let Some(save_error) = err.downcast_ref::<SaveError>() {
             let error_buffer_content : String =
               format_save_error_as_org(save_error);
-            // Create an s-exp with nil content and the error message
             let response : Sexp =
-              Sexp::List ( vec! [
-                Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "content" . to_string ( )) ),
-                  Sexp::Atom ( Atom::S ( "nil" . to_string ( )) ) ] ),
-                Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "errors" . to_string ( )) ),
-                  Sexp::List ( vec! [
-                    Sexp::Atom ( Atom::S ( error_buffer_content )) ] ) ] ) ] );
+              empty_response_sexp ( &error_buffer_content );
             let response_sexp : String =
               response . to_string ();
             let header : String =
@@ -144,6 +135,20 @@ fn read_length_prefixed_content (
   let content : String =
     String::from_utf8 (buffer) ?;
   Ok (content) }
+
+/// Create an s-expression with nil content and an error message.
+fn empty_response_sexp (
+  error_buffer_content : &str
+) -> Sexp {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( "nil" . to_string () )) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "errors" . to_string () )),
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S (
+          error_buffer_content . to_string () )) ] ) ] ) ] ) }
 
 /* Update dbs and filesystem, and generate text for a new org-buffer.
 Steps:
