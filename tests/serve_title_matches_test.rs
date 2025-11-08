@@ -1,7 +1,7 @@
 // cargo test --test serve_title_matches_test
 
 use skg::types::{ID, empty_skgnode, SkgNode, TantivyIndex};
-use skg::init::wipe_fs_then_create_index_there;
+use skg::init::in_fs_wipe_index_then_create_it;
 use skg::serve::title_matches::generate_title_matches_response;
 use tantivy::schema;
 use std::path::Path;
@@ -69,7 +69,7 @@ fn test_title_matches_org_format (
         vec! [ node1, node2, node3 ];
 
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
-        wipe_fs_then_create_index_there (
+        in_fs_wipe_index_then_create_it (
           &nodes,
           Path::new ( index_dir ),
           schema,

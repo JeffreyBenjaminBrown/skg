@@ -49,7 +49,7 @@ pub async fn multi_root_view (
   let mut forest : Vec < Tree < OrgNode > > =
     forest_from_root_ids (
       root_ids, config, driver ) . await ?;
-  set_metadata_relationships_in_forest (
+  set_metadata_relationship_viewdata_in_forest (
     &mut forest, config, driver ) . await ?;
   Ok ( render_forest_to_org (
     & forest )) }
@@ -279,7 +279,7 @@ async fn fetch_relationship_data (
 
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
-pub async fn set_metadata_relationships_in_forest (
+pub async fn set_metadata_relationship_viewdata_in_forest (
   forest : &mut [Tree < OrgNode >],
   config : &SkgConfig,
   driver : &TypeDBDriver,

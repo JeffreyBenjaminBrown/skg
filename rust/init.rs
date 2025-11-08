@@ -97,7 +97,7 @@ pub fn initialize_typedb_from_nodes (
   Arc::new( driver ) }
 
 /// Build a schema,
-/// then run `wipe_fs_then_create_index_there`.
+/// then run `in_fs_wipe_index_then_create_it`.
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
   nodes  : & [SkgNode],
@@ -119,7 +119,7 @@ pub fn initialize_tantivy_from_nodes (
     Path::new ( & config . tantivy_folder );
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
-    wipe_fs_then_create_index_there (
+    in_fs_wipe_index_then_create_it (
       nodes,
       index_path,
       schema,
@@ -139,7 +139,7 @@ pub fn initialize_tantivy_from_nodes (
 ///
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
-pub fn wipe_fs_then_create_index_there (
+pub fn in_fs_wipe_index_then_create_it (
   nodes                : &[SkgNode],
   index_path           : &Path,
   schema               : schema::Schema,

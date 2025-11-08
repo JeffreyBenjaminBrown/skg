@@ -3,7 +3,7 @@ use crate::save::update_graph;
 use crate::types::errors::SaveError;
 use crate::mk_org_text::content_view::{
   render_forest_to_org,
-  set_metadata_relationships_in_forest};
+  set_metadata_relationship_viewdata_in_forest};
 use crate::merge::merge_nodes_in_graph;
 use crate::rebuild::completeOrgnodeForest;
 use crate::serve::util::send_response;
@@ -186,7 +186,7 @@ async fn update_from_and_rerender_buffer (
       config,
       typedb_driver,
       &mut errors ) . await ?;
-    set_metadata_relationships_in_forest (
+    set_metadata_relationship_viewdata_in_forest (
       &mut orgnode_forest,
       config,
       typedb_driver ) . await ?; }

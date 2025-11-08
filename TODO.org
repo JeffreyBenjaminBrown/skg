@@ -1,21 +1,7 @@
 * TODO RESUME READING / EDITING at
   rust/serve*
     (have not read any of them yet)
-* ONGOING I've moved some things.
-  I'm collecting 'save' functionality in rust/save.rs and rust/save/.
-  Please continue that by moving
-    update_index_from_saveinstructions
-  to a new file
-    rust/save/tantivy.rs
-  and then fix all the broken imports so that cargo nextest is happy.
-* rename files
-In rust/save/, let's rename these files:
-
-update_fs.rs -> fs.rs
-update.rs -> typedb.rs
-* rename function
-  set_metadata_relationships_in_forest ->
-  set_metadata_relationship_viewdata_in_forest
+* Is there a lot of code duplication for tantivy?
 * break into standalone functions
 ** format_response_as_sexp
         { // Format response as s-exp: ((content "...") (errors (...)))
@@ -40,15 +26,6 @@ update.rs -> typedb.rs
                   Sexp::Atom ( Atom::S ( "errors" . to_string ( )) ),
                   Sexp::List ( vec! [
                     Sexp::Atom ( Atom::S ( error_buffer_content )) ] ) ] ) ] );
-* rename wipe_fs_then_create_index_there
-  to
-    in_fs_wipe_index_then_create_it
-* reorder rust/serve/parse_headline_md_sexp.rs
-  to put callers first.
-  (if there's mutual recursion,
-  the order within the mutual recursive functions doesn't matter,
-  unless one is clearly an entry point,
-  in which case it should be first).
 * rename
 struct SaveResponse {
   content : String, // rename to 'buffer_content'
@@ -58,12 +35,10 @@ struct SaveResponse {
 ** group handlers in handler/
    and rename so handler isn't restated
 ** Are there sexp functions that should be grouped?
-* + rust/typedb/init.rs
-move
-  initialize_typedb_from_nodes
-  initialize_tantivy_from_nodes
-  initialize_dbs
-and probably others to it.
+* move tests
+  from rust/test_utils.rs
+  to tests/test_utils.rs
+  (but leave the library functions in rust/test_utils.rs).
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * Appending from indef nodes moght be a misfeature.
 * "points" seems a better name than "nodes"
