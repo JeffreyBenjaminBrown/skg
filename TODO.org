@@ -2,43 +2,12 @@
   rust/serve*
     (have not read any of them yet)
 * Is there a lot of code duplication for tantivy?
-* break into standalone functions
-** format_response_as_sexp
-        { // Format response as s-exp: ((content "...") (errors (...)))
-          let response_sexp : String =
-            save_response . to_sexp ();
-          let header : String =
-            format! ( "Content-Length: {}\r\n\r\n",
-                      response_sexp . len () );
-          let full_response : String =
-            format! ( "{}{}", header, response_sexp );
-          stream . write_all(
-            full_response . as_bytes () ). unwrap ();
-          stream . flush() . unwrap (); }
-** empty_response_sexp
-            // Create an s-exp with nil content and the error message
-            let response : Sexp =
-              Sexp::List ( vec! [
-                Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "content" . to_string ( )) ),
-                  Sexp::Atom ( Atom::S ( "nil" . to_string ( )) ) ] ),
-                Sexp::List ( vec! [
-                  Sexp::Atom ( Atom::S ( "errors" . to_string ( )) ),
-                  Sexp::List ( vec! [
-                    Sexp::Atom ( Atom::S ( error_buffer_content )) ] ) ] ) ] );
-* rename
-struct SaveResponse {
-  content : String, // rename to 'buffer_content'
 * shuffle (*after* reading through!)
 ** media/{tantivy, typedb, file_io, textlinks}
 ** function 'cleanup_and_shutdown' to its own file
 ** group handlers in handler/
    and rename so handler isn't restated
 ** Are there sexp functions that should be grouped?
-* move tests
-  from rust/test_utils.rs
-  to tests/test_utils.rs
-  (but leave the library functions in rust/test_utils.rs).
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * Appending from indef nodes moght be a misfeature.
 * "points" seems a better name than "nodes"
