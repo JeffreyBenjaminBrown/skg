@@ -53,34 +53,42 @@ pub fn update_index_with_nodes (
 
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-  { // Delete those IDs from the index. (They'll come back.)
-    for node in nodes {
-      if !node.ids.is_empty() {
-        let primary_id: &ID = &node.ids[0];
-        let term: Term = Term::from_field_text(
-          tantivy_index.id_field,
-          primary_id.as_str() );
-        writer.delete_term(term); } } }
+  delete_nodes_from_index(
+    // Delete those IDs from the index. (They'll come back.)
+    nodes.iter(), &mut writer, tantivy_index)?;
   let processed_count: usize = // Add new associations.
-    add_documents_to_writer (
+    add_documents_to_tantivy_writer (
       nodes, &mut writer, tantivy_index)?;
   commit_with_status(
     &mut writer, processed_count, "Updated")?;
   Ok (processed_count) }
 
+pub fn delete_nodes_from_index<'a, I>(
+  nodes_iter: I,
+  writer: &mut IndexWriter,
+  tantivy_index: &TantivyIndex,
+) -> Result<(), Box<dyn Error>>
+where I: Iterator<Item = &'a SkgNode>, {
 
-/* -------------------- Private helpers -------------------- */
+  for node in nodes_iter {
+    if !node.ids.is_empty() {
+      let primary_id: &ID =
+        &node.ids[0];
+      let term: Term =
+        Term::from_field_text( tantivy_index.id_field,
+                               primary_id.as_str() );
+      writer . delete_term (term); }}
+  Ok (( )) }
 
-fn add_documents_to_writer (
-  nodes         : &[SkgNode],
+pub fn add_documents_to_tantivy_writer<'a, I> (
+  nodes         : I,
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<usize, Box<dyn Error>>
+where I: IntoIterator<Item = &'a SkgNode>, {
 
   let mut indexed_count: usize = 0;
   for node in nodes {
-    if node.ids.is_empty() {
-      return Err ( "SkgNode has no IDs".into () ); }
     let documents: Vec<Document> =
       create_documents_from_node(
         node, tantivy_index )?;
@@ -88,6 +96,9 @@ fn add_documents_to_writer (
       writer.add_document (document)?;
       indexed_count += 1; }}
   Ok (indexed_count) }
+
+
+/* -------------------- Private helpers -------------------- */
 
 pub fn create_documents_from_node (
   node: &SkgNode,

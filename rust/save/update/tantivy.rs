@@ -1,9 +1,9 @@
 // PURPOSE: Update Tantivy index from SaveInstructions.
 
-use crate::media::tantivy::{create_documents_from_node, commit_with_status};
-use crate::types::{ID, TantivyIndex, SaveInstruction};
+use crate::media::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_from_index};
+use crate::types::{SkgNode, TantivyIndex, SaveInstruction};
 
-use tantivy::{IndexWriter, Term, Document};
+use tantivy::IndexWriter;
 use std::error::Error;
 
 
@@ -18,26 +18,22 @@ pub fn update_index_from_saveinstructions (
 
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-  { // Delete all IDs in the SaveInstructions from the index --
-    // be they toDelete or otherwise.
-    // (Those that aren't will come back in the next step.)
-    for (node, _action) in instructions {
-      if !node.ids.is_empty() {
-        let primary_id: &ID = &node.ids[0];
-        let term: Term = Term::from_field_text(
-          tantivy_index.id_field,
-          primary_id.as_str() );
-        writer.delete_term(term); } } }
+  delete_nodes_from_index(
+    // Delete all IDs in the SaveInstructions from the index.
+    // (Instructions that aren't toDelete are then recreated.)
+    instructions.iter().map(|(node, _)| node),
+    &mut writer,
+    tantivy_index)?;
   { // Add documents only for non-deleted instructions.
-    let mut processed_count: usize = 0;
-    for (node, action) in instructions {
-      if ! action . toDelete {
-        let documents : Vec < Document > =
-          create_documents_from_node (
-            node, tantivy_index )?;
-        for document in documents {
-          writer.add_document (document)?;
-          processed_count += 1; }} }
+    let nodes_to_add: Vec<&SkgNode> =
+      instructions . iter()
+      . filter_map( |(node, action)|
+                      if !action.toDelete { Some(node) }
+                      else { None } )
+      . collect();
+    let processed_count: usize =
+      add_documents_to_tantivy_writer(
+        nodes_to_add, &mut writer, tantivy_index)?;
     commit_with_status(
       &mut writer, processed_count, "Updated")?;
     Ok (processed_count) }}
