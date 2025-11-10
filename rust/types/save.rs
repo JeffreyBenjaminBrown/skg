@@ -5,16 +5,18 @@ use super::{ID, SkgNode, SaveError, BufferValidationError};
 /// Types
 /////////////////
 
-pub type SaveInstruction = (SkgNode, NodeSaveAction_ExcludingMerge);
+pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
 
 /// Tells Rust what to do with a node.
+/// PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NonMerge_NodeAction will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.
 #[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NodeSaveAction_ExcludingMerge {
-  // PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NodeSaveAction_ExcludingMerge will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.
-  // PITFALL: It's nonsense if both of these fields are true. The server will in that case delete, so the indefinitive has no effect.
-  pub indefinitive: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content. Moreover, it is not used to define that node's content, but anything it contains that is not already in the node's contents will be appended to those contents.
-  pub toDelete: bool,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NonMerge_NodeAction {
+  /// The default case: the org-node's title, body and content define those of the node -- with the exception that after that definition, indeefinitive nodes can append novel content to the content. (TODO : That exception might be a misefeature.)
+  SaveDefinitive,
+  /// An exception from normal treatment. Usually, an org-node's content is taken to be equal to the corresponding node's content. But with SaveIndefinitive, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content. Moreover, it is not used to define that node's content, but anything it contains that is not already in the node's contents will be appended to those contents.
+  SaveIndefinitive,
+  Delete,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',

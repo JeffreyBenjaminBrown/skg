@@ -5,7 +5,7 @@
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, interpret};
-use skg::types::{OrgNode, ID, SkgNode, NodeSaveAction_ExcludingMerge};
+use skg::types::{OrgNode, ID, SkgNode, NonMerge_NodeAction};
 use ego_tree::Tree;
 
 #[test]
@@ -22,7 +22,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 3, "Should have 3 instructions");
@@ -33,8 +33,8 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
   assert_eq!(root1_skg.body, Some("Root body content".to_string()));
   assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
   assert_eq!(root1_skg.contains, Some(vec![ID::from("child1")]));
-  assert_eq!(root1_action.indefinitive, false);
-  assert_eq!(root1_action.toDelete, false);
+  assert!(matches!(root1_action,
+                   NonMerge_NodeAction::SaveDefinitive));
 
   // Test child1
   let (child1_skg, child1_action) = &instructions[1];
@@ -42,17 +42,16 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
   assert_eq!(child1_skg.body, Some("Child body".to_string()));
   assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
   assert_eq!(child1_skg.contains, Some(vec![])); // No children
-  assert_eq!(child1_action.indefinitive, false);
-  assert_eq!(child1_action.toDelete, false);
+  assert!(matches!(child1_action,
+                   NonMerge_NodeAction::SaveDefinitive));
 
   // Test root2 with metadata flags
   let (root2_skg, root2_action) = &instructions[2];
   assert_eq!(root2_skg.title, "root node 2");
   assert_eq!(root2_skg.body, Some("Root 2 body".to_string()));
   assert_eq!(root2_skg.ids, vec![ID::from("root2")]);
-  assert_eq!(root2_action.indefinitive, true);
-  assert_eq!(root2_action.toDelete, true);
-}
+  assert!(matches!(root2_action,
+                   NonMerge_NodeAction::Delete)); }
 
 #[test]
 fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
@@ -69,7 +68,7 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   // Should have 2 instructions: main node and content_child
@@ -104,7 +103,7 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 2);
@@ -129,7 +128,7 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 2); // main and content1
@@ -154,7 +153,7 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   // Should have instructions for: root, parentIgnores, content1, content2, none_rel
@@ -180,7 +179,7 @@ fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 5);
@@ -223,7 +222,7 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
 #[test]
 fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
   let trees: Vec<Tree<OrgNode>> = vec![];
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
@@ -241,7 +240,7 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 1); // Only main node
@@ -271,7 +270,7 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
 
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NodeSaveAction_ExcludingMerge)> =
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     interpret(trees).unwrap();
 
   assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
@@ -283,14 +282,14 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
   assert_eq!(doc1_skg.contains,
              Some(vec![ID::from("section1"), ID::from("section3")]),
              "Indefinitive node still collects contents (to be appended during reconciliation)");
-  assert_eq!(doc1_action.indefinitive, true);
-  assert_eq!(doc1_action.toDelete, false);
+  assert!(matches!(doc1_action,
+                   NonMerge_NodeAction::SaveIndefinitive));
 
   // Test section2 with toDelete
   let (section2_skg, section2_action) = &instructions[3];
   assert_eq!(section2_skg.title, "Section 2");
-  assert_eq!(section2_action.toDelete, true);
-  assert_eq!(section2_action.indefinitive, false);
+  assert!(matches!(section2_action,
+                   NonMerge_NodeAction::Delete));
 
   // Test that subsection1a is child of section1
   let (section1_skg, _) = &instructions[1];

@@ -7,7 +7,7 @@ use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, interpret, find_inconsistent_instructions};
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::test_utils::run_with_test_db;
-use skg::types::ID;
+use skg::types::{ID, NonMerge_NodeAction};
 use std::error::Error;
 
 #[test]
@@ -28,8 +28,14 @@ fn test_inconsistent_delete() {
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
   assert_eq!(instructions[1].0.ids[0], ID::from("1"));
-  assert_ne!(instructions[0].1.toDelete, instructions[1].1.toDelete);
-}
+  // One should be Delete, the other not
+  let is_delete_0: bool =
+    matches!(instructions[0].1,
+             NonMerge_NodeAction::Delete);
+  let is_delete_1: bool =
+    matches!(instructions[1].1,
+             NonMerge_NodeAction::Delete);
+  assert_ne!(is_delete_0, is_delete_1); }
 
 #[test]
 fn test_deletions_excluded (
@@ -56,9 +62,12 @@ fn test_deletions_excluded (
       let id2_instruction = reduced.iter()
         .find(|(node, _)| node.ids.contains(&ID::from("2")))
         .expect("Should have instruction for id:2");
-      assert_eq!(id1_instruction.1.toDelete, false);
-      assert_eq!(id2_instruction.1.toDelete, true);
-      assert_eq!( // id 1 should contain 3 and not 2 (which is being deleted)
+      assert!(!matches!(id1_instruction.1,
+                        NonMerge_NodeAction::Delete));
+      assert!(matches!(id2_instruction.1,
+                       NonMerge_NodeAction::Delete));
+      assert_eq!(
+        // id 1 should contain 3 and not 2 (which is being deleted)
         id1_instruction.0.contains, Some(vec![ID::from("3")]));
       Ok (( )) } ) ) }
 

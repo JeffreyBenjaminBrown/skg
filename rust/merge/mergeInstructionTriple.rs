@@ -1,5 +1,5 @@
 use crate::media::file_io::read_node;
-use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction_ExcludingMerge, ID, EditRequest};
+use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
 use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
@@ -66,16 +66,13 @@ fn saveinstructions_from_the_merge_in_an_orgnode(
           MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
-              NodeSaveAction_ExcludingMerge { indefinitive: false,
-                                              toDelete: false } ),
+              NonMerge_NodeAction::SaveDefinitive ),
             updated_acquirer : (
               updated_acquirer,
-              NodeSaveAction_ExcludingMerge { indefinitive: false,
-                                              toDelete: false } ),
+              NonMerge_NodeAction::SaveDefinitive ),
             acquiree_to_delete : (
               acquiree_from_disk,
-              NodeSaveAction_ExcludingMerge { indefinitive: false,
-                                              toDelete: true } ),
+              NonMerge_NodeAction::Delete ),
           } ); }}
   Ok(merge_instructions) }
 

@@ -28,6 +28,6 @@ pub use skgnode::{ SkgNode,
                    skgnode_example,
                    empty_skgnode, };
 pub mod save;
-pub use save::{ NodeSaveAction_ExcludingMerge,
+pub use save::{ NonMerge_NodeAction,
                 SaveInstruction,
                 MergeInstructionTriple, };

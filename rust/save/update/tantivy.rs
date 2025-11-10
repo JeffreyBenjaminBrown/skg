@@ -1,7 +1,7 @@
 // PURPOSE: Update Tantivy index from SaveInstructions.
 
 use crate::media::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_from_index};
-use crate::types::{SkgNode, TantivyIndex, SaveInstruction};
+use crate::types::{SkgNode, TantivyIndex, SaveInstruction, NonMerge_NodeAction};
 
 use tantivy::IndexWriter;
 use std::error::Error;
@@ -27,9 +27,12 @@ pub fn update_index_from_saveinstructions (
   { // Add documents only for non-deleted instructions.
     let nodes_to_add: Vec<&SkgNode> =
       instructions . iter()
-      . filter_map( |(node, action)|
-                      if !action.toDelete { Some(node) }
-                      else { None } )
+      . filter_map(
+        |(node, action)|
+        if !matches!( action,
+                      NonMerge_NodeAction::Delete) {
+          Some(node)
+        } else { None } )
       . collect();
     let processed_count: usize =
       add_documents_to_tantivy_writer(

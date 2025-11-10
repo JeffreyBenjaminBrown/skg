@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, RelToParent, ID, SkgNode, NodeSaveAction_ExcludingMerge, SaveInstruction, EditRequest};
+use crate::types::{OrgNode, RelToParent, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
 use ego_tree::{NodeRef, Tree};
 
 /// Converts a forest of OrgNode2s to SaveInstructions,
@@ -29,15 +29,18 @@ fn interpret_node_dfs(
   let rel_to_parent = &node_data.metadata.code.relToParent;
   if matches!(rel_to_parent, ( RelToParent::AliasCol |
                                RelToParent::Alias )) {
-    // Skip. Should never execute, because an ancestor should have already processed any alias node.
+    // Skip. Should never execute, because a predecessor in the tree should have already processed any alias node.
     return Ok(( )); }
   { // push another pair
-    let save_action : NodeSaveAction_ExcludingMerge =
-      NodeSaveAction_ExcludingMerge {
-        indefinitive : ( node_data.metadata.code.indefinitive ||
-                         node_data.metadata.viewData.repeat ),
-        toDelete     : matches!(node_data.metadata.code.editRequest,
-                                Some(EditRequest::Delete)), };
+    let save_action : NonMerge_NodeAction =
+      if matches!(node_data.metadata.code.editRequest,
+                  Some(EditRequest::Delete)) {
+        NonMerge_NodeAction::Delete
+      } else if node_data.metadata.code.indefinitive ||
+                node_data.metadata.viewData.repeat {
+        NonMerge_NodeAction::SaveIndefinitive
+      } else {
+        NonMerge_NodeAction::SaveDefinitive };
     let skg_node: SkgNode =
       mk_skgnode ( node_data, &node_ref )?;
     result.push (( skg_node, save_action )); }

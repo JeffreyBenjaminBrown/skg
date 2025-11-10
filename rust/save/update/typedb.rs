@@ -5,9 +5,9 @@ use crate::media::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::media::typedb::nodes::delete_nodes_from_pids;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::relationships::delete_out_links;
-use crate::types::{SkgNode, ID, SaveInstruction};
+use crate::types::{SkgNode, ID, SaveInstruction, NonMerge_NodeAction};
 
-/// Update the DB from a batch of `(SkgNode, NodeSaveAction_ExcludingMerge)` pairs:
+/// Update the DB from a batch of `(SkgNode, NonMerge_NodeAction)` pairs:
 /// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids
 /// 2) Remove deleted nodes from further processing
 /// 3) Create only nodes whose IDs are not present, via
@@ -32,7 +32,9 @@ pub async fn update_typedb_from_saveinstructions (
     : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
     instructions . iter ()
     . cloned ()
-    . partition ( |(_, action)| action . toDelete );
+    . partition (
+      |(_, action)| matches!(action,
+                             NonMerge_NodeAction::Delete));
   let to_write_skgnodes : Vec<SkgNode> =
     to_write_instructions . iter ()
     . map ( |(node, _)| node . clone () )

@@ -1,6 +1,6 @@
 use crate::media::file_io::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
 use crate::types::misc::SkgConfig;
-use crate::types::save::SaveInstruction;
+use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
 use crate::types::skgnode::SkgNode;
 
 use std::io;
@@ -13,7 +13,7 @@ pub fn update_fs_from_saveinstructions (
     : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
     instructions . into_iter ()
     . partition (|(_, action)|
-                 action . toDelete );
+                 matches!(action, NonMerge_NodeAction::Delete) );
   let delete_nodes : Vec<SkgNode> = // functional; no IO
     to_delete . into_iter ()
     . map ( |(node, _)| node )

@@ -33,7 +33,7 @@ Extra IDs are appended from disk.
 */
 
 use crate::types::{
-  ID, SkgNode, SaveInstruction, NodeSaveAction_ExcludingMerge, SkgConfig};
+  ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig};
 use crate::media::file_io::read_node_from_id_optional;
 use crate::util::dedup_vector;
 use std::collections::{HashMap, HashSet};
@@ -112,11 +112,11 @@ pub async fn reconcile_dup_instructions_for_one_id(
       &indefinitives, definer.as_ref(), &from_disk),
     overrides_view_of            : reconciled_overrides(
       &indefinitives, definer.as_ref(), &from_disk), };
-  let reconciled_action: NodeSaveAction_ExcludingMerge =
-    NodeSaveAction_ExcludingMerge {
-      indefinitive : false,
-      toDelete     : to_delete_if_consistent(
-        &indefinitives, definer.as_ref())?, };
+  let reconciled_action: NonMerge_NodeAction =
+    if to_delete_if_consistent(
+      &indefinitives, definer.as_ref())?
+    { NonMerge_NodeAction::Delete
+    } else { NonMerge_NodeAction::SaveDefinitive };
   Ok((reconciled_node, reconciled_action)) }
 
 /// Returns (definer, indefinitives),
@@ -131,7 +131,8 @@ fn extract_definer(
   let mut definer: Option<SaveInstruction> = None;
   let mut indefinitives: Vec<SaveInstruction> = Vec::new();
   for instr in instructions {
-    if !instr.1.indefinitive {
+    if matches!(instr.1,
+                NonMerge_NodeAction::SaveDefinitive) {
       if definer.is_some() {
         return Err(
           "Multiple definitive content definitions for same ID"
@@ -291,23 +292,21 @@ where
   else { // No instruction specified it. Use disk value.
     from_disk . as_ref() . and_then (extract_from_disk) }}
 
-/// Extracts 'the' toDelete value from definer and indefinitives,
-/// if they are all equal. Otherwise borks,
+/// Extracts 'the' delete status from definer and indefinitives,
+/// if they are all consistent. Otherwise borks,
 /// because you can't delete something and also not delete it.
 /// This check is redundant given validate_tree.
 fn to_delete_if_consistent(
   indefinitives: &[SaveInstruction],
   definer: Option<&SaveInstruction>
 ) -> Result<bool, Box<dyn Error>> {
-  let mut to_delete_values: HashSet<bool> =
-    HashSet::new();
-  for (_, action) in
+  let action_set: HashSet<NonMerge_NodeAction> =
     once(definer) . flatten() . chain (indefinitives.iter())
-  { // Collect toDelete values from definer and indefinitives.
-    to_delete_values.insert(action.toDelete); }
-  if to_delete_values.len() > 1 {
-    return Err(
-      "Inconsistent toDelete values for same ID".into()); }
-  let to_delete: bool =
-    *to_delete_values.iter().next().unwrap();
-  Ok(to_delete) }
+    . map ( |(_, action)| *action )
+    . collect();
+  if ( action_set.len() > 1 &&
+       action_set.contains(&NonMerge_NodeAction::Delete))
+  { return Err(
+    "Inconsistent delete status for same ID".into()); }
+  Ok ( action_set.contains (
+    &NonMerge_NodeAction::Delete )) }
