@@ -1,17 +1,25 @@
-* 'NodeSaveAction_ExcludingMerge' permits invalid state
-pub struct NodeSaveAction_ExcludingMerge {
-  pub indefinitive: bool,
-  pub toDelete: bool,
-}
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
-* Appending from indef nodes moght be a misfeature.
-* "points" seems a better name than "nodes"
-* TODO move buffer_to_save_instructions
-  from
-    rust/save.rs
-  to at the shallowest
-    rust/save/buffer_to_orgnodes.rs.
-* TODO buy statins, etc.
+* TODO ? move buffer_to_save_instructions
+** question
+Are these:
+
+    org_to_uninterpreted_nodes,
+    headline_to_triple,
+    HeadlineInfo,
+    find_inconsistent_instructions,
+    find_buffer_errors_for_saving,
+    add_missing_info_to_trees,
+    orgnodes_to_reconciled_save_instructions,
+    interpret,
+    reconcile_dup_instructions,
+    clobber_none_fields_with_data_from_disk,
+
+called by anything but buffer_to_save_instructions?
+** original idea
+   from
+     rust/save.rs
+   to at the shallowest
+     rust/save/buffer_to_orgnodes.rs.
 * aliases_to_org should rebuild the whole buffer
   like request containerward view
 * most plans are online
@@ -33,6 +41,7 @@ pub struct NodeSaveAction_ExcludingMerge {
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
 * QA
+** Appending from indef nodes moght be a misfeature.
 ** completeContents seems too long
 ** RelToParent could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
@@ -109,6 +118,8 @@ fold-preservation
 ** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
+** "point" seems a better name than "node"
+   But it conflicts with the Emacs 'point'.
 * solutions
 ** to extract Emacs properties into Rust
    use [[~/hodal/emacs/property-dump.el][property-dump]]

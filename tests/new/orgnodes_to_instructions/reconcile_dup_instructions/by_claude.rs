@@ -33,9 +33,7 @@ fn create_save_action( might_contain_more: bool,
   } else if might_contain_more {
     NonMerge_NodeAction::SaveIndefinitive
   } else {
-    NonMerge_NodeAction::SaveDefinitive
-  }
-}
+    NonMerge_NodeAction::SaveDefinitive }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {

@@ -36,7 +36,7 @@ use crate::types::{
   ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig};
 use crate::media::file_io::read_node_from_id_optional;
 use crate::util::dedup_vector;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::iter::once;
 use typedb_driver::TypeDBDriver;
@@ -83,9 +83,18 @@ pub async fn reconcile_dup_instructions_for_one_id(
 ) -> Result<SaveInstruction, Box<dyn Error>> {
   if instructions.is_empty() {
     return Err("Cannot reduce empty instruction list".into()); }
-  let (definer, indefinitives)
-    : (Option<SaveInstruction>, Vec<SaveInstruction>)
-    = extract_definer(instructions)?;
+  let (definer, to_delete, indefinitives)
+    : (Option<SaveInstruction>,
+       Option<SaveInstruction>,
+       Vec<SaveInstruction>)
+    = classify_instructions_by_actions(instructions)?;
+  if to_delete.is_some() {
+    if (definer.is_some() || !indefinitives.is_empty() )
+    { return Err(
+      "Inconsistent actions for same ID: at least one to delete and one to do something else."
+        . into() );
+    } else { // Ignore the other SkgNode fields; we only need an ID.
+      return Ok(to_delete.unwrap()); }}
   let from_disk: Option<SkgNode> = {
     let primary_id: ID =
       if let Some((ref node, _)) = definer {
@@ -113,34 +122,38 @@ pub async fn reconcile_dup_instructions_for_one_id(
     overrides_view_of            : reconciled_overrides(
       &indefinitives, definer.as_ref(), &from_disk), };
   let reconciled_action: NonMerge_NodeAction =
-    if to_delete_if_consistent(
-      &indefinitives, definer.as_ref())?
-    { NonMerge_NodeAction::Delete
-    } else { NonMerge_NodeAction::SaveDefinitive };
+    NonMerge_NodeAction::SaveDefinitive;
   Ok((reconciled_node, reconciled_action)) }
 
-/// Returns (definer, indefinitives),
-/// where 'indefinitives' is 'instructions' without 'definer'.
-/// If there is no definer, then the two lists are equal.
+/// Classifies instructions by their action type.
+/// Returns (definer, to_delete, indefinitives):
+/// - definer: SaveDefinitive instruction, if exactly one exists
+/// - to_delete: One Delete instruction (any one, we only need the ID)
+/// - indefinitives: SaveIndefinitive instructions
 /// Returns Err if multiple definers found.
-fn extract_definer(
+fn classify_instructions_by_actions(
   instructions: Vec<SaveInstruction>
-) -> Result<(Option<SaveInstruction>, // definer, if exactly one exists
-             Vec<SaveInstruction>), // indefinitive instructions
+) -> Result<(Option<SaveInstruction>, // definer. There can be at most one.
+             Option<SaveInstruction>, // to_delete. (There might be multiple, but they are all equivalent.)
+             Vec<SaveInstruction>), // indefinitives
             Box<dyn Error>> {
   let mut definer: Option<SaveInstruction> = None;
+  let mut to_delete: Option<SaveInstruction> = None;
   let mut indefinitives: Vec<SaveInstruction> = Vec::new();
   for instr in instructions {
-    if matches!(instr.1,
-                NonMerge_NodeAction::SaveDefinitive) {
-      if definer.is_some() {
-        return Err(
-          "Multiple definitive content definitions for same ID"
-            . into()); }
-      definer = Some(instr);
-    } else {
-      indefinitives.push(instr); }}
-  Ok((definer, indefinitives)) }
+    match instr.1 {
+      NonMerge_NodeAction::SaveDefinitive => {
+        if definer.is_some() {
+          return Err(
+            "Multiple definitive content definitions for same ID"
+              . into()); }
+        definer = Some(instr); }
+      NonMerge_NodeAction::Delete => {
+        if to_delete.is_none() {
+          to_delete = Some(instr); }}
+      NonMerge_NodeAction::SaveIndefinitive => {
+        indefinitives.push(instr); }} }
+  Ok ((definer, to_delete, indefinitives)) }
 
 /// Reconciles the ids field.
 /// Starts with definer's or first indefinitive's IDs,
@@ -161,7 +174,7 @@ fn reconciled_ids(
   final_ids }
 
 /// Reconciles the title field.
-/// Definer's title takes precedence, then disk's title.
+/// Definer's title takes precedence, then title from file on disk.
 /// If neither exists, that's an error.
 fn reconciled_title(
   definer: Option<&SaveInstruction>,
@@ -291,22 +304,3 @@ where
   if any_specified { Some(dedup_vector(collected)) }
   else { // No instruction specified it. Use disk value.
     from_disk . as_ref() . and_then (extract_from_disk) }}
-
-/// Extracts 'the' delete status from definer and indefinitives,
-/// if they are all consistent. Otherwise borks,
-/// because you can't delete something and also not delete it.
-/// This check is redundant given validate_tree.
-fn to_delete_if_consistent(
-  indefinitives: &[SaveInstruction],
-  definer: Option<&SaveInstruction>
-) -> Result<bool, Box<dyn Error>> {
-  let action_set: HashSet<NonMerge_NodeAction> =
-    once(definer) . flatten() . chain (indefinitives.iter())
-    . map ( |(_, action)| *action )
-    . collect();
-  if ( action_set.len() > 1 &&
-       action_set.contains(&NonMerge_NodeAction::Delete))
-  { return Err(
-    "Inconsistent delete status for same ID".into()); }
-  Ok ( action_set.contains (
-    &NonMerge_NodeAction::Delete )) }
