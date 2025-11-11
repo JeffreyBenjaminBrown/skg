@@ -607,14 +607,14 @@ Notes:
 - Function fails with clear error for missing foreign sources
 - All 115 tests passing
 
-** Phase 3: File Loading with Sources [COMPLETED - Enhancement Pending]
+** Phase 3: File Loading with Sources [COMPLETED including Phase 3b]
 1. ✓ Implemented =read_all_skg_files_from_sources= with HashMap parameter
 2. ✓ Added duplicate ID detection across sources with clear error messages
 3. ✓ Updated =initialize_dbs= to use new loading function
-4. ✓ Added 6 comprehensive tests in =tests/multi_source_loading.rs=
+4. ✓ Added 8 comprehensive tests in =tests/multi_source_loading.rs=
 5. ✓ Tests create temporary source directories as fixtures
 
-Tests cover:
+Initial tests (Phase 3):
 - Loading from single source
 - Loading from multiple sources with correct source field assignment
 - Duplicate ID detection across sources (fails with InvalidData error)
@@ -622,22 +622,30 @@ Tests cover:
 - Handling empty sources
 - Verifying source field is set correctly for each node
 
+Phase 3b enhancements:
+- ✓ Changed to collect ALL duplicate IDs instead of failing on first
+- ✓ Changed to collect ALL file read errors instead of failing on first
+- ✓ Implemented org file output for >10 duplicates (=initialization-error_duplicate-ids.org=)
+- ✓ Implemented org file output for unreadable files (=initialization-error_unreadable-skg-files.org=)
+- ✓ Sorted error output: IDs alphabetically, sources alphabetically, paths alphabetically
+- ✓ Enhanced tests to verify complete org file content with exact string comparison
+- ✓ Added test: =test_many_duplicate_ids_creates_org_file= (verifies org file with 15 duplicates)
+- ✓ Added test: =test_unreadable_files_creates_org_file= (verifies org file for bad source)
+- ✓ Removed misleading TODO comment in =read_skg_files=
+
 Implementation notes:
 - Function iterates over all sources in HashMap
 - Sets =node.source= to the correct nickname for each loaded node
-- Tracks all IDs seen across sources using HashMap<String, String>
-- Returns clear error message showing which sources have the duplicate ID
+- Tracks all IDs seen across sources using =HashMap<String, Vec<String>>=
+- Continues loading even after errors, collecting all issues
+- Reports to stderr for ≤10 duplicates, writes org file for >10
+- Always writes org file for unreadable files
+- Sorted output enables deterministic testing and easier user review
+- Tests generate expected content programmatically and do exact comparison
+- Error message includes specific IDs for small numbers of duplicates
 - Removed temporary "main" hardcoding from =rust/init.rs=
 
-All 121 tests passing
-
-**Enhancement needed (Phase 3b):**
-- Improve duplicate ID reporting: collect ALL duplicates, write org file if >10
-- Improve unreadable file reporting: collect ALL errors, write org file
-- Add tests for both error collection behaviors
-- Remove misleading TODO comment in =read_skg_files=
-
-See "Resolved Questions" section (questions 2-4) for detailed specifications.
+All 123 tests passing
 
 ** Phase 4: Metadata Serialization and Parsing [COMPLETED]
 1. ✓ Updated =orgnodemd_to_string= to serialize source (lines 46-47)
@@ -657,7 +665,6 @@ Notes:
 2. Find and update all call sites of =path_from_pid=
 3. Modify =write_all_nodes_to_fs= to use source-specific paths
 4. Test writing to multiple source directories
-
 ** Phase 6: Source Inheritance During Save
 1. Modify =add_missing_info_dfs= to accept and pass parent source
 2. Implement =inherit_source_if_needed= helper
@@ -703,6 +710,7 @@ Notes:
 - =OrgnodeMetadata.source= remains =Option<String>= (correct for user input)
 - Simplified =reconciled_source()= - no longer needs Option handling
 - Added support for source field in org-mode metadata parsing and rendering
+
 
 ** Phase 10: TypeDB and Tantivy Integration
 1. Update =create_node= in TypeDB to include source attribute
@@ -809,19 +817,28 @@ Data Integrity:
 - [X] Duplicate IDs across sources detected and rejected
 - [X] Source paths validated at startup
 
+Error Reporting:
+- [X] Comprehensive error collection (all duplicates, all file errors)
+- [X] Sorted error output for deterministic reporting
+- [X] Org file generation for large numbers of errors (>10 duplicates)
+- [X] Org file generation for unreadable files
+- [X] Tests verify complete error report content
+
 Testing and Migration:
-- [ ] All existing tests pass with updated fixtures
-- [ ] All config files migrated to new format
-- [ ] Test helper generates HashMap-based configs
-- [ ] Multi-source integration tests pass
+- [X] All existing tests pass with updated fixtures (123 tests)
+- [X] All config files migrated to new format
+- [X] Test helper generates HashMap-based configs
+- [X] Multi-source integration tests pass
 
 Documentation:
 - [ ] OVERVIEW.org updated with multi-source model
-- [ ] Plan document captures all design decisions
-- [ ] Code comments explain foreign data validation
-- [ ] Error messages include source information where relevant
+- [X] Plan document captures all design decisions (including Phase 3b)
+- [X] Surprises document tracks all implementation discoveries
+- [X] Temporary changes document tracks workarounds and resolution plan
+- [ ] Code comments explain foreign data validation (Phase 8)
+- [X] Error messages include source information where relevant
 
-* Lessons Learned from Phases 1-3
+* Lessons Learned from Phases 1-3b
 
 This section captures insights and patterns discovered during implementation that may inform future phases.
 
@@ -841,11 +858,17 @@ Initial consideration was to check for duplicates with nested loops (O(n²)). Us
 
 With N nodes and M IDs per node average: O(N*M) total time, which is efficient.
 
-** Pattern: Fail-fast error handling simplifies implementation
+** Pattern: Comprehensive error collection improves user experience (Phase 3b)
 
-Current implementation returns error on first problem found (duplicate ID, missing file, etc.). This simplified Phase 2-3 implementation significantly.
+Initial implementation (Phase 3) used fail-fast error handling: return error on first problem found (duplicate ID, missing file). This simplified implementation but created poor user experience.
 
-Trade-off: Users see one error at a time vs collecting all errors. May revisit in polish phase.
+Phase 3b enhancement: Changed to collect ALL errors before reporting:
+- Continue scanning all sources even after finding problems
+- Collect all duplicate IDs and file read errors
+- Report comprehensively: stderr for small numbers, org files for large batches
+- Users can fix all problems at once instead of iteratively
+
+Trade-off: More complex implementation, but much better user experience for large repositories with multiple sources.
 
 ** Pattern: TODO comments track temporary workarounds effectively
 
@@ -862,51 +885,65 @@ TypeDB schema includes =source= attribute. When Phase 3 loaded nodes with source
 
 Phase 10 will explicitly add source indexing, but basic functionality already works.
 
+** Pattern: Sorted output improves testing and debugging (Phase 3b enhancement)
+
+Making error reports deterministic by sorting before output:
+- Org file output is now sorted (IDs alphabetically, sources alphabetically)
+- Enables full programmatic comparison in tests vs substring checks
+- Tests generate expected content and do exact string comparison
+- Easier for users to review and compare error reports
+- Simpler test code: no need to parse structure, just build expected and compare
+
+Implementation: Sort HashMap keys into Vec, then iterate sorted collection.
+
+Trade-off: Tiny performance cost (negligible for error reporting) for major testing and UX benefits.
+
 * Resolved Questions
 
 ** 1. Source iteration order during loading ✓ RESOLVED
 
 HashMap iteration order is non-deterministic in Rust, but this doesn't matter for our use case.
 
-Decision: Keep non-deterministic iteration order
+Decision: Keep non-deterministic iteration order for loading, but sort for error reporting
 Rationale:
-- Order doesn't affect correctness
+- Loading order doesn't affect correctness
 - All nodes are loaded before relationships are created (TypeDB constraint)
-- Error messages may vary in order, but this is acceptable
+- For error reporting: sort output alphabetically for determinism (Phase 3b enhancement)
+- Sorted errors improve testing and user experience
 
 ** 2. Duplicate ID error reporting ✓ RESOLVED
 
 Decision: Collect ALL duplicate IDs and report comprehensively
 
-Implementation plan (Phase 3 enhancement):
+Implementation (Phase 3b):
 - Continue scanning all sources even after finding first duplicate
 - Collect all duplicate IDs in a data structure
-- If ≤10 duplicates: report in stderr error message
+- If ≤10 duplicates: report in stderr error message with specific IDs
 - If >10 duplicates: write to =initialization-error_duplicate-ids.org=
 - Org file format:
-  - =* <ID>= at level 1 (each duplicate ID)
-  - =** <source-nickname>= at level 2 (each source containing that ID)
+  - =* <ID>= at level 1 (each duplicate ID, sorted alphabetically)
+  - =** <source-nickname>= at level 2 (each source containing that ID, sorted alphabetically)
 - Also report error count via stderr
-- Add test to verify this behavior
+- Test verifies complete org file content with exact string comparison
 
-Rationale: Better user experience - see all problems at once instead of iteratively fixing
+Rationale: Better user experience - see all problems at once instead of iteratively fixing. Sorted output improves debugging and enables robust testing.
 
 ** 3. Error handling during multi-source loading ✓ RESOLVED
 
 Decision: Collect ALL file reading errors and report comprehensively
 
-Implementation plan (Phase 3 enhancement):
+Implementation (Phase 3b):
 - Continue trying to load from all sources even after errors
 - Collect all unreadable file errors
 - Write to =initialization-error_unreadable-skg-files.org=
 - Org file format:
-  - =* <filename>= at level 1 (each unreadable file)
+  - =* <filename>= at level 1 (each unreadable file, sorted alphabetically by path)
   - =** <source-nickname>= at level 2 (which source(s) contained it)
   - =*** Error: <error-message>= at level 3 (the actual error)
 - Also report error count via stderr
-- Add test to verify this behavior
+- Test verifies org file structure with exact assertions
 
-Rationale: Help users fix all problems at once; especially important for large repositories
+Rationale: Help users fix all problems at once; especially important for large repositories. Sorted output improves consistency.
 
 ** 4. Internal read_skg_files TODO comment ✓ RESOLVED
 
@@ -962,16 +999,9 @@ Note: See =multi-source/phase5-locations.md= for detailed breakdown of all Phase
 
 * Next Steps
 
-Phases 1, 2, and 3 are complete. Next steps:
+Phases 1, 2, 3 (including 3b enhancements) are complete. Next steps:
 
-1. **Phase 3b: Enhanced Error Collection** (immediate priority)
-   - Implement comprehensive duplicate ID reporting with org file output
-   - Implement comprehensive unreadable file reporting with org file output
-   - Add tests for both error collection behaviors
-   - Remove misleading TODO comment in =read_skg_files=
-   - See Resolved Questions 2-4 for detailed specifications
-
-2. **Phase 5: Path Generation and File Writing**
+1. **Phase 5: Path Generation and File Writing**
    - Update =path_from_pid= signature to accept source parameter
    - Update all 11+ call sites of =path_from_pid=
    - Remove remaining temporary "main" hardcoding (10 locations)

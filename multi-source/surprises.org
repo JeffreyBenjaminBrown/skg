@@ -129,12 +129,14 @@ For duplicate IDs:
 - Collect all duplicate IDs
 - If ≤10: report in stderr
 - If >10: write to =initialization-error_duplicate-ids.org= with org format
+- Sort output: IDs alphabetically, sources alphabetically within each ID
 - Add test to verify behavior
 
 For unreadable files:
 - Continue trying all sources even after errors
 - Collect all file read errors
 - Write to =initialization-error_unreadable-skg-files.org= with org format
+- Sort output: paths alphabetically
 - Add test to verify behavior
 
 Org file format uses:
@@ -142,11 +144,17 @@ Org file format uses:
 - =** <source-nickname>= at level 2
 - =*** Error: <error-message>= at level 3 (for unreadable files)
 
+Enhancement: Sorted output for determinism
+- Enables full programmatic test verification instead of substring checks
+- Tests generate expected content and do exact string comparison
+- Easier for users to review and compare error reports
+- Implemented by sorting HashMap keys into Vec before iteration
+
 *** Impact
-Better user experience - users can fix all problems at once instead of iteratively. Especially important for large repositories with many sources.
+Better user experience - users can fix all problems at once instead of iteratively. Especially important for large repositories with many sources. Deterministic output improves debugging and testing.
 
 *** Status
-✓ Resolved - Design decided, implementation pending as Phase 3b
+✓ Resolved - Implemented in Phase 3b (including sorted output enhancement)
 
 * Unresolved
 

@@ -278,3 +278,156 @@ fn test_source_field_set_correctly() {
   assert_eq!(node_a_result.unwrap().source, "source_a");
   assert_eq!(node_b_result.unwrap().source, "source_b");
 }
+
+#[test]
+fn test_many_duplicate_ids_creates_org_file() {
+  // Test that >10 duplicates triggers org file creation
+  let temp_dir = tempdir().unwrap();
+
+  let source_a = temp_dir.path().join("source_a");
+  let source_b = temp_dir.path().join("source_b");
+  fs::create_dir_all(&source_a).unwrap();
+  fs::create_dir_all(&source_b).unwrap();
+
+  // Create 15 nodes with duplicate IDs
+  for i in 1..=15 {
+    let id = format!("dup_id_{}", i);
+    let mut node_a = empty_skgnode();
+    let mut node_b = empty_skgnode();
+    node_a.ids = vec![ID::new(&id)];
+    node_b.ids = vec![ID::new(&id)];
+    node_a.title = format!("Node A {}", i);
+    node_b.title = format!("Node B {}", i);
+    write_node( &node_a,
+                &source_a.join(format!("{}.skg", id))) . unwrap();
+    write_node( &node_b,
+                &source_b.join(format!("{}.skg", id))) . unwrap(); }
+
+  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+  sources.insert(
+    "source_a".to_string(),
+    SkgfileSource {
+      nickname: "source_a".to_string(),
+      path: source_a,
+      user_owns_it: true,
+    }
+  );
+  sources.insert(
+    "source_b".to_string(),
+    SkgfileSource {
+      nickname: "source_b".to_string(),
+      path: source_b,
+      user_owns_it: true,
+    }
+  );
+
+  let result = read_all_skg_files_from_sources(&sources);
+  assert!(result.is_err(), "Should fail due to duplicate IDs");
+
+  let err = result.unwrap_err();
+  assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+  let err_msg = err.to_string();
+  assert!(err_msg.contains("15") || err_msg.contains("duplicate"),
+          "Error should mention duplicates: {}", err_msg);
+
+  // Check that org file was created
+  let org_file_path = "initialization-error_duplicate-ids.org";
+  assert!(std::path::Path::new(org_file_path).exists(),
+          "Org file should be created for >10 duplicates");
+
+  // Generate expected content programmatically
+  let mut expected = String::new();
+  expected.push_str("#+title: Duplicate IDs Across Sources\n");
+  expected.push_str("#+date: <generated at initialization>\n\n");
+  expected.push_str("Found 15 duplicate IDs across sources.\n\n");
+
+  // IDs are sorted alphabetically (lexicographic), not numerically
+  // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...
+  let mut ids: Vec<String> = (1..=15).map(|i| format!("dup_id_{}", i)).collect();
+  ids.sort();
+
+  for id in ids {
+    expected.push_str(&format!("* {}\n", id));
+    expected.push_str("** source_a\n");
+    expected.push_str("** source_b\n");
+  }
+
+  // Read and verify full org file content
+  let org_content = fs::read_to_string(org_file_path).unwrap();
+  assert_eq!(org_content, expected,
+             "Org file content should match expected format exactly");
+
+  // Clean up
+  fs::remove_file(org_file_path).unwrap();
+}
+
+#[test]
+fn test_unreadable_files_creates_org_file() {
+  // Test that unreadable files trigger org file creation
+  let temp_dir = tempdir().unwrap();
+
+  let source_good = temp_dir.path().join("source_good");
+  let source_bad = temp_dir.path().join("source_bad");
+  fs::create_dir_all(&source_good).unwrap();
+  // Don't create source_bad directory - it should cause an error
+
+  // Create a valid node in the good source
+  let mut node = empty_skgnode();
+  node.ids = vec![ID::new("test1")];
+  node.title = "Test Node".to_string();
+  write_node(&node, &source_good.join("test1.skg")).unwrap();
+
+  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+  sources.insert(
+    "source_good".to_string(),
+    SkgfileSource {
+      nickname: "source_good".to_string(),
+      path: source_good,
+      user_owns_it: true, } );
+  sources.insert(
+    "source_bad".to_string(),
+    SkgfileSource {
+      nickname: "source_bad".to_string(),
+      path: source_bad.clone(),
+      user_owns_it: true, } );
+
+  let result = read_all_skg_files_from_sources(&sources);
+  assert!(result.is_err(), "Should fail due to unreadable source");
+
+  let err = result.unwrap_err();
+  assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+  let err_msg = err.to_string();
+  assert!(err_msg.contains("unreadable"),
+          "Error should mention unreadable files: {}", err_msg);
+
+  // Check that org file was created
+  let org_file_path = "initialization-error_unreadable-skg-files.org";
+  assert!(std::path::Path::new(org_file_path).exists(),
+          "Org file should be created for unreadable files");
+
+  // Read org file content
+  let org_content = fs::read_to_string(org_file_path).unwrap();
+
+  // Verify header and count
+  assert!(org_content.starts_with("#+title: Unreadable SKG Files\n"));
+  assert!(org_content.contains("#+date: <generated at initialization>\n\n"));
+  assert!(org_content.contains("Found 1 unreadable file(s).\n\n"));
+
+  // Verify structure: should have path as level 1, source as level 2, error as level 3
+  let bad_path_str = source_bad.display().to_string();
+  assert!(org_content.contains(&format!("* {}\n", bad_path_str)),
+          "Should list the bad path at level 1");
+  assert!(org_content.contains("** source_bad\n"),
+          "Should list source_bad at level 2");
+  assert!(org_content.contains("*** Error: "),
+          "Should have error message at level 3");
+
+  // Error message is OS-dependent, but should mention the path issue
+  assert!(org_content.contains("No such file or directory") ||
+          org_content.contains("cannot find the path") ||
+          org_content.contains("system cannot find"),
+          "Error should mention file/directory not found");
+
+  // Clean up
+  fs::remove_file(org_file_path).unwrap();
+}

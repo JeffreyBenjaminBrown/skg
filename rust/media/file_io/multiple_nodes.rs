@@ -24,7 +24,8 @@ pub fn read_skg_files
          path . extension () . map_or (
            false,                // None => no extension found
            |ext| ext == "skg") ) // Some
-    { // TODO Phase 5: Determine source from dir_path instead of hardcoding "main"
+    { // Note: source is set by the caller (read_all_skg_files_from_sources)
+      // This temporary "main" is only used by test code that calls read_skg_files directly
       let mut node = read_node (&path) ?;
       node.source = "main".to_string();
       nodes.push (node); }}
@@ -32,39 +33,156 @@ pub fn read_skg_files
 
 /// Reads all .skg files from all configured sources.
 /// Sets each node's source field to the appropriate source nickname.
-/// Detects duplicate IDs across sources and returns an error if found.
+/// Detects duplicate IDs across sources and collects all errors.
+/// If errors are found, writes detailed error reports to org files.
 pub fn read_all_skg_files_from_sources (
   sources: &HashMap<String, SkgfileSource>
 ) -> io::Result<Vec<SkgNode>> {
   let mut all_nodes: Vec<SkgNode> = Vec::new();
-  let mut seen_ids: HashMap < String,  // ID
-                              String > // source nickname
-    // To verify no ID is in more than one source
+  let mut seen_ids: HashMap < String,       // ID
+                              Vec<String> > // source nicknames
+    // Maps each ID to all sources containing it
     = HashMap::new();
+  let mut load_errors: Vec<(String, // source nickname
+                            String, // filename
+                            String)> // error message
+    = Vec::new();
 
   for (nickname, source) in sources.iter() {
-    let path_str: &str = source.path.to_str()
-      . ok_or_else( || io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!("Invalid UTF-8 in source '{}' path",
-                nickname)) )?;
-    let mut nodes: Vec<SkgNode> =
-      read_skg_files (path_str)?;
+    // Load from all sources, collecting any errors
+    let path_str: &str = match source.path.to_str() {
+      Some(s) => s,
+      None => {
+        load_errors.push((
+          nickname.clone(),
+          source.path.display().to_string(),
+          "Invalid UTF-8 in source path".to_string() ));
+        continue; }};
 
-    for node in &mut nodes {
-      node.source = nickname.clone(); // because source is not serialized to the .skg file; it is instead inferred from that file's path
-      for id in &node.ids { // check for duplicate IDs across sources
-        let id_str = id.as_str();
-        if let Some(existing_source) = seen_ids.get(id_str) {
-          return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-              "Duplicate ID '{}' found in sources '{}' and '{}'",
-              id_str, existing_source, nickname)) ); }
-        seen_ids.insert ( id_str.to_string(),
-                          nickname.clone() ); }}
-    all_nodes.append (&mut nodes); }
-  Ok (all_nodes) }
+    match read_skg_files (path_str) {
+      Ok(mut nodes) => {
+        for node in &mut nodes {
+          node.source = nickname.clone();
+          for id in &node.ids {
+            // Track which sources contain each ID
+            let id_str = id.as_str().to_string();
+            seen_ids.entry(id_str)
+              .or_insert_with(Vec::new)
+              .push(nickname.clone()); }}
+        all_nodes.append(&mut nodes); }
+      Err(e) => {
+        load_errors.push((
+          nickname.clone(),
+          path_str.to_string(),
+          e.to_string()
+        )); }} }
+
+  // Check for duplicate IDs (IDs in multiple sources)
+  let mut duplicate_ids: HashMap<String, Vec<String>> = HashMap::new();
+  for (id, sources_list) in seen_ids.iter() {
+    if sources_list.len() > 1 {
+      duplicate_ids.insert( id.clone(),
+                            sources_list.clone()); }}
+
+  // Report errors if any were found
+  let has_duplicates = !duplicate_ids.is_empty();
+  let has_load_errors = !load_errors.is_empty();
+  if has_duplicates {
+    report_duplicate_ids(&duplicate_ids)?; }
+  if has_load_errors {
+    report_load_errors(&load_errors)?; }
+  if has_duplicates || has_load_errors {
+    let mut err_parts = Vec::new();
+    if has_duplicates {
+      if duplicate_ids.len() <= 10 {
+        // Include details in error message for small numbers
+        let ids_list: Vec<String> = duplicate_ids.keys()
+          .map(|id| format!("'{}'", id))
+          .collect();
+        err_parts.push(format!("Duplicate ID(s) found: {}",
+                               ids_list.join(", ")));
+      } else {
+        err_parts.push(format!("{} duplicate IDs found (see org file)",
+                               duplicate_ids.len() )); }}
+    if has_load_errors {
+      err_parts.push(format!("{} unreadable file(s)",
+                             load_errors.len() )); }
+    return Err(io::Error::new(
+      io::ErrorKind::InvalidData,
+      err_parts.join("; ") )); }
+  Ok(all_nodes) }
+
+/// Reports duplicate IDs found across sources.
+/// If ≤10 duplicates: reports to stderr only.
+/// If >10 duplicates: writes to org file and reports count to stderr.
+fn report_duplicate_ids(
+  duplicates: &HashMap<String, // ID
+                       Vec<String>> // sources
+) -> io::Result<()> {
+  let count = duplicates.len();
+  if count <= 10 {
+    // Report to stderr only
+    eprintln!("\nError: Found {} duplicate ID(s) across sources:",
+              count);
+    for (id, sources) in duplicates.iter() {
+      eprintln!("  - ID '{}' in sources: {}",
+                id, sources.join(", ")); }
+  } else { // Write to org file
+    let filename = "initialization-error_duplicate-ids.org";
+    let mut content = String::new();
+    content.push_str("#+title: Duplicate IDs Across Sources\n");
+    content.push_str("#+date: <generated at initialization>\n\n");
+    content.push_str(
+      &format!("Found {} duplicate IDs across sources.\n\n",
+               count));
+
+    // Sort IDs for deterministic output
+    let mut sorted_ids: Vec<(&String, &Vec<String>)> =
+      duplicates.iter().collect();
+    sorted_ids.sort_by_key(|(id, _)| *id);
+
+    for (id, sources) in sorted_ids {
+      content.push_str(&format!("* {}\n", id));
+      // Sort sources too
+      let mut sorted_sources = sources.clone();
+      sorted_sources.sort();
+      for source in sorted_sources {
+        content.push_str(&format!("** {}\n", source)); }}
+    fs::write(filename, content)?;
+    eprintln!("\nError: Found {} duplicate ID(s) across sources.",
+              count);
+    eprintln!("Details written to: {}", filename); }
+  Ok (( )) }
+
+/// Reports file loading errors.
+/// Always writes to org file and reports count to stderr.
+fn report_load_errors(
+  errors: &[(String, String, String)]
+) -> io::Result<()> {
+  let count = errors.len();
+  let filename = "initialization-error_unreadable-skg-files.org";
+
+  let mut content = String::new();
+  content.push_str("#+title: Unreadable SKG Files\n");
+  content.push_str("#+date: <generated at initialization>\n\n");
+  content.push_str(&format!("Found {} unreadable file(s).\n\n", count));
+
+  // Sort errors by path for deterministic output
+  let mut sorted_errors = errors.to_vec();
+  sorted_errors.sort_by(|a, b| a.1.cmp(&b.1));
+
+  for (source, filename_or_path, error_msg) in sorted_errors {
+    content.push_str(&format!("* {}\n", filename_or_path));
+    content.push_str(&format!("** {}\n", source));
+    content.push_str(&format!("*** Error: {}\n", error_msg));
+  }
+
+  fs::write(filename, content)?;
+  eprintln!("\nError: Found {} unreadable file(s).", count);
+  eprintln!("Details written to: {}", filename);
+
+  Ok(())
+}
 
 /// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.

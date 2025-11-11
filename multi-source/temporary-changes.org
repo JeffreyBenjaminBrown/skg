@@ -259,14 +259,14 @@ All existing tests work because they use a single "main" source via the test hel
 
 ** Removal plan
 
-*** Phase 3: File Loading with Sources [COMPLETED]
+*** Phase 3: File Loading with Sources [COMPLETED including Phase 3b]
 - ✓ Removed temporary code in =rust/init.rs=
 - ✓ Implemented =read_all_skg_files_from_sources=
-
-Note: Phase 3b enhancements pending:
-- Comprehensive error collection for duplicate IDs
-- Comprehensive error collection for unreadable files
-- Remove misleading TODO comment in =read_skg_files=
+- ✓ Comprehensive error collection for duplicate IDs (Phase 3b)
+- ✓ Comprehensive error collection for unreadable files (Phase 3b)
+- ✓ Sorted error output for deterministic reporting (Phase 3b)
+- ✓ Enhanced tests to verify complete org file content programmatically (Phase 3b)
+- ✓ Removed misleading TODO comment in =read_skg_files= (Phase 3b)
 
 *** Phase 5: Path Generation and File Writing
 - Remove temporary code in =rust/util.rs=
