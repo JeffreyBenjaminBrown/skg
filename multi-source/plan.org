@@ -670,10 +670,30 @@ Notes:
 - =reconciled_source()= implementation simplified after source made mandatory
 
 ** Phase 5: Path Generation and File Writing
+
+See =multi-source/phase5-analysis.md= for detailed call site analysis.
+See =multi-source/phase5-batching-analysis.md= for performance considerations.
+
+Key finding: Call sites fall into 3 categories:
+1. **3 sites** already have node.source → add parameter
+2. **8 sites** only have ID → need TypeDB helper to get source
+3. **1 site** already computed source → use it
+
+Performance decision: Start with single-ID lookups, add batching later if needed
+- Most Category B sites process one ID at a time
+- Batching infrastructure exists (=pids_from_ids=) if optimization needed
+- Premature optimization avoided
+
+Implementation steps:
 1. Update =path_from_pid= signature to accept source parameter
-2. Find and update all call sites of =path_from_pid=
-3. Modify =write_all_nodes_to_fs= to use source-specific paths
-4. Test writing to multiple source directories
+2. Create TypeDB helper: =pid_and_source_from_id= (single-ID lookup)
+3. Update Category A call sites (3): pass node.source
+4. Update Category B call sites (8): use TypeDB helper
+5. Update Category C call site (1): use reconciled_source_value
+6. Modify =write_all_nodes_to_fs= to use source-specific paths
+7. Test writing to multiple source directories
+
+Future optimization: Add =pids_and_sources_from_ids= batch function if profiling shows need
 ** Phase 6: Source Inheritance During Save
 1. Modify =add_missing_info_dfs= to accept and pass parent source
 2. Implement =inherit_source_if_needed= helper
@@ -994,27 +1014,54 @@ Rationale:
 - Clear error messages help users fix configuration issues
 - Type system provides compile-time safety where possible
 
+** 6. How to determine source when reading individual nodes (Phase 5) ✓ RESOLVED
+
+Decision: Use both approaches depending on context
+
+Analysis revealed three categories of `path_from_pid` call sites:
+1. **Category A (3 sites):** Caller has the node object → add `source` parameter to `path_from_pid`
+2. **Category B (8 sites):** Caller only has ID → create TypeDB helper to query source
+3. **Category C (1 site):** Already computed source → use the existing value
+
+Implementation approach:
+- Modify `path_from_pid` to accept `source` parameter
+- Create `pid_and_source_from_id` helper (or wrapper functions) to query TypeDB
+- Update call sites according to their category
+
+Detailed analysis: See =multi-source/phase5-analysis.md=
+
+Rationale:
+- Different call sites have different contexts (some have node, some only have ID)
+- TypeDB already stores source attribute, can query it efficiently
+- Avoids fragile path-parsing approaches
+- Clean separation: path construction vs source lookup
+
+** 7. Should source lookups be batched like pids_from_ids? ✓ RESOLVED
+
+Decision: Start with single-ID lookups, add batching if profiling shows need
+
+Analysis revealed:
+- Most Category B call sites (6 of 8) process single IDs sequentially
+- Only 1 site reads 2 nodes in quick succession (merge operations)
+- Batching infrastructure exists (=pids_from_ids=) showing the pattern to follow
+- Most call sites not easily batchable without major refactoring
+
+Implementation approach:
+- Create simple =pid_and_source_from_id= for single lookups
+- Measure performance during real usage
+- Add =pids_and_sources_from_ids= batch function later if justified
+
+Detailed analysis: See =multi-source/phase5-batching-analysis.md=
+
+Rationale:
+- Avoid premature optimization
+- Match current usage patterns (mostly one-off lookups)
+- Can optimize later with minimal API changes if measurements justify it
+- Keep initial implementation simple
+
 * Remaining Open Questions
 
 After stakeholder review, the following questions still need clarification:
-
-** 1. How to determine source when reading individual nodes (Phase 5)
-
-In 10 locations, individual nodes are read from disk and source is hardcoded to "main". When implementing Phase 5, how should we determine the correct source?
-
-Options:
-1. Pass source as a parameter to all read functions (requires updating many call sites)
-2. Infer source from file path by comparing against all source paths in config (fragile, path manipulation issues)
-3. Require callers to know the source beforehand (might not always be possible)
-
-Related locations:
-- =read_node_from_id()= in =rust/media/file_io/one_node.rs=
-- =fetch_aliases_from_file()= in =rust/media/file_io/one_node.rs=
-- Various read operations in merge, rebuild, save, and content_view modules
-
-Current behavior: All set source to "main" with TODO comments
-
-Note: See =multi-source/phase5-locations.md= for detailed breakdown of all Phase 5 locations with clickable links.
 
 * Next Steps
 

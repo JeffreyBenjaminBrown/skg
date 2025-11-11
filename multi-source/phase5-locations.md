@@ -1,6 +1,13 @@
 # Phase 5: All Locations Needing Updates
 
+**📊 See [phase5-analysis.md](phase5-analysis.md) for comprehensive analysis of call site categories and implementation strategy.**
+
 This document lists all locations that need updating for Phase 5 (Path Generation and File Writing).
+
+## Summary from Analysis
+- **Category A (3 sites):** Have node object → add `source` parameter to `path_from_pid`
+- **Category B (8 sites):** Only have ID → use TypeDB helper to get source
+- **Category C (1 site):** Already computed source → use existing value
 
 ## Core Path Generation
 

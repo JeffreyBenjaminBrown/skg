@@ -188,3 +188,82 @@ Still needs Phase 5:
 ⚠ Partially Resolved - Phase 3 complete, Phase 5 pending
 
 See =multi-source/temporary-changes.org= for detailed breakdown of remaining workarounds.
+
+** 8. path_from_pid call sites have different contexts (Phase 5 analysis)
+
+*** Issue
+Before implementing Phase 5, needed to understand: do callers of =path_from_pid= know the source, or do they need to look it up?
+
+*** Discovery
+Call site analysis revealed **three distinct categories** with different solutions:
+
+**** Category A: Callers have the node object (3 sites)
+- =rust/merge/fs.rs= - writing merge results (has all 3 node objects)
+- =rust/media/file_io/multiple_nodes.rs= - write_all_nodes_to_fs (iterating over nodes)
+- =rust/media/file_io/multiple_nodes.rs= - delete_all_nodes_from_fs (iterating over nodes)
+**Solution:** Add =source= parameter to =path_from_pid=, pass =node.source=
+
+**** Category B: Callers only have an ID (8 sites)
+- =rust/media/file_io/one_node.rs= - read_node_from_id, fetch_aliases_from_file
+- =rust/merge/mergeInstructionTriple.rs= - reading acquirer and acquiree by ID
+- =rust/rebuild/complete_aliascol.rs= - reading parent node by ID
+- =rust/rebuild/complete_contents.rs= - reading node by ID
+- =rust/mk_org_text/content_view.rs= - content view (2 locations)
+- =rust/save/orgnodes_to_instructions/none_node_fields_are_noops.rs= - validation
+**Solution:** Query TypeDB for source (create =pid_and_source_from_id= helper)
+
+**** Category C: Already computed source (1 site)
+- =rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs= - has =reconciled_source_value= computed but not using it yet
+**Solution:** Use the existing computed value
+
+*** Impact
+Need **both** approaches:
+1. =path_from_pid(config, source, pid)= - when you know the source
+2. TypeDB helper function - when you only have an ID and need to query source
+
+TypeDB already stores source as an attribute, so querying it is straightforward and efficient.
+
+*** Status
+✓ Resolved - Detailed analysis in =multi-source/phase5-analysis.md=
+
+** 9. Performance: Batch vs single-ID source lookups (Phase 5 analysis)
+
+*** Issue
+Category B call sites need to query TypeDB for source. Should we batch multiple lookups like =pids_from_ids= does, or query one at a time?
+
+*** Analysis
+Examined all Category B call sites and existing batching patterns:
+
+Existing batch infrastructure (=pids_from_ids=):
+- Used in save pipeline: collect all IDs → one TypeDB query → distribute results
+- Builds disjunction (OR clauses) for all IDs in single query
+- Returns =HashMap<ID, Option<ID>>=
+- Pattern works well for bulk operations
+
+Current Category B usage:
+- 6 sites process single IDs one at a time (content view, validation, rebuild)
+- 1 site reads 2 nodes (merge: acquirer and acquiree) - marginal benefit from batching
+- Most are sequential operations, not easily batchable without major refactoring
+
+*** Decision
+Start with single-ID lookups, add batching later if profiling shows need.
+
+Create simple helper:
+#+begin_src rust
+pub async fn pid_and_source_from_id(
+  db_name: &str,
+  driver: &TypeDBDriver,
+  node_id: &ID
+) -> Result<Option<(ID, String)>, Box<dyn Error>>
+#+end_src
+
+Future optimization: =pids_and_sources_from_ids= for batch lookups if needed.
+
+*** Impact
+- Simpler initial implementation
+- Matches current usage patterns (mostly one-off lookups)
+- Can add batching later if measurements justify it
+- Avoids premature optimization
+
+*** Status
+✓ Resolved - Detailed analysis in =multi-source/phase5-batching-analysis.md=
