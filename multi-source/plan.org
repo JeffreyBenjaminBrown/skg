@@ -428,7 +428,7 @@ Call this in =rust/save.rs= after instruction generation, before filesystem/Type
 
 In =rust/media/file_io/misc.rs=, add:
 #+begin_src rust
-pub fn validate_source_paths(
+pub fn validate_source_paths_creating_owned_ones_if_needed(
   sources: &HashMap<String, SkgfileSource>
 ) -> io::Result<()> {
   for (nickname, source) in sources.iter() {
@@ -581,10 +581,23 @@ Notes:
 - Removed Hash derive from SkgConfig (HashMap doesn't implement Hash)
 - Source reconciliation logic prioritizes definer over indefinitives
 
-** Phase 2: Source Path Validation
-1. Implement =validate_source_paths= in =rust/media/file_io/misc.rs=
-2. Call from =load_config= immediately after parsing
-3. Add tests for path validation logic
+** Phase 2: Source Path Validation [COMPLETED]
+1. ✓ Implemented =validate_source_paths_creating_owned_ones_if_needed= in =rust/media/file_io/misc.rs=
+2. ✓ Called from =load_config= immediately after parsing
+3. ✓ Added 6 comprehensive tests in =tests/source_path_validation.rs=
+
+Tests cover:
+- Existing owned sources (pass)
+- Nonexistent owned sources (create directory and pass)
+- Existing foreign sources (pass)
+- Nonexistent foreign sources (fail with NotFound error)
+- Multiple sources with mixed ownership
+- Multiple sources where one foreign source fails
+
+Notes:
+- Function creates directories for owned sources that don't exist
+- Function fails with clear error for missing foreign sources
+- All 115 tests passing
 
 ** Phase 3: File Loading with Sources
 1. Implement =read_all_skg_files_from_sources= with HashMap parameter
@@ -761,7 +774,7 @@ Data Integrity:
 - [ ] TypeDB stores source attribute for all nodes
 - [ ] Tantivy indexes source for all documents
 - [ ] Duplicate IDs across sources detected and rejected
-- [ ] Source paths validated at startup
+- [X] Source paths validated at startup
 
 Testing and Migration:
 - [ ] All existing tests pass with updated fixtures
@@ -785,25 +798,20 @@ All major design decisions have been resolved. Ready to begin implementation.
 
 * Next Steps
 
-Phase 1 is complete. Next steps:
+Phases 1 and 2 are complete. Next steps:
 
-1. **Phase 2: Source Path Validation**
-   - Implement =validate_source_paths= function
-   - Test directory creation for owned sources
-   - Test error handling for missing foreign source paths
-
-2. **Phase 3: File Loading with Sources**
+1. **Phase 3: File Loading with Sources**
    - Implement =read_all_skg_files_from_sources= to load from all configured sources
    - Add duplicate ID detection across sources
    - Remove temporary "main" hardcoding from =rust/init.rs=
 
-3. **Phase 5: Path Generation and File Writing**
+2. **Phase 5: Path Generation and File Writing**
    - Update =path_from_pid= signature to accept source parameter
    - Update all 11+ call sites of =path_from_pid=
    - Remove remaining temporary "main" hardcoding (10 locations)
    - Test writing to multiple source directories
 
-4. **Continue through remaining phases sequentially**
+3. **Continue through remaining phases sequentially**
    - Each phase builds on previous
    - Run tests after each phase
-   - All 108 tests should continue passing
+   - All 115 tests should continue passing
