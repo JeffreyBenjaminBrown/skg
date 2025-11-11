@@ -1,61 +1,6 @@
-* architecture to change
-** chnage OrgnodeMetadata
-OrgnodeMetadata, // id, viewdata, code
-  OrgnodeViewData, // focused, folded, repeated, cycle, relationships
-    OrgnodeRelationships, // 2 bools, 3 ints
-  OrgnodeCode, // relToParent, indef, editRequest (singular, optional), viewRequests (plural, set)
-    RelToParent, // content | for aliases | ignored
-    EditRequest, // merge | delete
-    ViewRequest, // containerward | sourceward
-** TypeDB is probably better for finding constraint violations.
-*** Some states are invalid or redundant.
-**** IDs should be unique.
-**** Redundant state is possible.
-***** A node can 'hide from subscriptions' something it contains.
-      'contains' should imply 'hides from subscriptions'.
-      (That is, the server should not display
-      in one of a node's subscriptions
-      something already shown in the node's content.)
-** Code should render before viewdata
-   and among code, first should be relToParent.
-** dividing code
-   Some is about save interpretation.
-     Here, 'indef' should only be found where relToParent=content
-   Some requests special edits: Delete, merge.
-   Some requests views.
-** 'indef' only makes sense if reltoparent = content
-** merge and delete should be among an enum, 'graphActions'
-   serial
-*** make an invalid state impossible
-    An orgnode has only one field for it, not a set,
-    so they can't conflict with each other.
-*** nodeRequests -> nodeViewRequests
-** RelToParent seems better as RelToAncestor
-   with two fields:
-** rename Hyperlink -> TextLink
-** merge the two Save errors
-** rename indefinitive -> definesNotTextNorContents
-** 'merge' should be encodeable in 'Nodesaveaction'
-   Then I wouldn't need to parse the action twice,
-   in two different ways.
-** ViewData combines what to display with how to display.
-   folded and focused are instructions to emacs,
-   the rest, glyphs
-** OrgnodeCode is unreasonable.
-   Deletion is represented as a bool,
-   but merge as an enum among view requests.
-** If repeated, don't display indefinitive too.
-** 'repeated' is view data, not code.
-** 'indefinitive' should go wherever 'repeated' does.
-   But not the reverse.
-* TypeDB should report constraint violations.
-  Yet succeed.
-** good constraints
-*** Each extra_id should be in at most one has_extra_id relationship.
-*** Each id value should belong to only one entity.
-    where entity = node | extra_id
-* mk_skgnode is wrong
-  It sets a lot of SkgNode list fields to None.
+* [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
+* aliases_to_org should rebuild the whole buffer
+  like request containerward view
 * most plans are online
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
@@ -68,14 +13,43 @@ OrgnodeMetadata, // id, viewdata, code
     Loads up its context with good stuff,
     for when it finally implements the chosen path.
 ** cargo nextest run
+** cargo test --doc
+   runs 'doctests', which ensure code in documentation works.
 ** claude --dangerously-skip-permissions
    Less ergonomically, can say:
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
-* ? populate ./TODO/
-  and then order links to them here like this:
-  [[./TODO/sharing-and-privacy.org][sharing and privacy]]
 * QA
+** ? move buffer_to_save_instructions
+*** question
+ Are these:
+
+     org_to_uninterpreted_nodes,
+     headline_to_triple,
+     HeadlineInfo,
+     find_inconsistent_instructions,
+     find_buffer_errors_for_saving,
+     add_missing_info_to_trees,
+     orgnodes_to_reconciled_save_instructions,
+     interpret,
+     reconcile_dup_instructions,
+     clobber_none_fields_with_data_from_disk,
+
+ called by anything but buffer_to_save_instructions?
+*** original idea
+    from
+      rust/save.rs
+    to at the shallowest
+      rust/save/buffer_to_orgnodes.rs.
+** Appending from indef nodes moght be a misfeature.
+** completeContents seems too long
+** RelToParent could be generalized as RelToAncestor.
+   It would need both a relation and a number of levels.
+   (RelToParent would translate to 1 level; to grandparent, 2; etc.)
+** nah
+*** 'merge' should be encodeable in NodeSaveAction
+    Then I wouldn't need to parse the action twice,
+    in two different ways.
 ** test validate_merge_requests
 ** in elisp/skg-sexpr/skg-lens.el, rather than concatenate with ":"
    (that's done by skg--tokens->string)
@@ -136,14 +110,16 @@ fold-preservation
 ** the dangers of repeated nodes to the user
    The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.
 ** find where to put this comment
- // Titles can include hyperlinks,
- // but can be searched for as if each hyperlink
+ // Titles can include textlinks,
+ // but can be searched for as if each textlink
  // was equal to its label, thanks to replace_each_link_with_its_label.
 ** change graph -> web
 ** drop [[../docs/progress.md][progress.md]]
 ** Didactically, concept maps > knowledge graph.
 ** [[../docs/data-model.md][The data model]] and [[../docs/sharing-model.md][The sharing model]] overlap
    as documents.
+** "point" seems a better name than "node"
+   But it conflicts with the Emacs 'point'.
 * solutions
 ** to extract Emacs properties into Rust
    use [[~/hodal/emacs/property-dump.el][property-dump]]
