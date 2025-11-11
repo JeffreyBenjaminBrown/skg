@@ -1,10 +1,10 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
-use crate::media::file_io::multiple_nodes::read_skg_files;
+use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
 use crate::media::tantivy::update_index_with_nodes;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
-use crate::types::{SkgNode, SkgConfig, SkgfileSource, TantivyIndex};
+use crate::types::{SkgNode, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::error::Error;
@@ -26,21 +26,14 @@ pub fn initialize_dbs (
   config : & SkgConfig,
 ) -> (Arc<TypeDBDriver>, TantivyIndex) {
 
-  println!("Reading .skg files...");
-  // TODO Phase 3: Replace with read_all_skg_files_from_sources
-  // For now, temporarily read from "main" source to get Phase 1 compiling
-  let main_source : &SkgfileSource =
-    config . sources . get ( "main" )
-    . expect ( "Config must have a 'main' source" );
-  let skg_folder_str: &str =
-    main_source . path
-    . to_str () . expect ("Invalid UTF-8 in skg folder path");
+  println!("Reading .skg files from all sources...");
   let nodes: Vec<SkgNode> =
-    read_skg_files ( skg_folder_str )
+    read_all_skg_files_from_sources(&config.sources)
     . unwrap_or_else(|e| {
       eprintln!("Failed to read .skg files: {}", e);
       std::process::exit(1); });
-  println!("{} .skg files were read", nodes.len());
+  println!("{} .skg files were read from {} source(s)",
+           nodes.len(), config.sources.len());
 
   let typedb_driver: Arc<TypeDBDriver> =
     initialize_typedb_from_nodes ( config, &nodes );

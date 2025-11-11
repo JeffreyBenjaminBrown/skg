@@ -1,8 +1,9 @@
 use crate::media::file_io::one_node::{read_node, write_node};
-use crate::types::misc::{SkgConfig, ID};
+use crate::types::misc::{SkgConfig, SkgfileSource, ID};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid;
 
+use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
@@ -28,6 +29,42 @@ pub fn read_skg_files
       node.source = "main".to_string();
       nodes.push (node); }}
   Ok (nodes) }
+
+/// Reads all .skg files from all configured sources.
+/// Sets each node's source field to the appropriate source nickname.
+/// Detects duplicate IDs across sources and returns an error if found.
+pub fn read_all_skg_files_from_sources (
+  sources: &HashMap<String, SkgfileSource>
+) -> io::Result<Vec<SkgNode>> {
+  let mut all_nodes: Vec<SkgNode> = Vec::new();
+  let mut seen_ids: HashMap < String,  // ID
+                              String > // source nickname
+    // To verify no ID is in more than one source
+    = HashMap::new();
+
+  for (nickname, source) in sources.iter() {
+    let path_str: &str = source.path.to_str()
+      . ok_or_else( || io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!("Invalid UTF-8 in source '{}' path",
+                nickname)) )?;
+    let mut nodes: Vec<SkgNode> =
+      read_skg_files (path_str)?;
+
+    for node in &mut nodes {
+      node.source = nickname.clone(); // because source is not serialized to the .skg file; it is instead inferred from that file's path
+      for id in &node.ids { // check for duplicate IDs across sources
+        let id_str = id.as_str();
+        if let Some(existing_source) = seen_ids.get(id_str) {
+          return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+              "Duplicate ID '{}' found in sources '{}' and '{}'",
+              id_str, existing_source, nickname)) ); }
+        seen_ids.insert ( id_str.to_string(),
+                          nickname.clone() ); }}
+    all_nodes.append (&mut nodes); }
+  Ok (all_nodes) }
 
 /// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.

@@ -91,29 +91,92 @@ Source reconciliation logic is now explicit and follows a clear priority: define
 *** Status
 ✓ Resolved - Source reconciliation implemented in Phase 1
 
+** 6. Duplicate ID detection handles nodes with multiple IDs correctly
+
+*** Issue
+During Phase 3 implementation and testing, realized that nodes can have multiple IDs (in the =ids= vector). The duplicate detection needs to check ALL IDs in each node, not just the primary ID.
+
+*** Resolution
+The =read_all_skg_files_from_sources= function correctly iterates over all IDs in =node.ids= vector:
+#+begin_src rust
+for id in &node.ids {
+  let id_str = id.as_str();
+  if let Some(existing_source) = seen_ids.get(id_str) {
+    return Err(...); // Duplicate found
+  }
+  seen_ids.insert(id_str.to_string(), nickname.clone());
+}
+#+end_src
+
+Added specific test =test_node_with_multiple_ids_duplicate_detection= to verify this behavior.
+
+*** Impact
+Duplicate detection is thorough and catches any ID overlap, even when nodes have multiple aliases/IDs. This prevents subtle bugs where nodes with different primary IDs might share a secondary ID.
+
+*** Status
+✓ Resolved - Proper multi-ID handling implemented and tested in Phase 3
+
+** 7. Error reporting strategy for initialization
+
+*** Issue
+During Phase 3 discussion, realized that fail-fast error handling (current behavior) is suboptimal for users. If there are multiple duplicate IDs or multiple unreadable files, users would have to fix one, restart, discover the next, etc.
+
+*** Resolution
+Decision to implement comprehensive error collection instead of fail-fast:
+
+For duplicate IDs:
+- Continue scanning all sources even after finding first duplicate
+- Collect all duplicate IDs
+- If ≤10: report in stderr
+- If >10: write to =initialization-error_duplicate-ids.org= with org format
+- Add test to verify behavior
+
+For unreadable files:
+- Continue trying all sources even after errors
+- Collect all file read errors
+- Write to =initialization-error_unreadable-skg-files.org= with org format
+- Add test to verify behavior
+
+Org file format uses:
+- =* <ID or filename>= at level 1
+- =** <source-nickname>= at level 2
+- =*** Error: <error-message>= at level 3 (for unreadable files)
+
+*** Impact
+Better user experience - users can fix all problems at once instead of iteratively. Especially important for large repositories with many sources.
+
+*** Status
+✓ Resolved - Design decided, implementation pending as Phase 3b
+
 * Unresolved
 
-** 2. Temporary workarounds for compilation
+** 2. Temporary workarounds for compilation (Partially Resolved)
 
 *** Issue
 Phase 1 removed =skg_folder= before implementing full multi-source loading logic.
 
-*** Temporary workarounds
-All marked with TODO comments in code:
-- =rust/init.rs=: Only reads from "main" source instead of all sources
+*** Temporary workarounds (updated after Phase 3)
+Resolved in Phase 3:
+- ✓ =rust/init.rs=: Now reads from all sources using =read_all_skg_files_from_sources=
+
+Still pending Phase 5:
 - =rust/util.rs:path_from_pid()=: Uses "main" source instead of accepting source parameter
 - =rust/media/file_io/multiple_nodes.rs=: Writes only to "main" source
 - =rust/save.rs=: Generic print message instead of per-source information
-- 11 locations where source is hardcoded to "main" after reading from disk
+- 10 locations where source is hardcoded to "main" after reading from disk
 
-*** To be addressed in
-- Phase 3: Proper multi-source file loading
-- Phase 5: Update =path_from_pid()= signature and all call sites
+*** Current status
+After Phase 3:
+- File loading now supports multiple sources correctly
+- Duplicate ID detection across sources working
+- Source field properly set during loading
 
-*** Impact
-Code compiles and runs but only supports single "main" source for now.
+Still needs Phase 5:
+- Path generation still hardcoded to "main"
+- File writing still hardcoded to "main"
+- Individual file reads still set source to "main"
 
 *** Status
-⚠ Unresolved - Awaiting Phase 3 and Phase 5 implementation
+⚠ Partially Resolved - Phase 3 complete, Phase 5 pending
 
-See =multi-source/temporary-changes.org= for detailed breakdown of all temporary workarounds.
+See =multi-source/temporary-changes.org= for detailed breakdown of remaining workarounds.

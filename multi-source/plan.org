@@ -5,28 +5,33 @@
 
 This document outlines the plan for refactoring Skg to support multiple data sources instead of a single =skg_folder=. Each source will have a path, nickname, and ownership flag.
 
-* Current State
+* Current State (After Phase 3)
 
 ** Configuration
-Currently, =skgconfig.toml= contains a single =skg_folder= field (PathBuf) that points to where all .skg files are stored.
+=skgconfig.toml= now uses =[[sources]]= array format:
+- Each source has: nickname, path, user_owns_it
+- Deserialized into =HashMap<String, SkgfileSource>= in SkgConfig
+- Location: =rust/types/misc.rs=
 
-Location: =rust/types/misc.rs:20-31=
+** File Loading ✓ IMPLEMENTED
+At startup (=rust/init.rs:29-36=):
+1. =read_all_skg_files_from_sources()= scans all configured source directories
+2. Each file is parsed into a =SkgNode= with source field set to source nickname
+3. Duplicate IDs across sources are detected and rejected
+4. All nodes are loaded into TypeDB and Tantivy
 
-** File Loading
-At startup (=rust/init.rs:25-45=):
-1. =read_skg_files()= scans =config.skg_folder= for all .skg files
-2. Each file is parsed into a =SkgNode=
-3. All nodes are loaded into TypeDB and Tantivy
-
-** Path Generation
-=path_from_pid()= (=rust/util.rs:13-23=) dynamically constructs file paths:
+** Path Generation (Still using "main" - Phase 5)
+=path_from_pid()= (=rust/util.rs:17-27=) dynamically constructs file paths:
+- Currently hardcoded to use "main" source (temporary)
 - Takes =config= and =pid= (primary ID)
-- Returns: =config.skg_folder / pid.skg=
+- Returns: =main_source.path / pid.skg=
+- TODO: Accept source parameter and use node's source field
 
-** Saving
-When saving (=rust/save.rs=, =rust/media/file_io/multiple_nodes.rs:32-54=):
-- All .skg files are written to =config.skg_folder=
+** Saving (Still using "main" - Phase 5)
+When saving (=rust/save.rs=, =rust/media/file_io/multiple_nodes.rs=):
+- All .skg files are written to "main" source only (temporary)
 - Filename is determined by primary ID
+- TODO: Write to appropriate source based on node.source field
 
 * Target State
 
@@ -234,26 +239,29 @@ Add pattern matching for ="source"= (similar to ="id"= at lines 220-225):
 },
 #+end_src
 
-** 6. File Loading (=rust/media/file_io/multiple_nodes.rs=)
+** 6. File Loading (=rust/media/file_io/multiple_nodes.rs=) ✓ COMPLETED
 
-Create new function:
+Created new function (Phase 3):
 #+begin_src rust
 pub fn read_all_skg_files_from_sources(
   sources: &HashMap<String, SkgfileSource>
 ) -> io::Result<Vec<SkgNode>>
 #+end_src
 
-For each source:
-1. Call =read_skg_files(source.path)=
-2. Set =source= field on each returned =SkgNode= to =source.nickname=
-3. Accumulate all nodes
-4. Check for duplicate IDs across sources (fail fast if found)
+Implementation:
+1. ✓ Call =read_skg_files(source.path)= for each source
+2. ✓ Set =source= field on each returned =SkgNode= to =source.nickname=
+3. ✓ Accumulate all nodes from all sources
+4. ✓ Check for duplicate IDs across sources (fail fast if found)
+5. ✓ Track all IDs using HashMap<String, String> (ID -> source nickname)
 
-** 7. Initialization (=rust/init.rs=)
+** 7. Initialization (=rust/init.rs=) ✓ COMPLETED
 
-Modify =initialize_dbs= (lines 25-45):
-- Replace =read_skg_files(skg_folder_str)=
-- With =read_all_skg_files_from_sources(&config.sources)=
+Modified =initialize_dbs= (Phase 3):
+- ✓ Replaced =read_skg_files(skg_folder_str)=
+- ✓ With =read_all_skg_files_from_sources(&config.sources)=
+- ✓ Updated print messages to show multiple sources
+- ✓ Removed temporary "main" source hardcoding
 
 ** 8. Path Generation (=rust/util.rs=)
 
@@ -599,12 +607,37 @@ Notes:
 - Function fails with clear error for missing foreign sources
 - All 115 tests passing
 
-** Phase 3: File Loading with Sources
-1. Implement =read_all_skg_files_from_sources= with HashMap parameter
-2. Add duplicate ID detection across sources
-3. Update =initialize_dbs= to use new loading function
-4. Add tests for multi-source loading
-5. Add test fixtures with multiple source directories
+** Phase 3: File Loading with Sources [COMPLETED - Enhancement Pending]
+1. ✓ Implemented =read_all_skg_files_from_sources= with HashMap parameter
+2. ✓ Added duplicate ID detection across sources with clear error messages
+3. ✓ Updated =initialize_dbs= to use new loading function
+4. ✓ Added 6 comprehensive tests in =tests/multi_source_loading.rs=
+5. ✓ Tests create temporary source directories as fixtures
+
+Tests cover:
+- Loading from single source
+- Loading from multiple sources with correct source field assignment
+- Duplicate ID detection across sources (fails with InvalidData error)
+- Duplicate detection for nodes with multiple IDs
+- Handling empty sources
+- Verifying source field is set correctly for each node
+
+Implementation notes:
+- Function iterates over all sources in HashMap
+- Sets =node.source= to the correct nickname for each loaded node
+- Tracks all IDs seen across sources using HashMap<String, String>
+- Returns clear error message showing which sources have the duplicate ID
+- Removed temporary "main" hardcoding from =rust/init.rs=
+
+All 121 tests passing
+
+**Enhancement needed (Phase 3b):**
+- Improve duplicate ID reporting: collect ALL duplicates, write org file if >10
+- Improve unreadable file reporting: collect ALL errors, write org file
+- Add tests for both error collection behaviors
+- Remove misleading TODO comment in =read_skg_files=
+
+See "Resolved Questions" section (questions 2-4) for detailed specifications.
 
 ** Phase 4: Metadata Serialization and Parsing [COMPLETED]
 1. ✓ Updated =orgnodemd_to_string= to serialize source (lines 46-47)
@@ -689,26 +722,26 @@ Notes:
 * Testing Strategy
 
 ** Unit Tests
-- Config parsing with multiple sources and HashMap structure
-- Custom deserializer for =[[sources]]= array to HashMap
-- Duplicate ID detection across sources
-- Source inheritance logic (parent to child)
-- Path generation with source parameter
-- Validation of roots without sources
-- Foreign node validation:
+- ✓ Config parsing with multiple sources and HashMap structure
+- ✓ Custom deserializer for =[[sources]]= array to HashMap
+- ✓ Duplicate ID detection across sources (Phase 3)
+- Source inheritance logic (parent to child) - Phase 6
+- Path generation with source parameter - Phase 5
+- Validation of roots without sources - Phase 7
+- Foreign node validation - Phase 8:
   - Unmodified foreign nodes (pass)
   - Modified foreign nodes (fail)
   - Indefinitive foreign nodes (filter)
-- Source path validation (create owned, fail foreign)
+- ✓ Source path validation (create owned, fail foreign) (Phase 2)
 
 ** Integration Tests
-- Load from multiple source directories simultaneously
-- Save to different sources based on node source field
-- Mixed ownership scenarios (=user_owns_it=)
-- Foreign data in views (viewable but not modifiable)
-- Attempting to modify foreign data (should error)
-- Source inheritance through multi-level trees
-- Config migration (verify all configs updated correctly)
+- ✓ Load from multiple source directories simultaneously (Phase 3)
+- Save to different sources based on node source field - Phase 5
+- Mixed ownership scenarios (=user_owns_it=) - Phase 8
+- Foreign data in views (viewable but not modifiable) - Phase 8
+- Attempting to modify foreign data (should error) - Phase 8
+- Source inheritance through multi-level trees - Phase 6
+- ✓ Config migration (verify all configs updated correctly) (Phase 1)
 
 ** Test Fixtures Needed
 1. Multi-source config.toml files with =[[sources]]= format
@@ -756,7 +789,7 @@ Notes:
 * Success Criteria
 
 Core Functionality:
-- [ ] Can load .skg files from multiple directories simultaneously
+- [X] Can load .skg files from multiple directories simultaneously
 - [X] Each node tracks its source (mandatory field)
 - [X] Source appears in org-mode metadata as =(source nickname)=
 - [ ] Nodes inherit source from parent during save
@@ -773,7 +806,7 @@ Foreign Data Handling:
 Data Integrity:
 - [ ] TypeDB stores source attribute for all nodes
 - [ ] Tantivy indexes source for all documents
-- [ ] Duplicate IDs across sources detected and rejected
+- [X] Duplicate IDs across sources detected and rejected
 - [X] Source paths validated at startup
 
 Testing and Migration:
@@ -788,30 +821,164 @@ Documentation:
 - [ ] Code comments explain foreign data validation
 - [ ] Error messages include source information where relevant
 
+* Lessons Learned from Phases 1-3
+
+This section captures insights and patterns discovered during implementation that may inform future phases.
+
+** Pattern: Source must be set immediately after deserialization
+
+Since =SkgNode.source= is not serialized to .skg files, it must be set immediately after every =read_node()= call. Missing this causes type errors (mandatory field).
+
+Lesson: Any function that reads a node from disk must either:
+1. Set the source field before returning, or
+2. Be called by a wrapper that sets the source
+
+The =read_all_skg_files_from_sources= pattern (wrapper sets source) works well.
+
+** Pattern: Duplicate detection requires HashMap for O(1) lookup
+
+Initial consideration was to check for duplicates with nested loops (O(n²)). Using =HashMap<String, String>= for tracking ID→source mappings provides O(1) lookup per ID.
+
+With N nodes and M IDs per node average: O(N*M) total time, which is efficient.
+
+** Pattern: Fail-fast error handling simplifies implementation
+
+Current implementation returns error on first problem found (duplicate ID, missing file, etc.). This simplified Phase 2-3 implementation significantly.
+
+Trade-off: Users see one error at a time vs collecting all errors. May revisit in polish phase.
+
+** Pattern: TODO comments track temporary workarounds effectively
+
+Marking temporary code with "TODO Phase X:" comments made it easy to:
+- Track what needs fixing later
+- Understand why code is written a certain way
+- Find all related workarounds using grep
+
+Recommendation: Continue this pattern for remaining phases.
+
+** Integration point: TypeDB and Tantivy already handle source field
+
+TypeDB schema includes =source= attribute. When Phase 3 loaded nodes with source field set, both databases handled it correctly. No changes needed to =create_all_nodes= or =update_index_with_nodes= yet (they just pass through the field).
+
+Phase 10 will explicitly add source indexing, but basic functionality already works.
+
+* Resolved Questions
+
+** 1. Source iteration order during loading ✓ RESOLVED
+
+HashMap iteration order is non-deterministic in Rust, but this doesn't matter for our use case.
+
+Decision: Keep non-deterministic iteration order
+Rationale:
+- Order doesn't affect correctness
+- All nodes are loaded before relationships are created (TypeDB constraint)
+- Error messages may vary in order, but this is acceptable
+
+** 2. Duplicate ID error reporting ✓ RESOLVED
+
+Decision: Collect ALL duplicate IDs and report comprehensively
+
+Implementation plan (Phase 3 enhancement):
+- Continue scanning all sources even after finding first duplicate
+- Collect all duplicate IDs in a data structure
+- If ≤10 duplicates: report in stderr error message
+- If >10 duplicates: write to =initialization-error_duplicate-ids.org=
+- Org file format:
+  - =* <ID>= at level 1 (each duplicate ID)
+  - =** <source-nickname>= at level 2 (each source containing that ID)
+- Also report error count via stderr
+- Add test to verify this behavior
+
+Rationale: Better user experience - see all problems at once instead of iteratively fixing
+
+** 3. Error handling during multi-source loading ✓ RESOLVED
+
+Decision: Collect ALL file reading errors and report comprehensively
+
+Implementation plan (Phase 3 enhancement):
+- Continue trying to load from all sources even after errors
+- Collect all unreadable file errors
+- Write to =initialization-error_unreadable-skg-files.org=
+- Org file format:
+  - =* <filename>= at level 1 (each unreadable file)
+  - =** <source-nickname>= at level 2 (which source(s) contained it)
+  - =*** Error: <error-message>= at level 3 (the actual error)
+- Also report error count via stderr
+- Add test to verify this behavior
+
+Rationale: Help users fix all problems at once; especially important for large repositories
+
+** 4. Internal read_skg_files TODO comment ✓ RESOLVED
+
+Decision: Remove the misleading TODO comment
+
+The =read_skg_files= function (line 27 in multiple_nodes.rs) has a TODO about determining source, but this is misleading. The function works correctly - its caller =read_all_skg_files_from_sources= sets the source field appropriately.
+
+Action: Remove TODO comment as part of Phase 3 cleanup
+
+** 5. What if a node's source is missing or invalid? ✓ RESOLVED
+
+Decision: Different handling for SkgNode vs OrgNode
+
+For =SkgNode= (disk representation):
+- Source is mandatory (=String=, not =Option<String>=)
+- Type system prevents SkgNode without source
+- If somehow a SkgNode has source that doesn't exist in config: fail fast during save with clear error
+
+For =OrgNodeMetadata= (buffer representation):
+- Source is =Option<String>= (may be None)
+- Validation in Phase 7 will check that root nodes have sources
+- Non-root nodes inherit source from parent (Phase 6)
+- If validation fails: clear error message before any disk operations
+
+This is already handled by design decisions from Phase 1.
+
+Rationale:
+- Fail-fast prevents data corruption
+- Clear error messages help users fix configuration issues
+- Type system provides compile-time safety where possible
+
 * Remaining Open Questions
 
 After stakeholder review, the following questions still need clarification:
 
-** None Currently
+** 1. How to determine source when reading individual nodes (Phase 5)
 
-All major design decisions have been resolved. Ready to begin implementation.
+In 10 locations, individual nodes are read from disk and source is hardcoded to "main". When implementing Phase 5, how should we determine the correct source?
+
+Options:
+1. Pass source as a parameter to all read functions (requires updating many call sites)
+2. Infer source from file path by comparing against all source paths in config (fragile, path manipulation issues)
+3. Require callers to know the source beforehand (might not always be possible)
+
+Related locations:
+- =read_node_from_id()= in =rust/media/file_io/one_node.rs=
+- =fetch_aliases_from_file()= in =rust/media/file_io/one_node.rs=
+- Various read operations in merge, rebuild, save, and content_view modules
+
+Current behavior: All set source to "main" with TODO comments
+
+Note: See =multi-source/phase5-locations.md= for detailed breakdown of all Phase 5 locations with clickable links.
 
 * Next Steps
 
-Phases 1 and 2 are complete. Next steps:
+Phases 1, 2, and 3 are complete. Next steps:
 
-1. **Phase 3: File Loading with Sources**
-   - Implement =read_all_skg_files_from_sources= to load from all configured sources
-   - Add duplicate ID detection across sources
-   - Remove temporary "main" hardcoding from =rust/init.rs=
+1. **Phase 3b: Enhanced Error Collection** (immediate priority)
+   - Implement comprehensive duplicate ID reporting with org file output
+   - Implement comprehensive unreadable file reporting with org file output
+   - Add tests for both error collection behaviors
+   - Remove misleading TODO comment in =read_skg_files=
+   - See Resolved Questions 2-4 for detailed specifications
 
 2. **Phase 5: Path Generation and File Writing**
    - Update =path_from_pid= signature to accept source parameter
    - Update all 11+ call sites of =path_from_pid=
    - Remove remaining temporary "main" hardcoding (10 locations)
    - Test writing to multiple source directories
+   - See =multi-source/phase5-locations.md= for complete location breakdown
 
 3. **Continue through remaining phases sequentially**
    - Each phase builds on previous
    - Run tests after each phase
-   - All 115 tests should continue passing
+   - All tests should continue passing
