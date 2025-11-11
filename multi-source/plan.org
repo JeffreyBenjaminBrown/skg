@@ -368,7 +368,35 @@ source: orgnode.metadata.source.clone()
   .ok_or_else(|| "SkgNode missing source".to_string())?,
 #+end_src
 
-** 16. Foreign Data Validation During Save
+** 16. Source Reconciliation for Duplicate Instructions
+
+When multiple orgnodes have the same ID (after ID replacement with PID), determine the canonical source to use.
+
+Location: =rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs=
+
+Add function:
+#+begin_src rust
+fn reconciled_source(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+) -> Result<String, Box<dyn Error>> {
+  // Priority: definer's source > first indefinitive's source
+  if let Some((node, _)) = definer {
+    return Ok(node.source.clone());
+  }
+  if !indefinitives.is_empty() {
+    return Ok(indefinitives[0].0.source.clone());
+  }
+  Err("No source found in buffer orgnodes for reconciliation".into())
+}
+#+end_src
+
+Call this in =reconcile_dup_instructions_for_one_id= before reading from disk:
+- Compute reconciled source from buffer orgnodes (definer takes priority)
+- Use reconciled source to determine which .skg file to read
+- Include reconciled source in the merged result
+
+** 17. Foreign Data Validation During Save
 
 Add new error type to =rust/types/errors.rs=:
 #+begin_src rust
@@ -396,7 +424,7 @@ pub fn validate_foreign_nodes(
 
 Call this in =rust/save.rs= after instruction generation, before filesystem/TypeDB updates.
 
-** 17. Source Path Validation
+** 18. Source Path Validation
 
 In =rust/media/file_io/misc.rs=, add:
 #+begin_src rust
@@ -425,7 +453,7 @@ pub fn validate_source_paths(
 
 Call this immediately after loading config in =load_config=.
 
-** 18. Config Migration Script
+** 19. Config Migration Script
 
 Create =scripts/migrate-configs.sh= to update all skgconfig.toml files:
 #+begin_src bash
@@ -534,17 +562,24 @@ Initially, source is immutable after creation.
 
 * Implementation Order
 
-** Phase 1: Core Data Structures and Config Migration
-1. Add =SkgfileSource= struct to =rust/types/misc.rs=
-2. Add =sources: HashMap<String, SkgfileSource>= to =SkgConfig= with custom deserializer
-3. **Run migration script/manual process to update all config files**
-4. Remove =skg_folder= field from =SkgConfig=
-5. Add helper methods to SkgConfig (=get_source=, =get_source_path=, =user_owns_source=)
-6. Add =source= field to =SkgNode= (initially =Option<String>=)
-7. Add =source= field to =OrgnodeMetadata= (=Option<String>=)
-8. Update TypeDB schema with =source= attribute
-9. Fix compilation errors from removed =skg_folder=
-10. Update test helper to generate configs with HashMap
+** Phase 1: Core Data Structures and Config Migration [COMPLETED]
+1. ✓ Added =SkgfileSource= struct to =rust/types/misc.rs=
+2. ✓ Added =sources: HashMap<String, SkgfileSource>= to =SkgConfig= with custom deserializer
+3. ✓ Migrated all config files manually (2 files updated)
+4. ✓ Removed =skg_folder= field from =SkgConfig= (removed Hash derive too)
+5. ✓ Added helper methods to SkgConfig (=get_source=, =get_source_path=, =user_owns_source=)
+6. ✓ Added =source: String= field to =SkgNode= (went straight to mandatory - Phase 9 done early)
+7. ✓ Added =source: Option<String>= field to =OrgnodeMetadata=
+8. ✓ Updated TypeDB schema with =source= attribute
+9. ✓ Fixed all compilation errors (11 locations with temporary "main" workarounds)
+10. ✓ Updated test helper to generate configs with HashMap
+11. ✓ Implemented =reconciled_source()= function for duplicate instruction handling
+
+Notes:
+- Phase 9 (Make Source Mandatory) was completed during Phase 1
+- Source set to "main" after all file reads (11 locations) - see temporary-changes.org
+- Removed Hash derive from SkgConfig (HashMap doesn't implement Hash)
+- Source reconciliation logic prioritizes definer over indefinitives
 
 ** Phase 2: Source Path Validation
 1. Implement =validate_source_paths= in =rust/media/file_io/misc.rs=
@@ -562,12 +597,14 @@ Initially, source is immutable after creation.
 1. ✓ Updated =orgnodemd_to_string= to serialize source (lines 46-47)
 2. ✓ Updated =parse_orgnode_metadata_sexp= to parse source (lines 226-231)
 3. ✓ Added tests - updated 5 test files to include =(source main)= in org-mode data
-4. Test utilities update pending if needed
+4. ✓ Updated =mk_skgnode= to require source in orgnode metadata (error if missing)
+5. ✓ Simplified =reconciled_source()= to work with mandatory String (no Option handling)
 
 Notes:
 - Source rendered as =(source nickname)= in org-mode format
 - Source parsed between =id= and =view= sections
 - Format matches existing =(id ...)= pattern
+- =reconciled_source()= implementation simplified after source made mandatory
 
 ** Phase 5: Path Generation and File Writing
 1. Update =path_from_pid= signature to accept source parameter
@@ -707,8 +744,8 @@ Notes:
 
 Core Functionality:
 - [ ] Can load .skg files from multiple directories simultaneously
-- [ ] Each node tracks its source (mandatory field)
-- [ ] Source appears in org-mode metadata as =(source nickname)=
+- [X] Each node tracks its source (mandatory field)
+- [X] Source appears in org-mode metadata as =(source nickname)=
 - [ ] Nodes inherit source from parent during save
 - [ ] Root nodes without source are rejected with clear error
 - [ ] Files are written to correct source directory based on node.source
@@ -748,21 +785,25 @@ All major design decisions have been resolved. Ready to begin implementation.
 
 * Next Steps
 
-1. **Create and run config migration script/process**
-   - Update all skgconfig.toml files to =[[sources]]= format
-   - Verify all configs parse correctly
+Phase 1 is complete. Next steps:
 
-2. **Begin Phase 1 implementation**
-   - Add SkgfileSource type
-   - Add HashMap field to SkgConfig
-   - Implement custom deserializer
-   - Remove skg_folder field
+1. **Phase 2: Source Path Validation**
+   - Implement =validate_source_paths= function
+   - Test directory creation for owned sources
+   - Test error handling for missing foreign source paths
 
-3. **Update test infrastructure**
-   - Create test helper for HashMap configs
-   - Update basic tests to ensure config parsing works
+2. **Phase 3: File Loading with Sources**
+   - Implement =read_all_skg_files_from_sources= to load from all configured sources
+   - Add duplicate ID detection across sources
+   - Remove temporary "main" hardcoding from =rust/init.rs=
 
-4. **Proceed through phases sequentially**
+3. **Phase 5: Path Generation and File Writing**
+   - Update =path_from_pid= signature to accept source parameter
+   - Update all 11+ call sites of =path_from_pid=
+   - Remove remaining temporary "main" hardcoding (10 locations)
+   - Test writing to multiple source directories
+
+4. **Continue through remaining phases sequentially**
    - Each phase builds on previous
    - Run tests after each phase
-   - Commit working increments
+   - All 108 tests should continue passing
