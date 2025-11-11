@@ -1,0 +1,36 @@
+#+title: Surprises and Discoveries During Multi-Source Implementation
+#+date: 2025-11-11
+
+This document tracks unexpected findings during implementation that may require design decisions.
+
+* Phase 1: Core Data Structures and Config Migration
+
+** 1. SkgConfig cannot derive Hash anymore
+
+*** Issue
+HashMap doesn't implement Hash, so SkgConfig can no longer derive Hash.
+
+*** Resolution
+Removed =Hash= from SkgConfig's derive macro. Need to verify if any code was using SkgConfig as a HashMap key or in a HashSet (unlikely).
+
+*** Impact
+Low - SkgConfig is typically not used as a hash key.
+
+** 2. Temporary workarounds for compilation
+
+*** Issue
+Phase 1 removed =skg_folder= before implementing full multi-source loading logic.
+
+*** Temporary workarounds
+All marked with TODO comments in code:
+- =rust/init.rs=: Only reads from "main" source instead of all sources
+- =rust/util.rs:path_from_pid()=: Uses "main" source instead of accepting source parameter
+- =rust/media/file_io/multiple_nodes.rs=: Writes only to "main" source
+- =rust/save.rs=: Generic print message instead of per-source information
+
+*** To be addressed in
+- Phase 3: Proper multi-source file loading
+- Phase 5: Update =path_from_pid()= signature and all call sites
+
+*** Impact
+Code compiles and runs but only supports single "main" source for now.

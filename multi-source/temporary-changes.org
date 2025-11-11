@@ -1,0 +1,146 @@
+#+title: Temporary Changes During Multi-Source Implementation
+#+date: 2025-11-11
+
+* Purpose
+
+This document tracks temporary workarounds added during Phase 1 to get the code compiling after removing =skg_folder=. These changes will be properly implemented in later phases.
+
+* Temporary Changes
+
+** rust/init.rs (Lines 30-37)
+
+*** What was changed
+File loading was hardcoded to only read from the "main" source.
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 3: Replace with read_all_skg_files_from_sources
+// For now, temporarily read from "main" source to get Phase 1 compiling
+let main_source : &SkgfileSource =
+  config . sources . get ( "main" )
+  . expect ( "Config must have a 'main' source" );
+let skg_folder_str: &str =
+  main_source . path
+  . to_str () . expect ("Invalid UTF-8 in skg folder path");
+#+end_src
+
+*** Proper implementation (Phase 3)
+- Create =read_all_skg_files_from_sources= function
+- Iterate over all sources in =config.sources=
+- Set =source= field on each loaded SkgNode based on which source it came from
+- Add duplicate ID detection across sources
+
+** rust/util.rs (Lines 17-27)
+
+*** What was changed
+=path_from_pid= function hardcoded to use "main" source instead of accepting a source parameter.
+
+*** Current signature
+#+begin_src rust
+pub fn path_from_pid (
+  config : &SkgConfig,
+  pid    : ID,
+) -> String
+#+end_src
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 5: Update signature to accept source parameter
+// For now, use "main" source to get Phase 1 compiling
+let main_source =
+  config . sources . get ( "main" )
+  . expect ( "Config must have a 'main' source" );
+let f : PathBuf = main_source . path . clone() ;
+#+end_src
+
+*** Proper implementation (Phase 5)
+**** New signature
+#+begin_src rust
+pub fn path_from_pid (
+  config : &SkgConfig,
+  source : &str,  // Add this parameter
+  pid    : ID,
+) -> String
+#+end_src
+
+**** Implementation
+- Look up source by nickname in =config.sources=
+- Use that source's path
+- Update all call sites to pass source parameter
+
+** rust/media/file_io/multiple_nodes.rs (Lines 37-44)
+
+*** What was changed
+=write_all_nodes_to_fs= hardcoded to write to "main" source.
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 5: Write to appropriate source based on node.source
+// For now, use "main" source to get Phase 1 compiling
+let main_source =
+  config . sources . get ( "main" )
+  . expect ( "Config must have a 'main' source" );
+fs::create_dir_all (
+  // Ensure entire path to folder exists
+  &main_source . path )?;
+#+end_src
+
+*** Proper implementation (Phase 5)
+- For each node, look up =node.source= in =config.sources=
+- Use that source's path to construct file path
+- Create directory for that source if needed
+- Write file to appropriate source directory
+
+** rust/save.rs (Lines 111-113)
+
+*** What was changed
+Print statement made generic instead of showing target directory.
+
+*** Old implementation
+#+begin_src rust
+let target_dir : &Path = &config.skg_folder;
+println!( "2) Writing {} instruction(s) to disk at {:?} ...",
+           total_input, target_dir );
+#+end_src
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 5: Print per-source write information
+println!( "2) Writing {} instruction(s) to disk ...",
+           total_input );
+#+end_src
+
+*** Proper implementation (Phase 5)
+- Group nodes by source
+- Print write information per source
+- Show counts per source directory
+
+* Impact
+
+** Current functionality
+- Code compiles and runs
+- Supports exactly one source with nickname "main"
+- All file operations use "main" source
+- No multi-source functionality yet
+
+** What doesn't work
+- Cannot configure multiple sources (they would be ignored)
+- Cannot load from multiple directories
+- Cannot write nodes to different sources
+- Source field exists but is not properly set or used
+
+* Testing implications
+
+All existing tests work because they use a single "main" source via the test helper in =rust/test_utils.rs= (lines 105-113).
+
+* Removal plan
+
+** Phase 3: File Loading with Sources
+- Remove temporary code in =rust/init.rs=
+- Implement =read_all_skg_files_from_sources=
+
+** Phase 5: Path Generation and File Writing
+- Remove temporary code in =rust/util.rs=
+- Remove temporary code in =rust/media/file_io/multiple_nodes.rs=
+- Remove temporary code in =rust/save.rs=
+- Update all call sites of =path_from_pid=
