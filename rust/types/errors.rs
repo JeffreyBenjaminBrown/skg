@@ -3,7 +3,7 @@ use std::error::Error;
 use std::io;
 
 #[derive(Debug)]
-pub enum HyperlinkParseError {
+pub enum TextLinkParseError {
   InvalidFormat,
   MissingDivider,
 }
@@ -13,16 +13,13 @@ pub enum SaveError {
   ParseError(String),
   DatabaseError(Box<dyn Error>),
   IoError(io::Error),
-  InconsistentInstructions {
-    inconsistent_deletions: Vec<ID>,
-    multiple_definers: Vec<ID>, },
-  BufferValidationErrors ( Vec<Buffer_Cannot_Be_Saved> ), }
+  BufferValidationErrors ( Vec<BufferValidationError> ), }
 
 /// If the user attempts to save a buffer
 /// with any of these properties,, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
-pub enum Buffer_Cannot_Be_Saved {
+pub enum BufferValidationError {
   Body_of_AliasCol               (OrgNode),
   Child_of_AliasCol_with_ID      (OrgNode),
   Body_of_Alias                  (OrgNode),
@@ -40,18 +37,18 @@ pub enum Buffer_Cannot_Be_Saved {
 // Implementations
 //
 
-impl std::fmt::Display for HyperlinkParseError {
+impl std::fmt::Display for TextLinkParseError {
   fn fmt (
     &self,
     f: &mut std::fmt::Formatter <'_>
   ) -> std::fmt::Result {
     match self {
-      HyperlinkParseError::InvalidFormat =>
+      TextLinkParseError::InvalidFormat =>
         write! (
-          f, "Invalid hyperlink format. Expected [[id:ID][LABEL]]" ),
-      HyperlinkParseError::MissingDivider =>
+          f, "Invalid textlink format. Expected [[id:ID][LABEL]]" ),
+      TextLinkParseError::MissingDivider =>
         write! (
           f, "Missing divider between ID and label. Expected ][" ),
     } } }
 
-impl Error for HyperlinkParseError {}
+impl Error for TextLinkParseError {}

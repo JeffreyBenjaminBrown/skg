@@ -4,10 +4,10 @@ use skg::merge::{
   instructiontriples_from_the_merges_in_an_orgnode_forest,
   merge_nodes_in_graph};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
-use skg::types::{ID, OrgNode, OrgnodeMetadata, NodeRequest, SkgConfig, SkgNode, MergeInstructionTriple};
-use skg::file_io::read_node;
+use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
+use skg::media::file_io::read_node;
 use skg::util::path_from_pid;
-use skg::typedb::search::{
+use skg::media::typedb::search::{
   contains_from_pids,
   find_related_nodes};
 use skg::types::TantivyIndex;
@@ -59,9 +59,6 @@ async fn test_merge_2_into_1_impl(
   driver: &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 1 requesting to merge node 2
-  let mut node_requests: HashSet<NodeRequest> = HashSet::new();
-  node_requests.insert(NodeRequest::Merge(ID::from("2")));
-
   let org_node_1: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("1")),
@@ -69,9 +66,8 @@ async fn test_merge_2_into_1_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        repeat: false,
-        toDelete: false,
-        nodeRequests: node_requests, }, },
+        editRequest: Some(EditRequest::Merge(ID::from("2"))),
+        viewRequests: HashSet::new(), }, },
     title: "1".to_string(),
     body: None, };
   let forest: Vec<Tree<OrgNode>> =
@@ -344,9 +340,6 @@ async fn test_merge_1_into_2_impl(
   driver: &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 2 requesting to merge node 1
-  let mut node_requests: HashSet<NodeRequest> = HashSet::new();
-  node_requests.insert(NodeRequest::Merge(ID::from("1")));
-
   let org_node_2: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("2")),
@@ -354,9 +347,8 @@ async fn test_merge_1_into_2_impl(
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
         indefinitive: false,
-        repeat: false,
-        toDelete: false,
-        nodeRequests: node_requests, }, },
+        editRequest: Some(EditRequest::Merge(ID::from("1"))),
+        viewRequests: HashSet::new(), }, },
     title: "2".to_string(),
     body: None, };
   let forest: Vec<Tree<OrgNode>> =
@@ -461,35 +453,35 @@ async fn verify_typedb_after_merge_1_into_2 (
     &ID::from("hidden-from-subscriptions-of-1-but-in-content-of-2")));
   // Note that the would-be second 'overlap' node was removed.
 
-  // Hyperlinks should be rerouted
+  // TextLinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
-  let acquiree_text_preserver_hyperlink_dests: HashSet<ID> = find_related_nodes(
+  let acquiree_text_preserver_textlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, acquiree_text_preserver_id,
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(
-    acquiree_text_preserver_hyperlink_dests.contains(&ID::from("1-links-to")),
-    "acquiree_text_preserver should hyperlink to 1-links-to");
+    acquiree_text_preserver_textlink_dests.contains(&ID::from("1-links-to")),
+    "acquiree_text_preserver should textlink to 1-links-to");
 
-  // - Node 2 should NOT have the outbound hyperlink from node 1
-  //   (the hyperlink is in the text, which went to acquiree_text_preserver)
-  let node_2_hyperlink_dests: HashSet<ID> = find_related_nodes(
+  // - Node 2 should NOT have the outbound textlink from node 1
+  //   (the textlink is in the text, which went to acquiree_text_preserver)
+  let node_2_textlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("2"),
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(
-    !node_2_hyperlink_dests.contains(&ID::from("1-links-to")),
-    "Node 2 should NOT hyperlink to 1-links-to");
+    !node_2_textlink_dests.contains(&ID::from("1-links-to")),
+    "Node 2 should NOT textlink to 1-links-to");
 
-  // - The hyperlink from links-to-1 to 1 should now be from links-to-1 to 2
-  //   (inbound hyperlinks target the acquirer because acquiree's ID becomes an extra_id)
+  // - The textlink from links-to-1 to 1 should now be from links-to-1 to 2
+  //   (inbound textlinks target the acquirer because acquiree's ID becomes an extra_id)
   let links_to_1_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, &ID::from("links-to-1"),
-    "hyperlinks_to", "source", "dest" ). await ?;
+    "textlinks_to", "source", "dest" ). await ?;
   assert!(links_to_1_dests.contains(&ID::from("2")),
-          "links-to-1 should hyperlink to 2 (rerouted from 1)");
+          "links-to-1 should textlink to 2 (rerouted from 1)");
   assert!(!links_to_1_dests.contains(&ID::from("1")),
-          "links-to-1 should NOT hyperlink to 1 (1 was merged)");
+          "links-to-1 should NOT textlink to 1 (1 was merged)");
 
   // Subscribes relationships should be rerouted
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2

@@ -8,15 +8,34 @@
 ///   maybe even all of it, might already be there.
 
 use crate::mk_org_text::content_view::skgnode_and_orgnode_from_pid;
-use crate::typedb::search::{
+use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
-use crate::types::{ID, SkgConfig, OrgNode, RelToParent};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+pub async fn wrapped_build_and_integrate_containerward_view (
+  tree          : &mut Tree < OrgNode >,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  if let Err ( e ) = build_and_integrate_containerward_path (
+    tree, node_id, config, typedb_driver ) . await
+  {
+    errors . push (
+      format! ( "Failed to integrate containerward path: {}", e )); }
+  tree . get_mut ( node_id )
+    . ok_or ( "Node not found in tree" ) ?
+    . value () . metadata . code . viewRequests
+    . remove ( &ViewRequest::ContainerwardView );
+  Ok (( )) }
 
 /// Integrate a containerward path into an OrgNode tree.
 /// This is called on a specific node in the tree,
@@ -39,6 +58,24 @@ pub async fn build_and_integrate_containerward_path (
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
     tree, node_id, path, branches, cycle_node, config ) }
+
+pub async fn wrapped_build_and_integrate_sourceward_view (
+  tree          : &mut Tree < OrgNode >,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  if let Err ( e ) = build_and_integrate_sourceward_path (
+    tree, node_id, config, typedb_driver ) . await
+  {
+    errors . push (
+      format! ( "Failed to integrate sourceward path: {}", e )); }
+  tree . get_mut ( node_id )
+    . ok_or ( "Node not found in tree" ) ?
+    . value () . metadata . code . viewRequests
+    . remove ( &ViewRequest::SourcewardView );
+  Ok (( )) }
 
 /// Integrate a sourceward path into an OrgNode tree.
 /// TODO ? Can this be dedup'd w/r/t

@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use ego_tree::Tree;
-use skg::types::{OrgNode, Buffer_Cannot_Be_Saved};
+use skg::types::{OrgNode, BufferValidationError};
 use skg::save::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving};
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
@@ -34,47 +34,47 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(
           input_with_errors).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> =
+      let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
   assert_eq!(errors.len(), 9,
              "Should find exactly 9 validation errors (8 original + 1 Multiple_DefiningContainers)");
 
-  { let aliasCol_body_errors: Vec<&Buffer_Cannot_Be_Saved> =
+  { let aliasCol_body_errors: Vec<&BufferValidationError> =
     errors.iter()
-    . filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Body_of_AliasCol(_)))
+    . filter(|e| matches!(e, BufferValidationError::Body_of_AliasCol(_)))
     .collect();
     assert_eq!(aliasCol_body_errors.len(), 1,
                "Should find 1 Body_of_AliasCol error");
-    if let Buffer_Cannot_Be_Saved::Body_of_AliasCol(node)
+    if let BufferValidationError::Body_of_AliasCol(node)
     = aliasCol_body_errors[0]
     { assert_eq!( node.title,
                   "AliasCol with body problem",
                   "Body_of_AliasCol error should come from correct node"); }}
 
-  { let aliasCol_child_id_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(_)))
+  { let aliasCol_child_id_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Child_of_AliasCol_with_ID(_)))
     .collect();
   assert_eq!(aliasCol_child_id_errors.len(), 1, "Should find 1 Child_of_AliasCol_with_ID error");
-  if let Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(node) = aliasCol_child_id_errors[0] {
+  if let BufferValidationError::Child_of_AliasCol_with_ID(node) = aliasCol_child_id_errors[0] {
     assert_eq!(node.title, "Child of AliasCol with ID", "Child_of_AliasCol_with_ID error should come from correct node"); }}
 
-  { let alias_body_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Body_of_Alias(_)))
+  { let alias_body_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Body_of_Alias(_)))
     .collect();
   assert_eq!(alias_body_errors.len(), 1, "Should find 1 Body_of_Alias error");
-  if let Buffer_Cannot_Be_Saved::Body_of_Alias(node) = alias_body_errors[0] {
+  if let BufferValidationError::Body_of_Alias(node) = alias_body_errors[0] {
     assert_eq!(node.title, "Alias with body problem and orphaned", "Body_of_Alias error should come from correct node"); }}
 
-  { let alias_child_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Child_of_Alias(_)))
+  { let alias_child_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Child_of_Alias(_)))
     .collect();
   assert_eq!(alias_child_errors.len(), 1, "Should find 1 Child_of_Alias error");
-  if let Buffer_Cannot_Be_Saved::Child_of_Alias(node) = alias_child_errors[0] {
+  if let BufferValidationError::Child_of_Alias(node) = alias_child_errors[0] {
     assert_eq!(node.title, "Any child of Alias (bad)", "Child_of_Alias error should come from correct node"); }}
 
-  { let alias_no_aliascol_parent_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(_)))
+  { let alias_no_aliascol_parent_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Alias_with_no_AliasCol_Parent(_)))
     .collect();
     assert_eq!(alias_no_aliascol_parent_errors.len(), 3, "Should find 3 Alias_with_no_AliasCol_Parent errors");
     let expected_titles: Vec<&str> = vec![
@@ -82,26 +82,26 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       "Alias under non-AliasCol parent",
       "Root level Alias (bad)" ];
     for error in &alias_no_aliascol_parent_errors {
-      if let Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(node) = error {
+      if let BufferValidationError::Alias_with_no_AliasCol_Parent(node) = error {
         assert!(expected_titles.contains(&node.title.as_str()),
                 "Alias_with_no_AliasCol_Parent error should come from expected node, got: {}", node.title); }} }
 
-  { let ambiguous_deletion_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-    .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::AmbiguousDeletion(_)))
+  { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::AmbiguousDeletion(_)))
     .collect();
   assert_eq!(ambiguous_deletion_errors.len(), 1, "Should find 1 AmbiguousDeletion error");
-    if let Buffer_Cannot_Be_Saved::AmbiguousDeletion(id)
+    if let BufferValidationError::AmbiguousDeletion(id)
     = ambiguous_deletion_errors[0] {
       assert_eq!(id.0, "conflict",
                  "AmbiguousDeletion error should come from conflicting ID"); }}
 
-  { let multiple_defining_errors: Vec<&Buffer_Cannot_Be_Saved> =
+  { let multiple_defining_errors: Vec<&BufferValidationError> =
     errors.iter()
     .filter(|e| matches!(
-      e, Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(_)))
+      e, BufferValidationError::Multiple_DefiningContainers(_)))
     .collect();
   assert_eq!(multiple_defining_errors.len(), 1, "Should find 1 Multiple_DefiningContainers error");
-    if let Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id)
+    if let BufferValidationError::Multiple_DefiningContainers(id)
     = multiple_defining_errors[0] {
       assert_eq!(id.0, "conflict",
                  "Multiple_DefiningContainers error should come from conflicting ID"); } }
@@ -131,7 +131,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
 
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(valid_input).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&trees, config, driver).await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&trees, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
       Ok(())
@@ -148,7 +148,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     |config, driver| Box::pin(async move {
       // Test empty input
       let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
-      let errors: Vec<Buffer_Cannot_Be_Saved> = find_buffer_errors_for_saving(&empty_trees, config, driver).await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_trees, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no errors in empty input");
       Ok(())
@@ -176,17 +176,17 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
 
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> =
+      let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-      let multiple_aliascols_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(_)))
+      let multiple_aliascols_errors: Vec<&BufferValidationError> = errors.iter()
+        .filter(|e| matches!(e, BufferValidationError::Multiple_AliasCols_in_Children(_)))
         .collect();
 
       assert_eq!(multiple_aliascols_errors.len(), 1,
                  "Should find exactly 1 Multiple_AliasCols_in_Children error");
 
-      if let Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) = multiple_aliascols_errors[0] {
+      if let BufferValidationError::Multiple_AliasCols_in_Children(node) = multiple_aliascols_errors[0] {
         assert_eq!(node.title, "Node with multiple AliasCol children",
                    "Multiple_AliasCols_in_Children error should come from the parent node");
       }
@@ -212,17 +212,17 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
 
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> =
+      let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-      let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+      let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
+        .filter(|e| matches!(e, BufferValidationError::DuplicatedContent(_)))
         .collect();
 
       assert_eq!(duplicated_content_errors.len(), 1,
                  "Should find exactly 1 DuplicatedContent error");
 
-      if let Buffer_Cannot_Be_Saved::DuplicatedContent(id) = duplicated_content_errors[0] {
+      if let BufferValidationError::DuplicatedContent(id) = duplicated_content_errors[0] {
         assert_eq!(id.0, "1",
                    "DuplicatedContent error should report ID '1'");
       }
@@ -248,11 +248,11 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
 
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> =
+      let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-      let duplicated_content_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::DuplicatedContent(_)))
+      let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
+        .filter(|e| matches!(e, BufferValidationError::DuplicatedContent(_)))
         .collect();
 
       assert_eq!(duplicated_content_errors.len(), 0,

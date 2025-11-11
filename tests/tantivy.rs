@@ -2,11 +2,9 @@
 
 use std::path::Path;
 use tantivy::schema as schema;
-use skg::file_io::read_skg_files;
-use skg::tantivy::{
-  wipe_fs_then_create_index_there,
-  search_index,
-  update_index_with_nodes};
+use skg::media::file_io::read_skg_files;
+use skg::init::in_fs_wipe_index_then_create_it;
+use skg::media::tantivy::{search_index, update_index_with_nodes};
 use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
 
 #[test]
@@ -33,7 +31,7 @@ fn test_many_tantivy_things (
     read_skg_files("tests/tantivy/fixtures")?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
-    wipe_fs_then_create_index_there (
+    in_fs_wipe_index_then_create_it (
       &nodes,
       index_path,
       schema,
@@ -210,7 +208,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let schema: schema::Schema = schema_builder.build();
 
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
-    wipe_fs_then_create_index_there(
+    in_fs_wipe_index_then_create_it(
       &nodes,
       Path::new(index_dir),
       schema,

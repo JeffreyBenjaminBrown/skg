@@ -70,7 +70,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Child1 body
             * (skg (code (relToParent parentIgnores) indefinitive)) parentIgnores node
             ParentIgnores body
-            * (skg (view cycle) (code repeated)) cycling node
+            * (skg (view cycle repeated)) cycling node
             This node has cycle and repeated flags
         "};
 
@@ -98,7 +98,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let cycle_node = trees[2].root().value();
   assert_eq!(cycle_node.title, "cycling node");
   assert_eq!(cycle_node.metadata.viewData.cycle, true);
-  assert_eq!(cycle_node.metadata.code.repeat, true);
+  assert_eq!(cycle_node.metadata.viewData.repeat, true);
   assert_eq!(cycle_node.body, Some("This node has cycle and repeated flags".to_string()));
 }
 
@@ -125,9 +125,9 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.metadata.viewData.cycle, false);
   assert_eq!(first_node.metadata.viewData.focused, false);
   assert_eq!(first_node.metadata.viewData.folded, false);
+  assert_eq!(first_node.metadata.viewData.repeat, false);
   assert_eq!(first_node.metadata.code.indefinitive, false);
-  assert_eq!(first_node.metadata.code.repeat, false);
-  assert_eq!(first_node.metadata.code.toDelete, false);
+  assert_eq!(first_node.metadata.code.editRequest, None);
 
   // Test second node - should have no body
   let second_node = trees[1].root().value();

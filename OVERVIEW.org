@@ -103,7 +103,7 @@
        its relationship to its parent is not the default.
 *** Nodes link to each other.
 **** language
-     a 'source' node 'hyperlinks_to' a 'target' node.
+     a 'source' node 'textlinks_to' a 'target' node.
 **** link representation
      These are encoded 'inline' in the text,
      just as in org-roam.
@@ -206,14 +206,14 @@
 ** Some TypeDB data must be calculated from these.
    Each time the server starts,
    the "in-relationships" (for all relations)
-   and the out-links (for hyperlinks specifically)
+   and the out-links (for textlinks specifically)
    must be computed for each node.
 
    That's because .skg files record relationships
      in at most one direction:
      what the node contains, but not what contains it;
      what it subscribes to, but not what subscribes to it; etc.
-   And one kind of relationship, hyperlinks,
+   And one kind of relationship, textlinks,
      is not recorded explicitly in either direction;
      rather, link targets (sourced from this node)
        are parsed from any links in the text in the title and body,

@@ -1,14 +1,16 @@
 Skg grafts a novel sharing model onto a familiar data model older than Rome.
-# The familiar part: Trees with hyperlinks
-This is [the data model that all serious knowledge mapping software seems to use](data-model-trees-with-links.md).
+# The familiar part: Trees with textlinks
+This is [the data model that almost all serious knowledge mapping software seems to use](data-model-trees-with-links.md).
 
-## What the `contains` relation means, and how it differs from hyperlinks
+(If 'textlink' sounds weird, just think 'hyperlink'. If you use the internet, you are used to using these.)
+
+## What the `contains` relation means, and how it differs from textlinks
 Each document is a curated view of data defined by the `contains` relation. Any document that includes the node N also includes every node that descends from N via `contains`.
 
-As is evident from the [schema](../schema.tql), there are a number of ways nodes can be connected: `contains`, `hyperlinks_to`, and a few more. Containment and hyperlinks differ in two ways:
+As is evident from the [schema](../schema.tql), there are a number of ways nodes can be connected: `contains`, `textlinks_to`, and a few more. Containment and textlinks differ in two ways:
 
-- Hyperlinks are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
-- Following a hyperlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
+- TextLinks are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
+- Following a textlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 # Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [the sharing model](sharing-model.md), and [easy to understand changes](diffs-are-clearer-in-skg.md).
 # The overrides_view_of relationship

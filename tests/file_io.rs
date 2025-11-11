@@ -5,7 +5,7 @@ use indoc::indoc; // A macro, which acts like an unused import.
 use std::fs;
 use std::path::PathBuf;
 
-use skg::file_io::{
+use skg::media::file_io::{
   read_node, write_node, fetch_aliases_from_file};
 use skg::mk_org_text::aliases_to_org;
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
@@ -124,7 +124,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
   }}
 
 #[test]
-fn test_hyperlinks_extracted_during_read() -> std::io::Result<()> {
+fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   use std::fs::File;
   use std::io::Write;
   use tempfile::tempdir;
@@ -134,12 +134,12 @@ fn test_hyperlinks_extracted_during_read() -> std::io::Result<()> {
   let file_path = dir.path().join("test_node.skg");
 
   let mut test_node : SkgNode = empty_skgnode ();
-  { test_node.title = "Title with two hyperlinks: [[(id hyperlink1][First) Hyperlink]] and [[(id hyperlink2][Second) Hyperlink]]"
+  { test_node.title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
       .to_string();
     test_node.aliases = Some(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
     test_node.ids = vec![ID::new("test123")];
-    test_node.body = Some("Some text with a link [[(id hyperlink3][Third) Hyperlink]] and another [[(id hyperlink4][Fourth) Hyperlink]]".to_string()); }
+    test_node.body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]".to_string()); }
 
   { // Write the node to a file
     let yaml = serde_yaml::to_string(&test_node)

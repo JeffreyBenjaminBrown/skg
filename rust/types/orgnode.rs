@@ -22,9 +22,13 @@ pub struct OrgnodeMetadata {
 /* View-related metadata: fields that dictate only how the node is shown. */
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeViewData {
+  // PITFALL: One could reasonably describe 'focused' and 'folded' as code rather than data. They tell Emacs what to do. Once Emacs has done that, it deletes them from the metadata. The other fields in this type are only acted on to the extent that Emacs displays them.
+
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool, // folded in the Emacs org-mode sense
+  pub repeat: bool, // Implies that the node already appears elsewhere in this buffer.
+    // PITFALL: repeated => indefinitive. (At least it should, and I think the code adheres to that.)
   pub relationships: OrgnodeRelationships,
 }
 
@@ -45,13 +49,11 @@ pub struct OrgnodeRelationships {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeCode {
   pub relToParent: RelToParent,
-  pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. Then the indefinitive nodes can append content. (Omitting the body of an indefinitive node can help economize on screen space.)
+  pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. The indefinitive nodes can append content, if they have any novel contents (where novel = not already contained by the target node).
+  // Thus 'indefinitive' defines, among other things, a node's relationship to its children -- at least, to those children that are content (i.e. with relToParent=Content). (Any orgnode, indefinitive or otherwise, can define aliases. I haven't decided whether that will be true of the three sharing relationsips -- subscription, hides and overrides.)
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
-  pub repeat: bool, /* Implies the same treatment as 'indefinitive', but also implies that the node already appears elsewhere in this buffer.
-PITFALL: We treat a node as indefinitive if 'repeat' OR 'indefinitive' is true. But the only time it is marked as 'repeat' is when Rust builds a content view and discovers the node has already been rendered. By contrast, when a node marked 'repeat' is saved, since the user may have edited it, the 'repeat' label is replaced with 'indefinitive'. And 'repeat' detection is skipped entirely for 'indefinitive' nodes, so it will thereafter appear without the 'repeat' marker.
-TODO : Is this ugly? I don't want to have to keep 'repeat' and 'indefinitive' in sync. In Rust, the function 'change_repeated_to_indefinitive', which is called each time a buffer is saved, ensures that the server knows to treat each repeated node as indefinitive. But in the Emacs client, nothing encodes the relationship between the two fields. */
-  pub toDelete: bool,
-  pub nodeRequests: HashSet<NodeRequest>,
+  pub editRequest: Option<EditRequest>,
+  pub viewRequests: HashSet<ViewRequest>,
 }
 
 /// 'RelToParent' describes how a node relates to its parent.
@@ -67,12 +69,20 @@ pub enum RelToParent {
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
 }
 
-/// Requests for additional information or views related to a node.
+/// Requests for editing operations on a node.
+/// Only one edit request is allowed per node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditRequest {
+  Merge(ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
+  Delete, // request to delete this node
+}
+
+/// Requests for additional views related to a node.
+/// Multiple view requests can be active simultaneously.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum NodeRequest {
+pub enum ViewRequest {
   ContainerwardView,
   SourcewardView,
-  Merge(ID), // to merge the node with that ID (as acquiree, deleted) into this one (as acquirer)
 }
 
 
@@ -108,33 +118,53 @@ impl FromStr for RelToParent {
       _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
     }} }
 
-impl fmt::Display for NodeRequest {
+impl fmt::Display for EditRequest {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      NodeRequest::ContainerwardView => write!(f, "containerwardView"),
-      NodeRequest::SourcewardView    => write!(f, "sourcewardView"),
-      NodeRequest::Merge(id)         => write!(f, "(merge {})", id.0),
+      EditRequest::Merge(id) => write!(f, "(merge {})", id.0),
+      EditRequest::Delete    => write!(f, "toDelete"),
     } } }
 
-impl FromStr for NodeRequest {
+impl FromStr for EditRequest {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "containerwardView" => Ok ( NodeRequest::ContainerwardView ),
-      "sourcewardView"    => Ok ( NodeRequest::SourcewardView ),
+      "toDelete" => Ok ( EditRequest::Delete ),
       _ => {
         // Try to parse as "merge <id>"
         if let Some(id_str) = s.strip_prefix("merge ") {
-          Ok ( NodeRequest::Merge ( ID::from(id_str) ) )
+          Ok ( EditRequest::Merge ( ID::from(id_str) ) )
         } else {
-          Err ( format! ( "Unknown NodeRequest value: {}", s ))
+          Err ( format! ( "Unknown EditRequest value: {}", s ))
         }} }} }
+
+impl fmt::Display for ViewRequest {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>
+  ) -> fmt::Result {
+    match self {
+      ViewRequest::ContainerwardView => write!(f, "containerwardView"),
+      ViewRequest::SourcewardView    => write!(f, "sourcewardView"),
+    } } }
+
+impl FromStr for ViewRequest {
+  type Err = String;
+
+  fn from_str (
+    s : &str
+  ) -> Result<Self, Self::Err> {
+    match s {
+      "containerwardView" => Ok ( ViewRequest::ContainerwardView ),
+      "sourcewardView"    => Ok ( ViewRequest::SourcewardView ),
+      _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),
+    }} }
 
 impl Default for OrgnodeRelationships {
   fn default () -> Self {
@@ -152,6 +182,7 @@ impl Default for OrgnodeViewData {
       cycle : false,
       focused : false,
       folded : false,
+      repeat : false,
       relationships : OrgnodeRelationships::default (),
     }} }
 
@@ -160,9 +191,8 @@ impl Default for OrgnodeCode {
     OrgnodeCode {
       relToParent : RelToParent::Content,
       indefinitive : false,
-      repeat : false,
-      toDelete : false,
-      nodeRequests : HashSet::new (),
+      editRequest : None,
+      viewRequests : HashSet::new (),
     }} }
 
 pub fn default_metadata () -> OrgnodeMetadata {

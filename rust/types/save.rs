@@ -1,20 +1,22 @@
-use super::{ID, SkgNode, SaveError, Buffer_Cannot_Be_Saved};
+use super::{ID, SkgNode, SaveError, BufferValidationError};
 
 
 /////////////////
 /// Types
 /////////////////
 
-pub type SaveInstruction = (SkgNode, NodeSaveAction);
+pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
 
 /// Tells Rust what to do with a node.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NodeSaveAction {
-  // PITFALL: It's nonsense if both of these are true.
-  // The server will in that case delete,
-  // so the indefinitive has no effect.
-  pub indefinitive: bool, // An exception from normal treatment. Uusually, an org-node's content is taken to be equal to the corresponding node's conent. But if this field is true, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content.
-  pub toDelete: bool,
+/// PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NonMerge_NodeAction will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.
+#[allow(non_camel_case_types)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NonMerge_NodeAction {
+  /// The default case: the org-node's title, body and content define those of the node -- with the exception that after that definition, indeefinitive nodes can append novel content to the content. (TODO : That exception might be a misefeature.)
+  SaveDefinitive,
+  /// An exception from normal treatment. Usually, an org-node's content is taken to be equal to the corresponding node's content. But with SaveIndefinitive, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content. Moreover, it is not used to define that node's content, but anything it contains that is not already in the node's contents will be appended to those contents.
+  SaveIndefinitive,
+  Delete,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
@@ -43,15 +45,9 @@ impl std::fmt::Display for SaveError {
         write!(f, "Database error: {}", err),
       SaveError::IoError(err) =>
         write!(f, "IO error: {}", err),
-      SaveError::InconsistentInstructions {
-        inconsistent_deletions, multiple_definers } => {
-        write!(
-          f,
-          "Inconsistent deletions: {:?} or multiple definers: {:?}",
-          inconsistent_deletions,
-          multiple_definers) },
       SaveError::BufferValidationErrors(errors) => {
-        write!(f, "Buffer validation errors: {} error(s) found", errors.len()) }} }}
+        write!(f, "Buffer validation errors: {} error(s) found",
+               errors.len()) }} }}
 
 impl std::error::Error for SaveError {
   fn source (
@@ -68,35 +64,14 @@ pub fn format_save_error_as_org (
 ) -> String {
   match error {
     SaveError::ParseError(msg) => {
-      format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}", msg)
-    },
+      format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
+              msg) },
     SaveError::DatabaseError(err) => {
       format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
     SaveError::IoError(err) => {
       format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
-    SaveError::InconsistentInstructions {
-      inconsistent_deletions, multiple_definers }
-    => {
-      let mut content : String =
-        String::from("* NOTHING WAS SAVED\n\nInconsistencies found when interpreting buffer text as save instructions.\n\n");
-      if !inconsistent_deletions.is_empty() {
-        content.push_str("** Inconsistent Deletion Instructions\n");
-        content.push_str("The following IDs have conflicting toDelete instructions:\n");
-        for id in inconsistent_deletions {
-          content.push_str(&format!("- {}\n", id.0)); }
-        content.push('\n'); }
-      if !multiple_definers.is_empty() {
-        content.push_str("** Multiple Defining Containers\n");
-        content.push_str("The following IDs are defined by multiple containers:\n");
-        for id in multiple_definers {
-          content.push_str(&format!("- {}\n", id.0)); }
-        content.push('\n'); }
-      content.push_str("** Resolution\n");
-      content.push_str(
-        "Please fix these inconsistencies and try saving again.\n");
-      content },
     SaveError::BufferValidationErrors(errors) => {
       let mut content : String =
         String::from("* NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n");
@@ -109,37 +84,37 @@ pub fn format_save_error_as_org (
       content }} }
 
 fn format_buffer_validation_error (
-  error : &Buffer_Cannot_Be_Saved
+  error : &BufferValidationError
 ) -> String {
   match error {
-    Buffer_Cannot_Be_Saved::Body_of_AliasCol(node) => {
-      format!("AliasCol node has a body (not allowed):\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Child_of_AliasCol_with_ID(node) => {
-      format!("Child of AliasCol has an ID (not allowed):\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Body_of_Alias(node) => {
-      format!("Alias node has a body (not allowed):\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Child_of_Alias(node) => {
-      format!("Alias node has children (not allowed):\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Alias_with_no_AliasCol_Parent(node) => {
-      format!("Alias node must have an AliasCol parent:\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Multiple_AliasCols_in_Children(node) => {
-      format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n", node.title)
-    },
-    Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id) => {
-      format!("ID has multiple defining containers:\n- ID: {}\n", id.0)
-    },
-    Buffer_Cannot_Be_Saved::AmbiguousDeletion(id) => {
-      format!("ID has ambiguous deletion instructions:\n- ID: {}\n", id.0)
-    },
-    Buffer_Cannot_Be_Saved::DuplicatedContent(id) => {
-      format!("Node has multiple Content children with the same ID:\n- ID: {}\n", id.0)
-    },
-    Buffer_Cannot_Be_Saved::Other(msg) => {
+    BufferValidationError::Body_of_AliasCol(node) => {
+      format!("AliasCol node has a body (not allowed):\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Child_of_AliasCol_with_ID(node) => {
+      format!("Child of AliasCol has an ID (not allowed):\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Body_of_Alias(node) => {
+      format!("Alias node has a body (not allowed):\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Child_of_Alias(node) => {
+      format!("Alias node has children (not allowed):\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Alias_with_no_AliasCol_Parent(node) => {
+      format!("Alias node must have an AliasCol parent:\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Multiple_AliasCols_in_Children(node) => {
+      format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n",
+              node.title) },
+    BufferValidationError::Multiple_DefiningContainers(id) => {
+      format!("ID has multiple defining containers:\n- ID: {}\n",
+              id.0) },
+    BufferValidationError::AmbiguousDeletion(id) => {
+      format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
+              id.0) },
+    BufferValidationError::DuplicatedContent(id) => {
+      format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
+              id.0) },
+    BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 
 impl MergeInstructionTriple {

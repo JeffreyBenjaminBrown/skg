@@ -5,10 +5,13 @@ or the example at data/skgconfig.toml.
 */
 
 use skg::file_io::load_config;
+use skg::serve::serve;
 use skg::types::{ SkgConfig };
+
+use std::error::Error;
 use std::env;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args().collect();
 
   let config_path: String =
@@ -18,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       "data/skgconfig.toml".to_string() };
   let config: SkgConfig = load_config (&config_path) ?;
 
-  skg::serve::serve (config)
+  serve (config)
     . map_err ( |e| Box::new(e)
-                 as Box<dyn std::error::Error>) ?;
+                 as Box<dyn Error>) ?;
   Ok (( )) }

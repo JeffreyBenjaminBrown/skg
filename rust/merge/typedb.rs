@@ -1,7 +1,7 @@
 use crate::types::{MergeInstructionTriple, SkgNode, ID};
-use crate::typedb::nodes::create_node;
-use crate::typedb::relationships::create_relationships_from_node;
-use crate::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::media::typedb::nodes::create_node;
+use crate::media::typedb::relationships::create_relationships_from_node;
+use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
@@ -49,10 +49,10 @@ async fn merge_one_node_in_typedb(
       "contains", "contained", "container" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, preserver_id,
-      "hyperlinks_to", "source", "dest" ). await ?;
+      "textlinks_to", "source", "dest" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
-      "hyperlinks_to", "dest", "source" ). await ?;
+      "textlinks_to", "dest", "source" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
       "subscribes", "subscriber", "subscribee" ). await ?;

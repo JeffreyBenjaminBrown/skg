@@ -1,12 +1,14 @@
 // cargo test --test save parentIgnores_and_indefinitive
 
-use indoc::indoc;
-use skg::file_io::{read_node_from_id, update_fs_from_saveinstructions};
+use skg::media::file_io::one_node::read_node_from_id;
 use skg::save::buffer_to_save_instructions;
+use skg::save::update::fs::update_fs_from_saveinstructions;
+use skg::save::update::typedb::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
-use skg::typedb::update::update_typedb_from_saveinstructions;
-use skg::types::{ID, SkgNode};
+use skg::types::misc::ID;
+use skg::types::skgnode::SkgNode;
 
+use indoc::indoc;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;

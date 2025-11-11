@@ -1,44 +1,186 @@
-use crate::file_io::read_node;
+use crate::media::file_io::one_node::read_node;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_pid};
-use crate::types::{ID, SkgConfig, SkgNode, OrgNode, RelToParent};
+use crate::rebuild::complete_aliascol::completeAliasCol;
+use crate::rebuild::integrate_backpath::{
+  wrapped_build_and_integrate_containerward_view,
+  wrapped_build_and_integrate_sourceward_view, };
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::skgnode::SkgNode;
+use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use crate::util::path_from_pid;
+
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
+use std::pin::Pin;
+use std::future::Future;
+use typedb_driver::TypeDBDriver;
 
-/// Completes a Content node's children by reconciling them
-/// with the 'contains' relationships found on disk.
-///
-/// ASSUMES it is called *after* saving,
-/// so the disk state is the source of truth.
-///
-/// ASSUMES the node P has been normalized
-/// so that its 'id' field is the PID (no need to call pid_from_id).
-///
-/// METHOD: Given a node N:
-/// - If N is indefinitive, do nothing and return.
-/// - Get N's ID (error if missing)
-/// - If N's ID is in 'visited', replace N with a repeated marker and return
-/// - Add N's ID to 'visited'.
-/// - Read N's SkgNode from disk
-/// - Categorize N's children into content/non-content
-/// - Change invalid content children to treatment=parentIgnores and move to the end of non-content.
-/// - Build completed-content list from disk, preserving order.
-/// - Reorder children: non-content first, then completed-content
-pub fn completeContents (
+/// Calls 'complete_node_preorder' on each tree,
+/// but threading 'visited' through the entire forest
+/// (rather than restarting with an empty 'visited' set in each tree).
+pub async fn completeOrgnodeForest (
+  forest        : &mut Vec < Tree < OrgNode > >,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  let mut visited : HashSet < ID > =
+    HashSet::new ();
+  for tree in forest . iter_mut () {
+    let root_id : ego_tree::NodeId =
+      tree . root () . id ();
+    let mut ancestor_path : Vec < ID > =
+      Vec::new ();
+    complete_node_preorder (
+      tree, root_id, config, typedb_driver,
+      &mut visited, &mut ancestor_path, errors ) . await ?; }
+  Ok (( )) }
+
+/* Check if this node creates a cycle (its ID is in ancestor_path).
+If so, mark it with cycle=true; otherwise mark it with cycle=false.
+Then push this node's ID to ancestor_path (to be popped later by caller). */
+fn detect_cycle_and_mark_if_so (
+  tree          : &mut Tree < OrgNode >,
+  node_id       : NodeId,
+  ancestor_path : &mut Vec < ID >,
+) -> Result < (), Box<dyn Error> > {
+  let node_pid_opt : Option < ID > = {
+    let node_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    node_ref . value () . metadata . id . clone () };
+  if let Some ( node_pid ) = node_pid_opt {
+    let mut node_mut : ego_tree::NodeMut < OrgNode > =
+      tree . get_mut ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    node_mut . value () . metadata . viewData.cycle =
+      ancestor_path . contains ( & node_pid );
+    ancestor_path . push ( node_pid ); }
+  Ok (( )) }
+
+/* Recursively processes a single node in preorder DFS.
+.
+- For AliasCol nodes, delegate to 'completeAliasCol'
+  (which handles the whole subtree)
+- For other nodes, these happen (in order):
+  - futz with the node itself
+    - check for repetition via 'check_for_and_modify_if_repeated'
+      (if repeated, modify body and metadata, update 'visited')
+    - call detect_cycle_and_mark_if_so (marks cycle before recursing to children)
+  - futz with its descendents
+    - call completeContents if node is definitive
+    - recurse via 'map_complete_node_preorder_over_children'
+    - integrate any view requests
+.
+NOTE: Processing view requests *after* completing children is helpful,
+because if a content child added during completion
+matches the head of the path, the path will be integrated there
+(where treatment=Content), instead of creating a duplicate child
+with treatment=ParentIgnores. */
+fn complete_node_preorder<'a> (
+  tree          : &'a mut Tree < OrgNode >,
+  node_id       : ego_tree::NodeId,
+  config        : &'a SkgConfig,
+  typedb_driver : &'a TypeDBDriver,
+  visited       : &'a mut HashSet < ID >,
+  ancestor_path : &'a mut Vec < ID >, // path from root to current node (for cycle detection)
+  errors        : &'a mut Vec < String >,
+) -> Pin<Box<dyn Future<Output =
+                        Result<(), Box<dyn Error>>> + 'a>> {
+  Box::pin(async move {
+    let (treatment, indefinitive) : (RelToParent, bool) = {
+      let node_ref : ego_tree::NodeRef < OrgNode > =
+        tree . get ( node_id )
+        . ok_or ( "Node not found in tree" ) ?;
+      let node : &OrgNode =
+        node_ref . value ();
+      ( node . metadata . code.relToParent . clone (),
+        node . metadata . code.indefinitive ) };
+    if treatment == RelToParent::AliasCol {
+      completeAliasCol ( tree, node_id, config ) ?;
+      // Don't recurse; completeAliasCol handles the whole subtree.
+    } else {
+      let is_repeat : bool;
+      { // futz with the OrgNode itself
+        is_repeat = (
+          // Tweak repeated nodes. Update 'visited'.
+          check_for_and_modify_if_repeated (
+            tree, node_id, config, visited ) ? );
+        detect_cycle_and_mark_if_so (
+          tree, node_id, ancestor_path ) ?; }
+
+      { // futz with its children
+        if (! is_repeat && // repeat should imply indefinitive, so this is redundant, but harmless.
+            ! indefinitive ) {
+          completeContents (
+            tree, node_id, config ) ?; }
+        map_complete_node_preorder_over_children (
+          // Always recurse to children, even for repeated nodes, since they may have children from view requests.
+          tree, node_id, config, typedb_driver,
+          visited, ancestor_path, errors ) . await ?; }
+
+      { // integrate view requests
+        let view_requests : Vec < ViewRequest > = {
+          let node_ref : ego_tree::NodeRef < OrgNode > =
+            tree . get ( node_id )
+            . ok_or ( "Node not found in tree" ) ?;
+          node_ref . value () . metadata . code . viewRequests
+            . iter () . cloned () . collect () };
+        for request in view_requests {
+          match request {
+            ViewRequest::ContainerwardView => {
+              wrapped_build_and_integrate_containerward_view (
+                tree, node_id, config, typedb_driver, errors )
+                . await ?; },
+            ViewRequest::SourcewardView => {
+              wrapped_build_and_integrate_sourceward_view (
+                tree, node_id, config, typedb_driver, errors )
+                . await ?; }, }} }}
+    Ok (( )) }) }
+
+fn map_complete_node_preorder_over_children<'a> (
+  tree          : &'a mut Tree < OrgNode >,
+  node_id       : ego_tree::NodeId,
+  config        : &'a SkgConfig,
+  typedb_driver : &'a TypeDBDriver,
+  visited       : &'a mut HashSet < ID >,
+  ancestor_path : &'a mut Vec < ID >,
+  errors        : &'a mut Vec < String >,
+) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
+  Box::pin(async move {
+    let child_ids : Vec < ego_tree::NodeId > = {
+      let node_ref : ego_tree::NodeRef < OrgNode > =
+        tree . get ( node_id )
+        . ok_or ( "Node not found in tree" ) ?;
+      node_ref . children ()
+        . map ( |c| c . id () )
+        . collect () };
+    for child_id in child_ids {
+      let child_has_id : bool = {
+        let child_ref : ego_tree::NodeRef < OrgNode > =
+          tree . get ( child_id )
+          . ok_or ( "Child not found in tree" ) ?;
+        child_ref . value () . metadata . id . is_some () };
+      complete_node_preorder (
+        tree, child_id, config, typedb_driver,
+        visited, ancestor_path, errors ) . await ?;
+      if child_has_id {
+        ancestor_path . pop (); }}
+    Ok (( )) }) }
+
+/// If this orgnode is a repeat, then modify its body and metadata
+///   (but change no descendents).
+/// If it is not a repeat, update 'visited' to include it.
+/// Returns true if node was marked as repeated, false otherwise.
+pub fn check_for_and_modify_if_repeated (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
   visited   : &mut HashSet < ID >,
-) -> Result < (), Box<dyn Error> > {
-  { // Indefinitive nodes are left unchanged.
-    let node_ref : ego_tree::NodeRef < OrgNode > =
-      tree . get ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    if node_ref . value () . metadata . code.indefinitive {
-      return Ok (( )); }}
+) -> Result < bool, Box<dyn Error> > {
   let node_pid : ID = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
@@ -46,17 +188,50 @@ pub fn completeContents (
     node_ref . value () . metadata . id . clone ()
       . ok_or ( "Node has no ID" ) ? };
   if visited . contains ( & node_pid ) {
-    // If already visited, replace with repeated node and return.
+    // Replace the orgnnode with a repeated marker.
+    // Its children are neither removed nor completed,
+    // although their children might be completed.
     let repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
         config, & node_pid ) ?;
-    let has_focused : bool =
-      subtree_contains_focused ( tree, node_id );
-    replace_subtree_with_node (
-      tree, node_id, repeated_node, has_focused ) ?;
-    return Ok (( )); }
-  visited . insert ( // Add to visited
-    node_pid . clone () );
+    let mut node_mut : NodeMut < OrgNode > =
+      tree . get_mut ( node_id )
+      . ok_or ( "Node not found" ) ?;
+    * node_mut . value () = repeated_node;
+    return Ok ( true ); }
+  visited . insert ( node_pid );
+  Ok ( false ) }
+
+/// Completes a Content node's children by reconciling them
+/// with the 'contains' relationships found on disk.
+///
+/// ASSUMES: check_for_and_modify_if_repeated has already been called
+/// ASSUMES: Called only for definitive (non-indefinitive) nodes
+/// ASSUMES: Node has been normalized so its 'id' field is the PID
+///
+/// METHOD: Given a node N:
+/// - Read N's SkgNode from disk
+/// - Categorize N's children into content/non-content
+/// - Mark invalid content children as parentIgnores and move to non-content
+/// - Build completed-content list from disk, preserving order
+/// - Add missing content children from disk (via extend_content)
+/// - Reorder children: non-content first, then completed-content
+pub fn completeContents (
+  tree      : &mut Tree < OrgNode >,
+  node_id   : NodeId,
+  config    : &SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+  // ASSUMES: check_for_and_modify_if_repeated has already been called
+  // Get node_pid and check if indefinitive
+  let (node_pid, is_indefinitive) : (ID, bool) = {
+    let node_ref : ego_tree::NodeRef < OrgNode > =
+      tree . get ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    ( node_ref . value () . metadata . id . clone ()
+        . ok_or ( "Node has no ID" ) ?,
+      node_ref . value () . metadata . code.indefinitive ) };
+  // Indefinitive nodes are not completed (though their children might be).
+  if is_indefinitive { return Ok (( )); }
   let skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, node_pid . clone () );
@@ -89,7 +264,7 @@ pub fn completeContents (
     content_id_to_node_id . insert (
       child_pid . clone (), *child_id ); }
 
-  // Mark invalid content as ParentIgnores
+  // Mark invalidated content as ParentIgnores
   // and move to non-content list
   let mut invalid_content_ids : Vec < NodeId > =
     Vec::new ();
@@ -147,13 +322,15 @@ fn categorize_children_by_treatment (
   for child in node_ref . children () {
     let child_node : &OrgNode =
       child . value ();
-    if child_node . metadata . code.relToParent == RelToParent::Content {
-      content_child_ids . push ( child . id () );
+    if child_node . metadata . code.relToParent
+      == RelToParent::Content
+    { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}
   Ok (( content_child_ids, non_content_child_ids )) }
 
-/// Create a new Content node from disk and append it to a parent.
+/// Create a new Content node from disk (using 'disk_id')
+/// and append it to the children of 'parent_id'.
 fn extend_content (
   tree      : &mut Tree < OrgNode >,
   parent_id : NodeId,
@@ -169,53 +346,6 @@ fn extend_content (
   let new_child : NodeMut < OrgNode > =
     parent_mut . append ( new_orgnode );
   Ok ( new_child . id ( )) }
-
-/// Check if a subtree contains any focused node.
-fn subtree_contains_focused (
-  tree    : &Tree < OrgNode >,
-  node_id : NodeId,
-) -> bool {
-  let node_ref : ego_tree::NodeRef < OrgNode > =
-    match tree . get ( node_id ) {
-      Some ( n ) => n,
-      None => return false, };
-  if node_ref . value () . metadata . viewData.focused {
-    return true; }
-  for child in node_ref . children () {
-    if subtree_contains_focused ( tree, child . id () ) {
-      return true; }}
-  false }
-
-/// Replace a subtree with a single node,
-/// optionally transferring focus.
-fn replace_subtree_with_node (
-  tree           : &mut Tree < OrgNode >,
-  old_node_id    : NodeId,
-  mut new_node   : OrgNode,
-  transfer_focus : bool,
-) -> Result < (), Box<dyn Error> > {
-  if transfer_focus {
-    new_node . metadata . viewData.focused = true; }
-  // Collect child IDs before mutating
-  let child_ids : Vec < NodeId > = {
-    let node_ref : ego_tree::NodeRef < OrgNode > =
-      tree . get ( old_node_id )
-      . ok_or ( "Old node not found" ) ?;
-    node_ref . children ()
-      . map ( |c| c . id () )
-      . collect () };
-  // Remove all children
-  for child_id in child_ids {
-    let mut child_mut : NodeMut < OrgNode > =
-      tree . get_mut ( child_id )
-      . ok_or ( "Child not found" ) ?;
-    child_mut . detach (); }
-  // Replace the node's value
-  let mut old_node_mut : NodeMut < OrgNode > =
-    tree . get_mut ( old_node_id )
-    . ok_or ( "Old node not found" ) ?;
-  * old_node_mut . value () = new_node;
-  Ok (( )) }
 
 /// Reorder a node's children by detaching all
 /// and re-appending in desired order.

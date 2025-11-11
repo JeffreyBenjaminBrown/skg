@@ -1,30 +1,9 @@
-use crate::types::{ID};
+use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::misc::ID;
 
-use sexp::{Atom, Sexp};
+use sexp::Sexp;
 use std::io::Write;
 use std::net::TcpStream; // handles two-way communication
-
-/// Extract a string value from an S-expression key-value pair.
-/// Expected format: (.. (key . "value") ..)
-pub fn extract_v_from_kv_pair_in_sexp (
-  sexp : &Sexp,
-  key  : &str,
-) -> Result<String, String> {
-  match sexp {
-    Sexp::List ( items ) => {
-      for item in items {
-        if let Sexp::List ( pair ) = item {
-          if pair.len() == 3 {
-            if let ( Sexp::Atom ( Atom::S ( k ) ),
-                     Sexp::Atom ( Atom::S ( dot ) ),
-                     Sexp::Atom ( Atom::S ( value ) ) ) =
-              ( &pair[0], &pair[1], &pair[2] )
-            { if k == key && dot == "." {
-              return Ok ( value.clone() ); }} }} }
-      Err ( format! (
-        "No {} field found in S-expression", key ) ) },
-    _ => Err ( "Expected list as top-level S-expression"
-                . to_string() ) }}
 
 pub fn send_response (
   stream   : &mut TcpStream,

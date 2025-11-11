@@ -2,7 +2,7 @@
 // Testing the logic for collecting and reducing duplicate instructions
 
 use skg::save::orgnodes_to_instructions::reconcile_dup_instructions::collect_dup_instructions;
-use skg::types::{ID, SkgNode, NodeSaveAction};
+use skg::types::{ID, SkgNode, NonMerge_NodeAction};
 
 // Helper function to create a basic SkgNode for testing
 fn create_test_node(
@@ -24,13 +24,16 @@ fn create_test_node(
     }
 }
 
-// Helper function to create a NodeSaveAction
-fn create_save_action(might_contain_more: bool, to_delete: bool) -> NodeSaveAction {
-    NodeSaveAction {
-        indefinitive: might_contain_more,
-        toDelete: to_delete,
-    }
-}
+// Helper function to create a NonMerge_NodeAction
+fn create_save_action( might_contain_more: bool,
+                       to_delete: bool
+) -> NonMerge_NodeAction {
+  if to_delete {
+    NonMerge_NodeAction::Delete
+  } else if might_contain_more {
+    NonMerge_NodeAction::SaveIndefinitive
+  } else {
+    NonMerge_NodeAction::SaveDefinitive }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {
@@ -88,14 +91,15 @@ fn test_collect_dup_instructions_empty_input() {
 
 #[test]
 fn test_reconcile_dup_instructions_for_one_id_error_empty() {
-    // Test that we get the expected error for empty instructions
-    // This doesn't require async since we return early
-    let instructions: Vec<(SkgNode, NodeSaveAction)> = vec![];
+  // Test that we get the expected error for empty instructions
+  // This doesn't require async since we return early
+  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+    vec![];
 
-    // The function should return an error for empty instructions
-    // We can't directly test the async function here without TypeDB setup,
-    // but we can verify the logic structure
-    assert!(instructions.is_empty());
+  // The function should return an error for empty instructions
+  // We can't directly test the async function here without TypeDB setup,
+  // but we can verify the logic structure
+  assert!(instructions.is_empty());
 }
 
 #[test]
@@ -106,13 +110,11 @@ fn test_consistent_to_delete_values() {
         (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(true, true)),
     ];
 
-    // All have toDelete=true, so should be consistent
-    let to_delete_values: std::collections::HashSet<bool> =
+    // All have Delete action, so should be consistent
+    let has_delete: bool =
         instructions_consistent.iter()
-        .map(|(_, action)| action.toDelete)
-        .collect();
-    assert_eq!(to_delete_values.len(), 1, "All toDelete values should be the same");
-    assert!(to_delete_values.contains(&true));
+        .all(|(_, action)| matches!(action, NonMerge_NodeAction::Delete));
+    assert!(has_delete, "All actions should be Delete");
 }
 
 #[test]
@@ -123,12 +125,14 @@ fn test_inconsistent_to_delete_values() {
         (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(true, false)),
     ];
 
-    // Mixed toDelete values should be detected
-    let to_delete_values: std::collections::HashSet<bool> =
+    // Mixed delete/non-delete values should be detected
+    let has_delete: bool =
         instructions_inconsistent.iter()
-        .map(|(_, action)| action.toDelete)
-        .collect();
-    assert_eq!(to_delete_values.len(), 2, "Should detect inconsistent toDelete values");
+        .any(|(_, action)| matches!(action, NonMerge_NodeAction::Delete));
+    let has_non_delete: bool =
+        instructions_inconsistent.iter()
+        .any(|(_, action)| !matches!(action, NonMerge_NodeAction::Delete));
+    assert!(has_delete && has_non_delete, "Should detect inconsistent delete status");
 }
 
 #[test]
@@ -237,7 +241,7 @@ fn test_last_instruction_defines_title_and_body() {
     let mut maybe_body: Option<String> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.indefinitive {
+        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
             maybe_title = Some(skg_node.title.clone());
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
@@ -274,12 +278,12 @@ fn test_defining_instruction_takes_precedence() {
     let mut defines_content: Option<Vec<ID>> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.indefinitive {
+        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
             maybe_title = Some(skg_node.title.clone());
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
             }
-        } else {
+        } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
             // Defining instruction
             if defines_content.is_some() {
                 panic!("Multiple defining instructions");
@@ -313,25 +317,28 @@ fn test_initial_content_from_disk_when_no_defining() {
     let mut append_to_content: Vec<ID> = Vec::new();
 
     for (skg_node, save_action) in &instructions {
-      if save_action.indefinitive {
+      if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
         if let Some(contents) = &skg_node.contains {
           append_to_content.extend(contents.iter().cloned()); }
-      } else {
+      } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
         defines_content = skg_node.contains.clone(); }}
 
     // No defining instruction, so defines_content should be None
     assert!(defines_content.is_none());
 
     // Simulate reading from disk
-    let disk_contents = vec![ID::from("disk1"), ID::from("disk2")];
-    let initial_contents = defines_content.unwrap_or(disk_contents);
+    let disk_contents: Vec<ID> =
+      vec![ID::from("disk1"), ID::from("disk2")];
+    let initial_contents: Vec<ID> =
+      defines_content.unwrap_or(disk_contents);
 
     // Simulate deduplication
     let initial_set: std::collections::HashSet<ID> =
         initial_contents.iter().cloned().collect();
     append_to_content.retain(|id| !initial_set.contains(id));
 
-    let mut final_contents = initial_contents;
+    let mut final_contents: Vec<ID> =
+      initial_contents;
     final_contents.extend(append_to_content);
 
     assert_eq!(final_contents, vec![
@@ -355,11 +362,11 @@ fn test_body_from_disk_when_no_instruction_has_body() {
     let mut defines_body: Option<String> = None;
 
     for (skg_node, save_action) in &instructions {
-        if save_action.indefinitive {
+        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
             if skg_node.body.is_some() {
                 maybe_body = skg_node.body.clone();
             }
-        } else {
+        } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
             defines_body = skg_node.body.clone();
         }
     }
@@ -369,8 +376,10 @@ fn test_body_from_disk_when_no_instruction_has_body() {
     assert!(maybe_body.is_none());
 
     // Simulate reading from disk
-    let disk_body = Some("Body from disk".to_string());
-    let final_body = defines_body.or(maybe_body).or(disk_body);
+    let disk_body: Option<String> =
+      Some("Body from disk".to_string());
+    let final_body: Option<String> =
+      defines_body.or(maybe_body).or(disk_body);
 
     assert_eq!(final_body, Some("Body from disk".to_string()));
 }
@@ -378,11 +387,13 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 #[test]
 fn test_might_contain_more_vs_definitive() {
     // Test the distinction between indefinitive (appendable) and definitive instructions
-    let appendable_action = create_save_action(true, false);
-    let definitive_action = create_save_action(false, false);
+    let appendable_action: NonMerge_NodeAction =
+      create_save_action(true, false);
+    let definitive_action: NonMerge_NodeAction =
+      create_save_action(false, false);
 
-    assert!(appendable_action.indefinitive);
-    assert!(!definitive_action.indefinitive);
+    assert!(matches!(appendable_action, NonMerge_NodeAction::SaveIndefinitive));
+    assert!(matches!(definitive_action, NonMerge_NodeAction::SaveDefinitive));
 
     // In the actual function, indefinitive=true means:
     // - append to content

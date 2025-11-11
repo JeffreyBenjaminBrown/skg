@@ -15,10 +15,10 @@ define
   # these are not stored to disk,
   # but rather inferred by rust from a node's text content
   # and from there loaded into typedb.
-  # hyperlinks are org-roam style plain text,
+  # textlinks are org-roam style plain text,
   # which look like
   #  [[id:id] [label:string]]
-  relation hyperlinks_to,
+  relation textlinks_to,
     relates source,
     relates dest;
 
@@ -42,8 +42,8 @@ define
     owns id @key,
     plays contains:container,
     plays contains:contained,
-    plays hyperlinks_to:source,
-    plays hyperlinks_to:dest,
+    plays textlinks_to:source,
+    plays textlinks_to:dest,
     plays subscribes:subscriber,
     plays subscribes:subscribee,
     plays hides_from_its_subscriptions:hider,

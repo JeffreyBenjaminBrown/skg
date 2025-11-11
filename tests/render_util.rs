@@ -49,13 +49,13 @@ fn test_render_org_node_from_text_with_id_metadata () {
     OrgNode {
       metadata : { let mut md = default_metadata ();
                    md.id = Some ( ID::from ( "test123" ));
-                   md.code.repeat = true;
+                   md.viewData.repeat = true;
                    md },
       title : "Test Title".to_string (),
       body : None, };
   let result : String =
     render_org_node_from_text ( 3, &node );
-  assert_eq! ( result, "*** (skg (id test123) (code repeated)) Test Title\n" ); }
+  assert_eq! ( result, "*** (skg (id test123) (view repeated)) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {
@@ -68,20 +68,20 @@ fn test_metadata_ordering () {
             cycle : true,
             focused : false,
             folded : false,
+            repeat : true,
             relationships : OrgnodeRelationships {
               parentIsContainer : false,
               .. OrgnodeRelationships::default () }, },
           code : OrgnodeCode {
             relToParent : RelToParent::Content,
             indefinitive : false,
-            repeat       : true,
-            toDelete     : false,
-            nodeRequests : HashSet::new (), }, },
+            editRequest  : None,
+            viewRequests : HashSet::new (), }, },
       title : "Test".to_string (),
       body : None, };
   let result : String =
     render_org_node_from_text ( 1, &node );
-  assert_eq! ( result, "* (skg (id xyz) (view cycle (rels notInParent)) (code repeated)) Test\n" ); }
+  assert_eq! ( result, "* (skg (id xyz) (view cycle repeated (rels notInParent))) Test\n" ); }
 
 #[test]
 #[should_panic ( expected = "render_org_node_from_text called with both empty metadata and empty title" )]

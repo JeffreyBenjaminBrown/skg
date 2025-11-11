@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, ID};
+use crate::types::{OrgNode, ID, EditRequest};
 
 use ego_tree::{Tree,NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -81,7 +81,8 @@ fn traverse_node_recursively_and_collect(
   if let Some(id) = &node.metadata.id {
     // Handle delete instructions
     let delete_instruction =
-      if node.metadata.code.toDelete {
+      if matches!(node.metadata.code.editRequest,
+                  Some(EditRequest::Delete)) {
         WhetherToDelete::Delete
       } else { WhetherToDelete::DoNotDelete };
     id_toDelete_instructions // record delete_instruction
@@ -90,7 +91,7 @@ fn traverse_node_recursively_and_collect(
       . insert(delete_instruction);
 
     // Handle defining containers
-    if !node.metadata.code.repeat && !node.metadata.code.indefinitive {
+    if !node.metadata.viewData.repeat && !node.metadata.code.indefinitive {
       // Increment the count for this defining container
       *id_defining_count.entry(id.clone()).or_insert(0) += 1; }}
   for child in node_ref.children() { // recurse

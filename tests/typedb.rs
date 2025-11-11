@@ -15,10 +15,10 @@ use skg::save::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
-use skg::typedb::nodes::create_only_nodes_with_no_ids_present;
-use skg::typedb::relationships::delete_out_links;
-use skg::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::typedb::util::pid_from_id;
+use skg::media::typedb::nodes::create_only_nodes_with_no_ids_present;
+use skg::media::typedb::relationships::delete_out_links;
+use skg::media::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::media::typedb::util::pid_from_id;
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
@@ -122,23 +122,23 @@ async fn test_all_relationships (
   expected_contains.insert(("c".to_string(), "b".to_string()));
   assert_eq!(contains_pairs, expected_contains);
 
-  let hyperlink_pairs = collect_all_of_some_binary_rel(
+  let textlink_pairs = collect_all_of_some_binary_rel(
     & config . db_name,
     & driver,
     r#" match
           $source isa node, has id $source_id;
           $dest   isa node, has id $dest_id;
-          $rel    isa hyperlinks_to (source: $source,
+          $rel    isa textlinks_to (source: $source,
                                      dest:   $dest);
         select $source_id, $dest_id;"#,
     "source_id",
     "dest_id"
   ).await?;
-  let mut expected_hyperlinks = HashSet::new();
-  expected_hyperlinks.insert(("5".to_string(), "2".to_string()));
-  expected_hyperlinks.insert(("5".to_string(), "3".to_string()));
-  expected_hyperlinks.insert(("5".to_string(), "5".to_string()));
-  assert_eq!(hyperlink_pairs, expected_hyperlinks);
+  let mut expected_textlinks = HashSet::new();
+  expected_textlinks.insert(("5".to_string(), "2".to_string()));
+  expected_textlinks.insert(("5".to_string(), "3".to_string()));
+  expected_textlinks.insert(("5".to_string(), "5".to_string()));
+  assert_eq!(textlink_pairs, expected_textlinks);
 
   let subscribes_pairs = collect_all_of_some_binary_rel(
     & config . db_name,
@@ -385,7 +385,7 @@ async fn test_recursive_document (
     "First child should have title 'b'" );
   assert_eq! ( b_node.body, Some ( "b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_node.metadata.code.repeat,
+  assert! ( ! b_node.metadata.viewData.repeat,
     "First occurrence of 'b' should not be marked as repeated" );
 
   // "b" should have 1 child: "c"
@@ -409,7 +409,7 @@ async fn test_recursive_document (
     "Child of 'c' should have id 'b'" );
   assert_eq! ( b_repeat.title, "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat.metadata.code.repeat,
+  assert! ( b_repeat.metadata.viewData.repeat,
     "Second occurrence of 'b' should be marked as repeated" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)

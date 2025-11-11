@@ -1,5 +1,5 @@
-use crate::file_io::read_node;
-use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NodeSaveAction, ID, NodeRequest};
+use crate::media::file_io::read_node;
+use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
 use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
@@ -26,7 +26,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
       if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let node: &OrgNode = node_ref.value();
         let node_triples : Vec<MergeInstructionTriple> =
-          saveinstructions_from_the_merge_in_a_node(
+          saveinstructions_from_the_merge_in_an_orgnode(
             node, config)?;
         triples.extend(node_triples); }} }
   Ok(triples) }
@@ -38,15 +38,15 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// nothing can merge with more than one other node per save.
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
-fn saveinstructions_from_the_merge_in_a_node(
+fn saveinstructions_from_the_merge_in_an_orgnode(
   node: &OrgNode,
   config: &SkgConfig,
 ) -> Result<Vec<MergeInstructionTriple>,
             Box<dyn Error>> {
   let mut merge_instructions: Vec<MergeInstructionTriple> =
     Vec::new();
-  for request in &node.metadata.code.nodeRequests {
-    if let NodeRequest::Merge(acquiree_id) = request {
+  if let Some(EditRequest::Merge(acquiree_id))
+    = &node.metadata.code.editRequest {
       let acquirer_id : &ID =
         node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
@@ -66,16 +66,14 @@ fn saveinstructions_from_the_merge_in_a_node(
           MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: false } ),
+              NonMerge_NodeAction::SaveDefinitive ),
             updated_acquirer : (
               updated_acquirer,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: false } ),
+              NonMerge_NodeAction::SaveDefinitive ),
             acquiree_to_delete : (
               acquiree_from_disk,
-              NodeSaveAction { indefinitive: false,
-                               toDelete: true } ), } ); }} }
+              NonMerge_NodeAction::Delete ),
+          } ); }}
   Ok(merge_instructions) }
 
 /// Computes the updated acquirer node with all fields properly merged.

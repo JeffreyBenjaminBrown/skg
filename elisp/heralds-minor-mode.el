@@ -10,10 +10,11 @@
 (require 'skg-sexpr)
 
 (defconst heralds--transform-rules
-  '(skg (id (ANY "ID"))
+  '(skg (id (BLUE ANY "ID"))
         (BLUE view (cycle (ANY "⟳"))
               (folded) ;; ignored
               (focused) ;; ignored
+              (RED repeated "REP")
               (rels
                 (RED notInParent "!{")
                 (containsParent "}")
@@ -27,7 +28,8 @@
                 (RED parentIgnores "!{"))
               (indefinitive "indef")
               (RED toDelete "delete")
-              (nodeRequests
+              (RED merge (ANY "merge:" IT))
+              (viewRequests
                 (containerwardView "req:containers")
                 (sourcewardView "req:sources"))))
   "Rules to convert metadata sexps into herald tokens.")
@@ -179,10 +181,12 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
   (text)
   "Some post-processing rules to for heralds:
 - Remove ID if other tokens are present
+- Remove indef if REP is present
 - Remove duplicate '!{' symbol if it appears twice"
   (when text
-    (let*
+    (let* ;; TODO: More efficient: Process both ID and REP in one pass.
         ((parts (split-string text " " t))
+          ;; Remove ID if other tokens are present
           (processed-parts
             (if (and (> (length parts) 1)
                      (cl-some (lambda (part)
@@ -195,7 +199,19 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
                                (substring-no-properties part) "ID"))
                             parts)
               parts))
-          (joined (mapconcat #'identity processed-parts " "))
+          ;; Remove indef if REP is present
+          (processed-parts-2
+            (if (cl-some (lambda (part)
+                           (string=
+                            (substring-no-properties part)
+                            "REP"))
+                         processed-parts)
+                (cl-remove-if (lambda (part)
+                                (string=
+                                 (substring-no-properties part) "indef"))
+                              processed-parts)
+              processed-parts))
+          (joined (mapconcat #'identity processed-parts-2 " "))
           (first-brace-pos (string-match "!{" joined))
           (second-brace-pos
             (when first-brace-pos
@@ -245,6 +261,7 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
 ;;
 ;; ID only: (skg (id 123)) should show "ID".
 ;; View with cycle: (skg (id 456) (view (cycle) (relationships (numContents 3)))) should show "⟳ {3".
+;; View with repeated: (skg (id 111) (view repeated)) should show red "REP".
 ;; Code markers: (skg (id 789) (code (relToParent aliasCol))) should show "aliases".
 ;; Delete marker: (skg (id abc) (code (toDelete))) should show red "delete".
 ;; Not in parent: (skg (id def) (view (relationships (notInParent)))) should show red "!{".

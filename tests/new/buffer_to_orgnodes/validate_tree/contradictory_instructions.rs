@@ -2,7 +2,7 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::{OrgNode, ID, Buffer_Cannot_Be_Saved};
+use skg::types::{OrgNode, ID, BufferValidationError};
 use skg::save::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
@@ -74,7 +74,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 Regular node with shared ID
                 * (skg (id duplicate)) Second defining container
                 Another regular node with the same ID
-                * (skg (id duplicate) (code repeated)) Repeated node (not defining)
+                * (skg (id duplicate) (view repeated)) Repeated node (not defining)
                 This one is ok because repeated=true
                 * (skg (id duplicate) (code indefinitive)) Might contain more (not defining)
                 This one is ok because indefinitive=true
@@ -84,22 +84,18 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
 
       let trees: Vec<Tree<OrgNode>> =
         org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
-      let errors: Vec<Buffer_Cannot_Be_Saved> =
+      let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
-      let multiple_defining_errors: Vec<&Buffer_Cannot_Be_Saved> = errors.iter()
-        .filter(|e| matches!(e, Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(_)))
+      let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
+        .filter(|e| matches!(e, BufferValidationError::Multiple_DefiningContainers(_)))
         .collect();
 
       assert_eq!(multiple_defining_errors.len(), 1,
                  "Should find exactly 1 Multiple_DefiningContainers error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let Buffer_Cannot_Be_Saved::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
+      if let BufferValidationError::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
         assert_eq!(id.0, "duplicate",
-                   "Multiple_DefiningContainers error should come from the duplicate ID");
-      }
-      Ok(())
-    })
-  )
-}
+                   "Multiple_DefiningContainers error should come from the duplicate ID"); }
+      Ok(( )) } )) }
