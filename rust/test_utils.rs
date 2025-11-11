@@ -1,7 +1,7 @@
 use crate::save::{headline_to_triple, HeadlineInfo};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
-use crate::types::misc::{SkgConfig, ID, TantivyIndex};
+use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::media::file_io::multiple_nodes::read_skg_files;
 use crate::init::{overwrite_new_empty_db, define_schema};
 use crate::media::typedb::nodes::create_all_nodes;
@@ -11,7 +11,7 @@ use crate::media::tantivy::search_index;
 use ego_tree::{Tree, NodeRef};
 use futures::executor::block_on;
 use futures::StreamExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::future::Future;
@@ -102,10 +102,19 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from ( fixtures_folder ),
+      user_owns_it : true,
+    });
   let config: SkgConfig = SkgConfig {
     db_name: db_name.to_string(),
-    skg_folder: PathBuf::from(fixtures_folder),
     tantivy_folder: PathBuf::from(tantivy_folder),
+    sources,
     port: 1730,
     delete_on_quit: false, // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs, not via delete_on_quit, because there's no server to quit.
   };

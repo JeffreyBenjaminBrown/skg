@@ -40,7 +40,9 @@ pub fn clobber_none_fields_with_data_from_disk (
   match from_disk {
     Err (_) => { // No such file => return input unchanged.
       Ok ( from_user ) },
-    Ok ( disk_node ) => {
+    Ok ( mut disk_node ) => {
+      // TODO Phase 5: Determine source from path instead of hardcoding "main"
+      disk_node.source = "main".to_string();
       let mut result : SkgNode =
         from_user;
       if result.aliases.is_none () {

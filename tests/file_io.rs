@@ -2,13 +2,14 @@
 
 #[allow(unused_imports)]
 use indoc::indoc; // A macro, which acts like an unused import.
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 use skg::media::file_io::{
   read_node, write_node, fetch_aliases_from_file};
 use skg::mk_org_text::aliases_to_org;
-use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
+use skg::types::{SkgNode, ID, SkgConfig, SkgfileSource, skgnode_example, empty_skgnode};
 
 #[test]
 fn test_node_io() {
@@ -29,8 +30,9 @@ fn test_node_io() {
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : SkgNode = read_node (
+  let mut read_node : SkgNode = read_node (
     & out_filename ). unwrap ();
+  read_node.source = "main".to_string();
   let mut reversed = reverse_some_of_node(&read_node);
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
@@ -74,6 +76,7 @@ fn verify_body_not_needed() {
 
   let mut node = read_node (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
+  node.source = "main".to_string();
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
   write_node(
@@ -116,6 +119,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
 
     title             : node.title             .clone(),
     aliases           : node.aliases           .clone(),
+    source            : node.source            .clone(),
     ids               : node.ids               .clone(),
     body              : node.body              .clone(),
     hides_from_its_subscriptions :
@@ -149,8 +153,9 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
           e.to_string()))?;
     let mut file = File::create( &file_path )?;
     file.write_all(yaml.as_bytes())?; }
-  let read_node = // Read it back from the file.
+  let mut read_node = // Read it back from the file.
     read_node(&file_path)?;
+  read_node.source = "main".to_string();
   assert_eq!( test_node, read_node,
               "Nodes should have matched." );
   Ok (( ))
@@ -158,10 +163,18 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
 
 #[test]
 fn test_fetch_aliases_from_file() -> std::io::Result<()> {
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from ("tests/file_io/fixtures"),
+      user_owns_it : true, });
   let config = SkgConfig {
     db_name        : "test_db".to_string (),
-    skg_folder     : PathBuf::from ("tests/file_io/fixtures"),
     tantivy_folder : PathBuf::from ("/tmp/tantivy"),
+    sources,
     port           : 1730,
     delete_on_quit : false,
   };

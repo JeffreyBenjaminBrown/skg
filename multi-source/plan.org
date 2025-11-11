@@ -558,11 +558,16 @@ Initially, source is immutable after creation.
 4. Add tests for multi-source loading
 5. Add test fixtures with multiple source directories
 
-** Phase 4: Metadata Serialization and Parsing
-1. Update =orgnodemd_to_string= to serialize source
-2. Update =parse_metadata_to_orgnodemd= to parse source
-3. Add tests for source in metadata s-expressions
-4. Update test utilities (=strip_id_from_metadata_struct= → also strip source)
+** Phase 4: Metadata Serialization and Parsing [COMPLETED]
+1. ✓ Updated =orgnodemd_to_string= to serialize source (lines 46-47)
+2. ✓ Updated =parse_orgnode_metadata_sexp= to parse source (lines 226-231)
+3. ✓ Added tests - updated 5 test files to include =(source main)= in org-mode data
+4. Test utilities update pending if needed
+
+Notes:
+- Source rendered as =(source nickname)= in org-mode format
+- Source parsed between =id= and =view= sections
+- Format matches existing =(id ...)= pattern
 
 ** Phase 5: Path Generation and File Writing
 1. Update =path_from_pid= signature to accept source parameter
@@ -577,12 +582,21 @@ Initially, source is immutable after creation.
 4. Add tests for source inheritance from parent to children
 
 ** Phase 7: Validation and Error Handling
-1. Add =RootWithoutSource(OrgNode)= to =BufferValidationError=
-2. Add =ModifiedForeignNode(ID, String)= to =BufferValidationError=
-3. Implement =validate_roots_have_sources=
-4. Integrate root validation into =find_buffer_errors_for_saving=
-5. Update =impl Display for BufferValidationError=
-6. Add tests for root validation
+Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have sources.
+
+1. Add source consistency validation:
+   - Implement =validate_source_consistency= helper function
+   - After source inheritance in Phase 6, group orgnodes by ID
+   - Check that all orgnodes with same ID have identical source values
+   - Add =InconsistentSources(ID, Vec<String>)= to =BufferValidationError=
+   - Integrate into =find_buffer_errors_for_saving=
+   - Add tests for inconsistent source detection
+2. Add =RootWithoutSource(OrgNode)= to =BufferValidationError=
+3. Add =ModifiedForeignNode(ID, String)= to =BufferValidationError=
+4. Implement =validate_roots_have_sources=
+5. Integrate root validation into =find_buffer_errors_for_saving=
+6. Update =impl Display for BufferValidationError=
+7. Add tests for root validation
 
 ** Phase 8: Foreign Data Validation
 1. Create =rust/save/validate_foreign_nodes.rs= module
@@ -594,12 +608,18 @@ Initially, source is immutable after creation.
    - Indefinitive foreign nodes (filtered, no append)
    - Owned nodes (unchanged behavior)
 
-** Phase 9: Make Source Mandatory
-1. Change =SkgNode.source= from =Option<String>= to =String=
-2. Update =mk_skgnode= to require source (error if missing)
-3. Fix any compilation errors
-4. Update all test fixtures to include sources
-5. Run full test suite
+** Phase 9: Make Source Mandatory [COMPLETED]
+1. ✓ Changed =SkgNode.source= from =Option<String>= to =String=
+2. ✓ Updated =mk_skgnode= to require source (error if missing)
+3. ✓ Fixed all compilation errors
+4. ✓ Updated all test fixtures to include sources (44+ locations)
+5. ✓ All 108 tests passing
+
+Notes:
+- Added source setting after every =read_node()= call (11 locations) - currently hardcoded to "main" with TODO comments
+- =OrgnodeMetadata.source= remains =Option<String>= (correct for user input)
+- Simplified =reconciled_source()= - no longer needs Option handling
+- Added support for source field in org-mode metadata parsing and rendering
 
 ** Phase 10: TypeDB and Tantivy Integration
 1. Update =create_node= in TypeDB to include source attribute

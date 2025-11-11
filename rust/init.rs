@@ -4,7 +4,7 @@ use crate::media::file_io::multiple_nodes::read_skg_files;
 use crate::media::tantivy::update_index_with_nodes;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
-use crate::types::{SkgNode, SkgConfig, TantivyIndex};
+use crate::types::{SkgNode, SkgConfig, SkgfileSource, TantivyIndex};
 
 use futures::executor::block_on;
 use std::error::Error;
@@ -27,8 +27,13 @@ pub fn initialize_dbs (
 ) -> (Arc<TypeDBDriver>, TantivyIndex) {
 
   println!("Reading .skg files...");
+  // TODO Phase 3: Replace with read_all_skg_files_from_sources
+  // For now, temporarily read from "main" source to get Phase 1 compiling
+  let main_source : &SkgfileSource =
+    config . sources . get ( "main" )
+    . expect ( "Config must have a 'main' source" );
   let skg_folder_str: &str =
-    config . skg_folder
+    main_source . path
     . to_str () . expect ("Invalid UTF-8 in skg folder path");
   let nodes: Vec<SkgNode> =
     read_skg_files ( skg_folder_str )

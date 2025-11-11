@@ -232,10 +232,12 @@ pub fn completeContents (
       node_ref . value () . metadata . code.indefinitive ) };
   // Indefinitive nodes are not completed (though their children might be).
   if is_indefinitive { return Ok (( )); }
-  let skgnode : SkgNode = {
+  let mut skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, node_pid . clone () );
     read_node ( path ) ? };
+  // TODO Phase 5: Determine source from path instead of hardcoding "main"
+  skgnode.source = "main".to_string();
   let content_from_disk : HashSet < ID > =
     skgnode . contains . clone ()
     . unwrap_or_default ()

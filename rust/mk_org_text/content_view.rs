@@ -186,7 +186,9 @@ pub fn skgnode_and_orgnode_from_pid (
   pid    : &ID,
 ) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
   let path : String = path_from_pid ( config, pid . clone () );
-  let skgnode : SkgNode = read_node ( path ) ?;
+  // TODO Phase 5: Determine source from path instead of hardcoding "main"
+  let mut skgnode : SkgNode = read_node ( path ) ?;
+  skgnode.source = "main".to_string();
   let orgnode : OrgNode = OrgNode {
     metadata : { let mut md = default_metadata ();
                  md . id = Some ( pid . clone () );
@@ -207,7 +209,9 @@ pub fn mk_repeated_orgnode_from_id (
   id     : &ID,
 ) -> Result < OrgNode, Box<dyn Error> > {
   let path : String = path_from_pid ( config, id . clone () );
-  let skgnode : SkgNode = read_node ( path ) ?;
+  // TODO Phase 5: Determine source from path instead of hardcoding "main"
+  let mut skgnode : SkgNode = read_node ( path ) ?;
+  skgnode.source = "main".to_string();
   let mut md = default_metadata ();
   md . viewData . repeat = true;
   md . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.

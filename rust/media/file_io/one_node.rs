@@ -22,8 +22,10 @@ pub async fn read_node_from_id (
       "ID '{}' not found in database", node_id ) ) ?;
   let node_file_path : String =
     path_from_pid ( config, pid );
-  let node : SkgNode =
+  // TODO Phase 5: Determine source from file path instead of hardcoding "main"
+  let mut node : SkgNode =
     read_node (node_file_path) ?;
+  node.source = "main".to_string();
   Ok (node) }
 
 /// Reads a node from disk, returning None if not found
@@ -55,10 +57,13 @@ pub fn fetch_aliases_from_file (
 ) -> Vec<String> {
   let file_path : String =
     path_from_pid ( config, id );
+  // TODO Phase 5: Determine source from file path instead of hardcoding "main"
   match read_node
     ( &Path::new ( &file_path )) {
-      Ok ( node ) => node.aliases
-        . unwrap_or_default (), // extract from Option
+      Ok ( mut node ) => {
+        node.source = "main".to_string();
+        node.aliases.unwrap_or_default()
+      },
       Err ( _ )   => Vec::new(),
     }}
 

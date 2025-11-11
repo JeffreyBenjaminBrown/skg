@@ -1,22 +1,32 @@
 // cargo test none_node_fields_are_noops
 
+use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 
 use skg::save::orgnodes_to_instructions::none_node_fields_are_noops::
   clobber_none_fields_with_data_from_disk;
-use skg::types::{ ID, SkgConfig, SkgNode, empty_skgnode };
+use skg::types::{ ID, SkgConfig, SkgfileSource, SkgNode, empty_skgnode };
 
 #[test]
 fn test_none_aliases_get_replaced_with_disk_aliases (
 ) -> io::Result<()> {
 
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from (
+        "tests/save/none_node_fields_are_noops/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
     db_name        : "test_db".to_string (),
-    skg_folder     : PathBuf::from (
-      "tests/save/none_node_fields_are_noops/fixtures"),
     tantivy_folder : PathBuf::from (
       "/tmp/tantivy"),
+    sources,
     port           : 1730,
     delete_on_quit : false, };
 
@@ -63,12 +73,21 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
 fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
 ) -> io::Result<()> {
 
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from (
+        "tests/save/none_node_fields_are_noops/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
     db_name        : "test_db".to_string (),
-    skg_folder     : PathBuf::from (
-      "tests/save/none_node_fields_are_noops/fixtures"),
     tantivy_folder : PathBuf::from (
       "/tmp/tantivy"),
+    sources,
     port           : 1730,
     delete_on_quit : false, };
 
@@ -115,12 +134,21 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
 fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
 ) -> io::Result<()> {
 
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from (
+        "tests/save/none_node_fields_are_noops/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
     db_name        : "test_db".to_string (),
-    skg_folder     : PathBuf::from (
-      "tests/save/none_node_fields_are_noops/fixtures"),
     tantivy_folder : PathBuf::from (
       "/tmp/tantivy"),
+    sources,
     port           : 1730,
     delete_on_quit : false, };
 
@@ -166,12 +194,21 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
 fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
 ) -> io::Result<()> {
 
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from (
+        "tests/save/none_node_fields_are_noops/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
     db_name        : "test_db".to_string (),
-    skg_folder     : PathBuf::from (
-      "tests/save/none_node_fields_are_noops/fixtures"),
     tantivy_folder : PathBuf::from (
       "/tmp/tantivy"),
+    sources,
     port           : 1730,
     delete_on_quit : false, };
 

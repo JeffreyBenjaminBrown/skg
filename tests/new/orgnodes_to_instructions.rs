@@ -12,11 +12,11 @@ use ego_tree::Tree;
 fn test_orgnodes_to_reconciled_save_instructions_basic() {
   let input: &str =
     indoc! {"
-            * (skg (id root1)) root node 1
+            * (skg (id root1) (source main)) root node 1
             Root body content
-            ** (skg (id child1)) child 1
+            ** (skg (id child1) (source main)) child 1
             Child body
-            * (skg (id root2) (code indefinitive toDelete)) root node 2
+            * (skg (id root2) (source main) (code indefinitive toDelete)) root node 2
             Root 2 body
         "};
 
@@ -57,12 +57,12 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
 fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (id main)) main node
+            * (skg (id main) (source main)) main node
             Main body
-            ** (skg (id alias_col) (code (relToParent aliasCol))) aliases
-            *** (skg (id alias1) (code (relToParent alias))) first alias
-            *** (skg (id alias2) (code (relToParent alias))) second alias
-            ** (skg (id content_child)) content child
+            ** (skg (id alias_col) (source main) (code (relToParent aliasCol))) aliases
+            *** (skg (id alias1) (source main) (code (relToParent alias))) first alias
+            *** (skg (id alias2) (source main) (code (relToParent alias))) second alias
+            ** (skg (id content_child) (source main)) content child
             Content body
         "};
 
@@ -95,9 +95,9 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
 fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (id node1)) node without aliases
+            * (skg (id node1) (source main)) node without aliases
             Body content
-            ** (skg (id child1)) regular child
+            ** (skg (id child1) (source main)) regular child
             Child body
         "};
 
@@ -117,13 +117,13 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
 fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
-            * (skg (id main)) main node
-            ** (skg (id alias_col1) (code (relToParent aliasCol))) first alias collection
-            *** (skg (id alias1) (code (relToParent alias))) alias one
-            *** (skg (id alias2) (code (relToParent alias))) alias two
-            ** (skg (id alias_col2) (code (relToParent aliasCol))) second alias collection
-            *** (skg (id alias3) (code (relToParent alias))) alias three
-            ** (skg (id content1)) content node
+            * (skg (id main) (source main)) main node
+            ** (skg (id alias_col1) (source main) (code (relToParent aliasCol))) first alias collection
+            *** (skg (id alias1) (source main) (code (relToParent alias))) alias one
+            *** (skg (id alias2) (source main) (code (relToParent alias))) alias two
+            ** (skg (id alias_col2) (source main) (code (relToParent aliasCol))) second alias collection
+            *** (skg (id alias3) (source main) (code (relToParent alias))) alias three
+            ** (skg (id content1) (source main)) content node
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -142,13 +142,13 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
 fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
-            * (skg (id root)) root node
-            ** (skg (id parentIgnores) (code (relToParent parentIgnores))) parentIgnores child
-            ** (skg (id content1)) content child 1
-            ** (skg (id alias_col) (code (relToParent aliasCol))) aliases
-            *** (skg (id alias1) (code (relToParent alias))) my alias
-            ** (skg (id content2)) content child 2
-            ** (skg (id none_rel) (code (relToParent parentIgnores))) parentIgnores relation child
+            * (skg (id root) (source main)) root node
+            ** (skg (id parentIgnores) (source main) (code (relToParent parentIgnores))) parentIgnores child
+            ** (skg (id content1) (source main)) content child 1
+            ** (skg (id alias_col) (source main) (code (relToParent aliasCol))) aliases
+            *** (skg (id alias1) (source main) (code (relToParent alias))) my alias
+            ** (skg (id content2) (source main)) content child 2
+            ** (skg (id none_rel) (source main) (code (relToParent parentIgnores))) parentIgnores relation child
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -170,11 +170,11 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
 fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
-            * (skg (id level1)) level 1
-            ** (skg (id level2a)) level 2a
-            *** (skg (id level3a)) level 3a
-            **** (skg (id level4)) level 4
-            ** (skg (id level2b)) level 2b
+            * (skg (id level1) (source main)) level 1
+            ** (skg (id level2a) (source main)) level 2a
+            *** (skg (id level3a) (source main)) level 3a
+            **** (skg (id level4) (source main)) level 4
+            ** (skg (id level2b) (source main)) level 2b
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -205,7 +205,7 @@ fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
 fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
-            * (skg (id good_node)) good node
+            * (skg (id good_node) (source main)) good node
             * node without ID
         "};
 
@@ -232,10 +232,10 @@ fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
 fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
-            * (skg (id main)) main node
-            ** (skg (id alias_col) (code (relToParent aliasCol))) aliases only
-            *** (skg (id alias1) (code (relToParent alias))) alias one
-            *** (skg (id alias2) (code (relToParent alias))) alias two
+            * (skg (id main) (source main)) main node
+            ** (skg (id alias_col) (source main) (code (relToParent aliasCol))) aliases only
+            *** (skg (id alias1) (source main) (code (relToParent alias))) alias one
+            *** (skg (id alias2) (source main) (code (relToParent alias))) alias two
         "};
 
   let trees: Vec<Tree<OrgNode>> =
@@ -254,18 +254,18 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
 fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
-            * (skg (id doc1) (code indefinitive)) Document 1
+            * (skg (id doc1) (source main) (code indefinitive)) Document 1
             Document body
-            ** (skg (id aliases1) (code (relToParent aliasCol))) Doc1 Aliases
-            *** (skg (id alias_a) (code (relToParent alias))) First Document
-            *** (skg (id alias_b) (code (relToParent alias))) Primary Doc
-            ** (skg (id section1)) Section 1
+            ** (skg (id aliases1) (source main) (code (relToParent aliasCol))) Doc1 Aliases
+            *** (skg (id alias_a) (source main) (code (relToParent alias))) First Document
+            *** (skg (id alias_b) (source main) (code (relToParent alias))) Primary Doc
+            ** (skg (id section1) (source main)) Section 1
             Section 1 body
-            *** (skg (id subsection1a)) Subsection 1a
-            ** (skg (id section2) (code toDelete)) Section 2
-            ** (skg (id section3)) Section 3
-            * (skg (id doc2)) Document 2
-            ** (skg (id ref_section) (code (relToParent parentIgnores))) Reference Section
+            *** (skg (id subsection1a) (source main)) Subsection 1a
+            ** (skg (id section2) (source main) (code toDelete)) Section 2
+            ** (skg (id section3) (source main)) Section 3
+            * (skg (id doc2) (source main)) Document 2
+            ** (skg (id ref_section) (source main) (code (relToParent parentIgnores))) Reference Section
         "};
 
   let trees: Vec<Tree<OrgNode>> =

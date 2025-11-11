@@ -32,10 +32,12 @@ pub fn completeAliasCol (
     get_aliascol_parent_id (
       tree,
       aliascol_node_id ) ?;
-  let skgnode : SkgNode = {
+  let mut skgnode : SkgNode = {
     let path : String =
       path_from_pid ( config, parent_id . clone () );
     read_node ( path )? };
+  // TODO Phase 5: Determine source from path instead of hardcoding "main"
+  skgnode.source = "main".to_string();
   let aliases_from_disk : HashSet < String > = (
     // source of truth
     skgnode . aliases

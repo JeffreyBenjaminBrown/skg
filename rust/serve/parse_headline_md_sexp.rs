@@ -41,9 +41,10 @@ pub fn orgnodemd_to_string (
 ) -> String {
   let mut parts : Vec<String> =
     Vec::new ();
-
   if let Some ( ref id ) = metadata.id {
     parts.push ( format! ( "(id {})", id.0 )); }
+  if let Some ( ref source ) = metadata.source {
+    parts.push ( format! ( "(source {})", source )); }
 
   // Build view s-expr
   let mut view_parts : Vec<String> = Vec::new ();
@@ -223,6 +224,12 @@ pub fn parse_metadata_to_orgnodemd (
             let value : String =
               atom_to_string ( &items[1] ) ?;
             result.id = Some ( ID::from ( value )); },
+          "source" => {
+            if items . len () != 2 {
+              return Err ( "source requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &items[1] ) ?;
+            result.source = Some ( value ); },
           "view" => {
             parse_view_sexp ( &items[1..], &mut result . viewData ) ?; },
           "code" => {

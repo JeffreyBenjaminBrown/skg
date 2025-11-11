@@ -61,9 +61,15 @@ fn mk_skgnode (
       Some(id) => vec![id.clone()],
       None => return Err(format!(
         "Node entitled '{}' has no ID", title)), };
+  let source: String =
+    match &orgnode.metadata.source {
+      Some(s) => s.clone(),
+      None => return Err(format!(
+        "Node entitled '{}' has no source", title)), };
   Ok ( SkgNode {
     title: title,
     aliases: collect_aliases(noderef),
+    source: source,
     ids: ids,
     body: body,
     contains: Some(collect_contents(noderef)),

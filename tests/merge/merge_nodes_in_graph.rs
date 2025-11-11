@@ -62,6 +62,7 @@ async fn test_merge_2_into_1_impl(
   let org_node_1: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("1")),
+      source: None,
       viewData: Default::default(),
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,
@@ -343,6 +344,7 @@ async fn test_merge_1_into_2_impl(
   let org_node_2: OrgNode = OrgNode {
     metadata: OrgnodeMetadata {
       id: Some(ID::from("2")),
+      source: None,
       viewData: Default::default(),
       code: skg::types::OrgnodeCode {
         relToParent: skg::types::RelToParent::Content,

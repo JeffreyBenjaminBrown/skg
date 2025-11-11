@@ -4,19 +4,28 @@ use indoc::indoc;
 use skg::rebuild::integrate_path_that_might_fork_or_cycle;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::test_utils::compare_orgnode_forests;
-use skg::types::{ID, OrgNode, SkgConfig};
+use skg::types::{ID, OrgNode, SkgConfig, SkgfileSource};
 
 use ego_tree::Tree;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
 
 #[test]
 fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from("tests/rebuild/fixtures"),
+      user_owns_it : true, });
   let config = SkgConfig {
-    skg_folder: PathBuf::from("tests/rebuild/fixtures"),
     db_name: "test".to_string(),
-    tantivy_folder: PathBuf::from("/tmp/test-integrate-backpath-tantivy"),
+    tantivy_folder: PathBuf::from(
+      "/tmp/test-integrate-backpath-tantivy"),
+    sources,
     port: 1730,
     delete_on_quit: false,
   };
@@ -78,10 +87,19 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
   // Create a simple config - we don't need actual files for this test
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from("tests/rebuild/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
-    skg_folder: PathBuf::from("tests/rebuild/fixtures"),
     db_name: "test".to_string(),
     tantivy_folder: PathBuf::from("/tmp/test-integrate-backpath-tantivy"),
+    sources,
     port: 1730,
     delete_on_quit: false,
   };
@@ -161,10 +179,19 @@ fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_path_with_branches_with_cycle() -> Result<(), Box<dyn Error>> {
   // Create a simple config - we don't need actual files for this test
+  let mut sources : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  sources.insert (
+    "main".to_string (),
+    SkgfileSource {
+      nickname     : "main".to_string (),
+      path         : PathBuf::from("tests/rebuild/fixtures"),
+      user_owns_it : true,
+    });
   let config = SkgConfig {
-    skg_folder: PathBuf::from("tests/rebuild/fixtures"),
     db_name: "test".to_string(),
     tantivy_folder: PathBuf::from("/tmp/test-integrate-backpath-tantivy"),
+    sources,
     port: 1730,
     delete_on_quit: false,
   };

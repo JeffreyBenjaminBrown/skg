@@ -3,6 +3,9 @@ define
   # Most nodes only have one id, but see `extra_id` below.
   attribute id, value string;
 
+  # The nickname (from the SkgConfig) of this node's source
+  attribute source, value string;
+
   # Like the relationship
   # from a document to a section thereof, or
   # from a section to a subsection, or
@@ -40,6 +43,7 @@ define
   # "the graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
+    owns source,
     plays contains:container,
     plays contains:contained,
     plays textlinks_to:source,

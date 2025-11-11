@@ -15,6 +15,7 @@ fn create_test_node(
     SkgNode {
         title: title.to_string(),
         aliases,
+        source: "main".to_string(),
         ids: vec![ID::from(id)],
         body,
         contains: Some(contains),

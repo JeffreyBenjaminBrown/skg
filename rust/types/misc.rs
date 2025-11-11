@@ -1,4 +1,5 @@
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, Deserializer};
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -6,6 +7,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::Field;
+
+//
+// Type Definitions
+//
 
 /* Each node has a random ID. Skg does not check for collisions.
 So far the IDs are Version 4 UUIDs.
@@ -17,11 +22,27 @@ the collision probability is less than 1 in 1e6. */
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ID ( pub String );
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextLink {
+  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
+  pub id: ID,
+  pub label: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct SkgfileSource {
+  pub nickname     : String,
+  pub path         : PathBuf,
+  pub user_owns_it : bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SkgConfig {
   pub db_name        : String,
-  pub skg_folder     : PathBuf, // The user's .skg files go here.
   pub tantivy_folder : PathBuf,
+
+  #[serde ( deserialize_with = "deserialize_sources" )]
+  pub sources        : HashMap<String, SkgfileSource>,
 
   #[serde(default = "default_port")]
   pub port           : u16,  // TCP port for Rust-Emacs comms.
@@ -29,8 +50,6 @@ pub struct SkgConfig {
   #[serde(default)] // defaults to false
   pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
 }
-
-fn default_port() -> u16 { 1730 }
 
 #[derive(Clone)]
 pub struct TantivyIndex {
@@ -40,12 +59,29 @@ pub struct TantivyIndex {
   pub title_or_alias_field : Field,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextLink {
-  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
-  pub id: ID,
-  pub label: String,
+
+//
+// Helper Functions
+//
+
+fn deserialize_sources<'de, D> (
+  deserializer : D
+) -> Result <HashMap<String, SkgfileSource>, D::Error>
+where
+  D : Deserializer<'de>
+{
+  let sources_vec : Vec<SkgfileSource> =
+    Vec::deserialize ( deserializer ) ?;
+  let mut map : HashMap<String, SkgfileSource> =
+    HashMap::new ();
+  for source in sources_vec {
+    map.insert (
+      source . nickname . clone (),
+      source ); }
+  Ok ( map )
 }
+
+fn default_port() -> u16 { 1730 }
 
 
 //
@@ -120,3 +156,29 @@ impl FromStr for TextLink {
     } else {
       Err ( TextLinkParseError::MissingDivider )
     } } }
+
+impl SkgConfig {
+  pub fn get_source (
+    &self,
+    nickname : &str
+  ) -> Option<&SkgfileSource> {
+    self . sources . get ( nickname )
+  }
+
+  pub fn get_source_path (
+    &self,
+    nickname : &str
+  ) -> Option<&PathBuf> {
+    self . sources . get ( nickname )
+      . map ( |s| &s.path )
+  }
+
+  pub fn user_owns_source (
+    &self,
+    nickname : &str
+  ) -> bool {
+    self . sources . get ( nickname )
+      . map ( |s| s.user_owns_it )
+      . unwrap_or ( false )
+  }
+}

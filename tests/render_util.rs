@@ -64,6 +64,7 @@ fn test_metadata_ordering () {
       metadata :
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
+          source : None,
           viewData : OrgnodeViewData {
             cycle : true,
             focused : false,

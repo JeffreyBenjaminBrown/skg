@@ -95,6 +95,14 @@ pub async fn reconcile_dup_instructions_for_one_id(
         . into() );
     } else { // Ignore the other SkgNode fields; we only need an ID.
       return Ok(to_delete.unwrap()); }}
+
+  // Reconcile source from buffer orgnodes first (before reading from disk)
+  let reconciled_source_value : String =
+    reconciled_source (
+      &indefinitives, definer.as_ref() ) ?;
+
+  // TODO Phase 5: Use reconciled_source_value to determine which .skg file to read
+  // For now, path_from_pid uses "main" source
   let from_disk: Option<SkgNode> = {
     let primary_id: ID =
       if let Some((ref node, _)) = definer {
@@ -109,6 +117,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
       definer.as_ref(), &from_disk)?,
     aliases                      : reconciled_aliases(
       &indefinitives, definer.as_ref(), &from_disk),
+    source                       : reconciled_source_value,
     ids                          : reconciled_ids(
       &indefinitives, definer.as_ref(), &from_disk),
     body                         : reconciled_body(
@@ -197,6 +206,21 @@ fn reconciled_body(
     return node.body.clone(); }
   from_disk . as_ref() . and_then (|node|
                                    node.body.clone()) }
+
+/// Reconciles the source field.
+/// Definer's source takes precedence, then first indefinitive's source.
+/// Unlike other fields, disk source is NOT used as fallback -
+/// buffer orgnodes must specify the source.
+fn reconciled_source(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+) -> Result<String, Box<dyn Error>> {
+  if let Some((node, _)) = definer {
+    return Ok(node.source.clone()); }
+  if !indefinitives.is_empty() {
+    return Ok(indefinitives[0].0.source.clone()); }
+  Err("No source found in buffer orgnodes for reconciliation"
+      . into( )) }
 
 /// Reconciles the aliases field.
 /// Collects all aliases from definer and indefinitives.

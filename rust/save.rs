@@ -31,7 +31,6 @@ use crate::types::orgnode::OrgNode;
 use crate::types::errors::{SaveError, BufferValidationError};
 use ego_tree::Tree;
 use std::error::Error;
-use std::path::Path;
 
 use typedb_driver::TypeDBDriver;
 
@@ -108,9 +107,9 @@ pub async fn update_graph (
 
   { // filesystem
     let total_input : usize = instructions.len ();
-    let target_dir  : &Path = &config.skg_folder;
-    println!( "2) Writing {} instruction(s) to disk at {:?} ...",
-               total_input, target_dir );
+    // TODO Phase 5: Print per-source write information
+    println!( "2) Writing {} instruction(s) to disk ...",
+               total_input );
     let (deleted_count, written_count) : (usize, usize) =
       update_fs_from_saveinstructions (
         instructions.clone (), config.clone ()) ?;

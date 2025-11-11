@@ -50,12 +50,15 @@ fn saveinstructions_from_the_merge_in_an_orgnode(
       let acquirer_id : &ID =
         node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
-      let acquirer_from_disk: SkgNode =
+      // TODO Phase 5: Determine source from path instead of hardcoding "main"
+      let mut acquirer_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
         read_node ( &path_from_pid ( config, acquirer_id.clone() ))?;
-      let acquiree_from_disk: SkgNode =
+      acquirer_from_disk.source = "main".to_string();
+      let mut acquiree_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
         read_node ( &path_from_pid ( config, acquiree_id.clone() ))?;
+      acquiree_from_disk.source = "main".to_string();
       let acquiree_text_preserver: SkgNode =
         create_acquiree_text_preserver ( &acquiree_from_disk );
       let updated_acquirer: SkgNode =
@@ -154,6 +157,7 @@ fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
   SkgNode {
     title: format!("MERGED: {}", acquiree.title),
     aliases: None,
+    source: acquiree . source . clone(),
     ids: vec![ID(uuid::Uuid::new_v4().to_string())],
     body: acquiree.body.clone(),
     contains                     : Some(vec![]),

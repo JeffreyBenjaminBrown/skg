@@ -16,6 +16,9 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub aliases: Option<Vec<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
 
+  #[serde(skip_serializing, skip_deserializing)]
+  pub source: String, // source nickname, inferred from file location and SkgConfig
+
   pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
   // TODO: Use a nonempty list type (e.g. the "nonempty" crate), or else separate fields pid : String and extra_ids : Vec<String>. I'm leaning toward the latter, as the pid is special among those ids.
 
@@ -43,6 +46,7 @@ pub fn skgnode_example () -> SkgNode {
   SkgNode {
     title: "This text gets indexed.".to_string(),
     aliases: None,
+    source: "main".to_string(),
     ids: vec![ ID::new("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
@@ -60,6 +64,7 @@ pub fn empty_skgnode () -> SkgNode {
   SkgNode {
     title                        : String::new (),
     aliases                      : None,
+    source                       : "main".to_string(),
     ids                          : vec![],
     body                         : None,
     contains                     : None,

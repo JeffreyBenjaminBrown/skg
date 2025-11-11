@@ -5,6 +5,7 @@
 pub mod misc;
 pub use misc::{ ID,
                 SkgConfig,
+                SkgfileSource,
                 TantivyIndex,
                 TextLink, };
 pub mod errors;

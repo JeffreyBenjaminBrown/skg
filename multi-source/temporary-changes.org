@@ -5,7 +5,11 @@
 
 This document tracks temporary workarounds added during Phase 1 to get the code compiling after removing =skg_folder=. These changes will be properly implemented in later phases.
 
-* Temporary Changes
+* Resolved
+
+(None yet - all items below are pending resolution in Phase 3 and Phase 5)
+
+* Unresolved
 
 ** rust/init.rs (Lines 30-37)
 
@@ -115,31 +119,125 @@ println!( "2) Writing {} instruction(s) to disk ...",
 - Print write information per source
 - Show counts per source directory
 
-* Impact
+** rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs (Lines 100-105)
 
-** Current functionality
+*** What was changed
+=reconcile_dup_instructions_for_one_id= computes reconciled source but doesn't use it yet.
+
+*** Current implementation
+#+begin_src rust
+// Reconcile source from buffer orgnodes first (before reading from disk)
+let reconciled_source_value : String =
+  reconciled_source (
+    &indefinitives, definer.as_ref() ) ?;
+
+// TODO Phase 5: Use reconciled_source_value to determine which .skg file to read
+// For now, path_from_pid uses "main" source
+let from_disk: Option<SkgNode> = {
+  let primary_id: ID = ...
+  read_node_from_id_optional(
+    config, driver, &primary_id).await? };
+#+end_src
+
+*** Proper implementation (Phase 5)
+- Use =reconciled_source_value= to determine which .skg file to read
+- Update =read_node_from_id_optional= call to use the reconciled source
+- Remove underscore prefix from variable name once it's used
+
+*** Note
+The =reconciled_source()= function itself (lines 214-225) is properly implemented and not temporary. Only the variable that stores its result is unused for now.
+
+** rust/media/file_io/one_node.rs (Multiple locations)
+
+*** What was changed
+All functions that read nodes from disk now set source to "main" after deserialization.
+
+*** Current implementation
+In =read_node_from_id()= (lines 26-28):
+#+begin_src rust
+// TODO Phase 5: Determine source from file path instead of hardcoding "main"
+let mut node : SkgNode =
+  read_node (node_file_path) ?;
+node.source = "main".to_string();
+#+end_src
+
+Similar changes in =fetch_aliases_from_file()= (lines 63-64).
+
+*** Proper implementation (Phase 5)
+- Parse the file path to determine which source it belongs to
+- Look up source nickname from path by comparing against all =config.sources= paths
+- Set =node.source= to the correct source nickname
+
+** rust/media/file_io/multiple_nodes.rs (Lines 26-28)
+
+*** What was changed
+=read_all_nodes_from_fs()= sets source to "main" after reading each node.
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 5: Determine source from dir_path instead of hardcoding "main"
+let mut node = read_node (&path) ?;
+node.source = "main".to_string();
+#+end_src
+
+*** Proper implementation (Phase 5)
+- Determine source from =dir_path= parameter
+- Set correct source for each node based on which directory it came from
+
+** rust/merge/mergeInstructionTriple.rs (Lines 53-61)
+
+*** What was changed
+Both =acquirer_from_disk= and =acquiree_from_disk= have source set to "main" after reading.
+
+*** Current implementation
+#+begin_src rust
+// TODO Phase 5: Determine source from path instead of hardcoding "main"
+let mut acquirer_from_disk: SkgNode = read_node(...)?;
+acquirer_from_disk.source = "main".to_string();
+let mut acquiree_from_disk: SkgNode = read_node(...)?;
+acquiree_from_disk.source = "main".to_string();
+#+end_src
+
+*** Proper implementation (Phase 5)
+- Determine source from the path returned by =path_from_pid=
+- Set correct source for each node
+
+** Additional file reading locations
+
+Similar temporary changes in:
+- =rust/save/orgnodes_to_instructions/none_node_fields_are_noops.rs= (lines 44-45)
+- =rust/rebuild/complete_aliascol.rs= (lines 39-40)
+- =rust/rebuild/complete_contents.rs= (lines 239-240)
+- =rust/mk_org_text/content_view.rs= (2 locations: lines 190-191, 213-214)
+- =tests/file_io.rs= (3 locations)
+
+All follow the same pattern: read node, then set =node.source = "main".to_string()=.
+
+** Impact
+
+*** Current functionality
 - Code compiles and runs
 - Supports exactly one source with nickname "main"
 - All file operations use "main" source
 - No multi-source functionality yet
 
-** What doesn't work
+*** What doesn't work
 - Cannot configure multiple sources (they would be ignored)
 - Cannot load from multiple directories
 - Cannot write nodes to different sources
 - Source field exists but is not properly set or used
 
-* Testing implications
+** Testing implications
 
 All existing tests work because they use a single "main" source via the test helper in =rust/test_utils.rs= (lines 105-113).
 
-* Removal plan
+** Removal plan
 
-** Phase 3: File Loading with Sources
+*** Phase 3: File Loading with Sources
 - Remove temporary code in =rust/init.rs=
 - Implement =read_all_skg_files_from_sources=
 
-** Phase 5: Path Generation and File Writing
+*** Phase 5: Path Generation and File Writing
 - Remove temporary code in =rust/util.rs=
 - Remove temporary code in =rust/media/file_io/multiple_nodes.rs=
 - Remove temporary code in =rust/save.rs=

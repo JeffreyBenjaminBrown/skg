@@ -15,6 +15,7 @@ pub struct OrgNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
   pub id: Option<ID>,
+  pub source: Option<String>,
   pub viewData: OrgnodeViewData,
   pub code: OrgnodeCode,
 }
@@ -198,6 +199,7 @@ impl Default for OrgnodeCode {
 pub fn default_metadata () -> OrgnodeMetadata {
   OrgnodeMetadata {
     id : None,
+    source : None,
     viewData : OrgnodeViewData::default (),
     code : OrgnodeCode::default (),
   }}

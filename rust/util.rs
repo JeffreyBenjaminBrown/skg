@@ -14,7 +14,12 @@ pub fn path_from_pid (
   config : &SkgConfig,
   pid    : ID,
 ) -> String {
-  let f : PathBuf = config . skg_folder . clone() ;
+  // TODO Phase 5: Update signature to accept source parameter
+  // For now, use "main" source to get Phase 1 compiling
+  let main_source =
+    config . sources . get ( "main" )
+    . expect ( "Config must have a 'main' source" );
+  let f : PathBuf = main_source . path . clone() ;
   let s: String = pid.0;
   f . join (s)
     . with_extension ("skg")

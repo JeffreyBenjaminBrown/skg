@@ -23,7 +23,9 @@ pub fn read_skg_files
          path . extension () . map_or (
            false,                // None => no extension found
            |ext| ext == "skg") ) // Some
-    { let node = read_node (&path) ?;
+    { // TODO Phase 5: Determine source from dir_path instead of hardcoding "main"
+      let mut node = read_node (&path) ?;
+      node.source = "main".to_string();
       nodes.push (node); }}
   Ok (nodes) }
 
@@ -34,9 +36,14 @@ pub fn write_all_nodes_to_fs (
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of files written
 
+  // TODO Phase 5: Write to appropriate source based on node.source
+  // For now, use "main" source to get Phase 1 compiling
+  let main_source =
+    config . sources . get ( "main" )
+    . expect ( "Config must have a 'main' source" );
   fs::create_dir_all (
     // Ensure entire path to folder exists
-    &config.skg_folder )?;
+    &main_source . path )?;
   let mut written : usize = 0;
   for node in nodes {
     let pid : ID = node . ids . get(0)

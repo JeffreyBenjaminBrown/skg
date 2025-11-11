@@ -3,7 +3,7 @@
 
 This document tracks unexpected findings during implementation that may require design decisions.
 
-* Phase 1: Core Data Structures and Config Migration
+* Resolved
 
 ** 1. SkgConfig cannot derive Hash anymore
 
@@ -16,6 +16,62 @@ Removed =Hash= from SkgConfig's derive macro. Need to verify if any code was usi
 *** Impact
 Low - SkgConfig is typically not used as a hash key.
 
+*** Status
+✓ Resolved - =Hash= removed permanently from derive macro
+
+** 3. Source reconciliation requires metadata parsing updates
+
+*** Issue
+Implementing =reconciled_source()= function revealed that org-mode metadata parsing and rendering didn't support the =source= field yet.
+
+*** Resolution
+Added source field support to two functions in =rust/serve/parse_headline_md_sexp.rs=:
+- =parse_orgnode_metadata_sexp()=: Added "source" case to parse =(source main)= syntax
+- =orgnodemd_to_string()=: Added source rendering to write source back to org format
+
+Also updated 5 test files to include =(source main)= in their test org-mode data:
+- =tests/new/orgnodes_to_instructions/reconcile_dup_instructions.rs= (3 tests)
+- =tests/save/parentIgnores_and_indefinitive.rs=
+- =tests/typedb/update_typedb_from_saveinstructions.rs=
+
+*** Impact
+Source fields can now be parsed from and written to org-mode format. This is required for source reconciliation during save operations.
+
+*** Status
+✓ Resolved - Source parsing and rendering fully implemented
+
+** 4. Source field made mandatory in SkgNode
+
+*** Issue
+Originally source was =Option<String>= in SkgNode, but this created complications when deserializing from .skg files (which don't contain source).
+
+*** Resolution
+Changed =SkgNode.source= from =Option<String>= to =String= (mandatory). OrgnodeMetadata.source remains =Option<String>= since user input may not specify source.
+
+Updated all file reading operations to set source after deserialization:
+- =rust/media/file_io/one_node.rs=: Added source setting in =read_node_from_id()= and =fetch_aliases_from_file()=
+- =rust/media/file_io/multiple_nodes.rs=: Set source in =read_all_nodes_from_fs()=
+- =rust/merge/mergeInstructionTriple.rs=: Set source after reading acquirer and acquiree
+- =rust/save/orgnodes_to_instructions/none_node_fields_are_noops.rs=: Set source after reading from disk
+- =rust/rebuild/complete_aliascol.rs=: Set source after reading
+- =rust/rebuild/complete_contents.rs=: Set source after reading
+- =rust/mk_org_text/content_view.rs=: Set source in both functions that read nodes (2 locations)
+- All test files that read nodes (3 test files, 3 locations)
+
+All currently hardcoded to "main" with TODO comments for Phase 5.
+
+Updated =mk_skgnode()= in =to_dirty_instructions.rs= to require source in orgnode metadata and return error if missing.
+
+Simplified =reconciled_source()= function - no longer checks for Option, just returns the String directly.
+
+*** Impact
+Source is now required in all SkgNode instances. The code is cleaner and the type system enforces that every SkgNode has a source. Temporary workarounds set source to "main" after reading from disk.
+
+*** Status
+✓ Resolved - Source is now mandatory in SkgNode (Phase 9 completed early)
+
+* Unresolved
+
 ** 2. Temporary workarounds for compilation
 
 *** Issue
@@ -27,6 +83,7 @@ All marked with TODO comments in code:
 - =rust/util.rs:path_from_pid()=: Uses "main" source instead of accepting source parameter
 - =rust/media/file_io/multiple_nodes.rs=: Writes only to "main" source
 - =rust/save.rs=: Generic print message instead of per-source information
+- 11 locations where source is hardcoded to "main" after reading from disk
 
 *** To be addressed in
 - Phase 3: Proper multi-source file loading
@@ -34,3 +91,8 @@ All marked with TODO comments in code:
 
 *** Impact
 Code compiles and runs but only supports single "main" source for now.
+
+*** Status
+⚠ Unresolved - Awaiting Phase 3 and Phase 5 implementation
+
+See =multi-source/temporary-changes.org= for detailed breakdown of all temporary workarounds.
