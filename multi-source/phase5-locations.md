@@ -86,13 +86,16 @@ These locations read individual nodes from disk and set source to "main". The ch
 **Current behavior:** Hardcoded source to "main"
 **Context:** Generating org-mode text for viewing
 
-## Internal Helper (Misleading TODO)
+## Internal Helper ✓ COMPLETED (Phase 3b)
 
-### [rust/media/file_io/multiple_nodes.rs:27](../rustmedia/file_io/multiple_nodes.rs#L27)
-**Function:** `read_skg_files` (internal helper)
-**Current behavior:** TODO comment suggests determining source from dir_path
-**Reality:** This is called by `read_all_skg_files_from_sources` which sets source correctly
-**Needs:** Remove misleading TODO comment (function works fine, wrapper sets source)
+### [rust/media/file_io/multiple_nodes.rs:11](../rust/media/file_io/multiple_nodes.rs#L11)
+**Function:** `read_skg_files` (private helper)
+**Status:** ✓ Made private, TODO comment removed, updated test code
+**Phase 3b cleanup:**
+- Changed from `pub fn` to `fn` (now private)
+- Removed from public re-exports in `rust/media/file_io.rs`
+- Updated all test code to use `read_all_skg_files_from_sources` instead
+- Function works correctly as internal helper
 
 ---
 
@@ -102,7 +105,7 @@ These locations read individual nodes from disk and set source to "main". The ch
 1. [path_from_pid signature update](../rustutil.rs#L17) (will cause widespread compilation errors - good!)
 2. [write_all_nodes_to_fs implementation](../rustmedia/file_io/multiple_nodes.rs#L76) (write to correct source directories)
 
-**Secondary changes (individual reads - 10 locations):**
+**Secondary changes (individual reads - 9 locations):**
 - [rust/media/file_io/one_node.rs:25](../rustmedia/file_io/one_node.rs#L25) - `read_node_from_id`
 - [rust/media/file_io/one_node.rs:60](../rustmedia/file_io/one_node.rs#L60) - `fetch_aliases_from_file`
 - [rust/merge/mergeInstructionTriple.rs:53](../rustmerge/mergeInstructionTriple.rs#L53) - merge operations
@@ -112,12 +115,10 @@ These locations read individual nodes from disk and set source to "main". The ch
 - [rust/rebuild/complete_contents.rs:239](../rustrebuild/complete_contents.rs#L239) - rebuild contents
 - [rust/mk_org_text/content_view.rs:189](../rustmk_org_text/content_view.rs#L189) - content view 1
 - [rust/mk_org_text/content_view.rs:212](../rustmk_org_text/content_view.rs#L212) - content view 2
-- [rust/media/file_io/multiple_nodes.rs:27](../rustmedia/file_io/multiple_nodes.rs#L27) - misleading TODO
 
 **Easy fixes:**
 1. [reconcile_dup_instructions.rs:104](../rustsave/orgnodes_to_instructions/reconcile_dup_instructions.rs#L104) - already has the source, just use it
-2. [multiple_nodes.rs:27](../rustmedia/file_io/multiple_nodes.rs#L27) - remove misleading TODO in `read_skg_files`
-3. [save.rs:110](../rustsave.rs#L110) - update print message
+2. [save.rs:110](../rustsave.rs#L110) - update print message
 
 **Key Design Question:**
 When reading an individual node by ID (not bulk loading), how do we determine which source it's in? Options:

@@ -241,19 +241,26 @@ Add pattern matching for ="source"= (similar to ="id"= at lines 220-225):
 
 ** 6. File Loading (=rust/media/file_io/multiple_nodes.rs=) ✓ COMPLETED
 
-Created new function (Phase 3):
+Created new public function (Phase 3):
 #+begin_src rust
 pub fn read_all_skg_files_from_sources(
   sources: &HashMap<String, SkgfileSource>
 ) -> io::Result<Vec<SkgNode>>
 #+end_src
 
+Helper function (private):
+#+begin_src rust
+fn read_skg_files<P: AsRef<Path>>(dir_path: P) -> io::Result<Vec<SkgNode>>
+#+end_src
+
 Implementation:
-1. ✓ Call =read_skg_files(source.path)= for each source
+1. ✓ Call private =read_skg_files(source.path)= for each source
 2. ✓ Set =source= field on each returned =SkgNode= to =source.nickname=
 3. ✓ Accumulate all nodes from all sources
 4. ✓ Check for duplicate IDs across sources (fail fast if found)
-5. ✓ Track all IDs using HashMap<String, String> (ID -> source nickname)
+5. ✓ Track all IDs using HashMap<String, Vec<String>> (ID -> source nicknames)
+6. ✓ Made =read_skg_files= private (Phase 3b cleanup)
+7. ✓ Updated all test code to use =read_all_skg_files_from_sources= (Phase 3b cleanup)
 
 ** 7. Initialization (=rust/init.rs=) ✓ COMPLETED
 
@@ -631,7 +638,9 @@ Phase 3b enhancements:
 - ✓ Enhanced tests to verify complete org file content with exact string comparison
 - ✓ Added test: =test_many_duplicate_ids_creates_org_file= (verifies org file with 15 duplicates)
 - ✓ Added test: =test_unreadable_files_creates_org_file= (verifies org file for bad source)
-- ✓ Removed misleading TODO comment in =read_skg_files=
+- ✓ Made =read_skg_files= private (cleanup)
+- ✓ Updated all test code to use =read_all_skg_files_from_sources= (cleanup)
+- ✓ Removed misleading TODO comment in =read_skg_files= (cleanup)
 
 Implementation notes:
 - Function iterates over all sources in HashMap
@@ -897,6 +906,16 @@ Making error reports deterministic by sorting before output:
 Implementation: Sort HashMap keys into Vec, then iterate sorted collection.
 
 Trade-off: Tiny performance cost (negligible for error reporting) for major testing and UX benefits.
+
+** Pattern: Make helpers private once API stabilizes (Phase 3b cleanup)
+
+After Phase 3 implementation stabilized, made =read_skg_files= private:
+- It's only used internally by =read_all_skg_files_from_sources=
+- Cleaner public API: users only see the multi-source version
+- Updated all test code to use the public API (with single-source HashMap)
+- Maintains good separation of concerns (directory reading vs multi-source orchestration)
+
+Benefits: Simpler API surface, prevents misuse, all code paths now go through multi-source logic.
 
 * Resolved Questions
 

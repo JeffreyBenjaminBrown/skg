@@ -17,7 +17,7 @@ pub use one_node::{
     write_node, };
 pub mod multiple_nodes;
 pub use multiple_nodes::{
-    read_skg_files,
+    read_all_skg_files_from_sources,
     write_all_nodes_to_fs,
     delete_all_nodes_from_fs, };
 pub mod misc;

@@ -8,29 +8,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
 
-pub fn read_skg_files
-  <P : AsRef<Path> > (
-    dir_path : P )
-  -> io::Result < Vec<SkgNode> >
-{ // Reads all relevant files from the path.
-
-  let mut nodes : Vec<SkgNode> = Vec::new ();
-  let entries : ReadDir = // an iterator
-    fs::read_dir (dir_path) ?;
-  for entry in entries {
-    let entry : DirEntry = entry ?;
-    let path : PathBuf = entry.path () ;
-    if ( path.is_file () &&
-         path . extension () . map_or (
-           false,                // None => no extension found
-           |ext| ext == "skg") ) // Some
-    { // Note: source is set by the caller (read_all_skg_files_from_sources)
-      // This temporary "main" is only used by test code that calls read_skg_files directly
-      let mut node = read_node (&path) ?;
-      node.source = "main".to_string();
-      nodes.push (node); }}
-  Ok (nodes) }
-
 /// Reads all .skg files from all configured sources.
 /// Sets each node's source field to the appropriate source nickname.
 /// Detects duplicate IDs across sources and collects all errors.
@@ -59,7 +36,7 @@ pub fn read_all_skg_files_from_sources (
           "Invalid UTF-8 in source path".to_string() ));
         continue; }};
 
-    match read_skg_files (path_str) {
+    match read_skg_files_from_folder (path_str) {
       Ok(mut nodes) => {
         for node in &mut nodes {
           node.source = nickname.clone();
@@ -111,6 +88,27 @@ pub fn read_all_skg_files_from_sources (
       io::ErrorKind::InvalidData,
       err_parts.join("; ") )); }
   Ok(all_nodes) }
+
+fn read_skg_files_from_folder
+  <P : AsRef<Path> > (
+    dir_path : P )
+  -> io::Result < Vec<SkgNode> >
+{ // Reads all relevant files from a single directory path.
+
+  let mut nodes : Vec<SkgNode> = Vec::new ();
+  let entries : ReadDir = // an iterator
+    fs::read_dir (dir_path) ?;
+  for entry in entries {
+    let entry : DirEntry = entry ?;
+    let path : PathBuf = entry.path () ;
+    if ( path.is_file () &&
+         path . extension () . map_or (
+           false,                // None => no extension found
+           |ext| ext == "skg") ) // Some
+    { let mut node = read_node (&path) ?; // Placeholder - caller always overwrites with actual source
+      node.source = String::new();
+      nodes.push (node); }}
+  Ok (nodes) }
 
 /// Reports duplicate IDs found across sources.
 /// If ≤10 duplicates: reports to stderr only.

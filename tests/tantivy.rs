@@ -1,11 +1,12 @@
 // cargo test --test tantivy
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 use tantivy::schema as schema;
-use skg::media::file_io::read_skg_files;
+use skg::media::file_io::read_all_skg_files_from_sources;
 use skg::init::in_fs_wipe_index_then_create_it;
 use skg::media::tantivy::{search_index, update_index_with_nodes};
-use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
+use skg::types::{TantivyIndex, SkgNode, SkgfileSource, ID, empty_skgnode};
 
 #[test]
 fn test_many_tantivy_things (
@@ -27,8 +28,16 @@ fn test_many_tantivy_things (
 
   let index_path: &Path =
     Path::new ( index_dir );
+
+  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+  sources.insert( // just one source
+    "test".to_string(),
+    SkgfileSource {
+      nickname: "test".to_string(),
+      path: PathBuf::from("tests/tantivy/fixtures"),
+      user_owns_it: true, } );
   let nodes: Vec<skg::types::SkgNode> =
-    read_skg_files("tests/tantivy/fixtures")?;
+    read_all_skg_files_from_sources(&sources)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (

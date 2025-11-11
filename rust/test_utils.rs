@@ -2,7 +2,7 @@ use crate::save::{headline_to_triple, HeadlineInfo};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
-use crate::media::file_io::multiple_nodes::read_skg_files;
+use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
 use crate::init::{overwrite_new_empty_db, define_schema};
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
@@ -75,8 +75,16 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
+  let mut sources: HashMap<String, SkgfileSource> =
+    HashMap::new();
+  sources.insert( // just one source
+    "test".to_string(),
+    SkgfileSource {
+      nickname: "test".to_string(),
+      path: PathBuf::from(data_folder),
+      user_owns_it: true, } );
   let nodes: Vec<SkgNode> =
-    read_skg_files(data_folder)?;
+    read_all_skg_files_from_sources(&sources)?;
   overwrite_new_empty_db (
     db_name, driver ). await ?;
   define_schema (

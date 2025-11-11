@@ -266,6 +266,8 @@ All existing tests work because they use a single "main" source via the test hel
 - ✓ Comprehensive error collection for unreadable files (Phase 3b)
 - ✓ Sorted error output for deterministic reporting (Phase 3b)
 - ✓ Enhanced tests to verify complete org file content programmatically (Phase 3b)
+- ✓ Made =read_skg_files= private (Phase 3b cleanup)
+- ✓ Updated all test code to use =read_all_skg_files_from_sources= (Phase 3b cleanup)
 - ✓ Removed misleading TODO comment in =read_skg_files= (Phase 3b)
 
 *** Phase 5: Path Generation and File Writing
