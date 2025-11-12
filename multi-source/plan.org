@@ -701,11 +701,19 @@ Key accomplishments:
 - All 122 tests passing
 
 Design decision: Single-ID TypeDB queries (not batched). Can optimize later if profiling shows need.
-** Phase 6: Source Inheritance During Save
-1. Modify =add_missing_info_dfs= to accept and pass parent source
-2. Implement =inherit_source_if_needed= helper
-3. Update recursive calls to pass source down tree
-4. Add tests for source inheritance from parent to children
+** Phase 6: Source Inheritance During Save [COMPLETED]
+1. ✓ Modify =add_missing_info_dfs= to accept and pass parent source
+2. ✓ Implement =inherit_source_if_needed= helper
+3. ✓ Update recursive calls to pass source down tree
+4. ✓ Add tests for source inheritance from parent to children
+
+Implementation (rust/save/buffer_to_orgnodes/add_missing_info.rs):
+- Added =parent_source: Option<String>= parameter to =add_missing_info_dfs=
+- Created =inherit_source_if_needed= helper function (lines 100-107)
+- Function copies parent source to child if child has no source
+- Updated initial call to pass None for roots (no parent)
+- Updated recursive call to pass current node's source to children
+- Extended test_add_missing_info_comprehensive to verify source inheritance
 
 ** Phase 7: Validation and Error Handling
 Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have sources.
@@ -858,7 +866,7 @@ Core Functionality:
 - [X] Files are written to correct source directory based on node.source (Phase 5)
 - [X] Path generation uses node's source field (Phase 5)
 - [X] TypeDB queries can retrieve source for any node ID (Phase 5)
-- [ ] Nodes inherit source from parent during save (Phase 6)
+- [X] Nodes inherit source from parent during save (Phase 6)
 - [ ] Root nodes without source are rejected with clear error (Phase 7)
 
 Foreign Data Handling:
@@ -930,13 +938,27 @@ Phase 10 (TypeDB integration) needed early because Phase 5 queries TypeDB. Schem
 ** Test async conversion is mechanical but time-consuming
 Pattern: wrap in =run_with_test_db=, add driver parameter, change =?= to =.await?=. Budget time for updates.
 
+* Lessons Learned from Phase 6
+
+** Source inheritance mirrors existing alias inheritance pattern
+Same DFS traversal, same parent-to-child parameter passing. Following established patterns made implementation straightforward.
+
+** Helper functions keep DFS traversal clean
+=inherit_source_if_needed= isolates inheritance logic, making =add_missing_info_dfs= easier to understand and maintain.
+
+** Option<String> naturally handles parent/child distinction
+Roots get =None= (no parent), children get =Some(parent_source)=. Type system enforces the distinction.
+
+** Extended existing test rather than creating new one
+Added source metadata to existing =test_add_missing_info_comprehensive= rather than creating separate test. Keeps test suite manageable.
+
 * Open Questions and Future Work
 
 ** Performance: Batch TypeDB lookups?
 Decision: Deferred until profiling shows need. Current single-ID queries acceptable.
 
 ** Testing: Multi-source integration tests?
-Recommendation: Wait for Phase 6/8 when foreign data handling requires it.
+Resolution (Phase 6): Extended existing tests with source metadata rather than creating multi-source infrastructure. Current single-source test fixtures with explicit source fields are sufficient.
 
 ** Design: Source inheritance for non-parent relationships?
 Current thinking: Only =contains= relationship inherits source. Other relationships (subscribes_to, overrides_view_of) don't imply ownership.
@@ -949,7 +971,7 @@ Consider for Phase 7 validation.
 Recommendation: Document as unsupported. Would require config update + TypeDB rebuild + org buffer updates. Add migration tool if needed later.
 
 ** Infrastructure: Multi-source test infrastructure?
-Recommendation: Wait for Phase 6. Current single-source =run_with_test_db= sufficient.
+Resolution (Phase 6): Not needed. Extended existing single-source tests with explicit source metadata. Current =run_with_test_db= infrastructure sufficient.
 
 * Resolved Questions
 

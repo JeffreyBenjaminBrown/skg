@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::save::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
-use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id};
+use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id, compare_orgnode_forests};
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
 
@@ -28,9 +28,10 @@ async fn test_add_missing_info_logic (
   // Applying 'add_missing_info_to_trees' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
+  // Also tests source inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
-            * (skg (id root)) root
+            * (skg (id root) (source main)) root
             ** (skg (code (relToParent aliasCol))) aliases
             *** new alias
             *** (skg (code (relToParent alias))) preexisting alias
@@ -39,12 +40,12 @@ async fn test_add_missing_info_logic (
         "};
   let without_missing_info: &str =
     indoc! {"
-            * (skg (id root-pid)) root
-            ** (skg (code (relToParent aliasCol))) aliases
-            *** (skg (code (relToParent alias))) new alias
-            *** (skg (code (relToParent alias))) preexisting alias
-            ** (skg (id unpredictable)) no id
-            *** (skg (id unpredictable)) also no id
+            * (skg (id root-pid) (source main)) root
+            ** (skg (code (relToParent aliasCol)) (source main)) aliases
+            *** (skg (code (relToParent alias)) (source main)) new alias
+            *** (skg (code (relToParent alias)) (source main)) preexisting alias
+            ** (skg (id unpredictable) (source main)) no id
+            *** (skg (id unpredictable) (source main)) also no id
         "};
   let mut after_adding_missing_info: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(
@@ -75,5 +76,65 @@ async fn test_add_missing_info_logic (
       "root-pid",
       "Root ID 'root' should have changed to 'root-pid', based on the .skg file in fixtures/."
     ); }
+
+  Ok (( )) }
+
+#[test]
+fn test_source_inheritance_multi_level(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-source-inheritance",
+    "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
+    "/tmp/tantivy-test-source-inheritance",
+    | config, driver | Box::pin ( async move {
+      test_source_inheritance_logic ( config, driver ) . await ?;
+      Ok (( )) } )
+  ) }
+
+async fn test_source_inheritance_logic (
+  config : &SkgConfig,
+  driver : &TypeDBDriver
+) -> Result<(), Box<dyn Error>> {
+  // Tests source inheritance through multiple levels,
+  // with explicit sources overriding inheritance at various depths.
+  let input: &str =
+    indoc! {"
+            * (skg (id 1) (source main)) _
+            ** (skg (id 11)) _
+            *** (skg (id 111) (source alt)) _
+            **** (skg (id 1111)) _
+            *** (skg (id 112)) _
+            * (skg (id 2)) _
+            ** (skg (id 21) (source alt)) _
+            ** (skg (id 22)) _
+        "};
+
+  let expected: &str =
+    indoc! {"
+            * (skg (id 1) (source main)) _
+            ** (skg (id 11) (source main)) _
+            *** (skg (id 111) (source alt)) _
+            **** (skg (id 1111) (source alt)) _
+            *** (skg (id 112) (source main)) _
+            * (skg (id 2)) _
+            ** (skg (id 21) (source alt)) _
+            ** (skg (id 22)) _
+        "};
+
+  let mut actual_forest: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes( input ).unwrap();
+  add_missing_info_to_trees(
+    &mut actual_forest,
+    &config.db_name,
+    driver ).await ?;
+  let expected_forest: Vec<Tree<OrgNode>> =
+    org_to_uninterpreted_nodes( expected ).unwrap();
+
+  assert!(
+    compare_orgnode_forests(
+      &actual_forest,
+      &expected_forest),
+    "Source inheritance: Forests not equivalent.\n\
+     Expected sources to inherit from parent, with explicit sources overriding." );
 
   Ok (( )) }

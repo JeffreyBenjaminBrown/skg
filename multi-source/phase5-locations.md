@@ -210,8 +210,14 @@ All locations updated and tested:
 
 ### Remaining Work
 
-None for Phase 5. Next phases:
-- **Phase 6:** Source inheritance from parent to children
+None for Phase 5.
+
+**Phase 6 Status:** ✅ Complete (2025-11-12)
+- Implemented source inheritance from parent to children
+- Added `inherit_source_if_needed` helper function
+- Extended test_add_missing_info_comprehensive to verify inheritance
+
+**Next phases:**
 - **Phase 7:** Source validation and error handling
 - **Phase 8:** Foreign data validation
 - **Phase 10 (Tantivy):** Add source to Tantivy schema and indexing

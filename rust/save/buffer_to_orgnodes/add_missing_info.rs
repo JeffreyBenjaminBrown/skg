@@ -30,7 +30,8 @@ pub async fn add_missing_info_to_trees(
   for tree in trees . iter_mut () {
     add_missing_info_dfs (
       tree . root_mut (),
-      None ); }
+      None,     // its parent's RelToParent
+      None ); } // its parent's source
   let mut ids_to_lookup : Vec < ID > = Vec::new ();
   for tree in trees . iter () {
     collect_ids_for_pid_lookup (
@@ -47,17 +48,23 @@ pub async fn add_missing_info_to_trees(
 
 fn add_missing_info_dfs (
   mut node_ref: ego_tree::NodeMut < OrgNode >,
-  parent_treatment: Option < RelToParent >
+  parent_reltoparent: Option < RelToParent >, // Thanks to AliasCol, if N(ode) descends from P(arent) descends from G(randparent), then to process N, we need to know P's relationship to G.
+  parent_source: Option < String >,
 ) {
-  // Process current node
-  assign_alias_relation_if_needed (
-    node_ref . value (), parent_treatment );
-  assign_id_if_needed (
-    node_ref . value () );
+  { // Process current node
+    assign_alias_relation_if_needed (
+      node_ref . value (), parent_reltoparent );
+    inherit_source_if_needed (
+      node_ref . value (), parent_source );
+    assign_id_if_needed (
+      node_ref . value () ); }
 
-  let node_rel: RelToParent =
+  let its_reltoparent: RelToParent =
     ( // Used to process each child.
-      node_ref . value () . metadata . code.relToParent . clone () );
+      node_ref . value ()
+        . metadata . code . relToParent . clone () );
+  let its_source: Option < String > =
+    node_ref . value () . metadata . source . clone ();
   { // Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
@@ -75,7 +82,8 @@ fn add_missing_info_dfs (
         node_ref . tree () . get_mut ( child_id )
       { add_missing_info_dfs (
         child_mut,
-        Some ( node_rel . clone () ) ); } } } }
+        Some ( its_reltoparent . clone () ),
+        its_source . clone () ); }} }}
 
 /// Assign treatment=Alias
 /// to nodes whose parent has treatment=AliasCol
@@ -95,3 +103,11 @@ fn assign_id_if_needed(
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}
+
+/// Inherit source from parent if node doesn't have one
+fn inherit_source_if_needed(
+  node: &mut OrgNode,
+  parent_source: Option<String>
+) {
+  if node.metadata.source.is_none() {
+    node.metadata.source = parent_source; }}
