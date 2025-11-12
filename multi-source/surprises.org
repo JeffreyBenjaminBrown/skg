@@ -3,7 +3,7 @@
 
 This document tracks unexpected findings during implementation that may require design decisions.
 
-*Note:* Phase 6 (Source Inheritance) had no surprises - implementation followed existing alias inheritance pattern perfectly.
+*Note:* Phases 6-8 (Source Inheritance, Source Validation, Foreign Data Protection) had no surprises - implementations were straightforward and followed existing patterns.
 
 * Resolved
 
@@ -103,7 +103,7 @@ This validation will be implemented in Phase 7 by:
 Phase 7 fix will ensure data consistency: nodes with the same ID must come from the same source. This catches user errors where they might have manually set inconsistent sources in metadata.
 
 *** Status
-⚠ Partial - Basic reconciliation implemented (Phase 1), validation to be added (Phase 7)
+✓ Resolved - Validation implemented in Phase 7, source consistency now enforced
 
 ** 6. Duplicate ID detection handles nodes with multiple IDs correctly
 
@@ -277,4 +277,4 @@ Key discoveries:
 9. Source nickname consistency critical in tests → Fixed in Phase 5
 10. Phase ordering - TypeDB needed earlier → Partial Phase 10 completed early
 
-All 122 tests passing. Phase 6 completed. No unresolved issues blocking Phase 7 implementation.
+All 135 tests passing. Phase 8 completed (including merge validation fix). Multi-source core functionality complete (Phases 1-8).

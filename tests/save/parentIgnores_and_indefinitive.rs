@@ -69,7 +69,7 @@ fn test_parentignores_and_indefinitive(
         )?;
 
         { // verify indefinitive is treated correctly
-          let node2: SkgNode =
+          let (node2, _source): (SkgNode, _) =
           read_node_from_id(
             config, driver, &ID("2".to_string() ))
           .await?;
@@ -81,7 +81,7 @@ fn test_parentignores_and_indefinitive(
         ); }
 
         { // verify parentIgnores is treated correctly
-          let node1: SkgNode =
+          let (node1, _source): (SkgNode, _) =
           read_node_from_id(config, driver, &ID("1".to_string()))
             .await?;
         assert_eq!(

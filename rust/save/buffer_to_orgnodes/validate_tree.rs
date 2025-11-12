@@ -12,14 +12,16 @@ pub use contradictory_instructions::find_inconsistent_instructions;
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
 ///
-/// ASSUMES: IDs have been replaced with PIDs.
-/// Otherwise two org nodes might refer to the same skg node,
-/// yet appear not to.
+/// ASSUMES that in the forest:
+/// - IDs have been replaced with PIDs. Otherwise two org nodes
+///   might refer to the same skg node, yet appear not to.
+/// - Where missing, source has been inherited from an ancestor.
 pub async fn find_buffer_errors_for_saving (
   trees: &[Tree<OrgNode>],
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
+) -> Result<Vec<BufferValidationError>,
+            Box<dyn std::error::Error>> {
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion and defining containers)
     let (ambiguous_deletion_ids, problematic_defining_ids) =
@@ -38,13 +40,27 @@ pub async fn find_buffer_errors_for_saving (
     for error_msg in merge_errors {
       errors.push(
         BufferValidationError::Other(error_msg)); }}
-  { // other kinds of error
-    for tree in trees {
-      validate_node_and_children (
-        tree.root(),
-        None, // because a root has no parent
-        &mut errors); }}
+  validate_roots_have_sources(
+    trees, &mut errors);
+  for tree in trees { // other kinds of error
+    validate_node_and_children (
+      tree.root(),
+      None, // because a root has no parent
+      &mut errors); }
   Ok(errors) }
+
+/// Validate that all root nodes (top-level in forest) have sources.
+/// After Phase 6 source inheritance, only roots can be without sources.
+fn validate_roots_have_sources(
+  trees: &[Tree<OrgNode>],
+  errors: &mut Vec<BufferValidationError>
+) {
+  for tree in trees {
+    let root: &OrgNode = tree.root().value();
+    if root.metadata.source.is_none() {
+      errors.push(
+        BufferValidationError::RootWithoutSource(
+          root.clone() )); }} }
 
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children (

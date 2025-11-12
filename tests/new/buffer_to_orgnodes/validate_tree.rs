@@ -17,7 +17,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       // Test input with various validation errors
       let input_with_errors: &str =
         indoc! {"
-                * (skg (id root)) Valid root node
+                * (skg (id root) (source main)) Valid root node
                 ** (skg (code (relToParent aliasCol))) AliasCol with body problem
                 This body should not exist on AliasCol
                 *** (skg (id bad_child)) Child of AliasCol with ID
@@ -26,9 +26,9 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 This body should not exist on Alias
                 *** Any child of Alias (bad)
                 ** (skg (code (relToParent alias))) Alias under non-AliasCol parent
-                * (skg (code (relToParent alias))) Root level Alias (bad)
-                * (skg (id conflict) (code toDelete)) Node with deletion conflict
-                * (skg (id conflict)) Same ID but no toDelete flag
+                * (skg (code (relToParent alias)) (source main)) Root level Alias (bad)
+                * (skg (id conflict) (code toDelete) (source main)) Node with deletion conflict
+                * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
 
       let trees: Vec<Tree<OrgNode>> =
@@ -120,7 +120,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
       // Test input with no validation errors
       let valid_input: &str =
         indoc! {"
-                * (skg (id root)) Valid root node
+                * (skg (id root) (source main)) Valid root node
                 ** (skg (code (relToParent aliasCol))) AliasCol without body
                 *** Regular child without ID
                 *** Another child without ID
@@ -241,7 +241,7 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
       // Test input with different Content children IDs (should be valid)
       let input_without_duplicated_content: &str =
         indoc! {"
-                * (skg (id root)) Node with duplicated content
+                * (skg (id root) (source main)) Node with duplicated content
                 ** (skg (id 1)) 1
                 ** (skg (id 2)) 2
             "};
@@ -261,3 +261,40 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
     })
   )
 }
+
+#[test]
+fn test_root_without_source_validation(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-root-without-source",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-root-without-source",
+    |config, driver| Box::pin(async move {
+      // root without source should be rejected
+      let input: &str =
+        indoc! {"
+                * (skg (id root1) (source main)) Root with source (valid)
+                * (skg (id root2)) Root without source (invalid)
+            "};
+
+      let trees: Vec<Tree<OrgNode>> =
+        org_to_uninterpreted_nodes(input).unwrap();
+      let errors: Vec<BufferValidationError> =
+        find_buffer_errors_for_saving(&trees, config, driver).await?;
+      assert_eq!(errors.len(), 1,
+                 "Should find 1 RootWithoutSource error");
+
+      let root_errors: Vec<&BufferValidationError> = errors.iter()
+        .filter(
+          |e| matches!(e,
+                       BufferValidationError::RootWithoutSource(_)))
+        .collect();
+      assert_eq!(root_errors.len(), 1,
+                 "Should find RootWithoutSource error");
+
+      if let BufferValidationError::RootWithoutSource(node)
+        = root_errors[0]
+      { assert_eq!(
+        node.title, "Root without source (invalid)",
+        "RootWithoutSource error should identify correct node"); }
+      Ok(( )) } )) }

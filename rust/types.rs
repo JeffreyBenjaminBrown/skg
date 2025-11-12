@@ -4,6 +4,7 @@
 
 pub mod misc;
 pub use misc::{ ID,
+                SourceNickname,
                 SkgConfig,
                 SkgfileSource,
                 TantivyIndex,

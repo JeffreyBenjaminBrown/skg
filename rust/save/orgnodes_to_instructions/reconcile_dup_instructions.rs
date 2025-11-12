@@ -33,7 +33,7 @@ Extra IDs are appended from disk.
 */
 
 use crate::types::{
-  ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig};
+  ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig, BufferValidationError, SourceNickname};
 use crate::media::file_io::read_node_from_id_optional;
 use crate::util::dedup_vector;
 use std::collections::HashMap;
@@ -95,29 +95,37 @@ pub async fn reconcile_dup_instructions_for_one_id(
         . into() );
     } else { // Ignore the other SkgNode fields; we only need an ID.
       return Ok(to_delete.unwrap()); }}
-
-  // Reconcile source from buffer orgnodes first (before reading from disk)
-  let reconciled_source_value : String =
+  let pid: ID =
+    if let Some((ref node, _)) = definer {
+      node.ids.first()
+    } else { indefinitives[0].0.ids.first()
+    } . ok_or("No primary ID found")?.clone();
+  let source : String =
+    // must precede reading the skgnode from disk
     reconciled_source (
-      &indefinitives, definer.as_ref() ) ?;
+      &indefinitives, definer.as_ref(), &pid ) ?;
 
-  // TODO Phase 5: Use reconciled_source_value to determine which .skg file to read
-  // For now, path_from_pid_and_source uses "main" source
+  // Read node from disk and validate source matches
   let from_disk: Option<SkgNode> = {
-    let primary_id: ID =
-      if let Some((ref node, _)) = definer {
-        node.ids.first()
-      } else { indefinitives[0].0.ids.first()
-      } . ok_or("No primary ID found")?.clone();
-    read_node_from_id_optional(
-      config, driver, &primary_id).await? };
+    match read_node_from_id_optional(
+      config, driver, &pid).await?
+    { Some((disk_node, disk_source)) =>
+      { // Validate that buffer source matches disk source
+        if source != disk_source.as_str() {
+          return Err(Box::new(
+            BufferValidationError::DiskSourceBufferSourceConflict(
+              pid.clone(),
+              disk_source,
+              SourceNickname::from(source.clone() )) )); }
+        Some(disk_node) }
+      None => None }};
 
   let reconciled_node: SkgNode = SkgNode {
     title                        : reconciled_title(
       definer.as_ref(), &from_disk)?,
     aliases                      : reconciled_aliases(
       &indefinitives, definer.as_ref(), &from_disk),
-    source                       : reconciled_source_value,
+    source                       : source,
     ids                          : reconciled_ids(
       &indefinitives, definer.as_ref(), &from_disk),
     body                         : reconciled_body(
@@ -207,25 +215,33 @@ fn reconciled_body(
   from_disk . as_ref() . and_then (|node|
                                    node.body.clone()) }
 
-/// Reconciles the source field.
-/// TODO Phase 7: This implementation is INCORRECT. It should:
-///   1. Collect ALL sources from definer and all indefinitives into a HashSet
-///   2. Verify the set is a singleton (all instances have identical source)
-///   3. If not singleton, return InconsistentSources validation error
-/// Current behavior: Takes first available source without validation.
-/// This is wrong because nodes with the same ID MUST have the same source.
+/// Reconciles the source field across instructions.
+/// If they are not all equal, throws an error.
 /// Unlike other fields, disk source is NOT used as fallback -
 /// buffer orgnodes must specify the source.
 fn reconciled_source(
   indefinitives: &[SaveInstruction],
   definer: Option<&SaveInstruction>,
+  primary_id: &ID,
 ) -> Result<String, Box<dyn Error>> {
+  use std::collections::HashSet;
+  use crate::types::{BufferValidationError, SourceNickname};
+  let mut sources: HashSet<SourceNickname> =
+    HashSet::new();
   if let Some((node, _)) = definer {
-    return Ok(node.source.clone()); }
-  if !indefinitives.is_empty() {
-    return Ok(indefinitives[0].0.source.clone()); }
-  Err("No source found in buffer orgnodes for reconciliation"
-      . into( )) }
+    sources.insert ( SourceNickname::from(
+      node.source.clone() )); }
+  for (node, _) in indefinitives {
+    sources.insert ( SourceNickname::from(
+      node.source.clone() )); }
+  if sources.is_empty() {
+    return Err("No source found in buffer orgnodes for reconciliation"
+                . into() ); }
+  if sources.len() > 1 {
+    return Err ( Box::new (
+      BufferValidationError::InconsistentSources (
+        primary_id.clone(), sources)) ); }
+  Ok (sources.into_iter().next().unwrap().0) }
 
 /// Reconciles the aliases field.
 /// Collects all aliases from definer and indefinitives.

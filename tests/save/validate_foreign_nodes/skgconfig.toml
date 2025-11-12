@@ -1,0 +1,13 @@
+db_name = "skg-test-foreign-validation"
+tantivy_folder = "/tmp/tantivy-test-foreign-validation"
+port = 3047
+
+[[sources]]
+nickname = "main"
+path = "tests/save/validate_foreign_nodes/fixtures/main"
+user_owns_it = true
+
+[[sources]]
+nickname = "foreign"
+path = "tests/save/validate_foreign_nodes/fixtures/foreign"
+user_owns_it = false

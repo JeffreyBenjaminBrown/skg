@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::skgnode::SkgNode;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -13,7 +13,7 @@ pub async fn read_node_from_id (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   node_id : &ID
-) -> Result<SkgNode, Box<dyn Error>> {
+) -> Result<(SkgNode, SourceNickname), Box<dyn Error>> {
 
   let (pid, source) : (ID, String) = pid_and_source_from_id (
     & config.db_name, driver, node_id
@@ -24,8 +24,8 @@ pub async fn read_node_from_id (
     path_from_pid_and_source ( config, &source, pid );
   let mut node : SkgNode =
     read_node (node_file_path) ?;
-  node.source = source;
-  Ok (node) }
+  node.source = source.clone();
+  Ok ((node, SourceNickname::from(source))) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -34,9 +34,9 @@ pub async fn read_node_from_id_optional(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   node_id: &ID
-) -> Result<Option<SkgNode>, Box<dyn Error>> {
+) -> Result<Option<(SkgNode, SourceNickname)>, Box<dyn Error>> {
   match read_node_from_id(config, driver, node_id).await {
-    Ok(node) => Ok(Some(node)),
+    Ok((node, source)) => Ok(Some((node, source))),
     Err(e)   => {
       let error_msg: String = e.to_string();
       // Check if this is a "not found" error

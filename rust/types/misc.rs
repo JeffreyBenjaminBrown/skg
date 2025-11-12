@@ -22,6 +22,11 @@ the collision probability is less than 1 in 1e6. */
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ID ( pub String );
 
+/// Each source has a unique nickname, defined in the SkgConfig,
+/// used in OrgNode metadata to track provenance.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SourceNickname ( pub String );
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextLink {
   // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
@@ -94,13 +99,31 @@ impl ID {
   pub fn as_str ( &self ) -> &str {
     &self.0 }} // a reference to the first (and only) field
 
+impl SourceNickname {
+  pub fn new <S : Into<String>> (s: S) -> Self {
+    SourceNickname ( s.into () ) }
+  pub fn as_str ( &self ) -> &str {
+    &self.0 }}
+
 impl Deref for ID {
   // lets ID be used like a String in (more?) cases
   type Target = String;
   fn deref ( &self ) -> &Self::Target {
     &self.0 }}
 
+impl Deref for SourceNickname {
+  // lets SourceNickname be used like a String in (more?) cases
+  type Target = String;
+  fn deref ( &self ) -> &Self::Target {
+    &self.0 }}
+
 impl fmt::Display for ID {
+  fn fmt ( &self,
+            f: &mut fmt::Formatter<'_> )
+         -> fmt::Result {
+    write! ( f, "{}", self.0 ) }}
+
+impl fmt::Display for SourceNickname {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
@@ -114,9 +137,21 @@ impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
     ID ( s.clone () ) }}
 
+impl From<String> for SourceNickname {
+  fn from ( s : String ) -> Self {
+    SourceNickname (s) }}
+
+impl From<&String> for SourceNickname {
+  fn from ( s : &String ) -> Self {
+    SourceNickname ( s.clone () ) }}
+
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s.to_string () ) }}
+
+impl From <&str> for SourceNickname {
+  fn from(s: &str) -> Self {
+    SourceNickname ( s.to_string () ) }}
 
 impl TextLink {
   pub fn new ( id     : impl Into<String>,

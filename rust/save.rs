@@ -24,6 +24,12 @@ pub use update::update_fs_from_saveinstructions;
 pub use update::update_index_from_saveinstructions;
 pub use update::update_typedb_from_saveinstructions;
 
+pub mod validate_foreign_nodes;
+pub use validate_foreign_nodes::{
+  validate_and_filter_foreign_instructions,
+  validate_foreign_merge_instructions,
+};
+
 use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple};
@@ -73,10 +79,22 @@ pub async fn buffer_to_save_instructions (
     orgnodes_to_reconciled_save_instructions (
       & orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
+
+  // Validate and filter foreign (read-only) node instructions
+  let instructions : Vec<SaveInstruction> =
+    validate_and_filter_foreign_instructions (
+      instructions, config, driver )
+    . await . map_err ( SaveError::BufferValidationErrors ) ?;
+
   let mergeInstructions : Vec<MergeInstructionTriple> =
     instructiontriples_from_the_merges_in_an_orgnode_forest (
       & orgnode_forest, config, driver
     ) . await . map_err ( SaveError::DatabaseError ) ?;
+
+  // Validate that merge instructions don't involve foreign nodes
+  validate_foreign_merge_instructions (
+    & mergeInstructions, config )
+    . map_err ( SaveError::BufferValidationErrors ) ?;
 
   Ok ((orgnode_forest,
        instructions,

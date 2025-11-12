@@ -715,10 +715,10 @@ Implementation (rust/save/buffer_to_orgnodes/add_missing_info.rs):
 - Updated recursive call to pass current node's source to children
 - Extended test_add_missing_info_comprehensive to verify source inheritance
 
-** Phase 7: Validation and Error Handling
+** Phase 7: Validation and Error Handling [COMPLETED]
 Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have sources.
 
-1. Add source consistency validation during reconciliation:
+1. ✓ Add source consistency validation during reconciliation:
    - *Critical insight*: When multiple orgnodes have the same ID, they MUST have the same source
    - Update =reconciled_source= function in =reconcile_dup_instructions.rs=:
      * Instead of just taking the first source (=indefinitives[0].0.source=),
@@ -730,12 +730,12 @@ Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have 
      which is called AFTER =add_missing_info= (Phase 6) completes source inheritance
    - Error is propagated up and reported alongside other validation errors
    - Add tests for inconsistent source detection with multiple conflicting sources
-2. Add =RootWithoutSource(OrgNode)= to =BufferValidationError=
-3. Add =ModifiedForeignNode(ID, String)= to =BufferValidationError=
-4. Implement =validate_roots_have_sources=
-5. Integrate root validation into =find_buffer_errors_for_saving=
-6. Update =impl Display for BufferValidationError= for all new error types
-7. Add tests for root validation
+2. ✓ Add =RootWithoutSource(OrgNode)= to =BufferValidationError=
+3. ✓ Add =ModifiedForeignNode(ID, String)= to =BufferValidationError=
+4. ✓ Implement =validate_roots_have_sources=
+5. ✓ Integrate root validation into =find_buffer_errors_for_saving=
+6. ✓ Update =impl Display for BufferValidationError= for all new error types
+7. ✓ Add tests for root validation
 
 *Rationale for source consistency validation location*:
 - Happens during reconciliation, where duplicate IDs are naturally grouped
@@ -743,15 +743,22 @@ Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have 
 - Occurs before any file writes, preventing inconsistent state
 - Error propagates through save pipeline and is reported with other validation errors
 
-** Phase 8: Foreign Data Validation
-1. Create =rust/save/validate_foreign_nodes.rs= module
-2. Implement =validate_foreign_nodes= function
-3. Integrate into save pipeline in =rust/save.rs=
-4. Add tests for:
-   - Unmodified foreign nodes (allowed)
-   - Modified foreign nodes (rejected)
+** Phase 8: Foreign Data Validation [COMPLETED]
+1. ✓ Create =rust/save/validate_foreign_nodes.rs= module
+2. ✓ Implement =validate_and_filter_foreign_instructions= function
+3. ✓ Implement =validate_foreign_merge_instructions= function (for merge validation)
+4. ✓ Integrate into save pipeline in =rust/save.rs=
+5. ✓ Add tests for:
+   - Unmodified foreign nodes (allowed, filtered out)
+   - Modified foreign nodes (rejected with ModifiedForeignNode error)
    - Indefinitive foreign nodes (filtered, no append)
    - Owned nodes (unchanged behavior)
+   - Deleting foreign nodes (rejected)
+   - Creating new foreign nodes (rejected)
+   - Mixed owned and foreign nodes
+   - Merge with foreign acquirer (rejected)
+   - Merge with foreign acquiree (rejected)
+   - Merge with both owned nodes (allowed)
 
 ** Phase 9: Make Source Mandatory [COMPLETED]
 1. ✓ Changed =SkgNode.source= from =Option<String>= to =String=

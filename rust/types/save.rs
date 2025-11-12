@@ -114,6 +114,20 @@ fn format_buffer_validation_error (
     BufferValidationError::DuplicatedContent(id) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               id.0) },
+    BufferValidationError::InconsistentSources(id, sources) => {
+      let source_list: Vec<String> =
+        sources.iter().map(|s| s.0.clone()).collect();
+      format!( "Multiple orgnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
+              id.0, source_list) },
+    BufferValidationError::RootWithoutSource(node) => {
+      format!("Root node (top-level in forest) must have a source:\n- Title: {}\n- ID: {:?}\n- Please add (source nickname) to the metadata.\n",
+              node.title, node.metadata.id) },
+    BufferValidationError::ModifiedForeignNode(id, source) => {
+      format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
+              id.0, source) },
+    BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) => {
+      format!("Source mismatch for node:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- Nodes cannot be moved between sources.\n",
+              id.0, disk_source, buffer_source) },
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 
