@@ -4,12 +4,11 @@ use indoc::indoc;
 use skg::rebuild::integrate_path_that_might_fork_or_cycle;
 use skg::save::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_forests, run_with_test_db};
-use skg::types::{ID, OrgNode, SkgConfig, SkgfileSource};
+use skg::types::{ID, OrgNode, SkgConfig};
 
 use ego_tree::Tree;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
-use std::path::PathBuf;
 use typedb_driver::TypeDBDriver;
 
 #[test]

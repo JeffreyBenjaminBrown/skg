@@ -2,14 +2,13 @@
 
 #[allow(unused_imports)]
 use indoc::indoc; // A macro, which acts like an unused import.
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 use skg::media::file_io::{
   read_node, write_node, fetch_aliases_from_file};
 use skg::mk_org_text::aliases_to_org;
-use skg::types::{SkgNode, ID, SkgConfig, SkgfileSource, skgnode_example, empty_skgnode};
+use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 use skg::test_utils::run_with_test_db;
 
 #[test]

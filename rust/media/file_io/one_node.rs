@@ -61,7 +61,8 @@ pub async fn fetch_aliases_from_file (
   ). await {
     Ok ( Some (( pid, source )) ) => {
       let file_path : String =
-        path_from_pid_and_source ( config, &source, pid );
+        path_from_pid_and_source (
+          config, &source, pid );
       match read_node ( &Path::new ( &file_path )) {
         Ok ( mut node ) => {
           node.source = source;

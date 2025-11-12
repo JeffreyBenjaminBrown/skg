@@ -12,7 +12,9 @@ pub use concept_document::{
 
 use std::error::Error;
 use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer},
+  answer::{ConceptRow,
+           QueryAnswer,
+           concept_document::{Node, Leaf}},
   Transaction,
   TransactionType,
   TypeDBDriver,
@@ -72,7 +74,7 @@ pub async fn pid_and_source_from_id (
   driver  : &TypeDBDriver,
   node_id : &ID
 ) -> Result < Option<(ID, String)>, Box<dyn Error> > {
-  use typedb_driver::answer::concept_document::Node;
+  use Node;
 
   let tx : Transaction =
     driver.transaction (
@@ -95,25 +97,26 @@ pub async fn pid_and_source_from_id (
     node_id );
   let answer : QueryAnswer = tx.query ( query ). await ?;
 
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = answer {
-    if let Some (doc_result) = stream . next () . await {
-      let doc = doc_result ?;
-      if let Some ( Node::Map ( ref map ) ) = doc . root {
-        let primary_id_opt : Option < ID > =
-          map . get ( "primary_id" )
-          . and_then ( extract_id_from_node );
-        let source_opt : Option < String > =
-          map . get ( "source" )
-          . and_then ( | node : & Node | {
-            if let Node::Leaf ( Some ( leaf ) ) = node {
-              if let typedb_driver::answer::concept_document::Leaf::Concept ( concept ) = leaf {
-                return Some (
-                  extract_payload_from_typedb_string_rep (
-                    & concept . to_string () ) ); }}
-            None } );
-        if let ( Some ( pid ), Some ( source ) )
-          = ( primary_id_opt, source_opt )
-        { return Ok ( Some ( ( pid, source ) ) ); }} }}
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
+    answer {
+      if let Some (doc_result) = stream . next () . await {
+        let doc = doc_result ?;
+        if let Some ( Node::Map ( ref map ) ) = doc . root {
+          let primary_id_opt : Option < ID > =
+            map . get ( "primary_id" )
+            . and_then ( extract_id_from_node );
+          let source_opt : Option < String > =
+            map . get ( "source" )
+            . and_then ( | node : & Node | {
+              if let Node::Leaf ( Some ( leaf ) ) = node {
+                if let Leaf::Concept ( concept ) = leaf {
+                  return Some (
+                    extract_payload_from_typedb_string_rep (
+                      & concept . to_string () ) ); }}
+              None } );
+          if let ( Some ( pid ), Some ( source ) )
+            = ( primary_id_opt, source_opt )
+          { return Ok ( Some ( ( pid, source ) ) ); }} }}
   Ok (None) }
 
 /// Returns the string it finds
