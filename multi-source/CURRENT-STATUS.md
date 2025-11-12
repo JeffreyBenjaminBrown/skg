@@ -26,11 +26,11 @@
 - Many functions became async due to TypeDB queries
 - Fixed test infrastructure source nickname mismatch
 
-## Open Questions for Future Phases
+## Known Issues to Address in Future Phases
 
-1. **Batch TypeDB lookups?** - Deferred until profiling shows need
-2. **Source inheritance for non-parent relationships?** - Only `contains` inherits (Phase 6 design)
-3. **Source validation timing?** - Consider in Phase 7
+1. **Source consistency validation (Phase 7)** - Current `reconciled_source` incorrectly takes first source instead of validating all instances of same ID have identical source
+2. **Batch TypeDB lookups?** - Deferred until profiling shows need
+3. **Source inheritance for non-parent relationships?** - Only `contains` inherits (Phase 6 design)
 4. **Multi-source test infrastructure?** - Wait for Phase 6/8 when needed
 5. **Source renaming support?** - Document as unsupported for now
 

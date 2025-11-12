@@ -75,21 +75,33 @@ Source is now required in all SkgNode instances. The code is cleaner and the typ
 *** Issue
 When implementing =reconcile_dup_instructions_for_one_id=, discovered that when multiple orgnodes have the same ID, we need to determine which source to use for the reconciled node.
 
-*** Resolution
+*** Initial Resolution (Phase 1)
 Implemented =reconciled_source()= function in =rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs= (lines 214-225).
 
-Priority order:
+Initial priority order (INCORRECT - will be fixed in Phase 7):
 1. If a definer exists, use its source
-2. Otherwise, use the first indefinitive's source
+2. Otherwise, use the first indefinitive's source (=indefinitives[0].0.source=)
 3. If neither exists, return error
 
 The function is called early in =reconcile_dup_instructions_for_one_id= to compute the canonical source before reading from disk.
 
+*** Critical Insight (Discovered before Phase 7)
+*The initial approach is wrong*: If two orgnodes have the same ID, they MUST have the same source.
+We shouldn't just take the first source - we should:
+1. Collect ALL sources from definer and all indefinitives into a =HashSet=
+2. Verify the set is a singleton (exactly one unique source)
+3. If not singleton, that's a validation error that should be reported to the user
+
+This validation will be implemented in Phase 7 by:
+- Adding =InconsistentSources(ID, HashSet<String>)= to =BufferValidationError=
+- Updating =reconciled_source= to validate source consistency
+- Propagating the error up so it's reported alongside other validation errors
+
 *** Impact
-Source reconciliation logic is now explicit and follows a clear priority: definer takes precedence over indefinitives. This ensures consistent behavior when multiple buffer orgnodes reference the same node.
+Phase 7 fix will ensure data consistency: nodes with the same ID must come from the same source. This catches user errors where they might have manually set inconsistent sources in metadata.
 
 *** Status
-✓ Resolved - Source reconciliation implemented in Phase 1
+⚠ Partial - Basic reconciliation implemented (Phase 1), validation to be added (Phase 7)
 
 ** 6. Duplicate ID detection handles nodes with multiple IDs correctly
 

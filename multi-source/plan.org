@@ -393,18 +393,35 @@ Add function:
 #+begin_src rust
 fn reconciled_source(
   indefinitives: &[SaveInstruction],
-  definer: Option<&SaveInstruction>,
+  definer: Option<&SaveInstruction],
+  primary_id: &ID,  // for error reporting
 ) -> Result<String, Box<dyn Error>> {
-  // Priority: definer's source > first indefinitive's source
+  // Collect all sources from all instances of this ID
+  let mut sources: HashSet<String> = HashSet::new();
   if let Some((node, _)) = definer {
-    return Ok(node.source.clone());
+    sources.insert(node.source.clone());
   }
-  if !indefinitives.is_empty() {
-    return Ok(indefinitives[0].0.source.clone());
+  for (node, _) in indefinitives {
+    sources.insert(node.source.clone());
   }
-  Err("No source found in buffer orgnodes for reconciliation".into())
+
+  // CRITICAL: All instances of the same ID MUST have the same source
+  // If they don't, that's a validation error
+  if sources.is_empty() {
+    return Err("No source found in buffer orgnodes for reconciliation".into());
+  }
+  if sources.len() > 1 {
+    return Err(BufferValidationError::InconsistentSources(
+      primary_id.clone(), sources).into());
+  }
+
+  // All instances have the same source - return it
+  Ok(sources.into_iter().next().unwrap())
 }
 #+end_src
+
+Note: Phase 7 will implement this validation. The current implementation incorrectly
+takes the first source without validation (=indefinitives[0].0.source=).
 
 Call this in =reconcile_dup_instructions_for_one_id= before reading from disk:
 - Compute reconciled source from buffer orgnodes (definer takes priority)
@@ -594,7 +611,8 @@ Notes:
 - Phase 9 (Make Source Mandatory) was completed during Phase 1
 - Source set to "main" after all file reads (11 locations) - see temporary-changes.org
 - Removed Hash derive from SkgConfig (HashMap doesn't implement Hash)
-- Source reconciliation logic prioritizes definer over indefinitives
+- *IMPORTANT*: Current implementation incorrectly takes first source without validation
+  (will be fixed in Phase 7 to validate all instances have identical source)
 
 ** Phase 2: Source Path Validation [COMPLETED]
 1. ✓ Implemented =validate_source_paths_creating_owned_ones_if_needed= in =rust/media/file_io/misc.rs=
@@ -692,19 +710,30 @@ Design decision: Single-ID TypeDB queries (not batched). Can optimize later if p
 ** Phase 7: Validation and Error Handling
 Note: This phase happens AFTER Phase 6 source inheritance, so all orgnodes have sources.
 
-1. Add source consistency validation:
-   - Implement =validate_source_consistency= helper function
-   - After source inheritance in Phase 6, group orgnodes by ID
-   - Check that all orgnodes with same ID have identical source values
-   - Add =InconsistentSources(ID, Vec<String>)= to =BufferValidationError=
-   - Integrate into =find_buffer_errors_for_saving=
-   - Add tests for inconsistent source detection
+1. Add source consistency validation during reconciliation:
+   - *Critical insight*: When multiple orgnodes have the same ID, they MUST have the same source
+   - Update =reconciled_source= function in =reconcile_dup_instructions.rs=:
+     * Instead of just taking the first source (=indefinitives[0].0.source=),
+       collect ALL sources from definer and all indefinitives into a =HashSet=
+     * Verify the set is a singleton (contains exactly one unique source)
+     * If not singleton, return error with all conflicting sources
+   - Add =InconsistentSources(ID, HashSet<String>)= to =BufferValidationError=
+   - This validation happens naturally during =reconcile_dup_instructions_for_one_id=,
+     which is called AFTER =add_missing_info= (Phase 6) completes source inheritance
+   - Error is propagated up and reported alongside other validation errors
+   - Add tests for inconsistent source detection with multiple conflicting sources
 2. Add =RootWithoutSource(OrgNode)= to =BufferValidationError=
 3. Add =ModifiedForeignNode(ID, String)= to =BufferValidationError=
 4. Implement =validate_roots_have_sources=
 5. Integrate root validation into =find_buffer_errors_for_saving=
-6. Update =impl Display for BufferValidationError=
+6. Update =impl Display for BufferValidationError= for all new error types
 7. Add tests for root validation
+
+*Rationale for source consistency validation location*:
+- Happens during reconciliation, where duplicate IDs are naturally grouped
+- Occurs after source inheritance (Phase 6), ensuring all nodes have sources
+- Occurs before any file writes, preventing inconsistent state
+- Error propagates through save pipeline and is reported with other validation errors
 
 ** Phase 8: Foreign Data Validation
 1. Create =rust/save/validate_foreign_nodes.rs= module
@@ -842,8 +871,9 @@ Foreign Data Handling:
 Data Integrity:
 - [X] TypeDB stores source attribute for all nodes (Phase 10 - TypeDB portion)
 - [ ] Tantivy indexes source for all documents (Phase 10 - Tantivy portion)
-- [X] Duplicate IDs across sources detected and rejected
+- [X] Duplicate IDs across sources detected at startup
 - [X] Source paths validated at startup
+- [ ] Orgnodes with same ID must have same source (validated during save in Phase 7)
 
 Error Reporting:
 - [X] Comprehensive error collection (all duplicates, all file errors)

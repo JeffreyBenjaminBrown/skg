@@ -208,7 +208,12 @@ fn reconciled_body(
                                    node.body.clone()) }
 
 /// Reconciles the source field.
-/// Definer's source takes precedence, then first indefinitive's source.
+/// TODO Phase 7: This implementation is INCORRECT. It should:
+///   1. Collect ALL sources from definer and all indefinitives into a HashSet
+///   2. Verify the set is a singleton (all instances have identical source)
+///   3. If not singleton, return InconsistentSources validation error
+/// Current behavior: Takes first available source without validation.
+/// This is wrong because nodes with the same ID MUST have the same source.
 /// Unlike other fields, disk source is NOT used as fallback -
 /// buffer orgnodes must specify the source.
 fn reconciled_source(
