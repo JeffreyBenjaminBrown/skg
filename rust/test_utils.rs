@@ -78,9 +78,9 @@ pub async fn populate_test_db_from_fixtures (
   let mut sources: HashMap<String, SkgfileSource> =
     HashMap::new();
   sources.insert( // just one source
-    "test".to_string(),
+    "main".to_string(),
     SkgfileSource {
-      nickname: "test".to_string(),
+      nickname: "main".to_string(),
       path: PathBuf::from(data_folder),
       user_owns_it: true, } );
   let nodes: Vec<SkgNode> =

@@ -10,16 +10,16 @@ pub fn option_vec_is_empty_or_none<T> (
     None => true,
     Some(vec) => vec.is_empty(), }}
 
-pub fn path_from_pid (
+pub fn path_from_pid_and_source (
   config : &SkgConfig,
+  source : &str,
   pid    : ID,
 ) -> String {
-  // TODO Phase 5: Update signature to accept source parameter
-  // For now, use "main" source to get Phase 1 compiling
-  let main_source =
-    config . sources . get ( "main" )
-    . expect ( "Config must have a 'main' source" );
-  let f : PathBuf = main_source . path . clone() ;
+  let source_config =
+    config . sources . get ( source )
+    . expect ( &format!("Source '{}' not found in config",
+                        source) );
+  let f : PathBuf = source_config . path . clone() ;
   let s: String = pid.0;
   f . join (s)
     . with_extension ("skg")

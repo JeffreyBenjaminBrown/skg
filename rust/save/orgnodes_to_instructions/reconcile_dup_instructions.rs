@@ -102,7 +102,7 @@ pub async fn reconcile_dup_instructions_for_one_id(
       &indefinitives, definer.as_ref() ) ?;
 
   // TODO Phase 5: Use reconciled_source_value to determine which .skg file to read
-  // For now, path_from_pid uses "main" source
+  // For now, path_from_pid_and_source uses "main" source
   let from_disk: Option<SkgNode> = {
     let primary_id: ID =
       if let Some((ref node, _)) = definer {

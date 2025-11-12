@@ -10,6 +10,7 @@ use skg::media::file_io::{
   read_node, write_node, fetch_aliases_from_file};
 use skg::mk_org_text::aliases_to_org;
 use skg::types::{SkgNode, ID, SkgConfig, SkgfileSource, skgnode_example, empty_skgnode};
+use skg::test_utils::run_with_test_db;
 
 #[test]
 fn test_node_io() {
@@ -162,39 +163,33 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
 }
 
 #[test]
-fn test_fetch_aliases_from_file() -> std::io::Result<()> {
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from ("tests/file_io/fixtures"),
-      user_owns_it : true, });
-  let config = SkgConfig {
-    db_name        : "test_db".to_string (),
-    tantivy_folder : PathBuf::from ("/tmp/tantivy"),
-    sources,
-    port           : 1730,
-    delete_on_quit : false,
-  };
+fn test_fetch_aliases_from_file(
+) -> Result<(), Box<dyn std::error::Error>> {
+  run_with_test_db(
+    "skg-test-fetch-aliases",
+    "tests/file_io/fixtures",
+    "/tmp/tantivy-test-fetch-aliases",
+    |config, driver| Box::pin(async move {
+      test_fetch_aliases_from_file_impl(config, driver).await
+    } )) }
 
+async fn test_fetch_aliases_from_file_impl(
+  config: &SkgConfig,
+  driver: &typedb_driver::TypeDBDriver,
+) -> Result<(), Box<dyn std::error::Error>> {
   let aliases_result : Vec<String> =
     fetch_aliases_from_file (
-      &config, ID::new ("node_with_aliases") );
+      &config, driver, ID::new ("node_with_aliases") ).await;
   assert_eq! ( aliases_result,
                vec![ "first alias".to_string (),
                      "second alias".to_string () ],
                "Should return aliases when present" );
-
   let no_aliases_result =
     fetch_aliases_from_file (
-      &config, ID::new ("node_without_aliases") );
+      &config, driver, ID::new ("node_without_aliases") ).await;
   assert_eq! ( no_aliases_result, Vec::<String>::new(),
                "Should return empty Vec when no aliases" );
-
-  Ok (())
-}
+  Ok (( )) }
 
 #[test]
 fn test_aliases_to_org() -> std::io::Result<()> {

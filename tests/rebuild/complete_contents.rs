@@ -13,18 +13,19 @@ use ego_tree::{Tree, NodeId};
 
 /// Helper to call check_for_and_modify_if_repeated followed by completeContents
 /// (matches the pattern used in complete_node_preorder)
-fn check_and_complete (
+async fn check_and_complete (
   tree    : &mut Tree < OrgNode >,
   node_id : NodeId,
   config  : &SkgConfig,
+  driver  : &typedb_driver::TypeDBDriver,
   visited : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let is_repeat : bool =
     check_for_and_modify_if_repeated (
-      tree, node_id, config, visited ) ?;
+      tree, node_id, config, driver, visited ) . await ?;
   if ! is_repeat {
     completeContents (
-      tree, node_id, config ) ?; }
+      tree, node_id, config, driver ) . await ?; }
   Ok (( )) }
 
 #[test]
@@ -34,13 +35,14 @@ fn test_indefinitive_identity_at_multiple_levels
     "skg-test-complete-contents-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-indefinitive",
-    |config, _driver| Box::pin ( async move {
+    |config, driver| Box::pin ( async move {
       test_indefinitive_identity_at_multiple_levels_logic (
-        config ) . await
+        config, driver ) . await
     } )) }
 
 async fn test_indefinitive_identity_at_multiple_levels_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
     indoc! { "
@@ -60,7 +62,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       HashSet::new ();
 
     check_and_complete (
-      tree, root_id, config, &mut visited ) ?;
+      tree, root_id, config, driver, &mut visited ) . await ?;
 
     let output_org_text : String =
       render_forest_to_org ( & forest );
@@ -84,7 +86,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     visited . insert ( ID::new ( "a" ));
 
     check_and_complete (
-      tree, root_id, config, &mut visited ) ?;
+      tree, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -117,7 +119,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       HashSet::new ();
 
     check_and_complete (
-      tree, second_node_id, config, &mut visited ) ?;
+      tree, second_node_id, config, driver, &mut visited ) . await ?;
 
     assert_eq! (
       render_forest_to_org ( & forest ),
@@ -134,13 +136,14 @@ fn test_visited_and_indefinitive
     "skg-test-complete-contents-visited-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-indefinitive",
-    |config, _driver| Box::pin ( async move {
+    |config, driver| Box::pin ( async move {
       test_visited_and_indefinitive_logic (
-        config ) . await
+        config, driver ) . await
     } )) }
 
 async fn test_visited_and_indefinitive_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   // Test 1: indefinitive with non-indefinitive child
   {
@@ -163,7 +166,7 @@ async fn test_visited_and_indefinitive_logic (
         HashSet::new ();
 
       check_and_complete (
-        tree, root_id, config, &mut visited ) ?;
+        tree, root_id, config, driver, &mut visited ) . await ?;
 
       let output_org_text : String =
         render_forest_to_org ( & forest );
@@ -185,7 +188,7 @@ async fn test_visited_and_indefinitive_logic (
       visited . insert ( ID::new ( "a" ));
 
       check_and_complete (
-        tree, root_id, config, &mut visited ) ?;
+        tree, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -222,7 +225,7 @@ async fn test_visited_and_indefinitive_logic (
         HashSet::new ();
 
       check_and_complete (
-        tree, root_id, config, &mut visited ) ?;
+        tree, root_id, config, driver, &mut visited ) . await ?;
 
       let output_org_text : String =
         render_forest_to_org ( & forest );
@@ -246,7 +249,7 @@ async fn test_visited_and_indefinitive_logic (
       visited . insert ( ID::new ( "d" ));
 
       check_and_complete (
-        tree, second_node_id, config, &mut visited ) ?;
+        tree, second_node_id, config, driver, &mut visited ) . await ?;
 
       let expected_output_from_second : &str =
         indoc! { "
@@ -271,13 +274,14 @@ fn test_visited_and_not_indefinitive
     "skg-test-complete-contents-visited-not-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-not-indefinitive",
-    |config, _driver| Box::pin ( async move {
+    |config, driver| Box::pin ( async move {
       test_visited_and_not_indefinitive_logic (
-        config ) . await
+        config, driver ) . await
     } )) }
 
 async fn test_visited_and_not_indefinitive_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
     indoc! { "
@@ -301,7 +305,7 @@ async fn test_visited_and_not_indefinitive_logic (
       visited . clone ();
 
     check_and_complete (
-      tree, root_id, config, &mut visited ) ?;
+      tree, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -330,7 +334,7 @@ async fn test_visited_and_not_indefinitive_logic (
       HashSet::new ();
 
     check_and_complete (
-      tree, root_id, config, &mut visited ) ?;
+      tree, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -368,7 +372,7 @@ async fn test_visited_and_not_indefinitive_logic (
       HashSet::new ();
 
     check_and_complete (
-      tree, root_id, config, &mut visited ) ?;
+      tree, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -393,13 +397,14 @@ fn test_false_content
     "skg-test-complete-contents-false-content",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-false-content",
-    |config, _driver| Box::pin ( async move {
+    |config, driver| Box::pin ( async move {
       test_false_content_logic (
-        config ) . await
+        config, driver ) . await
     } )) }
 
 async fn test_false_content_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
     indoc! { "
@@ -418,7 +423,7 @@ async fn test_false_content_logic (
     HashSet::new ();
 
   check_and_complete (
-    tree, root_id, config, &mut visited ) ?;
+    tree, root_id, config, driver, &mut visited ) . await ?;
 
   let expected_output : &str =
     indoc! { "

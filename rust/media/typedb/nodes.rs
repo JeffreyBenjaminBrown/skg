@@ -133,8 +133,10 @@ pub async fn create_node (
     node . ids [0] . as_str ();
   let insert_node_query : String = format! (
     r#"insert $n isa node,
-                 has id "{}";"#,
-    primary_id );
+                 has id "{}",
+                 has source "{}";"#,
+    primary_id,
+    node . source );
   tx . query ( insert_node_query ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }

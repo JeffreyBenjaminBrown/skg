@@ -1,12 +1,12 @@
-# Phase 5: path_from_pid Call Site Analysis
+# Phase 5: path_from_pid_and_source Call Site Analysis
 
 ## Question
-Do callers of `path_from_pid` have access to the source nickname, or do they need to query TypeDB?
+Do callers of `path_from_pid_and_source` have access to the source nickname, or do they need to query TypeDB?
 
 ## Answer
 **Both scenarios exist.** We need two different approaches:
 
-1. **For callers with the node object**: Add `source` parameter to `path_from_pid`
+1. **For callers with the node object**: Add `source` parameter to `path_from_pid_and_source`
 2. **For callers with only an ID**: Create helper that queries TypeDB for source
 
 ---
@@ -17,25 +17,25 @@ These callers already have a `SkgNode` object with a `source` field:
 
 ### [rust/merge/fs.rs:26-36](../rust/merge/fs.rs#L26) - Writing merge results
 **Context:** Has `acquiree_text_preserver`, `updated_acquirer`, and `acquiree` node objects
-**Solution:** Pass `node.source` to `path_from_pid`
+**Solution:** Pass `node.source` to `path_from_pid_and_source`
 ```rust
-path_from_pid(&config, &acquiree_text_preserver.source, acquiree_text_preserver.ids[0].clone())
-path_from_pid(&config, &updated_acquirer.source, updated_acquirer.ids[0].clone())
-path_from_pid(&config, &acquiree.source, acquiree.ids[0].clone())
+path_from_pid_and_source(&config, &acquiree_text_preserver.source, acquiree_text_preserver.ids[0].clone())
+path_from_pid_and_source(&config, &updated_acquirer.source, updated_acquirer.ids[0].clone())
+path_from_pid_and_source(&config, &acquiree.source, acquiree.ids[0].clone())
 ```
 
 ### [rust/media/file_io/multiple_nodes.rs:211](../rust/media/file_io/multiple_nodes.rs#L211) - write_all_nodes_to_fs
 **Context:** Iterating over `nodes`, has `node` object
-**Solution:** Pass `node.source` to `path_from_pid`
+**Solution:** Pass `node.source` to `path_from_pid_and_source`
 ```rust
-path_from_pid(&config, &node.source, pid)
+path_from_pid_and_source(&config, &node.source, pid)
 ```
 
 ### [rust/media/file_io/multiple_nodes.rs:227](../rust/media/file_io/multiple_nodes.rs#L227) - delete_all_nodes_from_fs
 **Context:** Iterating over `nodes`, has `node` object
-**Solution:** Pass `node.source` to `path_from_pid`
+**Solution:** Pass `node.source` to `path_from_pid_and_source`
 ```rust
-path_from_pid(&config, &node.source, pid)
+path_from_pid_and_source(&config, &node.source, pid)
 ```
 
 ---
@@ -48,7 +48,7 @@ These callers only have an ID and need to find which source contains it:
 **Context:** Has PID from TypeDB query, needs to read node
 **Current approach:**
 1. Query TypeDB for PID using `pid_from_id`
-2. Call `path_from_pid(config, pid)`
+2. Call `path_from_pid_and_source(config, pid)`
 3. Read node from path
 
 **Solution:** Modify `pid_from_id` to also return source, OR create new helper function
@@ -61,8 +61,8 @@ These callers only have an ID and need to find which source contains it:
 **Context:** Has acquirer_id and acquiree_id, needs to read both nodes
 **Current:**
 ```rust
-read_node(&path_from_pid(config, acquirer_id.clone()))?
-read_node(&path_from_pid(config, acquiree_id.clone()))?
+read_node(&path_from_pid_and_source(config, acquirer_id.clone()))?
+read_node(&path_from_pid_and_source(config, acquiree_id.clone()))?
 ```
 **Solution:** Need to query TypeDB for source before constructing path
 
@@ -100,9 +100,9 @@ read_node_from_id_with_source(config, driver, &primary_id, &reconciled_source_va
 
 ## Recommended Implementation Strategy
 
-### Step 1: Modify path_from_pid signature
+### Step 1: Modify path_from_pid_and_source signature
 ```rust
-pub fn path_from_pid(
+pub fn path_from_pid_and_source(
   config: &SkgConfig,
   source: &str,      // NEW parameter
   pid: ID,
@@ -139,5 +139,5 @@ pub async fn pid_and_source_from_id(
 - **1** already computed source → use it
 
 **Key insight:** We need BOTH approaches:
-1. `path_from_pid(config, source, pid)` - for when you have the source
+1. `path_from_pid_and_source(config, source, pid)` - for when you have the source
 2. Helper functions that query TypeDB for source - for when you only have an ID

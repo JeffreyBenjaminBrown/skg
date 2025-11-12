@@ -1,11 +1,13 @@
 use crate::media::file_io::one_node::read_node;
+use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata, RelToParent, default_metadata};
-use crate::util::path_from_pid;
+use crate::util::path_from_pid_and_source;
 use ego_tree::NodeId;
 use std::collections::HashSet;
 use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
 /// Complete an AliasCol node by reconciling its Alias children
 /// with the aliases found on disk for its parent node.
@@ -23,21 +25,26 @@ use std::error::Error;
 /// - Adds missing Alias children (those in S.aliases but not in C's children)
 /// - Transfers focus to C if any focused Alias is removed
 /// - Errors if C's parent has no ID or if non-Alias children are found
-pub fn completeAliasCol (
+pub async fn completeAliasCol (
   tree             : &mut ego_tree::Tree < OrgNode >,
   aliascol_node_id : NodeId,
   config           : &SkgConfig,
+  driver           : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let parent_id : ID =
     get_aliascol_parent_id (
       tree,
       aliascol_node_id ) ?;
+  let (parent_pid, parent_source) : (ID, String) =
+    pid_and_source_from_id( // Query TypeDB for them
+      &config.db_name, driver, &parent_id).await?
+    . ok_or_else( || format!(
+      "Parent ID '{}' not found in database", parent_id))?;
   let mut skgnode : SkgNode = {
     let path : String =
-      path_from_pid ( config, parent_id . clone () );
+      path_from_pid_and_source ( config, &parent_source, parent_pid );
     read_node ( path )? };
-  // TODO Phase 5: Determine source from path instead of hardcoding "main"
-  skgnode.source = "main".to_string();
+  skgnode.source = parent_source;
   let aliases_from_disk : HashSet < String > = (
     // source of truth
     skgnode . aliases

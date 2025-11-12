@@ -131,6 +131,7 @@ fn handle_emacs (
             handle_node_aliases_request(
               &mut stream,
               &request,
+              &typedb_driver,
               config);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(

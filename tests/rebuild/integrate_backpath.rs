@@ -3,33 +3,31 @@
 use indoc::indoc;
 use skg::rebuild::integrate_path_that_might_fork_or_cycle;
 use skg::save::org_to_uninterpreted_nodes;
-use skg::test_utils::compare_orgnode_forests;
+use skg::test_utils::{compare_orgnode_forests, run_with_test_db};
 use skg::types::{ID, OrgNode, SkgConfig, SkgfileSource};
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from("tests/rebuild/fixtures"),
-      user_owns_it : true, });
-  let config = SkgConfig {
-    db_name: "test".to_string(),
-    tantivy_folder: PathBuf::from(
-      "/tmp/test-integrate-backpath-tantivy"),
-    sources,
-    port: 1730,
-    delete_on_quit: false,
-  };
+  run_with_test_db(
+    "skg-test-integrate-backpath-cycle",
+    "tests/rebuild/fixtures",
+    "/tmp/tantivy-test-integrate-backpath-cycle",
+    |config, driver| Box::pin(async move {
+      test_path_with_cycle_impl(config, driver).await
+    })
+  )
+}
 
+async fn test_path_with_cycle_impl(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
     * (skg (id 1)) 1
@@ -56,13 +54,8 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree,
-    root_id,
-    path,
-    branches,
-    cycle_node,
-    &config,
-  )?;
+    tree, root_id, path, branches,
+    cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
     * (skg (id 1)) 1
@@ -85,25 +78,20 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
-  // Create a simple config - we don't need actual files for this test
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from("tests/rebuild/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name: "test".to_string(),
-    tantivy_folder: PathBuf::from("/tmp/test-integrate-backpath-tantivy"),
-    sources,
-    port: 1730,
-    delete_on_quit: false,
-  };
+fn test_path_with_branches_no_cycle(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-integrate-backpath-branches-no-cycle",
+    "tests/rebuild/fixtures",
+    "/tmp/tantivy-test-integrate-backpath-branches-no-cycle",
+    |config, driver| Box::pin(async move {
+      test_path_with_branches_no_cycle_impl(config, driver).await
+    } )) }
 
+async fn test_path_with_branches_no_cycle_impl(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
     * (skg (id 0)) 0
@@ -146,13 +134,8 @@ fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree,
-    node_1_id,
-    path,
-    branches,
-    cycle_node,
-    &config,
-  )?;
+    tree, node_1_id, path, branches,
+    cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
     * (skg (id 0)) 0
@@ -177,25 +160,20 @@ fn test_path_with_branches_no_cycle() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_path_with_branches_with_cycle() -> Result<(), Box<dyn Error>> {
-  // Create a simple config - we don't need actual files for this test
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from("tests/rebuild/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name: "test".to_string(),
-    tantivy_folder: PathBuf::from("/tmp/test-integrate-backpath-tantivy"),
-    sources,
-    port: 1730,
-    delete_on_quit: false,
-  };
+fn test_path_with_branches_with_cycle(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-integrate-backpath-branches-with-cycle",
+    "tests/rebuild/fixtures",
+    "/tmp/tantivy-test-integrate-backpath-branches-with-cycle",
+    |config, driver| Box::pin(async move {
+      test_path_with_branches_with_cycle_impl(config, driver).await
+    } )) }
 
+async fn test_path_with_branches_with_cycle_impl(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
     * (skg (id 0)) 0
@@ -238,13 +216,8 @@ fn test_path_with_branches_with_cycle() -> Result<(), Box<dyn Error>> {
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree,
-    node_1_id,
-    path,
-    branches,
-    cycle_node,
-    &config,
-  )?;
+    tree, node_1_id, path, branches,
+    cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
     * (skg (id 0)) 0

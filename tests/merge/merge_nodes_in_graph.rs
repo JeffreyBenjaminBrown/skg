@@ -6,7 +6,7 @@ use skg::merge::{
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
 use skg::media::file_io::read_node;
-use skg::util::path_from_pid;
+use skg::util::path_from_pid_and_source;
 use skg::media::typedb::search::{
   contains_from_pids,
   find_related_nodes};
@@ -186,14 +186,14 @@ fn verify_filesystem_after_merge_2_into_1(
   config: &SkgConfig,
   merge_instructions: &[MergeInstructionTriple],
 ) -> Result<(), Box<dyn Error>> {
-  let node_2_path: String = path_from_pid ( config,
+  let node_2_path: String = path_from_pid_and_source ( config, "main",
                                             ID::from("2"));
   assert!( !Path::new(&node_2_path).exists(),
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
   let node_1: SkgNode = read_node(
-    &Path::new(&path_from_pid(config, ID::from("1")) )) ?;
+    &Path::new(&path_from_pid_and_source(config, "main", ID::from("1")) )) ?;
   assert_eq!(node_1.ids.len(), 3, "Node 1 should have 3 ids");
   assert_eq!(&node_1.ids[0], &ID::from("1"));
   assert_eq!(&node_1.ids[1], &ID::from("2"));
@@ -249,7 +249,8 @@ fn verify_filesystem_after_merge_2_into_1(
              &ID::from("1-overrides-view-of"));
 
   let acquiree_text_preserver_path: String =
-    path_from_pid ( config, acquiree_text_preserver_id.clone() );
+    path_from_pid_and_source ( config, "main",
+                    acquiree_text_preserver_id . clone() );
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 
@@ -545,13 +546,14 @@ fn verify_filesystem_after_merge_1_into_2(
   config: &SkgConfig,
   merge_instructions: &[MergeInstructionTriple],
 ) -> Result<(), Box<dyn Error>> {
-  let node_1_path: String = path_from_pid(config, ID::from("1"));
+  let node_1_path: String =
+    path_from_pid_and_source ( config, "main", ID::from("1") );
   assert!( !Path::new(&node_1_path).exists(),
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
   let node_2: SkgNode = read_node(
-    &Path::new(&path_from_pid(config, ID::from("2")) )) ?;
+    &Path::new(&path_from_pid_and_source(config, "main", ID::from("2")) )) ?;
 
   // Should have 3 ids: [2, 2-extra-id, 1]
   assert_eq!(node_2.ids.len(), 3, "Node 2 should have 3 ids");
@@ -607,8 +609,8 @@ fn verify_filesystem_after_merge_1_into_2(
              &ID::from("1-overrides-view-of"),
              "Node 2 should override view of 1-overrides-view-of");
 
-  let acquiree_text_preserver_path: String = path_from_pid(
-    config, acquiree_text_preserver_id.clone() );
+  let acquiree_text_preserver_path: String = path_from_pid_and_source(
+    config, "main", acquiree_text_preserver_id.clone() );
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 

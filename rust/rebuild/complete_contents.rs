@@ -1,4 +1,5 @@
 use crate::media::file_io::one_node::read_node;
+use crate::media::typedb::util::pid_and_source_from_id;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_pid};
@@ -9,7 +10,7 @@ use crate::rebuild::integrate_backpath::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
-use crate::util::path_from_pid;
+use crate::util::path_from_pid_and_source;
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashSet, HashMap};
@@ -100,7 +101,7 @@ fn complete_node_preorder<'a> (
       ( node . metadata . code.relToParent . clone (),
         node . metadata . code.indefinitive ) };
     if treatment == RelToParent::AliasCol {
-      completeAliasCol ( tree, node_id, config ) ?;
+      completeAliasCol ( tree, node_id, config, typedb_driver ) . await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
     } else {
       let is_repeat : bool;
@@ -108,7 +109,8 @@ fn complete_node_preorder<'a> (
         is_repeat = (
           // Tweak repeated nodes. Update 'visited'.
           check_for_and_modify_if_repeated (
-            tree, node_id, config, visited ) ? );
+            tree, node_id, config, typedb_driver, visited
+          ). await ?);
         detect_cycle_and_mark_if_so (
           tree, node_id, ancestor_path ) ?; }
 
@@ -116,7 +118,7 @@ fn complete_node_preorder<'a> (
         if (! is_repeat && // repeat should imply indefinitive, so this is redundant, but harmless.
             ! indefinitive ) {
           completeContents (
-            tree, node_id, config ) ?; }
+            tree, node_id, config, typedb_driver ). await ?; }
         map_complete_node_preorder_over_children (
           // Always recurse to children, even for repeated nodes, since they may have children from view requests.
           tree, node_id, config, typedb_driver,
@@ -175,10 +177,11 @@ fn map_complete_node_preorder_over_children<'a> (
 ///   (but change no descendents).
 /// If it is not a repeat, update 'visited' to include it.
 /// Returns true if node was marked as repeated, false otherwise.
-pub fn check_for_and_modify_if_repeated (
+pub async fn check_for_and_modify_if_repeated (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
+  driver    : &TypeDBDriver,
   visited   : &mut HashSet < ID >,
 ) -> Result < bool, Box<dyn Error> > {
   let node_pid : ID = {
@@ -193,7 +196,7 @@ pub fn check_for_and_modify_if_repeated (
     // although their children might be completed.
     let repeated_node : OrgNode =
       mk_repeated_orgnode_from_id (
-        config, & node_pid ) ?;
+        config, driver, & node_pid ) . await ?;
     let mut node_mut : NodeMut < OrgNode > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
@@ -216,10 +219,11 @@ pub fn check_for_and_modify_if_repeated (
 /// - Build completed-content list from disk, preserving order
 /// - Add missing content children from disk (via extend_content)
 /// - Reorder children: non-content first, then completed-content
-pub fn completeContents (
+pub async fn completeContents (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
+  driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   // ASSUMES: check_for_and_modify_if_repeated has already been called
   // Get node_pid and check if indefinitive
@@ -232,12 +236,17 @@ pub fn completeContents (
       node_ref . value () . metadata . code.indefinitive ) };
   // Indefinitive nodes are not completed (though their children might be).
   if is_indefinitive { return Ok (( )); }
+  // Query TypeDB for node PID and source
+  let (node_pid_resolved, node_source) : (ID, String) =
+    pid_and_source_from_id(
+      &config.db_name, driver, &node_pid).await?
+    . ok_or_else( || format!(
+      "Node ID '{}' not found in database", node_pid))?;
   let mut skgnode : SkgNode = {
     let path : String =
-      path_from_pid ( config, node_pid . clone () );
+      path_from_pid_and_source ( config, &node_source, node_pid_resolved );
     read_node ( path ) ? };
-  // TODO Phase 5: Determine source from path instead of hardcoding "main"
-  skgnode.source = "main".to_string();
+  skgnode.source = node_source;
   let content_from_disk : HashSet < ID > =
     skgnode . contains . clone ()
     . unwrap_or_default ()
@@ -299,7 +308,7 @@ pub fn completeContents (
         // lets us add a child without considering grandchildren yet.
         completed_content_nodes . push (
           extend_content (
-            tree, node_id, disk_id, config )? ); }}}
+            tree, node_id, disk_id, config, driver ) . await ? ); }}}
 
   reorder_children (
     tree,
@@ -333,15 +342,16 @@ fn categorize_children_by_treatment (
 
 /// Create a new Content node from disk (using 'disk_id')
 /// and append it to the children of 'parent_id'.
-fn extend_content (
+async fn extend_content (
   tree      : &mut Tree < OrgNode >,
   parent_id : NodeId,
   disk_id   : &ID,
   config    : &SkgConfig,
+  driver    : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( new_orgnode, _skgnode ) : ( OrgNode, SkgNode ) =
     skgnode_and_orgnode_from_pid (
-      config, disk_id ) ?;
+      config, driver, disk_id ) . await ?;
   let mut parent_mut : NodeMut < OrgNode > =
     tree . get_mut ( parent_id )
     . ok_or ( "Parent node not found" ) ?;

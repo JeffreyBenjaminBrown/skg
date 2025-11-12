@@ -18,12 +18,16 @@ use std::path::Path;
 
 use crate::types::{ ID, SkgConfig, SkgNode };
 use crate::media::file_io::read_node;
-use crate::util::path_from_pid;
+use crate::media::typedb::util::pid_and_source_from_id;
+use crate::util::path_from_pid_and_source;
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
-pub fn clobber_none_fields_with_data_from_disk (
+pub async fn clobber_none_fields_with_data_from_disk (
   config    : &SkgConfig,
+  driver    : &TypeDBDriver,
   from_user : SkgNode,
-) -> io::Result<SkgNode> {
+) -> Result<SkgNode, Box<dyn Error>> {
 
   let pid : ID =
     from_user . ids . first ()
@@ -32,17 +36,23 @@ pub fn clobber_none_fields_with_data_from_disk (
         io::ErrorKind::InvalidInput,
         "SkgNode has no IDs" ))?
     . clone ();
+  // Query TypeDB for PID and source
+  let (pid_resolved, source) : (ID, String) =
+    ( match pid_and_source_from_id(
+      &config.db_name, driver, &pid).await?
+      { Some(result) => result,
+        None => { // No such node in database. Return input unchanged.
+          return Ok(from_user); }} );
   let from_disk : Result<SkgNode, io::Error> =
     read_node (
       & Path::new (
-        & path_from_pid (
-          config, pid )) );
+        & path_from_pid_and_source (
+          config, &source, pid_resolved )) );
   match from_disk {
     Err (_) => { // No such file => return input unchanged.
       Ok ( from_user ) },
     Ok ( mut disk_node ) => {
-      // TODO Phase 5: Determine source from path instead of hardcoding "main"
-      disk_node.source = "main".to_string();
+      disk_node.source = source;
       let mut result : SkgNode =
         from_user;
       if result.aliases.is_none () {

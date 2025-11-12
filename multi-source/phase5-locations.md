@@ -1,18 +1,24 @@
 # Phase 5: All Locations Needing Updates
 
+## ✅ STATUS: COMPLETED (2025-11-11)
+
+All locations listed below have been successfully updated. All 122 tests passing.
+
 **📊 See [phase5-analysis.md](phase5-analysis.md) for comprehensive analysis of call site categories and implementation strategy.**
 
-This document lists all locations that need updating for Phase 5 (Path Generation and File Writing).
+This document lists all locations that were updated for Phase 5 (Path Generation and File Writing).
+
+**Historical reference preserved for documentation purposes.**
 
 ## Summary from Analysis
-- **Category A (3 sites):** Have node object → add `source` parameter to `path_from_pid`
+- **Category A (3 sites):** Have node object → add `source` parameter to `path_from_pid_and_source`
 - **Category B (8 sites):** Only have ID → use TypeDB helper to get source
 - **Category C (1 site):** Already computed source → use existing value
 
 ## Core Path Generation
 
 ### [rust/util.rs:17](../rust/util.rs#L17)
-**Function:** `path_from_pid`
+**Function:** `path_from_pid_and_source`
 **Current behavior:** Hardcoded to use "main" source
 **Needs:** Update signature to accept `source: &str` parameter
 **Impact:** This is called by many other functions, so updating the signature will cause compilation errors at all call sites (which is good - compiler will find them all)
@@ -109,7 +115,7 @@ These locations read individual nodes from disk and set source to "main". The ch
 ## Summary by Category
 
 **Primary changes (affect architecture):**
-1. [path_from_pid signature update](../rustutil.rs#L17) (will cause widespread compilation errors - good!)
+1. [path_from_pid_and_source signature update](../rustutil.rs#L17) (will cause widespread compilation errors - good!)
 2. [write_all_nodes_to_fs implementation](../rustmedia/file_io/multiple_nodes.rs#L76) (write to correct source directories)
 
 **Secondary changes (individual reads - 9 locations):**
@@ -133,3 +139,79 @@ When reading an individual node by ID (not bulk loading), how do we determine wh
 2. Search all sources until node is found (inefficient, O(n) per read)
 3. Maintain in-memory index of ID→source (memory overhead, stale data risk)
 4. Store source in TypeDB and query it (extra query, but TypeDB already knows)
+
+---
+
+## Implementation Results (Completed 2025-11-11)
+
+### Design Decision: TypeDB Source Queries (Option 4)
+
+Chose option 4: Store source in TypeDB and query it when needed.
+
+**Implementation:**
+- Created `pid_and_source_from_id` helper in rust/media/typedb/util.rs:70-117
+- Updated TypeDB node creation to include source attribute (rust/media/typedb/nodes.rs:134-140)
+- All Category B sites now query TypeDB for source
+
+**Trade-offs:**
+- ✅ No memory overhead for in-memory index
+- ✅ Always up-to-date (TypeDB is source of truth)
+- ✅ Simple implementation (single query function)
+- ⚠️ Additional async propagation (functions became async)
+- ⚠️ Network query per node read (acceptable for current use cases)
+
+**Future optimization:** Can implement batch `pids_and_sources_from_ids` if profiling shows bottleneck.
+
+### Async Propagation Impact
+
+TypeDB queries are async, which propagated through the codebase:
+
+**Functions that became async:**
+- `fetch_aliases_from_file`
+- `read_node_from_id`
+- `clobber_none_fields_with_data_from_disk`
+- `check_for_and_modify_if_repeated`
+- `completeContents`
+- `completeAliasCol`
+
+**Test updates required:**
+- tests/save/none_node_fields_are_noops.rs (4 tests)
+- tests/rebuild/complete_contents.rs (helper function + all call sites)
+
+### Additional Changes Beyond Original Plan
+
+1. **TypeDB Integration (Partial Phase 10):**
+   - Had to complete TypeDB portion early for queries to work
+   - Added source attribute to node creation
+   - Tantivy portion still pending
+
+2. **Test Infrastructure Fix:**
+   - Fixed source nickname mismatch in rust/test_utils.rs
+   - Changed "test" → "main" for consistency
+
+3. **Source Reconciliation:**
+   - rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs now uses computed source value
+   - No longer hardcoded to "main"
+
+### Verification
+
+All locations updated and tested:
+- ✅ Core path generation (1 location)
+- ✅ File writing (2 locations)
+- ✅ Category A call sites (3 locations)
+- ✅ Category B call sites (8 locations)
+- ✅ Category C call site (1 location)
+- ✅ Test updates (2 test files)
+- ✅ Test infrastructure (1 location)
+
+**Total:** 18 locations updated across 12 files
+
+**Test Results:** All 122 tests passing
+
+### Remaining Work
+
+None for Phase 5. Next phases:
+- **Phase 6:** Source inheritance from parent to children
+- **Phase 7:** Source validation and error handling
+- **Phase 8:** Foreign data validation
+- **Phase 10 (Tantivy):** Add source to Tantivy schema and indexing

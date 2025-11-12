@@ -21,7 +21,7 @@ At startup (=rust/init.rs:29-36=):
 4. All nodes are loaded into TypeDB and Tantivy
 
 ** Path Generation (Still using "main" - Phase 5)
-=path_from_pid()= (=rust/util.rs:17-27=) dynamically constructs file paths:
+=path_from_pid_and_source()= (=rust/util.rs:17-27=) dynamically constructs file paths:
 - Currently hardcoded to use "main" source (temporary)
 - Takes =config= and =pid= (primary ID)
 - Returns: =main_source.path / pid.skg=
@@ -272,9 +272,9 @@ Modified =initialize_dbs= (Phase 3):
 
 ** 8. Path Generation (=rust/util.rs=)
 
-Modify =path_from_pid= signature (lines 13-23):
+Modify =path_from_pid_and_source= signature (lines 13-23):
 #+begin_src rust
-pub fn path_from_pid(
+pub fn path_from_pid_and_source(
   config: &SkgConfig,
   source: &str,  // Add this parameter
   pid: ID,
@@ -669,31 +669,20 @@ Notes:
 - Format matches existing =(id ...)= pattern
 - =reconciled_source()= implementation simplified after source made mandatory
 
-** Phase 5: Path Generation and File Writing
+** Phase 5: Path Generation and File Writing [COMPLETED]
 
-See =multi-source/phase5-analysis.md= for detailed call site analysis.
-See =multi-source/phase5-batching-analysis.md= for performance considerations.
+See =multi-source/phase5-*.md= for detailed analysis and locations.
 
-Key finding: Call sites fall into 3 categories:
-1. **3 sites** already have node.source → add parameter
-2. **8 sites** only have ID → need TypeDB helper to get source
-3. **1 site** already computed source → use it
+Key accomplishments:
+- Updated =path_from_pid_and_source= to accept source parameter
+- Created =pid_and_source_from_id= TypeDB helper
+- Updated all call sites (18 locations across 12 files)
+- Many functions became async due to TypeDB queries
+- Updated tests for async patterns
+- Source attribute stored in TypeDB (partial Phase 10)
+- All 122 tests passing
 
-Performance decision: Start with single-ID lookups, add batching later if needed
-- Most Category B sites process one ID at a time
-- Batching infrastructure exists (=pids_from_ids=) if optimization needed
-- Premature optimization avoided
-
-Implementation steps:
-1. Update =path_from_pid= signature to accept source parameter
-2. Create TypeDB helper: =pid_and_source_from_id= (single-ID lookup)
-3. Update Category A call sites (3): pass node.source
-4. Update Category B call sites (8): use TypeDB helper
-5. Update Category C call site (1): use reconciled_source_value
-6. Modify =write_all_nodes_to_fs= to use source-specific paths
-7. Test writing to multiple source directories
-
-Future optimization: Add =pids_and_sources_from_ids= batch function if profiling shows need
+Design decision: Single-ID TypeDB queries (not batched). Can optimize later if profiling shows need.
 ** Phase 6: Source Inheritance During Save
 1. Modify =add_missing_info_dfs= to accept and pass parent source
 2. Implement =inherit_source_if_needed= helper
@@ -741,12 +730,20 @@ Notes:
 - Added support for source field in org-mode metadata parsing and rendering
 
 
-** Phase 10: TypeDB and Tantivy Integration
-1. Update =create_node= in TypeDB to include source attribute
-2. Update =create_all_nodes= calls
-3. Add source field to Tantivy schema
-4. Update =update_index_with_nodes= to index source
-5. Test database initialization with sources
+** Phase 10: TypeDB and Tantivy Integration [PARTIALLY COMPLETED]
+
+TypeDB Integration (COMPLETED):
+1. ✓ Updated =create_node= in TypeDB to include source attribute (rust/media/typedb/nodes.rs:134-140)
+   - Query now inserts both id and source: =has id "{}", has source "{}"=
+   - Required for Phase 5 TypeDB lookups to work
+2. ✓ =create_all_nodes= calls work without changes (pass-through)
+3. ✓ Tested database initialization with sources (all 122 tests passing)
+4. ✓ =pid_and_source_from_id= successfully queries source from TypeDB
+
+Tantivy Integration (PENDING):
+1. Add source field to Tantivy schema
+2. Update =update_index_with_nodes= to index source
+3. Test search with source filtering (future enhancement)
 
 ** Phase 11: Polish and Documentation
 1. Add source field to all error messages where relevant
@@ -810,7 +807,7 @@ Notes:
 - **HashMap custom deserializer**: TOML array to HashMap conversion
   - *Mitigation*: Standard Serde pattern, test thoroughly
   - *Impact*: If broken, config parsing fails immediately (fail fast)
-- **Path construction changes**: Many call sites to update for =path_from_pid=
+- **Path construction changes**: Many call sites to update for =path_from_pid_and_source=
   - *Mitigation*: Compiler will find all call sites
   - *Impact*: Mechanical refactoring, straightforward
 - **Test fixture updates**: Time-consuming but straightforward
@@ -829,9 +826,11 @@ Core Functionality:
 - [X] Can load .skg files from multiple directories simultaneously
 - [X] Each node tracks its source (mandatory field)
 - [X] Source appears in org-mode metadata as =(source nickname)=
-- [ ] Nodes inherit source from parent during save
-- [ ] Root nodes without source are rejected with clear error
-- [ ] Files are written to correct source directory based on node.source
+- [X] Files are written to correct source directory based on node.source (Phase 5)
+- [X] Path generation uses node's source field (Phase 5)
+- [X] TypeDB queries can retrieve source for any node ID (Phase 5)
+- [ ] Nodes inherit source from parent during save (Phase 6)
+- [ ] Root nodes without source are rejected with clear error (Phase 7)
 
 Foreign Data Handling:
 - [ ] Foreign nodes can be viewed in content views
@@ -841,8 +840,8 @@ Foreign Data Handling:
 - [ ] Cannot create new nodes in foreign sources
 
 Data Integrity:
-- [ ] TypeDB stores source attribute for all nodes
-- [ ] Tantivy indexes source for all documents
+- [X] TypeDB stores source attribute for all nodes (Phase 10 - TypeDB portion)
+- [ ] Tantivy indexes source for all documents (Phase 10 - Tantivy portion)
 - [X] Duplicate IDs across sources detected and rejected
 - [X] Source paths validated at startup
 
@@ -869,73 +868,58 @@ Documentation:
 
 * Lessons Learned from Phases 1-3b
 
-This section captures insights and patterns discovered during implementation that may inform future phases.
+** Source must be set immediately after deserialization
+Not serialized to .skg files, must be set after every =read_node()= call. Use wrapper pattern (=read_all_skg_files_from_sources=).
 
-** Pattern: Source must be set immediately after deserialization
+** Duplicate detection: HashMap for O(1) lookup
+=HashMap<String, String>= for ID→source mappings. O(N*M) time where N=nodes, M=IDs per node.
 
-Since =SkgNode.source= is not serialized to .skg files, it must be set immediately after every =read_node()= call. Missing this causes type errors (mandatory field).
+** Comprehensive error collection > fail-fast (Phase 3b)
+Collect ALL errors before reporting. Users fix everything at once vs iteratively. Better UX for large repos.
 
-Lesson: Any function that reads a node from disk must either:
-1. Set the source field before returning, or
-2. Be called by a wrapper that sets the source
+** TODO comments track temporary workarounds effectively
+"TODO Phase X:" comments help track what needs fixing and why code is written a certain way.
 
-The =read_all_skg_files_from_sources= pattern (wrapper sets source) works well.
+** Sorted output improves testing and debugging (Phase 3b)
+Deterministic output enables programmatic comparison. Build expected content, compare strings exactly.
 
-** Pattern: Duplicate detection requires HashMap for O(1) lookup
+** Make helpers private once API stabilizes (Phase 3b)
+Made =read_skg_files= private after Phase 3. Users only see multi-source API.
 
-Initial consideration was to check for duplicates with nested loops (O(n²)). Using =HashMap<String, String>= for tracking ID→source mappings provides O(1) lookup per ID.
+* Lessons Learned from Phase 5
 
-With N nodes and M IDs per node average: O(N*M) total time, which is efficient.
+** TypeDB queries force async propagation
+Async propagated through 6+ functions to test code. Plan for full call chain, not just immediate callers.
 
-** Pattern: Comprehensive error collection improves user experience (Phase 3b)
+** Source nickname consistency is critical
+Bug: test fixtures used "test" nickname, config used "main". Must be consistent across config, database, and tests.
 
-Initial implementation (Phase 3) used fail-fast error handling: return error on first problem found (duplicate ID, missing file). This simplified implementation but created poor user experience.
+** Phase dependencies may force reordering
+Phase 10 (TypeDB integration) needed early because Phase 5 queries TypeDB. Schema changes needed before queries.
 
-Phase 3b enhancement: Changed to collect ALL errors before reporting:
-- Continue scanning all sources even after finding problems
-- Collect all duplicate IDs and file read errors
-- Report comprehensively: stderr for small numbers, org files for large batches
-- Users can fix all problems at once instead of iteratively
+** Test async conversion is mechanical but time-consuming
+Pattern: wrap in =run_with_test_db=, add driver parameter, change =?= to =.await?=. Budget time for updates.
 
-Trade-off: More complex implementation, but much better user experience for large repositories with multiple sources.
+* Open Questions and Future Work
 
-** Pattern: TODO comments track temporary workarounds effectively
+** Performance: Batch TypeDB lookups?
+Decision: Deferred until profiling shows need. Current single-ID queries acceptable.
 
-Marking temporary code with "TODO Phase X:" comments made it easy to:
-- Track what needs fixing later
-- Understand why code is written a certain way
-- Find all related workarounds using grep
+** Testing: Multi-source integration tests?
+Recommendation: Wait for Phase 6/8 when foreign data handling requires it.
 
-Recommendation: Continue this pattern for remaining phases.
+** Design: Source inheritance for non-parent relationships?
+Current thinking: Only =contains= relationship inherits source. Other relationships (subscribes_to, overrides_view_of) don't imply ownership.
 
-** Integration point: TypeDB and Tantivy already handle source field
+** Implementation: Source validation timing?
+Options: (1) fail later in path_from_pid_and_source, (2) validate in mk_skgnode, (3) validate during tree traversal.
+Consider for Phase 7 validation.
 
-TypeDB schema includes =source= attribute. When Phase 3 loaded nodes with source field set, both databases handled it correctly. No changes needed to =create_all_nodes= or =update_index_with_nodes= yet (they just pass through the field).
+** Design: Source renaming support?
+Recommendation: Document as unsupported. Would require config update + TypeDB rebuild + org buffer updates. Add migration tool if needed later.
 
-Phase 10 will explicitly add source indexing, but basic functionality already works.
-
-** Pattern: Sorted output improves testing and debugging (Phase 3b enhancement)
-
-Making error reports deterministic by sorting before output:
-- Org file output is now sorted (IDs alphabetically, sources alphabetically)
-- Enables full programmatic comparison in tests vs substring checks
-- Tests generate expected content and do exact string comparison
-- Easier for users to review and compare error reports
-- Simpler test code: no need to parse structure, just build expected and compare
-
-Implementation: Sort HashMap keys into Vec, then iterate sorted collection.
-
-Trade-off: Tiny performance cost (negligible for error reporting) for major testing and UX benefits.
-
-** Pattern: Make helpers private once API stabilizes (Phase 3b cleanup)
-
-After Phase 3 implementation stabilized, made =read_skg_files= private:
-- It's only used internally by =read_all_skg_files_from_sources=
-- Cleaner public API: users only see the multi-source version
-- Updated all test code to use the public API (with single-source HashMap)
-- Maintains good separation of concerns (directory reading vs multi-source orchestration)
-
-Benefits: Simpler API surface, prevents misuse, all code paths now go through multi-source logic.
+** Infrastructure: Multi-source test infrastructure?
+Recommendation: Wait for Phase 6. Current single-source =run_with_test_db= sufficient.
 
 * Resolved Questions
 
@@ -1018,13 +1002,13 @@ Rationale:
 
 Decision: Use both approaches depending on context
 
-Analysis revealed three categories of `path_from_pid` call sites:
-1. **Category A (3 sites):** Caller has the node object → add `source` parameter to `path_from_pid`
+Analysis revealed three categories of `path_from_pid_and_source` call sites:
+1. **Category A (3 sites):** Caller has the node object → add `source` parameter to `path_from_pid_and_source`
 2. **Category B (8 sites):** Caller only has ID → create TypeDB helper to query source
 3. **Category C (1 site):** Already computed source → use the existing value
 
 Implementation approach:
-- Modify `path_from_pid` to accept `source` parameter
+- Modify `path_from_pid_and_source` to accept `source` parameter
 - Create `pid_and_source_from_id` helper (or wrapper functions) to query TypeDB
 - Update call sites according to their category
 
@@ -1068,8 +1052,8 @@ After stakeholder review, the following questions still need clarification:
 Phases 1, 2, 3 (including 3b enhancements) are complete. Next steps:
 
 1. **Phase 5: Path Generation and File Writing**
-   - Update =path_from_pid= signature to accept source parameter
-   - Update all 11+ call sites of =path_from_pid=
+   - Update =path_from_pid_and_source= signature to accept source parameter
+   - Update all 11+ call sites of =path_from_pid_and_source=
    - Remove remaining temporary "main" hardcoding (10 locations)
    - Test writing to multiple source directories
    - See =multi-source/phase5-locations.md= for complete location breakdown

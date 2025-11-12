@@ -1,7 +1,7 @@
 use crate::media::file_io::one_node::{read_node, write_node};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID};
 use crate::types::skgnode::SkgNode;
-use crate::util::path_from_pid;
+use crate::util::path_from_pid_and_source;
 
 use std::collections::HashMap;
 use std::io;
@@ -189,14 +189,21 @@ pub fn write_all_nodes_to_fs (
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of files written
 
-  // TODO Phase 5: Write to appropriate source based on node.source
-  // For now, use "main" source to get Phase 1 compiling
-  let main_source =
-    config . sources . get ( "main" )
-    . expect ( "Config must have a 'main' source" );
-  fs::create_dir_all (
-    // Ensure entire path to folder exists
-    &main_source . path )?;
+  // Collect unique source directories and ensure they exist
+  use std::collections::HashSet;
+  let unique_sources : HashSet<&str> =
+    nodes . iter()
+    . map( |node| node.source.as_str() )
+    . collect();
+  for source_name in unique_sources {
+    let source_config =
+      config . sources . get ( source_name )
+      . ok_or_else( || io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("Source '{}' not found in config",
+                source_name)) )?;
+    fs::create_dir_all ( &source_config . path )?; }
+
   let mut written : usize = 0;
   for node in nodes {
     let pid : ID = node . ids . get(0)
@@ -208,8 +215,8 @@ pub fn write_all_nodes_to_fs (
     write_node (
       & node,
       & Path::new (
-        & path_from_pid (
-          & config, pid )) ) ?;
+        & path_from_pid_and_source (
+          & config, & node.source, pid )) ) ?;
     written += 1; }
   Ok (written) }
 
@@ -224,8 +231,8 @@ pub fn delete_all_nodes_from_fs (
       . unwrap () // Safe because we checked above
       . clone ();
     let file_path : String =
-      path_from_pid (
-      & config, pid );
+      path_from_pid_and_source (
+      & config, & node.source, pid );
     match fs::remove_file ( & file_path ) {
       Ok ( () ) => {
         deleted += 1; },

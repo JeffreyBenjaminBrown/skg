@@ -1,6 +1,7 @@
 use crate::media::file_io::read_node;
+use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
-use crate::util::{path_from_pid, dedup_vector, setlike_vector_subtraction};
+use crate::util::{path_from_pid_and_source, dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -16,7 +17,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
   forest: &[Tree<OrgNode>],
   config: &SkgConfig,
-  _driver: &TypeDBDriver,
+  driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
             Box<dyn Error>> {
   let mut triples: Vec<MergeInstructionTriple> =
@@ -27,7 +28,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
         let node: &OrgNode = node_ref.value();
         let node_triples : Vec<MergeInstructionTriple> =
           saveinstructions_from_the_merge_in_an_orgnode(
-            node, config)?;
+            node, config, driver).await?;
         triples.extend(node_triples); }} }
   Ok(triples) }
 
@@ -38,9 +39,10 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// nothing can merge with more than one other node per save.
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
-fn saveinstructions_from_the_merge_in_an_orgnode(
+async fn saveinstructions_from_the_merge_in_an_orgnode(
   node: &OrgNode,
   config: &SkgConfig,
+  driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
             Box<dyn Error>> {
   let mut merge_instructions: Vec<MergeInstructionTriple> =
@@ -50,15 +52,29 @@ fn saveinstructions_from_the_merge_in_an_orgnode(
       let acquirer_id : &ID =
         node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
-      // TODO Phase 5: Determine source from path instead of hardcoding "main"
+      // Query TypeDB for acquirer PID and source
+      let (acquirer_pid, acquirer_source) : (ID, String) =
+        pid_and_source_from_id (&config.db_name,
+                                driver,
+                                acquirer_id ). await?
+        .ok_or_else( || format!(
+          "Acquirer ID '{}' not found in database", acquirer_id))?;
       let mut acquirer_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
-        read_node ( &path_from_pid ( config, acquirer_id.clone() ))?;
-      acquirer_from_disk.source = "main".to_string();
+        read_node ( &path_from_pid_and_source (
+          config, &acquirer_source, acquirer_pid ))?;
+      acquirer_from_disk.source = acquirer_source;
+      let (acquiree_pid, acquiree_source) : (ID, String) =
+        pid_and_source_from_id (&config.db_name,
+                                driver,
+                                acquiree_id ). await?
+        .ok_or_else(|| format!(
+          "Acquiree ID '{}' not found in database", acquiree_id))?;
       let mut acquiree_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
-        read_node ( &path_from_pid ( config, acquiree_id.clone() ))?;
-      acquiree_from_disk.source = "main".to_string();
+        read_node ( &path_from_pid_and_source (
+          config, &acquiree_source, acquiree_pid ))?;
+      acquiree_from_disk.source = acquiree_source;
       let acquiree_text_preserver: SkgNode =
         create_acquiree_text_preserver ( &acquiree_from_disk );
       let updated_acquirer: SkgNode =

@@ -15,12 +15,13 @@ fn test_completeAliasCol
     "skg-test-complete-aliascol",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol",
-    |config, _driver| Box::pin ( async move {
-      test_completeAliasCol_logic ( config ) . await
+    |config, driver| Box::pin ( async move {
+      test_completeAliasCol_logic ( config, driver ) . await
     } )) }
 
 async fn test_completeAliasCol_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
   // Create org text with three AliasCol scenarios
@@ -63,8 +64,9 @@ async fn test_completeAliasCol_logic (
   completeAliasCol (
     tree_a,
     aliascol_1_id,
-    & config
-  ) ?;
+    & config,
+    driver
+  ) .await?;
 
   {
     let aliascol_1_ref : ego_tree::NodeRef < OrgNode > =
@@ -95,8 +97,9 @@ async fn test_completeAliasCol_logic (
   completeAliasCol (
     tree_a,
     aliascol_2_id,
-    & config
-  ) ?;
+    & config,
+    driver
+  ) .await?;
 
   {
     let aliascol_2_ref : ego_tree::NodeRef < OrgNode > =
@@ -139,8 +142,9 @@ async fn test_completeAliasCol_logic (
     completeAliasCol (
       tree_aliascol_3,
       aliascol_3_id,
-      & config
-    );
+      & config,
+      driver
+    ).await;
 
   assert! (
     result . is_err (),
@@ -156,12 +160,13 @@ fn test_completeAliasCol_duplicate_aliases_different_orders
     "skg-test-complete-aliascol-duplicates",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol-duplicates",
-    |config, _driver| Box::pin ( async move {
-      test_completeAliasCol_duplicate_aliases_different_orders_logic ( config ) . await
-    } )) }
+    |config, driver| Box::pin ( async move {
+      test_completeAliasCol_duplicate_aliases_different_orders_logic (
+        config, driver ). await } )) }
 
 async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
   let org_text : &str =
@@ -198,8 +203,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     tree,
     first_aliascol_id,
-    & config
-  ) ?;
+    & config,
+    driver
+  ) .await?;
 
   {
     let aliascol_ref : ego_tree::NodeRef < OrgNode > =
@@ -238,8 +244,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     tree,
     second_aliascol_id,
-    & config
-  ) ?;
+    & config,
+    driver
+  ) .await?;
 
   {
     let aliascol_ref : ego_tree::NodeRef < OrgNode > =

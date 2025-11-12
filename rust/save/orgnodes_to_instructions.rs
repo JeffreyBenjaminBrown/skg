@@ -11,7 +11,6 @@ use crate::types::orgnode::OrgNode;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
-use std::io;
 
 /// Converts a forest of OrgNode2s to SaveInstructions,
 /// reconciling duplicates via 'reconcile_dup_instructions',
@@ -27,12 +26,12 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   let instructions_without_dups : Vec<SaveInstruction> =
     reconcile_dup_instructions (
       config, driver, instructions ) . await ?;
-  let clobbered_instructions : Vec<SaveInstruction> =
-    instructions_without_dups . into_iter ()
-    . map ( |(node, action)| {
-      let clobbered_node : SkgNode =
-        clobber_none_fields_with_data_from_disk (
-          config, node ) ?;
-      Ok ((clobbered_node, action)) } )
-    . collect::<io::Result<Vec<SaveInstruction>>>() ?;
+  let mut clobbered_instructions : Vec<SaveInstruction> =
+    Vec::new();
+  for (node, action) in instructions_without_dups {
+    let clobbered_node : SkgNode =
+      clobber_none_fields_with_data_from_disk (
+        config, driver, node ) . await ?;
+    clobbered_instructions.push(
+      (clobbered_node, action)); }
   Ok (clobbered_instructions) }

@@ -1,34 +1,28 @@
 // cargo test none_node_fields_are_noops
 
-use std::collections::HashMap;
-use std::io;
-use std::path::PathBuf;
+use std::error::Error;
 
 use skg::save::orgnodes_to_instructions::none_node_fields_are_noops::
   clobber_none_fields_with_data_from_disk;
-use skg::types::{ ID, SkgConfig, SkgfileSource, SkgNode, empty_skgnode };
+use skg::test_utils::run_with_test_db;
+use skg::types::{ ID, SkgNode, empty_skgnode };
 
 #[test]
 fn test_none_aliases_get_replaced_with_disk_aliases (
-) -> io::Result<()> {
+) -> Result < (), Box<dyn Error> > {
+  run_with_test_db (
+    "skg-test-none-aliases",
+    "tests/save/none_node_fields_are_noops/fixtures",
+    "/tmp/tantivy-test-none-aliases",
+    |config, driver| Box::pin ( async move {
+      test_none_aliases_get_replaced_with_disk_aliases_logic (
+        config, driver ) . await
+    } )) }
 
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from (
-        "tests/save/none_node_fields_are_noops/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name        : "test_db".to_string (),
-    tantivy_folder : PathBuf::from (
-      "/tmp/tantivy"),
-    sources,
-    port           : 1730,
-    delete_on_quit : false, };
+async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
+  config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node.title   = "Title from user".to_string ();
@@ -36,7 +30,7 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
       user_node.aliases = None; }
     let result : SkgNode =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![ "alias 1 on disk".to_string (),
@@ -49,7 +43,7 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
       user_node.aliases = Some ( vec![] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![] ),
@@ -61,7 +55,7 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
       user_node.aliases = Some ( vec![ "new alias".to_string () ] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![ "new alias".to_string () ] ),
@@ -71,25 +65,20 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
 
 #[test]
 fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
-) -> io::Result<()> {
+) -> Result < (), Box<dyn Error> > {
+  run_with_test_db (
+    "skg-test-none-subscribes",
+    "tests/save/none_node_fields_are_noops/fixtures",
+    "/tmp/tantivy-test-none-subscribes",
+    |config, driver| Box::pin ( async move {
+      test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
+        config, driver ) . await
+    } )) }
 
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from (
-        "tests/save/none_node_fields_are_noops/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name        : "test_db".to_string (),
-    tantivy_folder : PathBuf::from (
-      "/tmp/tantivy"),
-    sources,
-    port           : 1730,
-    delete_on_quit : false, };
+async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
+  config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node.title   = "Title from user".to_string ();
@@ -97,7 +86,7 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
       user_node.subscribes_to = None; }
     let result : SkgNode =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![ ID::new("sub_1_on_disk"),
@@ -110,7 +99,7 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
       user_node.subscribes_to = Some ( vec![] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![] ),
@@ -122,7 +111,7 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
       user_node.subscribes_to = Some ( vec![ ID::new("new_sub") ] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![ ID::new("new_sub") ] ),
@@ -132,25 +121,20 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
 
 #[test]
 fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
-) -> io::Result<()> {
+) -> Result < (), Box<dyn Error> > {
+  run_with_test_db (
+    "skg-test-none-hides",
+    "tests/save/none_node_fields_are_noops/fixtures",
+    "/tmp/tantivy-test-none-hides",
+    |config, driver| Box::pin ( async move {
+      test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
+        config, driver ) . await
+    } )) }
 
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from (
-        "tests/save/none_node_fields_are_noops/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name        : "test_db".to_string (),
-    tantivy_folder : PathBuf::from (
-      "/tmp/tantivy"),
-    sources,
-    port           : 1730,
-    delete_on_quit : false, };
+async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
+  config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node.title   = "Title from user".to_string ();
@@ -158,7 +142,7 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
       user_node.hides_from_its_subscriptions = None; }
     let result : SkgNode =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![ ID::new("hide_1_on_disk") ]),
@@ -170,7 +154,7 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
       user_node.hides_from_its_subscriptions = Some ( vec![] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![] ),
@@ -182,7 +166,7 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
       user_node.hides_from_its_subscriptions = Some ( vec![ ID::new("new_hide") ] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![ ID::new("new_hide") ] ),
@@ -192,25 +176,20 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
 
 #[test]
 fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
-) -> io::Result<()> {
+) -> Result < (), Box<dyn Error> > {
+  run_with_test_db (
+    "skg-test-none-overrides",
+    "tests/save/none_node_fields_are_noops/fixtures",
+    "/tmp/tantivy-test-none-overrides",
+    |config, driver| Box::pin ( async move {
+      test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
+        config, driver ) . await
+    } )) }
 
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from (
-        "tests/save/none_node_fields_are_noops/fixtures"),
-      user_owns_it : true,
-    });
-  let config = SkgConfig {
-    db_name        : "test_db".to_string (),
-    tantivy_folder : PathBuf::from (
-      "/tmp/tantivy"),
-    sources,
-    port           : 1730,
-    delete_on_quit : false, };
+async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
+  config : &skg::types::SkgConfig,
+  driver : &typedb_driver::TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node.title   = "Title from user".to_string ();
@@ -218,7 +197,7 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
       user_node.overrides_view_of = None; }
     let result : SkgNode =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![ ID::new("override_1_on_disk"),
@@ -232,7 +211,7 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
       user_node.overrides_view_of = Some ( vec![] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![] ),
@@ -244,7 +223,7 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
       user_node.overrides_view_of = Some ( vec![ ID::new("new_override") ] ); }
     let result =
     clobber_none_fields_with_data_from_disk (
-      &config, user_node )?;
+      &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![ ID::new("new_override") ] ),

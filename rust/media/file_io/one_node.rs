@@ -1,7 +1,7 @@
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::media::typedb::util::pid_from_id;
-use crate::util::path_from_pid;
+use crate::media::typedb::util::pid_and_source_from_id;
+use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use std::io;
 use std::path::Path;
@@ -15,17 +15,16 @@ pub async fn read_node_from_id (
   node_id : &ID
 ) -> Result<SkgNode, Box<dyn Error>> {
 
-  let pid : ID = pid_from_id (
+  let (pid, source) : (ID, String) = pid_and_source_from_id (
     & config.db_name, driver, node_id
   ). await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", node_id ) ) ?;
   let node_file_path : String =
-    path_from_pid ( config, pid );
-  // TODO Phase 5: Determine source from file path instead of hardcoding "main"
+    path_from_pid_and_source ( config, &source, pid );
   let mut node : SkgNode =
     read_node (node_file_path) ?;
-  node.source = "main".to_string();
+  node.source = source;
   Ok (node) }
 
 /// Reads a node from disk, returning None if not found
@@ -51,21 +50,24 @@ pub async fn read_node_from_id_optional(
 
 /// If there's no such .skg file at path,
 /// returns the empty vector.
-pub fn fetch_aliases_from_file (
+pub async fn fetch_aliases_from_file (
   config : &SkgConfig,
+  driver : &TypeDBDriver,
   id     : ID,
 ) -> Vec<String> {
-  let file_path : String =
-    path_from_pid ( config, id );
-  // TODO Phase 5: Determine source from file path instead of hardcoding "main"
-  match read_node
-    ( &Path::new ( &file_path )) {
-      Ok ( mut node ) => {
-        node.source = "main".to_string();
-        node.aliases.unwrap_or_default()
-      },
-      Err ( _ )   => Vec::new(),
-    }}
+  match pid_and_source_from_id (
+    // Query TypeDB to get PID and source
+    &config.db_name, driver, &id
+  ). await {
+    Ok ( Some (( pid, source )) ) => {
+      let file_path : String =
+        path_from_pid_and_source ( config, &source, pid );
+      match read_node ( &Path::new ( &file_path )) {
+        Ok ( mut node ) => {
+          node.source = source;
+          node.aliases.unwrap_or_default() },
+        Err ( _ )   => Vec::new(), }},
+    _ => Vec::new(), }}
 
 pub fn read_node
   <P : AsRef <Path>> // any type that can be converted to an &Path

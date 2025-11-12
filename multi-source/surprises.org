@@ -156,114 +156,111 @@ Better user experience - users can fix all problems at once instead of iterative
 *** Status
 ✓ Resolved - Implemented in Phase 3b (including sorted output enhancement)
 
-* Unresolved
-
-** 2. Temporary workarounds for compilation (Partially Resolved)
+** 10. Async propagation from TypeDB queries (Phase 5)
 
 *** Issue
-Phase 1 removed =skg_folder= before implementing full multi-source loading logic.
+When =pid_and_source_from_id= helper was created to query TypeDB for source attribute, it had to be async (all TypeDB operations are async). This forced many calling functions to become async.
 
-*** Temporary workarounds (updated after Phase 3)
-Resolved in Phase 3:
-- ✓ =rust/init.rs=: Now reads from all sources using =read_all_skg_files_from_sources=
+*** Cascade
+Direct callers that became async:
+- =fetch_aliases_from_file= (rust/media/file_io/one_node.rs)
+- =read_node_from_id= (rust/media/file_io/one_node.rs)
+- =clobber_none_fields_with_data_from_disk= (rust/save/orgnodes_to_instructions/none_node_fields_are_noops.rs)
 
-Still pending Phase 5:
-- =rust/util.rs:path_from_pid()=: Uses "main" source instead of accepting source parameter
-- =rust/media/file_io/multiple_nodes.rs=: Writes only to "main" source
-- =rust/save.rs=: Generic print message instead of per-source information
-- 10 locations where source is hardcoded to "main" after reading from disk
+Indirect callers that became async (called the above):
+- =check_for_and_modify_if_repeated= (rust/rebuild/complete_contents.rs)
+- =completeContents= (rust/rebuild/complete_contents.rs)
+- =completeAliasCol= (rust/rebuild/completeAliasCol.rs)
 
-*** Current status
-After Phase 3:
-- File loading now supports multiple sources correctly
-- Duplicate ID detection across sources working
-- Source field properly set during loading
+Test impact:
+- All tests calling these functions needed async conversion
+- tests/save/none_node_fields_are_noops.rs (4 tests)
+- tests/rebuild/complete_contents.rs (helper + 4 tests)
+- All needed =run_with_test_db= wrapper pattern
+- All needed =Box::pin(async move { ... })= closures
 
-Still needs Phase 5:
-- Path generation still hardcoded to "main"
-- File writing still hardcoded to "main"
-- Individual file reads still set source to "main"
-
-*** Status
-⚠ Partially Resolved - Phase 3 complete, Phase 5 pending
-
-See =multi-source/temporary-changes.org= for detailed breakdown of remaining workarounds.
-
-** 8. path_from_pid call sites have different contexts (Phase 5 analysis)
-
-*** Issue
-Before implementing Phase 5, needed to understand: do callers of =path_from_pid= know the source, or do they need to look it up?
-
-*** Discovery
-Call site analysis revealed **three distinct categories** with different solutions:
-
-**** Category A: Callers have the node object (3 sites)
-- =rust/merge/fs.rs= - writing merge results (has all 3 node objects)
-- =rust/media/file_io/multiple_nodes.rs= - write_all_nodes_to_fs (iterating over nodes)
-- =rust/media/file_io/multiple_nodes.rs= - delete_all_nodes_from_fs (iterating over nodes)
-**Solution:** Add =source= parameter to =path_from_pid=, pass =node.source=
-
-**** Category B: Callers only have an ID (8 sites)
-- =rust/media/file_io/one_node.rs= - read_node_from_id, fetch_aliases_from_file
-- =rust/merge/mergeInstructionTriple.rs= - reading acquirer and acquiree by ID
-- =rust/rebuild/complete_aliascol.rs= - reading parent node by ID
-- =rust/rebuild/complete_contents.rs= - reading node by ID
-- =rust/mk_org_text/content_view.rs= - content view (2 locations)
-- =rust/save/orgnodes_to_instructions/none_node_fields_are_noops.rs= - validation
-**Solution:** Query TypeDB for source (create =pid_and_source_from_id= helper)
-
-**** Category C: Already computed source (1 site)
-- =rust/save/orgnodes_to_instructions/reconcile_dup_instructions.rs= - has =reconciled_source_value= computed but not using it yet
-**Solution:** Use the existing computed value
+*** Resolution
+Accepted async propagation as necessary cost of TypeDB integration. Updated all affected code and tests.
 
 *** Impact
-Need **both** approaches:
-1. =path_from_pid(config, source, pid)= - when you know the source
-2. TypeDB helper function - when you only have an ID and need to query source
-
-TypeDB already stores source as an attribute, so querying it is straightforward and efficient.
+Medium - Mechanical but time-consuming. ~200 lines of test code updated. All code paths now properly handle async TypeDB queries.
 
 *** Status
-✓ Resolved - Detailed analysis in =multi-source/phase5-analysis.md=
+✓ Resolved - All 122 tests passing after updates
 
-** 9. Performance: Batch vs single-ID source lookups (Phase 5 analysis)
+** 11. Source nickname consistency bug in test infrastructure (Phase 5)
 
 *** Issue
-Category B call sites need to query TypeDB for source. Should we batch multiple lookups like =pids_from_ids= does, or query one at a time?
+Discovered subtle bug: =populate_test_db_from_fixtures= used "test" as source nickname, but =setup_test_tantivy_and_typedb_dbs= created config with "main" source.
 
-*** Analysis
-Examined all Category B call sites and existing batching patterns:
+When Phase 5 code called =path_from_pid_and_source(config, source, pid)= with =source="test"= (from TypeDB), it panicked because config only had "main" source in HashMap.
 
-Existing batch infrastructure (=pids_from_ids=):
-- Used in save pipeline: collect all IDs → one TypeDB query → distribute results
-- Builds disjunction (OR clauses) for all IDs in single query
-- Returns =HashMap<ID, Option<ID>>=
-- Pattern works well for bulk operations
+*** Root cause
+Two different functions setting up test infrastructure used inconsistent source nicknames:
+- =populate_test_db_from_fixtures=: Created source "test", loaded nodes with source="test"
+- =setup_test_tantivy_and_typedb_dbs=: Created config with source "main"
 
-Current Category B usage:
-- 6 sites process single IDs one at a time (content view, validation, rebuild)
-- 1 site reads 2 nodes (merge: acquirer and acquiree) - marginal benefit from batching
-- Most are sequential operations, not easily batchable without major refactoring
+Phase 5 exposed this because:
+1. Nodes loaded with source="test" (stored in TypeDB)
+2. Config has source "main"
+3. =pid_and_source_from_id= queries TypeDB, returns "test"
+4. =path_from_pid_and_source(config, "test", ...)= fails - no "test" in config.sources HashMap
 
-*** Decision
-Start with single-ID lookups, add batching later if profiling shows need.
-
-Create simple helper:
-#+begin_src rust
-pub async fn pid_and_source_from_id(
-  db_name: &str,
-  driver: &TypeDBDriver,
-  node_id: &ID
-) -> Result<Option<(ID, String)>, Box<dyn Error>>
-#+end_src
-
-Future optimization: =pids_and_sources_from_ids= for batch lookups if needed.
+*** Resolution
+Changed =populate_test_db_from_fixtures= to use "main" to match =setup_test_tantivy_and_typedb_dbs=.
 
 *** Impact
-- Simpler initial implementation
-- Matches current usage patterns (mostly one-off lookups)
-- Can add batching later if measurements justify it
-- Avoids premature optimization
+Low once understood, but tricky to diagnose. Error message ("Source 'test' not found in config") was clear once we noticed the mismatch.
+
+*** Lesson
+Source nicknames must be consistent throughout test lifecycle:
+1. When creating sources HashMap for loading
+2. When creating config for tests
+3. When querying TypeDB and generating paths
 
 *** Status
-✓ Resolved - Detailed analysis in =multi-source/phase5-batching-analysis.md=
+✓ Resolved - Changed rust/test_utils.rs:81 to use "main"
+
+** 12. Phase ordering - TypeDB integration needed earlier than planned (Phase 5)
+
+*** Issue
+Originally planned Phase 10 (TypeDB integration) for later, but Phase 5 implementation required it immediately.
+
+*** Why
+=pid_and_source_from_id= queries TypeDB for source attribute. Without source stored in TypeDB:
+- Query returns None
+- Tests fail with "ID not found in database"
+- Cannot complete Phase 5 without TypeDB storing source
+
+*** Resolution
+Implemented TypeDB portion of Phase 10 early:
+- Updated =create_node= to include source attribute (rust/media/typedb/nodes.rs:134-140)
+- Query now: =has id "{}", has source "{}"=
+- Tantivy portion of Phase 10 still pending
+
+*** Impact
+Low - Single line change, straightforward implementation. But demonstrates phase dependencies weren't fully understood during planning.
+
+*** Lesson
+Dependencies between phases may force reordering. Functions that query database fields require those fields to exist first.
+
+*** Status
+✓ Resolved - Partial Phase 10 completion (TypeDB only)
+
+* Summary
+
+All surprises and issues discovered through Phase 5 have been resolved (as of 2025-11-11).
+
+Key discoveries:
+1. HashMap cannot derive Hash → Removed from SkgConfig (low impact)
+2. Source reconciliation required metadata parsing updates → Completed in Phase 1
+3. Source field made mandatory in SkgNode → Completed in Phase 9
+4. Source reconciliation for duplicate instructions → Implemented in Phase 1
+5. Duplicate ID detection handles multi-ID nodes correctly → Completed in Phase 3
+6. Error reporting strategy: comprehensive collection > fail-fast → Completed in Phase 3b
+7. Sorted output improves testing and UX → Completed in Phase 3b
+8. Async propagation from TypeDB queries → Resolved in Phase 5
+9. Source nickname consistency critical in tests → Fixed in Phase 5
+10. Phase ordering - TypeDB needed earlier → Partial Phase 10 completed early
+
+All 122 tests passing. No unresolved issues blocking Phase 6 implementation.
