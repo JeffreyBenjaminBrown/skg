@@ -17,8 +17,7 @@ use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::media::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::media::typedb::relationships::delete_out_links;
-use skg::media::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::media::typedb::util::pid_from_id;
+use skg::media::typedb::util::{extract_payload_from_typedb_string_rep, pid_and_source_from_id};
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;
@@ -295,17 +294,17 @@ async fn test_create_only_nodes_with_no_ids_present (
   // - 'new' should now exist (just created)
   // - 'absent' should not exist
   assert! (
-    pid_from_id ( db_name, driver, &ID::from ( "a" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ( "a" ) )
       . await . unwrap () . is_some (),
     "Expected lookup of existing id 'a' to return Some." );
 
   assert! (
-    pid_from_id ( db_name, driver, &ID::from ( "new" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ( "new" ) )
       . await . unwrap () . is_some (),
     "Expected lookup of newly created id 'new' to return Some." );
 
   assert! (
-    pid_from_id ( db_name, driver, &ID::from ( "absent" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ( "absent" ) )
       . await . unwrap () . is_none (),
     "Expected lookup of missing id 'absent' to return None." );
 

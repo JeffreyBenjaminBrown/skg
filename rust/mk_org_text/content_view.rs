@@ -5,7 +5,7 @@ use crate::media::typedb::search::{
   count_containers,
   count_contents,
   count_link_sources};
-use crate::media::typedb::util::{pid_from_id, pid_and_source_from_id};
+use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
 use crate::mk_org_text::util::newline_to_space;
@@ -91,8 +91,8 @@ pub async fn orgnode_tree_from_id_with_earlier_visits (
   driver  : &TypeDBDriver,
   visited : &mut HashSet < ID >,
 ) -> Result < Tree < OrgNode >, Box<dyn Error> > {
-  let root_pid : ID =
-    pid_from_id (
+  let (root_pid, _source) : (ID, String) =
+    pid_and_source_from_id (
       & config . db_name, driver, root_id ) . await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", root_id )) ?;
@@ -104,8 +104,8 @@ pub async fn orgnode_tree_from_id_with_earlier_visits (
   } else { // It has not been visited yet, so build normally.
     visited . insert ( root_pid . clone () );
     let ( root_orgnode, skgnode ) : ( OrgNode, SkgNode ) =
-      skgnode_and_orgnode_from_pid (
-        config, driver, & root_pid ) . await ?;
+      skgnode_and_orgnode_from_pid_and_source (
+        config, & root_pid, &_source ) ?;
     let mut tree : Tree < OrgNode > = (
       // a tree containing only the root node
       Tree::new ( root_orgnode ) );
@@ -137,8 +137,8 @@ async fn build_orgnode_tree_recursive (
   visited         : &mut HashSet < ID >,
   ancestor_path   : &mut Vec < ID >, // path from root to parent (for cycle detection)
 ) -> Result < (), Box<dyn Error> > {
-  let child_pid : ID =
-    pid_from_id (
+  let (child_pid, child_source) : (ID, String) =
+    pid_and_source_from_id (
       & config . db_name, driver, child_id ) . await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", child_id )) ?;
@@ -154,9 +154,10 @@ async fn build_orgnode_tree_recursive (
       . append ( repeated_node );
     return Ok (( )); }
   visited . insert ( child_pid . clone () );
+  // Read node from disk using the source we already queried
   let ( mut child_orgnode, child_skgnode ) : ( OrgNode, SkgNode ) =
-    skgnode_and_orgnode_from_pid (
-      config, driver, & child_pid ) . await ?;
+    skgnode_and_orgnode_from_pid_and_source (
+      config, & child_pid, &child_source ) ?;
   child_orgnode . metadata . viewData.cycle = is_cycle;
   let new_child_id : ego_tree::NodeId = (
     // append new child to its parent
@@ -178,23 +179,19 @@ async fn build_orgnode_tree_recursive (
   ancestor_path . pop ();
   return Ok (( )) }
 
-/// Fetch a SkgNode from disk.
+/// Fetch a SkgNode from disk given PID and source.
 /// Make an OrgNode from it, with validated title.
 /// Return both.
-pub async fn skgnode_and_orgnode_from_pid (
+pub fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   pid    : &ID,
+  source : &str,
 ) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
-  let (pid_resolved, source) : (ID, String) =
-    pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, pid).await?
-    . ok_or_else( || format!(
-      "ID '{}' not found in database", pid ))?;
   let path : String =
-    path_from_pid_and_source ( config, &source, pid_resolved );
+    path_from_pid_and_source (
+      config, source, pid.clone() );
   let mut skgnode : SkgNode = read_node ( path ) ?;
-  skgnode.source = source;
+  skgnode.source = source.to_string();
   let orgnode : OrgNode = OrgNode {
     metadata : { let mut md = default_metadata ();
                  md . id = Some ( pid . clone () );
@@ -208,6 +205,22 @@ pub async fn skgnode_and_orgnode_from_pid (
                  pid ), )) ); }
   Ok (( orgnode, skgnode )) }
 
+/// Fetch a SkgNode from disk (queries TypeDB for source).
+/// Make an OrgNode from it, with validated title.
+/// Return both.
+pub async fn skgnode_and_orgnode_from_id (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  id     : &ID,
+) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
+  let (pid_resolved, source) : (ID, String) =
+    pid_and_source_from_id( // Query TypeDB for them
+      &config.db_name, driver, id).await?
+    . ok_or_else( || format!(
+      "ID '{}' not found in database", id ))?;
+  skgnode_and_orgnode_from_pid_and_source (
+    config, &pid_resolved, &source ) }
+
 /// Make an OrgNode marked 'repeated' by fetching it from disk.
 pub async fn mk_repeated_orgnode_from_id (
   config : &SkgConfig,
@@ -219,20 +232,16 @@ pub async fn mk_repeated_orgnode_from_id (
       &config.db_name, driver, id).await?
     . ok_or_else( || format!(
       "ID '{}' not found in database", id))?;
-  let path : String = path_from_pid_and_source (
-    config, &source, pid_resolved );
-  let mut skgnode : SkgNode = read_node ( path ) ?;
-  skgnode.source = source;
-  let mut md = default_metadata ();
-  md . viewData . repeat = true;
-  md . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.
-  md . id = Some ( id . clone () );
-  Ok ( OrgNode {
-    metadata : md,
-    title : newline_to_space ( & skgnode . title ),
-    body : Some (
-      "Repeated, probably above. Edit there, not here."
-        . to_string () ), } ) }
+  let (mut orgnode, _skgnode) : ( OrgNode, SkgNode ) =
+    skgnode_and_orgnode_from_pid_and_source (
+      config, &pid_resolved, &source ) ?;
+  orgnode . metadata . viewData . repeat = true;
+  orgnode . metadata . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.
+  orgnode . metadata . id = Some ( id . clone () );
+  orgnode . body = Some (
+    "Repeated, probably above. Edit there, not here."
+      . to_string () );
+  Ok ( orgnode ) }
 
 /// Build MapsFromIdForView from a forest of OrgNode trees.
 /// Collects all PIDs from the forest and fetches relationship data.

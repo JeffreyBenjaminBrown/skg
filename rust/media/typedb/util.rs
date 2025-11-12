@@ -12,8 +12,7 @@ pub use concept_document::{
 
 use std::error::Error;
 use typedb_driver::{
-  answer::{ConceptRow,
-           QueryAnswer,
+  answer::{QueryAnswer,
            concept_document::{Node, Leaf}},
   Transaction,
   TransactionType,
@@ -32,40 +31,6 @@ pub async fn delete_database (
     databases . get ( db_name ) . await ? . delete () . await ?;
     println! ( "Database '{}' deleted successfully", db_name ); }
   Ok (( )) }
-
-/// Runs a single TypeDB query.
-/// Returns the PID associated with that ID, or None if not found.
-pub async fn pid_from_id (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node_id : &ID
-) -> Result < Option<ID>, Box<dyn Error> > {
-
-  let tx : Transaction =
-    driver.transaction (
-      db_name, TransactionType::Read
-    ). await ?;
-  let query : String = format! (
-    r#"match
-      $node isa node,
-            has id $primary_id;
-      {{ $node has id "{}"; }} or
-      {{ $e   isa     extra_id, has id "{}";
-         $rel isa has_extra_id ( node: $node,
-                                 extra_id: $e ); }} ;
-      select $primary_id;"#,
-    node_id,
-    node_id );
-  let answer : QueryAnswer = tx.query ( query ). await ?;
-  let mut stream = answer.into_rows ();
-  if let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some (concept) = row.get ("primary_id") ? {
-      return Ok (
-        Some ( ID (
-          extract_payload_from_typedb_string_rep (
-            &concept . to_string () )) ) ); }}
-  Ok ( None ) }
 
 /// Runs a single TypeDB query to get both PID and source.
 /// Returns None if not found.

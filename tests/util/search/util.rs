@@ -1,7 +1,7 @@
 // cargo test typedb::search::util
 
 use skg::test_utils::run_with_test_db;
-use skg::media::typedb::util::{pid_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
+use skg::media::typedb::util::{pid_and_source_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
 use skg::types::ID;
 
 use std::error::Error;
@@ -26,19 +26,21 @@ fn test_pid_from_id (
     "tests/typedb/search/util/fixtures",
     "/tmp/tantivy-test-typedb-search-util",
     | config, driver | Box::pin ( async move {
-      let path_to_4 = pid_from_id ( & config . db_name,
-                                      & driver,
-                                      & ID("4".to_string() ),
+      let (pid_for_4, source_for_4) = pid_and_source_from_id (
+        & config . db_name,
+        & driver,
+        & ID("4".to_string() ),
       ) . await ? . unwrap ();
-      let path_to_44 = pid_from_id ( & config . db_name,
-                                       & driver,
-                                       & ID("44".to_string() )
+      let (pid_for_44, source_for_44) =
+        pid_and_source_from_id ( & config . db_name,
+                                   & driver,
+                                   & ID("44".to_string() )
       ) . await ? . unwrap ();
-      assert_eq!(path_to_4,  ID("4" . to_string () ));
-      assert_eq!(path_to_44, ID("4" . to_string () ));
-      Ok (( )) } )
-  ) }
-
+      assert_eq!(pid_for_4,  ID("4" . to_string () ));
+      assert_eq!(pid_for_44, ID("4" . to_string () ));
+      assert_eq!(source_for_4,  "main".to_string() );
+      assert_eq!(source_for_44, "main".to_string() );
+      Ok (( )) } )) }
 
 #[test]
 fn test_pids_from_ids (

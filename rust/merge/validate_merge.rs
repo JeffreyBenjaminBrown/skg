@@ -10,7 +10,7 @@
 */
 
 use crate::types::{OrgNode, RelToParent, ID, EditRequest, SkgConfig};
-use crate::media::typedb::util::pid_from_id;
+use crate::media::typedb::util::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -111,18 +111,18 @@ async fn validate_merge_pair(
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
-    match pid_from_id (
+    match pid_and_source_from_id (
       &config.db_name, driver, acquirer_id).await?
-    { Some(pid) => pid,
+    { Some((pid, _source)) => pid,
       None      => {
         errors.push(format!(
           "Acquirer ID '{}' not found in database",
           acquirer_id.as_str() ));
         return Ok(errors); }} );
   let acquiree_pid : ID = (
-    match pid_from_id(
+    match pid_and_source_from_id(
       &config.db_name, driver, acquiree_id).await?
-    { Some(pid) => pid,
+    { Some((pid, _source)) => pid,
       None => {
         errors.push(format!(
           "Acquiree ID '{}' (requested by '{}') not found in database",

@@ -2,7 +2,7 @@ use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
-  skgnode_and_orgnode_from_pid};
+  skgnode_and_orgnode_from_id};
 use crate::rebuild::complete_aliascol::completeAliasCol;
 use crate::rebuild::integrate_backpath::{
   wrapped_build_and_integrate_containerward_view,
@@ -350,7 +350,7 @@ async fn extend_content (
   driver    : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( new_orgnode, _skgnode ) : ( OrgNode, SkgNode ) =
-    skgnode_and_orgnode_from_pid (
+    skgnode_and_orgnode_from_id (
       config, driver, disk_id ) . await ?;
   let mut parent_mut : NodeMut < OrgNode > =
     tree . get_mut ( parent_id )

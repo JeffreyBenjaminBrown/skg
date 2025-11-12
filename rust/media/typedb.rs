@@ -32,7 +32,6 @@ pub use search::{
 
 pub mod util;
 pub use util::{
-  pid_from_id,
   extract_payload_from_typedb_string_rep,
   pids_from_ids,
   conjugate_binary_role};

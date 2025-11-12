@@ -7,7 +7,7 @@
 /// - I say 'integrate' rather than 'insert' because some of the path,
 ///   maybe even all of it, might already be there.
 
-use crate::mk_org_text::content_view::skgnode_and_orgnode_from_pid;
+use crate::mk_org_text::content_view::skgnode_and_orgnode_from_id;
 use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
@@ -213,12 +213,14 @@ async fn integrate_cycle_in_node (
 async fn prepend_indefinitive_child_with_parent_ignores (
   tree       : &mut Tree < OrgNode >,
   parent_id  : ego_tree::NodeId,
-  child_pid  : &ID,
+  child_id   : &ID,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
   let ( mut child_orgnode, _ ) : ( OrgNode, _ ) =
-    skgnode_and_orgnode_from_pid ( config, driver, child_pid ) . await ?;
+    skgnode_and_orgnode_from_id (
+      config, driver, child_id
+    ). await ?;
   child_orgnode . metadata . code . relToParent =
     RelToParent::ParentIgnores;
   child_orgnode . metadata . code . indefinitive =
