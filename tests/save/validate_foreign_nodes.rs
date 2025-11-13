@@ -37,7 +37,7 @@ async fn setup_multi_source_test(
     },
   );
 
-  let config = SkgConfig {
+  let config: SkgConfig = SkgConfig {
     db_name: db_name.to_string(),
     tantivy_folder: PathBuf::from(format!("/tmp/tantivy-{}", db_name)),
     sources,
@@ -45,7 +45,7 @@ async fn setup_multi_source_test(
     delete_on_quit: false,
   };
 
-  let driver = TypeDBDriver::new(
+  let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,

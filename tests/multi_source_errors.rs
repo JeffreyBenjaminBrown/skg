@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
 use skg::save::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_trees};
-use skg::types::{OrgNode, BufferValidationError};
+use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode};
 use skg::media::file_io::{read_all_skg_files_from_sources, load_config};
 use skg::media::typedb::{create_all_nodes, create_all_relationships};
 use skg::init::{overwrite_new_empty_db, define_schema};
@@ -17,20 +17,23 @@ use futures::executor::block_on;
 fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
     // Load config from file and override db_name for this test
-    let mut config = load_config(
-      "tests/multi_source_errors/fixtures/skgconfig.toml")?;
+    let mut config: SkgConfig =
+      load_config(
+        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
     config.db_name = "skg-test-multi-source-errors-1".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-1");
 
     // Set up TypeDB driver
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
+    let driver: TypeDBDriver =
+      TypeDBDriver::new(
+        "127.0.0.1:1729",
+        Credentials::new("admin", "password"),
+        DriverOptions::new(false, None)?
+      ).await?;
 
     // Load fixtures into database
-    let nodes = read_all_skg_files_from_sources(&config.sources)?;
+    let nodes: Vec<SkgNode> =
+      read_all_skg_files_from_sources (&config.sources)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
     create_all_nodes(&config.db_name, &driver, &nodes).await?;
@@ -38,13 +41,14 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
-    let buffer_with_errors = indoc! {"
+    let buffer_with_errors: &str =
+      indoc! {"
         * (skg (id pub-1)) pub-1                                      # root with no source
         * (skg (id dub-1) (source dub)) dub-1                         # source does not exist
         * (skg (id priv-1) (source public)) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_save_instructions', as verified by 'test_reconciliation_errors'.
         * (skg (id priv-1) (source private)) priv-1                   # error: multiple defining orgnodes for this id
       "};
-    let buffer_text =
+    let buffer_text: String =
       strip_org_comments (buffer_with_errors);
     let mut trees: Vec<Tree<OrgNode>> =
       org_to_uninterpreted_nodes (&buffer_text)?;
@@ -103,18 +107,20 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 fn test_foreign_node_modification_errors(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let mut config = load_config(
-      "tests/multi_source_errors/fixtures/skgconfig.toml")?;
+    let mut config: SkgConfig =
+      load_config(
+        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
     config.db_name = "skg-test-multi-source-errors-2".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-2");
-    let driver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
-    ).await?;
+    let driver: TypeDBDriver =
+      TypeDBDriver::new(
+        "127.0.0.1:1729",
+        Credentials::new("admin", "password"),
+        DriverOptions::new(false, None)?
+      ).await?;
 
     // Load fixtures into database
-    let nodes =
+    let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config.sources)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
@@ -125,7 +131,7 @@ fn test_foreign_node_modification_errors(
     // (all other errors removed so initial validation passes)
     // Each line tests a different type of modification to get separate error reports
     {
-      let buffer_with_errors = indoc! {"
+      let buffer_with_errors: &str = indoc! {"
         * (skg (id ext-1) (source ext)) ext-1
         ** (skg (code (relToParent aliasCol))) aliases         # edit to aliases (set to empty)
         * (skg (id ext-2) (source ext)) ext-2-edited           # edit to title
@@ -139,7 +145,8 @@ fn test_foreign_node_modification_errors(
         Different body.
       "}; // note that nothing is wrong with ext-5
 
-      let buffer_text = strip_org_comments(buffer_with_errors);
+      let buffer_text: String =
+        strip_org_comments (buffer_with_errors);
       use skg::save::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
@@ -201,12 +208,12 @@ fn test_foreign_node_modification_errors(
     // Test 2: Foreign merge validations
     // Pipeline short-circuits on modification errors, so this tests merge errors separately
     {
-      let buffer_with_merges = indoc! {"
+      let buffer_with_merges: &str = indoc! {"
         * (skg (id pub-1) (source public) (code (merge ext-8))) pub-1  # merge into foreign acquirer (ext-8)
         * (skg (id ext-9) (source ext) (code (merge pub-2))) ext-9     # merge foreign acquiree (would delete ext-9)
       "};
 
-      let buffer_text = strip_org_comments(
+      let buffer_text: String = strip_org_comments(
         buffer_with_merges);
       use skg::save::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
@@ -267,20 +274,21 @@ fn test_foreign_node_modification_errors(
 fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
     // Load config from file and override db_name for this test
-    let mut config = load_config(
+    let mut config: SkgConfig = load_config(
       "tests/multi_source_errors/fixtures/skgconfig.toml")?;
     config.db_name = "skg-test-multi-source-errors-3".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-3");
 
     // Set up TypeDB driver
-    let driver = TypeDBDriver::new(
+    let driver: TypeDBDriver = TypeDBDriver::new(
       "127.0.0.1:1729",
       Credentials::new("admin", "password"),
       DriverOptions::new(false, None)?
     ).await?;
 
     // Load fixtures into database
-    let nodes = read_all_skg_files_from_sources(&config.sources)?;
+    let nodes: Vec<SkgNode> =
+      read_all_skg_files_from_sources (&config.sources)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
     create_all_nodes(&config.db_name, &driver, &nodes).await?;
@@ -289,11 +297,12 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Test 1: DiskSourceBufferSourceConflict
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
     {
-      let buffer_with_conflict = indoc! {"
+      let buffer_with_conflict: &str = indoc! {"
         * (skg (id priv-1) (source public)) priv-1  # disk has 'private', buffer says 'public'
       "};
 
-      let buffer_text = strip_org_comments(buffer_with_conflict);
+      let buffer_text: String =
+        strip_org_comments (buffer_with_conflict);
 
       use skg::save::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
@@ -332,12 +341,13 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Two instances of pub-1 with different sources in the same buffer
     // One must be indefinitive to trigger reconciliation
     {
-      let buffer_with_inconsistent = indoc! {"
+      let buffer_with_inconsistent: &str = indoc! {"
         * (skg (id pub-1) (source public)) pub-1                # definitive instance with 'public'
         * (skg (id pub-1) (source private) (code indefinitive)) pub-1  # indefinitive instance with 'private'
       "};
 
-      let buffer_text = strip_org_comments(buffer_with_inconsistent);
+      let buffer_text: String =
+        strip_org_comments (buffer_with_inconsistent);
 
       // This will fail during reconciliation (orgnodes_to_reconciled_save_instructions)
       use skg::save::buffer_to_save_instructions;
@@ -358,7 +368,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         match e {
           SaveError::DatabaseError(db_err) => {
             // InconsistentSources is wrapped in DatabaseError during reconciliation
-            let err_str = format!("{:?}", db_err);
+            let err_str: String = format!("{:?}", db_err);
             assert!(err_str.contains("InconsistentSources"),
                     "Expected InconsistentSources error, got: {}", err_str);
             println!("Successfully caught InconsistentSources error during reconciliation");

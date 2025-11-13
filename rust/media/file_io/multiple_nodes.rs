@@ -42,7 +42,7 @@ pub fn read_all_skg_files_from_sources (
           node.source = nickname.clone();
           for id in &node.ids {
             // Track which sources contain each ID
-            let id_str = id.as_str().to_string();
+            let id_str: String = id.as_str().to_string();
             seen_ids.entry(id_str)
               .or_insert_with(Vec::new)
               .push(nickname.clone()); }}
@@ -62,14 +62,14 @@ pub fn read_all_skg_files_from_sources (
                             sources_list.clone()); }}
 
   // Report errors if any were found
-  let has_duplicates = !duplicate_ids.is_empty();
-  let has_load_errors = !load_errors.is_empty();
+  let has_duplicates: bool = !duplicate_ids.is_empty();
+  let has_load_errors: bool = !load_errors.is_empty();
   if has_duplicates {
     report_duplicate_ids(&duplicate_ids)?; }
   if has_load_errors {
     report_load_errors(&load_errors)?; }
   if has_duplicates || has_load_errors {
-    let mut err_parts = Vec::new();
+    let mut err_parts: Vec<String> = Vec::new();
     if has_duplicates {
       if duplicate_ids.len() <= 10 {
         // Include details in error message for small numbers
@@ -105,7 +105,7 @@ fn read_skg_files_from_folder
          path . extension () . map_or (
            false,                // None => no extension found
            |ext| ext == "skg") ) // Some
-    { let mut node = read_node (&path) ?; // Placeholder - caller always overwrites with actual source
+    { let mut node: SkgNode = read_node (&path) ?; // Placeholder - caller always overwrites with actual source
       node.source = String::new();
       nodes.push (node); }}
   Ok (nodes) }
@@ -117,7 +117,7 @@ fn report_duplicate_ids(
   duplicates: &HashMap<String, // ID
                        Vec<String>> // sources
 ) -> io::Result<()> {
-  let count = duplicates.len();
+  let count: usize = duplicates.len();
   if count <= 10 {
     // Report to stderr only
     eprintln!("\nError: Found {} duplicate ID(s) across sources:",
@@ -126,8 +126,8 @@ fn report_duplicate_ids(
       eprintln!("  - ID '{}' in sources: {}",
                 id, sources.join(", ")); }
   } else { // Write to org file
-    let filename = "initialization-error_duplicate-ids.org";
-    let mut content = String::new();
+    let filename: &str = "initialization-error_duplicate-ids.org";
+    let mut content: String = String::new();
     content.push_str("#+title: Duplicate IDs Across Sources\n");
     content.push_str("#+date: <generated at initialization>\n\n");
     content.push_str(
@@ -142,7 +142,7 @@ fn report_duplicate_ids(
     for (id, sources) in sorted_ids {
       content.push_str(&format!("* {}\n", id));
       // Sort sources too
-      let mut sorted_sources = sources.clone();
+      let mut sorted_sources: Vec<String> = sources.clone();
       sorted_sources.sort();
       for source in sorted_sources {
         content.push_str(&format!("** {}\n", source)); }}
@@ -157,16 +157,19 @@ fn report_duplicate_ids(
 fn report_load_errors(
   errors: &[(String, String, String)]
 ) -> io::Result<()> {
-  let count = errors.len();
-  let filename = "initialization-error_unreadable-skg-files.org";
+  let count: usize = errors.len();
+  let filename: &str =
+    "initialization-error_unreadable-skg-files.org";
 
-  let mut content = String::new();
+  let mut content: String = String::new();
   content.push_str("#+title: Unreadable SKG Files\n");
   content.push_str("#+date: <generated at initialization>\n\n");
-  content.push_str(&format!("Found {} unreadable file(s).\n\n", count));
+  content.push_str( &format!(
+    "Found {} unreadable file(s).\n\n", count));
 
   // Sort errors by path for deterministic output
-  let mut sorted_errors = errors.to_vec();
+  let mut sorted_errors: Vec<(String, String, String)> =
+    errors.to_vec();
   sorted_errors.sort_by(|a, b| a.1.cmp(&b.1));
 
   for (source, filename_or_path, error_msg) in sorted_errors {
@@ -196,7 +199,7 @@ pub fn write_all_nodes_to_fs (
     . map( |node| node.source.as_str() )
     . collect();
   for source_name in unique_sources {
-    let source_config =
+    let source_config: &SkgfileSource =
       config . sources . get ( source_name )
       . ok_or_else( || io::Error::new(
         io::ErrorKind::NotFound,
