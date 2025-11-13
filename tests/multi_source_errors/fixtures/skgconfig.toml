@@ -1,0 +1,18 @@
+db_name = "skg-test-multi-source-errors"
+tantivy_folder = "/tmp/tantivy-test-multi-source-errors"
+port = 1730
+
+[[sources]]
+nickname = "public"
+path = "tests/multi_source_errors/fixtures/public"
+user_owns_it = true
+
+[[sources]]
+nickname = "private"
+path = "tests/multi_source_errors/fixtures/private"
+user_owns_it = true
+
+[[sources]]
+nickname = "ext"
+path = "tests/multi_source_errors/fixtures/ext"
+user_owns_it = false

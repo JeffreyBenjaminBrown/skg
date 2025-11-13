@@ -357,3 +357,24 @@ pub fn tantivy_contains_id(
     if id_value == Some(expected_id.to_string()) {
       return Ok(true); }}
   Ok(false) }
+
+/// Strips comments from an org-buffer string.
+///
+/// Comments are marked by '#' - everything after the first '#' on each line
+/// is removed, along with any trailing whitespace before the '#'.
+///
+/// # Example
+/// ```
+/// let input = "  * (skg (id 1)) title 1 # here's a comment\n  ** (skg (id 2)) title 2 # here's another";
+/// let result = strip_org_comments(input);
+/// assert_eq!(result, "  * (skg (id 1)) title 1\n  ** (skg (id 2)) title 2");
+/// ```
+pub fn strip_org_comments(s: &str) -> String {
+  s.lines()
+    .map(|line| {
+      if let Some(hash_pos) = line.find('#') {
+        // Remove everything from '#' onwards, then trim trailing whitespace
+        line[..hash_pos] . trim_end() . to_string()
+      } else { line . to_string() }} )
+    .collect::<Vec<String>>()
+    .join("\n") }

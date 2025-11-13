@@ -36,6 +36,7 @@ pub enum BufferValidationError {
   DiskSourceBufferSourceConflict (ID,
                                   SourceNickname, // disk source
                                   SourceNickname), // buffer source
+  SourceNotInConfig              (ID, SourceNickname),
   Other                          (String),
 }
 
@@ -100,6 +101,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
       BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) =>
         write!(f, "Source mismatch for node {:?}: disk has '{}', buffer specifies '{}'", id, disk_source, buffer_source),
+      BufferValidationError::SourceNotInConfig(id, source) =>
+        write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
       BufferValidationError::Other(msg) =>
         write!(f, "{}", msg), }} }
 

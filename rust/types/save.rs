@@ -128,6 +128,9 @@ fn format_buffer_validation_error (
     BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) => {
       format!("Source mismatch for node:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- Nodes cannot be moved between sources.\n",
               id.0, disk_source, buffer_source) },
+    BufferValidationError::SourceNotInConfig(id, source) => {
+      format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
+              id.0, source) },
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 

@@ -1,6 +1,6 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig};
+use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig, SourceNickname};
 use crate::merge::validate_merge_requests;
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -46,6 +46,7 @@ pub async fn find_buffer_errors_for_saving (
     validate_node_and_children (
       tree.root(),
       None, // because a root has no parent
+      config,
       &mut errors); }
   Ok(errors) }
 
@@ -66,6 +67,7 @@ fn validate_roots_have_sources(
 fn validate_node_and_children (
   node_ref: ego_tree::NodeRef<OrgNode>,
   parent_treatment : Option<RelToParent>, // that is, the treatment of the parent of what node_ref points to
+  config: &SkgConfig,
   errors: &mut Vec<BufferValidationError>
 ) {
 
@@ -136,9 +138,23 @@ fn validate_node_and_children (
                 BufferValidationError::DuplicatedContent (
                   child_id . clone () )); }} }} }}
 
+  { // Validate that the source exists in config
+    // todo ? For speed, we could restrict this check to those nodes that have a source specified in the original buffer-text, excluding nodes for which source is inherited from an ancestor.
+    if let Some(ref source_str) = node.metadata.source {
+      if ! config.sources.contains_key(source_str) {
+        let source_nickname: SourceNickname =
+          SourceNickname::from ( source_str.as_str() );
+        let node_id: ID =
+          node.metadata.id.clone()
+          .unwrap_or_else(|| ID::from("<no ID>"));
+        errors.push(
+          BufferValidationError::SourceNotInConfig(
+            node_id,
+            source_nickname )); }} }
+
   for child in node_ref.children() { // recurse
     let cloned_rel: RelToParent =
       node.metadata.code.relToParent.clone();
     validate_node_and_children(
-      child, Some(cloned_rel), errors);
+      child, Some(cloned_rel), config, errors);
   }}

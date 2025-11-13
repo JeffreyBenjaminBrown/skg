@@ -298,3 +298,51 @@ fn test_root_without_source_validation(
         node.title, "Root without source (invalid)",
         "RootWithoutSource error should identify correct node"); }
       Ok(( )) } )) }
+
+#[test]
+fn test_nonexistent_source_validation(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-nonexistent-source",
+    "tests/merge/merge_nodes_in_graph/fixtures",
+    "/tmp/tantivy-test-nonexistent-source",
+    |config, driver| Box::pin(async move {
+      { // Node with nonexistent source should be rejected
+        let input: &str =
+          indoc! {"
+                  * (skg (id root1) (source main)) Root with valid source
+                  ** (skg (id child1) (source nonexistent)) Child with invalid source
+                  * (skg (id root2) (source invalid_source)) Root with nonexistent source
+              "};
+        let trees: Vec<Tree<OrgNode>> =
+          org_to_uninterpreted_nodes(input).unwrap();
+        let errors: Vec<BufferValidationError> =
+          find_buffer_errors_for_saving(&trees, config, driver).await?;
+        let nonexistent_source_errors: Vec<&BufferValidationError> =
+          errors.iter()
+          .filter(
+            |e| matches!(e,
+                         BufferValidationError::SourceNotInConfig(_, _)))
+          .collect();
+
+        assert_eq!(nonexistent_source_errors.len(), 2,
+                   "Should find 2 SourceNotInConfig errors");
+
+        { // Check first error (child1 with 'nonexistent' source)
+          let found_child_error: bool =
+            nonexistent_source_errors.iter().any(|e| {
+              if let BufferValidationError::SourceNotInConfig(id, source) = e {
+                id.0 == "child1" && source.0 == "nonexistent"
+              } else { false } });
+          assert!(found_child_error,
+                  "Should find SourceNotInConfig error for child1 with source 'nonexistent'"); }
+
+        { // Check second error (root2 with 'invalid_source')
+          let found_root_error: bool =
+            nonexistent_source_errors.iter().any(|e| {
+              if let BufferValidationError::SourceNotInConfig(id, source) = e {
+                id.0 == "root2" && source.0 == "invalid_source"
+              } else { false } });
+          assert!(found_root_error,
+                  "Should find SourceNotInConfig error for root2 with source 'invalid_source'"); }}
+      Ok(( )) } )) }

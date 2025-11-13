@@ -1,5 +1,3 @@
-// Tests for rust/test_utils.rs
-
 use skg::test_utils::compare_headlines_modulo_id;
 
 #[test]
@@ -61,3 +59,42 @@ fn test_compare_headlines_modulo_id() {
   assert!(!compare_headlines_modulo_id(
     "* Title",
     "Body text" )); }
+
+#[test]
+fn test_strip_org_comments() {
+  use skg::test_utils::strip_org_comments;
+
+  // Test the example from the docs
+  let input: &str = concat!(
+    "  * (skg (id 1)) title 1 # here's a comment\n",
+    "  Here's a body. # and a body comment\n",
+    "  ** (skg (id 2)) title 2 # here's another");
+  let expected: &str = concat!(
+    "  * (skg (id 1)) title 1\n",
+    "  Here's a body.\n",
+    "  ** (skg (id 2)) title 2");
+  assert_eq!(strip_org_comments(input), expected);
+
+  // Test no comments
+  let input_no_comments: &str = "  * title\n  ** subtitle";
+  assert_eq!(strip_org_comments(input_no_comments), input_no_comments);
+
+  // Test comment at start of line
+  let input_start: &str = "# full line comment";
+  assert_eq!(strip_org_comments(input_start), "");
+
+  // Test multiple # symbols (only first should trigger comment)
+  let input_multi: &str = "  * title # comment with # another hash";
+  assert_eq!(strip_org_comments(input_multi), "  * title");
+
+  // Test trailing whitespace before comment is removed
+  let input_trailing: &str = "  * title   # comment";
+  assert_eq!(strip_org_comments(input_trailing), "  * title");
+
+  // Test empty string
+  assert_eq!(strip_org_comments(""), "");
+
+  // Test line with only whitespace and comment
+  let input_whitespace: &str = "   # just a comment";
+  assert_eq!(strip_org_comments(input_whitespace), "");
+}
