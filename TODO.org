@@ -123,3 +123,7 @@ fold-preservation
 * solutions
 ** to extract Emacs properties into Rust
    use [[~/hodal/emacs/property-dump.el][property-dump]]
+* save for posterity?
+** planning docs for multi-source branch
+   were deleted in this commit:
+   2dfa2c764202138bb75cc247ffdeedddad8347d0
