@@ -15,16 +15,12 @@ fn test_many_tantivy_things (
     "/tmp/tantivy-test-many-things";
 
   // Define the schema
-  let mut schema_builder: schema::SchemaBuilder =
-    schema::Schema::builder();
-  let id_field: schema::Field =
-    schema_builder.add_text_field(
-      "id", schema::STRING | schema::STORED);
-  let title_or_alias_field: schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias", schema::TEXT | schema::STORED);
   let schema: schema::Schema =
-    schema_builder.build();
+    skg::media::tantivy::mk_tantivy_schema();
+  let id_field: schema::Field =
+    schema.get_field("id").unwrap();
+  let title_or_alias_field: schema::Field =
+    schema.get_field("title_or_alias").unwrap();
 
   let index_path: &Path =
     Path::new ( index_dir );
@@ -43,9 +39,7 @@ fn test_many_tantivy_things (
     in_fs_wipe_index_then_create_it (
       &nodes,
       index_path,
-      schema,
-      id_field,
-      title_or_alias_field )?;
+      schema )?;
   assert!( indexed_count > 0,
            "Expected to index at least one title" );
 
@@ -126,7 +120,7 @@ fn test_many_tantivy_things (
   let final_doc1: tantivy::Document =
     final_searcher.doc(final_address1)?;
   let final_id1: &str =
-    final_doc1.get_first(id_field)
+    final_doc1.get_first(tantivy_index.id_field)
     .unwrap().as_text().unwrap();
 
   assert_eq!(final_id1, "6",
@@ -140,7 +134,7 @@ fn test_many_tantivy_things (
   let final_doc2: tantivy::Document =
     final_searcher.doc(final_address2)?;
   let final_id2: &str =
-    final_doc2.get_first(id_field)
+    final_doc2.get_first(tantivy_index.id_field)
     .unwrap().as_text().unwrap();
 
   assert_eq!(final_id2, "1",
@@ -207,22 +201,14 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let index_dir : &str =
     "/tmp/tantivy-test-aliases";
 
-  let mut schema_builder = schema::Schema::builder();
-  let id_field: schema::Field =
-    schema_builder.add_text_field(
-      "id", schema::STRING | schema::STORED);
-  let title_or_alias_field: schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias", schema::TEXT | schema::STORED);
-  let schema: schema::Schema = schema_builder.build();
+  let schema: schema::Schema =
+    skg::media::tantivy::mk_tantivy_schema();
 
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it(
       &nodes,
       Path::new(index_dir),
-      schema,
-      id_field,
-      title_or_alias_field)?;
+      schema)?;
 
   println!("Indexed {} documents", _indexed_count);
 
@@ -234,7 +220,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     matches1.iter()
     .map(|(_score, doc_address)| {
       let doc = searcher1 . doc (*doc_address) . unwrap();
-      doc . get_first(id_field) . unwrap()
+      doc . get_first(tantivy_index.id_field) . unwrap()
         . as_text() . unwrap() . to_string() })
     .collect();
 
@@ -254,7 +240,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let ids2: Vec<String> = matches2.iter()
     .map(|(_score, doc_address)| {
       let doc = searcher2.doc(*doc_address).unwrap();
-      doc.get_first(id_field).unwrap().as_text().unwrap().to_string()
+      doc.get_first(tantivy_index.id_field).unwrap().as_text().unwrap().to_string()
     })
     .collect();
 
@@ -269,7 +255,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let ids3: Vec<String> = matches3.iter()
     .map(|(_score, doc_address)| {
       let doc = searcher3.doc(*doc_address).unwrap();
-      doc.get_first(id_field).unwrap().as_text().unwrap().to_string()
+      doc.get_first(tantivy_index.id_field).unwrap().as_text().unwrap().to_string()
     })
     .collect();
 

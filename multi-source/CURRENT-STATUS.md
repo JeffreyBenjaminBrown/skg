@@ -1,14 +1,22 @@
 # Multi-Source Implementation - Current Status
 
 **Last Updated:** 2025-11-12
-**Status:** Phase 8 Complete (with merge validation fix)
-**Tests:** All 135 passing
+**Status:** Phase 10 Complete, Ready for Phase 11 (Polish & Documentation)
+**Tests:** All 136 passing
 
 ## Completed Phases
 
 - ✅ Phases 1-8: Core multi-source functionality (load, path generation, file writing, source inheritance, validation, foreign data protection)
 - ✅ Phase 9: Source made mandatory field
-- ✅ Phase 10 (partial): TypeDB integration (Tantivy pending)
+- ✅ Phase 10: Complete integration (TypeDB + Tantivy)
+  - **TypeDB:** SourceNickname newtype for type safety
+  - **TypeDB:** read_node_from_id returns (SkgNode, SourceNickname)
+  - **TypeDB:** Source validation between disk and buffer (DiskSourceBufferSourceConflict error)
+  - **Tantivy:** source_field added to schema and indexed
+  - **Tantivy:** All documents include source for potential filtering
+- ✅ Phase 8 enhancements:
+  - Aliases validated for foreign nodes with "no opinion" logic
+  - Type signatures added throughout
 
 ## What Works
 
@@ -59,14 +67,18 @@
 1. **Batch TypeDB lookups?** - Deferred until profiling shows need
 2. **Source renaming support?** - Document as unsupported for now
 
-## Next Steps: Phase 11 (Polish)
+## Next Steps: Phase 11 (Polish & Documentation)
 
-Phase 11 tasks:
-1. Add source field to error messages where relevant
-2. Update documentation (OVERVIEW.org, api-and-formats.md)
-3. Add comments explaining foreign data validation
-4. Performance testing with multiple sources
-5. Consider adding "list sources" API endpoint (optional)
+**Required:**
+1. Mark phase5-analysis.md and related docs as completed/obsolete
+2. Update OVERVIEW.org with multi-source model (if exists)
+3. Update api-and-formats.md (if exists)
+4. Review comments for clarity
+
+**Optional:**
+1. Performance testing with multiple sources
+2. Add source-filtered search capability to Tantivy
+3. Add "list sources" API endpoint
 
 ## Key Lessons
 
@@ -95,6 +107,13 @@ Phase 11 tasks:
 3. Multi-source test setup required custom helper function - `run_with_test_db` assumes single source
 4. Foreign validation placed perfectly after instruction generation - has all needed data, before writes
 5. Merge validation essential - merges modify acquirer and delete acquiree, both operations forbidden on foreign nodes
+6. Alias validation with "no opinion" logic - `None` in buffer means "no opinion", only validate if `Some(...)`
+
+**Phase 10:**
+1. SourceNickname newtype improves type safety - clear distinction from generic strings
+2. Returning source from read functions enables validation - disk vs buffer source comparison catches moves
+3. DiskSourceBufferSourceConflict error prevents accidental node migration between sources
+4. Type signatures throughout improve code clarity and catch errors earlier
 
 ## Documentation Guide
 

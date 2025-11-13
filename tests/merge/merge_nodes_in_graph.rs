@@ -90,25 +90,22 @@ async fn test_merge_2_into_1_impl(
   // Create a temporary Tantivy index for testing,
   // in the same directory that 'run_with_test_db' uses.
   fs::create_dir_all(&config.tantivy_folder)?;
-  let mut schema_builder: tantivy::schema::SchemaBuilder =
-    tantivy::schema::Schema::builder();
-  let id_field: tantivy::schema::Field =
-    schema_builder.add_text_field(
-      "id",
-      tantivy::schema::STRING | tantivy::schema::STORED);
-  let title_or_alias_field: tantivy::schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias",
-      tantivy::schema::TEXT | tantivy::schema::STORED);
   let tantivy_schema: tantivy::schema::Schema =
-    schema_builder.build();
+    skg::media::tantivy::mk_tantivy_schema();
+  let id_field: tantivy::schema::Field =
+    tantivy_schema.get_field("id").unwrap();
+  let title_or_alias_field: tantivy::schema::Field =
+    tantivy_schema.get_field("title_or_alias").unwrap();
+  let source_field: tantivy::schema::Field =
+    tantivy_schema.get_field("source").unwrap();
   let tantivy_index: tantivy::Index =
     tantivy::Index::create_in_dir(
       &config.tantivy_folder, tantivy_schema)?;
   let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
     index: std::sync::Arc::new(tantivy_index),
     id_field,
-    title_or_alias_field, };
+    title_or_alias_field,
+    source_field, };
 
   merge_nodes_in_graph(
     merge_instructions.clone(),
@@ -372,25 +369,22 @@ async fn test_merge_1_into_2_impl(
 
   // Create a temporary Tantivy index for testing
   fs::create_dir_all(&config.tantivy_folder)?;
-  let mut schema_builder: tantivy::schema::SchemaBuilder =
-    tantivy::schema::Schema::builder();
-  let id_field: tantivy::schema::Field =
-    schema_builder.add_text_field(
-      "id",
-      tantivy::schema::STRING | tantivy::schema::STORED);
-  let title_or_alias_field: tantivy::schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias",
-      tantivy::schema::TEXT | tantivy::schema::STORED);
   let tantivy_schema: tantivy::schema::Schema =
-    schema_builder.build();
+    skg::media::tantivy::mk_tantivy_schema();
+  let id_field: tantivy::schema::Field =
+    tantivy_schema.get_field("id").unwrap();
+  let title_or_alias_field: tantivy::schema::Field =
+    tantivy_schema.get_field("title_or_alias").unwrap();
+  let source_field: tantivy::schema::Field =
+    tantivy_schema.get_field("source").unwrap();
   let tantivy_index: tantivy::Index =
     tantivy::Index::create_in_dir(
       &config.tantivy_folder, tantivy_schema)?;
   let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
     index: std::sync::Arc::new(tantivy_index),
     id_field,
-    title_or_alias_field, };
+    title_or_alias_field,
+    source_field, };
 
   merge_nodes_in_graph(
     merge_instructions.clone(),

@@ -1,5 +1,17 @@
 # Phase 5: path_from_pid_and_source Call Site Analysis
 
+**STATUS: ✅ COMPLETED - 2025-11-12**
+
+All recommendations in this document have been implemented:
+- `path_from_pid_and_source` now accepts source parameter
+- `pid_and_source_from_id` helper function created for TypeDB queries
+- All call sites updated accordingly
+- TODO in reconcile_dup_instructions.rs resolved with source validation
+
+This document remains for historical reference.
+
+---
+
 ## Question
 Do callers of `path_from_pid_and_source` have access to the source nickname, or do they need to query TypeDB?
 

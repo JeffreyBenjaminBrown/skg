@@ -62,6 +62,7 @@ pub struct TantivyIndex {
   pub index                : Arc<Index>,
   pub id_field             : Field,
   pub title_or_alias_field : Field,
+  pub source_field         : Field,
 }
 
 

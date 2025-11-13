@@ -103,15 +103,8 @@ pub fn initialize_tantivy_from_nodes (
   println!("Initializing Tantivy index...");
 
   // Define the schema.
-  let mut schema_builder = schema::Schema::builder();
-  let id_field: schema::Field =
-    schema_builder.add_text_field(
-      "id", schema::STRING | schema::STORED);
-  let title_or_alias_field: schema::Field =
-    schema_builder.add_text_field(
-      "title_or_alias", schema::TEXT | schema::STORED);
   let schema: schema::Schema =
-    schema_builder.build();
+    crate::media::tantivy::mk_tantivy_schema();
 
   let index_path : &Path =
     Path::new ( & config . tantivy_folder );
@@ -120,9 +113,7 @@ pub fn initialize_tantivy_from_nodes (
     in_fs_wipe_index_then_create_it (
       nodes,
       index_path,
-      schema,
-      id_field,
-      title_or_alias_field )
+      schema )
     . unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1); } );
@@ -141,8 +132,6 @@ pub fn in_fs_wipe_index_then_create_it (
   nodes                : &[SkgNode],
   index_path           : &Path,
   schema               : schema::Schema,
-  id_field             : schema::Field,
-  title_or_alias_field : schema::Field,
 ) -> Result<(TantivyIndex,
              usize), // number of documents indexed
             Box<dyn Error>> {
@@ -150,12 +139,25 @@ pub fn in_fs_wipe_index_then_create_it (
   if index_path.exists() {
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all ( index_path )?;
+
+  // Get field handles from schema
+  let id_field: schema::Field =
+    schema.get_field("id")
+    .ok_or("Schema missing 'id' field")?;
+  let title_or_alias_field: schema::Field =
+    schema.get_field("title_or_alias")
+    .ok_or("Schema missing 'title_or_alias' field")?;
+  let source_field: schema::Field =
+    schema.get_field("source")
+    .ok_or("Schema missing 'source' field")?;
+
   let index : Index =
     Index::create_in_dir ( index_path, schema )?;
   let tantivy_index : TantivyIndex = TantivyIndex {
     index: Arc::new(index),
-    id_field: id_field,
-    title_or_alias_field, };
+    id_field,
+    title_or_alias_field,
+    source_field, };
   let indexed_count: usize = // populate it
     update_index_with_nodes ( nodes,
                               & tantivy_index )?;

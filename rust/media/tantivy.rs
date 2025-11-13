@@ -10,8 +10,24 @@ use crate::types::{ID, SkgNode, TantivyIndex};
 use tantivy::{IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
+use tantivy::schema;
 use std::error::Error;
 
+
+/// The only Tantivy schema used so far.
+/// It includes three fields:
+/// - "id": STRING | STORED - the node's primary ID
+/// - "title_or_alias": TEXT | STORED - searchable titles and aliases
+/// - "source": STRING | STORED - the source nickname
+pub fn mk_tantivy_schema() -> schema::Schema {
+  let mut schema_builder = schema::Schema::builder();
+  schema_builder.add_text_field(
+    "id", schema::STRING | schema::STORED);
+  schema_builder.add_text_field(
+    "title_or_alias", schema::TEXT | schema::STORED);
+  schema_builder.add_text_field(
+    "source", schema::STRING | schema::STORED);
+  schema_builder.build() }
 
 /// Returns the top 10 matching Tantivy "Documents"
 /// (see glossary, above).
@@ -122,7 +138,9 @@ pub fn create_documents_from_node (
         primary_id.as_str (),
       tantivy_index . title_or_alias_field =>
         replace_each_link_with_its_label (
-          & title_or_alias ));
+          & title_or_alias ),
+      tantivy_index . source_field =>
+        node.source.as_str() );
     documents_acc.push (doc); }
   Ok ( documents_acc ) }
 

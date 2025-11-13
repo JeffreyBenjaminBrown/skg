@@ -27,16 +27,8 @@ fn test_title_matches_org_format (
     : Result < (), Box < dyn std::error::Error >>
     = ( || {
       // Create schema
-      let mut schema_builder : schema::SchemaBuilder =
-        schema::Schema::builder ();
-      let id_field : schema::Field =
-        schema_builder . add_text_field (
-          "id", schema::STRING | schema::STORED );
-      let title_or_alias_field : schema::Field =
-        schema_builder . add_text_field (
-          "title_or_alias", schema::TEXT | schema::STORED );
       let schema : schema::Schema =
-        schema_builder . build ();
+        skg::media::tantivy::mk_tantivy_schema();
 
       // Create test nodes with overlapping titles/aliases
       let mut node1 : SkgNode = // the best match
@@ -72,9 +64,7 @@ fn test_title_matches_org_format (
         in_fs_wipe_index_then_create_it (
           &nodes,
           Path::new ( index_dir ),
-          schema,
-          id_field,
-          title_or_alias_field ) ?;
+          schema ) ?;
       let search_terms : &str =
         "the bear eats cheese";
       let result : String =
