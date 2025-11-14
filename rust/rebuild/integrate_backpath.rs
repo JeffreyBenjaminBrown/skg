@@ -36,7 +36,7 @@ pub async fn wrapped_build_and_integrate_containerward_view (
   tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?
     . value () . metadata . code . viewRequests
-    . remove ( &ViewRequest::ContainerwardView );
+    . remove ( &ViewRequest::Containerward );
   Ok (( )) }
 
 /// Integrate a containerward path into an OrgNode tree.
@@ -77,7 +77,7 @@ pub async fn wrapped_build_and_integrate_sourceward_view (
   tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?
     . value () . metadata . code . viewRequests
-    . remove ( &ViewRequest::SourcewardView );
+    . remove ( &ViewRequest::Sourceward );
   Ok (( )) }
 
 /// Integrate a sourceward path into an OrgNode tree.

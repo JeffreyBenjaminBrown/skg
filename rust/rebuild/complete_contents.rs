@@ -133,11 +133,11 @@ fn complete_node_preorder<'a> (
             . iter () . cloned () . collect () };
         for request in view_requests {
           match request {
-            ViewRequest::ContainerwardView => {
+            ViewRequest::Containerward => {
               wrapped_build_and_integrate_containerward_view (
                 tree, node_id, config, typedb_driver, errors )
                 . await ?; },
-            ViewRequest::SourcewardView => {
+            ViewRequest::Sourceward => {
               wrapped_build_and_integrate_sourceward_view (
                 tree, node_id, config, typedb_driver, errors )
                 . await ?; }, }} }}
