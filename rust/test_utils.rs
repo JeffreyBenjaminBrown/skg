@@ -1,4 +1,4 @@
-use crate::save::{headline_to_triple, HeadlineInfo};
+use crate::read_buffer::{headline_to_triple, HeadlineInfo};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};

@@ -3,6 +3,7 @@ pub mod init;
 pub mod media;
 pub mod merge;
 pub mod mk_org_text;
+pub mod read_buffer;
 pub mod rebuild;
 pub mod save;
 pub mod serve;

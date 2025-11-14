@@ -11,7 +11,7 @@ mod util {
 }
 
 use skg::mk_org_text::single_root_view;
-use skg::save::org_to_uninterpreted_nodes;
+use skg::read_buffer::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;

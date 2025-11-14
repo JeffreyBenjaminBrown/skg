@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::save::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_trees};
+use skg::read_buffer::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_trees};
 use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode};
 use skg::media::file_io::{read_all_skg_files_from_sources, load_config};
 use skg::media::typedb::{create_all_nodes, create_all_relationships};
@@ -147,7 +147,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      use skg::save::buffer_to_save_instructions;
+      use skg::read_buffer::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -215,7 +215,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      use skg::save::buffer_to_save_instructions;
+      use skg::read_buffer::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -304,7 +304,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_conflict);
 
-      use skg::save::buffer_to_save_instructions;
+      use skg::read_buffer::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -350,7 +350,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent);
 
       // This will fail during reconciliation (orgnodes_to_reconciled_save_instructions)
-      use skg::save::buffer_to_save_instructions;
+      use skg::read_buffer::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,

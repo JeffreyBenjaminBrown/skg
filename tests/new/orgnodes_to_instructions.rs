@@ -4,7 +4,7 @@
 // so revising these tests feels low-priority.)
 
 use indoc::indoc;
-use skg::save::{org_to_uninterpreted_nodes, interpret};
+use skg::read_buffer::{org_to_uninterpreted_nodes, interpret};
 use skg::types::{OrgNode, ID, SkgNode, NonMerge_NodeAction};
 use ego_tree::Tree;
 

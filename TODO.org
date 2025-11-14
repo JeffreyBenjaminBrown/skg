@@ -1,25 +1,13 @@
+* change how alias requests are handled
+** review how it currently works
+** for consistency with upcoming sharing rels
+* request definitive view at a node
+** for repeats
+** for subscriptions
+   which initially show just the title -- not even the content,
+     let alone the recursive content
+* initial node limit for content view
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
-* TODO ? move buffer_to_save_instructions
-** question
-Are these:
-
-    org_to_uninterpreted_nodes,
-    headline_to_triple,
-    HeadlineInfo,
-    find_inconsistent_instructions,
-    find_buffer_errors_for_saving,
-    add_missing_info_to_trees,
-    orgnodes_to_reconciled_save_instructions,
-    interpret,
-    reconcile_dup_instructions,
-    clobber_none_fields_with_data_from_disk,
-
-called by anything but buffer_to_save_instructions?
-** original idea
-   from
-     rust/save.rs
-   to at the shallowest
-     rust/save/buffer_to_orgnodes.rs.
 * aliases_to_org should rebuild the whole buffer
   like request containerward view
 * most plans are online

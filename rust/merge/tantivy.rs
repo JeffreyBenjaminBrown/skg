@@ -1,4 +1,4 @@
-use crate::save::update::tantivy::update_index_from_saveinstructions;
+use crate::save::update_index_from_saveinstructions;
 use crate::types::{MergeInstructionTriple, SaveInstruction, TantivyIndex};
 use std::error::Error;
 

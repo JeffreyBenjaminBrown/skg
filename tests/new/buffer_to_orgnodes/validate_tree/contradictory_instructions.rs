@@ -3,7 +3,7 @@
 use ego_tree::Tree;
 use indoc::indoc;
 use skg::types::{OrgNode, ID, BufferValidationError};
-use skg::save::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
+use skg::read_buffer::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
 

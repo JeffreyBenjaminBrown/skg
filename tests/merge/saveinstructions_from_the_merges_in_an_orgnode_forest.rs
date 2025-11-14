@@ -1,6 +1,6 @@
 use indoc::indoc;
 use skg::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
-use skg::save::org_to_uninterpreted_nodes;
+use skg::read_buffer::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, NonMerge_NodeAction};
 use std::error::Error;

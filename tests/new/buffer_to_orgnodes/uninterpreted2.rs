@@ -1,7 +1,7 @@
 // cargo test uninterpreted2
 
 use indoc::indoc;
-use skg::save::org_to_uninterpreted_nodes;
+use skg::read_buffer::org_to_uninterpreted_nodes;
 use skg::types::{ID, OrgNode, RelToParent};
 use ego_tree::Tree;
 
