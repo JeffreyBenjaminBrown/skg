@@ -1,6 +1,3 @@
-* change how alias requests are handled
-** review how it currently works
-** for consistency with upcoming sharing rels
 * request definitive view at a node
 ** for repeats
 ** for subscriptions

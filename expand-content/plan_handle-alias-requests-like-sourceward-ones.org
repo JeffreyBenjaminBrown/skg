@@ -1,0 +1,457 @@
+#+title: Plan: Handle Alias Requests Like Sourceward/Containerward Ones
+#+date: 2025-11-14
+
+* Overview
+
+Currently, alias view requests work differently from containerward and sourceward view requests:
+- Alias views use a special API request that returns only a portion of text (the AliasCol and Alias children)
+- Containerward/sourceward views use metadata in the buffer that triggers full buffer regeneration during save
+
+This plan describes how to unify these approaches so that alias views work the same way as containerward/sourceward views.
+
+Since there are no existing users, the old implementation will be completely removed as part of this work.
+
+* Current Alias View System (to be removed)
+
+** Client Side (Emacs)
+1. User calls =skg-request-node-aliases= (interactive command)
+2. Client extracts headline text and calculates insertion point
+3. Client sends special request: =((request . "node aliases") (headline . "..."))=
+4. Client receives length-prefixed response containing only AliasCol and Alias children
+5. Client inserts response at computed insertion point using =skg-insert-aliases-at-point=
+
+** Server Side (Rust)
+1. =handle_node_aliases_request= in =rust/serve/handlers/node_aliases.rs= handles the request
+2. Parses headline to extract ID and level
+3. Calls =fetch_aliases_from_file= to get aliases from disk
+4. Calls =aliases_to_org= to format just the alias nodes (AliasCol + Alias children)
+5. Sends back only the formatted alias subtree (not the full buffer)
+
+** Key Files (Current System)
+- =elisp/skg-request-node-aliases.el= - Client request function
+- =rust/serve/handlers/node_aliases.rs= - Server handler
+- =rust/mk_org_text/aliases.rs= - Org-mode formatting for aliases
+- =rust/media/file_io/one_node.rs= - Contains =fetch_aliases_from_file=
+
+* Target System: Containerward/Sourceward View Model
+
+** Client Side (Emacs)
+1. User calls =skg-request-containerward-view= or =skg-request-sourceward-view=
+2. Function adds metadata to headline: =(code (viewRequests containerwardView))= or =(code (viewRequests sourcewardView))=
+3. Function immediately saves buffer by calling =skg-request-save-buffer=
+4. Client receives complete regenerated buffer with view integrated
+
+** Server Side (Rust)
+1. During save processing, =complete_node_preorder= (in =rust/rebuild/complete_contents.rs:84=) processes each node
+2. After completing node and its children, it checks for view requests (line 128)
+3. For each =ViewRequest= in the node's metadata:
+   - =ViewRequest::Containerward= → calls =wrapped_build_and_integrate_containerward_view=
+   - =ViewRequest::Sourceward= → calls =wrapped_build_and_integrate_sourceward_view=
+4. These functions:
+   - Build the path from TypeDB
+   - Integrate the path into the tree at the appropriate location
+   - Remove the view request from metadata
+5. Server sends back complete regenerated buffer
+
+** Key Files (Target System)
+- =elisp/skg-request-backward-view.el= - Client request functions
+- =rust/rebuild/complete_contents.rs= - Main completion logic with view request handling
+- =rust/rebuild/integrate_backpath.rs= - Path integration functions
+
+* Changes Required
+
+** 1. Type System Changes (Rust)
+
+*** File: =rust/types/orgnode.rs=
+
+Add =Aliases= variant to =ViewRequest= enum:
+#+begin_src rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ViewRequest {
++ Aliases,
+  Containerward,
+  Sourceward,
+}
+#+end_src
+
+Add Display implementation for =Aliases=:
+#+begin_src rust
+impl fmt::Display for ViewRequest {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>
+  ) -> fmt::Result {
+    match self {
++     ViewRequest::Aliases       => write!(f, "aliases"),
+      ViewRequest::Containerward => write!(f, "containerwardView"),
+      ViewRequest::Sourceward    => write!(f, "sourcewardView"),
+    } } }
+#+end_src
+
+Add FromStr implementation for =Aliases=:
+#+begin_src rust
+impl FromStr for ViewRequest {
+  type Err = String;
+
+  fn from_str (
+    s : &str
+  ) -> Result<Self, Self::Err> {
+    match s {
++     "aliases"           => Ok ( ViewRequest::Aliases ),
+      "containerwardView" => Ok ( ViewRequest::Containerward ),
+      "sourcewardView"    => Ok ( ViewRequest::Sourceward ),
+      _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),
+    }} }
+#+end_src
+
+*** File: =rust/types.rs=
+
+Update the comment documenting ViewRequest to include Aliases:
+#+begin_src rust
+        ViewRequest, // aliases | containerward | sourceward. Can request multiple.
+#+end_src
+
+** 2. Server Side Changes (Rust)
+
+*** File: =rust/rebuild/aliases.rs= (NEW FILE)
+
+Create a new file for alias view integration, since aliases are fundamentally different from backpaths (backpaths can fork and cycle; aliases are just a flat list).
+
+Add new function =wrapped_build_and_integrate_aliases_view=:
+#+begin_src rust
+pub async fn wrapped_build_and_integrate_aliases_view (
+  tree          : &mut Tree < OrgNode >,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  if let Err ( e ) = build_and_integrate_aliases (
+    tree, node_id, config, typedb_driver ) . await
+  {
+    errors . push (
+      format! ( "Failed to integrate aliases view: {}", e )); }
+  tree . get_mut ( node_id )
+    . ok_or ( "Node not found in tree" ) ?
+    . value () . metadata . code . viewRequests
+    . remove ( &ViewRequest::Aliases );
+  Ok (( )) }
+#+end_src
+
+Add new function =build_and_integrate_aliases=:
+#+begin_src rust
+/// Integrate an aliases view into an OrgNode tree.
+/// This is called on a specific node in the tree,
+/// and integrates an AliasCol child with Alias grandchildren.
+///
+/// IMPORTANT: This function fetches aliases from disk and populates them immediately,
+/// unlike the original plan which relied on completeAliasCol.
+/// This is necessary because view requests are processed AFTER recursing to children,
+/// so any newly-created AliasCol wouldn't be visited by completeAliasCol
+/// in the same save cycle.
+pub async fn build_and_integrate_aliases (
+  tree      : &mut Tree < OrgNode >,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  // Get the node's ID
+  let node_id_val : ID =
+    tree . get ( node_id ) . unwrap ()
+    . value () . metadata . id . clone ()
+    . ok_or ( "Node has no ID" ) ?;
+
+  // Check if this node already has an AliasCol child
+  // If yes, do nothing (completeAliasCol already handled it)
+  let has_aliascol : bool = {
+    let node_ref = tree . get ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    node_ref . children ()
+      . any ( |child| child . value () . metadata . code.relToParent == RelToParent::AliasCol )
+  };
+
+  if has_aliascol {
+    return Ok (( ));
+  }
+
+  // Fetch aliases from disk
+  let aliases : Vec < String > =
+    fetch_aliases_from_file (
+      config,
+      driver,
+      node_id_val ) . await;
+
+  // Create AliasCol child node
+  let mut md_col : OrgnodeMetadata = default_metadata ();
+  md_col . code.relToParent = RelToParent::AliasCol;
+
+  let aliascol : OrgNode = OrgNode {
+    metadata : md_col,
+    title    : String::new (),
+    body     : None,
+  };
+
+  // Append AliasCol to the tree
+  let mut node_mut = tree . get_mut ( node_id )
+    . ok_or ( "Node not found in tree" ) ?;
+  let aliascol_id : ego_tree::NodeId =
+    node_mut . append ( aliascol ) . id ();
+
+  // Create and append Alias children
+  for alias in aliases {
+    let mut md_alias : OrgnodeMetadata = default_metadata ();
+    md_alias . code.relToParent = RelToParent::Alias;
+
+    let alias_node : OrgNode = OrgNode {
+      metadata : md_alias,
+      title    : alias,
+      body     : None,
+    };
+
+    let mut aliascol_mut = tree . get_mut ( aliascol_id )
+      . ok_or ( "AliasCol node not found" ) ?;
+    aliascol_mut . append ( alias_node );
+  }
+
+  Ok (( )) }
+#+end_src
+
+Required imports at top of file:
+#+begin_src rust
+use crate::media::file_io::one_node::fetch_aliases_from_file;
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{OrgNode, OrgnodeMetadata, RelToParent, ViewRequest, default_metadata};
+
+use ego_tree::Tree;
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
+#+end_src
+
+*** File: =rust/rebuild/complete_contents.rs=
+
+Add =ViewRequest::Aliases= case to the match statement in =complete_node_preorder= (around line 134):
+#+begin_src rust
+      { // integrate view requests
+        let view_requests : Vec < ViewRequest > = {
+          let node_ref : ego_tree::NodeRef < OrgNode > =
+            tree . get ( node_id )
+            . ok_or ( "Node not found in tree" ) ?;
+          node_ref . value () . metadata . code . viewRequests
+            . iter () . cloned () . collect () };
+        for request in view_requests {
+          match request {
++           ViewRequest::Aliases => {
++             wrapped_build_and_integrate_aliases_view (
++               tree, node_id, config, typedb_driver, errors )
++               . await ?; },
+            ViewRequest::Containerward => {
+              wrapped_build_and_integrate_containerward_view (
+                tree, node_id, config, typedb_driver, errors )
+                . await ?; },
+            ViewRequest::Sourceward => {
+              wrapped_build_and_integrate_sourceward_view (
+                tree, node_id, config, typedb_driver, errors )
+                . await ?; }, }} }}
+#+end_src
+
+Add import at top of file:
+#+begin_src rust
+use crate::rebuild::aliases::wrapped_build_and_integrate_aliases_view;
+use crate::rebuild::integrate_backpath::{
+  wrapped_build_and_integrate_containerward_view,
+  wrapped_build_and_integrate_sourceward_view, };
+#+end_src
+
+*** File: =rust/rebuild.rs= or =rust/rebuild/mod.rs=
+
+Add module declaration:
+#+begin_src rust
+pub mod aliases;
+#+end_src
+
+** 3. Client Side Changes (Emacs)
+
+*** File: =elisp/skg-request-backward-view.el= → =elisp/skg-request-views.el=
+
+Rename the file from =skg-request-backward-view.el= to =skg-request-views.el= since it now handles all three view types (aliases, containerward, sourceward).
+
+Add new function =skg-request-aliases-view=:
+#+begin_src emacs-lisp
+(defun skg-request-aliases-view ()
+  "Request aliases view for the headline at point."
+  (interactive)
+  (skg--request-view 'aliases))
+#+end_src
+
+Update the =provide= statement:
+#+begin_src emacs-lisp
+(provide 'skg-request-views)
+#+end_src
+
+Update header comment to reflect that this file handles all view request types.
+
+** 4. Cleanup of Old Implementation
+
+Since there are no existing users, we can completely remove the old implementation rather than deprecating it.
+
+*** File: =rust/serve.rs=
+
+Remove the "node aliases" request handling from the main request dispatcher.
+
+*** File: =rust/serve/handlers/node_aliases.rs=
+
+Delete this entire file - the functionality is now handled by view requests.
+
+*** File: =elisp/skg-request-node-aliases.el=
+
+Delete this entire file - replaced by =skg-request-aliases-view= in =elisp/skg-request-backward-view.el=.
+
+*** File: =rust/mk_org_text/aliases.rs=
+
+Review and possibly delete =aliases_to_org= function - it may no longer be needed.
+Note: =fetch_aliases_from_file= in =rust/media/file_io/one_node.rs= is still used by =completeAliasCol=, so keep that.
+
+*** Remove from module exports
+
+Check and remove any exports/re-exports of deleted functions in:
+- =rust/serve/handlers/mod.rs= (if it exists)
+- =rust/mk_org_text/mod.rs= (if it exists)
+
+** 5. Documentation Updates
+
+*** File: =api-and-formats.md=
+
+Remove the "Node aliases" endpoint entry entirely from the API documentation.
+
+*** File: =OVERVIEW.org=
+
+Update section about alias views (around line 256):
+#+begin_example
+** One can request an 'aliases view' at an orgnode.
+   Call that orgnode N.
+   Add the metadata (code (viewRequests aliases)) to N and save.
+   After the save completes, N will have a child C entitled 'aliases'
+   (with metadata indicating relToParent=aliasCol),
+   whose children (so N's grandchildren) are the aliases of N
+   (each with metadata indicating relToParent=alias).
+   This permits the user to edit the aliases of N.
+#+end_example
+
+* Implementation Order
+
+The changes should be implemented in this order to maintain working code at each step.
+
+Since there are no existing users, cleanup of the old implementation is included as a core step rather than being optional or postponed:
+
+1. *Type System* (rust/types/orgnode.rs, rust/types.rs)
+   - Add =Aliases= variant to =ViewRequest= enum
+   - Add Display and FromStr implementations
+   - Update documentation comments
+
+2. *Server Integration Logic* (rust/rebuild/aliases.rs - NEW FILE)
+   - Create new file =rust/rebuild/aliases.rs=
+   - Add =wrapped_build_and_integrate_aliases_view= function
+   - Add =build_and_integrate_aliases= function
+   - Add necessary imports
+   - Add module declaration in =rust/rebuild.rs= or =rust/rebuild/mod.rs=
+
+3. *Server Request Handling* (rust/rebuild/complete_contents.rs)
+   - Add =ViewRequest::Aliases= case to match statement
+   - Add import for =wrapped_build_and_integrate_aliases_view=
+
+4. *Client Function* (elisp/skg-request-views.el)
+   - Rename =elisp/skg-request-backward-view.el= to =elisp/skg-request-views.el=
+   - Update =provide= statement to ='skg-request-views=
+   - Update header comment
+   - Add =skg-request-aliases-view= function
+   - Update any files that import/require =skg-request-backward-view= to use =skg-request-views=
+   - Test that it works end-to-end
+
+5. *Testing*
+   - Create integration test similar to containerward-view-request
+   - Verify that aliases are properly integrated and displayed
+   - Verify that the view request is removed after processing
+
+6. *Cleanup of Old Implementation*
+   - Delete =rust/serve/handlers/node_aliases.rs=
+   - Delete =elisp/skg-request-node-aliases.el=
+   - Remove "node aliases" request handling from =rust/serve.rs=
+   - Review and clean up =rust/mk_org_text/aliases.rs= (may be able to delete =aliases_to_org=)
+   - Remove any module exports for deleted code
+   - Update any references in other test files or documentation
+
+7. *Documentation Updates* (api-and-formats.md, OVERVIEW.org)
+   - Remove old "Node aliases" endpoint from API documentation
+   - Update OVERVIEW.org to describe new approach
+
+* Key Differences from Current Implementation
+
+** Server Behavior
+- *Old*: Returns only AliasCol and Alias children as partial text
+- *New*: Returns complete regenerated buffer with AliasCol integrated
+
+** Client Behavior
+- *Old*: Makes special API request, inserts response at specific point
+- *New*: Adds metadata to headline, saves buffer, receives complete buffer
+
+** Integration Point
+- *Old*: Handled in special request handler (=handle_node_aliases_request=)
+- *New*: Handled during normal save processing in =complete_node_preorder=
+
+** Idempotency
+- *Old*: Calling multiple times creates duplicate AliasCol children
+- *New*: Calling multiple times is safe (checks if AliasCol already exists)
+
+* Benefits of This Approach
+
+1. *Consistency*: All view requests (aliases, containerward, sourceward) work the same way
+2. *Simplification*: Reduces special-case code in both client and server
+3. *Robustness*: Leverages existing save/completion infrastructure
+4. *Maintainability*: Easier to understand and modify in the future
+5. *Full Buffer Updates*: User always gets a complete, consistent view of the data
+
+* Testing Strategy
+
+Create integration test at =tests/integration/aliases-view-request/= modeled after =tests/integration/containerward-view-request/=:
+
+** Test Scenarios
+1. Request aliases view on node with no existing AliasCol
+   - Should create AliasCol child
+   - Should populate with Alias grandchildren from disk
+
+2. Request aliases view on node with existing AliasCol
+   - Should not create duplicate AliasCol
+   - Should update existing AliasCol via =completeAliasCol=
+
+3. Verify view request is removed after processing
+   - Metadata should not contain =aliases= in =viewRequests= after save completes
+
+** Test Files
+- =tests/integration/aliases-view-request/run-test.sh= - Test orchestration
+- =tests/integration/aliases-view-request/test-emacs.el= - Emacs test logic
+- =tests/integration/aliases-view-request/expected.org= - Expected output (if needed)
+
+* Potential Issues and Mitigations
+
+** Issue: Performance
+Creating and sending full buffer instead of just aliases might be slower.
+
+*Mitigation*: The existing containerward/sourceward views already do this, so no new performance impact. The completion infrastructure is designed for this.
+
+** Issue: AliasCol Already Exists
+If user manually created an AliasCol, the view request should still work.
+
+*Mitigation*: The =build_and_integrate_aliases= function checks for existing AliasCol and doesn't create duplicates.
+
+** Issue: Focus Preservation
+Current implementation has focus-handling logic in =completeAliasCol=.
+
+*Mitigation*: This is preserved - =completeAliasCol= is still called during normal processing, so focus handling continues to work.
+
+* Notes
+
+- The =build_and_integrate_aliases= function fetches aliases from disk and populates the AliasCol immediately. This is necessary because view requests are processed *after* recursing to children, so a newly-created empty AliasCol wouldn't be visited by =completeAliasCol= in the same save cycle.
+
+- If a user manually added an AliasCol before requesting the view, =build_and_integrate_aliases= detects this and skips creation to avoid duplicates.
+
+- The function reuses =fetch_aliases_from_file= from =rust/media/file_io/one_node.rs=, which is also used by =completeAliasCol=.

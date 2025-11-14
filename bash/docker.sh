@@ -10,6 +10,8 @@ docker exec -it $CONTAINER_NAME bash
 # e.g. 1729=1729 (TypeDB).
 NATIVE=/home/jeff/hodal/skg
 docker run --name "$CONTAINER_NAME" -it -d \
+  -v /run/user/1000/pipewire-0:/run/user/1000/pipewire-0   \
+  -e PIPEWIRE_RUNTIME_DIR=/run/user/1000                   \
   --network host                           \
   --platform linux/amd64                   \
   --user 1000:1000                         \
