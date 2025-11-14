@@ -55,7 +55,7 @@
       (org-mode)
 
       ;; Insert the 6 headlines
-      (insert "* (skg (id 1)) 1\n")
+      (insert "* (skg (id 1) (source main)) 1\n")
       (insert "** (skg (id 2)) 2\n")
       (insert "** (skg (id 3)) 3\n")
       (insert "*** (skg (id 4)) 4\n")

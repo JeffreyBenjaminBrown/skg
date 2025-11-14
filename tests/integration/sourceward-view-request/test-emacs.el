@@ -6,7 +6,7 @@
 (defvar integration-test-completed nil)
 
 (defconst skg-sourceward-base-buffer
-  "* (skg (id 1)) 1
+  "* (skg (id 1) (source main)) 1
 ** (skg (id 11)) 11
 ** (skg (id 12)) 12
 ")
@@ -68,18 +68,18 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-line0
-         (concat "* (skg (id 1) (view (rels (containers 0) (contents 2)))) 1\n"
-                 "** (skg (id 11) (view (rels (linksIn 1)))) 11\n"
-                 "** (skg (id 12)) 12\n"))
+         (concat "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) 1\n"
+                 "** (skg (id 11) (source main) (view (rels (linksIn 1)))) 11\n"
+                 "** (skg (id 12) (source main)) 12\n"))
         (expected-line2
-         (concat "* (skg (id 1) (view (rels (containers 0) (contents 2)))) 1\n"
-                 "** (skg (id 11) (view (rels (linksIn 1)))) 11\n"
-                 "** (skg (id 12)) 12\n"))
+         (concat "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) 1\n"
+                 "** (skg (id 11) (source main) (view (rels (linksIn 1)))) 11\n"
+                 "** (skg (id 12) (source main)) 12\n"))
         (expected-changed
-         (concat "* (skg (id 1) (view (rels (containers 0) (contents 2)))) 1\n"
-                 "** (skg (id 11) (view (rels (linksIn 1)))) 11\n"
-                 "*** (skg (id l-11) (view (rels notInParent (containers 0))) (code (relToParent parentIgnores) indefinitive)) [[id:11][a link to 11]]\n"
-                 "** (skg (id 12)) 12\n"))
+         (concat "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) 1\n"
+                 "** (skg (id 11) (source main) (view (rels (linksIn 1)))) 11\n"
+                 "*** (skg (id l-11) (source main) (view (rels notInParent (containers 0))) (code (relToParent parentIgnores) indefinitive)) [[id:11][a link to 11]]\n"
+                 "** (skg (id 12) (source main)) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))
 

@@ -90,7 +90,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
 
     let expected_output : &str =
       indoc! { "
-        * (skg (id a) (view repeated) (code indefinitive)) a
+        * (skg (id a) (source main) (view repeated) (code indefinitive)) a
         Repeated, probably above. Edit there, not here.
       " };
     let output_org_text : String =
@@ -192,7 +192,7 @@ async fn test_visited_and_indefinitive_logic (
 
       let expected_output : &str =
         indoc! { "
-          * (skg (id a) (view repeated) (code indefinitive)) a
+          * (skg (id a) (source main) (view repeated) (code indefinitive)) a
           Repeated, probably above. Edit there, not here.
         " };
       let output_org_text : String =
@@ -254,7 +254,7 @@ async fn test_visited_and_indefinitive_logic (
       let expected_output_from_second : &str =
         indoc! { "
           * (skg (id d) (code indefinitive)) d
-          ** (skg (id d) (view repeated) (code indefinitive)) d
+          ** (skg (id d) (source main) (view repeated) (code indefinitive)) d
           Repeated, probably above. Edit there, not here.
         " };
       let output_org_text : String =
@@ -309,7 +309,7 @@ async fn test_visited_and_not_indefinitive_logic (
 
     let expected_output : &str =
       indoc! { "
-        * (skg (id a) (view repeated) (code indefinitive)) a
+        * (skg (id a) (source main) (view repeated) (code indefinitive)) a
         Repeated, probably above. Edit there, not here.
       " };
     let output_org_text : String =
@@ -340,7 +340,7 @@ async fn test_visited_and_not_indefinitive_logic (
       indoc! { "
         * (skg (id a)) a
         ** (skg (id d) (code (relToParent parentIgnores))) d
-        ** (skg (id b)) b
+        ** (skg (id b) (source main)) b
         ** (skg (id c)) c
       " };
     let output_org_text : String =
@@ -379,7 +379,7 @@ async fn test_visited_and_not_indefinitive_logic (
         * (skg (id a)) a
         ** (skg (id d) (code (relToParent parentIgnores))) d
         ** (skg (id b)) b
-        ** (skg (id c)) c
+        ** (skg (id c) (source main)) c
       " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
@@ -429,7 +429,7 @@ async fn test_false_content_logic (
     indoc! { "
       * (skg (id a)) a
       ** (skg (id d) (code (relToParent parentIgnores))) d
-      ** (skg (id b)) b
+      ** (skg (id b) (source main)) b
       ** (skg (id c)) c
     " };
   let output_org_text : String =

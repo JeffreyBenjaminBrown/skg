@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use skg::media::file_io::{
   read_node, write_node, fetch_aliases_from_file};
-use skg::mk_org_text::aliases_to_org;
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 use skg::test_utils::run_with_test_db;
 
@@ -188,24 +187,4 @@ async fn test_fetch_aliases_from_file_impl(
       &config, driver, ID::new ("node_without_aliases") ).await;
   assert_eq! ( no_aliases_result, Vec::<String>::new(),
                "Should return empty Vec when no aliases" );
-  Ok (( )) }
-
-#[test]
-fn test_aliases_to_org() -> std::io::Result<()> {
-  assert_eq! ( // a node without aliases
-    aliases_to_org ( vec![], 3 ),
-    "**** (skg (code (relToParent aliasCol)))\n",
-    "Should return just header for node without aliases" );
-
-  assert_eq! ( // a node with aliases
-    aliases_to_org (
-      vec![ "first alias".to_string(),
-             "second alias".to_string() ], 1 ),
-    indoc! { r#"
-      ** (skg (code (relToParent aliasCol)))
-      *** (skg (code (relToParent alias))) first alias
-      *** (skg (code (relToParent alias))) second alias
-      "# }, // trailing newline matters
-    "Should return header + alias lines for node with aliases" );
-
   Ok (( )) }

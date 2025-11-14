@@ -195,6 +195,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
   let orgnode : OrgNode = OrgNode {
     metadata : { let mut md = default_metadata ();
                  md . id = Some ( pid . clone () );
+                 md . source = Some ( source . to_string () );
                  md },
     title : newline_to_space ( & skgnode . title ),
     body  : skgnode . body . clone (), };
@@ -238,6 +239,7 @@ pub async fn mk_repeated_orgnode_from_id (
   orgnode . metadata . viewData . repeat = true;
   orgnode . metadata . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.
   orgnode . metadata . id = Some ( id . clone () );
+  orgnode . metadata . source = Some ( source . clone () );
   orgnode . body = Some (
     "Repeated, probably above. Edit there, not here."
       . to_string () );

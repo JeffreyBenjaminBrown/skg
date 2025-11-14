@@ -38,6 +38,7 @@ TEST_DIRS=(
   "containerward-view-request"
   "sourceward-view-request"
   "fold-preservation"
+  "aliases-view-request"
 )
 
 # Function to run a single test in its directory

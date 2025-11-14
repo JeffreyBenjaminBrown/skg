@@ -255,8 +255,11 @@
    as the last element of the path.
 ** One can request an 'aliases view' at an orgnode.
    Call that orgnode N.
-   Doing this inserts into N a child entitled 'aliases',
-   whose children (so N's grandchildren) are the aliases of N.
+   Add the metadata (code (viewRequests aliases)) to N and save.
+   After the save completes, N will have a child C entitled 'aliases'
+   (with metadata indicating relToParent=aliasCol),
+   whose children (so N's grandchildren) are the aliases of N
+   (each with metadata indicating relToParent=alias).
    This permits the user to edit the aliases of N.
 ** If a node N has subscriptions
    then the orgnode representing N

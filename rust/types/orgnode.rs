@@ -82,6 +82,7 @@ pub enum EditRequest {
 /// Multiple view requests can be active simultaneously.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
+  Aliases,
   Containerward,
   Sourceward,
 }
@@ -151,6 +152,7 @@ impl fmt::Display for ViewRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
+      ViewRequest::Aliases       => write!(f, "aliases"),
       ViewRequest::Containerward => write!(f, "containerwardView"),
       ViewRequest::Sourceward    => write!(f, "sourcewardView"),
     } } }
@@ -162,6 +164,7 @@ impl FromStr for ViewRequest {
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
+      "aliases"           => Ok ( ViewRequest::Aliases ),
       "containerwardView" => Ok ( ViewRequest::Containerward ),
       "sourcewardView"    => Ok ( ViewRequest::Sourceward ),
       _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),

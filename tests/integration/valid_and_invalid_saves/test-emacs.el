@@ -47,7 +47,7 @@
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
     (erase-buffer)
-    (insert "* (skg (id 1)) 1\n** (skg (id 1)) 1")
+    (insert "* (skg (id 1) (source main)) 1\n** (skg (id 1)) 1")
     (org-mode)
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
@@ -82,7 +82,7 @@
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* (skg (id 1) (view focused)) 1\n** (skg (id 1)) 1")
+                  (if (string= content "* (skg (id 1) (source main) (view focused)) 1\n** (skg (id 1)) 1")
                       (progn
                         (message "✓ PASS: Buffer has focused marker as expected")
                         (setq integration-test-phase "invalid-save-complete")
@@ -90,7 +90,7 @@
                         (test-valid-save))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
-                      (message "Expected: %S" "* (skg (id 1) (view focused)) 1\n** (skg (id 1)) 1")
+                      (message "Expected: %S" "* (skg (id 1) (source main) (view focused)) 1\n** (skg (id 1)) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn

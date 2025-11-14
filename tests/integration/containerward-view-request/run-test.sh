@@ -82,10 +82,14 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
-skg_folder = "$TEST_DIR/data/skg-data"
 tantivy_folder = "$TEST_DIR/data/index.tantivy"
 port = $AVAILABLE_PORT
 delete_on_quit = true
+
+[[sources]]
+nickname = "main"
+path = "$TEST_DIR/data/skg-data"
+user_owns_it = true
 EOF
 
 start_skg_server

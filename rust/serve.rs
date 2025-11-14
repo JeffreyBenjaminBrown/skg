@@ -8,7 +8,6 @@ pub use parse_headline_md_sexp::parse_headline_from_sexp;
 pub mod util;
 
 // Re-export handlers for backwards compatibility
-pub use handlers::node_aliases;
 pub use handlers::save_buffer;
 pub use handlers::single_root_view;
 pub use handlers::title_matches;
@@ -16,7 +15,6 @@ pub use title_matches::generate_title_matches_response;
 
 use crate::cleanup::cleanup_and_shutdown;
 use crate::init::initialize_dbs;
-use crate::serve::handlers::node_aliases::handle_node_aliases_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
@@ -127,12 +125,6 @@ fn handle_emacs (
               &mut stream,
               &request,
               &tantivy_index);
-          } else if request_type == "node aliases" {
-            handle_node_aliases_request(
-              &mut stream,
-              &request,
-              &typedb_driver,
-              config);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(
               &mut stream);

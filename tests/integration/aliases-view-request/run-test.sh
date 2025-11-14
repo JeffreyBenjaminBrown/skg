@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# Integration test for focus and folded markers functionality
+# Integration test for aliases-view request functionality
 # This script:
-# - Backs up and resets test data to clean state (6 .skg files)
 # - Verifies TypeDB server is running
 # - Starts an independent cargo run process with test config
-# - Uses Emacs to test focus and folded marker addition during save
-# - Cleans up any test artifacts and restores original state
+# - Uses Emacs to test aliases-view request and integration
+# - Cleans up test artifacts
 
 set -e  # Exit on any error
 
@@ -16,7 +15,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 # Source common test library
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Focus and Folded Markers Integration Test ==="
+echo "=== SKG Aliases View Request Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 
@@ -24,22 +23,27 @@ echo "Project root: $PROJECT_ROOT"
 backup_and_reset_test_data() {
     echo "=== Backing up and resetting test data ==="
 
-    # Backup and reset each of the 6 files
-    for i in 1 2 3 4 5 6; do
-        if [ -f "$TEST_DIR/data/skg-data/$i.skg" ]; then
-            BACKUP_FILE="$TEST_DIR/data/skg-data/$i.skg.backup.$(date +%s)"
-            cp "$TEST_DIR/data/skg-data/$i.skg" "$BACKUP_FILE"
-            echo "✓ Backed up $i.skg to $(basename "$BACKUP_FILE")"
+    # Create skg-data directory if it doesn't exist
+    mkdir -p "$TEST_DIR/data/skg-data"
+
+    # Backup and reset test files
+    for file in test-node; do
+        if [ -f "$TEST_DIR/data/skg-data/$file.skg" ]; then
+            BACKUP_FILE="$TEST_DIR/data/skg-data/$file.skg.backup.$(date +%s)"
+            cp "$TEST_DIR/data/skg-data/$file.skg" "$BACKUP_FILE"
+            echo "✓ Backed up $file.skg to $(basename "$BACKUP_FILE")"
         fi
 
-        # Reset to clean state
-        cat > "$TEST_DIR/data/skg-data/$i.skg" << EOF
-title: "$i"
+        # Create a test node with aliases
+        cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
+title: 'Test Node'
 ids:
-  - "$i"
-contains: []
+- '$file'
+aliases:
+- 'first alias'
+- 'second alias'
 EOF
-        echo "✓ Reset $i.skg to clean state"
+        echo "✓ Created $file.skg with test aliases"
     done
 }
 
@@ -50,12 +54,16 @@ cleanup_test_data() {
     cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
 
     # Restore original files if backups exist
-    for i in 1 2 3 4 5 6; do
-        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$i.skg.backup.*" | head -1)
+    for file in test-node; do
+        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
-            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$i.skg"
+            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$file.skg"
             rm -f "$BACKUP_FILE"
-            echo "✓ Restored $i.skg from backup"
+            echo "✓ Restored $file.skg from backup"
+        else
+            # If no backup, remove the test file
+            rm -f "$TEST_DIR/data/skg-data/$file.skg"
+            echo "✓ Removed test file $file.skg"
         fi
     done
 }

@@ -2,6 +2,11 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
+pub mod aliases;
+pub use aliases::{
+  build_and_integrate_aliases,
+  wrapped_build_and_integrate_aliases_view, };
+
 pub mod complete_aliascol;
 pub use complete_aliascol::completeAliasCol;
 

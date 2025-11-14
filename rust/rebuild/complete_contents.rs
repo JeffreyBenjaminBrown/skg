@@ -3,6 +3,7 @@ use crate::media::typedb::util::pid_and_source_from_id;
 use crate::mk_org_text::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_id};
+use crate::rebuild::aliases::wrapped_build_and_integrate_aliases_view;
 use crate::rebuild::complete_aliascol::completeAliasCol;
 use crate::rebuild::integrate_backpath::{
   wrapped_build_and_integrate_containerward_view,
@@ -62,25 +63,24 @@ fn detect_cycle_and_mark_if_so (
     ancestor_path . push ( node_pid ); }
   Ok (( )) }
 
-/* Recursively processes a single node in preorder DFS.
-.
-- For AliasCol nodes, delegate to 'completeAliasCol'
-  (which handles the whole subtree)
-- For other nodes, these happen (in order):
-  - futz with the node itself
-    - check for repetition via 'check_for_and_modify_if_repeated'
-      (if repeated, modify body and metadata, update 'visited')
-    - call detect_cycle_and_mark_if_so (marks cycle before recursing to children)
-  - futz with its descendents
-    - call completeContents if node is definitive
-    - recurse via 'map_complete_node_preorder_over_children'
-    - integrate any view requests
-.
-NOTE: Processing view requests *after* completing children is helpful,
-because if a content child added during completion
-matches the head of the path, the path will be integrated there
-(where treatment=Content), instead of creating a duplicate child
-with treatment=ParentIgnores. */
+/// Completes a node, and then its children ('preorder DFS traversal').
+/// - For AliasCol nodes, delegate to 'completeAliasCol'
+///   (which handles the whole subtree)
+/// - For other nodes, these happen (in order):
+///   - futz with the node itself
+///     - check for repetition via 'check_for_and_modify_if_repeated'
+///       (if repeated, modify body and metadata, update 'visited')
+///     - call detect_cycle_and_mark_if_so (marks cycle before recursing to children)
+///   - futz with its descendents
+///     - call completeContents if node is definitive
+///     - recurse via 'map_complete_node_preorder_over_children'
+///     - integrate any view requests
+/// .
+/// NOTE: Processing view requests *after* completing children helps,
+/// because if a content child added during completion
+/// matches the head of the path, the path will be integrated there
+/// (where treatment=Content), instead of creating a duplicate child
+/// with treatment=ParentIgnores. */
 fn complete_node_preorder<'a> (
   tree          : &'a mut Tree < OrgNode >,
   node_id       : ego_tree::NodeId,
@@ -101,7 +101,8 @@ fn complete_node_preorder<'a> (
       ( node . metadata . code.relToParent . clone (),
         node . metadata . code.indefinitive ) };
     if treatment == RelToParent::AliasCol {
-      completeAliasCol ( tree, node_id, config, typedb_driver ) . await ?;
+      completeAliasCol (
+        tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
     } else {
       let is_repeat : bool;
@@ -133,6 +134,10 @@ fn complete_node_preorder<'a> (
             . iter () . cloned () . collect () };
         for request in view_requests {
           match request {
+            ViewRequest::Aliases => {
+              wrapped_build_and_integrate_aliases_view (
+                tree, node_id, config, typedb_driver, errors )
+                . await ?; },
             ViewRequest::Containerward => {
               wrapped_build_and_integrate_containerward_view (
                 tree, node_id, config, typedb_driver, errors )

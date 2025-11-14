@@ -15,9 +15,6 @@ So far there are these endpoints:
 - Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
-- Node aliases
-  - Request: ((request . "node aliases") (id . "NODE_ID") (level . "LEVEL"))
-  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes and contains org-mode formatted aliases.
 - Save buffer
   - Request: First `((request . \"save buffer\"))\n"`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` has length `LENGTH`.
   - Response: success/failure indicator followed by length-prefixed content:

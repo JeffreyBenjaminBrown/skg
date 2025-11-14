@@ -59,9 +59,9 @@ async fn test_path_with_cycle_impl(
   let expected: &str = indoc! {"
     * (skg (id 1)) 1
     ** (skg (id 2) (view folded)) 2
-    *** (skg (id 3) (code indefinitive (relToParent parentIgnores))) 3
-    **** (skg (id 4) (code indefinitive (relToParent parentIgnores))) 4
-    ***** (skg (id 1) (code indefinitive (relToParent parentIgnores))) 1
+    *** (skg (id 3) (source main) (code indefinitive (relToParent parentIgnores))) 3
+    **** (skg (id 4) (source main) (code indefinitive (relToParent parentIgnores))) 4
+    ***** (skg (id 1) (source main) (code indefinitive (relToParent parentIgnores))) 1
     *** (skg (id off-path)) off-path
   "};
 
@@ -140,10 +140,10 @@ async fn test_path_with_branches_no_cycle_impl(
     * (skg (id 0)) 0
     ** (skg (id 1)) 1
     *** (skg (id 2) (view folded)) 2
-    **** (skg (id 3) (code indefinitive (relToParent parentIgnores))) 3
-    ***** (skg (id 1) (code indefinitive (relToParent parentIgnores))) 1
-    ***** (skg (id 2) (code indefinitive (relToParent parentIgnores))) 2
-    ***** (skg (id 3) (code indefinitive (relToParent parentIgnores))) 3
+    **** (skg (id 3) (source main) (code indefinitive (relToParent parentIgnores))) 3
+    ***** (skg (id 1) (source main) (code indefinitive (relToParent parentIgnores))) 1
+    ***** (skg (id 2) (source main) (code indefinitive (relToParent parentIgnores))) 2
+    ***** (skg (id 3) (source main) (code indefinitive (relToParent parentIgnores))) 3
     **** (skg (id off-path)) off-path
   "};
 
@@ -222,10 +222,10 @@ async fn test_path_with_branches_with_cycle_impl(
     * (skg (id 0)) 0
     ** (skg (id 1)) 1
     *** (skg (id 2) (view folded)) 2
-    **** (skg (id 3) (code indefinitive (relToParent parentIgnores))) 3
-    ***** (skg (id 1) (code indefinitive (relToParent parentIgnores))) 1
-    ***** (skg (id 2) (code indefinitive (relToParent parentIgnores))) 2
-    ***** (skg (id 3) (code indefinitive (relToParent parentIgnores))) 3
+    **** (skg (id 3) (source main) (code indefinitive (relToParent parentIgnores))) 3
+    ***** (skg (id 1) (source main) (code indefinitive (relToParent parentIgnores))) 1
+    ***** (skg (id 2) (source main) (code indefinitive (relToParent parentIgnores))) 2
+    ***** (skg (id 3) (source main) (code indefinitive (relToParent parentIgnores))) 3
     **** (skg (id off-path)) off-path
   "};
 

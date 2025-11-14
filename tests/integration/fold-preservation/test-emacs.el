@@ -49,8 +49,8 @@
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
-      (insert (concat "* a\n"
-                      "* b\n"
+      (insert (concat "* (skg (source main)) a\n"
+                      "* (skg (source main)) b\n"
                       "** c\n"
                       "** d\n"
                       "*** d1\n"
@@ -107,11 +107,11 @@
             (message "✗ FAIL: Point should be on line 4 but is on line %d" current-line-num)
             (kill-emacs 1))))
 
-      ;; Verify we're still on ** d
+      ;; Verify we're still on ** d (may have skg metadata added by server)
       (let ((current-line (buffer-substring-no-properties
                            (line-beginning-position)
                            (line-end-position))))
-        (if (string-match-p "\\*\\* .*d" current-line)
+        (if (string-match-p "\\*\\* .* d" current-line)
             (message "✓ PASS: Still on line with '** d'")
           (progn
             (message "✗ FAIL: Expected to be on line with '** d', but on: %s" current-line)
@@ -133,11 +133,11 @@
                       (line-end-position)))
             (kill-emacs 1))))
 
-      ;; Verify we're on ** e
+      ;; Verify we're on ** e (may have skg metadata added by server)
       (let ((current-line (buffer-substring-no-properties
                            (line-beginning-position)
                            (line-end-position))))
-        (if (string-match-p "\\*\\* .*e" current-line)
+        (if (string-match-p "\\*\\* .* e" current-line)
             (message "✓ PASS: Now on line with '** e'")
           (progn
             (message "✗ FAIL: Expected to be on line with '** e', but on: %s" current-line)

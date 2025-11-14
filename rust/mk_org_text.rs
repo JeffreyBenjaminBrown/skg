@@ -2,14 +2,9 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
-pub mod aliases;
 pub mod content_view;
 pub mod orgnode;
 pub mod util;
-
-pub use aliases::{
-    aliases_to_org,
-};
 pub use content_view::{
     multi_root_view,
     single_root_view,
