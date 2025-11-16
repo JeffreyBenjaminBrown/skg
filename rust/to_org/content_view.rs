@@ -8,8 +8,8 @@ use crate::media::typedb::search::{
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
-use crate::mk_org_text::util::newline_to_space;
-use crate::mk_org_text::orgnode::render_org_node_from_text;
+use crate::to_org::util::newline_to_space;
+use crate::to_org::orgnode::render_org_node_from_text;
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;

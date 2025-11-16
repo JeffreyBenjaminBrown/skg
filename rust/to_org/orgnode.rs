@@ -1,5 +1,5 @@
 use crate::types::{OrgNode, orgnodemd_to_string};
-use crate::mk_org_text::util::org_bullet;
+use crate::to_org::util::org_bullet;
 
 /// Renders an OrgNode as org-mode formatted text.
 pub fn render_org_node_from_text (

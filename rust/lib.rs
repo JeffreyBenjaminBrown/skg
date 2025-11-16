@@ -2,7 +2,7 @@ pub mod cleanup;
 pub mod init;
 pub mod media;
 pub mod merge;
-pub mod mk_org_text;
+pub mod to_org;
 pub mod read_buffer;
 pub mod rebuild;
 pub mod save;

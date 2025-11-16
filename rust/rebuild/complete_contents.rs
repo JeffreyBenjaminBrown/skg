@@ -1,6 +1,6 @@
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::mk_org_text::content_view::{
+use crate::to_org::content_view::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_id};
 use crate::rebuild::aliases::wrapped_build_and_integrate_aliases_view;

@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::mk_org_text::{multi_root_view, single_root_view};
+use skg::to_org::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
 use skg::media::typedb::search::{
   climb_containerward_and_fetch_rootish_context,

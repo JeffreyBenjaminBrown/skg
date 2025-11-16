@@ -8,7 +8,7 @@ use skg::rebuild::{completeContents, check_for_and_modify_if_repeated};
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, OrgNode, SkgConfig};
-use skg::mk_org_text::content_view::render_forest_to_org;
+use skg::to_org::content_view::render_forest_to_org;
 use ego_tree::{Tree, NodeId};
 
 /// Helper to call check_for_and_modify_if_repeated followed by completeContents
