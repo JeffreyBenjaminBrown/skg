@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- integrate_backpath
 
 use indoc::indoc;
-use skg::rebuild::integrate_path_that_might_fork_or_cycle;
+use skg::to_org::integrate_path_that_might_fork_or_cycle;
 use skg::read_buffer::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_forests, run_with_test_db};
 use skg::types::{ID, OrgNode, SkgConfig};

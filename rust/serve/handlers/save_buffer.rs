@@ -5,8 +5,10 @@ use crate::to_org::content_view::{
   render_forest_to_org,
   set_metadata_relationship_viewdata_in_forest};
 use crate::merge::merge_nodes_in_graph;
-use crate::rebuild::completeOrgnodeForest;
-use crate::serve::util::send_response;
+use crate::to_org::complete_contents::completeOrgnodeForest;
+use crate::serve::util::{
+  send_response,
+  format_buffer_response_sexp};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
@@ -30,19 +32,9 @@ impl SaveResponse {
   /// Format the response as an s-expression.
   /// Format: ((content "...") (errors ("error1" "error2" ...)))
   fn to_sexp_string ( &self ) -> String {
-    Sexp::List ( vec! [
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S ( "content" . to_string () )),
-        Sexp::Atom ( Atom::S ( self . buffer_content . clone () )) ] ),
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S ( "errors" . to_string () )),
-        Sexp::List (
-          self . errors
-            . iter ()
-            . map ( |e| Sexp::Atom (
-              Atom::S ( e . clone () )) )
-            . collect () ) ] ) ] )
-      . to_string () }}
+    format_buffer_response_sexp (
+      & self . buffer_content,
+      & self . errors ) }}
 
 /* Handles save buffer requests from Emacs.
 .

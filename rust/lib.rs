@@ -4,7 +4,6 @@ pub mod media;
 pub mod merge;
 pub mod to_org;
 pub mod read_buffer;
-pub mod rebuild;
 pub mod save;
 pub mod serve;
 pub mod test_utils;

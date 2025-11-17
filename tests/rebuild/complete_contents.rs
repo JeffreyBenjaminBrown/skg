@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
 
-use skg::rebuild::{completeContents, check_for_and_modify_if_repeated};
+use skg::to_org::{completeContents, check_for_and_modify_if_repeated};
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, OrgNode, SkgConfig};

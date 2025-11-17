@@ -2,7 +2,8 @@ use crate::types::{OrgNode, orgnodemd_to_string};
 use crate::to_org::util::org_bullet;
 
 /// Renders an OrgNode as org-mode formatted text.
-pub fn render_org_node_from_text (
+/// Not recursive -- just stars, metadata, title, and maybe a body.
+pub fn orgnode_to_text (
   level : usize,
   node  : &OrgNode
 ) -> String {
@@ -11,7 +12,8 @@ pub fn render_org_node_from_text (
   if ( metadata_str . is_empty() &&
        node.title   . is_empty() ) {
     panic! (
-      "render_org_node_from_text called with both empty metadata and empty title" ); }
+      "orgnode_to_text called with both empty metadata and empty title"
+    ); }
   let mut result : String =
     String::new ();
   result . push_str (

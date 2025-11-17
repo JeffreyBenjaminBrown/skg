@@ -1,7 +1,9 @@
 use crate::to_org::content_view::single_root_view;
-use crate::serve::util::node_id_from_single_root_view_request;
-use crate::serve::util::send_response;
-use crate::serve::util::send_response_with_length_prefix;
+use crate::serve::util::{
+  node_id_from_single_root_view_request,
+  send_response,
+  send_response_with_length_prefix,
+  format_buffer_response_sexp};
 use crate::types::misc::SkgConfig;
 
 use futures::executor::block_on;
@@ -10,7 +12,8 @@ use typedb_driver::TypeDBDriver;
 
 /// Gets a node id from the request,
 /// generates an org view of that id's content (recursively),
-/// and sends the Org to Emacs (length-prefixed).
+/// and sends the response to Emacs (length-prefixed).
+/// Response format: ((content "...") (errors ("error1" "error2" ...)))
 pub fn handle_single_root_view_request (
   stream        : &mut TcpStream,
   request       : &str,
@@ -20,17 +23,25 @@ pub fn handle_single_root_view_request (
 
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
-      let buffer_content : String = block_on ( async {
+      let response_sexp : String = block_on ( async {
         match single_root_view (
           typedb_driver,
           config,
           &node_id ) . await
-        { Ok  (s) => s,
-          Err (e) => format!(
-            "Error generating document: {}", e), }} );
+        { Ok ( (buffer_content, errors) ) =>
+            format_buffer_response_sexp (
+              & buffer_content,
+              & errors ),
+          Err (e) => {
+            // If we fail to generate the view, return error in content
+            let error_content : String = format!(
+              "Error generating document: {}", e);
+            format_buffer_response_sexp (
+              & error_content,
+              & vec![] ) }} } );
       send_response_with_length_prefix (
         stream,
-        & buffer_content ); },
+        & response_sexp ); },
     Err ( err ) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);

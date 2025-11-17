@@ -81,7 +81,7 @@ The server calls =aliases_to_org= (defined in =rust/mk_org_text/aliases.rs:17=) 
    - Title: the alias string
    - Body: None
 
-3. Renders each node using =render_org_node_from_text=
+3. Renders each node using =orgnode_to_text=
 4. Returns concatenated org-mode text
 
 Example output for a node with aliases "foo" and "bar":

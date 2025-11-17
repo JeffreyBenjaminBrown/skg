@@ -3,7 +3,6 @@
 ** for subscriptions
    which initially show just the title -- not even the content,
      let alone the recursive content
-* initial node limit for content view
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * aliases_to_org should rebuild the whole buffer
   like request containerward view

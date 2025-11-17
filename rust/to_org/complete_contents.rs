@@ -1,11 +1,11 @@
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::to_org::content_view::{
+use crate::to_org::util::{
   mk_repeated_orgnode_from_id,
   skgnode_and_orgnode_from_id};
-use crate::rebuild::aliases::wrapped_build_and_integrate_aliases_view;
-use crate::rebuild::complete_aliascol::completeAliasCol;
-use crate::rebuild::integrate_backpath::{
+use crate::to_org::aliases::wrapped_build_and_integrate_aliases_view;
+use crate::to_org::complete_aliascol::completeAliasCol;
+use crate::to_org::integrate_backpath::{
   wrapped_build_and_integrate_containerward_view,
   wrapped_build_and_integrate_sourceward_view, };
 use crate::types::misc::{ID, SkgConfig};

@@ -3,7 +3,7 @@ use crate::serve::util::send_response;
 use crate::media::tantivy::search_index;
 use crate::types::orgnode::{OrgNode, RelToParent, default_metadata};
 use crate::types::misc::TantivyIndex;
-use crate::to_org::orgnode::render_org_node_from_text;
+use crate::to_org::orgnode::orgnode_to_text;
 
 use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
@@ -118,7 +118,7 @@ fn format_matches_as_org_mode (
       // The unique level-1 headline states the search terms.
       body : None, };
   result.push_str (
-    & render_org_node_from_text (
+    & orgnode_to_text (
       1,
       &search_root_node ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
@@ -151,7 +151,7 @@ fn format_matches_as_org_mode (
           score, id, title ),
         body : None, };
     result.push_str (
-      & render_org_node_from_text (
+      & orgnode_to_text (
         2,
         &match_node ));
     for (score, title) in matches.iter().skip(1) {
@@ -164,7 +164,7 @@ fn format_matches_as_org_mode (
             score, id, title ),
           body : None, };
       result.push_str (
-        & render_org_node_from_text (
+        & orgnode_to_text (
           3,
           &alias_match_node )); }}
   result }

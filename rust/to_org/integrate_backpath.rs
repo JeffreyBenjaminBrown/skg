@@ -7,7 +7,7 @@
 /// - I say 'integrate' rather than 'insert' because some of the path,
 ///   maybe even all of it, might already be there.
 
-use crate::to_org::content_view::skgnode_and_orgnode_from_id;
+use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
