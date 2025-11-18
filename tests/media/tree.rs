@@ -1,10 +1,16 @@
 use ego_tree::Tree;
-use skg::media::tree::{first_in_generation, first_in_nth_generation_of_descendents, next_in_generation};
+use skg::media::tree::{
+  first_in_generation,
+  first_in_generation_in_forest,
+  next_in_generation,
+  next_in_generation_in_forest
+};
 use std::error::Error;
 
 #[test]
 fn test_first_in_generation_root() -> Result<(), Box<dyn Error>> {
-  let tree: Tree<String> = build_binary_tree(1);
+  let tree: Tree<String> =
+    build_binary_tree(1);
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&tree, 1)?;
   assert!(result.is_some(), "Generation 1 should exist (root)");
@@ -19,7 +25,8 @@ fn test_first_in_generation_first_child(
     build_binary_tree(2);
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&tree, 2)?;
-  assert!(result.is_some(), "Generation 2 should exist (first child)");
+  assert!(result.is_some(),
+          "Generation 2 should exist (first child)");
   assert_eq!(result.unwrap().value(), "11",
              "Should return first child");
   Ok(()) }
@@ -40,7 +47,8 @@ fn test_first_in_generation_grandchild(
 #[test]
 fn test_first_in_generation_deep_tree(
 ) -> Result<(), Box<dyn Error>> {
-  let tree: Tree<String> = build_binary_tree(5);
+  let tree: Tree<String> =
+    build_binary_tree(5);
   for (generation_num, expected_value) in [
     (1, "1"),
     (2, "11"),
@@ -86,9 +94,11 @@ fn test_first_in_generation_skips_childless_nodes(
   //   2   3
   //       |
   //       4
-  let mut tree: Tree<i32> = Tree::new(1);
+  let mut tree: Tree<i32> =
+    Tree::new(1);
   tree.root_mut().append(2);
-  let child2_id: ego_tree::NodeId = tree.root_mut().append(3).id();
+  let child2_id: ego_tree::NodeId =
+    tree.root_mut().append(3).id();
   tree.get_mut(child2_id).unwrap().append(4);
 
   // Generation 3 exists!
@@ -105,7 +115,8 @@ fn test_first_in_generation_with_deleted_subtrees(
 ) -> Result<(), Box<dyn Error>> {
   // Build a 5-generation tree,
   // and delete children of nodes "11" and "121".
-  let mut tree: Tree<String> = build_binary_tree(5);
+  let mut tree: Tree<String> =
+    build_binary_tree(5);
 
   { // Find and delete all children of node "11"
     let node_11_id: ego_tree::NodeId =
@@ -157,7 +168,8 @@ fn test_next_in_generation_from_root() {
 
 #[test]
 fn test_next_in_generation_second() {
-  let tree: Tree<String> = build_binary_tree(2);
+  let tree: Tree<String> =
+    build_binary_tree(2);
 
   // Generation 2: test first and last positions
   let node_11: ego_tree::NodeRef<String> =
@@ -174,7 +186,8 @@ fn test_next_in_generation_second() {
 
 #[test]
 fn test_next_in_generation_third() {
-  let tree: Tree<String> = build_binary_tree(3);
+  let tree: Tree<String> =
+    build_binary_tree(3);
 
   // Generation 3: test first, second, and last positions
   let node_111: ego_tree::NodeRef<String> =
@@ -221,7 +234,8 @@ fn test_next_in_generation_fourth() {
 
 #[test]
 fn test_next_in_generation_1122_to_1211() {
-  let tree: Tree<String> = build_binary_tree(4);
+  let tree: Tree<String> =
+    build_binary_tree(4);
 
   // Special test: from 1122, should climb 2 generations to reach 1211
   let node_1122: ego_tree::NodeRef<String> =
@@ -235,7 +249,8 @@ fn test_next_in_generation_1122_to_1211() {
 #[test]
 fn test_next_in_generation_with_deleted_node() {
   // Build a 5-generation tree and delete node "1122"
-  let mut tree: Tree<String> = build_binary_tree(5);
+  let mut tree: Tree<String> =
+    build_binary_tree(5);
 
   { // Find and delete node "1122" (and all its descendants)
     let node_1122_id: ego_tree::NodeId =
@@ -258,6 +273,113 @@ fn test_next_in_generation_with_deleted_node() {
   assert_eq!(next.value(), "12111",
     "Next after 11212 should be 12111 (1122 and its children are deleted)");
 }
+
+#[test]
+fn test_next_in_generation_in_forest() {
+  // Create a forest: Vec of 3 trees
+  // Tree A (depth 2), Tree B (depth 3), Tree C (depth 2)
+  let mut tree_a: Tree<String> =
+    Tree::new("A".to_string());
+  tree_a.root_mut().append("A1".to_string());
+  tree_a.root_mut().append("A2".to_string());
+
+  let mut tree_b: Tree<String> =
+    Tree::new("B".to_string());
+  let b1_id: ego_tree::NodeId =
+    tree_b.root_mut().append("B1".to_string()).id();
+  let b2_id: ego_tree::NodeId =
+    tree_b.root_mut().append("B2".to_string()).id();
+  tree_b.get_mut(b1_id).unwrap().append("B11".to_string());
+  tree_b.get_mut(b2_id).unwrap().append("B21".to_string());
+
+  let mut tree_c: Tree<String> =
+    Tree::new("C".to_string());
+  tree_c.root_mut().append("C1".to_string());
+  tree_c.root_mut().append("C2".to_string());
+
+  let forest: Vec<Tree<String>> =
+    vec![tree_a, tree_b, tree_c];
+
+  // Test: from A2 (last in Tree A's generation 2), next should be B1 (first in Tree B's generation 2)
+  let node_a2: ego_tree::NodeRef<String> =
+    forest[0].root().children().nth(1).unwrap();
+  let next: ego_tree::NodeRef<String> =
+    next_in_generation_in_forest(&forest, 0, node_a2).unwrap();
+  assert_eq!(next.value(), "B1", "Next after A2 should be B1 (crossing to next tree)");
+
+  // Test: from B2, next should be C1 (skipping to Tree C)
+  let node_b2: ego_tree::NodeRef<String> =
+    forest[1].root().children().nth(1).unwrap();
+  let next: ego_tree::NodeRef<String> =
+    next_in_generation_in_forest(&forest, 1, node_b2).unwrap();
+  assert_eq!(next.value(), "C1", "Next after B2 should be C1");
+
+  // Test: from C2 (last node in last tree), next should be None
+  let node_c2: ego_tree::NodeRef<String> =
+    forest[2].root().children().nth(1).unwrap();
+  let next: Option<ego_tree::NodeRef<String>> =
+    next_in_generation_in_forest(&forest, 2, node_c2);
+  assert!(next.is_none(), "C2 is last in the forest's generation 2");
+}
+
+#[test]
+fn test_first_in_generation_in_forest() -> Result<(), Box<dyn Error>> {
+  // Create a forest with 3 trees
+  // Tree A: only has depth 2 (A -> A1)
+  // Tree B: has depth 4 (B -> B1 -> B11 -> B111)
+  // Tree C: has depth 3 (C -> C1 -> C11)
+  let mut tree_a: Tree<String> =
+    Tree::new("A".to_string());
+  tree_a.root_mut().append("A1".to_string());
+
+  let mut tree_b: Tree<String> =
+    Tree::new("B".to_string());
+  let b1_id: ego_tree::NodeId =
+    tree_b.root_mut().append("B1".to_string()).id();
+  let b11_id: ego_tree::NodeId =
+    tree_b.get_mut(b1_id).unwrap().append("B11".to_string()).id();
+  tree_b.get_mut(b11_id).unwrap().append("B111".to_string());
+
+  let mut tree_c: Tree<String> =
+    Tree::new("C".to_string());
+  let c1_id: ego_tree::NodeId =
+    tree_c.root_mut().append("C1".to_string()).id();
+  tree_c.get_mut(c1_id).unwrap().append("C11".to_string());
+
+  let forest: Vec<Tree<String>> =
+    vec![tree_a, tree_b, tree_c];
+
+  // Search for generation 1 - should find Tree A's root
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 1)?;
+  assert_eq!(result.unwrap().value(), "A",
+    "Generation 1 should be first tree's root");
+
+  // Search for generation 2 - should find A1 in Tree A
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 2)?;
+  assert_eq!(result.unwrap().value(), "A1",
+    "Generation 2 should be A1");
+
+  // Search for generation 3 - Tree A doesn't have it, should find B11 in Tree B
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 3)?;
+  assert_eq!(result.unwrap().value(), "B11",
+    "Generation 3 should be B11 from Tree B");
+
+  // Search for generation 4 - only Tree B has it (B111)
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 4)?;
+  assert_eq!(result.unwrap().value(), "B111",
+    "Generation 4 should be B111 from Tree B");
+
+  // Search for generation 5 - no tree has it
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 5)?;
+  assert!(result.is_none(),
+    "Generation 5 should not exist in any tree");
+
+  Ok(()) }
 
 // Helper function to find a node by its label
 fn find_node_by_label<'a>(
@@ -285,8 +407,10 @@ fn build_binary_tree(
   ) {
     if current_generation >= max_generations {
       return; }
-    let left_label: String = format!("{}1", label);
-    let right_label: String = format!("{}2", label);
+    let left_label: String =
+      format!("{}1", label);
+    let right_label: String =
+      format!("{}2", label);
     let left_id: ego_tree::NodeId =
       tree . get_mut (parent_id) . unwrap()
       . append (left_label.clone()) . id();
