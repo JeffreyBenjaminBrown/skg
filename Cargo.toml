@@ -19,6 +19,10 @@ name = "cleanup-test-dbs"
 path = "rust/bin/cleanup-test-dbs.rs"
 
 [[bin]]
+name = "delete-one-db"
+path = "rust/bin/delete-one-db.rs"
+
+[[bin]]
 name = "smsn-keywords"
 path = "discoveries/smsn/find-keywords.rs"
 

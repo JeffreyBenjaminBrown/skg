@@ -11,7 +11,7 @@ use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use crate::util::path_from_pid_and_source;
 
-use ego_tree::{NodeId, NodeMut, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
@@ -48,7 +48,7 @@ fn detect_cycle_and_mark_if_so (
   ancestor_path : &mut Vec < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid_opt : Option < ID > = {
-    let node_ref : ego_tree::NodeRef < OrgNode > =
+    let node_ref : NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     node_ref . value () . metadata . id . clone () };
@@ -66,11 +66,12 @@ fn detect_cycle_and_mark_if_so (
 ///   (which handles the whole subtree)
 /// - For other nodes, these happen (in order):
 ///   - futz with the node itself
-///     - check for repetition via 'check_for_and_modify_if_repeated'
+///     - check for repetition via 'make_indefinitive_if_repeated'
 ///       (if repeated, modify body and metadata, update 'visited')
 ///     - call detect_cycle_and_mark_if_so (marks cycle before recursing to children)
 ///   - futz with its descendents
-///     - call completeContents if node is definitive
+///     - if definitive, call completeDefinitiveOrgnode
+///       - else call clobberIndefinitiveOrgnode
 ///     - recurse via 'map_complete_node_preorder_over_children'
 ///     - integrate any view requests
 /// .
@@ -90,39 +91,45 @@ fn complete_node_preorder<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let (treatment, indefinitive) : (RelToParent, bool) = {
-      let node_ref : ego_tree::NodeRef < OrgNode > =
+    let treatment : RelToParent = {
+      let node_ref : NodeRef < OrgNode > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
       let node : &OrgNode =
         node_ref . value ();
-      ( node . metadata . code.relToParent . clone (),
-        node . metadata . code.indefinitive ) };
+      node . metadata . code.relToParent . clone () };
     if treatment == RelToParent::AliasCol {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
     } else {
       { // futz with the OrgNode itself
-        check_for_and_modify_if_repeated (
-          // Maybe tweak the orgnode, maybe update 'visited'.
+        make_indefinitive_if_repeated (
+          // Maybe mark indefinitive, maybe update 'visited'.
           tree, node_id, visited
         ). await ?;
         detect_cycle_and_mark_if_so (
           tree, node_id, ancestor_path ) ?; }
 
-      { // futz with its children
-        if ! indefinitive {
-          completeContents (
+      { let is_indefinitive : bool = { // 'make_indefinitive_if_repeated' may have just changed this value.
+          let node_ref : NodeRef < OrgNode > =
+            tree . get ( node_id )
+            . ok_or ( "Node not found in tree" ) ?;
+          node_ref . value () . metadata . code.indefinitive };
+        if is_indefinitive {
+          clobberIndefinitiveOrgnode (
+            tree, node_id, config, typedb_driver ). await ?;
+        } else { // futz with the orgnode and its content children
+          completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
         map_complete_node_preorder_over_children (
-          // Always recurse to children, even for repeated nodes, since they may have children from view requests.
+          // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver,
           visited, ancestor_path, errors ) . await ?; }
 
       { // integrate view requests
         let view_requests : Vec < ViewRequest > = {
-          let node_ref : ego_tree::NodeRef < OrgNode > =
+          let node_ref : NodeRef < OrgNode > =
             tree . get ( node_id )
             . ok_or ( "Node not found in tree" ) ?;
           node_ref . value () . metadata . code . viewRequests
@@ -154,7 +161,7 @@ fn map_complete_node_preorder_over_children<'a> (
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     let child_ids : Vec < ego_tree::NodeId > = {
-      let node_ref : ego_tree::NodeRef < OrgNode > =
+      let node_ref : NodeRef < OrgNode > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
       node_ref . children ()
@@ -162,7 +169,7 @@ fn map_complete_node_preorder_over_children<'a> (
         . collect () };
     for child_id in child_ids {
       let child_has_id : bool = {
-        let child_ref : ego_tree::NodeRef < OrgNode > =
+        let child_ref : NodeRef < OrgNode > =
           tree . get ( child_id )
           . ok_or ( "Child not found in tree" ) ?;
         child_ref . value () . metadata . id . is_some () };
@@ -176,13 +183,13 @@ fn map_complete_node_preorder_over_children<'a> (
 /// If this orgnode is a repeat, then modify its body and metadata
 ///   (but change no descendents).
 /// If it is definitive, update 'visited' to include it.
-pub async fn check_for_and_modify_if_repeated (
+pub async fn make_indefinitive_if_repeated (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   visited   : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let (node_pid, is_indefinitive) : (ID, bool) = {
-    let node_ref : ego_tree::NodeRef < OrgNode > =
+    let node_ref : NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     ( node_ref . value () . metadata . id . clone ()
@@ -196,43 +203,86 @@ pub async fn check_for_and_modify_if_repeated (
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
     node_mut . value () . metadata . code . indefinitive = true;
-    node_mut . value () . body = None; // indefinitive => no body
-    return Ok (( )); }
+    return Ok ( () ); }
   if ! is_indefinitive { // Only definitive nodes count as visited.
     visited . insert ( node_pid ); }
-  Ok (( )) }
+  Ok ( () ) }
 
-/// Completes a Content node's children by reconciling them
-/// with the 'contains' relationships found on disk.
+/// Completes an indefinitive orgnode by fetching its canonical title and source from disk.
 ///
-/// ASSUMES: check_for_and_modify_if_repeated has already been called
-/// ASSUMES: Called only for definitive (non-indefinitive) nodes
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
+/// ASSUMES: make_indefinitive_if_repeated has already been called
+/// ASSUMES: The input is indefinitive
 ///
-/// METHOD: Given a node N:
+/// METHOD: Given an indefinitive node N:
 /// - Read N's SkgNode from disk
-/// - Categorize N's children into content/non-content
-/// - Mark invalid content children as parentIgnores and move to non-content
-/// - Build completed-content list from disk, preserving order
-/// - Add missing content children from disk (via extend_content)
-/// - Reorder children: non-content first, then completed-content
-pub async fn completeContents (
+/// - Set orgnode's title to the canonical title from disk
+/// - Set orgnode's source (a field of its metadata)
+/// - Set orgnode's body to None
+///
+/// Note: Children are unaffected by this function,
+/// and will be recursed into separately by the caller.
+pub async fn clobberIndefinitiveOrgnode (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  // ASSUMES: check_for_and_modify_if_repeated has already been called
-  // Get node_pid and check if indefinitive
-  let (node_pid, is_indefinitive) : (ID, bool) = {
-    let node_ref : ego_tree::NodeRef < OrgNode > =
+  let node_pid : ID = {
+    let node_ref : NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    ( node_ref . value () . metadata . id . clone ()
-        . ok_or ( "Node has no ID" ) ?,
-      node_ref . value () . metadata . code.indefinitive ) };
-  // Indefinitive nodes are not completed (though their children might be).
-  if is_indefinitive { return Ok (( )); }
+    node_ref . value () . metadata . id . clone ()
+      . ok_or ( "Node has no ID" ) ? };
+  let (node_pid_resolved, node_source) : (ID, String) =
+    pid_and_source_from_id(
+      &config.db_name, driver, &node_pid).await?
+    . ok_or_else( || format!(
+      "Node ID '{}' not found in database", node_pid))?;
+  let skgnode : SkgNode = {
+    let path : String =
+      path_from_pid_and_source (
+        config, &node_source, node_pid_resolved );
+    read_node ( path ) ? };
+  { // Update its title and source, and clear its body.
+    let mut node_mut : NodeMut < OrgNode > =
+      tree . get_mut ( node_id )
+      . ok_or ( "Node not found" ) ?;
+    node_mut . value () . title = skgnode . title;
+    node_mut . value () . metadata . source = Some ( node_source );
+    node_mut . value () . body = None; }
+
+  Ok (( )) }
+
+/// Completes a definitive Content node's children by reconciling them
+/// with the 'contains' relationships found on disk.
+///
+/// ASSUMES: Node has been normalized so its 'id' field is the PID
+/// ASSUMES: make_indefinitive_if_repeated has already been called
+/// ASSUMES: Input is definitive
+///
+/// METHOD: Given a node N:
+/// - Read N's SkgNode from disk
+/// - Categorize N's children into content/non-content
+/// - Mark 'invalid content' as parentIgnores and move to non-content
+///   - 'invalid content' = nodes marked content that are not content.
+///     This can happen if a separate buffer edited their container.
+/// - Build completed-content list from disk, preserving order
+/// - Add missing content children from disk (via extend_content)
+/// - Reorder children: non-content first, then completed-content
+pub async fn completeDefinitiveOrgnode (
+  tree      : &mut Tree < OrgNode >,
+  node_id   : NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  // Get node_pid
+  let node_pid : ID = {
+    let node_ref : NodeRef < OrgNode > =
+      tree . get ( node_id )
+      . ok_or ( "Node not found in tree" ) ?;
+    node_ref . value () . metadata . id . clone ()
+      . ok_or ( "Node has no ID" ) ? };
   // Query TypeDB for node PID and source
   let (node_pid_resolved, node_source) : (ID, String) =
     pid_and_source_from_id(
@@ -241,7 +291,8 @@ pub async fn completeContents (
       "Node ID '{}' not found in database", node_pid))?;
   let mut skgnode : SkgNode = {
     let path : String =
-      path_from_pid_and_source ( config, &node_source, node_pid_resolved );
+      path_from_pid_and_source (
+        config, &node_source, node_pid_resolved );
     read_node ( path ) ? };
   skgnode.source = node_source;
   let content_from_disk : HashSet < ID > =
@@ -261,7 +312,7 @@ pub async fn completeContents (
   let mut content_id_to_node_id : HashMap < ID, NodeId > =
     HashMap::new ();
   for child_id in & content_child_ids {
-    let child_ref : ego_tree::NodeRef < OrgNode > =
+    let child_ref : NodeRef < OrgNode > =
       tree . get ( *child_id )
       . ok_or ( "Child node not found" ) ?;
     let child_node : &OrgNode =
@@ -324,7 +375,7 @@ fn categorize_children_by_treatment (
     Vec::new ();
   let mut non_content_child_ids : Vec < NodeId > =
     Vec::new ();
-  let node_ref : ego_tree::NodeRef < OrgNode > =
+  let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {

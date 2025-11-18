@@ -85,229 +85,53 @@ You should see the typedb_server_bin process running.
 ** Note
 This issue was fixed in `/home/ubuntu/bash/run-servers.sh` on 2025-10-14. If you're using that script, it should now work correctly. If you're manually starting TypeDB, remember to include the stdin redirection.
 
-* Corrupted TypeDB Checkpoints
-** PITFALL: Never delete the _system database.
-** Quick Diagnostic Workflow
-When TypeDB fails to start with "Connection refused" on port 1729, or when you want to prevent issues:
+* Test Database Accumulation & "Too Many Open Files"
 
-*** Scenario A: TypeDB is Running (Preventive Maintenance)
-If TypeDB is currently running but you want to prevent future issues:
+** Quick Fix
 
-1. *Check database count* - Use diagnostic script while TypeDB is running:
-   #+begin_src bash
-   bash troubleshooting/typedb/check-typedb-databases.sh
-   #+end_src
+If TypeDB fails to start with "Too many open files" errors:
 
-2. *If many test databases found* (e.g., 20+ databases):
-   - Clean them up immediately to prevent "Too many open files" on next restart
-   - Use manual cleanup (most reliable):
-     #+begin_src bash
-     cd /var/lib/typedb/core/data && rm -rf skg-test*
-     #+end_src
-   - TypeDB will continue running normally after cleanup
-   - No restart needed unless you encounter issues
-
-*** Scenario B: TypeDB Won't Start
-When TypeDB fails to start with "Connection refused" on port 1729:
-
-1. *Check the TypeDB log first* - This is your most valuable diagnostic tool:
-   #+begin_src bash
-   tail -100 /home/ubuntu/logs/typedb.log
-   #+end_src
-   Look for: "Too many open files", checkpoint recovery errors, RocksDB errors
-
-2. *Count databases* using the diagnostic script:
-   #+begin_src bash
-   bash troubleshooting/typedb/check-typedb-databases.sh
-   #+end_src
-   This tells you if test database accumulation is the problem
-
-3. *If many test databases found* (e.g., 20+ databases named skg-test*):
-   This is almost certainly causing "Too many open files" errors at startup
-   Proceed directly to cleanup (see Solution section below)
-
-** The problem
-*** Symptoms
-- TypeDB server fails to start with "Connection refused" error when trying to connect to port 1729
-- TypeDB log shows error about "Too many open files"
-- Error pattern in `/home/ubuntu/logs/typedb.log`:
-  #+begin_example
-  called Result::unwrap() on an Err value: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-  #+end_example
-- Or checkpoint recovery errors:
-  #+begin_example
-  [STO10] Failed to recover from checkpoint for database 'DATABASE_NAME'.
-  Cause:
-        [CLO7] Error while opening storage keyspaces.
-  Cause:
-        RocksDB { name: "OptimisedPrefix25", source: Error { message: "IO error: While opendir: PATH: Too many open files" } }
-  #+end_example
-- Or during test runs (Connection Error from Rust tests):
-  #+begin_example
-  Connection Error: Unable to connect to TypeDB server(s), received errors:
-  - 127.0.0.1:1729:
-  IO error: while open a file for lock: /opt/typedb/core/server/data/skg-test-DATABASE_NAME/storage/OptimisedPrefix16/LOCK: Too many open files
-  #+end_example
-- The "too many open files" error occurs because TypeDB attempts to open all databases at startup, including corrupted ones and accumulated test databases
-- This error can also appear when tests try to create new databases while TypeDB already has many databases open
-*** Root Cause
-This typically happens when:
-1. *Test database accumulation* (most common): Many test runs leave behind skg-test* databases
-   - Each database uses file handles
-   - TypeDB opens all databases at startup
-   - System file handle limit is exceeded (error code 24)
-   - VERIFIED FIX: Deleting 31 accumulated test databases resolved the issue completely
-2. Docker container or system is stopped abruptly while TypeDB is running
-3. TypeDB doesn't get a chance to properly close databases and flush checkpoints
-4. RocksDB (TypeDB's storage engine) leaves databases in an inconsistent state
-
-Other common corruption patterns:
-- Error: "Corruption: Mismatch in unique ID on table file"
-  - Cause: RocksDB MANIFEST file corruption from incomplete writes
-  - Solution: Same as above - delete the corrupted database
-- Error: "Could not open database" with "LoadErrorDirectoryMissing" for WAL directory
-  #+begin_example
-  [SRO6] Could not open database.
-  Cause:
-        [DBO5] Error opening WAL.
-  Cause:
-        WAL { source: LoadErrorDirectoryMissing { directory: "/.../wal" } }
-  #+end_example
-  - Cause: Database directory is incomplete or corrupted (missing WAL subdirectory)
-  - Solution: Same as above - delete the corrupted database (usually a test database)
-** Solution:
-*** Recommended Approach: Use Diagnostic Script First
-The most reliable way to fix this issue:
-
-1. *Diagnose* - Check what databases exist and identify test databases:
-   #+begin_src bash
-   bash troubleshooting/typedb/check-typedb-databases.sh
-   #+end_src
-   This script:
-   - Shows count of test databases (these can be safely deleted)
-   - Identifies potentially corrupt databases
-   - Gives you confidence about what to remove
-   - VERIFIED: Successfully identified 31 test databases causing the problem
-
-2. *Clean up test databases* - Use manual cleanup (most reliable):
-   #+begin_src bash
-   cd /var/lib/typedb/core/data && rm -rf skg-test*
-   #+end_src
-   - The cleanup script may have issues with symlinked directories
-   - Manual cleanup is the most reliable approach
-   - VERIFIED: Successfully resolved "Too many open files" issue
-
-   Alternative: Use the cleanup script (may require adjustments):
-   #+begin_src bash
-   bash troubleshooting/typedb/clean-typedb-test-databases.sh
-   #+end_src
-   - Interactive confirmation before deletion
-   - Note: Script uses /opt/typedb/core/server/data which is symlinked to /var/lib/typedb/core/data
-   - If script doesn't find databases, use manual cleanup above instead
-
-3. *Restart TypeDB*:
-   #+begin_src bash
-   pkill -f typedb
-   nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
-   #+end_src
-
-4. *Verify* - Check that TypeDB started successfully:
-   #+begin_src bash
-   tail -20 /home/ubuntu/logs/typedb.log
-   #+end_src
-   Look for "TypeDB Server is ready" message
-
-*** Alternative: Manual Cleanup (if scripts unavailable)
-**** For test database accumulation:
-This deletes test databases. Note: Some test databases are named "skg-test"
-without a dash before "test", so we need to match both patterns.
 #+begin_src bash
+# Modern approach (recommended) - uses TypeDB API
+cargo run --bin cleanup-test-dbs
+
+# Then restart TypeDB
+pkill -f typedb
+nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
+#+end_src
+
+** Complete Documentation
+
+See ~troubleshooting/typedb/database-cleanup.md~ for comprehensive documentation including:
+- Problem symptoms and root causes
+- Cleanup utilities (Rust-based and shell-based)
+- Automatic cleanup in integration tests
+- Database naming conventions
+- Prevention strategies
+- Monitoring commands
+
+** Diagnostic Tools
+
+*** Check TypeDB Status
+#+begin_src bash
+bash troubleshooting/typedb/check-typedb-status.sh
+#+end_src
+Shows: process status, recent logs, helpful commands
+
+*** Check Database Count
+#+begin_src bash
+bash troubleshooting/typedb/check-typedb-databases.sh
+#+end_src
+Shows: count of test/corrupt/okay databases, recommendations
+
+** Legacy Approach (Filesystem-Based)
+
+*WARNING*: Manual filesystem deletion can cause TypeDB to crash if databases are open.
+Use the Rust utilities above instead when possible.
+
+#+begin_src bash
+# Only use if TypeDB is NOT running
 cd /var/lib/typedb/core/data && rm -rf skg-test*
 #+end_src
 
-Or using the symlinked path (equivalent):
-#+begin_src bash
-rm -rf /opt/typedb/core/server/data/skg-test*
-#+end_src
-
-Or using find (more portable but slower):
-#+begin_src bash
-find /var/lib/typedb/core/data/ -maxdepth 1 -type d -name "skg-test*" -exec rm -rf {} \;
-#+end_src
-
-**** For specific corrupted database:
-1. Identify the problematic database from the error message in the log
-2. Remove the corrupted database directory:
-   #+begin_src bash
-   rm -rf /opt/typedb/core/server/data/PROBLEMATIC_DATABASE_NAME
-   #+end_src
-
-*** Script Reference
-**** troubleshooting/typedb/check-typedb-databases.sh
-- Classifies all TypeDB databases as 'okay', 'corrupt', or 'test'
-- Identifies corruption indicators like inaccessible storage directories
-- Provides summary and recommendations
-- Very helpful for understanding the scope of the problem before taking action
-**** troubleshooting/typedb/clean-typedb-test-databases.sh
-- Safely removes all test databases (pattern: *skg-*test*)
-- Interactive confirmation before deletion
-- Preserves system and production databases
-** Diagnostic Lessons Learned
-*** What Was Helpful (Do This First)
-1. *Reading the TypeDB log* - `/home/ubuntu/logs/typedb.log` was the most valuable source
-   - Showed the exact error: "Too many open files" with OS error code 24
-   - Provided immediate direction for investigation
-   - Start here every time TypeDB won't start
-
-2. *Using check-typedb-databases.sh* - Confirmed the diagnosis
-   - Showed exactly how many test databases had accumulated (31 to 56 in documented cases)
-   - Gave confidence that test database cleanup was the right solution
-   - Quick to run and informative
-   - Can be run even when TypeDB is running (for preventive maintenance)
-
-3. *Following the documented solution* - The existing documentation was accurate
-   - Manual cleanup with `rm -rf /opt/typedb/core/server/data/skg-test*` worked perfectly
-   - All integration tests passed after cleanup
-
-*** What Could Be Misleading
-1. *"Connection refused" error alone* - This is too generic
-   - Could be many things: server not running, wrong port, firewall, etc.
-   - Don't spend time checking ports or network - check the log first
-   - The log will tell you why the server failed to start
-
-2. *Checking if process is running* - Less helpful than expected
-   - Process might be running but failing to initialize
-   - Process might exit immediately on startup
-   - Again, the log is more informative
-
-3. *Looking at individual database directories* - Not necessary
-   - The check-typedb-databases.sh script does this better
-   - Manual inspection is time-consuming and error-prone
-   - Use the script instead
-
-*** Prevention
-To avoid accumulating test databases in the future:
-
-1. *Regular cleanup* - Add to periodic maintenance (before TypeDB restarts):
-   #+begin_src bash
-   cd /var/lib/typedb/core/data && rm -rf skg-test*
-   #+end_src
-   - Safe to run even while TypeDB is running
-   - Prevents "Too many open files" errors on next restart
-
-2. *After test runs* - Clean up test databases when done testing:
-   #+begin_src bash
-   cd /var/lib/typedb/core/data && rm -rf skg-test*
-   #+end_src
-
-3. *Monitor database count* - Check occasionally (especially before restarts):
-   #+begin_src bash
-   bash troubleshooting/typedb/check-typedb-databases.sh
-   #+end_src
-   - Alert threshold: 20+ test databases is risky
-   - Documented cases: 20, 31, 56 test databases caused issues
-
-4. Consider adding test database cleanup to test teardown procedures
-
-Note: Manual cleanup using `cd /var/lib/typedb/core/data && rm -rf skg-test*`
-is more reliable than the cleanup script, especially with symlinked directories.
+* Database Corruption (Non-Accumulation Issues)

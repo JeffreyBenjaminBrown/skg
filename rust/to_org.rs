@@ -17,8 +17,9 @@ pub use aliases::{
 pub use complete_aliascol::completeAliasCol;
 
 pub use complete_contents::{
-  completeContents,
-  check_for_and_modify_if_repeated,
+  completeDefinitiveOrgnode,
+  clobberIndefinitiveOrgnode,
+  make_indefinitive_if_repeated,
   completeOrgnodeForest, };
 
 pub use content_view::{

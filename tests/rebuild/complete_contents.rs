@@ -4,14 +4,14 @@ use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
 
-use skg::to_org::{completeContents, check_for_and_modify_if_repeated};
+use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, make_indefinitive_if_repeated};
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, OrgNode, SkgConfig};
 use skg::to_org::content_view::render_forest_to_org;
 use ego_tree::{Tree, NodeId};
 
-/// Helper to call check_for_and_modify_if_repeated followed by completeContents
+/// Helper to call make_indefinitive_if_repeated followed by completeContents
 /// (matches the pattern used in complete_node_preorder)
 async fn check_and_complete (
   tree    : &mut Tree < OrgNode >,
@@ -20,14 +20,18 @@ async fn check_and_complete (
   driver  : &typedb_driver::TypeDBDriver,
   visited : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  check_for_and_modify_if_repeated (
+  make_indefinitive_if_repeated (
     tree, node_id, visited ) . await ?;
   let is_indefinitive : bool = {
+    // 'make_indefinitive_if_repeated' may have changed this value.
     let node_ref = tree . get ( node_id )
       . ok_or ( "Node not found" ) ?;
     node_ref . value () . metadata . code . indefinitive };
-  if ! is_indefinitive {
-    completeContents (
+  if is_indefinitive {
+    clobberIndefinitiveOrgnode (
+      tree, node_id, config, driver ) . await ?;
+  } else {
+    completeDefinitiveOrgnode (
       tree, node_id, config, driver ) . await ?; }
   Ok (( )) }
 
@@ -66,11 +70,17 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     check_and_complete ( // processes root but *not* its descendents
       tree, root_id, config, driver, &mut visited ) . await ?;
 
+    let expected_output : &str =
+      indoc! { "
+        * (skg (id a) (source main) (code indefinitive)) a
+        ** (skg (id c) (code indefinitive)) c
+        *** (skg (id d) (code (relToParent parentIgnores))) d
+      " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
     assert_eq! (
-      output_org_text, input_org_text,
-      "Running on root with empty visited should preserve tree" );
+      output_org_text, expected_output,
+      "Running on root with empty visited should fetch canonical info for indefinitive node" );
     assert_eq! (
       visited . len (), 0,
       "Visited should be empty, because we only ran it on the indefinitive root" ); }
@@ -91,12 +101,14 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a) (source main) (code indefinitive)) a
+        ** (skg (id c) (code indefinitive)) c
+        *** (skg (id d) (code (relToParent parentIgnores))) d
       " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
     assert_eq! (
       output_org_text, expected_output,
-      "Since ID 'a' was in 'visited', orgnode for 'a' should be marked 'indefinitive'." );
+      "Since ID 'a' was in 'visited', orgnode for 'a' should be marked 'indefinitive' with source, but children preserved." );
     assert_eq! (
       visited . len (), 1,
       "Visited should still contain only 'a'" );
@@ -120,10 +132,16 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     check_and_complete (
       tree, second_node_id, config, driver, &mut visited ) . await ?;
 
+    let expected_output : &str =
+      indoc! { "
+        * (skg (id a) (code indefinitive)) a
+        ** (skg (id c) (source main) (code indefinitive)) c
+        *** (skg (id d) (code (relToParent parentIgnores))) d
+      " };
     assert_eq! (
       render_forest_to_org ( & forest ),
-      input_org_text,
-      "Running on second node should preserve tree" );
+      expected_output,
+      "Running on second indefinitive node should fetch canonical info from disk" );
   }
 
   Ok (( )) }
@@ -167,11 +185,17 @@ async fn test_visited_and_indefinitive_logic (
       check_and_complete (
         tree, root_id, config, driver, &mut visited ) . await ?;
 
+      let expected_output : &str =
+        indoc! { "
+          * (skg (id a) (source main) (code indefinitive)) a
+          ** (skg (id c)) c
+          *** (skg (id d) (code (relToParent parentIgnores))) d
+        " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
-        output_org_text, input_org_text,
-        "indefinitive root with empty visited should preserve tree" );
+        output_org_text, expected_output,
+        "indefinitive root with empty visited should fetch canonical info from disk" );
     }
 
     // Test with 'a' in visited - should mark as repeated
@@ -192,12 +216,14 @@ async fn test_visited_and_indefinitive_logic (
       let expected_output : &str =
         indoc! { "
           * (skg (id a) (source main) (code indefinitive)) a
+          ** (skg (id c)) c
+          *** (skg (id d) (code (relToParent parentIgnores))) d
         " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, expected_output,
-        "indefinitive root with 'a' in visited should mark as indefinitive" );
+        "indefinitive root with ID in visited should get canonical info from disk" );
     }
   }
 
@@ -225,11 +251,18 @@ async fn test_visited_and_indefinitive_logic (
       check_and_complete (
         tree, root_id, config, driver, &mut visited ) . await ?;
 
+      let expected_output : &str =
+        indoc! { "
+          * (skg (id d) (source main) (code indefinitive)) d
+          ** (skg (id d)) d
+          *** (skg (id d)) d
+          **** (skg (id d)) d
+        " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
-        output_org_text, input_org_text_self_ref,
-        "Self-referential tree from root should be unchanged" );
+        output_org_text, expected_output,
+        "Self-referential indefinitive root should fetch canonical info from disk" );
     }
 
     // Running from second node
@@ -253,12 +286,14 @@ async fn test_visited_and_indefinitive_logic (
         indoc! { "
           * (skg (id d) (code indefinitive)) d
           ** (skg (id d) (source main) (code indefinitive)) d
+          *** (skg (id d)) d
+          **** (skg (id d)) d
         " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, expected_output_from_second,
-        "Self-referential second node should become indefinitive" );
+        "Self-referential second node should become indefinitive with source, but children preserved" );
     }
   }
 
@@ -307,12 +342,14 @@ async fn test_visited_and_not_indefinitive_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a) (source main) (code indefinitive)) a
+        ** (skg (id c)) c
+        ** (skg (id d) (code (relToParent parentIgnores))) d
       " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
     assert_eq! (
       output_org_text, expected_output,
-      "Node 'a' in visited should become indefinitive" );
+      "Node 'a' in visited should become indefinitive with source, but children preserved" );
     assert_eq! (
       visited, visited_before,
       "Visited should be unchanged" );

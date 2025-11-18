@@ -1,10 +1,16 @@
 #!/bin/bash
 
+# DEPRECATED: Use the Rust-based cleanup utility instead:
+#   cargo run --bin cleanup-test-dbs
+#
+# This shell script uses filesystem operations which can cause TypeDB to crash
+# if databases are open. The Rust utility uses TypeDB's API which is safer.
+#
 # Script to safely delete TypeDB test databases
 # Deletes any database whose name matches "*skg-*test*"
 #
 # Note: /opt/typedb/core/server/data is a symlink to /var/lib/typedb/core/data
-# If this script doesn't work, try manual cleanup:
+# If this script doesn't work, use the Rust utility above or manual cleanup:
 #   cd /var/lib/typedb/core/data && rm -rf skg-test*
 
 set -e

@@ -16,7 +16,7 @@ pub use errors::{ TextLinkParseError,
 pub mod orgnode;
 pub use orgnode::{
   OrgNode, // metadata, title, body
-    OrgnodeMetadata, // id, viewdata, code
+    OrgnodeMetadata, // id, source, viewdata, code
       OrgnodeViewData, // cycle, focused, folded, relationships
         OrgnodeRelationships, // 2 bools, 3 ints
       OrgnodeCode, // relToParent, indef, editRequest, viewRequests
