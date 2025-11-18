@@ -1,8 +1,6 @@
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::to_org::util::{
-  mk_repeated_orgnode_from_id,
-  skgnode_and_orgnode_from_id};
+use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::to_org::aliases::wrapped_build_and_integrate_aliases_view;
 use crate::to_org::complete_aliascol::completeAliasCol;
 use crate::to_org::integrate_backpath::{
@@ -105,19 +103,16 @@ fn complete_node_preorder<'a> (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
     } else {
-      let is_repeat : bool;
       { // futz with the OrgNode itself
-        is_repeat = (
-          // Tweak repeated nodes. Update 'visited'.
-          check_for_and_modify_if_repeated (
-            tree, node_id, config, typedb_driver, visited
-          ). await ?);
+        check_for_and_modify_if_repeated (
+          // Maybe tweak the orgnode, maybe update 'visited'.
+          tree, node_id, visited
+        ). await ?;
         detect_cycle_and_mark_if_so (
           tree, node_id, ancestor_path ) ?; }
 
       { // futz with its children
-        if (! is_repeat && // repeat should imply indefinitive, so this is redundant, but harmless.
-            ! indefinitive ) {
+        if ! indefinitive {
           completeContents (
             tree, node_id, config, typedb_driver ). await ?; }
         map_complete_node_preorder_over_children (
@@ -180,35 +175,32 @@ fn map_complete_node_preorder_over_children<'a> (
 
 /// If this orgnode is a repeat, then modify its body and metadata
 ///   (but change no descendents).
-/// If it is not a repeat, update 'visited' to include it.
-/// Returns true if node was marked as repeated, false otherwise.
+/// If it is definitive, update 'visited' to include it.
 pub async fn check_for_and_modify_if_repeated (
   tree      : &mut Tree < OrgNode >,
   node_id   : NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
   visited   : &mut HashSet < ID >,
-) -> Result < bool, Box<dyn Error> > {
-  let node_pid : ID = {
+) -> Result < (), Box<dyn Error> > {
+  let (node_pid, is_indefinitive) : (ID, bool) = {
     let node_ref : ego_tree::NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    node_ref . value () . metadata . id . clone ()
-      . ok_or ( "Node has no ID" ) ? };
+    ( node_ref . value () . metadata . id . clone ()
+        . ok_or ( "Node has no ID" ) ?,
+      node_ref . value () . metadata . code . indefinitive ) };
   if visited . contains ( & node_pid ) {
-    // Replace the orgnnode with a repeated marker.
+    // It is a repeat. Mark it as indefinitive.
     // Its children are neither removed nor completed,
     // although their children might be completed.
-    let repeated_node : OrgNode =
-      mk_repeated_orgnode_from_id (
-        config, driver, & node_pid ) . await ?;
     let mut node_mut : NodeMut < OrgNode > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
-    * node_mut . value () = repeated_node;
-    return Ok ( true ); }
-  visited . insert ( node_pid );
-  Ok ( false ) }
+    node_mut . value () . metadata . code . indefinitive = true;
+    node_mut . value () . body = None; // indefinitive => no body
+    return Ok (( )); }
+  if ! is_indefinitive { // Only definitive nodes count as visited.
+    visited . insert ( node_pid ); }
+  Ok (( )) }
 
 /// Completes a Content node's children by reconciling them
 /// with the 'contains' relationships found on disk.

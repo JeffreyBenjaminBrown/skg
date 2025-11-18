@@ -124,8 +124,7 @@ async fn test_multi_root_view_logic (
   let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0)))) 1
                           1 has a body
                           * (skg (id 2) (source main) (view (rels (containers 0)))) 2
-                          * (skg (id 1) (source main) (view repeated (rels (containers 0))) (code indefinitive)) 1
-                          Repeated, probably above. Edit there, not here.
+                          * (skg (id 1) (source main) (view (rels (containers 0))) (code indefinitive)) 1
                           "};
   assert_eq!(result, expected,
              "Multi-root view should produce exact expected output");
@@ -154,8 +153,7 @@ fn test_single_root_view_with_cycle
                               ** (skg (id b) (source main) (view (rels (containers 2) (contents 1)))) b
                               b has a body
                               *** (skg (id c) (source main) (view (rels containsParent (contents 1)))) c
-                              **** (skg (id b) (source main) (view cycle repeated (rels containsParent (containers 2) (contents 1))) (code indefinitive)) b
-                              Repeated, probably above. Edit there, not here.
+                              **** (skg (id b) (source main) (view cycle (rels containsParent (containers 2) (contents 1))) (code indefinitive)) b
                               "};
       assert_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -191,8 +189,7 @@ fn test_multi_root_view_with_shared_nodes
                               this one string could span pages
                               ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
                               this one string could span pages
-                              * (skg (id 2) (source main) (view repeated (rels (linksIn 1))) (code indefinitive)) title 2
-                              Repeated, probably above. Edit there, not here.
+                              * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
                               "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");

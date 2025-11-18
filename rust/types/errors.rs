@@ -27,7 +27,7 @@ pub enum BufferValidationError {
   Child_of_Alias                 (OrgNode),
   Alias_with_no_AliasCol_Parent  (OrgNode),
   Multiple_AliasCols_in_Children (OrgNode),
-  Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have repeated=false and indefinitive=false. (Its contents are intended to define those of the node.)
+  Multiple_DefiningContainers    (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceNickname>), // Multiple orgnodes with same ID have different sources
@@ -86,7 +86,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node has multiple AliasCol children (max 1 allowed). Node: {:?}",
                node.metadata.id),
       BufferValidationError::Multiple_DefiningContainers(id) =>
-        write!(f, "Multiple nodes with ID {:?} are marked as defining (repeated=false, indefinitive=false)", id),
+        write!(f, "Multiple nodes with ID {:?} are marked as defining (indefinitive=false)", id),
       BufferValidationError::AmbiguousDeletion(id) =>
         write!(f, "Ambiguous deletion request for ID {:?}", id),
       BufferValidationError::DuplicatedContent(id) =>

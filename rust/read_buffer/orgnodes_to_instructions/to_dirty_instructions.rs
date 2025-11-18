@@ -36,8 +36,7 @@ fn interpret_node_dfs(
       if matches!(node_data.metadata.code.editRequest,
                   Some(EditRequest::Delete)) {
         NonMerge_NodeAction::Delete
-      } else if node_data.metadata.code.indefinitive ||
-                node_data.metadata.viewData.repeat {
+      } else if node_data.metadata.code.indefinitive {
         NonMerge_NodeAction::SaveIndefinitive
       } else {
         NonMerge_NodeAction::SaveDefinitive };

@@ -51,29 +51,6 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
                  pid ), )) ); }
   Ok (( orgnode, skgnode )) }
 
-/// Make an OrgNode marked 'repeated' by fetching it from disk.
-pub async fn mk_repeated_orgnode_from_id (
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-  id     : &ID,
-) -> Result < OrgNode, Box<dyn Error> > {
-  let (pid_resolved, source) : (ID, String) =
-    pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, id).await?
-    . ok_or_else( || format!(
-      "ID '{}' not found in database", id))?;
-  let (mut orgnode, _skgnode) : ( OrgNode, SkgNode ) =
-    skgnode_and_orgnode_from_pid_and_source (
-      config, &pid_resolved, &source ) ?;
-  orgnode . metadata . viewData . repeat = true;
-  orgnode . metadata . code . indefinitive = true; // Any repeated node is indefinitive, although not vice-versa.
-  orgnode . metadata . id = Some ( id . clone () );
-  orgnode . metadata . source = Some ( source . clone () );
-  orgnode . body = Some (
-    "Repeated, probably above. Edit there, not here."
-      . to_string () );
-  Ok ( orgnode ) }
-
 pub fn newline_to_space ( s: &str ) -> String {
   s.replace ( '\n', " " ) }
 

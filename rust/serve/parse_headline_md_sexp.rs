@@ -54,8 +54,6 @@ pub fn orgnodemd_to_string (
     view_parts.push ( "focused".to_string () ); }
   if metadata.viewData.folded {
     view_parts.push ( "folded".to_string () ); }
-  if metadata.viewData.repeat {
-    view_parts.push ( "repeated".to_string () ); }
 
   // Build rels s-expr (only if has non-default values)
   let mut rel_parts : Vec<String> = Vec::new ();
@@ -266,7 +264,6 @@ fn parse_view_sexp (
           "cycle"    => view_data . cycle = true,
           "focused"  => view_data . focused = true,
           "folded"   => view_data . folded = true,
-          "repeated" => view_data . repeat = true,
           _ => {
             return Err ( format! ( "Unknown view value: {}",
                                     bare_value )); }} },

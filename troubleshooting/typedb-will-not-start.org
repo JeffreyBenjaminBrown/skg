@@ -142,7 +142,14 @@ When TypeDB fails to start with "Connection refused" on port 1729:
   Cause:
         RocksDB { name: "OptimisedPrefix25", source: Error { message: "IO error: While opendir: PATH: Too many open files" } }
   #+end_example
+- Or during test runs (Connection Error from Rust tests):
+  #+begin_example
+  Connection Error: Unable to connect to TypeDB server(s), received errors:
+  - 127.0.0.1:1729:
+  IO error: while open a file for lock: /opt/typedb/core/server/data/skg-test-DATABASE_NAME/storage/OptimisedPrefix16/LOCK: Too many open files
+  #+end_example
 - The "too many open files" error occurs because TypeDB attempts to open all databases at startup, including corrupted ones and accumulated test databases
+- This error can also appear when tests try to create new databases while TypeDB already has many databases open
 *** Root Cause
 This typically happens when:
 1. *Test database accumulation* (most common): Many test runs leave behind skg-test* databases
@@ -298,7 +305,7 @@ To avoid accumulating test databases in the future:
    bash troubleshooting/typedb/check-typedb-databases.sh
    #+end_src
    - Alert threshold: 20+ test databases is risky
-   - Documented cases: 31, 56 test databases caused issues
+   - Documented cases: 20, 31, 56 test databases caused issues
 
 4. Consider adding test database cleanup to test teardown procedures
 

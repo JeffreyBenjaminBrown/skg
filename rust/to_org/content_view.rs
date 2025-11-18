@@ -212,12 +212,11 @@ pub fn render_forest_to_org (
     let node : &OrgNode = node_ref . value ();
     let mut out : String =
       orgnode_to_text ( level, node );
-    if ! node . metadata . viewData.repeat {
-      for child in node_ref . children () {
-        out . push_str (
-          & render_node_subtree_to_org (
-            child,
-            level + 1 )); }}
+    for child in node_ref . children () {
+      out . push_str (
+        & render_node_subtree_to_org (
+          child,
+          level + 1 )); }
     out }
   let mut result : String =
     String::new ();

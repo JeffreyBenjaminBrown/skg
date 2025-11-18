@@ -21,7 +21,7 @@ but another node with the same ID that has 'toDelete' false,
 that's a problem.
 .
 And if two nodes with the same ID 'define their contents'
-(identifiable if repeated=false and indefinitive=false),
+(identifiable if indefinitive=false),
 that's a problem, too.
 .
 STRATEGY:
@@ -79,7 +79,6 @@ fn traverse_node_recursively_and_collect(
 ) {
   let node: &OrgNode = node_ref.value();
   if let Some(id) = &node.metadata.id {
-    // Handle delete instructions
     let delete_instruction =
       if matches!(node.metadata.code.editRequest,
                   Some(EditRequest::Delete)) {
@@ -89,11 +88,10 @@ fn traverse_node_recursively_and_collect(
       . entry(id.clone())
       . or_insert_with(HashSet::new)
       . insert(delete_instruction);
-
-    // Handle defining containers
-    if !node.metadata.viewData.repeat && !node.metadata.code.indefinitive {
+    if !node.metadata.code.indefinitive {
       // Increment the count for this defining container
-      *id_defining_count.entry(id.clone()).or_insert(0) += 1; }}
+      *id_defining_count . entry (id.clone())
+        . or_insert(0) += 1; }}
   for child in node_ref.children() { // recurse
     traverse_node_recursively_and_collect(
       child,

@@ -28,8 +28,6 @@ pub struct OrgnodeViewData {
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
   pub folded: bool, // folded in the Emacs org-mode sense
-  pub repeat: bool, // Implies that the node already appears elsewhere in this buffer.
-    // PITFALL: repeated => indefinitive. (At least it should, and I think the code adheres to that.)
   pub relationships: OrgnodeRelationships,
 }
 
@@ -186,7 +184,6 @@ impl Default for OrgnodeViewData {
       cycle : false,
       focused : false,
       folded : false,
-      repeat : false,
       relationships : OrgnodeRelationships::default (),
     }} }
 

@@ -20,10 +20,13 @@ async fn check_and_complete (
   driver  : &typedb_driver::TypeDBDriver,
   visited : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  let is_repeat : bool =
-    check_for_and_modify_if_repeated (
-      tree, node_id, config, driver, visited ) . await ?;
-  if ! is_repeat {
+  check_for_and_modify_if_repeated (
+    tree, node_id, visited ) . await ?;
+  let is_indefinitive : bool = {
+    let node_ref = tree . get ( node_id )
+      . ok_or ( "Node not found" ) ?;
+    node_ref . value () . metadata . code . indefinitive };
+  if ! is_indefinitive {
     completeContents (
       tree, node_id, config, driver ) . await ?; }
   Ok (( )) }
@@ -52,16 +55,15 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     " };
 
   { // Test running on root with empty visited
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
     let mut visited : HashSet < ID > =
       HashSet::new ();
-
-    check_and_complete (
+    check_and_complete ( // processes root but *not* its descendents
       tree, root_id, config, driver, &mut visited ) . await ?;
 
     let output_org_text : String =
@@ -70,34 +72,31 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       output_org_text, input_org_text,
       "Running on root with empty visited should preserve tree" );
     assert_eq! (
-      visited . len (), 1,
-      "Visited should contain 'a'" );
-  }
+      visited . len (), 0,
+      "Visited should be empty, because we only ran it on the indefinitive root" ); }
 
   { // Test running on root with 'a' in visited
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
     let mut visited : HashSet < ID > =
       HashSet::new ();
     visited . insert ( ID::new ( "a" ));
-
     check_and_complete (
-      tree, root_id, config, driver, &mut visited ) . await ?;
+      tree, root_id, config, driver, &mut visited ). await ?;
 
     let expected_output : &str =
       indoc! { "
-        * (skg (id a) (source main) (view repeated) (code indefinitive)) a
-        Repeated, probably above. Edit there, not here.
+        * (skg (id a) (source main) (code indefinitive)) a
       " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
     assert_eq! (
       output_org_text, expected_output,
-      "Running on root with 'a' in visited should mark as repeated" );
+      "Since ID 'a' was in 'visited', orgnode for 'a' should be marked 'indefinitive'." );
     assert_eq! (
       visited . len (), 1,
       "Visited should still contain only 'a'" );
@@ -107,9 +106,9 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
   }
 
   { // Test running on second node (c)
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let second_node_id : ego_tree::NodeId =
       tree . root ()
@@ -156,9 +155,9 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with empty visited
     {
-      let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+      let mut forest : Vec < Tree < OrgNode > > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
-      let tree : &mut ego_tree::Tree < OrgNode > =
+      let tree : &mut Tree < OrgNode > =
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
@@ -177,9 +176,9 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with 'a' in visited - should mark as repeated
     {
-      let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+      let mut forest : Vec < Tree < OrgNode > > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
-      let tree : &mut ego_tree::Tree < OrgNode > =
+      let tree : &mut Tree < OrgNode > =
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
@@ -192,14 +191,13 @@ async fn test_visited_and_indefinitive_logic (
 
       let expected_output : &str =
         indoc! { "
-          * (skg (id a) (source main) (view repeated) (code indefinitive)) a
-          Repeated, probably above. Edit there, not here.
+          * (skg (id a) (source main) (code indefinitive)) a
         " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, expected_output,
-        "indefinitive root with 'a' in visited should mark as repeated" );
+        "indefinitive root with 'a' in visited should mark as indefinitive" );
     }
   }
 
@@ -215,9 +213,9 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from root
     {
-      let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+      let mut forest : Vec < Tree < OrgNode > > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
-      let tree : &mut ego_tree::Tree < OrgNode > =
+      let tree : &mut Tree < OrgNode > =
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
@@ -236,9 +234,9 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from second node
     {
-      let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+      let mut forest : Vec < Tree < OrgNode > > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
-      let tree : &mut ego_tree::Tree < OrgNode > =
+      let tree : &mut Tree < OrgNode > =
         & mut forest [ 0 ];
       let second_node_id : ego_tree::NodeId =
         tree . root ()
@@ -254,14 +252,13 @@ async fn test_visited_and_indefinitive_logic (
       let expected_output_from_second : &str =
         indoc! { "
           * (skg (id d) (code indefinitive)) d
-          ** (skg (id d) (source main) (view repeated) (code indefinitive)) d
-          Repeated, probably above. Edit there, not here.
+          ** (skg (id d) (source main) (code indefinitive)) d
         " };
       let output_org_text : String =
         render_forest_to_org ( & forest );
       assert_eq! (
         output_org_text, expected_output_from_second,
-        "Self-referential second node should become repeated" );
+        "Self-referential second node should become indefinitive" );
     }
   }
 
@@ -292,9 +289,9 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with 'a' in visited
   {
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
@@ -309,14 +306,13 @@ async fn test_visited_and_not_indefinitive_logic (
 
     let expected_output : &str =
       indoc! { "
-        * (skg (id a) (source main) (view repeated) (code indefinitive)) a
-        Repeated, probably above. Edit there, not here.
+        * (skg (id a) (source main) (code indefinitive)) a
       " };
     let output_org_text : String =
       render_forest_to_org ( & forest );
     assert_eq! (
       output_org_text, expected_output,
-      "Node 'a' in visited should become repeated" );
+      "Node 'a' in visited should become indefinitive" );
     assert_eq! (
       visited, visited_before,
       "Visited should be unchanged" );
@@ -324,9 +320,9 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with empty visited
   {
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
@@ -362,9 +358,9 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id d) (code (relToParent parentIgnores))) d
       " };
 
-    let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+    let mut forest : Vec < Tree < OrgNode > > =
       org_to_uninterpreted_nodes ( input_with_existing_content ) ?;
-    let tree : &mut ego_tree::Tree < OrgNode > =
+    let tree : &mut Tree < OrgNode > =
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
@@ -413,9 +409,9 @@ async fn test_false_content_logic (
       ** (skg (id d)) d
     " };
 
-  let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+  let mut forest : Vec < Tree < OrgNode > > =
     org_to_uninterpreted_nodes ( input_org_text ) ?;
-  let tree : &mut ego_tree::Tree < OrgNode > =
+  let tree : &mut Tree < OrgNode > =
     & mut forest [ 0 ];
   let root_id : ego_tree::NodeId =
     tree . root () . id ();

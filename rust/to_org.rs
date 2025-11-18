@@ -36,7 +36,6 @@ pub use orgnode::{
 };
 
 pub use util::{
-  mk_repeated_orgnode_from_id,
   newline_to_space,
   org_bullet,
   skgnode_and_orgnode_from_id,
