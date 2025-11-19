@@ -33,7 +33,7 @@ pub mod orgnodes_to_instructions;
 pub mod validate_foreign_nodes;
 pub use validate_foreign_nodes::{
   validate_and_filter_foreign_instructions,
-  validate_foreign_merge_instructions,
+  validate_merges_involve_only_owned_nodes,
 };
 
 /// Builds a forest of OrgNodes:
@@ -53,8 +53,8 @@ pub async fn buffer_to_save_instructions (
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
   add_missing_info_to_trees (
-    /* This should precede 'find_buffer_errors_for_saving'.
-    See the latter's header comment for why. */
+    // Should (and does) precede 'find_buffer_errors_for_saving'.
+    // See that function's's header comment for why.
     & mut orgnode_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
 
@@ -66,26 +66,19 @@ pub async fn buffer_to_save_instructions (
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
-
-  // Generate instructions.
   let instructions : Vec<SaveInstruction> =
     orgnodes_to_reconciled_save_instructions (
       & orgnode_forest, config, driver )
     . await . map_err ( SaveError::DatabaseError ) ?;
-
-  // Validate and filter foreign (read-only) node instructions
   let instructions : Vec<SaveInstruction> =
     validate_and_filter_foreign_instructions (
       instructions, config, driver )
     . await . map_err ( SaveError::BufferValidationErrors ) ?;
-
   let mergeInstructions : Vec<MergeInstructionTriple> =
     instructiontriples_from_the_merges_in_an_orgnode_forest (
       & orgnode_forest, config, driver
     ) . await . map_err ( SaveError::DatabaseError ) ?;
-
-  // Validate that merge instructions don't involve foreign nodes
-  validate_foreign_merge_instructions (
+  validate_merges_involve_only_owned_nodes (
     & mergeInstructions, config )
     . map_err ( SaveError::BufferValidationErrors ) ?;
 

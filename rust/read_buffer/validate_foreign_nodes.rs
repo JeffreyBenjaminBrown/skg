@@ -17,8 +17,8 @@ fn normalize_string_vec(v: &Option<Vec<String>>) -> Option<Vec<String>> {
 
 /// Validates that foreign (read-only) nodes are not being modified.
 /// Filters out:
-/// - Indefinitive foreign nodes (they don't append to foreign data)
-/// - Unmodified definitive foreign nodes (no need to write)
+/// - Indefinitive foreign nodes
+/// - Definitive foreign nodes without modifications (no need to write)
 ///
 /// Returns errors if:
 /// - Foreign nodes have been modified (title, body, or contains changed)
@@ -87,10 +87,10 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
   if errors.is_empty() { Ok(filtered)
   } else { Err(errors) }}
 
-/// Validates that merge instructions don't involve foreign (read-only) nodes.
-/// A merge modifies the acquirer and deletes the acquiree, so both must be from
-/// owned (writable) sources.
-pub fn validate_foreign_merge_instructions(
+/// Validates that merge instructions involve no foreign nodes.
+/// A merge modifies the acquirer and deletes the acquiree,
+/// so both must be from sources the user owns.
+pub fn validate_merges_involve_only_owned_nodes(
   merge_instructions: &[MergeInstructionTriple],
   config: &SkgConfig,
 ) -> Result<(), Vec<BufferValidationError>> {
