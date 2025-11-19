@@ -7,26 +7,42 @@ Introduce a configurable limit to the number of nodes rendered in initial conten
 ** Key Changes
 1. Add =initial_node_limit= field to =SkgConfig= (default: 1000)
 2. Switch from DFS to BFS for content view generation
-3. When limit is hit at node N in generation G, apply two-part truncation:
-   - Part 1: Truncate the ENTIRE generation G
-   - Part 2: Truncate everything after N's parent in generation G-1
-   - STOP - Don't go further up (earlier generations already have their children)
+3. When limit is hit at node N in generation G:
+   - Save reference to N and its parent P
+   - Go back to start of Gen G
+   - Render entire Gen G as truncated (indefinitive)
+   - When reaching N, complete its sibling group (also truncated)
+   - Stop - don't render rest of Gen G (nodes don't exist)
+   - Truncate everything after P in Gen G-1
+   - Stop - don't process earlier or deeper generations
 
-** Rationale for Truncation Strategy
-- Gen G nodes: Won't have children rendered (limit hit), so must be indefinitive
-- Gen G-1 nodes after parent: Won't have children rendered, so must be indefinitive
-- Earlier generations: Already had children rendered, so remain definitive
+** Rationale for Simplified Algorithm
+- **All Gen G nodes are truncated**: Won't have children rendered (limit hit), so must be indefinitive
+- **Complete sibling group**: Users expect to see ALL siblings, even if truncated
+- **Don't render after sibling group**: More efficient - those nodes simply don't exist
+- **Gen G-1 nodes after parent truncated**: Won't have children rendered, so must be indefinitive
+- **Earlier generations stay definitive**: Already had children rendered
+- **Simpler implementation**: No tracking which nodes were already processed, single pass through Gen G
 
 ** Implementation Approach
 Process generation-by-generation rather than node-by-node:
 - Collect all nodes in generation G
 - Check if processing them would exceed limit
-- If yes: apply truncation strategy and stop
-- If no: process all nodes and move to next generation
-- This avoids retroactive truncation of already-processed nodes
+- If no: process all nodes normally and move to next generation
+- If yes (limit hit):
+  1. Save NodeRef to the limit node
+  2. Go back to start of generation G
+  3. Walk through generation, rendering all nodes as truncated (indefinitive)
+  4. When reaching limit node, complete its sibling group (also truncated)
+  5. Stop - don't render rest of generation G
+  6. Truncate everything after parent in generation G-1
 
-** Critical Open Question
-What should happen if we've already processed some nodes before hitting the limit? (See Challenge 0 below for details and recommendation)
+This approach is simpler and more efficient than tracking which nodes to process normally vs. truncated.
+
+** Important Clarification (commit bb476aa)
+Indefinitive nodes have NO effect on saves (except for delete instructions).
+This simplifies the truncation implementation - marking nodes as indefinitive is purely for display purposes.
+Truncated nodes won't accidentally contribute data when saved.
 
 * Current Architecture
 ** Entry Point
@@ -67,10 +83,20 @@ Handler: =rust/serve/handlers/single_root_view.rs:handle_single_root_view_reques
 - Only definitive nodes call =extend_content= to add missing children
 
 ** Indefinitive Nodes
-From =rust/types/orgnode.rs:51=:
+From =rust/types/orgnode.rs:51= (updated in commit bb476aa):
 #+begin_quote
+Describes a node's relationship to those of its children that are content.
 A definitive node defines the title, body and initial contents, if present.
-Otherwise those things are taken from disk.
+So changing which nodes are its children can change its contents.
+Indefinitive nodes, by contrast, do not permit the user to modify the node they represent.
+If it has children, they are kept in the view when the user saves,
+but saving does not create a 'contains' relationship from the indefinitive parent to the child.
+#+end_quote
+
+From =rust/types/save.rs= (updated in commit bb476aa):
+#+begin_quote
+An indefinitive node generally has no effect on the graph when saved.
+The exception is that it can contain a delete instruction.
 #+end_quote
 
 Currently used for:
@@ -78,7 +104,7 @@ Currently used for:
 - Nodes marked indefinitive by user (rare)
 
 Will be extended for:
-- Nodes beyond the rendering limit
+- Nodes beyond the rendering limit (truncated nodes)
 
 * New Architecture Requirements
 ** New SkgConfig Field
@@ -137,26 +163,33 @@ loop {
 ** Truncation Strategy
 When =nodes_rendered >= initial_node_limit=:
 
-*** Two-Part Truncation
-When we hit the limit at node N in generation G (where N's parent is P in generation G-1):
+*** Simplified Algorithm
+When limit is hit at node N in generation G (where N's parent is P):
 
-**** Part 1: Truncate the ENTIRE Generation G
-- Truncate ALL nodes in generation G
-- This includes:
-  - N's sibling group (all children of N's parent P)
-  - All nodes before N in generation G (other sibling groups)
-  - All nodes after N in generation G
+**Step 1**: Save reference to limit node
+- Save NodeRef to N ("where-limit-was-hit")
+- Save N's parent P
 
-**** Part 2: Truncate Everything AFTER Parent in Generation G-1
+**Step 2**: Render entire generation G as truncated
+- Go back to start of generation G
+- Walk through generation, rendering each node as truncated (indefinitive)
+- When reaching N (where limit was hit):
+  - Continue rendering N's remaining siblings (also truncated)
+  - After completing N's sibling group, STOP
+- Nodes after N's sibling group are NOT rendered (don't exist in tree)
+- Rationale: Users expect to see ALL siblings for completeness, but not unrelated nodes
+
+**Step 3**: Truncate parent's generation
 - Go up to N's parent P (in generation G-1)
 - Truncate everything in generation G-1 that comes AFTER P
   - Not just P's immediate siblings
   - But ALL remaining nodes in that generation (across all trees)
 
-**** STOP - Don't Go Further Up
-- Do NOT continue recursing up the tree
-- Nodes in generations G-2, G-3, etc. remain as-is
-- Rationale: Those nodes have already had their children rendered, so they can remain definitive
+**STOP**: Don't process further
+- Do NOT continue recursing up the tree to G-2, G-3, etc.
+  - Those nodes have already had their children rendered, so they can remain definitive
+- Do NOT process generation G+1 or deeper
+  - Those nodes simply won't exist in the tree
 
 *** Example 1: Simple Case
 #+begin_example
@@ -179,17 +212,26 @@ BFS generations:
 
 If limit is reached at A22:
 
+Step 0: Complete A22's sibling group
+- A22's siblings: A21, A22, A23
+- Continue rendering A23 (even though we're over limit)
+- Mark A23 as indefinitive
+- Result: All of [A21, A22, A23] are rendered (but truncated)
+
 Part 1: Truncate ENTIRE Gen 3
-- Truncate: A21, A22, A23
+- Mark as indefinitive: A21, A22, A23
 
 Part 2: Truncate everything AFTER A2 in Gen 2
 - A2's subsequent nodes in Gen 2: A3, B1, B2
-- Truncate: A3, B1, B2
+- Mark as indefinitive: A3, B1, B2
+
+Part 3: Don't render Gen 4
+- No nodes in Gen 4 are created or rendered
 
 STOP - Don't go to Gen 1
 - A and B remain definitive (they already had their children rendered)
 
-Total truncated: [A21, A22, A23, A3, B1, B2]
+Total rendered but truncated (indefinitive): [A21, A22, A23, A3, B1, B2]
 Remain definitive: [A, B, A1, A2]
 #+end_example
 
@@ -199,39 +241,68 @@ Tree structure:
 A
   A1
     A11
+    A12
   A2
     A21
     A22 <- hit limit here
     A23
   A3
 B
+  B1
 
 BFS generations:
 - Gen 1: A, B
-- Gen 2: A1, A2, A3
-- Gen 3: A11, A21, A22, A23
+- Gen 2: A1, A2, A3, B1
+- Gen 3: A11, A12, A21, A22, A23
 
-If limit is reached at A22:
+If limit is reached at A22 (4th node in Gen 3):
 
-Part 1: Truncate ENTIRE Gen 3
-- Truncate: A11, A21, A22, A23
-- This includes all sibling groups (A11 from A1, A21-A23 from A2)
+Algorithm:
+1. Save NodeRef to A22 (where limit was hit)
+2. Save A22's parent (A2)
+3. Go back to start of Gen 3
+4. Walk through Gen 3, rendering as truncated:
+   - Render A11 (truncated/indefinitive)
+   - Render A12 (truncated/indefinitive)
+   - Render A21 (truncated/indefinitive)
+   - Render A22 (truncated/indefinitive) - reached limit node
+   - Render A23 (truncated/indefinitive) - same parent as A22, complete sibling group
+5. STOP - Don't render rest of Gen 3
+   - A11, A12, A21, A22, A23 are rendered (all truncated)
+   - NO other nodes in Gen 3 exist in the tree
+6. Truncate everything after A2 in Gen 2:
+   - Mark A3, B1 as indefinitive
 
-Part 2: Truncate everything AFTER A2 in Gen 2
-- A2's subsequent nodes in Gen 2: A3
-- Truncate: A3
-
-STOP - Don't go to Gen 1
-- A and B remain definitive (they already had their children rendered)
-
-Total truncated: [A11, A21, A22, A23, A3]
-Remain definitive: [A, B, A1, A2]
+Result:
+- Rendered and truncated (indefinitive): A11, A12, A21, A22, A23, A3, B1
+- Remain definitive: A, B, A1, A2
+- Not rendered at all: (nothing after A23 in Gen 3)
+- Gen 4 and deeper: Not rendered at all
 #+end_example
 
-*** Rationale
-- Gen G: Truncated because we hit the limit - won't render their children
-- Nodes after parent in Gen G-1: Truncated because we won't render their children either
-- Nodes in Gen G-2 and earlier: Remain definitive because their children were already rendered
+*** Rationale and Benefits
+**Why render entire generation G as truncated?**
+- All nodes in Gen G won't have their children rendered (limit hit)
+- Therefore they must all be shown as truncated (indefinitive)
+- Simpler than tracking which nodes were already processed normally
+
+**Why complete the sibling group?**
+- Users expect to see ALL siblings for completeness
+- Seeing "A has children: A1, A2 (indef), A3 (indef)" is better than "A has children: A1, A2 (indef), ???"
+- But we don't need to render unrelated sibling groups (more efficient)
+
+**Why truncate after parent in Gen G-1?**
+- Those nodes won't have their children rendered either
+- Must be shown as truncated
+
+**Why stop at Gen G-2?**
+- Earlier generations already had their children rendered
+- Can remain definitive
+
+**Efficiency gains:**
+- Don't render nodes after limit sibling group (they simply don't exist)
+- Don't need complex logic to track which nodes to process normally vs. truncated
+- Single pass through Gen G (no need to go back and retroactively mark nodes)
 
 *** Interaction with Repetition
 - Repeated nodes are already marked indefinitive
@@ -239,197 +310,39 @@ Remain definitive: [A, B, A1, A2]
 - But we should still count them toward the limit
 
 * Implementation Challenges and Questions
-** Challenge 0: CRITICAL - Processing Model and Retroactive Truncation
-This is the most fundamental question that affects the entire design.
+** Challenge 1: Tree Utilities Need Mutable Access
+The tree utilities in =rust/media/tree.rs= currently use immutable =NodeRef=.
+For this feature, we need mutable access to mark nodes as indefinitive and add children.
 
-*** The Problem
-The truncation strategy requires truncating nodes that may have already been processed.
+*** Solution: Modify Tree Utilities
+Update the tree utilities to use mutable =NodeMut= instead of immutable =NodeRef=.
 
-Consider Example 2 where we hit the limit at A22:
-- BFS order in Gen 3: A11, A21, A22, A23
-- Suppose we process nodes one-by-one:
-  1. Process A11 (count=8, under limit):
-     - Mark as definitive
-     - Read from disk
-     - Add A11's children to tree (creating Gen 4 nodes)
-  2. Process A21 (count=9, under limit):
-     - Mark as definitive
-     - Read from disk
-     - Add A21's children to tree
-  3. Process A22 (count=10, AT/OVER limit):
-     - LIMIT HIT!
-     - Part 1: Need to truncate A21, A22, A23 (A22's sibling group)
-     - Part 2: Need to truncate A3 (after parent A2)
-     - Part 3: Need to truncate A11 (before A22 in Gen 3)
+** Challenge 2: Initial View Generation vs Buffer Completion
+Saved buffer "completion" (=completeOrgnodeForest=) is complex due to sourceward/containerward view overlap.
 
-*** The Question
-What happens to A11 and A21, which were already processed as definitive?
-- A11 has been marked definitive, read from disk, and had its children added
-- A21 has been marked definitive, read from disk, and had its children added
-- But now we need to truncate them
+For initial view generation (de novo), it's much simpler: just render the node's contents in order.
 
-**** Option A: Leave Already-Processed Nodes As-Is
-- A21 stays definitive
-- A21's children stay in the tree
-- Only truncate A22 and A23 (not yet processed)
-- Problem: Violates user requirement "truncate ALL siblings, even A21 which precedes it"
+*** Solution: Create New BFS Rendering Function
+Don't call =completeOrgnodeForest= for initial view generation. Instead, create new simpler logic:
+- Read node from graph database
+- Get its content children (from =contains= relationship only - no sourceward/containerward)
+- Add them to the tree in BFS order
+- Not "completion" - just "rendering initial content"
 
-**** Option B: Retroactively Truncate A21
-- Mark A21 as indefinitive (clobber its body, set title from disk)
-- But what about A21's children (Gen 4 nodes already in tree)?
-  - Remove them from tree?
-  - Mark them as indefinitive too?
-  - Leave them but don't process them?
+This is cleaner and more appropriate for initial view generation.
 
-**** Option C: Process Sibling Groups Atomically
-- Don't process A21 individually
-- Instead, process the entire sibling group [A21, A22, A23] as a batch:
-  1. Check if processing this batch would exceed limit
-  2. If yes: mark all as truncate
-  3. If no: process all as definitive
-- Problem: Requires knowing all siblings before processing any
-- Problem: Different parents' children are interleaved in the same generation
+** Challenge 3: Save Path - No Changes Needed
+The =initial_node_limit= applies only to initial view generation, not saves.
 
-**** Option D: Process Generation-by-Generation with Lookahead
-- Before processing Gen 3, count how many nodes it has
-- If Gen 3 would exceed limit, truncate the entire generation
-- Problem: Still need to handle partial generation (limit hit mid-generation)
+Save path uses =completeOrgnodeForest= (which we're NOT modifying):
+- Initial view: Use new BFS rendering function (with limit)
+- Save: Continue using =completeOrgnodeForest= (no limit)
 
-**** Option E: Two-Pass Approach
-- Pass 1: Build stubs for all nodes in BFS order, counting as we go
-  - When limit hit, mark which nodes should be truncated
-  - Mark sibling groups, parent's subsequent siblings, etc.
-- Pass 2: Actually complete the nodes
-  - Definitive nodes: read from disk, add children
-  - Truncated nodes: mark indefinitive
+Both paths share these functions (no changes needed):
+- =set_metadata_relationship_viewdata_in_forest= - Adds metadata, doesn't change forest shape
+- =render_forest_to_org= - Immutable, just converts to text
 
-*** Recommendation
-Need user clarification on what happens when we've already processed a node and then need to truncate it retroactively.
-
-Likely answer: Process generation-by-generation as batches, and if limit is hit within a generation, handle specially.
-
-** Challenge 1: Mutable Tree Traversal with ego_tree
-The tree utilities in =rust/media/tree.rs= use immutable =NodeRef=.
-But our processing requires mutable access (=NodeMut=) to:
-- Mark nodes as indefinitive
-- Complete nodes (add children, modify metadata)
-
-*** Possible Solutions:
-1. Two-pass approach:
-   - Pass 1 (BFS with immutable refs): Identify which nodes to process vs truncate
-     - Collect NodeIds in BFS order
-     - Track which nodes should be truncated
-   - Pass 2 (using NodeIds): Process nodes with mutable access
-     - Process definitive nodes (complete them)
-     - Mark truncated nodes as indefinitive
-
-2. Hybrid approach:
-   - Use BFS iteration pattern to determine processing order
-   - For each generation, collect all NodeIds in that generation
-   - Process them with mutable access
-   - Decision point: truncate remaining generations or not
-
-3. Convert current recursive approach to iterative with explicit queue
-   - Maintain =Vec<NodeId>= as queue
-   - Process nodes from queue (with mutable access)
-   - Add children to queue only if under limit
-
-*** Recommendation: Two-pass approach (option 1)
-- Cleanest separation of concerns
-- BFS traversal purely for ordering and decision-making
-- Actual mutation happens in second pass
-- Can reuse existing completion logic
-
-** Challenge 2: Completing Nodes Creates New Children
-Current =completeDefinitiveOrgnode= in =rust/to_org/complete_contents.rs:273=:
-- Reads node from disk
-- Calls =extend_content= to add missing children
-- This happens during traversal, modifying the tree structure
-
-*** Problem for BFS:
-- If we're iterating through generation N
-- Completing a node might add new nodes at generation N+1
-- But we haven't started processing generation N+1 yet
-- Need to ensure newly-added children are included in next generation
-
-*** Possible Solutions:
-1. Stub first, complete later:
-   - Pass 1: Walk BFS, create stub children (just ID, no completion)
-   - Pass 2: Complete all nodes that should be definitive
-   - Ensures tree structure is stable before iteration
-
-2. Complete incrementally with queue:
-   - Maintain queue of nodes to process
-   - When completing a node adds children, add them to queue
-   - Process until queue is empty or limit reached
-
-3. Generation-by-generation completion:
-   - For generation N:
-     - Collect all NodeIds at generation N
-     - Complete each one (adding children at generation N+1)
-   - Move to generation N+1 (which now includes newly added children)
-
-*** Recommendation: Generation-by-generation (option 3)
-- Fits naturally with BFS processing
-- Each generation is fully completed before moving to next
-- Newly added children automatically included in next generation
-- Can track count accurately
-
-** Challenge 3: Truncation Semantics
-User requirement: "truncate each node in the current list of siblings
-(all of which are under parent P) and then we move up a level in the tree,
-and truncate every subsequent (but not previous) sibling to P."
-
-*** Questions:
-1. When we truncate "subsequent siblings", do we mean:
-   a) Siblings that come after in document order (later in children list)
-   b) Siblings that come after in BFS visitation order
-
-   Answer: Likely (a) - document order, since BFS processes left-to-right
-
-2. Do we truncate just the immediate subsequent siblings, or all ancestors' subsequent siblings?
-
-   Answer from requirement: "move up a level...and truncate every subsequent sibling"
-   This suggests we continue up the tree, truncating subsequent siblings at each level.
-
-3. How do we track "which parent a truncated node belongs to" during BFS?
-
-   Answer: Need to maintain parent information during traversal.
-   Could extend NodeId collection to include (NodeId, ParentId) tuples.
-
-** Challenge 4: Save vs View Behavior
-Requirement: "initial_node_limit" applies only to initial view generation, not saves.
-
-*** Questions:
-1. Is save handled by a different code path?
-
-   Answer: Yes, =handle_save_buffer_request= in =rust/serve/handlers/save_buffer.rs=
-
-2. Does save ever call =completeOrgnodeForest=?
-
-   Need to trace save logic to confirm.
-
-*** Investigation needed:
-Check if save logic uses any view generation code.
-If so, need to pass a flag to disable limit during saves.
-
-** Challenge 5: View Requests
-Current =complete_node_preorder= processes view requests (aliases, containerward, sourceward)
-AFTER completing children.
-
-*** Question:
-Should view requests be allowed to add children to truncated nodes?
-
-Current behavior: Yes - even indefinitive nodes can have view request children.
-
-New behavior: Should probably maintain this - truncation shouldn't prevent
-containerward/sourceward navigation, as those are user-requested.
-
-*** Implication:
-View request children don't count toward limit?
-Or they do count, but can be added even after limit reached?
-
-Need clarification from user.
+Verified: These shared functions don't add/remove nodes (don't change forest shape), so no need for save process to be aware of node limit.
 
 * Proposed Implementation Plan
 ** Phase 1: Add Configuration
@@ -437,20 +350,21 @@ Need clarification from user.
 2. Add =default_initial_node_limit()= helper function
 3. Test that config loads correctly with and without the field
 
-** Phase 2: Refactor to BFS (Without Limit)
-Before adding limit logic, refactor to BFS to ensure it works correctly:
+** Phase 2: Implement BFS Rendering (Without Limit)
+Create new initial view generation logic using BFS:
 
-1. Create new =completeOrgnodeForest_bfs= function
+1. Create new function for initial view generation (not reusing save buffer completion logic)
 2. Implement generation-by-generation processing:
    - For each generation:
      - Collect all NodeIds at that generation using tree utilities
      - For each node in generation (in BFS order):
        - Check if repeated (using visited set)
-       - If definitive: complete it (read from disk, add children)
-       - If indefinitive: clobber it
+       - If not repeated: render it (read from graph, get =contains= children, add to tree)
+       - If repeated: mark as indefinitive
      - Children added during this generation become next generation
-3. Maintain =visited= set as before
-4. Test that BFS produces same results as DFS (modulo ordering)
+3. Maintain =visited= set to detect repetitions
+4. Update tree utilities in =rust/media/tree.rs= to use mutable refs
+5. Test that BFS rendering works correctly
 
 *** Generation-by-Generation Processing Pattern
 #+begin_src rust
@@ -483,7 +397,7 @@ loop {
 ** Phase 4: Implement Truncation
 With generation-by-generation processing, truncation becomes cleaner:
 
-*** Truncation Algorithm
+*** Truncation Algorithm (Simplified)
 #+begin_src rust
 let mut generation: usize = 1;
 let mut visited: HashSet<ID> = HashSet::new();
@@ -500,16 +414,36 @@ loop {
 
   // Check if this generation would exceed the limit
   if nodes_rendered + nodes_in_gen.len() > limit {
-    // LIMIT HIT! Find which node specifically causes the overflow
+    // LIMIT HIT!
     let overflow_index: usize = limit - nodes_rendered;
-    let limit_node_id: NodeId = nodes_in_gen[overflow_index].1;
+    let where_limit_was_hit: NodeId = nodes_in_gen[overflow_index].1;
+    let limit_parent: Option<NodeId> = nodes_in_gen[overflow_index].2;
 
-    // Apply three-part truncation:
-    apply_truncation_strategy(
+    // Go back to start of this generation
+    // Render everything as truncated (indefinitive)
+    let mut hit_limit_node = false;
+    for (tree_idx, node_id, parent) in nodes_in_gen {
+      // Render node as truncated
+      process_node_as_truncated(
+        forest, tree_idx, node_id, &mut visited)?;
+
+      // Check if we've reached the limit node
+      if node_id == where_limit_was_hit {
+        hit_limit_node = true;
+      }
+
+      // If we've passed the limit node and moved to a different parent,
+      // stop (don't render rest of generation)
+      if hit_limit_node && parent != limit_parent {
+        break;
+      }
+    }
+
+    // Apply truncation to parent's generation
+    apply_truncation_to_parent_generation(
       forest,
       generation,
-      limit_node_id,
-      &nodes_in_gen)?;
+      where_limit_was_hit)?;
 
     // Stop processing further generations
     break;
@@ -525,26 +459,40 @@ loop {
 }
 #+end_src
 
-*** Two-Part Truncation Implementation
+*** Truncation Helper Functions
 #+begin_src rust
-fn apply_truncation_strategy(
+fn process_node_as_truncated(
+  forest: &mut Vec<Tree<OrgNode>>,
+  tree_idx: usize,
+  node_id: NodeId,
+  visited: &mut HashSet<ID>,
+) -> Result<(), Box<dyn Error>> {
+  // Mark node as indefinitive
+  mark_indefinitive(forest, tree_idx, node_id)?;
+
+  // Update visited set if node has an ID
+  let node_pid_opt: Option<ID> =
+    get_node_id(forest, tree_idx, node_id)?;
+  if let Some(pid) = node_pid_opt {
+    visited.insert(pid);
+  }
+
+  Ok(())
+}
+
+fn apply_truncation_to_parent_generation(
   forest: &mut Vec<Tree<OrgNode>>,
   limit_generation: usize,
   limit_node_id: NodeId,
-  nodes_in_gen: &[(usize, NodeId, Option<NodeId>)],
 ) -> Result<(), Box<dyn Error>> {
-
-  // Part 1: Truncate ENTIRE generation
-  for (tree_idx, node_id, _parent) in nodes_in_gen {
-    mark_indefinitive(forest, *tree_idx, *node_id)?;
-  }
-
-  // Part 2: Truncate everything after parent in parent's generation
+  // Find parent of limit node
   let limit_parent: Option<NodeId> =
     find_parent(forest, limit_node_id)?;
 
   if let Some(parent_id) = limit_parent {
     let parent_gen: usize = limit_generation - 1;
+
+    // Truncate everything after parent in parent's generation
     truncate_after_in_generation(
       forest,
       parent_gen,
@@ -585,101 +533,41 @@ fn truncate_after_in_generation(
 3. Test with multiple sibling groups in same generation
 4. Test truncation of "everything after parent" in parent's generation
 5. Verify earlier generations remain definitive (children already rendered)
-6. Test edge cases:
+6. **Test sibling group completion**:
+   - Limit hit at first node in sibling group (all siblings rendered as indefinitive)
+   - Limit hit at middle node in sibling group (all siblings rendered, later ones indefinitive)
+   - Limit hit at last node in sibling group (all siblings rendered normally)
+7. Test edge cases:
    - Limit hit at first node in generation
    - Limit hit at last node in generation
    - Parent is last node in its generation (nothing to truncate after it)
    - Limit hit in Gen 1 (roots)
+   - Sibling group that spans the limit boundary
 
 ** Phase 5: Handle Edge Cases
-1. View requests on truncated nodes
-2. Repeated nodes near limit
-3. Limit reached in middle of sibling group
-4. Very small limits (< number of roots)
-5. Limit = 0 (should show just roots?)
+1. Repeated nodes near limit
+2. Limit reached in middle of sibling group
+3. Small limits (limit=1 should show all roots as truncated)
+4. Limit hit in Gen 1 (roots)
+5. Sibling group that spans the limit boundary
 
 ** Phase 6: Integration
-1. Replace =completeOrgnodeForest= with BFS version
-2. Ensure save path is not affected (or pass flag to disable limit)
+1. Update =single_root_view= and =multi_root_view= in =rust/to_org/content_view.rs=:
+   - Replace =completeOrgnodeForest= call with new BFS rendering function
+   - Keep =set_metadata_relationship_viewdata_in_forest= and =render_forest_to_org= as-is
+2. Save buffer path (=update_from_and_rerender_buffer=) continues using =completeOrgnodeForest= unchanged
 3. Run full test suite
 4. Integration tests with real data
 
-* Questions for User
-** CRITICAL: Processing Model (Challenge 0)
-When we hit the limit at node N and need to truncate:
-- Part 1: N's entire sibling group (including siblings before N)
-- Part 2: Everything after parent in parent's generation
-- Part 3: Everything before N in N's generation (including other sibling groups)
+* Edge Cases and Special Behaviors
+** Small Limits
+Node limit must be a positive integer (>= 1).
 
-Many of these nodes may have already been processed (marked definitive, read from disk, children added).
-
-**What should we do with already-processed nodes that need to be truncated?**
-
-Options:
-a) **Leave as-is** (violates "must be shown as truncated" requirement - wrong)
-
-b) **Mark indefinitive retroactively, remove children from tree**
-   - Clobber the node (set title from disk, clear body)
-   - Detach all children that were added
-   - Clean slate
-
-c) **Mark indefinitive retroactively, leave children but mark them indefinitive too**
-   - Clobber the node
-   - Keep children in tree
-   - Recursively mark all descendants as indefinitive
-   - Children won't be rendered in final output
-
-d) **Mark indefinitive retroactively, leave children in tree as-is**
-   - Clobber the node
-   - Keep children as they are (some might be definitive)
-   - Problem: Inconsistent - parent is indefinitive but children are definitive?
-
-e) **Process in a way that avoids this situation**
-   - Don't process any node until we know the entire generation's size
-   - If generation would exceed limit, mark entire generation as truncated up front
-   - Requires two-pass or generation-at-a-time processing
-
-**Recommendation: Option (e) - avoid the situation by processing generation-by-generation**
-- Collect all nodes in generation G
-- Check if processing them would exceed limit
-- If yes: truncate appropriately (including parts 1-3 of truncation strategy)
-- If no: process all nodes in generation
-- This ensures we never process a node we later need to retroactively truncate
-
-** View Requests
-3. Should view request children (aliases, containerward, sourceward) count toward the node limit?
-   Or should they be allowed even on truncated nodes?
-
-   Current behavior: Even indefinitive nodes can have view request children.
-   Proposed: Maintain this - view requests are user-initiated navigation.
-
-** Edge Cases
-4. What should happen with a very small limit (e.g., limit=5 with 10 root nodes)?
-   - Show first 5 roots as definitive, rest as indefinitive?
-   - Or different behavior?
-
-5. Should limit=0 be allowed? What would it mean?
-   - Show no nodes at all (empty buffer)?
-   - Show just root nodes as stubs (indefinitive)?
-
-** Integration with Save
-6. Does the save path ever call view generation code?
-   If so, need to ensure limit doesn't apply during saves.
-   Should I trace the save logic to confirm?
-
-** BFS Processing Granularity
-7. Should we process strictly generation-by-generation (finish all nodes at depth N before any at depth N+1)?
-   Or process nodes one-by-one in BFS order?
-
-   Current understanding: Strict generation-by-generation makes most sense for the truncation logic.
-
-** Truncation Scope (ANSWERED)
-8. ~~After truncating in Gen G-1, do we continue up to Gen G-2?~~
-
-   ANSWER: No! Only truncate:
-   - Entire generation G
-   - Everything after parent in generation G-1
-   - STOP - Don't go further up
+Example: limit=1 with 10 root nodes:
+- We render the entire first generation (all 10 roots)
+- But render them as truncated: indefinitive, no children, no body, just title and metadata
+- This is consistent with the general behavior: when limit is hit, render that whole generation through end of sibling group
+- For roots, the "sibling group" is all the roots (they share the same implicit parent)
 
 * Implementation Notes
 ** Existing Code to Reuse

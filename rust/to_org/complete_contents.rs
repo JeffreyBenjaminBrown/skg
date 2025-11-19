@@ -389,19 +389,19 @@ fn categorize_children_by_treatment (
   Ok (( content_child_ids, non_content_child_ids )) }
 
 /// Create a new Content node from disk (using 'disk_id')
-/// and append it to the children of 'parent_id'.
+/// and append it to the children of 'parent_nid'.
 async fn extend_content (
-  tree      : &mut Tree < OrgNode >,
-  parent_id : NodeId,
-  disk_id   : &ID,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  tree       : &mut Tree < OrgNode >,
+  parent_nid : NodeId,
+  id         : &ID,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( new_orgnode, _skgnode ) : ( OrgNode, SkgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, disk_id ) . await ?;
+      config, driver, id ) . await ?;
   let mut parent_mut : NodeMut < OrgNode > =
-    tree . get_mut ( parent_id )
+    tree . get_mut ( parent_nid )
     . ok_or ( "Parent node not found" ) ?;
   let new_child : NodeMut < OrgNode > =
     parent_mut . append ( new_orgnode );

@@ -1,75 +1,10 @@
 * maybe we don't need the SaveIndefinitive constructor
   and can rename the other Save* to simply 'Save'
-* dfs-bfs and request view expansion
-** SOLVED (in theory)
-   Here's how to unify the two things below:
-   So far the bfs-dfs truncation view
-   applies a limit to the entire forest.
-   Permit the user to request recursive content views from anywhere.
-   Once the forest is rendered,
-   these content views are rendered just like the whole forest was,
-   with a depth limit that only applies to that branch.
-
-   The limit only needs to apply to the initial render;
-   it does not need to be re-applied at each save
-   (unless the save includes a new recursive content view request
-   to un-truncate a node currently rendered truncated).
-** dfs truncation-leaf renderings performed with count-limited bfs
-*** functions for initial population of a view
-**** fn mk_indefinitive_node
-     Title and metadata (with indef=true).
-     No body, no children.
-**** fn mk_definitive_node
-     Change 'indef' in metadata.
-     Include body, children.
-*** representation as a few simple functions
-**** fn render : list of roots -> tree
- Populate the tree with all the roots in truncated form.
- Set 'count' = number of roots.
- Call 'show-children-of-generation' repeatedly on (Forest, Count)
-   until Count exceeds the limit.
-**** fn render-children-of-generation : [inputs] -> (Forest, Count)
-***** inputs
-****** the mutable output forest
-****** the number of nodes rendered so far in it
-****** a generation G : int
-****** the node limit L : int
-***** loop
-****** Start at 'node' = first-in-gen.
-       for each tree in the forest
-****** If the limit of showable nodes has been reached
-       then return the forest and the new rendered-node count
-****** Otherwise
-******* render the node's children in truncated form
-******* add that number of children to the stored number rendered
-******* go to the next node in this generation, or return
-        If there is no next node in this generation,
-        then return the forest and the new rendered-node count.
-**** fn next-in-generation : Node -> Maybe Node
-     Given a node N,
-     gets the next member of that generation.
-**** fn first-in-generation : Int -> Node
-     Given N >= 1,
-     gets the first member of that generation.
-*** some terms
-    A truncation-leaf is a leaf headline.
-    Ideally it gives a sense of the shape of what it omits,
-      e.g. [[id:d3d4945c-3e28-474b-9b9b-87592b1d4b69][of the containerward manifold]].
-*** the whole idea
-    Once a layer L of the tree is completely written in truncated form,
-    if the bfs node limit has not been reached,
-    the next layer L2
-      (found using something like the
-      [[id:1c84728d-cc81-4749-a538-5c71875b6345][next-same-level function for forests : node -> node]])
-    is traversed, rendering truncated headlines of L3.
-    As soon as the limit is hit, that set of siblings is completed,
-    and the forest is returned.
-*** ? Can it be represented via preorder-postorder?
-** Request definitive view at a node
-*** for repeats
-*** for subscriptions
-    which initially show just the title -- not even the content,
-      let alone the recursive content
+* Request definitive view at a node
+** for repeats
+** for subscriptions
+   which initially show just the title -- not even the content,
+     let alone the recursive content
 * truncation resembles folding
 ** 'folded': emacs org-mode folding
 ** 'truncated': whether a node's contents are among its children
