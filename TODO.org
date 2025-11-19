@@ -1,9 +1,7 @@
-* rename Multiple_DefiningContainers -> Multiple_Defining_Orgnodes
 * rename reconcile_dup_instructions
   and the module it's in
 * maybe we don't need the SaveIndefinitive constructor
   and can rename the other Save* to simply 'Save'
-* move 'first_that_is_not_none'
 * dfs-bfs and request view expansion
 ** SOLVED (in theory)
    Here's how to unify the two things below:

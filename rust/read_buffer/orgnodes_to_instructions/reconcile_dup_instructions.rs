@@ -33,11 +33,6 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 
-/// Returns the first Option if it is Some, otherwise returns the second.
-fn first_that_is_not_none<T>(first: Option<T>, second: Option<T>) -> Option<T> {
-  first.or(second)
-}
-
 /// Runs 'collect_dup_instructions' to group same-ID instructions.
 /// Then, on each group of SaveInstructions,
 /// runs 'reconcile_dup_instructions_for_one_id'
@@ -149,25 +144,26 @@ pub async fn reconcile_dup_instructions_for_one_id(
 
     let supplemented_node: SkgNode = SkgNode {
       title         : definer.0.title.clone(),
-      aliases       : first_that_is_not_none(
-        definer.0.aliases.clone(),
-        from_disk.as_ref().and_then(|node| node.aliases.clone())),
+      aliases       : (
+        definer.0.aliases.clone() . or(
+          from_disk.as_ref().and_then(
+            |node| node.aliases.clone() )) ),
       source        : source,
       ids           : supplement_ids( &definer, &from_disk),
       body          : definer.0.body.clone(),
       contains      : definer.0.contains.clone(),
-      subscribes_to : first_that_is_not_none(
-        definer.0.subscribes_to.clone(),
-        from_disk.as_ref().and_then(
-          |node| node.subscribes_to.clone())),
-      hides_from_its_subscriptions : first_that_is_not_none(
-        definer.0.hides_from_its_subscriptions.clone(),
-        from_disk.as_ref().and_then(
-          |node| node.hides_from_its_subscriptions.clone())),
-      overrides_view_of            : first_that_is_not_none(
-        definer.0.overrides_view_of.clone(),
-        from_disk.as_ref().and_then(
-          |node| node.overrides_view_of.clone())), };
+      subscribes_to : (
+        definer.0.subscribes_to.clone() . or (
+          from_disk.as_ref().and_then(
+            |node| node.subscribes_to.clone() )) ),
+      hides_from_its_subscriptions : (
+        definer.0.hides_from_its_subscriptions.clone() . or (
+          from_disk.as_ref().and_then(
+            |node| node.hides_from_its_subscriptions.clone() )) ),
+      overrides_view_of : (
+        definer.0.overrides_view_of.clone() . or (
+          from_disk.as_ref().and_then(
+            |node| node.overrides_view_of.clone() )) ), };
     Ok((supplemented_node, NonMerge_NodeAction::SaveDefinitive)) }}
 
 /// Supplements instruction's IDs with any extra IDs from disk.
