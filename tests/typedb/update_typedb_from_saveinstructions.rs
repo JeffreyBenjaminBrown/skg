@@ -33,7 +33,7 @@ fn test_update_nodes_and_relationships2 (
       org_to_uninterpreted_nodes ( org_text )?;
 
     // Check for inconsistent instructions
-    let ( inconsistent_deletions, multiple_definers ) =
+    let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
       find_inconsistent_instructions ( & trees );
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
@@ -41,6 +41,9 @@ fn test_update_nodes_and_relationships2 (
     assert!( multiple_definers . is_empty (),
              "Found multiple definer instructions: {:?}",
              multiple_definers );
+    assert!( inconsistent_sources . is_empty (),
+             "Found inconsistent source instructions: {:?}",
+             inconsistent_sources );
 
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<SaveInstruction> =
