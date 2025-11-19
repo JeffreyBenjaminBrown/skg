@@ -38,7 +38,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
   assert_eq!(errors.len(), 9,
-             "Should find exactly 9 validation errors (8 original + 1 Multiple_DefiningContainers)");
+             "Should find exactly 9 validation errors (8 original + 1 Multiple_Defining_Orgnodes)");
 
   { let aliasCol_body_errors: Vec<&BufferValidationError> =
     errors.iter()
@@ -98,13 +98,13 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
   { let multiple_defining_errors: Vec<&BufferValidationError> =
     errors.iter()
     .filter(|e| matches!(
-      e, BufferValidationError::Multiple_DefiningContainers(_)))
+      e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
     .collect();
-  assert_eq!(multiple_defining_errors.len(), 1, "Should find 1 Multiple_DefiningContainers error");
-    if let BufferValidationError::Multiple_DefiningContainers(id)
+  assert_eq!(multiple_defining_errors.len(), 1, "Should find 1 Multiple_Defining_Orgnodes error");
+    if let BufferValidationError::Multiple_Defining_Orgnodes(id)
     = multiple_defining_errors[0] {
       assert_eq!(id.0, "conflict",
-                 "Multiple_DefiningContainers error should come from conflicting ID"); } }
+                 "Multiple_Defining_Orgnodes error should come from conflicting ID"); } }
       Ok(())
     })
   )

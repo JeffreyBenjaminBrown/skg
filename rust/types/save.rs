@@ -105,7 +105,7 @@ fn format_buffer_validation_error (
     BufferValidationError::Multiple_AliasCols_in_Children(node) => {
       format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n",
               node.title) },
-    BufferValidationError::Multiple_DefiningContainers(id) => {
+    BufferValidationError::Multiple_Defining_Orgnodes(id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
               id.0) },
     BufferValidationError::AmbiguousDeletion(id) => {

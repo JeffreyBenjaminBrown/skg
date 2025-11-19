@@ -88,14 +88,14 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
         find_buffer_errors_for_saving(&trees, config, driver).await?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::Multiple_DefiningContainers(_)))
+        .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
         .collect();
 
       assert_eq!(multiple_defining_errors.len(), 1,
-                 "Should find exactly 1 Multiple_DefiningContainers error for the problematic ID");
+                 "Should find exactly 1 Multiple_Defining_Orgnodes error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let BufferValidationError::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
+      if let BufferValidationError::Multiple_Defining_Orgnodes(id) = multiple_defining_errors[0] {
         assert_eq!(id.0, "duplicate",
-                   "Multiple_DefiningContainers error should come from the duplicate ID"); }
+                   "Multiple_Defining_Orgnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }

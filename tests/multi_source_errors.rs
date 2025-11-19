@@ -86,12 +86,12 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors.iter()
           . filter(
-            |e| matches!(e, BufferValidationError::Multiple_DefiningContainers(_)))
+            |e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
           . collect() );
       assert_eq!(multiple_defining_errors.len(), 1,
-                 "Expected exactly 1 Multiple_DefiningContainers error for priv-1");
-      if let BufferValidationError::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
-        assert_eq!(id.0, "priv-1", "Multiple_DefiningContainers should be for priv-1"); }}
+                 "Expected exactly 1 Multiple_Defining_Orgnodes error for priv-1");
+      if let BufferValidationError::Multiple_Defining_Orgnodes(id) = multiple_defining_errors[0] {
+        assert_eq!(id.0, "priv-1", "Multiple_Defining_Orgnodes should be for priv-1"); }}
 
     { let inconsistent_source_errors: Vec<&BufferValidationError>
       = ( errors.iter()
@@ -105,7 +105,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(sources.len(), 2, "Should have 2 different sources for priv-1"); }}
 
     assert_eq!(errors.len(), 4,
-               "Expected exactly 4 errors: 1 RootWithoutSource, 1 SourceNotInConfig, 1 Multiple_DefiningContainers, 1 InconsistentSources");
+               "Expected exactly 4 errors: 1 RootWithoutSource, 1 SourceNotInConfig, 1 Multiple_Defining_Orgnodes, 1 InconsistentSources");
 
     cleanup_test_tantivy_and_typedb_dbs(
       &config.db_name,

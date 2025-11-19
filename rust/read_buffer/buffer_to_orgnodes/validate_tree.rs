@@ -32,7 +32,7 @@ pub async fn find_buffer_errors_for_saving (
           BufferValidationError::AmbiguousDeletion(id)); }
       for id in problematic_defining_ids {
         errors.push(
-          BufferValidationError::Multiple_DefiningContainers(id)); }
+          BufferValidationError::Multiple_Defining_Orgnodes(id)); }
       for (id, sources) in inconsistent_source_ids {
         errors.push(
           BufferValidationError::InconsistentSources(id, sources));
