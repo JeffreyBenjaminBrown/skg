@@ -1,13 +1,13 @@
 use crate::types::{OrgNode, RelToParent, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
 use ego_tree::{NodeRef, Tree};
 
-/// Converts a forest of OrgNode2s to SaveInstructions,
+/// Converts a forest of OrgNodes to SaveInstructions,
 /// taking them all at face value.
 ///
-/// PITFALL: Only public for testing. Leaves important work undone,
+/// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
-pub fn interpret (
+pub fn interpret_orgnode_forest (
   trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =

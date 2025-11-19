@@ -23,8 +23,8 @@ pub async fn find_buffer_errors_for_saving (
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>> {
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion and defining containers)
-    let (ambiguous_deletion_ids, problematic_defining_ids) =
+  { // inconsistent instructions (deletion, defining containers, and sources)
+    let (ambiguous_deletion_ids, problematic_defining_ids, inconsistent_source_ids) =
       find_inconsistent_instructions(trees);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
@@ -32,7 +32,10 @@ pub async fn find_buffer_errors_for_saving (
           BufferValidationError::AmbiguousDeletion(id)); }
       for id in problematic_defining_ids {
         errors.push(
-          BufferValidationError::Multiple_DefiningContainers(id));
+          BufferValidationError::Multiple_DefiningContainers(id)); }
+      for (id, sources) in inconsistent_source_ids {
+        errors.push(
+          BufferValidationError::InconsistentSources(id, sources));
       }} }
   { // merge validation
     let merge_errors: Vec<String> =

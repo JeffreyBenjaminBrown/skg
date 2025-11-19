@@ -4,7 +4,7 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::read_buffer::{org_to_uninterpreted_nodes, interpret, find_inconsistent_instructions};
+use skg::read_buffer::{org_to_uninterpreted_nodes, interpret_orgnode_forest, find_inconsistent_instructions};
 use skg::read_buffer::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, NonMerge_NodeAction};
@@ -18,12 +18,12 @@ fn test_inconsistent_delete() {
     "};
 
   let trees = org_to_uninterpreted_nodes(input).unwrap();
-  let (inconsistent_deletes, _) = find_inconsistent_instructions(&trees);
+  let (inconsistent_deletes, _, _) = find_inconsistent_instructions(&trees);
   assert!(!inconsistent_deletes.is_empty(),
           "Should detect inconsistent toDelete");
 
   let instructions =
-    interpret(trees)
+    interpret_orgnode_forest(trees)
     . unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
@@ -52,7 +52,7 @@ fn test_deletions_excluded (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret(trees)?;
+      let instructions = interpret_orgnode_forest(trees)?;
       let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
@@ -88,7 +88,7 @@ fn test_defining_node_defines (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret(trees)?;
+      let instructions = interpret_orgnode_forest(trees)?;
       let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -96,9 +96,11 @@ fn test_defining_node_defines (
         .find(|(node, _)| node.ids.contains(&ID::from("1")))
         .unwrap();
       assert_eq!(id1_instruction.0.title, "1 definer");
-      // Defining instruction should define body completely, even if None
-      assert_eq!(id1_instruction.0.body, None);
-      assert_eq!(id1_instruction.0.contains, Some(vec![ID::from("3"), ID::from("2")]));
+      { // Defining instruction should define body completely, even if None
+        assert_eq!(id1_instruction.0.body, None); }
+      { // Only definer's contents are used
+        assert_eq!(id1_instruction.0.contains,
+                   Some(vec![ID::from("3")])); }
       Ok (( )) } ) ) }
 
 #[test]
@@ -115,30 +117,30 @@ fn test_adding_without_definer (
             ** (skg (id 4) (source main)) 4
             ** (skg (id 4) (source main) (code indefinitive)) 4 again
         "};
-
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret(trees)?;
+      let instructions = interpret_orgnode_forest(trees)?;
       let reduced = reconcile_dup_instructions(
         config, driver, instructions).await?;
 
-      let id1_instruction = reduced.iter()
-        .find(|(node, _)| node.ids.contains(&ID::from("1")))
-        .expect("Should have instruction for id:1");
+      { // id:1 is indefinitive-only, so it should be filtered out
+        let id1_instruction = reduced.iter()
+          .find(|(node, _)| node.ids.contains(&ID::from("1")));
+        assert!(id1_instruction.is_none(),
+                "Indefinitive-only nodes should be filtered out"); }
 
-      assert_eq!(
-        // With no definer, title comes from disk (indefinitives are ignored)
-        id1_instruction.0.title,
-        "title from disk");
-      assert_eq!(
-        // Body comes from disk since no instruction provides one.
-        id1_instruction.0.body,
-        Some("body from disk".to_string()));
-      assert_eq!(
-        // Since there is no defining node, contents are read from disk,
-        // and then the indefinitive node with id 1
-        // appends its contents, with deduplication.
-        id1_instruction.0.contains,
-        Some(vec![ ID::from("2"),
-                   ID::from("3"),
-                   ID::from("4"), ]));
-      Ok (( )) } ) ) }
+      { // id:2 has a definitive instruction, so it should be present
+        let id2_instruction = reduced.iter()
+          .find(|(node, _)| node.ids.contains(&ID::from("2")))
+          .expect("Should have instruction for id:2");
+        assert_eq!(id2_instruction.0.title, "2"); }
+
+      { // id:4 has one definitive and one indefinitive
+        // The indefinitive should be filtered, only definitive kept
+        let id4_instruction = reduced.iter()
+          .find(|(node, _)| node.ids.contains(&ID::from("4")))
+          .expect("Should have instruction for id:4");
+        assert_eq!( // Contains should only have what the definitive specified, and no data from the indefinitive
+          id4_instruction.0.title, "4");
+        assert_eq!(id4_instruction.0.contains, Some(vec![])); }
+
+      Ok (( )) } )) }

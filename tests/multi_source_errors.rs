@@ -93,8 +93,19 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       if let BufferValidationError::Multiple_DefiningContainers(id) = multiple_defining_errors[0] {
         assert_eq!(id.0, "priv-1", "Multiple_DefiningContainers should be for priv-1"); }}
 
-    assert_eq!(errors.len(), 3,
-               "Expected exactly 3 errors: 1 RootWithoutSource, 1 SourceNotInConfig, 1 Multiple_DefiningContainers");
+    { let inconsistent_source_errors: Vec<&BufferValidationError>
+      = ( errors.iter()
+          . filter(
+            |e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
+          . collect() );
+      assert_eq!(inconsistent_source_errors.len(), 1,
+                 "Expected exactly 1 InconsistentSources error for priv-1");
+      if let BufferValidationError::InconsistentSources(id, sources) = inconsistent_source_errors[0] {
+        assert_eq!(id.0, "priv-1", "InconsistentSources should be for priv-1");
+        assert_eq!(sources.len(), 2, "Should have 2 different sources for priv-1"); }}
+
+    assert_eq!(errors.len(), 4,
+               "Expected exactly 4 errors: 1 RootWithoutSource, 1 SourceNotInConfig, 1 Multiple_DefiningContainers, 1 InconsistentSources");
 
     cleanup_test_tantivy_and_typedb_dbs(
       &config.db_name,
@@ -338,18 +349,17 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     }
 
     // Test 2: InconsistentSources
-    // Two instances of pub-1 with different sources in the same buffer
-    // One must be indefinitive to trigger reconciliation
+    // Two instances of pub-1 with different sources (validation should catch this)
     {
-      let buffer_with_inconsistent: &str = indoc! {"
+      let buffer_with_inconsistent_sources: &str = indoc! {"
         * (skg (id pub-1) (source public)) pub-1                # definitive instance with 'public'
         * (skg (id pub-1) (source private) (code indefinitive)) pub-1  # indefinitive instance with 'private'
       "};
 
       let buffer_text: String =
-        strip_org_comments (buffer_with_inconsistent);
+        strip_org_comments (buffer_with_inconsistent_sources);
 
-      // This will fail during reconciliation (orgnodes_to_reconciled_save_instructions)
+      // This should fail during validation (before indefinitives are filtered)
       use skg::read_buffer::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
@@ -366,14 +376,16 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
         use skg::types::SaveError;
         match e {
-          SaveError::DatabaseError(db_err) => {
-            // InconsistentSources is wrapped in DatabaseError during reconciliation
-            let err_str: String = format!("{:?}", db_err);
-            assert!(err_str.contains("InconsistentSources"),
-                    "Expected InconsistentSources error, got: {}", err_str);
-            println!("Successfully caught InconsistentSources error during reconciliation");
+          SaveError::BufferValidationErrors(errors) => {
+            // Should contain InconsistentSources error
+            let source_errors: Vec<&BufferValidationError> = errors.iter()
+              .filter(|e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
+              .collect();
+            assert!(!source_errors.is_empty(),
+                    "Expected InconsistentSources error in validation");
+            println!("Successfully caught InconsistentSources error during validation");
           }
-          _ => panic!("Unexpected error type: {:?}", e),
+          _ => panic!("Expected BufferValidationErrors, got: {:?}", e),
         }
       }
     }
