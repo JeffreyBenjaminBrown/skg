@@ -267,7 +267,6 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
             * (skg (id doc2) (source main)) Document 2
             ** (skg (id ref_section) (source main) (code (relToParent parentIgnores))) Reference Section
         "};
-
   let trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
@@ -278,10 +277,14 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
   // Test doc1
   let (doc1_skg, doc1_action) = &instructions[0];
   assert_eq!(doc1_skg.title, "Document 1");
-  assert_eq!(doc1_skg.aliases, Some(vec!["First Document".to_string(), "Primary Doc".to_string()]));
+  assert_eq!(doc1_skg.aliases,
+             Some(vec!["First Document".to_string(),
+                       "Primary Doc".to_string()]));
   assert_eq!(doc1_skg.contains,
-             Some(vec![ID::from("section1"), ID::from("section3")]),
-             "Indefinitive node still collects contents (to be appended during reconciliation)");
+             Some(vec![ID::from("section1"),
+                       ID::from("section3")]),
+             // TODO ? Don't create it at all? It used to be needed because indefinitive nodes could append content.
+             "Indefinitive node still collects contents (for no reason, really)");
   assert!(matches!(doc1_action,
                    NonMerge_NodeAction::SaveIndefinitive));
 

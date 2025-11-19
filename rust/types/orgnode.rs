@@ -48,8 +48,7 @@ pub struct OrgnodeRelationships {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeCode {
   pub relToParent: RelToParent,
-  pub indefinitive: bool, // A definitive node defines the title, body and initial contents, if present. Otherwise those things are taken from disk. The indefinitive nodes can append content, if they have any novel contents (where novel = not already contained by the target node).
-  // Thus 'indefinitive' defines, among other things, a node's relationship to its children -- at least, to those children that are content (i.e. with relToParent=Content). (Any orgnode, indefinitive or otherwise, can define aliases. I haven't decided whether that will be true of the three sharing relationsips -- subscription, hides and overrides.)
+  pub indefinitive: bool, // Describes a node's relationship to those of its children that are content. A definitive node defines the title, body and initial contents, if present. So changing which nodes are its children can change its contents. Indefinitive nodes, by contrast, do not permit the user to modify the node they represent. If it has children, they are kept in the view when the user saves, but saving does not create a 'contains' relationship from the indefinitive parent to the child.
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
   pub editRequest: Option<EditRequest>,
   pub viewRequests: HashSet<ViewRequest>,

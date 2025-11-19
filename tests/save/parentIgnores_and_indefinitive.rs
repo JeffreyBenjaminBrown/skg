@@ -44,29 +44,18 @@ fn test_parentignores_and_indefinitive(
           ** (skg (id 2) (source main) (code (relToParent parentIgnores) indefinitive)) 2
           *** (skg (id 4) (source main)) 4
         "};
-
-        // Get save instructions
         let (_orgnode_forest, save_instructions, _merge_instructions) =
           buffer_to_save_instructions(
             org_text,
             config,
-            driver,
-          )
-          .await?;
-
-        // Apply to database
+            driver, ). await?;
         update_typedb_from_saveinstructions(
           &config.db_name,
           driver,
-          &save_instructions,
-        )
-        .await?;
-
-        // Apply to filesystem
+          &save_instructions, ). await?;
         update_fs_from_saveinstructions(
           save_instructions,
-          config.clone(),
-        )?;
+          config.clone(), )?;
 
         { // verify indefinitive is treated correctly
           let (node2, _source): (SkgNode, _) =
@@ -75,10 +64,8 @@ fn test_parentignores_and_indefinitive(
           .await?;
         assert_eq!(
           node2.contains,
-          Some(vec![ ID("3".to_string()),
-                     ID("4".to_string()) ]),
-          "Node 2 should contain [3, 4], because 4 was appended, due to the 'indefinitive' in the metadata for node 2."
-        ); }
+          Some(vec![ ID("3".to_string()) ]),
+          "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 
         { // verify parentIgnores is treated correctly
           let (node1, _source): (SkgNode, _) =

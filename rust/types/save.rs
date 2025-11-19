@@ -12,9 +12,9 @@ pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NonMerge_NodeAction {
-  /// The default case: the org-node's title, body and content define those of the node -- with the exception that after that definition, indeefinitive nodes can append novel content to the content. (TODO : That exception might be a misefeature.)
+  /// The default case: the org-node's title, body and content define those of the node.
   SaveDefinitive,
-  /// An exception from normal treatment. Usually, an org-node's content is taken to be equal to the corresponding node's content. But with SaveIndefinitive, the org-node's content is merely a (potentially improper, potentially empty) subset of the node's content. Moreover, it is not used to define that node's content, but anything it contains that is not already in the node's contents will be appended to those contents.
+  /// An indefinitive node generally has no effect on the graph when saved. The exception is that it can contain a delete instruction. (TODO: Get rid of that exception.)
   SaveIndefinitive,
   Delete,
 }
