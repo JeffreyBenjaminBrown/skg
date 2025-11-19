@@ -22,7 +22,7 @@ PITFALL:
 Does not add *all* missing info.
 'clobber_none_fields_with_data_from_disk' does some of that, too,
 but it operates on SaveInstructions, downstream. */
-pub async fn add_missing_info_to_trees(
+pub async fn add_missing_info_to_forest(
   trees: &mut [Tree<OrgNode>],
   db_name: &str,
   driver: &TypeDBDriver

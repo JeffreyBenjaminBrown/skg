@@ -1,6 +1,6 @@
 /* PITFALL: ASSUMES IDs have been replaced by PIDs
 in the 'id' field of every OrgNode.
-(Currently, 'add_missing_info_to_trees' does this.)
+(Currently, 'add_missing_info_to_forest' does this.)
 .
 THE IDEA
 After filtering out indefinitives and validation, we have:

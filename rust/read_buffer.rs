@@ -18,7 +18,7 @@ pub use buffer_to_orgnodes::{
     HeadlineInfo,
     find_inconsistent_instructions,
     find_buffer_errors_for_saving,
-    add_missing_info_to_trees,
+    add_missing_info_to_forest,
 };
 pub mod buffer_to_orgnodes;
 
@@ -37,7 +37,7 @@ pub use validate_foreign_nodes::{
 };
 
 /// Builds a forest of OrgNodes:
-///   - Fills in information via 'add_missing_info_to_trees'.
+///   - Fills in information via 'add_missing_info_to_forest'.
 ///   - Reconciles duplicates via 'reconcile_dup_instructions'
 /// Outputs that plus a forest of SaveInstructions, plus MergeInstructionTriples.
 pub async fn buffer_to_save_instructions (
@@ -52,9 +52,10 @@ pub async fn buffer_to_save_instructions (
   let mut orgnode_forest : Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
-  add_missing_info_to_trees (
-    // Should (and does) precede 'find_buffer_errors_for_saving'.
-    // See that function's's header comment for why.
+  add_missing_info_to_forest (
+    // Precedes all validation functions.
+    // For why, see the header comment of one of them,
+    // 'find_buffer_errors_for_saving'.
     & mut orgnode_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
 
@@ -66,6 +67,7 @@ pub async fn buffer_to_save_instructions (
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
+
   let instructions : Vec<SaveInstruction> =
     orgnodes_to_reconciled_save_instructions (
       & orgnode_forest, config, driver )

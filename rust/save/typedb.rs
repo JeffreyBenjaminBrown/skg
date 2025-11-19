@@ -25,7 +25,7 @@ pub async fn update_typedb_from_saveinstructions (
 
   // PITFALL: Below, each get(0) on an 'ids' field
   // is not motivated by separating the PID from the others,
-  // because (see add_missing_info_to_trees) there are no others.
+  // because (see add_missing_info_to_forest) there are no others.
   // It is simply to turn the Vec<ID> into a bare ID.
 
   let ( to_delete_instructions, to_write_instructions )

@@ -1,7 +1,7 @@
 // cargo test test_add_missing_info_comprehensive
 
 use indoc::indoc;
-use skg::read_buffer::{org_to_uninterpreted_nodes, add_missing_info_to_trees};
+use skg::read_buffer::{org_to_uninterpreted_nodes, add_missing_info_to_forest};
 use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id, compare_orgnode_forests};
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;
@@ -25,7 +25,7 @@ async fn test_add_missing_info_logic (
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  // Applying 'add_missing_info_to_trees' should make
+  // Applying 'add_missing_info_to_forest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
   // Also tests source inheritance from parent to children.
@@ -50,7 +50,7 @@ async fn test_add_missing_info_logic (
   let mut after_adding_missing_info: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(
       with_missing_info).unwrap();
-  add_missing_info_to_trees(
+  add_missing_info_to_forest(
     &mut after_adding_missing_info,
     &config.db_name,
     driver ).await ?;
@@ -65,7 +65,7 @@ async fn test_add_missing_info_logic (
     compare_two_forests_modulo_id(
       &after_adding_missing_info,
       &expected_forest),
-    "add_missing_info_to_trees: Forests not equivalent modulo ID." );
+    "add_missing_info_to_forest: Forests not equivalent modulo ID." );
 
   { let actual_root : &OrgNode =
       after_adding_missing_info[0] . root() . value();
@@ -123,7 +123,7 @@ async fn test_source_inheritance_logic (
 
   let mut actual_forest: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes( input ).unwrap();
-  add_missing_info_to_trees(
+  add_missing_info_to_forest(
     &mut actual_forest,
     &config.db_name,
     driver ).await ?;

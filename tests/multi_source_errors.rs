@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::read_buffer::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_trees};
+use skg::read_buffer::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
 use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode};
 use skg::media::file_io::{read_all_skg_files_from_sources, load_config};
 use skg::media::typedb::{create_all_nodes, create_all_relationships};
@@ -52,7 +52,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       strip_org_comments (buffer_with_errors);
     let mut trees: Vec<Tree<OrgNode>> =
       org_to_uninterpreted_nodes (&buffer_text)?;
-    add_missing_info_to_trees(
+    add_missing_info_to_forest(
       &mut trees, &config.db_name, &driver).await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(

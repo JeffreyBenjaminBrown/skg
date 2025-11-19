@@ -10,7 +10,7 @@ pub use uninterpreted::{
   HeadlineInfo};
 
 // Adds missing information to trees (Alias relations and UUIDs).
-pub use add_missing_info::add_missing_info_to_trees;
+pub use add_missing_info::add_missing_info_to_forest;
 
 // Finds user errors in the forest that make saving impossible.
 pub use validate_tree::find_buffer_errors_for_saving;
