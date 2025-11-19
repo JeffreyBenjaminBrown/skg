@@ -1,0 +1,315 @@
+* Report: Refactoring Indefinitive Nodes to Contribute Nothing to Save Operations
+
+** Executive Summary
+
+Currently, indefinitive nodes (marked by =metadata.code.indefinitive= or =metadata.viewData.repeat=) can contribute content, aliases, and other fields to their corresponding on-disk nodes during save operations. This report documents the current behavior, identifies code locations that need modification, and raises questions about edge cases and design decisions.
+
+** Current Behavior of Indefinitive Nodes
+
+*** 1. Creation and Assignment
+
+*Location*: =/home/ubuntu/rust/read_buffer/orgnodes_to_instructions/to_dirty_instructions.rs:35-43=
+
+Indefinitive status is assigned when:
+- =node_data.metadata.code.indefinitive= is true, OR
+- =node_data.metadata.viewData.repeat= is true
+
+#+begin_src rust
+let save_action : NonMerge_NodeAction =
+  if matches!(node_data.metadata.code.editRequest,
+              Some(EditRequest::Delete)) {
+    NonMerge_NodeAction::Delete
+  } else if node_data.metadata.code.indefinitive ||
+            node_data.metadata.viewData.repeat {
+    NonMerge_NodeAction::SaveIndefinitive
+  } else {
+    NonMerge_NodeAction::SaveDefinitive };
+#+end_src
+
+*Currently*: The same function calls =mk_skgnode= which collects ALL fields (title, body, aliases, contains, etc.) regardless of whether the node is indefinitive.
+
+*** 2. What Indefinitives Currently Contribute During Reconciliation
+
+*Location*: =/home/ubuntu/rust/read_buffer/orgnodes_to_instructions/reconcile_same_id_instructions.rs=
+
+When multiple SaveInstructions have the same ID, they are reconciled. Currently indefinitives contribute to:
+
+**** a) Contents/Contains (lines 265-280)
+#+begin_src rust
+fn reconciled_contains(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<ID>> {
+  // ... gets initial contents from definer or disk ...
+  let mut final_contents: Vec<ID> = initial_contents;
+  for (node, _) in indefinitives {  // <-- Currently appends indefinitive contents
+    if let Some(contents) = &node.contains {
+      final_contents.extend(contents.iter().cloned()); }}
+  Some(dedup_vector(final_contents)) }
+#+end_src
+
+**** b) Aliases (lines 246-259)
+#+begin_src rust
+fn reconciled_aliases(
+  indefinitives: &[SaveInstruction],
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> Option<Vec<String>> {
+  reconcile_collected_field(  // <-- Currently collects from indefinitives
+    indefinitives,
+    definer,
+    from_disk,
+    |node| &node.aliases,
+    |disk_node| disk_node.aliases.clone() ) }
+#+end_src
+
+**** c) Other Collected Fields
+Similar patterns exist for:
+- =reconciled_subscribes_to= (lines 225-238)
+- =reconciled_hides= (lines 211-223)
+- =reconciled_overrides= (lines 197-209)
+
+All currently collect from indefinitive instructions via =reconcile_collected_field=.
+
+**** d) Title and Body (lines 283-307)
+*Already correct*: Only uses the definer, never indefinitives:
+#+begin_src rust
+fn reconciled_title_and_body(
+  definer: Option<&SaveInstruction>,
+  from_disk: &Option<SkgNode>
+) -> (String, Option<String>) {
+  // Only looks at definer, not indefinitives
+}
+#+end_src
+
+*** 3. View Rendering Behavior
+
+*Location*: =/home/ubuntu/rust/to_org/complete_contents.rs=
+
+During view rendering (OrgNode tree completion):
+
+*Lines 95-102*: The indefinitive flag is read from the node
+*Lines 119-122*: If node is indefinitive (or repeated), =completeContents= is NOT called
+*Lines 235-243*: =completeContents= returns early if node is indefinitive
+
+This means:
+- Indefinitive nodes are NOT completed from disk
+- Their children are NOT reconciled with disk's =contains= field
+- They are rendered "as-is" from the buffer/view request
+
+*** 4. Repeated Nodes (Special Case of Indefinitive)
+
+*Location*: =/home/ubuntu/rust/to_org/util.rs:54-75=
+
+Repeated nodes are nodes that appear multiple times in a view. They are created with:
+#+begin_src rust
+orgnode . metadata . viewData . repeat = true;
+orgnode . metadata . code . indefinitive = true; // Any repeated node is indefinitive
+orgnode . body = Some (
+  "Repeated, probably above. Edit there, not here."
+    . to_string () );
+#+end_src
+
+*Location*: =/home/ubuntu/rust/read_buffer/repeated_to_indefinitive.rs=
+
+Before saving, repeat markers are converted to indefinitive:
+#+begin_src rust
+if node_mut . value () . metadata . viewData.repeat {
+  node_mut . value () . metadata . code . indefinitive = true;
+  node_mut . value () . metadata . viewData.repeat = false; }
+#+end_src
+
+*** 5. Foreign Node Handling
+
+*Location*: =/home/ubuntu/rust/read_buffer/validate_foreign_nodes.rs:47-49=
+
+Foreign indefinitive nodes are currently filtered out silently:
+#+begin_src rust
+NonMerge_NodeAction::SaveIndefinitive => { // Ignore.
+  // TODO ? Better to disallow?
+}
+#+end_src
+
+** Code Locations Requiring Modification
+
+*** 1. *to_dirty_instructions.rs* (Primary Change)
+
+*Function*: =mk_skgnode= and/or the calling code around lines 35-60
+
+*Current*: Builds a full SkgNode for all nodes regardless of save action
+*Needed*: When creating a SaveIndefinitive instruction, build a minimal SkgNode with:
+- Only the =ids= field populated (needed to identify which node this is)
+- Possibly =source= field (for routing)
+- All other fields should be =None= or empty
+
+*Options*:
+1. Modify =mk_skgnode= to accept the save action and conditionally collect fields
+2. Create a separate function =mk_minimal_skgnode_for_indefinitive=
+3. Clear fields after calling =mk_skgnode= when action is SaveIndefinitive
+
+*** 2. *reconcile_same_id_instructions.rs* (Multiple Functions)
+
+*Functions to modify*:
+- =reconciled_contains= (lines 265-280)
+- =reconciled_aliases= (lines 246-259)
+- =reconciled_subscribes_to= (lines 225-238)
+- =reconciled_hides= (lines 211-223)
+- =reconciled_overrides= (lines 197-209)
+
+*Current*: All iterate over indefinitives and collect their field values
+*Needed*: Skip indefinitives entirely, only collect from definer
+
+*Note*: =reconciled_title_and_body= already does this correctly (doesn't use indefinitives)
+
+*** 3. *Tests* (Multiple Files)
+
+*Test files mentioning indefinitive*:
+- =tests/save/parentIgnores_and_indefinitive.rs=
+- =tests/new/orgnodes_to_instructions.rs=
+- =tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs=
+- Various integration tests
+
+*Needed*: Update tests to verify indefinitives contribute nothing
+
+*** 4. *Documentation* (Optional)
+
+*Files*:
+- =tests/save/parentIgnores_and_indefinitive/fixtures/README.md=
+- =build-buffer-functions.org=
+- =TODO.org=
+
+*Needed*: Update comments explaining indefinitive behavior
+
+** Questions, Difficulties, and Ambiguities
+
+*** 1. SkgNode Structure for SaveIndefinitive Instructions
+
+*Question*: Should indefinitive SkgNodes have ANY fields besides =ids= and =source=?
+
+*Current state*: The SkgNode type likely requires certain fields to be populated for the instruction to be processed.
+
+*Needs clarification*:
+- Can we create a SkgNode with all fields as None/empty except =ids=?
+- Will downstream code (TypeDB updates, file writes) handle this correctly?
+- Should we verify the SkgNode struct definition and its minimal requirements?
+
+*** 2. Edge Case: Only Indefinitive Instruction for a Node
+
+*Question*: What happens if the ONLY instruction for a node ID is SaveIndefinitive (no definer, not on disk)?
+
+*Current behavior*: Would probably error or create empty node
+*Needed clarification*:
+- Should this be a validation error?
+- Should indefinitives without a corresponding definitive be filtered out?
+- Can this even occur in practice?
+
+*** 3. Edge Case: Indefinitive with No Corresponding Disk Node
+
+*Question*: If indefinitives are reconciled against disk nodes, what if disk node doesn't exist?
+
+*Looking at reconcile_same_id_instructions.rs*: The function takes =from_disk: &Option<SkgNode>=, so it handles None case.
+*Current*: If no definer and no disk node, uses empty defaults
+*After change*: Should work the same since indefinitives won't contribute anything
+
+*** 4. Foreign Indefinitive Nodes
+
+*Question*: Should indefinitive instructions for foreign nodes be silently ignored or treated as an error?
+
+*Current*: Silently filtered out with a TODO comment (validate_foreign_nodes.rs:47-49)
+*After change*: Still need to decide - are they harmless (contribute nothing anyway) or should they be disallowed?
+
+*** 5. Implementation Strategy for mk_skgnode
+
+*Question*: What's the cleanest way to avoid collecting fields for indefinitives?
+
+*Options*:
+a) Pass save action to =mk_skgnode=, conditionally collect
+   - Pro: Centralized logic
+   - Con: mk_skgnode signature changes
+
+b) Create =mk_minimal_skgnode= for indefinitives
+   - Pro: Separate concerns, no signature changes
+   - Con: Code duplication
+
+c) Build full SkgNode, then clear fields for SaveIndefinitive
+   - Pro: Minimal code changes
+   - Con: Wasteful (collects then discards)
+
+d) Don't even call mk_skgnode for indefinitives; build minimal SkgNode inline
+   - Pro: Most efficient
+   - Con: Logic split across locations
+
+*Recommendation needed*: Which approach aligns better with the codebase architecture?
+
+*** 6. Repeated Nodes and View Reproduction
+
+*Question*: The requirement states "They should still be reproduced when rebuilding the view" - how do repeated nodes get reproduced if they contribute nothing?
+
+*Current understanding*:
+- Repeated nodes are created during view rendering (complete_contents.rs)
+- They pull from disk using the node ID
+- The indefinitive flag prevents their CHILDREN from being completed
+- But the node itself is rendered with disk title/body
+
+*After change*:
+- When saving, repeated nodes (converted to indefinitive) contribute nothing ✓
+- When rendering, they still pull from disk to show title/body ✓
+- This seems correct, but needs verification
+
+*** 7. The =repeat= Flag vs =indefinitive= Flag
+
+*Question*: Are these always equivalent after =change_repeated_to_indefinitive= runs?
+
+*Current*:
+- =repeat= is a viewData field (rendering concern)
+- =indefinitive= is a code field (save concern)
+- =change_repeated_to_indefinitive= converts repeat→indefinitive before save
+
+*After change*: Should both flags cause identical save behavior (contribute nothing)?
+Or is there a semantic difference we need to preserve?
+
+*** 8. View Requests and Indefinitive Nodes
+
+*Question*: Can view requests create indefinitive nodes? Do they need special handling?
+
+*Location*: Aliases, Containerward, Sourceward view requests in complete_contents.rs:136-148
+
+*Observation*: View requests call =wrapped_build_and_integrate_*= functions. These might create indefinitive nodes?
+
+*Needs investigation*: Do view request nodes get marked indefinitive? Should they?
+
+*** 9. Validation and Error Messages
+
+*Question*: Should we add validation to catch users trying to edit indefinitive nodes?
+
+*Current*: Users can edit repeated nodes (they see "Repeated, probably above. Edit there, not here." but can still type)
+
+*After change*: Edits to indefinitive nodes will be silently ignored during save
+
+*Better UX*: Should we validate and error with "Cannot edit repeated/indefinitive nodes"?
+
+*** 10. Reconciliation Function Signatures
+
+*Question*: Should we remove the =indefinitives= parameter from reconciliation functions entirely?
+
+*Current*: Functions like =reconciled_aliases= take =indefinitives: &[SaveInstruction]=
+*After change*: This parameter would be unused
+
+*Options*:
+- Keep parameter, ignore it (preserve signature)
+- Remove parameter, update all call sites (cleaner but more changes)
+
+** Summary of Required Changes
+
+1. *to_dirty_instructions.rs*: Modify SkgNode creation for SaveIndefinitive to collect minimal/no fields
+2. *reconcile_same_id_instructions.rs*: Remove indefinitive contributions from 5 reconciliation functions
+3. *Tests*: Update expectations to verify indefinitives contribute nothing
+4. *Validation*: Possibly add checks for impossible states (indefinitive-only nodes?)
+
+** Estimated Scope
+
+- *Core implementation*: 2 files, ~6 functions modified
+- *Test updates*: ~10 test files need review, possibly 20-30 assertions updated
+- *Risk level*: Medium - touches save/reconciliation logic (critical path)
+- *Verification needed*: Round-trip test (save indefinitive, reload, verify no changes written)
