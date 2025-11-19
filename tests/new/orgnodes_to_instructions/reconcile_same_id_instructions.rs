@@ -1,11 +1,11 @@
 // I spec'd these tests by hand.
 // They are much briefer than those by Claude
-// (at tests/new/orgnodes_to_instructions/reconcile_dup_instructions/by_claude.rs),
+// (at tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs),
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
 use skg::read_buffer::{org_to_uninterpreted_nodes, interpret_orgnode_forest, find_inconsistent_instructions};
-use skg::read_buffer::orgnodes_to_instructions::reconcile_dup_instructions::reconcile_dup_instructions;
+use skg::read_buffer::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, NonMerge_NodeAction};
 use std::error::Error;
@@ -42,7 +42,7 @@ fn test_deletions_excluded (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-deletions-excluded",
-    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-deletions-excluded",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
@@ -53,7 +53,7 @@ fn test_deletions_excluded (
 
       let trees = org_to_uninterpreted_nodes(input)?;
       let instructions = interpret_orgnode_forest(trees)?;
-      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
+      let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
       let id1_instruction = reduced.iter()
@@ -76,7 +76,7 @@ fn test_defining_node_defines (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-defining-node",
-    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-defining-node",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
@@ -89,7 +89,7 @@ fn test_defining_node_defines (
 
       let trees = org_to_uninterpreted_nodes(input)?;
       let instructions = interpret_orgnode_forest(trees)?;
-      let reduced = reconcile_dup_instructions(config, driver, instructions).await?;
+      let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
       let id1_instruction = reduced.iter()
@@ -108,7 +108,7 @@ fn test_adding_without_definer (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-adding-without-definer",
-    "tests/new/orgnodes_to_instructions/reconcile_dup_instructions/fixtures",
+    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-adding-without-definer",
     |config, driver| Box::pin ( async move {
       let input = indoc! {"
@@ -119,7 +119,7 @@ fn test_adding_without_definer (
         "};
       let trees = org_to_uninterpreted_nodes(input)?;
       let instructions = interpret_orgnode_forest(trees)?;
-      let reduced = reconcile_dup_instructions(
+      let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;
 
       { // id:1 is indefinitive-only, so it should be filtered out

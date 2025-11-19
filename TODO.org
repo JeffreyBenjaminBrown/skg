@@ -1,5 +1,3 @@
-* rename reconcile_dup_instructions
-  and the module it's in
 * maybe we don't need the SaveIndefinitive constructor
   and can rename the other Save* to simply 'Save'
 * dfs-bfs and request view expansion

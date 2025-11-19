@@ -15,7 +15,7 @@ This module does two things:
    - Append any extra IDs from disk
 .
 IMPORTANT: SaveIndefinitive instructions are filtered out at the
-start of reconcile_dup_instructions. They contribute nothing to saves.
+start of reconcile_same_id_instructions. They contribute nothing to saves.
 .
 Validation (find_buffer_errors_for_saving) runs BEFORE this module
 and blocks saves if:
@@ -35,12 +35,12 @@ use typedb_driver::TypeDBDriver;
 
 /// Runs 'collect_dup_instructions' to group same-ID instructions.
 /// Then, on each group of SaveInstructions,
-/// runs 'reconcile_dup_instructions_for_one_id'
+/// runs 'reconcile_same_id_instructions_for_one_id'
 /// to get a single SaveInstruction.
 ///
-/// NOTE: Disregards SaveIndefinitive instructions.
-/// Those nodes do not contribute any data to saves.
-pub async fn reconcile_dup_instructions(
+/// NOTE: Disregards SaveIndefinitive instructions,
+/// because they do not contribute any data to saves.
+pub async fn reconcile_same_id_instructions(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   instructions: Vec<SaveInstruction>
@@ -57,7 +57,7 @@ pub async fn reconcile_dup_instructions(
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
     let reduced_instruction: SaveInstruction =
-      reconcile_dup_instructions_for_one_id(
+      reconcile_same_id_instructions_for_one_id(
         config, driver, instruction_group ). await ?;
     result.push (reduced_instruction); }
   Ok(result) }
@@ -88,7 +88,7 @@ pub fn collect_dup_instructions(
 /// with disk data -- replacing None fields in the OrgNode
 /// with the same field from disk, and including all the extra IDs
 /// -- or else returns the Delete instruction.
-pub async fn reconcile_dup_instructions_for_one_id(
+pub async fn reconcile_same_id_instructions_for_one_id(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   instructions: Vec<SaveInstruction>

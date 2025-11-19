@@ -15,8 +15,8 @@ mod add_missing_info;
 #[path = "new/orgnodes_to_instructions.rs"]
 mod orgnodes_to_instructions;
 
-#[path = "new/orgnodes_to_instructions/reconcile_dup_instructions.rs"]
-mod reconcile_dup_instructions;
+#[path = "new/orgnodes_to_instructions/reconcile_same_id_instructions.rs"]
+mod reconcile_same_id_instructions;
 
-#[path = "new/orgnodes_to_instructions/reconcile_dup_instructions/by_claude.rs"]
-mod reconcile_dup_instructions_by_claude;
+#[path = "new/orgnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs"]
+mod reconcile_same_id_instructions_by_claude;

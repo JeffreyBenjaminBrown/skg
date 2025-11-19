@@ -25,7 +25,7 @@ pub mod buffer_to_orgnodes;
 pub use orgnodes_to_instructions::{
     orgnodes_to_reconciled_save_instructions,
     interpret_orgnode_forest,
-    reconcile_dup_instructions,
+    reconcile_same_id_instructions,
     clobber_none_fields_with_data_from_disk,
 };
 pub mod orgnodes_to_instructions;
@@ -38,7 +38,7 @@ pub use validate_foreign_nodes::{
 
 /// Builds a forest of OrgNodes:
 ///   - Fills in information via 'add_missing_info_to_forest'.
-///   - Reconciles duplicates via 'reconcile_dup_instructions'
+///   - Reconciles duplicates via 'reconcile_same_id_instructions'
 /// Outputs that plus a forest of SaveInstructions, plus MergeInstructionTriples.
 pub async fn buffer_to_save_instructions (
   buffer_text : &str,

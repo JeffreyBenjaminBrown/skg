@@ -1,7 +1,7 @@
-// Tests for the reconcile_dup_instructions module
+// Tests for the reconcile_same_id_instructions module
 // Testing the logic for collecting and reducing duplicate instructions
 
-use skg::read_buffer::orgnodes_to_instructions::reconcile_dup_instructions::collect_dup_instructions;
+use skg::read_buffer::orgnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
 use skg::types::{ID, SkgNode, NonMerge_NodeAction};
 
 // Helper function to create a basic SkgNode for testing
@@ -91,7 +91,7 @@ fn test_collect_dup_instructions_empty_input() {
 }
 
 #[test]
-fn test_reconcile_dup_instructions_for_one_id_error_empty() {
+fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
   // Test that we get the expected error for empty instructions
   // This doesn't require async since we return early
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
@@ -424,5 +424,5 @@ fn test_id_merging() {
     ]);
 }
 
-// Note: Integration tests for reconcile_dup_instructions_for_one_id and reconcile_dup_instructions
+// Note: Integration tests for reconcile_same_id_instructions_for_one_id and reconcile_same_id_instructions
 // would require TypeDB setup and are better suited for integration test files

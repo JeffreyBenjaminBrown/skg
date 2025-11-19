@@ -1,9 +1,9 @@
 pub mod to_dirty_instructions;
-pub mod reconcile_dup_instructions;
+pub mod reconcile_same_id_instructions;
 pub mod none_node_fields_are_noops;
 
 pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
-pub use reconcile_dup_instructions::reconcile_dup_instructions;
+pub use reconcile_same_id_instructions::reconcile_same_id_instructions;
 pub use to_dirty_instructions::interpret_orgnode_forest;
 
 use crate::types::{SkgNode, SkgConfig, SaveInstruction};
@@ -13,7 +13,7 @@ use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
 /// Converts a forest of OrgNodes to SaveInstructions,
-/// reconciling duplicates via 'reconcile_dup_instructions'
+/// reconciling duplicates via 'reconcile_same_id_instructions'
 /// (which filters out indefinitive instructions),
 /// and clobbering None fields with data from disk.
 pub async fn orgnodes_to_reconciled_save_instructions (
@@ -24,7 +24,7 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   let instructions : Vec<SaveInstruction> =
     interpret_orgnode_forest ( forest . clone () ) ?;
   let instructions_without_dups : Vec<SaveInstruction> =
-    reconcile_dup_instructions (
+    reconcile_same_id_instructions (
       config, driver, instructions ) . await ?;
   let mut clobbered_instructions : Vec<SaveInstruction> =
     Vec::new();
