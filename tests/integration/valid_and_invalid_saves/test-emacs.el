@@ -1,7 +1,7 @@
 ;;; Integration test for skg save error handling
 ;;; This script tests:
-;;; 1. Invalid save (duplicate ID without repeated) should show error buffer
-;;; 2. Valid save (with repeated) should work normally
+;;; 1. Invalid save (duplicate ID without indefinitive) should show error buffer
+;;; 2. Valid save (with indefinitive) should work normally
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -42,7 +42,7 @@
 
 (defun test-invalid-save ()
   "Test invalid save that should create error buffer."
-  (message "=== PHASE 1: Testing invalid save (duplicate ID without repeated) ===")
+  (message "=== PHASE 1: Testing invalid save (duplicate ID without indefinitive) ===")
 
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
@@ -105,14 +105,14 @@
 
 (defun test-valid-save ()
   "Test valid save after fixing the content."
-  (message "=== PHASE 2: Testing valid save (with repeated) ===")
+  (message "=== PHASE 2: Testing valid save (with indefinitive) ===")
 
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg (id 1)) 1")
-    (replace-match "** (skg (id 1) (view repeated)) 1")
-    (message "✓ Amended previously invalid content to use repeated, so it is now valid"))
+    (replace-match "** (skg (id 1) (code indefinitive)) 1")
+    (message "✓ Amended previously invalid content to use indefinitive, so it is now valid"))
 
   ;; Switch to buffer to make it current
   (switch-to-buffer "*skg-content-view*")
