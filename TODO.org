@@ -1,8 +1,7 @@
 * redundant
 ** is_ancestor duplicates something done a different way elsewhere
-* maybe we don't need the SaveIndefinitive constructor
-  and can rename the other Save* to simply 'Save'
-* Request definitive view at a node
+* Move some code from serve/ to save/.
+* Request definitive content view at a node
 ** for repeats
 ** for subscriptions
    which initially show just the title -- not even the content,

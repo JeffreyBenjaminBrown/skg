@@ -18,9 +18,10 @@ pub fn interpret_orgnode_forest (
   Ok(result) }
 
 /// Appends another pair to 'result' and recurses.
-/// Skips AliasCol and Alias nodes. (Aliases are handled by
-/// 'collect_aliases' in 'mk_skgnode', when 'interpret_node_dfs'
-/// is called on the orgnode ancestor they describe.)
+/// Skips AliasCol, Alias, and indefinitive nodes.
+/// (Aliases are handled by 'collect_aliases' in 'mk_skgnode',
+/// when 'interpret_node_dfs' is called on the orgnode ancestor they describe.)
+/// (Indefinitive nodes represent views and don't contribute to saves.)
 fn interpret_node_dfs(
   node_ref: NodeRef<OrgNode>,
   result: &mut Vec<SaveInstruction>
@@ -31,20 +32,20 @@ fn interpret_node_dfs(
                                RelToParent::Alias )) {
     // Skip. Should never execute, because a predecessor in the tree should have already processed any alias node.
     return Ok(( )); }
-  { // push another pair
+  if !node_data.metadata.code.indefinitive {
+    // push another pair
     let save_action : NonMerge_NodeAction =
       if matches!(node_data.metadata.code.editRequest,
                   Some(EditRequest::Delete)) {
         NonMerge_NodeAction::Delete
-      } else if node_data.metadata.code.indefinitive {
-        NonMerge_NodeAction::SaveIndefinitive
       } else {
-        NonMerge_NodeAction::SaveDefinitive };
+        NonMerge_NodeAction::Save };
     let skg_node: SkgNode =
       mk_skgnode ( node_data, &node_ref )?;
-    result.push (( skg_node, save_action )); }
-  for child in node_ref.children() { // recurse over children
-    interpret_node_dfs( child, result)?; }
+    result . push (( skg_node, save_action )); }
+  for child in node_ref.children() {
+    // Recurse over children, even if their parent is indefinitive.
+    interpret_node_dfs ( child, result)?; }
   Ok (( )) }
 
 fn mk_skgnode (

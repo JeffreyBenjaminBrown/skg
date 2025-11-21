@@ -85,10 +85,10 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
           MergeInstructionTriple {
             acquiree_text_preserver : (
               acquiree_text_preserver,
-              NonMerge_NodeAction::SaveDefinitive ),
+              NonMerge_NodeAction::Save ),
             updated_acquirer : (
               updated_acquirer,
-              NonMerge_NodeAction::SaveDefinitive ),
+              NonMerge_NodeAction::Save ),
             acquiree_to_delete : (
               acquiree_from_disk,
               NonMerge_NodeAction::Delete ),

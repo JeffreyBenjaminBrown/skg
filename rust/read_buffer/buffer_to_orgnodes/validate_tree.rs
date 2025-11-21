@@ -155,6 +155,12 @@ fn validate_node_and_children (
             node_id,
             source_nickname )); }} }
 
+  if node.metadata.code.indefinitive { // indef + edit = error
+    if node.metadata.code.editRequest.is_some() {
+      errors.push(
+        BufferValidationError::IndefinitiveWithEditRequest(
+          node.clone() )); }}
+
   for child in node_ref.children() { // recurse
     let cloned_rel: RelToParent =
       node.metadata.code.relToParent.clone();

@@ -13,9 +13,7 @@ pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NonMerge_NodeAction {
   /// The default case: the org-node's title, body and content define those of the node.
-  SaveDefinitive,
-  /// An indefinitive node generally has no effect on the graph when saved. The exception is that it can contain a delete instruction. (TODO: Get rid of that exception.)
-  SaveIndefinitive,
+  Save,
   Delete,
 }
 
@@ -131,6 +129,9 @@ fn format_buffer_validation_error (
     BufferValidationError::SourceNotInConfig(id, source) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
               id.0, source) },
+    BufferValidationError::IndefinitiveWithEditRequest(node) => {
+      format!("Indefinitive node cannot have an edit request:\n- Title: {}\n- ID: {:?}\n- Indefinitive nodes represent views and should not be edited or deleted.\n",
+              node.title, node.metadata.id) },
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 

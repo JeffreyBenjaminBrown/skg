@@ -16,7 +16,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
             Root body content
             ** (skg (id child1) (source main)) child 1
             Child body
-            * (skg (id root2) (source main) (code indefinitive toDelete)) root node 2
+            * (skg (id root2) (source main) (code toDelete)) root node 2
             Root 2 body
         "};
 
@@ -34,7 +34,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
   assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
   assert_eq!(root1_skg.contains, Some(vec![ID::from("child1")]));
   assert!(matches!(root1_action,
-                   NonMerge_NodeAction::SaveDefinitive));
+                   NonMerge_NodeAction::Save));
 
   // Test child1
   let (child1_skg, child1_action) = &instructions[1];
@@ -43,7 +43,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
   assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
   assert_eq!(child1_skg.contains, Some(vec![])); // No children
   assert!(matches!(child1_action,
-                   NonMerge_NodeAction::SaveDefinitive));
+                   NonMerge_NodeAction::Save));
 
   // Test root2 with metadata flags
   let (root2_skg, root2_action) = &instructions[2];
@@ -254,7 +254,7 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
 fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
-            * (skg (id doc1) (source main) (code indefinitive)) Document 1
+            * (skg (id doc1) (source main)) Document 1
             Document body
             ** (skg (id aliases1) (source main) (code (relToParent aliasCol))) Doc1 Aliases
             *** (skg (id alias_a) (source main) (code (relToParent alias))) First Document
@@ -282,11 +282,9 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
                        "Primary Doc".to_string()]));
   assert_eq!(doc1_skg.contains,
              Some(vec![ID::from("section1"),
-                       ID::from("section3")]),
-             // TODO ? Don't create it at all? It used to be needed because indefinitive nodes could append content.
-             "Indefinitive node still collects contents (for no reason, really)");
+                       ID::from("section3")]));
   assert!(matches!(doc1_action,
-                   NonMerge_NodeAction::SaveIndefinitive));
+                   NonMerge_NodeAction::Save));
 
   // Test section2 with toDelete
   let (section2_skg, section2_action) = &instructions[3];

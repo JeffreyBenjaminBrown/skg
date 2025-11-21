@@ -37,6 +37,7 @@ pub enum BufferValidationError {
                                   SourceNickname, // disk source
                                   SourceNickname), // buffer source
   SourceNotInConfig              (ID, SourceNickname),
+  IndefinitiveWithEditRequest    (OrgNode), // Indefinitive node has an edit request (not allowed)
   Other                          (String),
 }
 
@@ -103,6 +104,9 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Source mismatch for node {:?}: disk has '{}', buffer specifies '{}'", id, disk_source, buffer_source),
       BufferValidationError::SourceNotInConfig(id, source) =>
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
+      BufferValidationError::IndefinitiveWithEditRequest(node) =>
+        write!(f, "Indefinitive node cannot have an edit request. Node ID: {:?}, title: '{}'",
+               node.metadata.id, node.title),
       BufferValidationError::Other(msg) =>
         write!(f, "{}", msg), }} }
 

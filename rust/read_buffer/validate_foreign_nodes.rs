@@ -16,9 +16,7 @@ fn normalize_string_vec(v: &Option<Vec<String>>) -> Option<Vec<String>> {
     other => other.clone(), }}
 
 /// Validates that foreign (read-only) nodes are not being modified.
-/// Filters out:
-/// - Indefinitive foreign nodes
-/// - Definitive foreign nodes without modifications (no need to write)
+/// Filters out foreign nodes without modifications (no need to write).
 ///
 /// Returns errors if:
 /// - Foreign nodes have been modified (title, body, or contains changed)
@@ -44,10 +42,7 @@ pub async fn validate_and_filter_foreign_instructions(
         errors.push(BufferValidationError::ModifiedForeignNode(
           node.ids[0].clone(),
           SourceNickname::from ( node.source.clone() )) ); }
-      NonMerge_NodeAction::SaveIndefinitive => { // Ignore.
-        // TODO ? Better to disallow?
-      }
-      NonMerge_NodeAction::SaveDefinitive => {
+      NonMerge_NodeAction::Save => {
         // Check if node has been modified.
         // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
         match read_node_from_id_optional(

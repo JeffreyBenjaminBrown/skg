@@ -44,8 +44,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                           "acquiree_text_preserver body incorrect" );
               assert!(
                 matches!(acquiree_text_preserver_action,
-                         NonMerge_NodeAction::SaveDefinitive),
-                "acquiree_text_preserver should be SaveDefinitive");
+                         NonMerge_NodeAction::Save),
+                "acquiree_text_preserver should be Save");
               assert_eq!(acquiree_text_preserver.contains.as_ref().unwrap().len(),
                          0, "acquiree_text_preserver should have no contents");
                 assert_eq!(
@@ -77,8 +77,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                 );
               assert!(
                 matches!(action1,
-                         NonMerge_NodeAction::SaveDefinitive),
-                "Node 1 should be SaveDefinitive");
+                         NonMerge_NodeAction::Save),
+                "Node 1 should be Save");
 
                 // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
                 // In this case: [acquiree_text_preserver ID] (since both started with empty contents)

@@ -26,22 +26,18 @@ fn create_test_node(
 }
 
 // Helper function to create a NonMerge_NodeAction
-fn create_save_action( might_contain_more: bool,
-                       to_delete: bool
-) -> NonMerge_NodeAction {
+fn create_save_action(to_delete: bool) -> NonMerge_NodeAction {
   if to_delete {
     NonMerge_NodeAction::Delete
-  } else if might_contain_more {
-    NonMerge_NodeAction::SaveIndefinitive
   } else {
-    NonMerge_NodeAction::SaveDefinitive }}
+    NonMerge_NodeAction::Save }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {
     let instructions = vec![
-        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(false, false)),
-        (create_test_node("id2", "Node 2", None, None, vec![]), create_save_action(false, false)),
-        (create_test_node("id3", "Node 3", None, None, vec![]), create_save_action(false, false)),
+        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id2", "Node 2", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id3", "Node 3", None, None, vec![]), create_save_action(false)),
     ];
 
     let grouped = collect_dup_instructions(instructions);
@@ -60,11 +56,11 @@ fn test_collect_dup_instructions_no_duplicates() {
 #[test]
 fn test_collect_dup_instructions_with_duplicates() {
     let instructions = vec![
-        (create_test_node("id1", "Node 1 First", None, None, vec![]), create_save_action(true, false)),
-        (create_test_node("id2", "Node 2", None, None, vec![]), create_save_action(false, false)),
-        (create_test_node("id1", "Node 1 Second", None, None, vec![]), create_save_action(false, false)),
-        (create_test_node("id3", "Node 3", None, None, vec![]), create_save_action(false, false)),
-        (create_test_node("id1", "Node 1 Third", None, None, vec![]), create_save_action(true, false)),
+        (create_test_node("id1", "Node 1 First", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id2", "Node 2", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id1", "Node 1 Second", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id3", "Node 3", None, None, vec![]), create_save_action(false)),
+        (create_test_node("id1", "Node 1 Third", None, None, vec![]), create_save_action(false)),
     ];
 
     let grouped = collect_dup_instructions(instructions);
@@ -107,8 +103,8 @@ fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
 fn test_consistent_to_delete_values() {
     // Test the to_delete_if_consistent logic indirectly
     let instructions_consistent = vec![
-        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(false, true)),
-        (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(true, true)),
+        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(true)),
+        (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(true)),
     ];
 
     // All have Delete action, so should be consistent
@@ -122,8 +118,8 @@ fn test_consistent_to_delete_values() {
 fn test_inconsistent_to_delete_values() {
     // Test inconsistent toDelete values
     let instructions_inconsistent = vec![
-        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(false, true)),
-        (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(true, false)),
+        (create_test_node("id1", "Node 1", None, None, vec![]), create_save_action(true)),
+        (create_test_node("id1", "Node 1 Again", None, None, vec![]), create_save_action(false)),
     ];
 
     // Mixed delete/non-delete values should be detected
@@ -147,9 +143,9 @@ fn test_alias_collection_and_deduplication() {
         Some(vec!["alias1".to_string(), "alias4".to_string()]), None, vec![]);
 
     let instructions = vec![
-        (node1, create_save_action(true, false)),
-        (node2, create_save_action(true, false)),
-        (node3, create_save_action(false, false)),
+        (node1, create_save_action(false)),
+        (node2, create_save_action(false)),
+        (node3, create_save_action(false)),
     ];
 
     // Collect all aliases
@@ -228,25 +224,23 @@ fn test_last_instruction_defines_title_and_body() {
     let instructions = vec![
         (create_test_node("id1", "First Title",
             None, Some("First Body".to_string()), vec![]),
-         create_save_action(true, false)),
+         create_save_action(false)),
         (create_test_node("id1", "Middle Title",
             None, None, vec![]),
-         create_save_action(true, false)),
+         create_save_action(false)),
         (create_test_node("id1", "Last Title",
             None, Some("Last Body".to_string()), vec![]),
-         create_save_action(true, false)),
+         create_save_action(false)),
     ];
 
     // Simulate the logic: last instruction should win for both title and body
     let mut maybe_title: Option<String> = None;
     let mut maybe_body: Option<String> = None;
 
-    for (skg_node, save_action) in &instructions {
-        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
-            maybe_title = Some(skg_node.title.clone());
-            if skg_node.body.is_some() {
-                maybe_body = skg_node.body.clone();
-            }
+    for (skg_node, _save_action) in &instructions {
+        maybe_title = Some(skg_node.title.clone());
+        if skg_node.body.is_some() {
+            maybe_body = skg_node.body.clone();
         }
     }
 
@@ -262,43 +256,32 @@ fn test_defining_instruction_takes_precedence() {
     let instructions = vec![
         (create_test_node("id1", "First Title",
             None, Some("First Body".to_string()), vec![ID::from("content1")]),
-         create_save_action(true, false)),
+         create_save_action(false)),
         (create_test_node("id1", "Defining Title",
             None, Some("Defining Body".to_string()), vec![ID::from("content2")]),
-         create_save_action(false, false)), // This is the defining instruction
+         create_save_action(false)), // This is the defining instruction
         (create_test_node("id1", "Last Title",
             None, Some("Last Body".to_string()), vec![ID::from("content3")]),
-         create_save_action(true, false)),
+         create_save_action(false)),
     ];
 
-    // Simulate the logic
-    let mut maybe_title: Option<String> = None;
-    let mut maybe_body: Option<String> = None;
-    let mut defines_title: Option<String> = None;
-    let mut defines_body: Option<String> = None;
-    let mut defines_content: Option<Vec<ID>> = None;
+    // Simulate the logic: last Save instruction should win
+    let mut last_title: Option<String> = None;
+    let mut last_body: Option<String> = None;
+    let mut last_content: Option<Vec<ID>> = None;
 
     for (skg_node, save_action) in &instructions {
-        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
-            maybe_title = Some(skg_node.title.clone());
-            if skg_node.body.is_some() {
-                maybe_body = skg_node.body.clone();
-            }
-        } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
-            // Defining instruction
-            if defines_content.is_some() {
-                panic!("Multiple defining instructions");
-            }
-            defines_content = skg_node.contains.clone();
-            defines_title = Some(skg_node.title.clone());
-            defines_body = skg_node.body.clone();
+        if matches!(save_action, NonMerge_NodeAction::Save) {
+            last_title = Some(skg_node.title.clone());
+            last_body = skg_node.body.clone();
+            last_content = skg_node.contains.clone();
         }
     }
 
-    // Defining should take precedence
-    assert_eq!(defines_title.or(maybe_title), Some("Defining Title".to_string()));
-    assert_eq!(defines_body.or(maybe_body), Some("Defining Body".to_string()));
-    assert_eq!(defines_content, Some(vec![ID::from("content2")]));
+    // Last Save instruction should win
+    assert_eq!(last_title, Some("Last Title".to_string()));
+    assert_eq!(last_body, Some("Last Body".to_string()));
+    assert_eq!(last_content, Some(vec![ID::from("content3")]));
 }
 
 #[test]
@@ -309,41 +292,24 @@ fn test_initial_content_from_disk_when_no_defining() {
     let instructions = vec![
       (create_test_node("id1", "Title 1",
                         None, None, vec![ID::from("append1")]),
-         create_save_action(true, false)),
+         create_save_action(false)),
       (create_test_node("id1", "Title 2",
                         None, None, vec![ID::from("append2")]),
-         create_save_action(true, false)), ];
+         create_save_action(false)), ];
 
-    let mut defines_content: Option<Vec<ID>> = None;
-    let mut append_to_content: Vec<ID> = Vec::new();
+    // Collect all contents from all Save instructions
+    let mut all_contents: Vec<ID> = Vec::new();
 
     for (skg_node, save_action) in &instructions {
-      if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
-        if let Some(contents) = &skg_node.contains {
-          append_to_content.extend(contents.iter().cloned()); }
-      } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
-        defines_content = skg_node.contains.clone(); }}
+        if matches!(save_action, NonMerge_NodeAction::Save) {
+            if let Some(contents) = &skg_node.contains {
+                all_contents.extend(contents.iter().cloned());
+            }
+        }
+    }
 
-    // No defining instruction, so defines_content should be None
-    assert!(defines_content.is_none());
-
-    // Simulate reading from disk
-    let disk_contents: Vec<ID> =
-      vec![ID::from("disk1"), ID::from("disk2")];
-    let initial_contents: Vec<ID> =
-      defines_content.unwrap_or(disk_contents);
-
-    // Simulate deduplication
-    let initial_set: std::collections::HashSet<ID> =
-        initial_contents.iter().cloned().collect();
-    append_to_content.retain(|id| !initial_set.contains(id));
-
-    let mut final_contents: Vec<ID> =
-      initial_contents;
-    final_contents.extend(append_to_content);
-
-    assert_eq!(final_contents, vec![
-        ID::from("disk1"), ID::from("disk2"),
+    // Should collect content from both instructions
+    assert_eq!(all_contents, vec![
         ID::from("append1"), ID::from("append2")
     ]);
 }
@@ -354,55 +320,41 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 
     let instructions = vec![
         (create_test_node("id1", "Title 1", None, None, vec![]),
-         create_save_action(true, false)),
+         create_save_action(false)),
         (create_test_node("id1", "Title 2", None, None, vec![]),
-         create_save_action(true, false)),
+         create_save_action(false)),
     ];
 
     let mut maybe_body: Option<String> = None;
-    let mut defines_body: Option<String> = None;
 
-    for (skg_node, save_action) in &instructions {
-        if matches!(save_action, NonMerge_NodeAction::SaveIndefinitive) {
-            if skg_node.body.is_some() {
-                maybe_body = skg_node.body.clone();
-            }
-        } else if matches!(save_action, NonMerge_NodeAction::SaveDefinitive) {
-            defines_body = skg_node.body.clone();
+    for (skg_node, _save_action) in &instructions {
+        if skg_node.body.is_some() {
+            maybe_body = skg_node.body.clone();
         }
     }
 
     // No instruction had a body
-    assert!(defines_body.is_none());
     assert!(maybe_body.is_none());
 
     // Simulate reading from disk
     let disk_body: Option<String> =
       Some("Body from disk".to_string());
     let final_body: Option<String> =
-      defines_body.or(maybe_body).or(disk_body);
+      maybe_body.or(disk_body);
 
     assert_eq!(final_body, Some("Body from disk".to_string()));
 }
 
 #[test]
-fn test_might_contain_more_vs_definitive() {
-    // Test the distinction between indefinitive (appendable) and definitive instructions
-    let appendable_action: NonMerge_NodeAction =
-      create_save_action(true, false);
-    let definitive_action: NonMerge_NodeAction =
-      create_save_action(false, false);
+fn test_save_vs_delete() {
+    // Test the distinction between Save and Delete actions
+    let save_action: NonMerge_NodeAction =
+      create_save_action(false);
+    let delete_action: NonMerge_NodeAction =
+      create_save_action(true);
 
-    assert!(matches!(appendable_action, NonMerge_NodeAction::SaveIndefinitive));
-    assert!(matches!(definitive_action, NonMerge_NodeAction::SaveDefinitive));
-
-    // In the actual function, indefinitive=true means:
-    // - append to content
-    // - set maybe_title and maybe_body
-    //
-    // indefinitive=false means:
-    // - set definitive content (error if already set)
-    // - set definitive title and body
+    assert!(matches!(save_action, NonMerge_NodeAction::Save));
+    assert!(matches!(delete_action, NonMerge_NodeAction::Delete));
 }
 
 #[test]
