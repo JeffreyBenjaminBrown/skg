@@ -1,7 +1,55 @@
 /// Utilities for working with ego_tree::Tree.
 
-use ego_tree::{Tree, NodeRef};
+use ego_tree::{Tree, NodeRef, NodeId};
 use std::error::Error;
+
+/// Converts Vec<Tree<(A, B)>> to Vec<Tree<B>> the obvious way.
+pub fn map_snd_over_forest<A, B>(
+  paired_forest: Vec<Tree<(A, B)>>
+) -> Vec<Tree<B>> where A: Clone,
+                        B: Clone, {
+  paired_forest . into_iter() . map(
+    |paired_tree| {
+      map_snd_over_tree( &paired_tree,
+                          paired_tree . root() . id())
+    } ).collect() }
+
+/// Converts a subtree of Tree<(A, B)> to Tree<B> the obvious way.
+pub fn map_snd_over_tree<A, B>(
+  paired_tree: &Tree<(A, B)>,
+  subtree_root: NodeId,
+) -> Tree<B> where A: Clone,
+                   B: Clone, {
+
+  fn copy_children_recursively<A, B>(
+    paired_tree: &Tree<(A, B)>,
+    paired_node_id: NodeId,
+    new_tree: &mut Tree<B>,
+    new_node_id: NodeId,
+  ) where A: Clone,
+          B: Clone, {
+    let child_ids: Vec<NodeId> =
+      paired_tree . get(paired_node_id) . unwrap()
+      . children() . map(|c| c.id())
+      . collect();
+    for child_id in child_ids {
+      let child_data: (A, B) =
+        paired_tree . get(child_id) . unwrap() . value() . clone();
+      let new_child_id: NodeId =
+        new_tree . get_mut(new_node_id) . unwrap()
+        . append(child_data.1) .  id();
+      copy_children_recursively( // recurse
+        paired_tree, child_id, new_tree, new_child_id); }}
+
+  let root_data: (A, B) =
+    paired_tree . get(subtree_root)
+    . unwrap() . value() . clone();
+  let mut new_tree: Tree<B> = Tree::new(root_data.1);
+  let new_root_id: NodeId = new_tree.root().id();
+  copy_children_recursively(
+    paired_tree, subtree_root, &mut new_tree, new_root_id);
+  new_tree
+}
 
 /// Returns the first node in the Nth generation of the tree.
 /// Generation 1 is the root; generation 2 is the next one; etc.
@@ -128,3 +176,55 @@ pub fn next_in_generation_in_forest<'a, T>(
           tree.root(), depth )
       { return Some(result); }} }
   None }
+
+//
+// NodeId-based utilities for mutable access
+//
+
+/// Collects all NodeIds at a given generation in a tree.
+/// Generation 1 is the root; generation 2 is children of root; etc.
+/// Returns an empty Vec if the generation doesn't exist.
+/// Returns an error if generation < 1.
+pub fn collect_generation_ids<T>(
+  tree: &Tree<T>,
+  generation: usize,
+) -> Result<Vec<NodeId>, Box<dyn Error>> {
+  if generation < 1 {
+    return Err("Generation must be >= 1".into() ); }
+  let mut result : Vec<NodeId> = Vec::new();
+  fn collect_at_depth<T>(
+    node: NodeRef<'_, T>,
+    current_depth: usize,
+    target_depth: usize,
+    result: &mut Vec<NodeId>,
+  ) {
+    if current_depth == target_depth {
+      result.push (node.id());
+      return; }
+    for child in node.children() {
+      collect_at_depth (
+        child, current_depth + 1, target_depth, result); }}
+  collect_at_depth (
+    tree.root(), 1, generation, &mut result);
+  Ok (result) }
+
+/// Collects all NodeIds at a given generation
+/// across all trees in a forest.
+/// Returns (tree_index, vec_of_node_ids) pairs in BFS order.
+/// Returns an error if generation < 1.
+pub fn collect_generation_ids_in_forest<T>(
+  forest: &[Tree<T>],
+  generation: usize,
+) -> Result<
+  Vec<(usize, // index specifying a tree in 'forest'
+       Vec<NodeId>)>, // all nodes in that tree at this generation
+  Box<dyn Error>> {
+  if generation < 1 {
+    return Err("Generation must be >= 1".into() ); }
+  let mut result: Vec<(usize, Vec<NodeId>)> = Vec::new();
+  for (tree_index, tree) in forest.iter().enumerate() {
+    let ids: Vec<NodeId> =
+      collect_generation_ids (tree, generation)?;
+    if !ids.is_empty() {
+      result.push ((tree_index, ids)); }}
+  Ok (result) }

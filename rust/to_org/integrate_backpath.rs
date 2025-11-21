@@ -217,7 +217,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
-  let ( mut child_orgnode, _ ) : ( OrgNode, _ ) =
+  let ( _, mut child_orgnode ) : ( _, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, child_id
     ). await ?;

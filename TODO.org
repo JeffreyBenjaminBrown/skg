@@ -1,3 +1,5 @@
+* redundant
+** is_ancestor duplicates something done a different way elsewhere
 * maybe we don't need the SaveIndefinitive constructor
   and can rename the other Save* to simply 'Save'
 * Request definitive view at a node

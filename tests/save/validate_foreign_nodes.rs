@@ -43,6 +43,7 @@ async fn setup_multi_source_test(
     sources,
     port: 1730,
     delete_on_quit: false,
+    initial_node_limit: 1000,
   };
 
   let driver: TypeDBDriver = TypeDBDriver::new(

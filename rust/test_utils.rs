@@ -125,6 +125,7 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     sources,
     port: 1730,
     delete_on_quit: false, // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs, not via delete_on_quit, because there's no server to quit.
+    initial_node_limit: 1000,
   };
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",

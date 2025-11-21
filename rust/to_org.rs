@@ -6,6 +6,7 @@ pub mod aliases;
 pub mod complete_aliascol;
 pub mod complete_contents;
 pub mod content_view;
+pub mod initial_view_bfs;
 pub mod integrate_backpath;
 pub mod orgnode;
 pub mod util;
@@ -25,6 +26,10 @@ pub use complete_contents::{
 pub use content_view::{
   multi_root_view,
   single_root_view,
+};
+
+pub use initial_view_bfs::{
+  render_initial_forest_bfs,
 };
 
 pub use integrate_backpath::{

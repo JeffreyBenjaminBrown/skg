@@ -54,6 +54,9 @@ pub struct SkgConfig {
 
   #[serde(default)] // defaults to false
   pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
+
+  #[serde(default = "default_initial_node_limit")]
+  pub initial_node_limit : usize, // Max nodes to render in initial content views.
 }
 
 #[derive(Clone)]
@@ -88,6 +91,8 @@ where
 }
 
 fn default_port() -> u16 { 1730 }
+
+fn default_initial_node_limit() -> usize { 1000 }
 
 
 //

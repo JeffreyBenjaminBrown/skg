@@ -44,7 +44,6 @@ impl SaveResponse {
 pub fn handle_save_buffer_request (
   reader        : &mut BufReader <TcpStream>,
   stream        : &mut TcpStream,
-  _request      : &str,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
   tantivy_index : &TantivyIndex ) {

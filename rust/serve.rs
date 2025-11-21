@@ -116,7 +116,6 @@ fn handle_emacs (
             handle_save_buffer_request (
               &mut reader,
               &mut stream,
-              &request,
               &typedb_driver,
               config,
               &tantivy_index);

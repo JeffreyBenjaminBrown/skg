@@ -397,7 +397,7 @@ async fn extend_content (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( new_orgnode, _skgnode ) : ( OrgNode, SkgNode ) =
+  let ( _skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, id ) . await ?;
   let mut parent_mut : NodeMut < OrgNode > =

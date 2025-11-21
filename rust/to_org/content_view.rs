@@ -1,9 +1,10 @@
+use crate::media::tree::map_snd_over_forest;
 use crate::media::typedb::search::{
   contains_from_pids,
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::complete_contents::completeOrgnodeForest;
+use crate::to_org::initial_view_bfs::render_initial_forest_bfs;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::to_org::orgnode::orgnode_to_text;
@@ -42,13 +43,16 @@ pub async fn multi_root_view (
   config   : &SkgConfig,
   root_ids : &[ID],
 ) -> Result < (String, Vec<String>), Box<dyn Error> > {
-  let mut forest : Vec < Tree < OrgNode > > =
+  let mut paired_forest : Vec < Tree < (SkgNode, OrgNode) > > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
-  let mut errors : Vec < String > =
+  let errors : Vec < String > =
     Vec::new ();
-  completeOrgnodeForest (
-    &mut forest, config, driver, &mut errors ) . await ?;
+  render_initial_forest_bfs (
+    &mut paired_forest, config, driver ) . await ?;
+  // Convert to OrgNode-only trees for metadata enrichment
+  let mut forest : Vec < Tree < OrgNode > > =
+    map_snd_over_forest ( paired_forest );
   set_metadata_relationship_viewdata_in_forest (
     &mut forest, config, driver ) . await ?;
   let buffer_content : String =
@@ -56,20 +60,21 @@ pub async fn multi_root_view (
   Ok ( (buffer_content, errors) ) }
 
 /// Create a minimal forest containing just root nodes (no children).
-/// To be completed by rebuild::completeOrgnodeForest.
+/// Returns (SkgNode, OrgNode) trees to avoid multiple SkgNode lookups.
 async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < Tree < OrgNode > >, Box<dyn Error> > {
-  let mut forest : Vec < Tree < OrgNode > > =
+) -> Result < Vec < Tree < (SkgNode, OrgNode) > >,
+              Box<dyn Error> > {
+  let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
     Vec::new ();
   for root_id in root_ids {
-    let (root_orgnode, _skgnode) : ( OrgNode, SkgNode ) =
+    let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
       skgnode_and_orgnode_from_id (
         config, driver, root_id ) . await ?;
-    let tree : Tree < OrgNode > =
-      Tree::new ( root_orgnode );
+    let tree : Tree < (SkgNode, OrgNode) > =
+      Tree::new ( (root_skgnode, root_orgnode) );
     forest . push ( tree ); }
   Ok ( forest ) }
 

@@ -182,16 +182,113 @@ fn test_multi_root_view_with_shared_nodes
       assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
       println!("Multi root view with shared nodes result:\n{}", result);
 
+      // BFS processes all roots (generation 1) before children (generation 2),
+      // so node 2 appears first as a root, then as a child (marked indefinitive)
       let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
                               This one string could span pages,
                               and it can include newlines, no problem.
-                              ** (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
-                              this one string could span pages
+                              ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
                               ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
                               this one string could span pages
-                              * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+                              * (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
+                              this one string could span pages
                               "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
+
+      Ok (( )) } )) }
+
+#[test]
+fn test_multi_root_view_with_node_limit
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-multi-root-view-limit",
+    "tests/typedb/fixtures",
+    "/tmp/tantivy-test-multi-root-view-limit",
+    |config, driver| Box::pin ( async move {
+      // Test with two roots that share a node, with node limit
+      // Tree structure: 1 -> (2, 3), 2 (standalone root)
+      // Generations: 1: [1, 2], 2: [2 (repeated), 3]
+      // With limit=3, should render 1, 2, then 2 and 3 are both truncated (sibling group)
+      let mut test_config = config.clone();
+      test_config.initial_node_limit = 3;
+
+      let focii = vec![
+        ID ( "1".to_string () ),
+        ID ( "2".to_string () )
+      ];
+      let (result, errors) : (String, Vec<String>) = multi_root_view (
+        driver,
+        &test_config,
+        & focii
+      ) . await ?;
+
+      assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+      println!("Multi root view with limit=3 result:\n{}", result);
+
+      // Expected: roots 1 and 2 (gen 1), then children 2 and 3 truncated (gen 2)
+      // Generation 2 has 2 nodes, so 2+2=4 > 3, apply truncation
+      // Limit node is at index 1 (the 4th node overall, 2nd in gen 2)
+      // That's node 3, child of node 1. Its parent is node 1.
+      // Complete sibling group: truncate both node 2 (repeated) and node 3
+      // Then truncate everything after node 1 in gen 1 - which includes root node 2
+      let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
+                              This one string could span pages,
+                              and it can include newlines, no problem.
+                              ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+                              ** (skg (id 3) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 3
+                              * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+                              "};
+      assert_eq!(result, expected,
+                 "Multi root view with limit=3 should truncate generation 2 sibling group");
+
+      Ok (( )) } )) }
+
+#[test]
+fn test_limit_with_multiple_sibling_groups
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-multiple-sibling-groups",
+    "tests/content_view/fixtures-3",
+    "/tmp/tantivy-test-multiple-sibling-groups",
+    |config, driver| Box::pin ( async move {
+      // Test that truncation correctly stops at sibling group boundaries
+      // Tree structure:
+      //   1 (gen 1)
+      //   ├─ 11 (gen 2)
+      //   │  ├─ 111 (gen 3)
+      //   │  └─ 112 (gen 3)
+      //   └─ 12 (gen 2)
+      //      └─ 121 (gen 3)
+      //
+      // With limit=4: 1 (1), 11 (2), 12 (3), 111 (4)
+      // Generation 3 has 3 nodes, so 4+3=7 > 4, apply truncation
+      // Limit node is 111 (index 0 in gen 3)
+      // Complete its sibling group: truncate both 111 and 112
+      // Stop there - do NOT truncate 121 (different parent)
+      // Then truncate 12 (everything after 11 in gen 2)
+
+      let mut test_config = config.clone();
+      test_config.initial_node_limit = 4;
+
+      let (result, errors) : (String, Vec<String>) = single_root_view (
+        driver,
+        &test_config,
+        &ID ( "1".to_string () )
+      ) . await ?;
+
+      assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+      println!("Result with multiple sibling groups:\n{}", result);
+
+      let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) 1
+                              1 body
+                              ** (skg (id 11) (source main) (view (rels (contents 2)))) 11
+                              11 body
+                              *** (skg (id 111) (source main) (code indefinitive)) 111
+                              *** (skg (id 112) (source main) (code indefinitive)) 112
+                              ** (skg (id 12) (source main) (view (rels (contents 1))) (code indefinitive)) 12
+                              "};
+      assert_eq!(result, expected,
+                 "Truncated nodes should have no children (121 removed)");
 
       Ok (( )) } )) }

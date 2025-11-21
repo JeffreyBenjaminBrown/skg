@@ -15,7 +15,7 @@ pub async fn skgnode_and_orgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   id     : &ID,
-) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, id).await?
@@ -31,7 +31,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &str,
-) -> Result < ( OrgNode, SkgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let path : String =
     path_from_pid_and_source (
       config, source, pid.clone() );
@@ -49,7 +49,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
       io::ErrorKind::InvalidData,
       format! ( "SkgNode with ID {} has an empty title",
                  pid ), )) ); }
-  Ok (( orgnode, skgnode )) }
+  Ok (( skgnode, orgnode )) }
 
 pub fn newline_to_space ( s: &str ) -> String {
   s.replace ( '\n', " " ) }
