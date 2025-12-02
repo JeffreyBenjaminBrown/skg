@@ -1,20 +1,39 @@
-* redundant
-** is_ancestor duplicates something done a different way elsewhere
-* Move some code from serve/ to save/.
+* TODO in elisp/
+** functions for IDs and links
+*** already defined but maybe bad
+**** skg-visit-link
+*** absent; were implemented but via properties
+    and vanished just after commit
+      7418b1d9136bdc9998b965fcc0c74e593c390ca6
+**** skg-next-id, skg-previous-id
+     move point to the {next, previous} metadata expression or link,
+     whichever comes first
+**** skg-copy-to-id-stack
+     Writes not just the ID but it's title to that stack,
+     so the user can easily distinguish them.
+**** skg-next-id-matching, skg-previous-id-matching
+***** searches over both links and metadata
+***** By default, searches to match the stack's top ID
+***** If preceded with C-u, instead
+      prompts user to choose from the stack.
+** possibilities
+*** the cursor can be placed over the first herald character
+    manually, and in code maybe over others --
+    but the first seems ideal already
+* reorient : explore elisp/ functions
+** Can I make a node indefinitive?
+*** What happens to its body, content and other children if I do?
+** (Rip)grep for 'defun' in Emacs, read all the function names.
+** Read USAGE.md
+* minor fixes
+** dedup some code
+*** is_ancestor duplicates something done a different way elsewhere
+** Move some code from serve/ to save/.
 * Request definitive content view at a node
 ** for repeats
 ** for subscriptions
    which initially show just the title -- not even the content,
      let alone the recursive content
-* truncation resembles folding
-** 'folded': emacs org-mode folding
-** 'truncated': whether a node's contents are among its children
-   If a node is truncated, it should be indefinitive.
-* showing an indefinitive node's body is fine
-  The user can delete it if they want; no effect.
-  They can also hide it in a 'to delete' node.
-  Oh but whether the user wants the body
-  should be preserved by the server when saving.
 * undoing that mis-feature shouldn't be hard
   Don't let indefinite nodes contribute at all to saving,
   but recognize that their children might.
