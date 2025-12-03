@@ -1,10 +1,11 @@
-use crate::serve::util::search_terms_from_request;
 use crate::serve::util::send_response;
+use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::media::tantivy::search_index;
 use crate::types::orgnode::{OrgNode, RelToParent, default_metadata};
 use crate::types::misc::TantivyIndex;
 use crate::to_org::orgnode::orgnode_to_text;
 
+use sexp::Sexp;
 use std::collections::HashMap;
 use std::net::TcpStream; // handles two-way communication
 use tantivy::{Document, Searcher};
@@ -168,3 +169,12 @@ fn format_matches_as_org_mode (
           3,
           &alias_match_node )); }}
   result }
+
+pub fn search_terms_from_request (
+  request : &str
+) -> Result<String, String> {
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) }

@@ -25,10 +25,6 @@
     manually, and in code maybe over others --
     but the first seems ideal already
 ** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
-* minor fixes
-** dedup some code
-*** is_ancestor duplicates something done a different way elsewhere
-** Move some code from serve/ to save/.
 * Request definitive content view at a node
 ** for repeats
 ** for subscriptions
@@ -123,6 +119,8 @@ fold-preservation
       .context("Failed to connect to TypeDB server")?;
 *** once it's possible, make a good pids_from_ids
     see [[./not_using/pids_from_ids]]
+** dedup some code
+*** is_ancestor duplicates something done a different way elsewhere
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user

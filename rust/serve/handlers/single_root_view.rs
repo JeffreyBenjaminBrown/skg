@@ -1,12 +1,14 @@
 use crate::to_org::content_view::single_root_view;
 use crate::serve::util::{
-  node_id_from_single_root_view_request,
   send_response,
   send_response_with_length_prefix,
   format_buffer_response_sexp};
+use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::SkgConfig;
+use crate::types::ID;
 
 use futures::executor::block_on;
+use sexp::Sexp;
 use std::net::TcpStream; // handles two-way communication
 use typedb_driver::TypeDBDriver;
 
@@ -47,3 +49,13 @@ pub fn handle_single_root_view_request (
         "Error extracting node ID: {}", err);
       println! ( "{}", error_msg ) ;
       send_response ( stream, &error_msg ); } } }
+
+pub fn node_id_from_single_root_view_request (
+  request : &str
+) -> Result<ID, String> {
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_v_from_kv_pair_in_sexp ( &sexp, "id" )
+    . map(ID) }

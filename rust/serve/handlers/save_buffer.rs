@@ -7,8 +7,9 @@ use crate::to_org::content_view::{
 use crate::merge::merge_nodes_in_graph;
 use crate::to_org::complete_contents::completeOrgnodeForest;
 use crate::serve::util::{
-  send_response,
-  format_buffer_response_sexp};
+  format_buffer_response_sexp,
+  read_length_prefixed_content,
+  send_response};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
@@ -17,7 +18,7 @@ use ego_tree::Tree;
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::error::Error;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use typedb_driver::TypeDBDriver;
 
@@ -93,39 +94,6 @@ pub fn handle_save_buffer_request (
         format! ("Error reading buffer content: {}", err );
       println! ( "{}", error_msg );
       send_response ( stream, &error_msg ); }} }
-
-/// Reads length-prefixed content from the stream.
-/// Expected format:
-///   "Content-Length: N\r\n\r\n" followed by N bytes of content.
-fn read_length_prefixed_content (
-  reader : &mut BufReader <TcpStream>
-) -> Result<String, Box<dyn Error>> {
-
-  // Consume header lines already in this reader's buffer,
-  // then read exactly Content-Length bytes from the same reader.
-  let mut header_lines : Vec <String> =
-    Vec::new ();
-  loop { // Read header lines until reaching the empty line.
-    let mut line : String = String::new();
-    reader.read_line ( &mut line )?;
-    if line == "\r\n" { break; }
-    header_lines.push (line); }
-  let content_length : usize =
-    header_lines
-    .iter()
-    .find_map ( |line| {
-      if line.starts_with("Content-Length: ")
-      { line.strip_prefix("Content-Length: ")
-        . and_then ( |s|
-                      s.trim() . parse::<usize> () . ok( ))
-      } else { None }} )
-    . ok_or ("Content-Length header not found") ?;
-  let mut buffer : Vec<u8> = // Read content_length bytes.
-    vec! [0u8; content_length] ;
-  reader.read_exact (&mut buffer) ?;
-  let content : String =
-    String::from_utf8 (buffer) ?;
-  Ok (content) }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (

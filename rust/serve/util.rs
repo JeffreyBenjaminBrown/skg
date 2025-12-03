@@ -1,8 +1,8 @@
 use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::misc::ID;
 
 use sexp::{Sexp, Atom};
-use std::io::Write;
+use std::error::Error;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream; // handles two-way communication
 
 pub fn send_response (
@@ -35,25 +35,6 @@ pub fn request_type_from_request (
       "Failed to parse S-expression: {}", e ) ) ?;
   extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
 
-pub fn node_id_from_single_root_view_request (
-  request : &str
-) -> Result<ID, String> {
-  let sexp : Sexp =
-    sexp::parse ( request )
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) ) ?;
-  extract_v_from_kv_pair_in_sexp ( &sexp, "id" )
-    . map(ID) }
-
-pub fn search_terms_from_request (
-  request : &str
-) -> Result<String, String> {
-  let sexp : Sexp =
-    sexp::parse ( request )
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) ) ?;
-  extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) }
-
 /// Format buffer content and errors as an s-expression.
 /// Format: ((content "...") (errors ("error1" "error2" ...)))
 /// This is shared by save_buffer and single_root_view handlers.
@@ -74,3 +55,36 @@ pub fn format_buffer_response_sexp (
             Atom::S ( e . clone () )) )
           . collect () ) ] ) ] )
     . to_string () }
+
+/// Reads length-prefixed content from the stream.
+/// Expected format:
+///   "Content-Length: N\r\n\r\n" followed by N bytes of content.
+pub fn read_length_prefixed_content (
+  reader : &mut BufReader <TcpStream>
+) -> Result<String, Box<dyn Error>> {
+
+  // Consume header lines already in this reader's buffer,
+  // then read exactly Content-Length bytes from the same reader.
+  let mut header_lines : Vec <String> =
+    Vec::new ();
+  loop { // Read header lines until reaching the empty line.
+    let mut line : String = String::new();
+    reader.read_line ( &mut line )?;
+    if line == "\r\n" { break; }
+    header_lines.push (line); }
+  let content_length : usize =
+    header_lines
+    .iter()
+    .find_map ( |line| {
+      if line.starts_with("Content-Length: ")
+      { line.strip_prefix("Content-Length: ")
+        . and_then ( |s|
+                      s.trim() . parse::<usize> () . ok( ))
+      } else { None }} )
+    . ok_or ("Content-Length header not found") ?;
+  let mut buffer : Vec<u8> = // Read content_length bytes.
+    vec! [0u8; content_length] ;
+  reader.read_exact (&mut buffer) ?;
+  let content : String =
+    String::from_utf8 (buffer) ?;
+  Ok (content) }
