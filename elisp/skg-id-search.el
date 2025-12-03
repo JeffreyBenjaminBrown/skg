@@ -6,7 +6,10 @@
 ;;;   skg-visit-link
 ;;;   skg-next-id
 ;;;   skg-previous-id
-;;;   push-sides-of-line-to-id-stack
+;;;   skg-push-id-to-stack
+
+;; todo ? speed : This could be more efficient.
+;; It re-reads the same text a few times.
 
 (require 'skg-state)
 
@@ -139,19 +142,81 @@ For links, point moves to the opening bracket of [[id:..."
      ( prev-metadata
        (goto-char prev-metadata) )) ))
 
-(defun push-sides-of-line-to-id-stack ()
-  "TEMPORARY CODE.
-This is just a scaffold, an easier function to implement,
-before the implementation of 'skg-push-id-to-stack'.
+(defun skg--extract-id-from-sexp
+    (sexp)
+  "Extract the id value from SEXP, a list like (skg (id X) ...).
+Returns the id as a string, or nil if not found."
+  (let (( id-pair (seq-find (lambda (elem)
+                              (and (listp elem)
+                                   (eq (car elem) 'id) ))
+                            sexp) ))
+    (when id-pair
+      (format "%s" (cadr id-pair)) )))
 
-PURPOSE: Push a pair of strings to `skg-id-stack'.
-The first string is text from line start to point.
-The second string is text from point to line end."
+(defun skg--point-in-metadata-p ()
+  "If point is within metadata, return (id . title). Otherwise nil."
+  (save-excursion
+    (let (( pos (point) ))
+      (beginning-of-line)
+      (when (looking-at "^\\*+ (skg")
+        (let* ( ( skg-start (- (match-end 0) 4) )
+                ( after-bullet (buffer-substring-no-properties
+                                skg-start (line-end-position) )))
+          (condition-case nil
+              (let* ( ( sexp (read after-bullet) )
+                      ( sexp-len (length (format "%S" sexp)) )
+                      ( skg-end (+ skg-start sexp-len) ))
+                (when (and (>= pos skg-start)
+                           (< pos skg-end)
+                           (skg--metadata-sexp-contains-id-p sexp) )
+                  (let ( ( id (skg--extract-id-from-sexp sexp) )
+                         ( title (string-trim
+                                  (buffer-substring-no-properties
+                                   skg-end (line-end-position)) )))
+                    (cons id title) )) )
+            (error nil) )) )) ))
+
+(defun skg--point-in-link-p ()
+  "If point is within a link, return (id . label). Otherwise nil."
+  (let ( ( pos (point) )
+         ( line-start (line-beginning-position) )
+         ( line-end (line-end-position) )
+         ( link-regex "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]+\\)\\]\\]" )
+         ( result nil ))
+    (save-excursion
+      (goto-char line-start)
+      (while (and (not result)
+                  (re-search-forward link-regex line-end t) )
+        (when (and (>= pos (match-beginning 0))
+                   (< pos (match-end 0)) )
+          (setq result (cons (match-string 1)
+                             (match-string 2) )) )) )
+    result ))
+
+(defun skg--truncate-id
+    (id)
+  "Return first 6 characters of ID followed by ellipsis."
+  (if (> (length id) 6)
+      (concat (substring id 0 6) "...")
+    id ))
+
+(defun skg-push-id-to-stack ()
+  "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
+For metadata, id comes from (id X) and label is the headline title.
+For links, id and label come from [[id:X][label]].
+Does nothing if point is not within metadata or a link."
   (interactive)
-  (let ( ( left (buffer-substring-no-properties
-                 (line-beginning-position) (point) ))
-         ( right (buffer-substring-no-properties
-                  (point) (line-end-position) )))
-    (push (list left right) skg-id-stack) ))
+  (let ( ( md-result (skg--point-in-metadata-p) )
+         ( result nil ))
+    (if md-result
+        (setq result md-result)
+      (setq result (skg--point-in-link-p)) )
+    (if result
+        (let ( ( id (car result) )
+               ( label (cdr result) ))
+          (push (list id label) skg-id-stack)
+          (message "pushed (%s, %s) to skg-id-stack"
+                   (skg--truncate-id id) label) )
+      (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
 
 (provide 'skg-id-search)

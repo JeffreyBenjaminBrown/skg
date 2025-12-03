@@ -46,23 +46,59 @@
       (skg-previous-id)
       (should (equal (point) line2-skg-start)) )))
 
-(ert-deftest test-push-sides-of-line-to-id-stack ()
-  "Test that push-sides-of-line-to-id-stack pushes correct pairs."
+(ert-deftest test-skg-push-id-to-stack ()
+  "Test that skg-push-id-to-stack extracts id and label from links and metadata."
   (setq skg-id-stack nil)
   (with-temp-buffer
-    (insert "a b c d e\n")
-    (insert "f g h i j")
-    (goto-char (point-min))
-    (search-forward "c")
-    (backward-char 1) ;; now on 'c'
-    (should (equal (char-after) ?c))
-    (push-sides-of-line-to-id-stack)
-    (search-forward "g")
-    (backward-char 1) ;; now on 'g'
-    (should (equal (char-after) ?g))
-    (push-sides-of-line-to-id-stack) )
-  (should (equal skg-id-stack
-                 '( ("f " "g h i j")
-                    ("a b " "c d e") )) ))
+    (insert "* (skg (id 1)) [[id:2][link to 2]]\n")
+    (insert "* (skg (id 3)) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
+    (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
+    (insert "* (skg (id 6)) just a title\n")
+    (insert "* (skg (id 7)) [[id:8][link to 8]]\n")
+    (let* ( ( link-start
+              (progn (goto-char (point-min))
+                     (search-forward "[[id:2][link to 2]]")
+                     (- (point) (length "[[id:2][link to 2]]")) ))
+            ( link-end (point) )
+            ( metadata-start
+              (progn (goto-char (point-min))
+                     (search-forward "(skg (id 6))")
+                     (- (point) (length "(skg (id 6))")) ))
+            ( metadata-end (point) )
+            ( line3-start
+              (progn (goto-char (point-min))
+                     (forward-line 2)
+                     (point) ))
+            ( line3-end (line-end-position) ))
+      (dotimes (_ 3) ;; Test 3 random positions in link
+        (let (( len-before (length skg-id-stack) ))
+          (goto-char (+ link-start (random (- link-end link-start))))
+          (skg-push-id-to-stack)
+          (should (equal (length skg-id-stack) (1+ len-before)))
+          (should (equal (car skg-id-stack) '("2" "link to 2"))) ))
+      (dotimes (_ 3) ;; Test 3 random positions in metadata
+        (let (( len-before (length skg-id-stack) ))
+          (goto-char (+ metadata-start (random (- metadata-end metadata-start))))
+          (skg-push-id-to-stack)
+          (should (equal (length skg-id-stack) (1+ len-before)))
+          (should (equal (car skg-id-stack) '("6" "just a title"))) ))
+      (let (( len-before (length skg-id-stack) )) ;; Test positions that should NOT push
+        (dolist (id '("1" "3" "6" "7"))
+          ;; First whitespace after )) on each line
+          (goto-char (point-min))
+          (search-forward (format "(skg (id %s))" id))
+          (skg-push-id-to-stack)
+          (should (equal (length skg-id-stack) len-before)) )
+        (progn (goto-char (point-min)) ;; The 'h' in "hello"
+               (search-forward "hello")
+               (backward-char 5)
+               (should (equal (char-after) ?h))
+               (skg-push-id-to-stack)
+               (should (equal (length skg-id-stack) len-before)))
+        (dotimes (_ 3) ;; 3 random positions on line 3
+          (goto-char (+ line3-start
+                        (random (- line3-end line3-start))))
+          (skg-push-id-to-stack)
+          (should (equal (length skg-id-stack) len-before)) )) )))
 
 (provide 'test-skg-id-search)
