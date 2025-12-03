@@ -63,13 +63,12 @@ fn test_bfs_limit_across_multiple_trees
         ID ( "3".to_string () )
       ];
 
-      let (result, errors) : (String, Vec<String>) = multi_root_view (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii
       ) . await ?;
 
-      assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
       println!("BFS multi-tree limit result:\n{}", result);
 
       let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
@@ -121,13 +120,12 @@ fn test_bfs_limit_9_three_branches
         ID ( "3".to_string () )
       ];
 
-      let (result, errors) : (String, Vec<String>) = multi_root_view (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii
       ) . await ?;
 
-      assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
       println!("BFS limit=9 three branches result:\n{}", result);
 
       let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
@@ -173,13 +171,12 @@ fn test_bfs_limit_8_two_branches
         // Note: node 3 and its descendants not included
       ];
 
-      let (result, errors) : (String, Vec<String>) = multi_root_view (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii
       ) . await ?;
 
-      assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
       println!("BFS limit=8 two branches result:\n{}", result);
 
       let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1

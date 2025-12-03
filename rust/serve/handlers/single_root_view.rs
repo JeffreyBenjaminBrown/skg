@@ -28,10 +28,10 @@ pub fn handle_single_root_view_request (
           typedb_driver,
           config,
           &node_id ) . await
-        { Ok ( (buffer_content, errors) ) =>
+        { Ok ( buffer_content ) =>
             format_buffer_response_sexp (
               & buffer_content,
-              & errors ),
+              & vec![] ),
           Err (e) => {
             // If we fail to generate the view, return error in content
             let error_content : String = format!(

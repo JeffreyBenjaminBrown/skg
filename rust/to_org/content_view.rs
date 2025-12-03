@@ -25,29 +25,25 @@ struct MapsFromIdForView {
 }
 
 /// Build a tree from a root ID and render it to org text.
-/// Returns (buffer_content, errors).
 pub async fn single_root_view (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
   root_id : &ID,
-) -> Result < (String, Vec<String>), Box<dyn Error> > {
+) -> Result < String, Box<dyn Error> > {
   multi_root_view (
     driver,
     config,
     & [ root_id . clone () ] ) . await }
 
 /// Build a forest from multiple root IDs and render it to org text.
-/// Returns (buffer_content, errors).
 pub async fn multi_root_view (
   driver   : &TypeDBDriver,
   config   : &SkgConfig,
   root_ids : &[ID],
-) -> Result < (String, Vec<String>), Box<dyn Error> > {
+) -> Result < String, Box<dyn Error> > {
   let mut paired_forest : Vec < Tree < (SkgNode, OrgNode) > > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
-  let errors : Vec < String > =
-    Vec::new ();
   render_initial_forest_bfs (
     &mut paired_forest, config, driver ) . await ?;
   // Convert to OrgNode-only trees for metadata enrichment
@@ -57,7 +53,7 @@ pub async fn multi_root_view (
     &mut forest, config, driver ) . await ?;
   let buffer_content : String =
     render_forest_to_org ( & forest );
-  Ok ( (buffer_content, errors) ) }
+  Ok ( buffer_content ) }
 
 /// Create a minimal forest containing just root nodes (no children).
 /// Returns (SkgNode, OrgNode) trees to avoid multiple SkgNode lookups.

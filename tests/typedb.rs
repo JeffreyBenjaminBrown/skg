@@ -349,13 +349,12 @@ async fn test_recursive_document (
   driver  : &TypeDBDriver,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
-  let (result_org_text, errors) : (String, Vec<String>) =
+  let result_org_text : String =
     single_root_view (
       driver,
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
   let result_forest : Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
