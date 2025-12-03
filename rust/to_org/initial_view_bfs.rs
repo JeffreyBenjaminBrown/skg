@@ -17,6 +17,7 @@
 mod truncate;
 
 use crate::media::tree::collect_generation_ids_in_forest;
+use crate::to_org::content_view::stub_forest_from_root_ids;
 use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 
@@ -28,37 +29,42 @@ use typedb_driver::TypeDBDriver;
 
 /// Render initial content views using BFS traversal with node limit.
 /// Renders content one generation at a time, in BFS order.
+/// Creates stub forest from root IDs, then builds it out.
 /// Uses (SkgNode, OrgNode) trees to avoid redundant DB fetches.
 pub async fn render_initial_forest_bfs (
-  forest : &mut Vec<Tree<(SkgNode, OrgNode)>>, // begins as a list of roots
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
+  root_ids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+) -> Result < Vec < Tree < (SkgNode, OrgNode) > >, Box<dyn Error> > {
+  let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
+    stub_forest_from_root_ids (
+      root_ids, config, driver ) . await ?;
   let mut visited : HashSet<ID> = HashSet::new();
   let mut generation : usize = 1;
   let mut nodes_rendered : usize = 0;
   let limit : usize = config.initial_node_limit;
   loop {
     let nodes_in_gen_by_tree : Vec<(usize, Vec<NodeId>)> =
-      collect_generation_ids_in_forest (forest, generation)?;
+      collect_generation_ids_in_forest (
+        &forest, generation)?;
     if nodes_in_gen_by_tree.is_empty() {
       break; }
     for (tree_idx, node_ids) in &nodes_in_gen_by_tree {
       for node_id in node_ids {
         process_cycles_and_repeats(
-          forest,
+          &mut forest,
           *tree_idx,
           *node_id,
           &mut visited, )?;
         nodes_rendered += 1; }}
     let children_to_add : Vec<(usize, NodeId, ID)> =
       collect_children_from_generation(
-        forest, &nodes_in_gen_by_tree);
+        &forest, &nodes_in_gen_by_tree);
     let children_count : usize =
       children_to_add.len();
     if nodes_rendered + children_count >= limit {
       add_children_with_truncation (
-        forest,
+        &mut forest,
         generation,
         &children_to_add,
         nodes_rendered,
@@ -76,7 +82,7 @@ pub async fn render_initial_forest_bfs (
         forest[tree_idx] . get_mut(parent_id) . unwrap();
       parent_mut . append((child_skgnode, child_orgnode)); }
     generation += 1; }
-  Ok (( )) }
+  Ok ( forest ) }
 
 fn process_cycles_and_repeats (
   forest     : &mut Vec<Tree<(SkgNode, OrgNode)>>,

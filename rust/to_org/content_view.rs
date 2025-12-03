@@ -41,12 +41,9 @@ pub async fn multi_root_view (
   config   : &SkgConfig,
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> > {
-  let mut paired_forest : Vec < Tree < (SkgNode, OrgNode) > > =
-    stub_forest_from_root_ids (
+  let paired_forest : Vec < Tree < (SkgNode, OrgNode) > > =
+    render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
-  render_initial_forest_bfs (
-    &mut paired_forest, config, driver ) . await ?;
-  // Convert to OrgNode-only trees for metadata enrichment
   let mut forest : Vec < Tree < OrgNode > > =
     map_snd_over_forest ( paired_forest );
   set_metadata_relationship_viewdata_in_forest (
@@ -57,7 +54,7 @@ pub async fn multi_root_view (
 
 /// Create a minimal forest containing just root nodes (no children).
 /// Returns (SkgNode, OrgNode) trees to avoid multiple SkgNode lookups.
-async fn stub_forest_from_root_ids (
+pub async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
