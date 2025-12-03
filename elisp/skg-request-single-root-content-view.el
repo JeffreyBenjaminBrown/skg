@@ -1,5 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
-;; DATA USED/ASSUMED: See /api.md.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-request-single-root-content-view-from-id
+;;;
+;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-length-prefix)
 (require 'skg-buffer)

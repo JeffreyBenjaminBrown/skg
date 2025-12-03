@@ -1,10 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
-
-;; PURPOSE
-;; See the comment for 'heralds-minor-mode' below.
-;;
-;; TESTING
-;; Try it on the sample text at the end of the file.
+;;;
+;;; PURPOSE
+;;; See the comment for 'heralds-minor-mode' below.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   heralds-minor-mode
 
 (require 'cl-lib)
 (require 'skg-sexpr)
@@ -255,16 +255,5 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))
   "Black-on-yellow for CYCLE.")
-
-;; TESTING, interactive:
-;; `M-x heralds-minor-mode` should change how the text below looks.
-;;
-;; ID only: (skg (id 123)) should show "ID".
-;; View with cycle: (skg (id 456) (view (cycle) (relationships (numContents 3)))) should show "⟳ {3".
-;; View with repeated: (skg (id 111) (view repeated)) should show red "REP".
-;; Code markers: (skg (id 789) (code (relToParent aliasCol))) should show "aliases".
-;; Delete marker: (skg (id abc) (code (toDelete))) should show red "delete".
-;; Not in parent: (skg (id def) (view (relationships (notInParent)))) should show red "!{".
-;; Multiple heralds: (skg (id xyz) (view (cycle) (relationships (numContainers 2) (numLinksIn 5)))) should show "⟳ 2{ 5→".
 
 (provide 'heralds-minor-mode)

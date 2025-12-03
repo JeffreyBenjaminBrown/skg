@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
-;; TODO: Can these globals be avoided?
+;;;
+;;; TODO: Can these globals be avoided?
 
 (defvar skg-rust-tcp-proc nil
   "Persistent TCP connection to the Rust backend. See

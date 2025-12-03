@@ -1,3 +1,25 @@
+# A full list of user-facing commands
+
+(This list will probably go stale very soon.)
+```
+heralds-minor-mode
+skg-open-empty-content-view
+skg-visit-link
+skg-request-save-buffer
+skg-request-single-root-content-view-from-id
+skg-request-title-matches
+skg-request-aliases-view
+skg-request-containerward-view
+skg-request-sourceward-view
+```
+
+And these are sometimes useful for troubleshooting,
+not intended for regular use.
+```
+skg-verify-connection
+skg-doc-disconnect
+```
+
 # Initializing
 
 First start the TYpeDB and Rust servers,

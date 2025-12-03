@@ -1,4 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-open-empty-content-view
 
 (defconst skg-content-view-buffer-name
   "*skg-content-view*")

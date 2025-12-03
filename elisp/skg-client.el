@@ -1,6 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
-
-;; For instructions see USAGE.md, in this same folder.
+;;;
+;;; For instructions see USAGE.md, in this same folder.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-doc-disconnect
 
 (require 'cl-lib)
 

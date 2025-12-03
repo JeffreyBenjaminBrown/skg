@@ -1,8 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-visit-link
 
-;;;###autoload
 (defun skg-visit-link ()
   "If point is on an org-mode link like [[id:THE_ID][label]],
 request a single root content view from that ID.

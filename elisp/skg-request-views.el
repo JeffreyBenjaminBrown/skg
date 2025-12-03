@@ -1,8 +1,14 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; Functions for requesting views (aliases, containerward, sourceward)
+;;; by adding metadata to the current headline and saving the buffer,
+;;; allowing Rust to process the request during completion.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-request-aliases-view ()
+;;;   skg-request-containerward-view ()
+;;;   skg-request-sourceward-view ()
 
-;; Functions for requesting views (aliases, containerward, sourceward)
-;; by adding metadata to the current headline and saving the buffer,
-;; allowing Rust to process the request during completion.
 
 (require 'skg-metadata)
 (require 'skg-request-save)

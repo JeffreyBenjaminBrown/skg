@@ -1,4 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-request-title-matches
+;;;
+;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-client)
 (require 'heralds-minor-mode)

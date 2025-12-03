@@ -4,6 +4,9 @@
 ;;; (This file does not handle adding length prefixes to outgoing
 ;;; messages. That's easier, and done inline where messages are sent,
 ;;; e.g., in skg-request-save.el.)
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   (none)
 
 (defun skg-lp-handle-generic-chunk (completion-handler tcp-proc chunk)
   "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.

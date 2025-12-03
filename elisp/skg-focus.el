@@ -2,6 +2,9 @@
 ;;;
 ;;; PURPOSE: Read, edit and act on
 ;;; (by moving point to the focused heading) 'focus' metadata.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   (none)
 
 (require 'org)
 (require 'skg-metadata)

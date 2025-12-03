@@ -1,4 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-request-save-buffer
 
 (require 'skg-length-prefix)
 (require 'skg-org-fold)

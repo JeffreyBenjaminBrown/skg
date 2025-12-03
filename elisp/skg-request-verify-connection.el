@@ -1,4 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   skg-verify-connection
+;;;
+;;; DATA USED/ASSUMED: See /api.md.
 
 (defun skg-verify-connection ()
   "Verify connection to the Rust server."
