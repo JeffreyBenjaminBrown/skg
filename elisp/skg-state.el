@@ -16,4 +16,8 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
   (defvar skg-lp--bytes-left nil
     "If nil, expecting header. If an integer, number of body bytes remaining.") )
 
+(defvar skg-id-stack nil
+  "Stack of (id title) pairs for navigation history.
+Each element is a list of two strings.")
+
 (provide 'skg-state)

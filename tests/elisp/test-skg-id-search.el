@@ -1,4 +1,4 @@
-;;; test-skg-id-search.el --- Tests for skg-next-id and skg-previous-id
+;;; test-skg-id-search.el --- Tests for skg-id-search functions
 
 (add-to-list
  'load-path
@@ -45,5 +45,24 @@
       (skg-previous-id)
       (skg-previous-id)
       (should (equal (point) line2-skg-start)) )))
+
+(ert-deftest test-push-sides-of-line-to-id-stack ()
+  "Test that push-sides-of-line-to-id-stack pushes correct pairs."
+  (setq skg-id-stack nil)
+  (with-temp-buffer
+    (insert "a b c d e\n")
+    (insert "f g h i j")
+    (goto-char (point-min))
+    (search-forward "c")
+    (backward-char 1) ;; now on 'c'
+    (should (equal (char-after) ?c))
+    (push-sides-of-line-to-id-stack)
+    (search-forward "g")
+    (backward-char 1) ;; now on 'g'
+    (should (equal (char-after) ?g))
+    (push-sides-of-line-to-id-stack) )
+  (should (equal skg-id-stack
+                 '( ("f " "g h i j")
+                    ("a b " "c d e") )) ))
 
 (provide 'test-skg-id-search)

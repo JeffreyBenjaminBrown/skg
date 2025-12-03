@@ -6,6 +6,9 @@
 ;;;   skg-visit-link
 ;;;   skg-next-id
 ;;;   skg-previous-id
+;;;   push-sides-of-line-to-id-stack
+
+(require 'skg-state)
 
 (defconst skg-link-regex
   "\\[\\[id:[^]]+\\]\\[[^]]+\\]\\]"
@@ -135,5 +138,20 @@ For links, point moves to the opening bracket of [[id:..."
        (goto-char prev-link) )
      ( prev-metadata
        (goto-char prev-metadata) )) ))
+
+(defun push-sides-of-line-to-id-stack ()
+  "TEMPORARY CODE.
+This is just a scaffold, an easier function to implement,
+before the implementation of 'skg-push-id-to-stack'.
+
+PURPOSE: Push a pair of strings to `skg-id-stack'.
+The first string is text from line start to point.
+The second string is text from point to line end."
+  (interactive)
+  (let ( ( left (buffer-substring-no-properties
+                 (line-beginning-position) (point) ))
+         ( right (buffer-substring-no-properties
+                  (point) (line-end-position) )))
+    (push (list left right) skg-id-stack) ))
 
 (provide 'skg-id-search)
