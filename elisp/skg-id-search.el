@@ -7,6 +7,7 @@
 ;;;   skg-next-id
 ;;;   skg-previous-id
 ;;;   skg-push-id-to-stack
+;;;   skg-validate-id-stack-buffer
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -218,5 +219,54 @@ Does nothing if point is not within metadata or a link."
           (message "pushed (%s, %s) to skg-id-stack"
                    (skg--truncate-id id) label) )
       (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
+
+(defun skg-validate-id-stack-buffer ()
+  "Validate current buffer as an id-stack buffer and return the stack.
+Each headline must have a non-empty title and exactly one body line (the ID).
+Returns a list of (id label) pairs, with the first headline last in the list.
+Returns nil and displays an error message if validation fails."
+  (save-excursion
+    (goto-char (point-min))
+    (let ( ( result nil )
+           ( valid t )
+           ( headline-regex "^\\*+ +\\([^ ].*\\)$" ))
+      (progn ;; Check no content before first headline
+        (skip-chars-forward " \t\n")
+        (when (and (not (eobp))
+                   (not (looking-at "^\\*")) )
+          (setq valid nil)
+          (message "Invalid: content before first headline") ))
+      (while (and valid (not (eobp)))
+        (if (looking-at headline-regex)
+            ;; Current line is a headline with non-empty title.
+            (let ( ( label (match-string 1) )
+                   ( body-start (1+ (line-end-position)) )
+                   ( body-end nil ))
+              (progn ;; Find where the body ends:
+                ;; either at the next headline or at end of buffer.
+                (forward-line 1)
+                (setq body-end
+                      (if (re-search-forward "^\\*" nil t)
+                          (progn (beginning-of-line) (point))
+                        (point-max) )))
+              (let* ( ( body-text (buffer-substring-no-properties
+                                   body-start body-end) )
+                      ( body-lines (seq-filter
+                                    (lambda (line)
+                                      (not (string-empty-p
+                                            (string-trim line) )))
+                                    (split-string body-text "\n") )))
+                (if (= (length body-lines) 1)
+                    (push (list
+                           (string-trim (car body-lines)) ;; the id
+                           label)
+                          result)
+                  (setq valid nil)
+                  (message "Invalid: headline '%s' must have exactly one bodyline."
+                           label) )) )
+          (;; Not a headline, so skip this line.
+           ;; (Blank lines would make this happen.)
+           forward-line 1) ))
+      (when valid result)) ))
 
 (provide 'skg-id-search)

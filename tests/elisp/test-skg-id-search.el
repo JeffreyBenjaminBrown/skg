@@ -101,4 +101,48 @@
           (skg-push-id-to-stack)
           (should (equal (length skg-id-stack) len-before)) )) )))
 
+(ert-deftest test-skg-validate-id-stack-buffer_valid-input ()
+  "Test skg-validate-id-stack-buffer with valid inputs."
+  (with-temp-buffer ;; Single headline
+    (insert "* the label\n")
+    (insert "  the-id\n")
+    (should (equal (skg-validate-id-stack-buffer)
+                   '(("the-id" "the label")) )))
+  (with-temp-buffer ;; Two headlines
+    (insert "* the label\n")
+    (insert "  the-id\n")
+    (insert "* label 2\n")
+    (insert "  id-2\n")
+    (should (equal (skg-validate-id-stack-buffer)
+                   '( ("id-2" "label 2")
+                      ("the-id" "the label") )) )))
+
+(ert-deftest test-skg-validate-id-stack-buffer_invalid-input ()
+  "Test skg-validate-id-stack-buffer rejects invalid inputs."
+  (with-temp-buffer ;; Text before first headline
+    (insert "Hello!\n")
+    (insert "* okay\n")
+    (insert "  okay-id\n")
+    (should (null (skg-validate-id-stack-buffer))) )
+  (with-temp-buffer ;; looks like a headline but has no title
+    (insert "* \n")
+    (insert "  okay-id\n")
+    (should (null (skg-validate-id-stack-buffer))) )
+  (with-temp-buffer ;; Headline without body
+    (insert "* okay\n")
+    (insert "  okay-id\n")
+    (insert "* label without ID\n")
+    (insert "* okay\n")
+    (insert "  okay-id\n")
+    (should (null (skg-validate-id-stack-buffer))) )
+  (with-temp-buffer ;; Headline with multi-line body
+    (insert "* okay\n")
+    (insert "  okay-id\n")
+    (insert "* label with too much ID stuff\n")
+    (insert "  an-id\n")
+    (insert "  invalid-extra-stuff\n")
+    (insert "* okay\n")
+    (insert "  okay-id\n")
+    (should (null (skg-validate-id-stack-buffer))) ))
+
 (provide 'test-skg-id-search)
