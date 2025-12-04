@@ -9,6 +9,7 @@
 ;;;   skg-push-id-to-stack
 ;;;   skg-validate-id-stack-buffer
 ;;;   skg-replace-id-stack-from-buffer
+;;;   skg-edit-id-stack
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -274,7 +275,8 @@ Returns (error MESSAGE) if validation fails."
              forward-line 1) ) ))
       (if error-msg
           (list 'error error-msg)
-        (list 'success result) )) ))
+        ;; nreverse so first headline in buffer = head of stack
+        (list 'success (nreverse result)) )) ))
 
 (defun skg-replace-id-stack-from-buffer ()
   "Replace `skg-id-stack' with contents parsed from current buffer.
@@ -285,5 +287,63 @@ On failure, prints error message and leaves `skg-id-stack' unchanged."
     (if (eq (car validation-result) 'success)
         (setq skg-id-stack (cadr validation-result))
       (message "Invalid ID buffer: %s" (cadr validation-result)) )))
+
+(defun skg--format-id-stack-as-org ()
+  "Format `skg-id-stack' as org-mode text.
+Each (id label) pair becomes a headline with label as title and id as body.
+Head of stack (most recently pushed) appears at top of buffer."
+  (mapconcat
+   (lambda (entry)
+     (let (( id (car entry) )
+           ( label (cadr entry) ))
+       (format "* %s\n%s" label id) ))
+   skg-id-stack
+   "\n" ))
+
+(defun skg--save-id-stack-buffer ()
+  "Save handler for the id-stack buffer.
+Validates and replaces `skg-id-stack' with buffer contents.
+Rather than make this function 'interactive'
+(which would interfere with tab-completing
+'skg-save' to become 'skg-request-save-buffer'),
+it is bound to C-x C-s (which normally calls 'save-buffer')
+by 'skg-id-stack-mode'."
+  (let (( validation-result (skg-validate-id-stack-buffer) ))
+    (if (eq (car validation-result) 'success)
+        (progn
+          (setq skg-id-stack (cadr validation-result))
+          (set-buffer-modified-p nil)
+          (message "ID stack updated (%d items)"
+                   (length skg-id-stack)) )
+      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
+
+(defvar skg-id-stack-mode-map
+  (let (( map (make-sparse-keymap) ))
+    (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer)
+    map )
+  "Keymap for `skg-id-stack-mode'.")
+
+(define-minor-mode skg-id-stack-mode
+  "Minor mode for editing the skg ID stack.
+Overrides save to update `skg-id-stack' instead of writing to a file."
+  :lighter " ID-Stack"
+  :keymap skg-id-stack-mode-map)
+
+(defun skg-edit-id-stack ()
+  "Open a buffer to edit `skg-id-stack'.
+The buffer displays the stack in org format
+(label headlines and ID bodies).
+Saving (C-x C-s) validates and updates `skg-id-stack'
+without writing to disk."
+  (interactive)
+  (let (( buf (get-buffer-create "*skg-id-stack*") ))
+    (switch-to-buffer buf)
+    (erase-buffer)
+    (insert (skg--format-id-stack-as-org))
+    (goto-char (point-min))
+    (org-mode)
+    (skg-id-stack-mode 1)
+    (set-buffer-modified-p nil)
+    (message "Edit ID stack. C-x C-s to save changes.") ))
 
 (provide 'skg-id-search)

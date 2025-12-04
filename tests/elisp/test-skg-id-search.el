@@ -108,14 +108,14 @@
     (insert "  the-id\n")
     (should (equal (skg-validate-id-stack-buffer)
                    '(success (("the-id" "the label"))) )))
-  (with-temp-buffer ;; Two headlines
+  (with-temp-buffer ;; Two headlines. First headline = head of stack.
     (insert "* the label\n")
     (insert "  the-id\n")
     (insert "* label 2\n")
     (insert "  id-2\n")
     (should (equal (skg-validate-id-stack-buffer)
-                   '(success ( ("id-2" "label 2")
-                               ("the-id" "the label") )))) ))
+                   '(success ( ("the-id" "the label")
+                               ("id-2" "label 2") )))) ))
 
 (ert-deftest test-skg-validate-id-stack-buffer_invalid-input ()
   "Test skg-validate-id-stack-buffer rejects invalid inputs."
@@ -170,13 +170,46 @@
     (should (equal skg-id-stack '(("id" "label")) )) ))
 
 (ert-deftest test-skg-replace-id-stack-from-buffer_two-headlines ()
-  "Test two headlines."
+  "Test two headlines - first headline = head of stack."
   (setq skg-id-stack nil)
   (with-temp-buffer
     (insert "* label\nid\n* label-2\n  id-2\n")
     (skg-replace-id-stack-from-buffer) )
   (should (equal skg-id-stack
-                 '( ("id-2" "label-2")
-                    ("id" "label") )) ))
+                 '( ("id" "label")
+                    ("id-2" "label-2") )) ))
+
+(ert-deftest test-skg--format-id-stack-as-org ()
+  "Test that skg--format-id-stack-as-org produces correct org format."
+  (let (( skg-id-stack nil )) ;; Empty stack
+    (should (equal (skg--format-id-stack-as-org) "")) )
+  (let (( skg-id-stack '(("id-1" "label one")) )) ;; Single item
+    (should (equal (skg--format-id-stack-as-org) "* label one\nid-1")) )
+  (let (( skg-id-stack '(("id-2" "second") ("id-1" "first")) )) ;; Two items
+    ;; Head of stack (most recent) appears first in buffer
+    (should (equal (skg--format-id-stack-as-org)
+                   "* second\nid-2\n* first\nid-1")) ))
+
+(ert-deftest test-skg-edit-id-stack ()
+  "Test that skg-edit-id-stack creates buffer with correct content."
+  (let (( skg-id-stack '(("uuid-123" "My Node")) ))
+    (skg-edit-id-stack)
+    (should (equal (buffer-name) "*skg-id-stack*"))
+    (should (equal (buffer-string) "* My Node\nuuid-123"))
+    (should skg-id-stack-mode)
+    (kill-buffer "*skg-id-stack*") ))
+
+(ert-deftest test-skg--save-id-stack-buffer ()
+  "Test that saving the id-stack buffer updates skg-id-stack."
+  (let (( skg-id-stack '(("old-id" "old label")) ))
+    (skg-edit-id-stack)
+    (erase-buffer)
+    (insert "* new label\nnew-id\n* another\nanother-id\n")
+    (skg--save-id-stack-buffer)
+    ;; First headline = head of stack
+    (should (equal skg-id-stack
+                   '( ("new-id" "new label")
+                      ("another-id" "another") )))
+    (kill-buffer "*skg-id-stack*") ))
 
 (provide 'test-skg-id-search)
