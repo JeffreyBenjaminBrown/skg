@@ -1,5 +1,16 @@
 First check out [the project overview](OVERVIEW.org).
 
+## Push back
+
+If I specify a funciton and a test,
+and they don't seem to correspond,
+don't try to make sense of it on your own --
+explain the contradition to me.
+
+If I specify an implementation and it looks
+inefficient, incorrect, or unnecessary,
+ditto.
+
 ## Don't change anything in git.
 
 That includes my credentials (which, as the git history reveals,

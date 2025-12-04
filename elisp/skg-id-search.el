@@ -8,6 +8,7 @@
 ;;;   skg-previous-id
 ;;;   skg-push-id-to-stack
 ;;;   skg-validate-id-stack-buffer
+;;;   skg-replace-id-stack-from-buffer
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -223,20 +224,20 @@ Does nothing if point is not within metadata or a link."
 (defun skg-validate-id-stack-buffer ()
   "Validate current buffer as an id-stack buffer and return the stack.
 Each headline must have a non-empty title and exactly one body line (the ID).
-Returns a list of (id label) pairs, with the first headline last in the list.
-Returns nil and displays an error message if validation fails."
+Returns (success RESULT) where RESULT is a list of (id label) pairs,
+with the first headline last in the list.
+Returns (error MESSAGE) if validation fails."
   (save-excursion
     (goto-char (point-min))
     (let ( ( result nil )
-           ( valid t )
-           ( headline-regex "^\\*+ +\\([^ ].*\\)$" ))
+           ( error-msg nil )
+           ( headline-regex "^\\*+ +\\([^ \n].*\\)$" ))
       (progn ;; Check no content before first headline
         (skip-chars-forward " \t\n")
         (when (and (not (eobp))
                    (not (looking-at "^\\*")) )
-          (setq valid nil)
-          (message "Invalid: content before first headline") ))
-      (while (and valid (not (eobp)))
+          (setq error-msg "content before first headline") ))
+      (while (and (not error-msg) (not (eobp)))
         (if (looking-at headline-regex)
             ;; Current line is a headline with non-empty title.
             (let ( ( label (match-string 1) )
@@ -261,12 +262,28 @@ Returns nil and displays an error message if validation fails."
                            (string-trim (car body-lines)) ;; the id
                            label)
                           result)
-                  (setq valid nil)
-                  (message "Invalid: headline '%s' must have exactly one bodyline."
-                           label) )) )
-          (;; Not a headline, so skip this line.
-           ;; (Blank lines would make this happen.)
-           forward-line 1) ))
-      (when valid result)) ))
+                  (setq error-msg
+                        (format "headline '%s' must have exactly one body line"
+                                label) )) ))
+          (;; Not a headline with a valid title.
+           ;; Could be a blank line, or a headline with empty title.
+           if (looking-at "^\\*")
+              ;; Looks like headline but has no title - that's an error.
+              (setq error-msg "headline with empty title")
+            ( ;; Not a headline at all (blank line), so skip it.
+             forward-line 1) ) ))
+      (if error-msg
+          (list 'error error-msg)
+        (list 'success result) )) ))
+
+(defun skg-replace-id-stack-from-buffer ()
+  "Replace `skg-id-stack' with contents parsed from current buffer.
+Uses `skg-validate-id-stack-buffer' to parse and validate.
+On success, sets `skg-id-stack' to the parsed result.
+On failure, prints error message and leaves `skg-id-stack' unchanged."
+  (let (( validation-result (skg-validate-id-stack-buffer) ))
+    (if (eq (car validation-result) 'success)
+        (setq skg-id-stack (cadr validation-result))
+      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
 
 (provide 'skg-id-search)

@@ -107,15 +107,15 @@
     (insert "* the label\n")
     (insert "  the-id\n")
     (should (equal (skg-validate-id-stack-buffer)
-                   '(("the-id" "the label")) )))
+                   '(success (("the-id" "the label"))) )))
   (with-temp-buffer ;; Two headlines
     (insert "* the label\n")
     (insert "  the-id\n")
     (insert "* label 2\n")
     (insert "  id-2\n")
     (should (equal (skg-validate-id-stack-buffer)
-                   '( ("id-2" "label 2")
-                      ("the-id" "the label") )) )))
+                   '(success ( ("id-2" "label 2")
+                               ("the-id" "the label") )))) ))
 
 (ert-deftest test-skg-validate-id-stack-buffer_invalid-input ()
   "Test skg-validate-id-stack-buffer rejects invalid inputs."
@@ -123,18 +123,18 @@
     (insert "Hello!\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (null (skg-validate-id-stack-buffer))) )
+    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
   (with-temp-buffer ;; looks like a headline but has no title
     (insert "* \n")
     (insert "  okay-id\n")
-    (should (null (skg-validate-id-stack-buffer))) )
+    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
   (with-temp-buffer ;; Headline without body
     (insert "* okay\n")
     (insert "  okay-id\n")
     (insert "* label without ID\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (null (skg-validate-id-stack-buffer))) )
+    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) )
   (with-temp-buffer ;; Headline with multi-line body
     (insert "* okay\n")
     (insert "  okay-id\n")
@@ -143,6 +143,40 @@
     (insert "  invalid-extra-stuff\n")
     (insert "* okay\n")
     (insert "  okay-id\n")
-    (should (null (skg-validate-id-stack-buffer))) ))
+    (should (eq (car (skg-validate-id-stack-buffer)) 'error)) ))
+
+(ert-deftest test-skg-replace-id-stack-from-buffer_empty-inputs ()
+  "Test that empty/whitespace buffers result in empty stack."
+  (dolist (content '( ""
+                      "\n"
+                      "\n\n"
+                      " \n"
+                      " \n \n" ))
+    (setq skg-id-stack '(("old" "stuff"))) ;; Start with non-empty stack
+    (with-temp-buffer
+      (insert content)
+      (skg-replace-id-stack-from-buffer) )
+    (should (equal skg-id-stack nil)) ))
+
+(ert-deftest test-skg-replace-id-stack-from-buffer_single-headline ()
+  "Test single headline with body."
+  (dolist (content
+           '( "*   label\n  id\n" ;; leading space is ignored
+              "* label\nid\n" )) ;; leading space is not needed, except the bit after the bullet
+    (setq skg-id-stack nil)
+    (with-temp-buffer
+      (insert content)
+      (skg-replace-id-stack-from-buffer) )
+    (should (equal skg-id-stack '(("id" "label")) )) ))
+
+(ert-deftest test-skg-replace-id-stack-from-buffer_two-headlines ()
+  "Test two headlines."
+  (setq skg-id-stack nil)
+  (with-temp-buffer
+    (insert "* label\nid\n* label-2\n  id-2\n")
+    (skg-replace-id-stack-from-buffer) )
+  (should (equal skg-id-stack
+                 '( ("id-2" "label-2")
+                    ("id" "label") )) ))
 
 (provide 'test-skg-id-search)
