@@ -42,7 +42,8 @@ LINE-NUMBER is zero-based."
       (setq integration-test-phase
             (format "requesting-sourceward-view-line-%d" line-number))
       (skg-request-sourceward-view)
-      (sleep-for 0.25)
+      (skg-request-save-buffer) ;; save to send request to server
+      (sleep-for 0.5)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
 (defun skg-sourceward--verify-view (line-number expected-full expected-stripped)

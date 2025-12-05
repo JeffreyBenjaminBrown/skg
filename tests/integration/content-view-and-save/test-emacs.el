@@ -109,7 +109,7 @@
           (skg-request-save-buffer)
 
           ;; Wait for save response
-          (sleep-for 0.25)
+          (sleep-for 0.5)
 
           ;; Check the updated content
           (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))

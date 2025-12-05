@@ -123,6 +123,7 @@
   (with-current-buffer "*skg-content-view*"
     (message "Calling skg-request-containerward-view...")
     (skg-request-containerward-view)
+    (skg-request-save-buffer) ;; save to send request to server
 
     ;; Wait for response
     (sleep-for 0.5)

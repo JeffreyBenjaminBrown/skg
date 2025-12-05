@@ -60,7 +60,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 0.25)
+  (sleep-for 0.5)
 
   ;; Check if error buffer was created
   (let ((error-buffer (get-buffer "*SKG Save Errors - Inconsistencies Found*"))
@@ -122,7 +122,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 0.25)
+  (sleep-for 0.5)
 
   ;; Check the updated content
   (with-current-buffer "*skg-content-view*"
