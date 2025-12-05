@@ -14,7 +14,6 @@
         (BLUE view (cycle (ANY "⟳"))
               (folded) ;; ignored
               (focused) ;; ignored
-              (RED repeated "REP")
               (rels
                 (RED notInParent "!{")
                 (containsParent "}")
@@ -178,47 +177,33 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
     (setq heralds-overlays (nreverse keep))))
 
 (defun heralds--post-process-text
-  (text)
-  "Some post-processing rules to for heralds:
+    (text)
+  "Some post-processing rules for heralds:
 - Remove ID if other tokens are present
-- Remove indef if REP is present
 - Remove duplicate '!{' symbol if it appears twice"
   (when text
-    (let* ;; TODO: More efficient: Process both ID and REP in one pass.
-        ((parts (split-string text " " t))
-          ;; Remove ID if other tokens are present
-          (processed-parts
+    (let* ((parts (split-string text " " t))
+           ;; Remove ID if other tokens are present
+           (processed-parts
             (if (and (> (length parts) 1)
                      (cl-some (lambda (part)
                                 (string=
                                  (substring-no-properties part)
                                  "ID"))
-                      parts))
-              (cl-remove-if (lambda (part)
-                              (string=
-                               (substring-no-properties part) "ID"))
-                            parts)
-              parts))
-          ;; Remove indef if REP is present
-          (processed-parts-2
-            (if (cl-some (lambda (part)
-                           (string=
-                            (substring-no-properties part)
-                            "REP"))
-                         processed-parts)
+                              parts))
                 (cl-remove-if (lambda (part)
                                 (string=
-                                 (substring-no-properties part) "indef"))
-                              processed-parts)
-              processed-parts))
-          (joined (mapconcat #'identity processed-parts-2 " "))
-          (first-brace-pos (string-match "!{" joined))
-          (second-brace-pos
+                                 (substring-no-properties part) "ID"))
+                              parts)
+              parts))
+           (joined (mapconcat #'identity processed-parts " "))
+           (first-brace-pos (string-match "!{" joined))
+           (second-brace-pos
             (when first-brace-pos
               (string-match "!{" joined (+ first-brace-pos 2)))))
       (if second-brace-pos
-        (concat (substring joined 0 second-brace-pos)
-                (substring joined (+ second-brace-pos 2)))
+          (concat (substring joined 0 second-brace-pos)
+                  (substring joined (+ second-brace-pos 2)))
         joined))))
 
 (defun heralds-from-metadata
@@ -250,7 +235,7 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
 
 (defface heralds-red-face
   '((t :foreground "white" :background "red"))
-  "White-on-red for REP (repeated).")
+  "White-on-red for problem markers like !{ and delete.")
 
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))

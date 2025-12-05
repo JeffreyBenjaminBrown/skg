@@ -22,9 +22,9 @@ pub use orgnode::{
       OrgnodeCode, // relToParent, indef, editRequest, viewRequests
         RelToParent, // content | for aliases | ignored
         EditRequest, // merge | delete
-                     //  Mutually excclusive.
+                     //   Mutually excclusive.
         ViewRequest, // aliases | containerward | sourceward
-                     // Can request multiple.
+                     //   *Not* mutually exclusive.
 };
 pub use crate::serve::parse_headline_md_sexp::orgnodemd_to_string;
 pub mod skgnode;
