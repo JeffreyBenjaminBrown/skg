@@ -3,10 +3,17 @@
 ;;; PURPOSE: Utilities to parse and edit skg headline metadata.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   (none)
+;;;   skg-set-metadata-indefinitive
 
 (require 'org)
 (require 'skg-sexpr)
+
+(defun skg-set-metadata-indefinitive ()
+  "Mark the headline at point as indefinitive.
+Edits the metadata to include `indefinitive` in the `code` section.
+Does NOT save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (skg-edit-metadata-at-point '(skg (code indefinitive))))
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.

@@ -31,6 +31,8 @@
 ;;;     skg-open-empty-content-view
 ;;;   elisp/skg-request-title-matches.el
 ;;;     skg-request-title-matches
+;;;   elisp/skg-metadata.el
+;;;     skg-set-metadata-indefinitive
 
 (let ;; Add project directories to load-path
     ((project-root

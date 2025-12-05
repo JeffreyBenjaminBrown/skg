@@ -8,6 +8,7 @@
 (require 'ert)
 (require 'org)
 (require 'skg-metadata)
+(require 'skg-compare-sexpr)
 
 (ert-deftest test-skg-parse-headline-metadata ()
   "Test skg-parse-headline-metadata with various inputs."
@@ -53,5 +54,55 @@
                      '(("c" . "d") ("e" . "f"))))
       (should (equal (sort set #'string<) '("a" "b"))))))
 
+(defun test-skg--extract-metadata-sexp ()
+  "Extract and parse the (skg ...) metadata from current buffer's first line.
+Returns the parsed s-expression or nil if not found."
+  (goto-char (point-min))
+  (when (re-search-forward "(skg[^)]*)" nil t)
+    (goto-char (point-min))
+    (when (search-forward "(skg" nil t)
+      (let* ((start (- (point) 4))
+             (text (buffer-substring-no-properties start (point-max)))
+             (end-pos (skg-find-sexp-end text)))
+        (when end-pos
+          (read (substring text 0 end-pos)))))))
+
+(ert-deftest test-skg-set-metadata-indefinitive ()
+  "Test skg-set-metadata-indefinitive adds indefinitive to code section."
+  ;; Test adding indefinitive to headline with no code section
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (id 1)) title")
+    (goto-char (point-min))
+    (skg-set-metadata-indefinitive)
+    (let ((result (test-skg--extract-metadata-sexp)))
+      ;; Verify indefinitive is in code section
+      (should (skg-sexp-subtree-p result '(skg (code indefinitive))))
+      ;; Verify id is preserved
+      (should (skg-sexp-subtree-p result '(skg (id 1))))))
+
+  ;; Test adding indefinitive to headline with existing code section
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (id 2) (code (relToParent content))) title")
+    (goto-char (point-min))
+    (skg-set-metadata-indefinitive)
+    (let ((result (test-skg--extract-metadata-sexp)))
+      ;; Verify indefinitive is in code section
+      (should (skg-sexp-subtree-p result '(skg (code indefinitive))))
+      ;; Verify existing code content is preserved
+      (should (skg-sexp-subtree-p result '(skg (code (relToParent content)))))
+      ;; Verify id is preserved
+      (should (skg-sexp-subtree-p result '(skg (id 2))))))
+
+  ;; Test adding indefinitive to headline with no metadata
+  (with-temp-buffer
+    (org-mode)
+    (insert "* plain title")
+    (goto-char (point-min))
+    (skg-set-metadata-indefinitive)
+    (let ((result (test-skg--extract-metadata-sexp)))
+      ;; Verify indefinitive is in code section
+      (should (skg-sexp-subtree-p result '(skg (code indefinitive)))))))
 
 (provide 'test-skg-metadata)
