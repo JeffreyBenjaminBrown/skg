@@ -1,6 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Compare s-expressions
+;;; PURPOSE: Compare s-expressions.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   (none)
 
 (require 'cl-lib)
 

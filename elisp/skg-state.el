@@ -1,5 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
+;;; PURPOSE: Global state variables for the skg client.
+;;;
+;;; USER-FACING FUNCTIONS AND GLOBAL VARIABLES
+;;;   skg-id-stack (variable)
+;;;
 ;;; TODO: Can these globals be avoided?
 
 (defvar skg-rust-tcp-proc nil

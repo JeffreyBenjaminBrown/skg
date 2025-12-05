@@ -1,7 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
-;;
-;; PURPOSE: Generic utilities that
-;; read, compare, edit and transform s-exps.
+;;;
+;;; PURPOSE: Generic utilities that
+;;; read, compare, edit and transform s-exps.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   (none)
 
 (require 'skg-edit-sexpr)
 (require 'skg-compare-sexpr)

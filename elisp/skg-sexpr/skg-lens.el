@@ -1,6 +1,14 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Transform s-expressions using pattern-matching rules
+;;; PURPOSE:
+;;; Transform s-expressions using
+;;; an abstract, declarative set of pattern-matching rules.
+;;; Currently, it is used to turn a text-only metadata sexp
+;;; into a shorter, colorful visual representation.
+;;; But it might turn out to be useful for other things.
+;;;
+;;; USER-FACING FUNCTIONS
+;;;   (none)
 
 (require 'cl-lib)
 

@@ -1,23 +1,5 @@
 * explore elisp/
-** functions needed
-*** for storing and navigating IDs and links
-**** already defined but maybe bad
-***** skg-visit-link
-**** absent; were implemented but via properties
-     and vanished just after commit
-       7418b1d9136bdc9998b965fcc0c74e593c390ca6
-***** skg-next-id, skg-previous-id
-      move point to the {next, previous} metadata expression or link,
-      whichever comes first
-***** skg-copy-to-id-stack
-      Writes not just the ID but it's title to that stack,
-      so the user can easily distinguish them.
-***** skg-next-id-matching, skg-previous-id-matching
-****** searches over both links and metadata
-****** By default, searches to match the stack's top ID
-****** If preceded with C-u, instead
-       prompts user to choose from the stack.
-*** mark a node indefinitive
+** mark a node indefinitive
 ** Read USAGE.md
 ** (Rip)grep for 'defun' in Emacs, read all the function names.
 ** possibilities
