@@ -29,6 +29,7 @@
               (RED toDelete "delete")
               (RED merge (ANY "merge:" IT))
               (viewRequests
+                (aliases "req:aliases")
                 (containerwardView "req:containers")
                 (sourcewardView "req:sources"))))
   "Rules to convert metadata sexps into herald tokens.")

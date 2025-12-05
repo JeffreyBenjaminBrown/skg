@@ -78,4 +78,33 @@
                            overlays-at-herald )) )
         ( should-not display-overlay )) )) )
 
+(ert-deftest test-heralds-viewrequests-display ()
+  "Test that viewRequests are displayed as req:* heralds."
+  (with-temp-buffer
+    ;; Test aliases viewRequest
+    (erase-buffer)
+    (insert "(skg (id 1) (code (viewRequests aliases)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "req:aliases" result)))
+
+    ;; Test containerwardView viewRequest
+    (erase-buffer)
+    (insert "(skg (id 2) (code (viewRequests containerwardView)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "req:containers" result)))
+
+    ;; Test sourcewardView viewRequest
+    (erase-buffer)
+    (insert "(skg (id 3) (code (viewRequests sourcewardView)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "req:sources" result)))
+
+    ;; Test multiple viewRequests
+    (erase-buffer)
+    (insert "(skg (id 4) (code (viewRequests aliases containerwardView sourcewardView)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "req:aliases" result))
+      (should (string-match "req:containers" result))
+      (should (string-match "req:sources" result)))))
+
 (provide 'test-heralds-minor-mode)
