@@ -1,6 +1,6 @@
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::to_org::util::{skgnode_and_orgnode_from_id, VisitedMap};
+use crate::to_org::util::{skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id};
 use crate::to_org::aliases::wrapped_build_and_integrate_aliases_view;
 use crate::to_org::complete_aliascol::completeAliasCol;
 use crate::to_org::integrate_backpath::{
@@ -31,11 +31,9 @@ pub async fn completeOrgnodeForest (
   for (tree_idx, tree) in forest . iter_mut () . enumerate () {
     let root_id : NodeId =
       tree . root () . id ();
-    let mut ancestor_path : Vec < ID > =
-      Vec::new ();
     complete_node_preorder (
       tree, root_id, tree_idx, config, typedb_driver,
-      &mut visited, &mut ancestor_path, errors ) . await ?; }
+      &mut visited, errors ) . await ?; }
   Ok (( )) }
 
 /// Completes a node, and then its children ('preorder DFS traversal').
@@ -45,7 +43,7 @@ pub async fn completeOrgnodeForest (
 ///   - futz with the node itself
 ///     - check for repetition via 'make_indefinitive_if_repeated'
 ///       (if repeated, modify body and metadata, update 'visited')
-///     - call detect_cycle_and_mark_if_so
+///     - detect cycles via 'is_ancestor_id'
 ///   - futz with its descendents
 ///     - if definitive, call completeDefinitiveOrgnode
 ///       - else call clobberIndefinitiveOrgnode
@@ -64,7 +62,6 @@ fn complete_node_preorder<'a> (
   config        : &'a SkgConfig,
   typedb_driver : &'a TypeDBDriver,
   visited       : &'a mut VisitedMap,
-  ancestor_path : &'a mut Vec < ID >, // path from root to current node (for cycle detection)
   errors        : &'a mut Vec < String >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
@@ -86,8 +83,8 @@ fn complete_node_preorder<'a> (
           // Maybe mark indefinitive, maybe update 'visited'.
           tree, node_id, tree_idx, visited
         ). await ?;
-        detect_cycle_and_mark_if_so (
-          tree, node_id, ancestor_path ) ?; }
+        detect_cycle_and_mark (
+          tree, node_id ) ?; }
 
       { let is_indefinitive : bool = { // 'make_indefinitive_if_repeated' may have just changed this value.
           let node_ref : NodeRef < OrgNode > =
@@ -103,7 +100,7 @@ fn complete_node_preorder<'a> (
         map_complete_node_preorder_over_children (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, tree_idx, config, typedb_driver,
-          visited, ancestor_path, errors ) . await ?; }
+          visited, errors ) . await ?; }
 
       { // integrate view requests
         let view_requests : Vec < ViewRequest > = {
@@ -132,26 +129,27 @@ TODO : That's not implemented yet. */
             }, }} }}
     Ok (( )) } ) }
 
-/* Check if this node creates a cycle (its ID is in ancestor_path).
-If so, mark it with cycle=true; otherwise mark it with cycle=false.
-Then push this node's ID to ancestor_path (to be popped later by caller). */
-fn detect_cycle_and_mark_if_so (
-  tree          : &mut Tree < OrgNode >,
-  node_id       : NodeId,
-  ancestor_path : &mut Vec < ID >,
+/// Check if this node creates a cycle (its ID is an ancestor).
+/// If so, mark it with cycle=true; otherwise mark it with cycle=false.
+fn detect_cycle_and_mark (
+  tree    : &mut Tree < OrgNode >,
+  node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid_opt : Option < ID > = {
     let node_ref : NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     node_ref . value () . metadata . id . clone () };
-  if let Some ( node_pid ) = node_pid_opt {
-    let mut node_mut : NodeMut < OrgNode > =
-      tree . get_mut ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    node_mut . value () . metadata . viewData.cycle =
-      ancestor_path . contains ( & node_pid );
-    ancestor_path . push ( node_pid ); }
+  let is_cycle : bool =
+    if let Some ( ref node_pid ) = node_pid_opt {
+      is_ancestor_id (
+        tree, node_id, node_pid,
+        |n| n . metadata . id . as_ref () ) ?
+    } else { false };
+  let mut node_mut : NodeMut < OrgNode > =
+    tree . get_mut ( node_id )
+    . ok_or ( "Node not found in tree" ) ?;
+  node_mut . value () . metadata . viewData . cycle = is_cycle;
   Ok (( )) }
 
 fn map_complete_node_preorder_over_children<'a> (
@@ -161,7 +159,6 @@ fn map_complete_node_preorder_over_children<'a> (
   config        : &'a SkgConfig,
   typedb_driver : &'a TypeDBDriver,
   visited       : &'a mut VisitedMap,
-  ancestor_path : &'a mut Vec < ID >,
   errors        : &'a mut Vec < String >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -173,16 +170,9 @@ fn map_complete_node_preorder_over_children<'a> (
         . map ( |c| c . id () )
         . collect () };
     for child_id in child_ids {
-      let child_has_id : bool = {
-        let child_ref : NodeRef < OrgNode > =
-          tree . get ( child_id )
-          . ok_or ( "Child not found in tree" ) ?;
-        child_ref . value () . metadata . id . is_some () };
       complete_node_preorder (
         tree, child_id, tree_idx, config, typedb_driver,
-        visited, ancestor_path, errors ) . await ?;
-      if child_has_id {
-        ancestor_path . pop (); }}
+        visited, errors ) . await ?; }
     Ok (( )) }) }
 
 /// If this orgnode is a repeat, then modify its body and metadata

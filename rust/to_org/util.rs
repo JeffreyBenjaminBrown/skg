@@ -4,7 +4,7 @@ use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
 
-use ego_tree::NodeId;
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -70,3 +70,30 @@ pub fn newline_to_space ( s: &str ) -> String {
 
 pub fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }
+
+/// Check if `target_id` appears in the ancestor path of `node_id`.
+/// Used for cycle detection.
+///
+/// The `get_id` closure extracts an `Option<&ID>` from a node value,
+/// allowing this to work with different tree types:
+/// - `Tree<OrgNode>`: `|n| n.metadata.id.as_ref()`
+/// - `Tree<(SkgNode, OrgNode)>`: `|n| n.1.metadata.id.as_ref()`
+pub fn is_ancestor_id < T, F > (
+  tree      : &Tree < T >,
+  node_id   : NodeId,
+  target_id : &ID,
+  get_id    : F,
+) -> Result < bool, Box<dyn Error> >
+where F : Fn ( &T ) -> Option < &ID >
+{
+  let node_ref : NodeRef < T > =
+    tree . get ( node_id )
+    . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
+  let mut current : Option < NodeRef < T > > =
+    node_ref . parent ();
+  while let Some ( parent ) = current {
+    if let Some ( parent_id ) = get_id ( parent . value () ) {
+      if parent_id == target_id {
+        return Ok ( true ); }}
+    current = parent . parent (); }
+  Ok ( false ) }

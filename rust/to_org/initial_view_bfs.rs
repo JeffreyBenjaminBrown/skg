@@ -19,7 +19,7 @@ mod truncate;
 
 use crate::to_org::content_view::stub_forest_from_root_ids;
 use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
-use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::to_org::util::{skgnode_and_orgnode_from_id, is_ancestor_id};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::cmp::min;
@@ -144,14 +144,15 @@ fn mark_cycles_and_repeats (
   visited    : &mut HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let pid_opt : Option<ID> = {
-    let node_ref =
+    let node_ref : NodeRef<(SkgNode, OrgNode)> =
       forest[tree_idx] . get(node_id) . unwrap();
     node_ref . value() . 1 . metadata.id . clone() };
   let Some(pid) = pid_opt else {
     return Err("Node has no ID".into()); };
   { // Check for cycles
-    let is_cycle : bool = is_ancestor(
-      &forest[tree_idx], node_id, &pid);
+    let is_cycle : bool = is_ancestor_id (
+      &forest[tree_idx], node_id, &pid,
+      |n| n . 1 . metadata . id . as_ref () ) ?;
     let mut node_mut : NodeMut<(SkgNode, OrgNode)> =
       forest[tree_idx].get_mut(node_id).unwrap();
     node_mut . value() . 1 . metadata.viewData.cycle =
@@ -246,22 +247,3 @@ async fn add_children_with_truncation(
     limit_parent_id, )?;
   Ok (( )) }
 
-/// Check if a node with a given ID
-/// is in the ancestor path of the current node.
-/// This is used for cycle detection.
-fn is_ancestor (
-  tree : &Tree<(SkgNode, OrgNode)>,
-  node_id : NodeId,
-  target_id : &ID,
-) -> bool {
-  let node_ref : NodeRef<(SkgNode, OrgNode)> =
-    tree . get (node_id) . unwrap();
-  let mut current : Option<NodeRef<(SkgNode, OrgNode)>> =
-    node_ref . parent();
-  while let Some(parent) = current {
-    if let Some(ref parent_id)
-      = parent . value() . 1 . metadata.id {
-        if parent_id == target_id {
-          return true; }}
-    current = parent . parent(); }
-  false }
