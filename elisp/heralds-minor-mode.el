@@ -31,7 +31,8 @@
               (viewRequests
                 (aliases "req:aliases")
                 (containerwardView "req:containers")
-                (sourcewardView "req:sources"))))
+                (sourcewardView "req:sources")
+                (definitiveView "req:definitive"))))
   "Rules to convert metadata sexps into herald tokens.")
 
 (defun heralds--read-metadata (metadata-sexp)
