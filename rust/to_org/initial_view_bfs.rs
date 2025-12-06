@@ -1,18 +1,10 @@
 /// PURPOSE: BFS rendering of content views with node count limit.
-/// This avoids complexities in 'completeOrgnodeForest',
+///
+/// MOTIVATION: Avoids some complexities of 'completeOrgnodeForest',
 /// because in an initial view the only kind of child is content.
 ///
-/// THE ALGORITHM
-/// Start with a list of roots.
-/// Render one generation at a time as definitive orgnodes.
-/// Once the node limit is hit, stop rendering that generation,
-/// and re-render it as indefinitive orgnodes.
-/// (Re-render sounds like a lot of work but it just changes 2 fields.)
-/// Once the last orgnode has been re-rendered as indefinitive,
-/// continue rendering any of its remaining siblings the same way,
-/// but omit the rest of its generation.
-/// Then navigate up to its parent P,
-/// and navigate every node in P's generation after P as indefinitive.
+/// ALGORITHM DETAILS are in the comment for the only public function,
+/// 'render_initial_forest_bfs'.
 
 mod truncate;
 
@@ -27,46 +19,56 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Render initial content views using BFS traversal with node limit.
-/// Renders content one generation at a time, in BFS order.
-/// Creates stub forest from root IDs, then builds it out.
-/// Uses (SkgNode, OrgNode) trees to avoid redundant DB fetches.
+/// THE ALGORITHM:
+/// Start with a list of roots.
+/// Render one generation at a time as definitive orgnodes.
+/// Once the node limit is hit, stop rendering that generation,
+/// and re-render it as indefinitive orgnodes.
+/// (Re-render sounds like a lot of work but it just changes 2 fields.)
+/// Once the last orgnode L has been re-rendered as indefinitive,
+/// continue rendering any of its remaining siblings the same way,
+/// but ignore (omit, leave unrendered) the rest of its generation.
+/// Then navigate up to L's parent P,
+/// and re-render every node in P's generation after P as indefinitive.
 pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < Tree < (SkgNode, OrgNode) > >, Box<dyn Error> > {
+) -> Result < Vec < Tree <
+    (SkgNode, OrgNode) > >, // The end goal is just OrgNodes, but the SkgNodes permit us to avoid redundant DB fetches.
+  Box<dyn Error> > {
   let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
   let mut visited : HashSet<ID> = HashSet::new();
-  let mut generation : usize = 1;
+  let mut generation : usize = 1; // meaningless if < 1
   let mut nodes_rendered : usize = 0;
   let limit : usize = config.initial_node_limit;
   loop {
-    let nodes_in_gen_by_tree : Vec<(usize, Vec<NodeId>)> =
+    let nodes_in_gen_by_tree : Vec<(usize, // indicates which tree
+                                    Vec<NodeId>)> =
       collect_generation_ids_in_forest (
         &forest, generation)?;
     if nodes_in_gen_by_tree.is_empty() {
       break; }
     for (tree_idx, node_ids) in &nodes_in_gen_by_tree {
       for node_id in node_ids {
-        process_cycles_and_repeats(
+        mark_cycles_and_repeats(
           &mut forest,
           *tree_idx,
           *node_id,
           &mut visited, )?;
         nodes_rendered += 1; }}
-    let children_to_add : Vec<(usize, NodeId, ID)> =
+    let next_generation : Vec<(usize, NodeId, ID)> =
       collect_children_from_generation(
         &forest, &nodes_in_gen_by_tree);
     let children_count : usize =
-      children_to_add.len();
+      next_generation.len();
     if nodes_rendered + children_count >= limit {
       add_children_with_truncation (
         &mut forest,
         generation,
-        &children_to_add,
+        &next_generation,
         nodes_rendered,
         limit,
         config,
@@ -74,7 +76,7 @@ pub async fn render_initial_forest_bfs (
         &mut visited,
       ).await?;
       break; }
-    for (tree_idx, parent_id, child_id) in children_to_add {
+    for (tree_idx, parent_id, child_id) in next_generation {
       let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
         skgnode_and_orgnode_from_id(
           config, driver, &child_id).await?;
@@ -84,7 +86,11 @@ pub async fn render_initial_forest_bfs (
     generation += 1; }
   Ok ( forest ) }
 
-fn process_cycles_and_repeats (
+/// Marks as a cycle if it's a cycle.
+///   (Leaves the corresponding ancestor unchanged.)
+/// Marks as indefinitive if it's a repeat.
+/// Updates 'visited'.
+fn mark_cycles_and_repeats (
   forest     : &mut Vec<Tree<(SkgNode, OrgNode)>>,
   tree_idx   : usize,
   node_id    : NodeId,
@@ -101,7 +107,8 @@ fn process_cycles_and_repeats (
       &forest[tree_idx], node_id, &pid);
     let mut node_mut : NodeMut<(SkgNode, OrgNode)> =
       forest[tree_idx].get_mut(node_id).unwrap();
-    node_mut . value() . 1 . metadata.viewData.cycle = is_cycle; }
+    node_mut . value() . 1 . metadata.viewData.cycle =
+      is_cycle; }
   if visited . contains (&pid) { // It's a repeat.
     let mut node_mut : NodeMut<(SkgNode, OrgNode)> =
       forest[tree_idx] . get_mut(node_id) . unwrap();
