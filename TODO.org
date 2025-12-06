@@ -1,17 +1,9 @@
-* explore elisp/
-** mark a node indefinitive
-** Read USAGE.md
-** (Rip)grep for 'defun' in Emacs, read all the function names.
-** possibilities
-*** the cursor can be placed over the first herald character
-    manually, and in code maybe over others --
-    but the first seems ideal already
-** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * Request definitive content view at a node
 ** for repeats
 ** for subscriptions
    which initially show just the title -- not even the content,
      let alone the recursive content
+* Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * undoing that mis-feature shouldn't be hard
   Don't let indefinite nodes contribute at all to saving,
   but recognize that their children might.

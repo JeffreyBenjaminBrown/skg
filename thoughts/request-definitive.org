@@ -1,0 +1,476 @@
+=== Request Definitive View: Implementation Plan ===
+
+This document describes how to implement ~ViewRequest::Definitive~, which allows
+a user to request that an indefinitive OrgNode become the definitive view for
+its Node, expanding its content from disk.
+
+* Feature Overview
+
+Allow indefinitive nodes in the save buffer to request definitive expansion.
+The server:
+1. Marks the requesting node as definitive
+2. Marks any OTHER definitive instances of the same ID as indefinitive
+3. Expands the node's content from disk, respecting node limits, and integrating rather than duplicating preexisting descendents in the tree
+4. Uses the ~visited~ set to prevent duplicate definitive nodes
+
+This is purely a view operation - it happens after save and only affects
+the response buffer, not the graph.
+
+* Key Behaviors
+
+1. Each Definitive expansion uses the same node limit (default 1000) but starts
+   counting from 0 (fresh budget per expansion)
+2. Multiple Definitive requests allowed per buffer (each gets fresh budget)
+3. At most ONE Definitive request per ID (validation required)
+4. Each ID can appear definitively only once in the response
+5. A node requesting Definitive MUST be indefinitive (validation required)
+
+Note: ViewRequests are already cleared by each handler after processing
+(see ~wrapped_build_and_integrate_*~ functions), so no additional clearing needed.
+
+* Architecture: Two-Phase Processing
+
+** Tree Completion Phase
+
+During ~completeOrgnodeForest~, process the tree normally but SKIP
+~ViewRequest::Definitive~ processing. Nodes with this request:
+- Remain indefinitive
+- Get the ~clobberIndefinitiveOrgnode~ treatment (title from disk, body cleared)
+- Are collected for later processing
+
+This phase builds the ~visited~ map containing all existing definitive nodes.
+
+** Definitive Expansion Phase
+
+After Tree Completion, process collected Definitive requests sequentially
+in tree order (preorder DFS). For each request:
+1. Mark any other definitive instance of the same ID as indefinitive
+2. Mark this node as definitive (~indefinitive = false~)
+3. Expand content using ~completeDefinitiveOrgnode~ with node limit
+4. Add this node and its definitive descendants to ~visited~
+5. Remove the ViewRequest
+
+Sequential processing ensures the ~visited~ set accumulates correctly -
+each expansion inherits nodes from all previous expansions.
+
+* The Definitive Uniqueness Algorithm
+
+Uses ~HashMap<ID, NodeId>~ (not ~HashSet<ID>~) to track which NodeId is the
+definitive instance for each ID. This allows finding and marking other
+instances indefinitive.
+
+** During Tree Completion Phase
+
+Collect two pieces of data:
+
+1. ~visited: HashMap<ID, NodeId>~ - Maps each ID to its definitive instance
+   - Add definitive nodes to ~visited~
+   - Do NOT add indefinitive nodes (even if they have Definitive requests)
+
+2. ~definitive_requests: Vec<(usize, NodeId)>~ - Nodes with Definitive requests
+   - Collect ALL nodes with ~ViewRequest::Definitive~
+   - Store ~(tree_idx, node_id)~ tuples
+   - Collect in preorder DFS order
+
+** During Definitive Expansion Phase
+
+For each ~(tree_idx, node_id)~ in ~definitive_requests~:
+
+1. *Mark conflicting instances indefinitive and clobber them*:
+   - Get this node's ID
+   - Look up ID in ~visited~
+   - If found with different NodeId:
+     - Mark that node indefinitive
+     - Clobber it (set title from disk, clear body) for visual consistency
+     - Leave its children as-is (they persist but don't affect saves)
+
+2. *Mark this node definitive*:
+   - Set ~indefinitive = false~
+   - Insert into ~visited~: ~visited.insert(id, node_id)~
+
+3. *Expand content*:
+   - Call ~completeDefinitiveOrgnode~ with node limit and ~visited~
+   - This adds content children from disk
+   - Descendants already in ~visited~ are marked indefinitive
+   - New definitive descendants are added to ~visited~
+
+4. *Clear the ViewRequest*:
+   - Remove ~ViewRequest::Definitive~ from the node
+
+* Content Integration: Disk-Based Markers
+
+When expanding a node's content, do NOT trust existing ~relToParent~ markers.
+Instead, recreate them by comparing to the SkgNode read from disk:
+
+For each child C of parent P:
+- If C's ID is among P's contents on disk: mark C as ~Content~
+- Otherwise: mark C as ~ParentIgnores~
+
+This ensures Content markers accurately reflect the disk state, not stale
+metadata from the buffer.
+
+(Note: ~completeDefinitiveOrgnode~ already reads the SkgNode from disk to get
+the canonical content list, so this information is available.)
+
+* Node Limit Handling in completeDefinitiveOrgnode
+
+Currently, ~completeDefinitiveOrgnode~ has no node limit - it processes all
+content children recursively. To support Definitive requests, add optional
+limit parameters:
+
+#+begin_src rust
+pub async fn completeDefinitiveOrgnode(
+  tree: &mut Tree<OrgNode>,
+  node_id: NodeId,
+  config: &SkgConfig,
+  typedb_driver: &TypeDBDriver,
+  visited: &mut HashMap<ID, NodeId>,
+  errors: &mut Vec<String>,
+  // NEW optional parameters:
+  node_limit: Option<usize>,      // None = no limit (existing behavior)
+  nodes_added: Option<&mut usize>, // Running count across recursive calls
+) -> Result<(), Box<dyn Error>>
+#+end_src
+
+Behavior when limits are provided:
+- Track ~nodes_added~ across recursive calls
+- When ~nodes_added >= node_limit~: mark remaining descendants indefinitive
+- Truncation clears body and prevents further recursion
+
+This allows reusing ~completeDefinitiveOrgnode~ for both:
+- Normal tree completion (no limit, ~None~)
+- Definitive expansion (with limit, ~Some(1000)~)
+
+* Implementation Components
+
+** 1. Type Definitions
+
+*** ~types/orgnode.rs~
+
+Add to ViewRequest enum:
+#+begin_src rust
+pub enum ViewRequest {
+  Aliases,
+  Containerward,
+  Sourceward,
+  Definitive,  // NEW
+}
+#+end_src
+
+Update FromStr/Display:
+#+begin_src rust
+// Display:
+ViewRequest::Definitive => write!(f, "definitiveView"),
+
+// FromStr:
+"definitiveView" | "definitive" => Ok(ViewRequest::Definitive),
+#+end_src
+
+*** ~types/errors.rs~
+
+#+begin_src rust
+MultipleDefinitiveRequests(ID),
+DefinitiveRequestOnDefinitiveNode(ID),
+#+end_src
+
+** 2. Validation
+
+*** ~buffer_to_orgnodes/validate_tree.rs~
+
+New validation rules:
+
+#+begin_src rust
+// 1. At most one Definitive request per ID
+fn validate_definitive_requests(
+  forest: &[Tree<OrgNode>],
+  errors: &mut Vec<BufferValidationError>,
+) {
+  let mut ids_with_requests: HashMap<ID, usize> = HashMap::new();
+  // Traverse forest, count Definitive requests per ID
+  // Error if any ID has count > 1
+}
+
+// 2. Definitive request must be on indefinitive node
+// (Check during traversal: if node has ViewRequest::Definitive
+//  and !node.metadata.code.indefinitive, error)
+#+end_src
+
+** 3. Modified completeOrgnodeForest
+
+*** ~to_org/complete_contents.rs~
+
+Change signature to support two-phase processing:
+
+#+begin_src rust
+pub async fn completeOrgnodeForest(
+  forest: &mut Vec<Tree<OrgNode>>,
+  config: &SkgConfig,
+  typedb_driver: &TypeDBDriver,
+  errors: &mut Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+  // Use HashMap instead of HashSet
+  let mut visited: HashMap<ID, NodeId> = HashMap::new();
+
+  // --- TREE COMPLETION PHASE ---
+  // Process forest normally, skipping ViewRequest::Definitive
+  let mut definitive_requests: Vec<(usize, NodeId)> = Vec::new();
+
+  for (tree_idx, tree) in forest.iter_mut().enumerate() {
+    complete_node_preorder_skip_definitive(
+      tree,
+      root_id,
+      config,
+      typedb_driver,
+      &mut visited,
+      &mut definitive_requests, // collect requests
+      tree_idx,
+      errors,
+    ).await?;
+  }
+  // After this: visited contains all existing definitive nodes
+
+  // --- DEFINITIVE EXPANSION PHASE ---
+  // Process collected requests sequentially
+  for (tree_idx, node_id) in definitive_requests {
+    expand_definitive_node(
+      forest,
+      tree_idx,
+      node_id,
+      config,
+      typedb_driver,
+      &mut visited,
+      config.initial_node_limit,
+      errors,
+    ).await?;
+  }
+
+  Ok(())
+}
+#+end_src
+
+** 4. Modified complete_node_preorder
+
+Skip ~ViewRequest::Definitive~ during Tree Completion Phase:
+
+#+begin_src rust
+// In the viewRequests processing loop:
+for request in view_requests {
+  match request {
+    ViewRequest::Definitive => {
+      // Skip - will be processed in Definitive Expansion Phase
+      // Collect for later processing
+      definitive_requests.push((tree_idx, node_id));
+    },
+    ViewRequest::Aliases => { ... },
+    ViewRequest::Containerward => { ... },
+    ViewRequest::Sourceward => { ... },
+  }
+}
+#+end_src
+
+** 5. Modified completeDefinitiveOrgnode
+
+Add optional node limit parameters:
+
+#+begin_src rust
+pub async fn completeDefinitiveOrgnode(
+  tree: &mut Tree<OrgNode>,
+  node_id: NodeId,
+  config: &SkgConfig,
+  typedb_driver: &TypeDBDriver,
+  visited: &mut HashMap<ID, NodeId>,
+  errors: &mut Vec<String>,
+  node_limit: Option<usize>,
+  nodes_added: Option<&mut usize>,
+) -> Result<(), Box<dyn Error>> {
+  // Existing logic: read SkgNode from disk, get content list
+
+  // NEW: Check limit before processing each child
+  if let (Some(limit), Some(count)) = (node_limit, nodes_added.as_deref()) {
+    if *count >= limit {
+      // Truncate: mark remaining children indefinitive, clear body, return
+      return Ok(());
+    }
+  }
+
+  // Existing logic: categorize children, mark invalid as ParentIgnores
+  // NEW: Recreate Content markers from disk, don't trust existing markers
+
+  // For each content child:
+  //   - Increment nodes_added if tracking
+  //   - Recursively complete (passing node_limit and nodes_added)
+  //   - Add definitive nodes to visited
+}
+#+end_src
+
+** 6. Definitive Expansion Function
+
+New function to handle a single Definitive request:
+
+#+begin_src rust
+async fn expand_definitive_node(
+  forest: &mut Vec<Tree<OrgNode>>,
+  tree_idx: usize,
+  node_id: NodeId,
+  config: &SkgConfig,
+  typedb_driver: &TypeDBDriver,
+  visited: &mut HashMap<ID, NodeId>,
+  node_limit: usize,
+  errors: &mut Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+  let tree = &mut forest[tree_idx];
+  let node_id_value = {
+    let node = tree.get(node_id).ok_or("Node not found")?;
+    node.value().metadata.id.clone()
+  };
+
+  // 1. Mark conflicting instances indefinitive and clobber them
+  if let Some(id) = &node_id_value {
+    if let Some(&existing_node_id) = visited.get(id) {
+      if existing_node_id != node_id {
+        // Mark indefinitive, clobber (title from disk, clear body),
+        // but leave children as-is
+        clobber_and_mark_indefinitive_in_forest(
+          forest, existing_node_id, config, typedb_driver).await?;
+      }
+    }
+    // 2. Mark this node definitive and add to visited
+    {
+      let mut node_mut = tree.get_mut(node_id).ok_or("Node not found")?;
+      node_mut.value().metadata.code.indefinitive = false;
+    }
+    visited.insert(id.clone(), node_id);
+  }
+
+  // 3. Expand content with fresh limit
+  let mut nodes_added: usize = 0;
+  completeDefinitiveOrgnode(
+    tree,
+    node_id,
+    config,
+    typedb_driver,
+    visited,
+    errors,
+    Some(node_limit),
+    Some(&mut nodes_added),
+  ).await?;
+
+  // 4. Clear the ViewRequest
+  {
+    let mut node_mut = tree.get_mut(node_id).ok_or("Node not found")?;
+    node_mut.value().metadata.code.viewRequests.remove(&ViewRequest::Definitive);
+  }
+
+  Ok(())
+}
+#+end_src
+
+** 7. Helper: Clobber and Mark Indefinitive in Forest
+
+#+begin_src rust
+async fn clobber_and_mark_indefinitive_in_forest(
+  forest: &mut [Tree<OrgNode>],
+  target_node_id: NodeId,
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  // Find the node in the forest
+  for tree in forest.iter_mut() {
+    if tree.get(target_node_id).is_some() {
+      // Mark indefinitive
+      {
+        let mut node_mut = tree.get_mut(target_node_id).unwrap();
+        node_mut.value().metadata.code.indefinitive = true;
+      }
+      // Clobber: set title from disk, clear body
+      // (Children are left as-is)
+      clobberIndefinitiveOrgnode(tree, target_node_id, config, driver).await?;
+      return Ok(());
+    }
+  }
+  Ok(())
+}
+#+end_src
+
+** 8. Emacs Support
+
+*** ~elisp/skg-request-views.el~
+
+#+begin_src elisp
+(defun skg-request-definitive-view ()
+  "Request definitive view for the headline at point.
+The node must be indefinitive. After save, it becomes definitive
+and its content is expanded from disk."
+  (interactive)
+  (skg--request-view 'definitiveView))
+#+end_src
+
+*** ~elisp/heralds-minor-mode.el~
+
+Add to viewRequests transform rules:
+#+begin_src elisp
+(viewRequests
+  (aliases "req:aliases")
+  (definitiveView "req:definitive")  ; NEW
+  (containerwardView "req:containers")
+  (sourcewardView "req:sources"))
+#+end_src
+
+* Edge Cases
+
+** Cycles
+Handled by ~visited~ map - if a node's ID is already in ~visited~, mark it
+indefinitive. Prevents infinite recursion.
+
+** Multiple Definitive Requests
+Each gets same limit but fresh count from 0. No cap on number of requests.
+Example: 10 expansions with 1000 limit = up to 10,000 new nodes possible.
+
+** Nested Definitive Requests
+If expanding node B reveals a child C that also has ~ViewRequest::Definitive~:
+- Only requests collected BEFORE Tree Completion Phase are processed
+- C's request is ignored in this save cycle
+- User can save again to expand C
+
+** No Other Definitive Instance
+If requesting node is the only instance of that ID in the forest:
+- No other instance to mark indefinitive
+- Just mark this node definitive and expand
+
+** Definitive Instance On Disk But Not In View
+If there's a definitive instance on disk but not in the current view:
+- No conflict detected (we only check the forest)
+- When user saves, their content overwrites the disk version
+- This is correct: user is intentionally taking ownership
+
+** Existing Children from Other ViewRequests
+If the indefinitive node already has children (e.g., from containerwardView):
+- Those children are non-content (ParentIgnores)
+- Content children are added from disk
+- Final order: non-content first, then content
+
+* Implementation Order
+
+1. Add ~Definitive~ variant to ~ViewRequest~ enum with FromStr/Display
+2. Add error variants: ~MultipleDefinitiveRequests~, ~DefinitiveRequestOnDefinitiveNode~
+3. Add validation for Definitive requests
+4. Change ~visited~ from ~HashSet<ID>~ to ~HashMap<ID, NodeId>~ throughout
+5. Modify ~complete_node_preorder~ to skip and collect Definitive requests
+6. Add optional ~node_limit~ and ~nodes_added~ parameters to ~completeDefinitiveOrgnode~
+7. Update ~completeDefinitiveOrgnode~ to:
+   - Recreate Content markers from disk (not trust existing)
+   - Respect node limits when provided
+   - Add definitive descendants to ~visited~
+8. Implement ~expand_definitive_node~ function
+9. Implement ~clobber_and_mark_indefinitive_in_forest~ helper
+10. Update ~completeOrgnodeForest~ with two-phase structure
+11. Add Emacs support (~skg-request-definitive-view~, heralds update)
+12. Write tests:
+    - Single Definitive request on leaf
+    - Multiple requests (verify ~visited~ accumulation)
+    - Node limit truncation
+    - Other instances marked indefinitive
+    - Validation: already definitive = error
+    - Validation: multiple requests for same ID = error
+    - Content markers recreated from disk
+
