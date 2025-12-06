@@ -442,3 +442,43 @@ fn reorder_children (
       . ok_or ( "Parent not found" ) ?;
     parent_mut . append_id ( *child_id ); }
   Ok (( )) }
+
+/// Marks a node and its content subtree as indefinitive,
+/// removing them from `visited`.
+///
+/// This is used when transferring definitiveness from one node to another
+/// with the same ID. The old definitive node's entire content subtree
+/// must be removed from `visited` so the new node can expand without
+/// seeing them as already-visited.
+///
+/// Only recurses into content children (relToParent == Content).
+/// Non-content children (AliasCol, ParentIgnores, etc.)
+/// are retained without changes.
+pub fn indefinitize_content_subtree (
+  tree    : &mut Tree < OrgNode >,
+  node_id : NodeId,
+  visited : &mut VisitedMap,
+) -> Result < (), Box<dyn Error> > {
+  let node_ref : NodeRef < OrgNode > =
+    tree . get ( node_id )
+    . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
+  let node : &OrgNode = node_ref . value ();
+  let node_pid_opt : Option < ID > =
+    node . metadata . id . clone ();
+  let content_child_ids : Vec < NodeId > = node_ref . children ()
+    . filter ( |c| c . value () . metadata . code . relToParent
+                   == RelToParent::Content )
+    . map ( |c| c . id () )
+    . collect ();
+  if let Some(ref pid) = node_pid_opt { // remove from visited
+    visited . remove ( pid ); }
+  { // mark indefinitive, clear body
+    let mut node_mut : NodeMut < OrgNode > =
+      tree . get_mut ( node_id )
+      . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
+    node_mut . value () . metadata . code . indefinitive = true;
+    node_mut . value () . body = None; }
+  for child_id in content_child_ids { // recurse
+    indefinitize_content_subtree (
+      tree, child_id, visited ) ?; }
+  Ok (( )) }
