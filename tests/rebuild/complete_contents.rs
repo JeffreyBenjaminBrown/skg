@@ -1,7 +1,6 @@
 // cargo test --test rebuild -- --nocapture
 
 use indoc::indoc;
-use std::collections::HashSet;
 use std::error::Error;
 
 use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, make_indefinitive_if_repeated};
@@ -14,26 +13,16 @@ use ego_tree::{Tree, NodeId};
 
 /// Helper to call make_indefinitive_if_repeated followed by completeContents
 /// (matches the pattern used in complete_node_preorder)
-///
-/// This version uses the old HashSet interface for backwards-compatible tests.
-/// It creates a temporary VisitedMap internally.
 async fn check_and_complete (
-  tree    : &mut Tree < OrgNode >,
-  node_id : NodeId,
-  config  : &SkgConfig,
-  driver  : &typedb_driver::TypeDBDriver,
-  visited : &mut HashSet < ID >,
+  tree     : &mut Tree < OrgNode >,
+  node_id  : NodeId,
+  tree_idx : usize,
+  config   : &SkgConfig,
+  driver   : &typedb_driver::TypeDBDriver,
+  visited  : &mut VisitedMap,
 ) -> Result < (), Box<dyn Error> > {
-  // Convert HashSet to VisitedMap for the new signature
-  let mut visited_map : VisitedMap =
-    visited . iter ()
-    . map ( |id| (id.clone(), (0, node_id)) ) // Use dummy tree_idx=0 and current node_id
-    . collect ();
   make_indefinitive_if_repeated (
-    tree, node_id, 0, &mut visited_map ) . await ?;
-  // Update the original visited set with any new entries
-  for id in visited_map . keys () {
-    visited . insert ( id . clone () ); }
+    tree, node_id, tree_idx, visited ) . await ?;
   let is_indefinitive : bool = {
     // 'make_indefinitive_if_repeated' may have changed this value.
     let node_ref = tree . get ( node_id )
@@ -77,10 +66,10 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
     check_and_complete ( // processes root but *not* its descendents
-      tree, root_id, config, driver, &mut visited ) . await ?;
+      tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -104,11 +93,12 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
-    visited . insert ( ID::new ( "a" ));
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
+    // Pre-populate visited with 'a' at a dummy location
+    visited . insert ( ID::new ( "a" ), (0, root_id) );
     check_and_complete (
-      tree, root_id, config, driver, &mut visited ). await ?;
+      tree, root_id, 0, config, driver, &mut visited ). await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -125,7 +115,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       visited . len (), 1,
       "Visited should still contain only 'a'" );
     assert! (
-      visited . contains ( & ID::new ( "a" )),
+      visited . contains_key ( & ID::new ( "a" )),
       "Visited should contain 'a'" );
   }
 
@@ -138,11 +128,11 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       tree . root ()
       . first_child () . unwrap ()
       . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
 
     check_and_complete (
-      tree, second_node_id, config, driver, &mut visited ) . await ?;
+      tree, second_node_id, 0, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -191,11 +181,11 @@ async fn test_visited_and_indefinitive_logic (
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
-      let mut visited : HashSet < ID > =
-        HashSet::new ();
+      let mut visited : VisitedMap =
+        VisitedMap::new ();
 
       check_and_complete (
-        tree, root_id, config, driver, &mut visited ) . await ?;
+        tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -218,12 +208,12 @@ async fn test_visited_and_indefinitive_logic (
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
-      let mut visited : HashSet < ID > =
-        HashSet::new ();
-      visited . insert ( ID::new ( "a" ));
+      let mut visited : VisitedMap =
+        VisitedMap::new ();
+      visited . insert ( ID::new ( "a" ), (0, root_id) );
 
       check_and_complete (
-        tree, root_id, config, driver, &mut visited ) . await ?;
+        tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -257,11 +247,11 @@ async fn test_visited_and_indefinitive_logic (
         & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
         tree . root () . id ();
-      let mut visited : HashSet < ID > =
-        HashSet::new ();
+      let mut visited : VisitedMap =
+        VisitedMap::new ();
 
       check_and_complete (
-        tree, root_id, config, driver, &mut visited ) . await ?;
+        tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -283,16 +273,18 @@ async fn test_visited_and_indefinitive_logic (
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
       let tree : &mut Tree < OrgNode > =
         & mut forest [ 0 ];
+      let root_id : ego_tree::NodeId =
+        tree . root () . id ();
       let second_node_id : ego_tree::NodeId =
         tree . root ()
         . first_child () . unwrap ()
         . id ();
-      let mut visited : HashSet < ID > =
-        HashSet::new ();
-      visited . insert ( ID::new ( "d" ));
+      let mut visited : VisitedMap =
+        VisitedMap::new ();
+      visited . insert ( ID::new ( "d" ), (0, root_id) );
 
       check_and_complete (
-        tree, second_node_id, config, driver, &mut visited ) . await ?;
+        tree, second_node_id, 0, config, driver, &mut visited ) . await ?;
 
       let expected_output_from_second : &str =
         indoc! { "
@@ -342,14 +334,14 @@ async fn test_visited_and_not_indefinitive_logic (
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
-    visited . insert ( ID::new ( "a" ));
-    let visited_before : HashSet < ID > =
-      visited . clone ();
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
+    visited . insert ( ID::new ( "a" ), (0, root_id) );
+    let visited_keys_before : Vec < ID > =
+      visited . keys () . cloned () . collect ();
 
     check_and_complete (
-      tree, root_id, config, driver, &mut visited ) . await ?;
+      tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -362,9 +354,11 @@ async fn test_visited_and_not_indefinitive_logic (
     assert_eq! (
       output_org_text, expected_output,
       "Node 'a' in visited should become indefinitive with source, but children preserved" );
+    let visited_keys_after : Vec < ID > =
+      visited . keys () . cloned () . collect ();
     assert_eq! (
-      visited, visited_before,
-      "Visited should be unchanged" );
+      visited_keys_after, visited_keys_before,
+      "Visited keys should be unchanged" );
   }
 
   // Test with empty visited
@@ -375,11 +369,11 @@ async fn test_visited_and_not_indefinitive_logic (
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
 
     check_and_complete (
-      tree, root_id, config, driver, &mut visited ) . await ?;
+      tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -394,7 +388,7 @@ async fn test_visited_and_not_indefinitive_logic (
       output_org_text, expected_output,
       "Node 'a' not in visited should be completed from disk" );
     assert! (
-      visited . contains ( & ID::new ( "a" )),
+      visited . contains_key ( & ID::new ( "a" )),
       "Visited should now contain 'a'" );
   }
 
@@ -413,11 +407,11 @@ async fn test_visited_and_not_indefinitive_logic (
       & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
       tree . root () . id ();
-    let mut visited : HashSet < ID > =
-      HashSet::new ();
+    let mut visited : VisitedMap =
+      VisitedMap::new ();
 
     check_and_complete (
-      tree, root_id, config, driver, &mut visited ) . await ?;
+      tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -464,11 +458,11 @@ async fn test_false_content_logic (
     & mut forest [ 0 ];
   let root_id : ego_tree::NodeId =
     tree . root () . id ();
-  let mut visited : HashSet < ID > =
-    HashSet::new ();
+  let mut visited : VisitedMap =
+    VisitedMap::new ();
 
   check_and_complete (
-    tree, root_id, config, driver, &mut visited ) . await ?;
+    tree, root_id, 0, config, driver, &mut visited ) . await ?;
 
   let expected_output : &str =
     indoc! { "
