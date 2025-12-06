@@ -71,6 +71,26 @@ pub async fn stub_forest_from_root_ids (
     forest . push ( tree ); }
   Ok ( forest ) }
 
+/// Enrich all nodes in a forest with relationship metadata.
+/// Fetches relationship data from TypeDB and applies it to the forest.
+pub async fn set_metadata_relationship_viewdata_in_forest (
+  forest : &mut [Tree < OrgNode >],
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let rel_data : MapsFromIdForView =
+    mapsFromIdForView_from_forest (
+      forest, config, driver ) . await ?;
+  for tree in forest {
+    let root_id : ego_tree::NodeId =
+      tree . root () . id ();
+    set_metadata_relationships_in_node_recursive (
+      tree,
+      root_id,
+      None,
+      & rel_data ); }
+  Ok (( )) }
+
 /// Build MapsFromIdForView from a forest of OrgNode trees.
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
@@ -128,26 +148,6 @@ async fn fetch_relationship_data (
     container_to_contents,
     content_to_containers,
   }) }
-
-/// Enrich all nodes in a forest with relationship metadata.
-/// Fetches relationship data from TypeDB and applies it to the forest.
-pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut [Tree < OrgNode >],
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let rel_data : MapsFromIdForView =
-    mapsFromIdForView_from_forest (
-      forest, config, driver ) . await ?;
-  for tree in forest {
-    let root_id : ego_tree::NodeId =
-      tree . root () . id ();
-    set_metadata_relationships_in_node_recursive (
-      tree,
-      root_id,
-      None,
-      & rel_data ); }
-  Ok (( )) }
 
 fn set_metadata_relationships_in_node_recursive (
   tree       : &mut Tree < OrgNode >,

@@ -82,7 +82,7 @@ fn render_generation_and_recurse<'a> (
     let parent_child_rels_to_add : Vec<(usize, // the tree
                                         NodeId, // the parent
                                         ID)> = ( // the child
-      collect_children_from_generation(
+      collect_rels_to_children_from_generation(
         forest, &current_gen ));
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
@@ -166,24 +166,27 @@ fn mark_cycles_and_repeats (
   Ok (( )) }
 
 /// Collect all children IDs from nodes in the current generation.
+/// Passes over indefinitive nodes,
+///   as their contents do not need rendering.
 /// Returns (tree_idx, parent_node_id, child_id) tuples.
-fn collect_children_from_generation(
+fn collect_rels_to_children_from_generation(
   forest : &[Tree<(SkgNode, OrgNode)>],
-  nodes_in_gen : &[(usize, // an index into the forest
-                    Vec<NodeId>)], // all in the same generation
-) -> Vec<(usize, // an index into the forest
+  nodes_in_gen :  &[(usize,         // which tree of the forest
+                     Vec<NodeId>)], // all in the same generation (even across trees, not just within them)
+) -> Vec<(usize,  // an index into the forest
           NodeId, // a parent from 'nodes_in_gen'
-          ID)> { // a child of that parent
+          ID)> {  // a child of that parent
   let mut children : Vec<(usize, NodeId, ID)> = Vec::new();
   for (tree_idx, node_ids) in nodes_in_gen {
     for node_id in node_ids {
       let node_ref =
         forest[*tree_idx] . get(*node_id) . unwrap();
       if node_ref . value() . 1 . metadata.code.indefinitive {
-        continue; } // OrgNode (1) is indefinitive, so ignore it.
+        // The OrgNode (1) is indefinitive, so ignore it.
+        continue; }
       else if let Some(ref child_ids) =
         node_ref . value() . 0 . contains {
-          // SkgNode (0) has contents. Include them.
+          // The SkgNode (0) has contents, so include them.
           for child_id in child_ids {
             children . push(
               (*tree_idx, *node_id, child_id.clone() )); }} }}
