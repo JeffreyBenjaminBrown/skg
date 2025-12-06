@@ -3,22 +3,6 @@
 /// MOTIVATION: Avoids some complexities of 'completeOrgnodeForest',
 /// because in an initial view the only kind of child is content.
 ///
-/// ALGORITHM DETAILS are in the comment for the only public function,
-/// 'render_initial_forest_bfs'.
-
-mod truncate;
-
-use crate::media::tree::collect_generation_ids_in_forest;
-use crate::to_org::content_view::stub_forest_from_root_ids;
-use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
-use crate::to_org::util::skgnode_and_orgnode_from_id;
-
-use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
-use std::cmp::min;
-use std::collections::HashSet;
-use std::error::Error;
-use typedb_driver::TypeDBDriver;
-
 /// THE ALGORITHM:
 /// Start with a list of roots.
 /// Render one generation at a time as definitive orgnodes.
@@ -30,6 +14,22 @@ use typedb_driver::TypeDBDriver;
 /// but ignore (omit, leave unrendered) the rest of its generation.
 /// Then navigate up to L's parent P,
 /// and re-render every node in P's generation after P as indefinitive.
+
+mod truncate;
+
+use crate::to_org::content_view::stub_forest_from_root_ids;
+use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
+use crate::to_org::util::skgnode_and_orgnode_from_id;
+
+use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use std::cmp::min;
+use std::collections::HashSet;
+use std::error::Error;
+use std::pin::Pin;
+use std::future::Future;
+use typedb_driver::TypeDBDriver;
+
+/// The file header comment describes the algorithm.
 pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
@@ -37,54 +37,101 @@ pub async fn render_initial_forest_bfs (
 ) -> Result < Vec < Tree <
     (SkgNode, OrgNode) > >, // The end goal is just OrgNodes, but the SkgNodes permit us to avoid redundant DB fetches.
   Box<dyn Error> > {
+  let mut visited : HashSet<ID> = HashSet::new();
   let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
-  let mut visited : HashSet<ID> = HashSet::new();
-  let mut generation : usize = 1; // meaningless if < 1
-  let mut nodes_rendered : usize = 0;
-  let limit : usize = config.initial_node_limit;
-  loop {
-    let nodes_in_gen_by_tree : Vec<(usize, // indicates which tree
-                                    Vec<NodeId>)> =
-      collect_generation_ids_in_forest (
-        &forest, generation)?;
-    if nodes_in_gen_by_tree.is_empty() {
-      break; }
-    for (tree_idx, node_ids) in &nodes_in_gen_by_tree {
+  let root_nodes : Vec<(usize, Vec<NodeId>)> =
+    forest . iter() . enumerate()
+    . map(|(idx, tree)| (idx, vec![tree.root().id()]))
+    . collect();
+  render_generation_and_recurse (
+    &mut forest,
+    root_nodes,
+    1,  // generation
+    0,  // nodes_rendered
+    config.initial_node_limit,
+    &mut visited,
+    config,
+    driver,
+  ) . await ?;
+  Ok ( forest ) }
+
+/// Returns when the generation is empty or the limit is reached.
+fn render_generation_and_recurse<'a> (
+  forest         : &'a mut Vec<Tree<(SkgNode, OrgNode)>>,
+  current_gen    : Vec<(usize, Vec<NodeId>)>,
+  generation     : usize,
+  nodes_rendered : usize,
+  limit          : usize,
+  visited        : &'a mut HashSet<ID>,
+  config         : &'a SkgConfig,
+  driver         : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<
+    Output = Result<(), Box<dyn Error>>> + 'a>> {
+  Box::pin ( async move {
+    if current_gen.is_empty() {
+      return Ok(( )); }
+    let mut nodes_rendered : usize = nodes_rendered;
+    for (tree_idx, node_ids) in &current_gen {
+      // mark cycles and repeats
       for node_id in node_ids {
         mark_cycles_and_repeats(
-          &mut forest,
-          *tree_idx,
-          *node_id,
-          &mut visited, )?;
+          forest, *tree_idx, *node_id, visited)?;
         nodes_rendered += 1; }}
-    let next_generation : Vec<(usize, NodeId, ID)> =
+    let parent_child_rels_to_add : Vec<(usize, // the tree
+                                        NodeId, // the parent
+                                        ID)> = ( // the child
       collect_children_from_generation(
-        &forest, &nodes_in_gen_by_tree);
-    let children_count : usize =
-      next_generation.len();
-    if nodes_rendered + children_count >= limit {
+        forest, &current_gen ));
+    let next_gen_count : usize =
+      parent_child_rels_to_add . len();
+    if nodes_rendered + next_gen_count >= limit {
       add_children_with_truncation (
-        &mut forest,
-        generation,
-        &next_generation,
-        nodes_rendered,
-        limit,
-        config,
-        driver,
-        &mut visited,
-      ).await?;
-      break; }
-    for (tree_idx, parent_id, child_id) in next_generation {
-      let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
-        skgnode_and_orgnode_from_id(
-          config, driver, &child_id).await?;
-      let mut parent_mut : NodeMut<(SkgNode, OrgNode)> =
-        forest[tree_idx] . get_mut(parent_id) . unwrap();
-      parent_mut . append((child_skgnode, child_orgnode)); }
-    generation += 1; }
-  Ok ( forest ) }
+        forest, generation, &parent_child_rels_to_add,
+        nodes_rendered, limit, config, driver, visited,
+      ) . await ?;
+      return Ok(( )); }
+    else {
+      let next_gen : Vec<(usize, Vec<NodeId>)> =
+        add_children_and_collect_their_ids (
+          forest, parent_child_rels_to_add, config, driver
+        ) . await ?;
+      render_generation_and_recurse (
+        forest, next_gen, generation + 1,
+        nodes_rendered, limit, visited, config, driver,
+      ) . await }} ) }
+
+/// Add children to the forest.
+/// Return their NodeIds grouped by tree.
+async fn add_children_and_collect_their_ids (
+  forest      : &mut Vec<Tree<(SkgNode, OrgNode)>>,
+  rels_to_add : Vec<( usize,  // which tree
+                      NodeId, // parent
+                      ID )>,  // child of that parent
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result<Vec<( usize,         // which tree
+                  Vec<NodeId>)>, // children added
+            Box<dyn Error>> {
+  let mut child_gen : Vec<(usize, Vec<NodeId>)> = Vec::new();
+  for (tree_idx, parent_id, child_id) in rels_to_add {
+    let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+      skgnode_and_orgnode_from_id(config, driver, &child_id).await?;
+    let mut parent_mut : NodeMut<(SkgNode, OrgNode)> =
+      forest[tree_idx] . get_mut(parent_id) . unwrap();
+    let child_node_id : NodeId =
+      parent_mut . append((child_skgnode, child_orgnode)) . id();
+    if let Some((_, ids)) =
+      child_gen . iter_mut() . find(|(idx, _)| *idx == tree_idx) {
+        // Group by tree_idx
+        // todo ? Using 'find' is inefficient, but arguably safer,
+        // than simply accessing the 'idx'th element.
+        let ids : &mut Vec<NodeId> = ids;
+        ids . push(child_node_id);
+    } else {
+      child_gen . push((tree_idx, vec![child_node_id])); }}
+  Ok(child_gen) }
 
 /// Marks as a cycle if it's a cycle.
 ///   (Leaves the corresponding ancestor unchanged.)
