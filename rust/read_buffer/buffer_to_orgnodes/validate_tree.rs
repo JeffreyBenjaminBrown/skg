@@ -1,8 +1,9 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig, SourceNickname};
+use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig, SourceNickname, ViewRequest};
 use crate::merge::validate_merge_requests;
 use ego_tree::Tree;
+use ego_tree::iter::Edge;
 use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
 
@@ -43,6 +44,8 @@ pub async fn find_buffer_errors_for_saving (
     for error_msg in merge_errors {
       errors.push(
         BufferValidationError::Other(error_msg)); }}
+  validate_definitive_view_requests(
+    trees, &mut errors);
   validate_roots_have_sources(
     trees, &mut errors);
   for tree in trees { // other kinds of error
@@ -167,3 +170,37 @@ fn validate_node_and_children (
     validate_node_and_children(
       child, Some(cloned_rel), config, errors);
   }}
+
+/// Validate definitive view requests:
+/// - Must be on an indefinitive orgnode
+/// - Must be on a childless orgnode
+/// - At most one request of this kind per ID
+fn validate_definitive_view_requests (
+  trees  : &[Tree<OrgNode>],
+  errors : &mut Vec<BufferValidationError>,
+) {
+  let mut ids_with_requests : HashSet<ID> =
+    HashSet::new();
+  for tree in trees {
+    for edge in tree.root().traverse() {
+      if let Edge::Open(node_ref) = edge {
+        let node : &OrgNode =
+          node_ref.value();
+        if node.metadata.code.viewRequests.contains(
+          &ViewRequest::Definitive ) {
+          if let Some(ref id) = node.metadata.id {
+            { // Error: must be indefinitive
+              if ! node.metadata.code.indefinitive {
+                errors.push(
+                  BufferValidationError::DefinitiveRequestOnDefinitiveNode(
+                    id.clone() )); }}
+            { // Error: must be childless
+              if node_ref.children().next().is_some() {
+                errors.push(
+                  BufferValidationError::DefinitiveRequestOnNodeWithChildren(
+                    id.clone() )); }}
+            { // Error: at most one request per ID
+              if ! ids_with_requests.insert(id.clone()) {
+                errors.push(
+                  BufferValidationError::MultipleDefinitiveRequestsForSameId(
+                    id.clone() )); }} }} }} }}

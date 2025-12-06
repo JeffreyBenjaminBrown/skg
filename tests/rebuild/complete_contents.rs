@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::error::Error;
 
 use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, make_indefinitive_if_repeated};
+use skg::to_org::util::VisitedMap;
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, OrgNode, SkgConfig};
@@ -13,6 +14,9 @@ use ego_tree::{Tree, NodeId};
 
 /// Helper to call make_indefinitive_if_repeated followed by completeContents
 /// (matches the pattern used in complete_node_preorder)
+///
+/// This version uses the old HashSet interface for backwards-compatible tests.
+/// It creates a temporary VisitedMap internally.
 async fn check_and_complete (
   tree    : &mut Tree < OrgNode >,
   node_id : NodeId,
@@ -20,8 +24,16 @@ async fn check_and_complete (
   driver  : &typedb_driver::TypeDBDriver,
   visited : &mut HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
+  // Convert HashSet to VisitedMap for the new signature
+  let mut visited_map : VisitedMap =
+    visited . iter ()
+    . map ( |id| (id.clone(), (0, node_id)) ) // Use dummy tree_idx=0 and current node_id
+    . collect ();
   make_indefinitive_if_repeated (
-    tree, node_id, visited ) . await ?;
+    tree, node_id, 0, &mut visited_map ) . await ?;
+  // Update the original visited set with any new entries
+  for id in visited_map . keys () {
+    visited . insert ( id . clone () ); }
   let is_indefinitive : bool = {
     // 'make_indefinitive_if_repeated' may have changed this value.
     let node_ref = tree . get ( node_id )

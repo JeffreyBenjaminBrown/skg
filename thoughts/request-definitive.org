@@ -71,10 +71,12 @@ sees nodes from all previous expansions.
 ** Data Structures
 
 #+begin_src rust
-// Change from HashSet<ID> to HashMap<ID, (usize, NodeId)>
+// Type alias defined in to_org/util.rs:
+// pub type VisitedMap = HashMap<ID, (usize, NodeId)>;
+//
 // This lets us find and modify conflicting definitive instances
 // without searching across trees.
-visited: HashMap<ID, (usize, NodeId)>  // ID -> (tree_index, node_id)
+visited: VisitedMap  // ID -> (tree_index, node_id)
 
 // Collected during Phase 1
 definitive_requests: Vec<(usize, NodeId)>  // (tree_index, node_id)

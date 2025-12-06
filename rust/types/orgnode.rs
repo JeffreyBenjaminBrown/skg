@@ -82,6 +82,7 @@ pub enum ViewRequest {
   Aliases,
   Containerward,
   Sourceward,
+  Definitive,
 }
 
 
@@ -152,6 +153,7 @@ impl fmt::Display for ViewRequest {
       ViewRequest::Aliases       => write!(f, "aliases"),
       ViewRequest::Containerward => write!(f, "containerwardView"),
       ViewRequest::Sourceward    => write!(f, "sourcewardView"),
+      ViewRequest::Definitive    => write!(f, "definitiveView"),
     } } }
 
 impl FromStr for ViewRequest {
@@ -164,6 +166,7 @@ impl FromStr for ViewRequest {
       "aliases"           => Ok ( ViewRequest::Aliases ),
       "containerwardView" => Ok ( ViewRequest::Containerward ),
       "sourcewardView"    => Ok ( ViewRequest::Sourceward ),
+      "definitiveView"    => Ok ( ViewRequest::Definitive ),
       _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),
     }} }
 

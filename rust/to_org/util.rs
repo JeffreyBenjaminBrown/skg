@@ -4,9 +4,23 @@ use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
 
+use ego_tree::NodeId;
+use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use typedb_driver::TypeDBDriver;
+
+/// Tracks which IDs have been rendered definitively and where.
+/// - Key: the ID that was visited
+/// - Value: ( index identifying a tree in the forest,
+///            NodeId within that tree )
+///
+/// Uses:
+/// - prevent duplicate definitive expansions
+/// - locate the conflict when an earlier definitive view
+///   conflicts with a new definitive view request
+pub type VisitedMap =
+  HashMap < ID, (usize, NodeId) >;
 
 /// Fetch a SkgNode from disk (queries TypeDB for source).
 /// Make an OrgNode from it, with validated title.

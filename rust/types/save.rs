@@ -132,6 +132,15 @@ fn format_buffer_validation_error (
     BufferValidationError::IndefinitiveWithEditRequest(node) => {
       format!("Indefinitive node cannot have an edit request:\n- Title: {}\n- ID: {:?}\n- Indefinitive nodes represent views and should not be edited or deleted.\n",
               node.title, node.metadata.id) },
+    BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) => {
+      format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
+              id.0) },
+    BufferValidationError::DefinitiveRequestOnNodeWithChildren(id) => {
+      format!("Definitive view request on a node with children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
+              id.0) },
+    BufferValidationError::MultipleDefinitiveRequestsForSameId(id) => {
+      format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
+              id.0) },
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 

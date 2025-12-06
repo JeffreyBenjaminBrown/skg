@@ -1,3 +1,10 @@
+* fix this
+/// Helper to call make_indefinitive_if_repeated followed by completeContents
+/// (matches the pattern used in complete_node_preorder)
+///
+/// This version uses the old HashSet interface for backwards-compatible tests.
+/// It creates a temporary VisitedMap internally.
+async fn check_and_complete (
 * Request definitive content view at a node
 ** for repeats
 ** for subscriptions

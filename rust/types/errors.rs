@@ -38,6 +38,9 @@ pub enum BufferValidationError {
                                   SourceNickname), // buffer source
   SourceNotInConfig              (ID, SourceNickname),
   IndefinitiveWithEditRequest    (OrgNode), // Indefinitive node has an edit request (not allowed)
+  DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
+  DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
+  MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   Other                          (String),
 }
 
@@ -107,6 +110,12 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::IndefinitiveWithEditRequest(node) =>
         write!(f, "Indefinitive node cannot have an edit request. Node ID: {:?}, title: '{}'",
                node.metadata.id, node.title),
+      BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) =>
+        write!(f, "Definitive view request on a node that is already definitive (ID {:?}). The node already shows its content; no expansion needed.", id),
+      BufferValidationError::DefinitiveRequestOnNodeWithChildren(id) =>
+        write!(f, "Definitive view request on a node with children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", id),
+      BufferValidationError::MultipleDefinitiveRequestsForSameId(id) =>
+        write!(f, "Multiple definitive view requests for the same ID {:?}. At most one request per ID is allowed.", id),
       BufferValidationError::Other(msg) =>
         write!(f, "{}", msg), }} }
 
