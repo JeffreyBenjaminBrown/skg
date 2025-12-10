@@ -5,7 +5,6 @@ use skg::media::tree::{
   next_in_generation,
   next_in_generation_in_forest,
   collect_generation_ids,
-  collect_generation_ids_in_forest
 };
 use std::error::Error;
 
@@ -386,44 +385,21 @@ fn test_first_in_generation_in_forest() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_collect_generation_ids_error_on_zero() {
   let tree: Tree<i32> = Tree::new(1);
-  let result = collect_generation_ids(&tree, 0);
+  let result = collect_generation_ids(&tree, 0, None);
   assert!(result.is_err());
   assert_eq!(result.unwrap_err().to_string(), "Generation must be >= 1");
 }
 
-#[test]
-fn test_collect_generation_ids_in_forest_error_on_zero() {
-  let tree1: Tree<i32> = Tree::new(1);
-  let tree2: Tree<i32> = Tree::new(2);
-  let forest = vec![tree1, tree2];
-  let result = collect_generation_ids_in_forest(&forest, 0);
-  assert!(result.is_err());
-  assert_eq!(result.unwrap_err().to_string(), "Generation must be >= 1");
-}
 
 #[test]
 fn test_collect_generation_ids_success() {
   let tree: Tree<i32> = Tree::new(1);
-  let result = collect_generation_ids(&tree, 1);
+  let result = collect_generation_ids(&tree, 1, None);
   assert!(result.is_ok());
   let ids = result.unwrap();
   assert_eq!(ids.len(), 1);
 }
 
-#[test]
-fn test_collect_generation_ids_in_forest_success() {
-  let tree1: Tree<i32> = Tree::new(1);
-  let tree2: Tree<i32> = Tree::new(2);
-  let forest = vec![tree1, tree2];
-  let result = collect_generation_ids_in_forest(&forest, 1);
-  assert!(result.is_ok());
-  let grouped_ids = result.unwrap();
-  // Should have 2 groups, one per tree
-  assert_eq!(grouped_ids.len(), 2);
-  // Each group should have 1 node (the root)
-  assert_eq!(grouped_ids[0].1.len(), 1);
-  assert_eq!(grouped_ids[1].1.len(), 1);
-}
 
 // Helper function to find a node by its label
 fn find_node_by_label<'a>(

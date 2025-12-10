@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Functions for requesting views (aliases, containerward, sourceward)
+;;; Functions for requesting views (aliases, containerward, sourceward, definitive)
 ;;; by adding metadata to the current headline and saving the buffer,
 ;;; allowing Rust to process the request during completion.
 ;;;
@@ -8,6 +8,7 @@
 ;;;   skg-request-aliases-view ()
 ;;;   skg-request-containerward-view ()
 ;;;   skg-request-sourceward-view ()
+;;;   skg-request-definitive-view ()
 
 
 (require 'skg-metadata)
@@ -29,6 +30,12 @@
   "Edit metadata to request a sourceward view for the headline at point."
   (interactive)
   (skg--request-view 'sourcewardView))
+
+(defun skg-request-definitive-view ()
+  "Edit metadata to request a definitive view for the headline at point.
+The node must be indefinitive and childless."
+  (interactive)
+  (skg--request-view 'definitiveView))
 
 (defun skg--request-view
     (view-token) ;; 'aliases, 'containerwardView, or 'sourcewardView

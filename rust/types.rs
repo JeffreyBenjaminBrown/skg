@@ -35,3 +35,5 @@ pub mod save;
 pub use save::{ NonMerge_NodeAction,
                 SaveInstruction,
                 MergeInstructionTriple, };
+pub mod trees;
+pub use trees::PairTree;

@@ -1,0 +1,38 @@
+* Alternative: SkgNode Cache Instead of Paired Trees
+
+** The Problem
+~definitive_branch.rs~ refetches SkgNodes that were already fetched during completion.
+User wants to eliminate this waste.
+
+** Option 1: Change All Trees to Paired
+Change the entire pipeline to use ~Tree<(SkgNode, OrgNode)>~.
+This is a large refactor touching many files.
+
+** Option 2: SkgNode Cache
+Keep ~Tree<OrgNode>~ but pass a ~HashMap<ID, SkgNode>~ cache alongside.
+
+During completion, populate the cache when we fetch SkgNodes.
+During definitive expansion, check the cache before fetching.
+
+Pros:
+- Minimal code changes
+- No tree type changes
+- Still eliminates refetches
+
+Cons:
+- An extra data structure to thread through
+- Doesn't match ~initial_view_bfs~ structure exactly
+
+** Which Is Better?
+
+The user specifically asked to "use the same kind of tree of (skgnode, orgnode) pairs".
+This suggests Option 1 is preferred.
+
+However, the buffer parsing fundamentally produces OrgNodes from text, not (SkgNode, OrgNode) pairs.
+We could wrap them as ~(empty_skgnode(), OrgNode)~ but that's awkward.
+
+A compromise: Use ~Tree<(Option<SkgNode>, OrgNode)>~ where:
+- Buffer-parsed nodes have ~None~
+- Completed/expanded nodes have ~Some(SkgNode)~
+
+This allows gradually populating SkgNodes as we fetch them, while keeping the tree structure.

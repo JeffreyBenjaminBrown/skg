@@ -1,5 +1,10 @@
 /// Utilities for working with ego_tree::Tree.
 
+pub mod orgnode_skgnode;
+pub use orgnode_skgnode::{
+  pair_forest_with_save_instructions,
+};
+
 use ego_tree::{Tree, NodeRef, NodeId};
 use std::error::Error;
 
@@ -181,16 +186,25 @@ pub fn next_in_generation_in_forest<'a, T>(
 // NodeId-based utilities for mutable access
 //
 
-/// Collects all NodeIds at a given generation in a tree.
-/// Generation 1 is the root; generation 2 is children of root; etc.
+/// Collects all NodeIds at a given generation in a tree,
+/// relative to an effective root (which might be the true root).
+/// Generation 1 = the effective root; generation 2, its children; etc.
+/// If effective_root is None, uses the true tree root.
 /// Returns an empty Vec if the generation doesn't exist.
-/// Returns an error if generation < 1.
+/// Returns an error if generation < 1
+/// or if effective_root is not in the tree.
 pub fn collect_generation_ids<T>(
-  tree: &Tree<T>,
-  generation: usize,
+  tree           : &Tree<T>,
+  generation     : usize,
+  effective_root : Option<NodeId>,
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
   if generation < 1 {
     return Err("Generation must be >= 1".into() ); }
+  let effective_root_noderef : NodeRef<'_, T> =
+    match effective_root {
+      None => tree.root(),
+      Some(nid) => tree.get(nid)
+        . ok_or("collect_generation_ids: effective_root not in tree")? };
   let mut result : Vec<NodeId> = Vec::new();
   fn collect_at_depth<T>(
     node: NodeRef<'_, T>,
@@ -205,26 +219,6 @@ pub fn collect_generation_ids<T>(
       collect_at_depth (
         child, current_depth + 1, target_depth, result); }}
   collect_at_depth (
-    tree.root(), 1, generation, &mut result);
+    effective_root_noderef, 1, generation, &mut result);
   Ok (result) }
 
-/// Collects all NodeIds at a given generation
-/// across all trees in a forest.
-/// Returns (tree_index, vec_of_node_ids) pairs in BFS order.
-/// Returns an error if generation < 1.
-pub fn collect_generation_ids_in_forest<T>(
-  forest: &[Tree<T>],
-  generation: usize,
-) -> Result<
-  Vec<(usize, // index specifying a tree in 'forest'
-       Vec<NodeId>)>, // all nodes in that tree at this generation
-  Box<dyn Error>> {
-  if generation < 1 {
-    return Err("Generation must be >= 1".into() ); }
-  let mut result: Vec<(usize, Vec<NodeId>)> = Vec::new();
-  for (tree_index, tree) in forest.iter().enumerate() {
-    let ids: Vec<NodeId> =
-      collect_generation_ids (tree, generation)?;
-    if !ids.is_empty() {
-      result.push ((tree_index, ids)); }}
-  Ok (result) }

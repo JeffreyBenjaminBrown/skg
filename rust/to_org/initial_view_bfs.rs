@@ -1,6 +1,6 @@
 /// PURPOSE: BFS rendering of content views with node count limit.
 ///
-/// MOTIVATION: Avoids some complexities of 'completeOrgnodeForest',
+/// MOTIVATION: Avoids some complexities of 'completeOrgnodeForest_collectingDefinitiveRequests',
 /// because in an initial view the only kind of child is content.
 ///
 /// THE ALGORITHM:
@@ -15,13 +15,17 @@
 /// Then navigate up to L's parent P,
 /// and re-render every node in P's generation after P as indefinitive.
 
-mod truncate;
-
 use crate::to_org::content_view::stub_forest_from_root_ids;
-use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
+use crate::to_org::bfs_shared::{
+  collect_content_children,
+  rewrite_to_indefinitive };
+use crate::to_org::truncate::truncate_after_node_in_generation_in_forest;
+use crate::to_org::util::is_ancestor_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
+use crate::types::trees::PairTree;
 
-use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::cmp::min;
 use std::collections::HashSet;
 use std::error::Error;
@@ -34,11 +38,10 @@ pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < Tree <
-    (SkgNode, OrgNode) > >, // The end goal is just OrgNodes, but the SkgNodes permit us to avoid redundant DB fetches.
+) -> Result < Vec < PairTree >,
   Box<dyn Error> > {
   let mut visited : HashSet<ID> = HashSet::new();
-  let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
+  let mut forest : Vec < PairTree > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
   let root_nodes : Vec<(usize, Vec<NodeId>)> =
@@ -59,7 +62,7 @@ pub async fn render_initial_forest_bfs (
 
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
-  forest         : &'a mut Vec<Tree<(SkgNode, OrgNode)>>,
+  forest         : &'a mut Vec<PairTree>,
   current_gen    : Vec<(usize, Vec<NodeId>)>,
   generation     : usize,
   nodes_rendered : usize,
@@ -105,7 +108,7 @@ fn render_generation_and_recurse<'a> (
 /// Add children to the forest.
 /// Return their NodeIds grouped by tree.
 async fn add_children_and_collect_their_ids (
-  forest      : &mut Vec<Tree<(SkgNode, OrgNode)>>,
+  forest      : &mut Vec<PairTree>,
   rels_to_add : Vec<( usize,  // which tree
                       NodeId, // parent
                       ID )>,  // child of that parent
@@ -118,10 +121,10 @@ async fn add_children_and_collect_their_ids (
   for (tree_idx, parent_id, child_id) in rels_to_add {
     let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
       skgnode_and_orgnode_from_id(config, driver, &child_id).await?;
-    let mut parent_mut : NodeMut<(SkgNode, OrgNode)> =
+    let mut parent_mut : NodeMut<(Option<SkgNode>, OrgNode)> =
       forest[tree_idx] . get_mut(parent_id) . unwrap();
     let child_node_id : NodeId =
-      parent_mut . append((child_skgnode, child_orgnode)) . id();
+      parent_mut . append((Some(child_skgnode), child_orgnode)) . id();
     if let Some((_, ids)) =
       child_gen . iter_mut() . find(|(idx, _)| *idx == tree_idx) {
         // Group by tree_idx
@@ -133,36 +136,33 @@ async fn add_children_and_collect_their_ids (
       child_gen . push((tree_idx, vec![child_node_id])); }}
   Ok(child_gen) }
 
-/// Marks as a cycle if it's a cycle.
-///   (Leaves the corresponding ancestor unchanged.)
-/// Marks as indefinitive if it's a repeat.
-/// Updates 'visited'.
+/// If node is a cycle or a repeat,
+/// call rewrite_to_indefinitive on it.
+/// Otherwise add it to 'visited'.
 fn mark_cycles_and_repeats (
-  forest     : &mut Vec<Tree<(SkgNode, OrgNode)>>,
+  forest     : &mut Vec<PairTree>,
   tree_idx   : usize,
   node_id    : NodeId,
   visited    : &mut HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
-  let pid_opt : Option<ID> = {
-    let node_ref =
-      forest[tree_idx] . get(node_id) . unwrap();
-    node_ref . value() . 1 . metadata.id . clone() };
-  let Some(pid) = pid_opt else {
-    return Err("Node has no ID".into()); };
-  { // Check for cycles
-    let is_cycle : bool = is_ancestor(
-      &forest[tree_idx], node_id, &pid);
-    let mut node_mut : NodeMut<(SkgNode, OrgNode)> =
-      forest[tree_idx].get_mut(node_id).unwrap();
-    node_mut . value() . 1 . metadata.viewData.cycle =
-      is_cycle; }
-  if visited . contains (&pid) { // It's a repeat.
-    let mut node_mut : NodeMut<(SkgNode, OrgNode)> =
-      forest[tree_idx] . get_mut(node_id) . unwrap();
-    node_mut . value() . 1 . metadata.code.indefinitive = true;
-    node_mut . value() . 1 . body = None;
-    return Ok(( )); }
-  visited.insert(pid);
+  let tree = &mut forest[tree_idx];
+  let pid : ID = {
+    let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+      tree . get ( node_id )
+      . ok_or ( "mark_cycles_and_repeats: node not found" ) ?;
+    node_ref . value () . 1 . metadata . id . clone ()
+      . ok_or ( "mark_cycles_and_repeats: node has no ID" ) ? };
+  let is_cycle : bool =
+    is_ancestor_id ( tree, node_id, &pid,
+                     |n| n . 1 . metadata . id . as_ref () ) ?;
+  { let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+      tree . get_mut ( node_id )
+      . ok_or ( "mark_cycles_and_repeats: node not found" ) ?;
+    node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }
+  if visited . contains ( &pid ) {
+    rewrite_to_indefinitive ( tree, node_id ) ?; }
+  else {
+    visited . insert ( pid ); }
   Ok (( )) }
 
 /// Collect all children IDs from nodes in the current generation.
@@ -170,7 +170,7 @@ fn mark_cycles_and_repeats (
 ///   as their contents do not need rendering.
 /// Returns (tree_idx, parent_node_id, child_id) tuples.
 fn collect_rels_to_children_from_generation(
-  forest : &[Tree<(SkgNode, OrgNode)>],
+  forest : &[PairTree],
   nodes_in_gen :  &[(usize,         // which tree of the forest
                      Vec<NodeId>)], // all in the same generation (even across trees, not just within them)
 ) -> Vec<(usize,  // an index into the forest
@@ -179,25 +179,20 @@ fn collect_rels_to_children_from_generation(
   let mut children : Vec<(usize, NodeId, ID)> = Vec::new();
   for (tree_idx, node_ids) in nodes_in_gen {
     for node_id in node_ids {
-      let node_ref =
-        forest[*tree_idx] . get(*node_id) . unwrap();
-      if node_ref . value() . 1 . metadata.code.indefinitive {
-        // The OrgNode (1) is indefinitive, so ignore it.
-        continue; }
-      else if let Some(ref child_ids) =
-        node_ref . value() . 0 . contains {
-          // The SkgNode (0) has contents, so include them.
-          for child_id in child_ids {
-            children . push(
-              (*tree_idx, *node_id, child_id.clone() )); }} }}
+      // collect_content_children returns empty vec if indefinitive
+      if let Ok ( child_ids ) =
+        collect_content_children (
+          &forest[*tree_idx], *node_id )
+      { for child_id in child_ids {
+          children . push ( (*tree_idx, *node_id, child_id) ); }}}}
   children }
 
-/// Add children with truncation when limit is exceeded. In odrer:
+/// Add children with truncation when limit is exceeded. In order:
 /// - fetch and add children up to the limit as indefinitive nodes
 /// - complete the sibling group of the limit node
-/// - omit rest of generation (later would-be siblin groups)
+/// - omit rest of generation (later would-be sibling groups)
 async fn add_children_with_truncation(
-  forest           : &mut Vec<Tree<(SkgNode, OrgNode)>>,
+  forest           : &mut Vec<PairTree>,
   generation       : usize,
   children_to_add  : &[(usize, NodeId, ID)],
   nodes_rendered   : usize,
@@ -212,56 +207,31 @@ async fn add_children_with_truncation(
   let last_addable_index =
     min (space_left_before_limit, children_to_add . len()) - 1;
   let (limit_tree_idx, limit_parent_id) : (usize, NodeId) = {
-    let (tree_idx, // index of the node to end at
-         parent_id, // the parent of that node
-         _child_id) =
+    let (tree_idx, parent_id, _child_id) =
       &children_to_add [last_addable_index];
     (*tree_idx, *parent_id) };
   for (idx, (tree_idx, parent_id, child_id))
     in children_to_add . iter() . enumerate() {
-      if idx > last_addable_index && // past the index
-        ( *tree_idx != limit_tree_idx || // in a new tree
-           *parent_id != limit_parent_id ) // in a new sibling group
-      // That 'in a new tree' condition is needed because ego_tree does not permit comparison of node_ids from different trees.
+      if idx > last_addable_index &&
+        ( *tree_idx != limit_tree_idx ||
+           *parent_id != limit_parent_id )
+      // That 'in a new tree' condition is needed because
+      // ego_tree does not permit comparison of
+      // node_ids from different trees.
       { break; }
       let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
         skgnode_and_orgnode_from_id(
           config, driver, child_id ). await?;
-      let mut parent_mut : NodeMut<(SkgNode, OrgNode)> =
-        forest[*tree_idx] . get_mut(*parent_id) . unwrap();
-      let child_node_id : NodeId = // append it
-        parent_mut . append((child_skgnode, child_orgnode)) . id();
-      { let mut child_mut : NodeMut<(SkgNode, OrgNode)> =
-          forest[*tree_idx] . get_mut(child_node_id) . unwrap();
-        child_mut . value() . 1 . metadata.code.indefinitive = true;
-        child_mut . value() . 1 . body = None; }
+      let child_node_id : NodeId = {
+        let mut parent_mut : NodeMut<(Option<SkgNode>, OrgNode)> =
+          forest[*tree_idx] . get_mut(*parent_id) . unwrap();
+        parent_mut . append((Some(child_skgnode), child_orgnode)) . id() };
+      rewrite_to_indefinitive (
+        &mut forest[*tree_idx], child_node_id ) ?;
       if let Some(ref child_pid) =
         forest[*tree_idx] . get(child_node_id)
-        . unwrap() . value() . 1 . metadata.id {
-          visited.insert(child_pid.clone()); }}
-  truncate::truncate_after_node_in_generation(
-    forest,
-    generation,
-    limit_tree_idx,
-    limit_parent_id, )?;
+        . unwrap() . value() . 1 . metadata.id
+      { visited.insert(child_pid.clone()); }}
+  truncate_after_node_in_generation_in_forest(
+    forest, generation, limit_tree_idx, limit_parent_id )?;
   Ok (( )) }
-
-/// Check if a node with a given ID
-/// is in the ancestor path of the current node.
-/// This is used for cycle detection.
-fn is_ancestor (
-  tree : &Tree<(SkgNode, OrgNode)>,
-  node_id : NodeId,
-  target_id : &ID,
-) -> bool {
-  let node_ref : NodeRef<(SkgNode, OrgNode)> =
-    tree . get (node_id) . unwrap();
-  let mut current : Option<NodeRef<(SkgNode, OrgNode)>> =
-    node_ref . parent();
-  while let Some(parent) = current {
-    if let Some(ref parent_id)
-      = parent . value() . 1 . metadata.id {
-        if parent_id == target_id {
-          return true; }}
-    current = parent . parent(); }
-  false }

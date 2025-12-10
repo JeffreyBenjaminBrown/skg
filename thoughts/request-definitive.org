@@ -1,476 +1,82 @@
-=== Definitive View Request: Implementation Plan ===
+=== Definitive View Request: Implementation Status ===
 
-This document describes how to implement ~ViewRequest::Definitive~, which allows
-a user to request that an indefinitive OrgNode expand its content from disk,
-becoming definitive.
+Request that an indefinitive OrgNode expand its content from disk, becoming definitive.
 
-* Terminology
+* Status Summary
 
-For clarity, these terms are used consistently throughout:
+** DONE Core Implementation
+- [X] ~ViewRequest::Definitive~ variant in ~types/orgnode.rs~ (with FromStr/Display)
+- [X] Validation errors in ~types/errors.rs~
+- [X] Validation in ~read_buffer/buffer_to_orgnodes/validate_tree.rs~
+- [X] ~VisitedMap~ type alias (~HashMap<ID, (usize, NodeId)>~) in ~to_org/util.rs~
+- [X] Two-phase processing in ~to_org/complete_contents.rs~
+- [X] ~indefinitize_content_subtree~ in ~to_org/definitive_branch.rs~
+- [X] ~extendDefinitiveSubtreeFromLeaf~ with BFS expansion in ~to_org/definitive_branch.rs~
+- [X] ~execute_definitive_view_request~ (the main entry point) in ~to_org/definitive_branch.rs~
+- [X] Generation calculations use effective root (not true tree root) to avoid clobbering nodes outside the expanded subtree
 
-- *ID*: A Skg UUID (string), stored in ~OrgNode.metadata.id~
-- *NodeId*: An ~ego_tree::NodeId~, the internal identifier for a node's position in a tree
-- *definitive*: An OrgNode whose ~indefinitive~ flag is false. Its content children reflect the graph. Editing them affects the graph on save.
-- *indefinitive*: An OrgNode whose ~indefinitive~ flag is true. It shows only a title (no body, no expandable content). Used for repeated nodes and truncated views.
-- *visited*: A map from ID to ~(tree_idx, NodeId)~, tracking which IDs have already been rendered definitively and where. Prevents infinite loops and duplicate definitive expansions.
-- *content child*: A child OrgNode with ~relToParent == Content~. These represent the graph's 'contains' relationships.
-- *definitive view request*: A ~ViewRequest::Definitive~ on a node, requesting that it be expanded.
+** DONE Emacs Support
+- [X] ~skg-request-definitive-view~ in ~elisp/skg-request-views.el~
+- [X] Display support in ~elisp/heralds-minor-mode.el~
 
-* Feature Overview
+** TODO Remaining Work
+- [ ] Dedicated tests for definitive view requests
+- [ ] Integration test exercising the full flow
 
-Allow childless (leaf) indefinitive nodes in a save buffer to request definitive
-expansion. After the save completes, the server returns an updated buffer where:
+* Key Design Decisions
 
-1. The requesting node is now definitive
-2. Its content has been expanded from disk (up to the node limit)
-3. Any OTHER definitive instance of the same ID becomes indefinitive
-4. The ~visited~ set enforces: each ID appears definitively at most once
+** Two-Phase Processing
 
-This is purely a view operation -- it happens after save and only affects
-the response buffer, not the graph.
+Phase 1 (~completeOrgnodeForest_collectingDefinitiveRequests~): Process the tree normally,
+skipping ~ViewRequest::Definitive~. Collect requests for later. Build ~visited~ map.
 
-* Key Behaviors
+Phase 2 (~execute_definitive_view_requests~): Process collected requests sequentially.
+Each request gets a fresh node budget. Sequential processing ensures ~visited~ accumulates correctly.
 
-1. Each definitive view request uses a fresh node budget (default 1000)
-2. Multiple requests per buffer are allowed (each gets fresh budget, but each grows ~visited~)
-3. At most ONE definitive view request per ID (validated before processing)
-4. A node requesting definitive expansion MUST be indefinitive (validated)
-5. A node requesting definitive expansion MUST be childless (validated)
+** Effective Root for Generation Calculations
 
-* Architecture: Two-Phase Processing
+When expanding a definitive subtree, generation numbers are relative to the node
+containing the request (the "effective root"), not the true tree root. This ensures
+that truncation only affects nodes within the expanded subtree, not siblings of ancestors
+elsewhere in the tree.
 
-** Phase 1: Tree Completion
+** Fresh Budget Per Request
 
-During ~completeOrgnodeForest~, process the tree normally but SKIP
-~ViewRequest::Definitive~. Nodes with this request:
+Each definitive view request gets the full ~initial_node_limit~ budget. This is intentional:
+the user explicitly requested multiple expansions.
 
-- Remain indefinitive
-- Get the ~clobberIndefinitiveOrgnode~ treatment (title from disk, body cleared)
-- Are collected for later processing
+* Validation Rules
 
-This phase builds the ~visited~ map containing all existing definitive nodes.
+1. Node must be indefinitive (error: ~DefinitiveRequestOnDefinitiveNode~)
+2. Node must be childless (error: ~DefinitiveRequestOnNodeWithChildren~)
+3. At most one request per ID (error: ~MultipleDefinitiveRequestsForSameId~)
 
-** Phase 2: Definitive Expansion
+* Algorithm Overview
 
-After tree completion, process collected definitive view requests sequentially
-in tree order (preorder DFS). For each request:
+For each definitive view request:
 
 1. If another OrgNode is currently definitive for this ID:
-   - Mark that node and its content subtree indefinitive
-   - Remove those IDs from ~visited~
-2. Mark this node definitive (~indefinitive = false~)
-3. Expand content using BFS with fresh node budget
-4. Add newly definitive nodes to ~visited~
-5. Remove the ~ViewRequest::Definitive~
+   - Call ~indefinitize_content_subtree~ on that node
+   - This removes it and its content descendants from ~visited~
 
-Sequential processing ensures ~visited~ accumulates correctly -- each expansion
-sees nodes from all previous expansions.
+2. Mark this node definitive, add to ~visited~
 
-* The Algorithm in Detail
-
-** Data Structures
-
-#+begin_src rust
-// Type alias defined in to_org/util.rs:
-// pub type VisitedMap = HashMap<ID, (usize, NodeId)>;
-//
-// This lets us find and modify conflicting definitive instances
-// without searching across trees.
-visited: VisitedMap  // ID -> (tree_index, node_id)
-
-// Collected during Phase 1
-definitive_requests: Vec<(usize, NodeId)>  // (tree_index, node_id)
-#+end_src
-
-** Phase 1: Collecting Requests
-
-During tree traversal, when encountering ~ViewRequest::Definitive~:
-
-#+begin_src rust
-ViewRequest::Definitive => {
-  // Skip expansion -- will process in Phase 2
-  // Just collect for later
-  definitive_requests.push((tree_idx, node_id));
-}
-#+end_src
-
-The node is still processed normally: since it's indefinitive, it gets clobbered
-(title from disk, body cleared).
-
-** Phase 2: Processing Each Request
-
-For each ~(tree_idx, node_id)~ in ~definitive_requests~:
-
-1. *Handle conflicting definitive instance*:
-   - Look up this node's ID in ~visited~
-   - If found with a different NodeId, that's the conflict
-   - Recursively indefinitize that node's content subtree (see below)
-
-2. *Make this node definitive*:
-   - Set ~indefinitive = false~
-   - Add to ~visited~
-
-3. *Expand content*:
-   - Reuse the BFS rendering logic from ~render_initial_forest_bfs~
-   - Start from this (childless) node
-   - Use fresh node budget
-   - Mark nodes already in ~visited~ as indefinitive
+3. Expand content via ~extendDefinitiveSubtreeFromLeaf~:
+   - BFS from the requesting node
+   - Mark repeats (in ~visited~) and cycles as indefinitive
    - Add new definitive nodes to ~visited~
-
-4. *Clear the request*:
-   - Remove ~ViewRequest::Definitive~ from the node
-
-** Indefinitizing a Content Subtree
-
-When transferring definitiveness from node P to node Q (same ID):
-
-#+begin_src rust
-fn indefinitize_content_subtree(
-  tree: &mut Tree<OrgNode>,
-  node_id: NodeId,
-  visited: &mut HashMap<ID, (usize, NodeId)>,
-) {
-  // 1. Remove from visited
-  if let Some(id) = node.metadata.id {
-    visited.remove(&id);
-  }
-
-  // 2. Mark indefinitive and clobber
-  node.metadata.code.indefinitive = true;
-  // (title from disk, body = None)
-
-  // 3. Recurse on content children only
-  for child in children where relToParent == Content {
-    indefinitize_content_subtree(tree, child_id, visited);
-  }
-  // Non-content children (AliasCol, ParentIgnores, etc.) are left alone
-}
-#+end_src
-
-This is necessary because P's entire content subtree is in ~visited~. Without
-removing them, Q's expansion would mark all those nodes indefinitive (already
-visited), resulting in only one generation of indefinitive stubs.
-
-* Implementation Components
-
-** 1. Type Changes
-
-*** ~types/orgnode.rs~: Add variant
-
-#+begin_src rust
-pub enum ViewRequest {
-  Aliases,
-  Containerward,
-  Sourceward,
-  Definitive,  // NEW
-}
-
-// Display:
-ViewRequest::Definitive => write!(f, "definitiveView"),
-
-// FromStr:
-"definitiveView" => Ok(ViewRequest::Definitive),
-#+end_src
-
-*** ~types/errors.rs~: Add validation errors
-
-#+begin_src rust
-DefinitiveRequestOnDefinitiveNode(ID),
-DefinitiveRequestOnNodeWithChildren(ID),
-MultipleDefinitiveRequestsForSameId(ID),
-#+end_src
-
-** 2. Validation (~read_buffer/buffer_to_orgnodes/validate_tree.rs~)
-
-Add to ~find_buffer_errors_for_saving~:
-
-#+begin_src rust
-// Definitive view request validation
-validate_definitive_view_requests(trees, &mut errors);
-#+end_src
-
-Where:
-
-#+begin_src rust
-fn validate_definitive_view_requests(
-  trees: &[Tree<OrgNode>],
-  errors: &mut Vec<BufferValidationError>,
-) {
-  let mut ids_with_requests: HashSet<ID> = HashSet::new();
-
-  for tree in trees {
-    for edge in tree.root().traverse() {
-      if let Edge::Open(node_ref) = edge {
-        let node = node_ref.value();
-        if node.metadata.code.viewRequests.contains(&ViewRequest::Definitive) {
-
-          // Error: must be indefinitive
-          if !node.metadata.code.indefinitive {
-            errors.push(DefinitiveRequestOnDefinitiveNode(
-              node.metadata.id.clone().unwrap()));
-          }
-
-          // Error: must be childless
-          if node_ref.children().next().is_some() {
-            errors.push(DefinitiveRequestOnNodeWithChildren(
-              node.metadata.id.clone().unwrap()));
-          }
-
-          // Error: at most one request per ID
-          if let Some(id) = &node.metadata.id {
-            if !ids_with_requests.insert(id.clone()) {
-              errors.push(MultipleDefinitiveRequestsForSameId(id.clone()));
-            }
-          }
-        }
-      }
-    }
-  }
-}
-#+end_src
-
-** 3. Modified ~completeOrgnodeForest~ (~to_org/complete_contents.rs~)
-
-Change ~visited~ from ~HashSet<ID>~ to ~HashMap<ID, (usize, NodeId)>~.
-Add two-phase processing:
-
-#+begin_src rust
-pub async fn completeOrgnodeForest(
-  forest: &mut Vec<Tree<OrgNode>>,
-  config: &SkgConfig,
-  typedb_driver: &TypeDBDriver,
-  errors: &mut Vec<String>,
-) -> Result<(), Box<dyn Error>> {
-  let mut visited: HashMap<ID, (usize, NodeId)> = HashMap::new();
-  let mut definitive_requests: Vec<(usize, NodeId)> = Vec::new();
-
-  // --- PHASE 1: Tree Completion ---
-  for (tree_idx, tree) in forest.iter_mut().enumerate() {
-    complete_node_preorder(
-      tree, tree.root().id(), config, typedb_driver,
-      &mut visited, &mut ancestor_path,
-      &mut definitive_requests, tree_idx, // NEW parameters
-      errors,
-    ).await?;
-  }
-
-  // --- PHASE 2: Definitive Expansion ---
-  for (tree_idx, node_id) in definitive_requests {
-    expand_definitive_node(
-      forest, tree_idx, node_id,
-      config, typedb_driver,
-      &mut visited,
-      config.initial_node_limit,
-      errors,
-    ).await?;
-  }
-
-  Ok(())
-}
-#+end_src
-
-** 4. Definitive Expansion Function (NEW)
-
-This is the key new function. It reuses BFS logic from ~render_initial_forest_bfs~:
-
-#+begin_src rust
-async fn expand_definitive_node(
-  forest: &mut Vec<Tree<OrgNode>>,
-  tree_idx: usize,
-  node_id: NodeId,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
-  visited: &mut HashMap<ID, (usize, NodeId)>,
-  node_limit: usize,
-  errors: &mut Vec<String>,
-) -> Result<(), Box<dyn Error>> {
-  let tree = &mut forest[tree_idx];
-
-  // Get this node's ID
-  let node_pid: ID = tree.get(node_id)?.value().metadata.id.clone()
-    .ok_or("Node has no ID")?;
-
-  // 1. Handle conflicting definitive instance
-  if let Some(&(existing_tree_idx, existing_node_id)) = visited.get(&node_pid) {
-    if existing_tree_idx != tree_idx || existing_node_id != node_id {
-      // Direct access to the correct tree -- no search needed
-      indefinitize_content_subtree(
-        &mut forest[existing_tree_idx], existing_node_id,
-        config, driver, visited).await?;
-    }
-  }
-
-  // 2. Mark this node definitive
-  let tree = &mut forest[tree_idx];
-  tree.get_mut(node_id)?.value().metadata.code.indefinitive = false;
-  visited.insert(node_pid.clone(), (tree_idx, node_id));
-
-  // 3. Expand content using BFS
-  // Reuse logic from render_initial_forest_bfs, adapted for single node
-  expand_content_bfs(
-    tree, node_id, tree_idx, node_limit, visited, config, driver).await?;
-
-  // 4. Clear the ViewRequest
-  tree.get_mut(node_id)?.value().metadata.code.viewRequests
-    .remove(&ViewRequest::Definitive);
-
-  Ok(())
-}
-#+end_src
-
-** 5. BFS Content Expansion (Code Reuse Opportunity)
-
-The ~expand_content_bfs~ function should reuse logic from ~render_initial_forest_bfs~.
-The key insight: both are doing BFS rendering from a root, the difference is:
-
-- ~render_initial_forest_bfs~: starts with stub roots, builds ~(SkgNode, OrgNode)~ pairs
-- ~expand_content_bfs~: starts with an existing OrgNode (no SkgNode needed), operates on ~OrgNode~ trees
-
-Options for code reuse:
-
-*Option A*: Extract shared BFS logic into a generic helper
-- Pro: Cleanest, no duplication
-- Con: Requires refactoring existing code
-
-*Option B*: Adapt ~render_initial_forest_bfs~ to work on a single tree
-- Pro: Minimal changes to existing code
-- Con: Some awkwardness (single tree vs forest)
-
-*Option C*: Write parallel implementation using same patterns
-- Pro: Simplest immediate implementation
-- Con: Some duplication
-
-Recommendation: Start with Option C, then refactor to Option A if the duplication
-becomes burdensome.
-
-** 6. Emacs Support
-
-*** ~elisp/skg-request-views.el~
-
-#+begin_src elisp
-(defun skg-request-definitive-view ()
-  "Request definitive view for the headline at point.
-The node must be indefinitive and childless."
-  (interactive)
-  (skg--request-view 'definitiveView))
-#+end_src
-
-*** ~elisp/heralds-minor-mode.el~
-
-#+begin_src elisp
-(viewRequests
-  (aliases "req:aliases")
-  (definitiveView "req:definitive")  ; NEW
-  (containerwardView "req:containers")
-  (sourcewardView "req:sources"))
-#+end_src
-
-* Edge Cases
-
-** Cycles
-Handled by ~visited~ -- if an ID is already there, mark new instance indefinitive.
-
-** Node not in database
-If the ID doesn't exist in TypeDB, the expansion will fail. This should produce
-a clear error message.
-
-** Multiple definitive view requests
-Validated: error before processing if same ID has multiple requests.
-
-** No conflicting instance
-If the requesting node is the only instance of that ID, just mark it definitive
-and expand. No conflict handling needed.
-
-** Deeply nested content subtree
-When transferring definitiveness, must recursively process the entire content
-subtree. This could be expensive for large subtrees but is necessary for
-correctness.
-
-* Implementation Order
-
-1. Add ~Definitive~ variant to ~ViewRequest~ enum with FromStr/Display
-2. Add validation error variants
-3. Add validation function for definitive view requests
-4. Change ~visited~ from ~HashSet<ID>~ to ~HashMap<ID, (usize, NodeId)>~ throughout
-5. Add ~definitive_requests~ collection to ~complete_node_preorder~
-6. Implement ~indefinitize_content_subtree~ helper
-7. Implement ~expand_content_bfs~ (adapting BFS logic)
-8. Implement ~expand_definitive_node~
-9. Update ~completeOrgnodeForest~ with two-phase structure
-10. Add Emacs support
-11. Write tests
-
-* Tests
-
-- Single definitive view request on childless leaf
-- Multiple requests for different IDs
-- Node limit truncation during expansion
-- Conflicting instance marked indefinitive with content subtree handling
-- Validation: already definitive = error
-- Validation: has children = error
-- Validation: multiple requests for same ID = error
-- Cycle detection during expansion
-- Request on node that doesn't exist in DB = error
-
-* Concerns and Anticipated Difficulties
-
-** Code Duplication with Initial View Generation
-
-The BFS expansion logic is largely duplicated between ~render_initial_forest_bfs~
-and the proposed ~expand_content_bfs~. Both do:
-- BFS traversal with node limit
-- Mark repeats/cycles as indefinitive
-- Track ~visited~ set
-- Truncate when limit exceeded
-
-Mitigation: Extract a shared BFS helper that both can use. The main differences:
-- Initial view: builds ~(SkgNode, OrgNode)~ pairs in new trees
-- Expansion: adds children to existing ~OrgNode~ trees
-
-A generic approach could abstract over the tree type.
-
-** Complexity of Two-Phase Processing
-
-The two-phase approach adds complexity but is necessary because:
-- Phase 1 must complete to know all currently-definitive nodes
-- Phase 2 can then correctly handle conflicts
-
-Alternative considered: Process definitive view requests inline during Phase 1.
-Rejected because: a later node in the traversal might be the "conflict" for
-an earlier request, and we wouldn't know about it yet.
-
-** HashMap<ID, (usize, NodeId)> Complexity
-
-Changing ~visited~ from ~HashSet~ to ~HashMap~ touches multiple functions.
-However, the change is mechanical: ~insert(id)~ becomes ~insert(id, (tree_idx, node_id))~,
-~contains(&id)~ becomes ~contains_key(&id)~. The tree index enables direct access
-to conflicting instances without searching across trees.
-
-** Testing Complexity
-
-Testing requires setting up scenarios with:
-- Multiple instances of the same ID
-- Deep content subtrees
-- Interactions between multiple definitive view requests
-
-Recommend: Build test utilities for constructing these scenarios.
-
-** Memory Usage
-
-Each definitive expansion can add up to ~node_limit~ nodes. With multiple
-requests, memory could grow significantly. The fresh budget per request is
-intentional (user requested multiple expansions) but worth noting.
-
-* Ambiguities Resolved
-
-1. "definitive view request" vs "expansion": Standardized on "definitive view request"
-   for the ~ViewRequest::Definitive~ value, "expansion" for the resulting action.
-
-2. ~visited~ type: Now consistently ~HashMap<ID, (usize, NodeId)>~ throughout,
-   where the ~usize~ is a tree index for direct access.
-
-3. Fresh budget per request: Confirmed -- each request gets full ~node_limit~
-   budget. This is intentional: the user explicitly requested multiple expansions.
-
-4. Processing order: Preorder DFS within each tree, trees in forest order.
-   This matches the existing traversal order.
+   - Truncate when node limit exceeded (marking last generation indefinitive)
+
+4. Clear the ~ViewRequest::Definitive~ from the node
+
+* Files
+
+- ~rust/to_org/definitive_branch.rs~ - Main implementation
+- ~rust/to_org/complete_contents.rs~ - Two-phase orchestration
+- ~rust/to_org/util.rs~ - ~VisitedMap~ type alias and helpers
+- ~rust/media/tree.rs~ - ~collect_generation_ids~ (with effective root support)
+- ~rust/types/orgnode.rs~ - ~ViewRequest::Definitive~ variant
+- ~rust/types/errors.rs~ - Validation error variants
+- ~rust/read_buffer/buffer_to_orgnodes/validate_tree.rs~ - Request validation
+- ~elisp/skg-request-views.el~ - Emacs command
+- ~elisp/heralds-minor-mode.el~ - Display

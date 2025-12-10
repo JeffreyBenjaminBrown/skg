@@ -3,25 +3,26 @@
 // longer definition path. That makes it easier to find definitions.
 
 pub mod aliases;
+pub mod bfs_shared;
 pub mod complete_aliascol;
 pub mod complete_contents;
 pub mod content_view;
+pub mod definitive_branch;
 pub mod initial_view_bfs;
 pub mod integrate_backpath;
 pub mod orgnode;
+pub mod truncate;
 pub mod util;
 
 pub use aliases::{
   build_and_integrate_aliases,
   wrapped_build_and_integrate_aliases_view, };
 
-pub use complete_aliascol::completeAliasCol;
-
 pub use complete_contents::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   make_indefinitive_if_repeated,
-  completeOrgnodeForest, };
+  completeOrgnodeForest_collectingDefinitiveRequests, };
 
 pub use content_view::{
   multi_root_view,
@@ -46,4 +47,6 @@ pub use util::{
   org_bullet,
   skgnode_and_orgnode_from_id,
   skgnode_and_orgnode_from_pid_and_source,
+  content_ids_from_skgnode,
+  get_node_pid_generic,
 };

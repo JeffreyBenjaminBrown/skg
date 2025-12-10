@@ -3,8 +3,9 @@ use crate::util::path_from_pid_and_source;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::default_metadata;
+use crate::types::trees::PairTree;
 
-use ego_tree::NodeId;
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -70,3 +71,69 @@ pub fn newline_to_space ( s: &str ) -> String {
 
 pub fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }
+
+/// Check if `target_id` appears in the ancestor path of `node_id`.
+/// Used for cycle detection.
+///
+/// The `get_id` closure extracts an `Option<&ID>` from a node value,
+/// allowing this to work with different tree types:
+/// - `Tree<OrgNode>`: `|n| n.metadata.id.as_ref()`
+/// - `Tree<(SkgNode, OrgNode)>`: `|n| n.1.metadata.id.as_ref()`
+pub fn is_ancestor_id < T, F > (
+  tree      : &Tree < T >,
+  node_id   : NodeId,
+  target_id : &ID,
+  get_id    : F,
+) -> Result < bool, Box<dyn Error> >
+where F : Fn ( &T ) -> Option < &ID >
+{
+  let node_ref : NodeRef < T > =
+    tree . get ( node_id )
+    . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
+  let mut current : Option < NodeRef < T > > =
+    node_ref . parent ();
+  while let Some ( parent ) = current {
+    if let Some ( parent_id ) = get_id ( parent . value () ) {
+      if parent_id == target_id {
+        return Ok ( true ); }}
+    current = parent . parent (); }
+  Ok ( false ) }
+
+/// Extract the PID from a node in a tree.
+/// Returns an error if the node is not found or has no ID.
+///
+/// The `get_id` closure extracts an `Option<&ID>` from a node value,
+/// allowing this to work with different tree types:
+/// - `Tree<OrgNode>`: `|n| n.metadata.id.as_ref()`
+/// - `Tree<(SkgNode, OrgNode)>`: `|n| n.1.metadata.id.as_ref()`
+pub fn get_node_pid_generic < T, F > (
+  tree    : &Tree < T >,
+  node_id : NodeId,
+  get_id  : F,
+) -> Result < ID, Box<dyn Error> >
+where F : Fn ( &T ) -> Option < &ID >
+{
+  let node_ref : NodeRef < T > =
+    tree . get ( node_id )
+    . ok_or ( "get_node_pid_generic: NodeId not in tree" ) ?;
+  get_id ( node_ref . value () )
+    . cloned ()
+    . ok_or_else ( || "get_node_pid_generic: node has no ID" . into () ) }
+
+/// Extract the PID from a node in a PairTree.
+/// Returns an error if the node is not found or has no ID.
+/// (Convenience wrapper around get_node_pid_generic for PairTree.)
+pub fn get_pid_in_pairtree (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < ID, Box<dyn Error> > {
+  get_node_pid_generic (
+    tree, node_id,
+    |n| n . 1 . metadata . id . as_ref () ) }
+
+/// Extract the content child IDs from an SkgNode.
+/// Returns an empty Vec if there are no contents.
+pub fn content_ids_from_skgnode (
+  skgnode : &SkgNode
+) -> Vec < ID > {
+  skgnode . contains . clone () . unwrap_or_default () }

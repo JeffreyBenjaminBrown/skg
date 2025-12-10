@@ -1,24 +1,29 @@
-use crate::read_buffer::{headline_to_triple, HeadlineInfo};
-use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
-use crate::types::skgnode::SkgNode;
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
-use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
 use crate::init::{overwrite_new_empty_db, define_schema};
+use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
+use crate::media::tantivy::search_index;
+use crate::media::tree::map_snd_over_forest;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::media::tantivy::search_index;
+use crate::read_buffer::{headline_to_triple, HeadlineInfo};
+use crate::to_org::content_view::render_forest_to_org;
+use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
+use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
+use crate::types::skgnode::SkgNode;
+use crate::types::trees::PairTree;
+
 use ego_tree::{Tree, NodeRef};
-use futures::executor::block_on;
 use futures::StreamExt;
+use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType};
 use typedb_driver::answer::QueryAnswer;
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType};
+
 
 /// Run tests with automatic database setup and cleanup.
 ///
@@ -380,3 +385,53 @@ pub fn strip_org_comments(s: &str) -> String {
       } else { line . to_string() }} )
     .collect::<Vec<String>>()
     .join("\n") }
+
+/// Render a paired forest to org text by first converting to OrgNode forest.
+pub fn render_paired_forest_to_org (
+  forest : &[PairTree],
+) -> String {
+  let orgnode_forest : Vec < Tree < OrgNode > > =
+    map_snd_over_forest ( forest . to_vec () );
+  render_forest_to_org ( & orgnode_forest ) }
+
+/// Convert an OrgNode forest to a paired forest
+/// *with None for all SkgNodes*.
+/// Used in tests where we don't have save instructions.
+pub fn orgnode_forest_to_paired (
+  forest : Vec < Tree < OrgNode > >,
+) -> Vec < PairTree > {
+  forest . into_iter ()
+    . map ( orgnode_tree_to_paired )
+    . collect () }
+
+/// Convert an OrgNode tree to pair tree with None for all SkgNodes.
+pub fn orgnode_tree_to_paired (
+  tree : Tree < OrgNode >,
+) -> PairTree {
+  fn copy_children_recursively (
+    old_tree    : &Tree < OrgNode >,
+    old_node_id : ego_tree::NodeId,
+    new_tree    : &mut PairTree,
+    new_node_id : ego_tree::NodeId,
+  ) {
+    let child_ids : Vec < ego_tree::NodeId > =
+      old_tree . get ( old_node_id ) . unwrap ()
+      . children () . map ( |c| c . id () )
+      . collect ();
+    for child_id in child_ids {
+      let child_data : OrgNode =
+        old_tree . get ( child_id ) . unwrap () . value () . clone ();
+      let new_child_id : ego_tree::NodeId =
+        new_tree . get_mut ( new_node_id ) . unwrap ()
+        . append ( (None, child_data) ) . id ();
+      copy_children_recursively (
+        old_tree, child_id, new_tree, new_child_id ); }}
+  let root_data : OrgNode =
+    tree . root () . value () . clone ();
+  let mut new_tree : PairTree =
+    Tree::new ( (None, root_data) );
+  let new_root_id : ego_tree::NodeId =
+    new_tree . root () . id ();
+  copy_children_recursively (
+    &tree, tree . root () . id (), &mut new_tree, new_root_id );
+  new_tree }

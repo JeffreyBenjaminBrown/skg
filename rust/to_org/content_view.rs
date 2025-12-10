@@ -6,6 +6,7 @@ use crate::media::typedb::search::{
   count_link_sources};
 use crate::to_org::initial_view_bfs::render_initial_forest_bfs;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
+use crate::types::trees::PairTree;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::to_org::orgnode::orgnode_to_text;
 
@@ -41,7 +42,7 @@ pub async fn multi_root_view (
   config   : &SkgConfig,
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> > {
-  let paired_forest : Vec < Tree < (SkgNode, OrgNode) > > =
+  let paired_forest : Vec < PairTree > =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
   let mut forest : Vec < Tree < OrgNode > > =
@@ -53,21 +54,21 @@ pub async fn multi_root_view (
   Ok ( buffer_content ) }
 
 /// Create a minimal forest containing just root nodes (no children).
-/// Returns (SkgNode, OrgNode) trees to avoid multiple SkgNode lookups.
+/// Returns (Option<SkgNode>, OrgNode) trees to avoid multiple SkgNode lookups.
 pub async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < Tree < (SkgNode, OrgNode) > >,
+) -> Result < Vec < PairTree >,
               Box<dyn Error> > {
-  let mut forest : Vec < Tree < (SkgNode, OrgNode) > > =
+  let mut forest : Vec < PairTree > =
     Vec::new ();
   for root_id in root_ids {
     let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
       skgnode_and_orgnode_from_id (
         config, driver, root_id ) . await ?;
-    let tree : Tree < (SkgNode, OrgNode) > =
-      Tree::new ( (root_skgnode, root_orgnode) );
+    let tree : PairTree =
+      Tree::new ( (Some(root_skgnode), root_orgnode) );
     forest . push ( tree ); }
   Ok ( forest ) }
 

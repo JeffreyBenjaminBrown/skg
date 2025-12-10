@@ -3,8 +3,10 @@
 use indoc::indoc;
 use skg::to_org::integrate_path_that_might_fork_or_cycle;
 use skg::read_buffer::org_to_uninterpreted_nodes;
-use skg::test_utils::{compare_orgnode_forests, run_with_test_db};
+use skg::test_utils::{compare_orgnode_forests, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::{ID, OrgNode, SkgConfig};
+use skg::types::trees::PairTree;
+use skg::media::tree::map_snd_over_forest;
 
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -34,10 +36,12 @@ async fn test_path_with_cycle_impl(
     *** (skg (id off-path)) off-path
   "};
 
-  let mut trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
 
+  let mut trees: Vec<PairTree> =
+    orgnode_forest_to_paired(orgnode_trees);
   let tree = &mut trees[0];
   let root_id = tree.root().id();
 
@@ -68,8 +72,12 @@ async fn test_path_with_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
+  // Convert paired trees back to OrgNode trees for comparison
+  let result_trees: Vec<Tree<OrgNode>> =
+    map_snd_over_forest(trees);
+
   assert!(
-    compare_orgnode_forests(&trees, &expected_trees),
+    compare_orgnode_forests(&result_trees, &expected_trees),
     "Tree structure after integrating path with cycle should match expected"
   );
 
@@ -99,17 +107,19 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let mut trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
 
+  let mut trees: Vec<PairTree> =
+    orgnode_forest_to_paired(orgnode_trees);
   let tree = &mut trees[0];
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
   for edge in tree.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(ref id) = node_ref.value().metadata.id {
+      if let Some(ref id) = node_ref.value().1.metadata.id {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -150,8 +160,12 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
+  // Convert paired trees back to OrgNode trees for comparison
+  let result_trees: Vec<Tree<OrgNode>> =
+    map_snd_over_forest(trees);
+
   assert!(
-    compare_orgnode_forests(&trees, &expected_trees),
+    compare_orgnode_forests(&result_trees, &expected_trees),
     "Tree structure after integrating path with branches (no cycle) should match expected"
   );
 
@@ -181,17 +195,19 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let mut trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
 
+  let mut trees: Vec<PairTree> =
+    orgnode_forest_to_paired(orgnode_trees);
   let tree = &mut trees[0];
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
   for edge in tree.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(ref id) = node_ref.value().metadata.id {
+      if let Some(ref id) = node_ref.value().1.metadata.id {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -232,8 +248,12 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
+  // Convert paired trees back to OrgNode trees for comparison
+  let result_trees: Vec<Tree<OrgNode>> =
+    map_snd_over_forest(trees);
+
   assert!(
-    compare_orgnode_forests(&trees, &expected_trees),
+    compare_orgnode_forests(&result_trees, &expected_trees),
     "Tree structure after integrating path with branches (with cycle) should match expected"
   );
 

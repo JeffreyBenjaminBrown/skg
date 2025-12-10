@@ -13,8 +13,8 @@ use crate::media::typedb::search::{
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
+use crate::types::trees::PairTree;
 
-use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
@@ -22,7 +22,7 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 pub async fn wrapped_build_and_integrate_containerward_view (
-  tree          : &mut Tree < OrgNode >,
+  tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -35,7 +35,7 @@ pub async fn wrapped_build_and_integrate_containerward_view (
       format! ( "Failed to integrate containerward path: {}", e )); }
   tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?
-    . value () . metadata . code . viewRequests
+    . value () . 1 . metadata . code . viewRequests
     . remove ( &ViewRequest::Containerward );
   Ok (( )) }
 
@@ -43,14 +43,14 @@ pub async fn wrapped_build_and_integrate_containerward_view (
 /// This is called on a specific node in the tree,
 /// and integrates the containerward path from that node.
 pub async fn build_and_integrate_containerward_path (
-  tree      : &mut Tree < OrgNode >,
+  tree      : &mut PairTree,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     tree . get ( node_id ) . unwrap ()
-    . value () . metadata . id . clone ()
+    . value () . 1 . metadata . id . clone ()
     . ok_or ( "Node has no ID" ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
@@ -63,7 +63,7 @@ pub async fn build_and_integrate_containerward_path (
   ). await }
 
 pub async fn wrapped_build_and_integrate_sourceward_view (
-  tree          : &mut Tree < OrgNode >,
+  tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -76,7 +76,7 @@ pub async fn wrapped_build_and_integrate_sourceward_view (
       format! ( "Failed to integrate sourceward path: {}", e )); }
   tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?
-    . value () . metadata . code . viewRequests
+    . value () . 1 . metadata . code . viewRequests
     . remove ( &ViewRequest::Sourceward );
   Ok (( )) }
 
@@ -84,14 +84,14 @@ pub async fn wrapped_build_and_integrate_sourceward_view (
 /// TODO ? Can this be dedup'd w/r/t
 ///   'build_and_integrate_containerward_path'?
 pub async fn build_and_integrate_sourceward_path (
-  tree      : &mut Tree < OrgNode >,
+  tree      : &mut PairTree,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     tree . get ( node_id ) . unwrap ()
-    . value () . metadata . id . clone ()
+    . value () . 1 . metadata . id . clone ()
     . ok_or ( "Node has no ID" ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
@@ -105,17 +105,17 @@ pub async fn build_and_integrate_sourceward_path (
 /// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
 /// using provided backpath data.
 pub async fn integrate_path_that_might_fork_or_cycle (
-  tree        : &mut Tree < OrgNode >,
-  node_id     : ego_tree::NodeId, // where to integrate
-  mut path    : Vec < ID >,     // part of the computed path
-  branches    : HashSet < ID >, // part of the computed path
-  cycle_node  : Option < ID >,  // part of the computed path
+  tree        : &mut PairTree,
+  node_id     : ego_tree::NodeId,
+  mut path    : Vec < ID >,
+  branches    : HashSet < ID >,
+  cycle_node  : Option < ID >,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     tree . get ( node_id ) . unwrap ()
-    . value () . metadata . id . clone ()
+    . value () . 1 . metadata . id . clone ()
     . ok_or ( "Node has no ID" ) ?;
   if ! path . is_empty () {
     // The head of the path should be the terminus. We strip it.
@@ -142,7 +142,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
 /// Operates on a specific node and the remaining path.
 /// Returns the NodeId of the last node in the path.
 fn integrate_linear_portion_of_path<'a> (
-  tree       : &'a mut Tree < OrgNode >,
+  tree       : &'a mut PairTree,
   node_id    : ego_tree::NodeId,
   path       : &'a [ID],
   config     : &'a SkgConfig,
@@ -171,7 +171,7 @@ fn integrate_linear_portion_of_path<'a> (
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
 async fn integrate_branches_in_node (
-  tree       : &mut Tree < OrgNode >,
+  tree       : &mut PairTree,
   node_id    : ego_tree::NodeId,
   branches   : HashSet < ID >,
   config     : &SkgConfig,
@@ -195,7 +195,7 @@ async fn integrate_branches_in_node (
 /// Add a cycle node as a child of the specified node.
 /// The cycle node is only added if it's not already a child.
 async fn integrate_cycle_in_node (
-  tree       : &mut Tree < OrgNode >,
+  tree       : &mut PairTree,
   node_id    : ego_tree::NodeId,
   cycle_id   : ID,
   config     : &SkgConfig,
@@ -211,7 +211,7 @@ async fn integrate_cycle_in_node (
 /// TODO: This procedure could later be improved to
 /// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
-  tree       : &mut Tree < OrgNode >,
+  tree       : &mut PairTree,
   parent_id  : ego_tree::NodeId,
   child_id   : &ID,
   config     : &SkgConfig,
@@ -227,18 +227,18 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     true;
   let new_child_id : ego_tree::NodeId =
     tree . get_mut ( parent_id ) . unwrap ()
-    . prepend ( child_orgnode ) . id ();
+    . prepend ( (None, child_orgnode) ) . id ();
   Ok ( new_child_id ) }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
 fn find_child_by_id (
-  tree       : & Tree < OrgNode >,
+  tree       : & PairTree,
   parent_id  : ego_tree::NodeId,
   target_id  : & ID,
 ) -> Option < ego_tree::NodeId > {
   for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid ) = child . value () . metadata . id {
+    if let Some ( ref child_pid ) = child . value () . 1 . metadata . id {
       if child_pid == target_id {
         return Some ( child . id () ); } } }
   None }
@@ -247,14 +247,14 @@ fn find_child_by_id (
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 fn find_children_by_ids (
-  tree       : & Tree < OrgNode >,
+  tree       : & PairTree,
   parent_id  : ego_tree::NodeId,
   target_ids : & HashSet < ID >,
 ) -> HashMap < ID, ego_tree::NodeId > {
   let mut result : HashMap < ID, ego_tree::NodeId > =
     HashMap::new ();
   for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid ) = child . value () . metadata . id {
+    if let Some ( ref child_pid ) = child . value () . 1 . metadata . id {
       if target_ids . contains ( child_pid ) {
         result . insert ( child_pid . clone (), child . id () ); }} }
   result }

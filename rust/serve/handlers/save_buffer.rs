@@ -4,8 +4,11 @@ use crate::types::errors::SaveError;
 use crate::to_org::content_view::{
   render_forest_to_org,
   set_metadata_relationship_viewdata_in_forest};
+use crate::media::tree::map_snd_over_forest;
 use crate::merge::merge_nodes_in_graph;
-use crate::to_org::complete_contents::completeOrgnodeForest;
+use crate::to_org::complete_contents::completeOrgnodeForest_collectingDefinitiveRequests;
+use crate::to_org::definitive_branch::execute_definitive_view_requests;
+use crate::media::tree::pair_forest_with_save_instructions;
 use crate::serve::util::{
   format_buffer_response_sexp,
   read_length_prefixed_content,
@@ -13,6 +16,7 @@ use crate::serve::util::{
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
+use crate::types::skgnode::SkgNode;
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -122,7 +126,7 @@ async fn update_from_and_rerender_buffer (
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
 
-  let (mut orgnode_forest, save_instructions, mergeInstructions)
+  let (orgnode_forest, save_instructions, mergeInstructions)
     : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>, Vec<MergeInstructionTriple>)
     = buffer_to_save_instructions (
       org_buffer_text, config, typedb_driver )
@@ -131,7 +135,7 @@ async fn update_from_and_rerender_buffer (
   if orgnode_forest.is_empty() { return Err (
     "No valid org nodes found in org_buffer_text" . into( )); }
   update_graph (
-    save_instructions,
+    save_instructions.clone(),
     config.clone(),
     tantivy_index,
     typedb_driver ) . await ?;
@@ -144,16 +148,36 @@ async fn update_from_and_rerender_buffer (
 
   let mut errors : Vec < String > = Vec::new ();
 
-  { // modify the orgnode forest before re-rendering it
-    completeOrgnodeForest (
-      &mut orgnode_forest,
+  let mut paired_forest : Vec < Tree < (Option<SkgNode>, OrgNode) >> =
+    pair_forest_with_save_instructions (
+      // Definitive nodes get Some(skgnode), indefinitive get None.
+      orgnode_forest,
+      & save_instructions );
+
+  { // modify the paired forest before re-rendering it
+    let (mut visited, definitive_requests) =
+      completeOrgnodeForest_collectingDefinitiveRequests (
+        &mut paired_forest,
+        config,
+        typedb_driver,
+        &mut errors ) . await ?;
+
+    execute_definitive_view_requests (
+      &mut paired_forest,
+      definitive_requests,
       config,
       typedb_driver,
-      &mut errors ) . await ?;
-    set_metadata_relationship_viewdata_in_forest (
-      &mut orgnode_forest,
-      config,
-      typedb_driver ) . await ?; }
+      &mut visited,
+      &mut errors ) . await ?; }
+
+  // The SkgNode data is no longer needed.
+  let mut orgnode_forest : Vec < Tree < OrgNode > > =
+    map_snd_over_forest ( paired_forest );
+
+  set_metadata_relationship_viewdata_in_forest (
+    &mut orgnode_forest,
+    config,
+    typedb_driver ) . await ?;
 
   let buffer_content : String =
     render_forest_to_org ( & orgnode_forest );

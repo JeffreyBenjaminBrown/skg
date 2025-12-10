@@ -42,7 +42,7 @@ Since there are no existing users, the old implementation will be completely rem
 4. Client receives complete regenerated buffer with view integrated
 
 ** Server Side (Rust)
-1. During save processing, =complete_node_preorder= (in =rust/rebuild/complete_contents.rs:84=) processes each node
+1. During save processing, =completeNodePreorder_collectingDefinitiveRequests= (in =rust/rebuild/complete_contents.rs:84=) processes each node
 2. After completing node and its children, it checks for view requests (line 128)
 3. For each =ViewRequest= in the node's metadata:
    - =ViewRequest::Containerward= → calls =wrapped_build_and_integrate_containerward_view=
@@ -229,7 +229,7 @@ use typedb_driver::TypeDBDriver;
 
 *** File: =rust/rebuild/complete_contents.rs=
 
-Add =ViewRequest::Aliases= case to the match statement in =complete_node_preorder= (around line 134):
+Add =ViewRequest::Aliases= case to the match statement in =completeNodePreorder_collectingDefinitiveRequests= (around line 134):
 #+begin_src rust
       { // integrate view requests
         let view_requests : Vec < ViewRequest > = {
@@ -396,7 +396,7 @@ Since there are no existing users, cleanup of the old implementation is included
 
 ** Integration Point
 - *Old*: Handled in special request handler (=handle_node_aliases_request=)
-- *New*: Handled during normal save processing in =complete_node_preorder=
+- *New*: Handled during normal save processing in =completeNodePreorder_collectingDefinitiveRequests=
 
 ** Idempotency
 - *Old*: Calling multiple times creates duplicate AliasCol children

@@ -1,15 +1,19 @@
-* fix this
-/// Helper to call make_indefinitive_if_repeated followed by completeContents
-/// (matches the pattern used in complete_node_preorder)
-///
-/// This version uses the old HashSet interface for backwards-compatible tests.
-/// It creates a temporary VisitedMap internally.
-async fn check_and_complete (
+* RESUME REVIEW at
+  rust/to_org/definitive_branch.rs
+  (reading down in magit)
+* add tests
+** collect_generation_ids
+   test the new effective root logic
+* those indef nodes in a def view request or an initial view should be def if they have no children
+* use the same kind of tree for initial and re-rendered views
+  This will permit deduplicating a lot of common logic.
+* Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
 * Request definitive content view at a node
-** for repeats
-** for subscriptions
-   which initially show just the title -- not even the content,
-     let alone the recursive content
+** for indefinitive nodes
+** use that logic for building subscription views
+   Requesting the subscription view
+   unfolds the entire subscribed-to node,
+   with what the subscriber hides grouped under 'hides'.
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * undoing that mis-feature shouldn't be hard
   Don't let indefinite nodes contribute at all to saving,

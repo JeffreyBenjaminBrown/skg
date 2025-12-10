@@ -25,6 +25,13 @@ and can be recovered by a later session.
 
 Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.
 
+## An 'm' prefix
+
+In Haskell, 'm' is sometimes prefixed to a word to indicate 'maybe'.
+The Rust term for Maybe is Optional, but I've used the Haskell idiom.
+For any function with a name like this, if its meaning is unclear,
+the type signature should clarify what's going on.
+
 ## md = Metadata
 
 Most org nodes are prefixed with some metadata.

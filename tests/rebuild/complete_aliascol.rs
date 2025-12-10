@@ -3,10 +3,13 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::completeAliasCol;
+use skg::to_org::complete_aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
 use skg::types::OrgNode;
+use skg::types::trees::PairTree;
+
+use ego_tree::{Tree, NodeId};
 
 #[test]
 fn test_completeAliasCol
@@ -40,20 +43,22 @@ async fn test_completeAliasCol_logic (
       ** (skg (code (relToParent alias))) the above should break
     " };
 
-  let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+  let orgnode_forest : Vec < Tree < OrgNode > > =
     org_to_uninterpreted_nodes ( org_text ) ?;
+  let mut forest : Vec < PairTree > =
+    orgnode_forest_to_paired ( orgnode_forest );
 
   // Get the first tree (node "a" and its children)
-  let tree_a : &mut ego_tree::Tree < OrgNode > =
+  let tree_a : &mut PairTree =
     & mut forest [ 0 ];
 
   // Find the NodeIds for the AliasCol nodes
-  let aliascol_1_id : ego_tree::NodeId = {
+  let aliascol_1_id : NodeId = {
     tree_a . root ()
       . first_child () . unwrap ()
       . id ()
   };
-  let aliascol_2_id : ego_tree::NodeId = {
+  let aliascol_2_id : NodeId = {
     tree_a . root ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
@@ -61,7 +66,7 @@ async fn test_completeAliasCol_logic (
   };
 
   // Test 1: First AliasCol should have c and b (deduped, valid only)
-  completeAliasCol (
+  completeAliasCol_in_mskg_org_tree (
     tree_a,
     aliascol_1_id,
     & config,
@@ -69,11 +74,11 @@ async fn test_completeAliasCol_logic (
   ) .await?;
 
   {
-    let aliascol_1_ref : ego_tree::NodeRef < OrgNode > =
+    let aliascol_1_ref =
       tree_a . get ( aliascol_1_id ) . unwrap ();
     let children : Vec < & OrgNode > =
       aliascol_1_ref . children ()
-      . map ( |n| n . value () )
+      . map ( |n| & n . value () . 1 )
       . collect ();
 
     assert_eq! (
@@ -94,7 +99,7 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  completeAliasCol (
+  completeAliasCol_in_mskg_org_tree (
     tree_a,
     aliascol_2_id,
     & config,
@@ -102,13 +107,13 @@ async fn test_completeAliasCol_logic (
   ) .await?;
 
   {
-    let aliascol_2_ref : ego_tree::NodeRef < OrgNode > =
+    let aliascol_2_ref =
       tree_a . get ( aliascol_2_id ) . unwrap ();
     let aliascol_2_node : & OrgNode =
-      aliascol_2_ref . value ();
+      & aliascol_2_ref . value () . 1;
     let children : Vec < & OrgNode > =
       aliascol_2_ref . children ()
-      . map ( |n| n . value () )
+      . map ( |n| & n . value () . 1 )
       . collect ();
 
     assert_eq! (
@@ -133,13 +138,13 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 3: Third AliasCol should error (no parent or parent has no ID)
-  let tree_aliascol_3 : &mut ego_tree::Tree < OrgNode > =
+  let tree_aliascol_3 : &mut PairTree =
     & mut forest [ 1 ];
-  let aliascol_3_id : ego_tree::NodeId =
+  let aliascol_3_id : NodeId =
     tree_aliascol_3 . root () . id ();
 
   let result : Result < (), Box<dyn Error> > =
-    completeAliasCol (
+    completeAliasCol_in_mskg_org_tree (
       tree_aliascol_3,
       aliascol_3_id,
       & config,
@@ -180,19 +185,21 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       *** (skg (code (relToParent alias))) b
     " };
 
-  let mut forest : Vec < ego_tree::Tree < OrgNode > > =
+  let orgnode_forest : Vec < Tree < OrgNode > > =
     org_to_uninterpreted_nodes ( org_text ) ?;
+  let mut forest : Vec < PairTree > =
+    orgnode_forest_to_paired ( orgnode_forest );
 
-  let tree : &mut ego_tree::Tree < OrgNode > =
+  let tree : &mut PairTree =
     & mut forest [ 0 ];
 
   // Find the NodeIds for both AliasCol nodes
-  let first_aliascol_id : ego_tree::NodeId = {
+  let first_aliascol_id : NodeId = {
     tree . root ()
       . first_child () . unwrap ()
       . id ()
   };
-  let second_aliascol_id : ego_tree::NodeId = {
+  let second_aliascol_id : NodeId = {
     tree . root ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
@@ -200,7 +207,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   };
 
   // Test first AliasCol
-  completeAliasCol (
+  completeAliasCol_in_mskg_org_tree (
     tree,
     first_aliascol_id,
     & config,
@@ -208,11 +215,11 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   ) .await?;
 
   {
-    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+    let aliascol_ref =
       tree . get ( first_aliascol_id ) . unwrap ();
     let children : Vec < & OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| n . value () )
+      . map ( |n| & n . value () . 1 )
       . collect ();
 
     assert_eq! (
@@ -241,7 +248,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   }
 
   // Test second AliasCol
-  completeAliasCol (
+  completeAliasCol_in_mskg_org_tree (
     tree,
     second_aliascol_id,
     & config,
@@ -249,11 +256,11 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   ) .await?;
 
   {
-    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+    let aliascol_ref =
       tree . get ( second_aliascol_id ) . unwrap ();
     let children : Vec < & OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| n . value () )
+      . map ( |n| & n . value () . 1 )
       . collect ();
 
     assert_eq! (
