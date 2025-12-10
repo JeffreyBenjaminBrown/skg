@@ -5,14 +5,17 @@
 /// - `definitive_branch.rs` (expanding definitive view requests)
 
 use crate::media::tree::collect_generation_ids;
-use crate::to_org::util::content_ids_from_skgnode;
-use crate::types::misc::ID;
+use crate::to_org::util::{
+  content_ids_from_skgnode,
+  skgnode_and_orgnode_from_id };
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::OrgNode;
 use crate::types::trees::PairTree;
 
 use ego_tree::{NodeId, NodeRef, NodeMut};
 use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
 /// Mark a node as indefinitive and clear its body.
 pub fn rewrite_to_indefinitive (
@@ -65,3 +68,21 @@ pub fn nodes_after_in_generation (
     } else if id == after_node {
       found_target = true; } }
   Ok ( result ) }
+
+/// Fetch a node from disk and append it as a child.
+/// Returns the new node's NodeId and the OrgNode (for further mutation).
+pub async fn fetch_and_append_child_pair (
+  tree      : &mut PairTree,
+  parent_id : NodeId,
+  child_id  : &ID,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+    skgnode_and_orgnode_from_id ( config, driver, child_id ) . await ?;
+  let mut parent_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    tree . get_mut ( parent_id )
+    . ok_or ( "fetch_and_append_child_pair: parent not found" ) ?;
+  let child_node_id : NodeId =
+    parent_mut . append ( (Some(child_skgnode), child_orgnode) ) . id ();
+  Ok ( child_node_id ) }

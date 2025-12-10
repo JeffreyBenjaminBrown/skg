@@ -4,7 +4,7 @@ use crate::media::tree::collect_generation_ids;
 use crate::to_org::bfs_shared::{
   nodes_after_in_generation,
   rewrite_to_indefinitive };
-use crate::to_org::util::VisitedMap;
+use crate::to_org::util::{get_pid_in_pairtree, VisitedMap};
 use crate::types::trees::PairTree;
 
 use ego_tree::NodeId;
@@ -24,11 +24,8 @@ pub fn truncate_after_node_in_generation_in_tree (
     nodes_after_in_generation (
       tree, generation, node_id, Some ( effective_root ) ) ?;
   for id in nodes_to_truncate {
-    if let Some ( ref pid ) =
-      tree . get ( id )
-      . ok_or ( "truncate_after_node_in_generation_in_tree: node not found" ) ?
-      . value () . 1 . metadata . id
-    { visited . remove ( pid ); }
+    if let Ok ( pid ) = get_pid_in_pairtree ( tree, id ) {
+      visited . remove ( &pid ); }
     rewrite_to_indefinitive ( tree, id ) ?; }
   Ok (( )) }
 

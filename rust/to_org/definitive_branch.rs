@@ -4,7 +4,7 @@ use crate::to_org::bfs_shared::collect_content_children;
 use crate::to_org::truncate::truncate_after_node_in_generation_in_tree;
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source,
-  VisitedMap, get_pid_in_pairtree, is_ancestor_id };
+  VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
@@ -181,12 +181,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
       nodes_rendered += 1;
 
       // If the new node is definitive, collect its children for next gen
-      let is_indefinitive : bool = {
-        let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
-          tree . get ( new_node_id )
-          . ok_or ( "extendDefinitiveSubtreeFromLeaf: new node not found" ) ?;
-        node_ref . value () . 1 . metadata . code . indefinitive };
-      if ! is_indefinitive {
+      if ! is_indefinitive ( tree, new_node_id ) ? {
         // Read content children from the SkgNode we just added
         let grandchild_ids : Vec < ID > =
           collect_content_children ( tree, new_node_id ) ?;

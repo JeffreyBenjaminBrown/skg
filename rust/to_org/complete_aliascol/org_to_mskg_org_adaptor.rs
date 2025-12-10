@@ -7,6 +7,7 @@
 /// then sync the changes back to the paired tree.
 
 use crate::to_org::complete_aliascol::completeAliasCol;
+use crate::to_org::util::{get_pid_from_pair_using_noderef, collect_child_ids};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata, RelToParent, default_metadata};
@@ -65,8 +66,7 @@ fn extract_parent_id_and_aliascol (
     aliascol_ref . parent ()
     . ok_or ( "AliasCol has no parent" ) ?;
   let parent_id : ID =
-    parent_ref . value () . 1 . metadata . id . clone ()
-    . ok_or ( "Parent has no ID" ) ?;
+    get_pid_from_pair_using_noderef ( &parent_ref ) ?;
   Ok (( parent_id, aliascol_orgnode )) }
 
 /// Build a minimal Tree<OrgNode> with structure:
@@ -115,13 +115,13 @@ fn build_minimal_orgnode_tree (
 /// This updates the AliasCol's metadata and replaces its children.
 fn sync_aliascol_changes_to_paired_tree (
   paired_tree          : &mut PairTree,
-  paired_aliascol_id   : NodeId,
+  pairtree_aliascol_id : NodeId,
   orgnode_tree         : &Tree < OrgNode >,
-  orgnode_aliascol_id  : NodeId,
+  orgtree_aliascol_id  : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   // Get the completed AliasCol and its children from orgnode_tree
   let orgnode_aliascol_ref : NodeRef < OrgNode > =
-    orgnode_tree . get ( orgnode_aliascol_id )
+    orgnode_tree . get ( orgtree_aliascol_id )
     . ok_or ( "AliasCol not found in orgnode_tree" ) ?;
   let new_children : Vec < OrgNode > =
     orgnode_aliascol_ref . children ()
@@ -132,14 +132,12 @@ fn sync_aliascol_changes_to_paired_tree (
     let new_aliascol_orgnode : OrgNode =
       orgnode_aliascol_ref . value () . clone ();
     let mut paired_mut =
-      paired_tree . get_mut ( paired_aliascol_id )
+      paired_tree . get_mut ( pairtree_aliascol_id )
       . ok_or ( "AliasCol not found in paired tree" ) ?;
     paired_mut . value () . 1 = new_aliascol_orgnode; }
   { // Remove old children from paired tree
-    let old_child_ids : Vec < NodeId > = {
-      let paired_ref = paired_tree . get ( paired_aliascol_id )
-        . ok_or ( "AliasCol not found" ) ?;
-      paired_ref . children () . map ( |c| c . id () ) . collect () };
+    let old_child_ids : Vec < NodeId > =
+      collect_child_ids ( paired_tree, pairtree_aliascol_id ) ?;
     for child_id in old_child_ids {
       let mut child_mut = paired_tree . get_mut ( child_id )
         . ok_or ( "Child not found" ) ?;
@@ -147,7 +145,7 @@ fn sync_aliascol_changes_to_paired_tree (
   { // Add new children
     // (with None for SkgNode, since aliases don't have SkgNodes)
     let mut paired_mut =
-      paired_tree . get_mut ( paired_aliascol_id )
+      paired_tree . get_mut ( pairtree_aliascol_id )
       . ok_or ( "AliasCol not found in paired tree" ) ?;
     for child in new_children {
       paired_mut . append ( (None, child) ); }}

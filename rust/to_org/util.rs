@@ -2,7 +2,7 @@ use crate::media::file_io::read_node;
 use crate::util::path_from_pid_and_source;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
-use crate::types::orgnode::default_metadata;
+use crate::types::orgnode::{default_metadata, RelToParent, ViewRequest};
 use crate::types::trees::PairTree;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -72,6 +72,16 @@ pub fn newline_to_space ( s: &str ) -> String {
 pub fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }
 
+/// Create an OrgNode with a given RelToParent and title.
+/// Body is set to None, and all other metadata fields use defaults.
+pub fn orgnode_from_title_and_rel (
+  rel: RelToParent,
+  title: String
+) -> OrgNode {
+  let mut md = default_metadata ();
+  md . code . relToParent = rel;
+  OrgNode { metadata: md, title, body: None }}
+
 /// Check if `target_id` appears in the ancestor path of `node_id`.
 /// Used for cycle detection.
 ///
@@ -131,9 +141,63 @@ pub fn get_pid_in_pairtree (
     tree, node_id,
     |n| n . 1 . metadata . id . as_ref () ) }
 
+/// Extract the PID from a PairTree NodeRef.
+/// Returns an error if the node has no ID.
+/// Use this when you already have a NodeRef to avoid redundant tree lookup.
+pub fn get_pid_from_pair_using_noderef (
+  node_ref : &NodeRef < (Option<SkgNode>, OrgNode) >,
+) -> Result < ID, Box<dyn Error> > {
+  node_ref . value () . 1 . metadata . id . clone ()
+    . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
+
+/// Check if a node in a PairTree is marked indefinitive.
+/// Returns an error if the node is not found.
+pub fn is_indefinitive (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < bool, Box<dyn Error> > {
+  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    tree . get ( node_id )
+    . ok_or ( "is_indefinitive: NodeId not in tree" ) ?;
+  Ok ( node_ref . value () . 1 . metadata . code . indefinitive ) }
+
 /// Extract the content child IDs from an SkgNode.
 /// Returns an empty Vec if there are no contents.
 pub fn content_ids_from_skgnode (
   skgnode : &SkgNode
 ) -> Vec < ID > {
   skgnode . contains . clone () . unwrap_or_default () }
+
+/// Collect all child NodeIds from a node in a PairTree.
+/// Returns an error if the node is not found.
+pub fn collect_child_ids (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < Vec < NodeId >, Box<dyn Error> > {
+  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    tree . get ( node_id )
+    . ok_or ( "collect_child_ids: NodeId not in tree" ) ?;
+  Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
+
+/// Complete a view request: log any error and remove the request from the node.
+/// Called after the builder function has been awaited.
+///
+/// This pattern is used by:
+/// - wrapped_build_and_integrate_aliases_view
+/// - wrapped_build_and_integrate_containerward_view
+/// - wrapped_build_and_integrate_sourceward_view
+pub fn complete_view_request (
+  tree         : &mut PairTree,
+  node_id      : NodeId,
+  view_request : ViewRequest,
+  error_msg    : &str,
+  errors       : &mut Vec < String >,
+  result       : Result < (), Box<dyn Error> >,
+) -> Result < (), Box<dyn Error> > {
+  if let Err ( e ) = result {
+    errors . push ( format! ( "{}: {}", error_msg, e )); }
+  tree . get_mut ( node_id )
+    . ok_or ( "complete_view_request: node not found" ) ?
+    . value () . 1 . metadata . code . viewRequests
+    . remove ( &view_request );
+  Ok (()) }

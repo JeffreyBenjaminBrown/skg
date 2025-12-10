@@ -2,7 +2,7 @@
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id,
-  get_pid_in_pairtree };
+  get_pid_in_pairtree, is_indefinitive, collect_child_ids };
 use crate::to_org::aliases::wrapped_build_and_integrate_aliases_view;
 use crate::to_org::complete_aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
 use crate::to_org::integrate_backpath::{
@@ -90,12 +90,8 @@ fn completeNodePreorder_collectingDefinitiveRequests<'a> (
         detect_cycle_and_mark (
           tree, node_id ) ?; }
 
-      { let is_indefinitive : bool = { // 'make_indefinitive_if_repeated' may have just changed this value.
-          let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
-            tree . get ( node_id )
-            . ok_or ( "Node not found in tree" ) ?;
-          node_ref . value () . 1 . metadata . code.indefinitive };
-        if is_indefinitive {
+      { // 'make_indefinitive_if_repeated' may have just changed this value.
+        if is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?;
         } else { // futz with the orgnode and its content children
@@ -399,13 +395,8 @@ fn map_completeNodePreorderCollectingDefinitiveRequests_over_children<'a> (
   errors               : &'a mut Vec < String >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let child_ids : Vec < NodeId > = {
-      let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
-        tree . get ( node_id )
-        . ok_or ( "Node not found in tree" ) ?;
-      node_ref . children ()
-        . map ( |c| c . id () )
-        . collect () };
+    let child_ids : Vec < NodeId > =
+      collect_child_ids ( tree, node_id ) ?;
     for child_id in child_ids {
       completeNodePreorder_collectingDefinitiveRequests (
         tree, child_id, tree_idx, config, typedb_driver,

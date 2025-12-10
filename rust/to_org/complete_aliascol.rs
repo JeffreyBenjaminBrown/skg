@@ -2,9 +2,10 @@ pub mod org_to_mskg_org_adaptor;
 
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
+use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, OrgnodeMetadata, RelToParent, default_metadata};
+use crate::types::orgnode::{OrgNode, RelToParent};
 use crate::util::path_from_pid_and_source;
 use ego_tree::NodeId;
 use std::collections::HashSet;
@@ -77,13 +78,8 @@ pub async fn completeAliasCol (
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for alias in missing_aliases_from_disk {
-      let mut md : OrgnodeMetadata =
-        default_metadata ();
-      md . code.relToParent = RelToParent::Alias;
-      aliascol_mut . append ( OrgNode {
-        metadata : md,
-        title    : alias,
-        body     : None, }); }}
+      aliascol_mut . append (
+        orgnode_from_title_and_rel ( RelToParent::Alias, alias )); }}
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.

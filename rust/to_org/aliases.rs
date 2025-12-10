@@ -1,6 +1,7 @@
 use crate::media::file_io::one_node::fetch_aliases_from_file;
+use crate::to_org::util::{get_pid_in_pairtree, complete_view_request, orgnode_from_title_and_rel};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, OrgnodeMetadata, RelToParent, ViewRequest, default_metadata};
+use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use crate::types::trees::PairTree;
 
 use std::error::Error;
@@ -13,15 +14,13 @@ pub async fn wrapped_build_and_integrate_aliases_view (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  if let Err ( e ) = build_and_integrate_aliases (
-    tree, node_id, config, typedb_driver ) . await
-  { errors . push ( format! (
-    "Failed to integrate aliases view: {}", e )); }
-  tree . get_mut ( node_id )
-    . ok_or ( "Node not found in tree" ) ?
-    . value () . 1 . metadata . code . viewRequests
-    . remove ( &ViewRequest::Aliases );
-  Ok (( )) }
+  let result = build_and_integrate_aliases (
+    tree, node_id, config, typedb_driver ) . await;
+  complete_view_request (
+    tree, node_id,
+    ViewRequest::Aliases,
+    "Failed to integrate aliases view",
+    errors, result ) }
 
 /// Integrate an AliasCol child and, under it, Alias grandchildren
 /// into the OrgNode tree containing the target node.
@@ -41,9 +40,7 @@ pub async fn build_and_integrate_aliases (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
-    tree . get ( node_id ) . unwrap ()
-    . value () . 1 . metadata . id . clone ()
-    . ok_or ( "Node has no ID" ) ?;
+    get_pid_in_pairtree ( tree, node_id ) ?;
   { // If it already has an AliasCol child, then do nothing,
     // because completeAliasCol already handled it.
     let has_aliascol : bool = {
@@ -61,14 +58,8 @@ pub async fn build_and_integrate_aliases (
       config,
       driver,
       node_id_val ) . await;
-  let aliascol : OrgNode = {
-    let mut aliascol_md : OrgnodeMetadata =
-      default_metadata ();
-    aliascol_md . code.relToParent = RelToParent::AliasCol;
-    OrgNode {
-      metadata : aliascol_md,
-      title    : String::new (),
-      body     : None, }};
+  let aliascol : OrgNode =
+    orgnode_from_title_and_rel ( RelToParent::AliasCol, String::new () );
   let aliascol_id : ego_tree::NodeId = {
     // prepend an AliasCol to the node's children
     let mut node_mut =
@@ -77,14 +68,8 @@ pub async fn build_and_integrate_aliases (
     node_mut . prepend ( (None, aliascol) ) . id () };
   for alias in aliases {
     // append each Alias to the AliasCol's children
-    let mut md_alias : OrgnodeMetadata =
-      default_metadata ();
-    md_alias . code.relToParent =
-      RelToParent::Alias;
-    let alias_node : OrgNode = OrgNode {
-      metadata : md_alias,
-      title    : alias,
-      body     : None, };
+    let alias_node : OrgNode =
+      orgnode_from_title_and_rel ( RelToParent::Alias, alias );
     let mut aliascol_mut =
       tree . get_mut ( aliascol_id )
       . ok_or ( "AliasCol node not found" ) ?;

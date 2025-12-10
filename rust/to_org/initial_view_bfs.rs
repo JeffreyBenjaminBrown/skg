@@ -18,10 +18,10 @@
 use crate::to_org::content_view::stub_forest_from_root_ids;
 use crate::to_org::bfs_shared::{
   collect_content_children,
+  fetch_and_append_child_pair,
   rewrite_to_indefinitive };
 use crate::to_org::truncate::truncate_after_node_in_generation_in_forest;
-use crate::to_org::util::is_ancestor_id;
-use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::to_org::util::{get_pid_in_pairtree, is_ancestor_id};
 use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
 use crate::types::trees::PairTree;
 
@@ -119,18 +119,15 @@ async fn add_children_and_collect_their_ids (
             Box<dyn Error>> {
   let mut child_gen : Vec<(usize, Vec<NodeId>)> = Vec::new();
   for (tree_idx, parent_id, child_id) in rels_to_add {
-    let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
-      skgnode_and_orgnode_from_id(config, driver, &child_id).await?;
-    let mut parent_mut : NodeMut<(Option<SkgNode>, OrgNode)> =
-      forest[tree_idx] . get_mut(parent_id) . unwrap();
     let child_node_id : NodeId =
-      parent_mut . append((Some(child_skgnode), child_orgnode)) . id();
+      fetch_and_append_child_pair (
+        &mut forest[tree_idx], parent_id, &child_id, config, driver
+      ) . await ?;
     if let Some((_, ids)) =
       child_gen . iter_mut() . find(|(idx, _)| *idx == tree_idx) {
         // Group by tree_idx
         // todo ? Using 'find' is inefficient, but arguably safer,
         // than simply accessing the 'idx'th element.
-        let ids : &mut Vec<NodeId> = ids;
         ids . push(child_node_id);
     } else {
       child_gen . push((tree_idx, vec![child_node_id])); }}
@@ -146,12 +143,7 @@ fn mark_cycles_and_repeats (
   visited    : &mut HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let tree = &mut forest[tree_idx];
-  let pid : ID = {
-    let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
-      tree . get ( node_id )
-      . ok_or ( "mark_cycles_and_repeats: node not found" ) ?;
-    node_ref . value () . 1 . metadata . id . clone ()
-      . ok_or ( "mark_cycles_and_repeats: node has no ID" ) ? };
+  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
   let is_cycle : bool =
     is_ancestor_id ( tree, node_id, &pid,
                      |n| n . 1 . metadata . id . as_ref () ) ?;
@@ -219,13 +211,10 @@ async fn add_children_with_truncation(
       // ego_tree does not permit comparison of
       // node_ids from different trees.
       { break; }
-      let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
-        skgnode_and_orgnode_from_id(
-          config, driver, child_id ). await?;
-      let child_node_id : NodeId = {
-        let mut parent_mut : NodeMut<(Option<SkgNode>, OrgNode)> =
-          forest[*tree_idx] . get_mut(*parent_id) . unwrap();
-        parent_mut . append((Some(child_skgnode), child_orgnode)) . id() };
+      let child_node_id : NodeId =
+        fetch_and_append_child_pair (
+          &mut forest[*tree_idx], *parent_id, child_id, config, driver
+        ) . await ?;
       rewrite_to_indefinitive (
         &mut forest[*tree_idx], child_node_id ) ?;
       if let Some(ref child_pid) =

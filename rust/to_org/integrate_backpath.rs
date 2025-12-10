@@ -7,7 +7,9 @@
 /// - I say 'integrate' rather than 'insert' because some of the path,
 ///   maybe even all of it, might already be there.
 
-use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::to_org::util::{
+  get_pid_in_pairtree, skgnode_and_orgnode_from_id,
+  complete_view_request};
 use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
@@ -28,16 +30,13 @@ pub async fn wrapped_build_and_integrate_containerward_view (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  if let Err ( e ) = build_and_integrate_containerward_path (
-    tree, node_id, config, typedb_driver ) . await
-  {
-    errors . push (
-      format! ( "Failed to integrate containerward path: {}", e )); }
-  tree . get_mut ( node_id )
-    . ok_or ( "Node not found in tree" ) ?
-    . value () . 1 . metadata . code . viewRequests
-    . remove ( &ViewRequest::Containerward );
-  Ok (( )) }
+  let result = build_and_integrate_containerward_path (
+    tree, node_id, config, typedb_driver ) . await;
+  complete_view_request (
+    tree, node_id,
+    ViewRequest::Containerward,
+    "Failed to integrate containerward path",
+    errors, result ) }
 
 /// Integrate a containerward path into an OrgNode tree.
 /// This is called on a specific node in the tree,
@@ -49,9 +48,7 @@ pub async fn build_and_integrate_containerward_path (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    tree . get ( node_id ) . unwrap ()
-    . value () . 1 . metadata . id . clone ()
-    . ok_or ( "Node has no ID" ) ?;
+    get_pid_in_pairtree ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_containerward_to_end_cycle_and_or_branches (
@@ -69,16 +66,13 @@ pub async fn wrapped_build_and_integrate_sourceward_view (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  if let Err ( e ) = build_and_integrate_sourceward_path (
-    tree, node_id, config, typedb_driver ) . await
-  {
-    errors . push (
-      format! ( "Failed to integrate sourceward path: {}", e )); }
-  tree . get_mut ( node_id )
-    . ok_or ( "Node not found in tree" ) ?
-    . value () . 1 . metadata . code . viewRequests
-    . remove ( &ViewRequest::Sourceward );
-  Ok (( )) }
+  let result = build_and_integrate_sourceward_path (
+    tree, node_id, config, typedb_driver ) . await;
+  complete_view_request (
+    tree, node_id,
+    ViewRequest::Sourceward,
+    "Failed to integrate sourceward path",
+    errors, result ) }
 
 /// Integrate a sourceward path into an OrgNode tree.
 /// TODO ? Can this be dedup'd w/r/t
@@ -90,9 +84,7 @@ pub async fn build_and_integrate_sourceward_path (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    tree . get ( node_id ) . unwrap ()
-    . value () . 1 . metadata . id . clone ()
-    . ok_or ( "Node has no ID" ) ?;
+    get_pid_in_pairtree ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_sourceward_to_end_cycle_and_or_branches (
@@ -114,9 +106,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    tree . get ( node_id ) . unwrap ()
-    . value () . 1 . metadata . id . clone ()
-    . ok_or ( "Node has no ID" ) ?;
+    get_pid_in_pairtree ( tree, node_id ) ?;
   if ! path . is_empty () {
     // The head of the path should be the terminus. We strip it.
     if path[0] != terminus_pid {
