@@ -18,18 +18,16 @@
 /// and re-render as indefinitive every node in P's generation after P.
 
 use crate::to_org::util::stub_forest_from_root_ids;
-use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_generation_in_forest;
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_forest;
 use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   fetch_and_append_child_pair,
   mark_visited_or_repeat_or_cycle,
-  rewrite_to_indefinitive,
   VisitedMap };
 use crate::types::{SkgConfig, ID};
 use crate::types::trees::PairTree;
 
 use ego_tree::NodeId;
-use std::cmp::min;
 use std::error::Error;
 use std::pin::Pin;
 use std::future::Future;
@@ -94,7 +92,7 @@ fn render_generation_and_recurse<'a> (
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count >= limit {
-      add_last_generation_truncated (
+      add_last_generation_and_edit_previous_in_forest (
         forest, gen_int, &parent_child_rels_to_add,
         rendered_count, limit, config, driver,
       ) . await ?;
@@ -160,45 +158,3 @@ fn collect_rels_to_children_from_generation(
         children . push ( (*tree_idx,
                            *node_id, child_id) ); }} }}
   children }
-
-/// Render the last generation because limit is hit. In order:
-/// - fetch and add children up to the limit as indefinitive nodes
-/// - complete the sibling group of the limit node
-/// - omit rest of generation (later would-be sibling groups)
-/// - truncate the preceding generation after the limit-hitting node's parent
-async fn add_last_generation_truncated (
-  forest           : &mut Vec<PairTree>,
-  generation       : usize,
-  children_to_add  : &[(usize, NodeId, ID)],
-  nodes_rendered   : usize,
-  limit            : usize,
-  config           : &SkgConfig,
-  driver           : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
-  let space_left_before_limit : usize = limit - nodes_rendered;
-  if space_left_before_limit < 1 { // shouldn't happen
-    return Ok (( )); }
-  let last_addable_index =
-    min (space_left_before_limit, children_to_add . len()) - 1;
-  let (limit_tree_idx, limit_parent_id) : (usize, NodeId) = {
-    // identify where limit is hit
-    let (tree_idx, parent_id, _child_id) =
-      &children_to_add [last_addable_index];
-    (*tree_idx, *parent_id) };
-  for (idx, (tree_idx, parent_id, child_id))
-    in children_to_add . iter() . enumerate() {
-      if idx > last_addable_index &&
-        ( *tree_idx != limit_tree_idx ||
-           *parent_id != limit_parent_id )
-      // That 'in a new tree' condition is needed because ego_tree does not permit comparison of node_ids from different trees.
-      { break; }
-      let child_node_id : NodeId =
-        fetch_and_append_child_pair (
-          &mut forest[*tree_idx], *parent_id, child_id,
-          config, driver
-        ). await ?;
-      rewrite_to_indefinitive (
-        &mut forest[*tree_idx], child_node_id ) ?; }
-  truncate_after_node_in_generation_in_forest(
-    forest, generation, limit_tree_idx, limit_parent_id )?;
-  Ok (( )) }

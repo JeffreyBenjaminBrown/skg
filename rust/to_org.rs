@@ -2,6 +2,12 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
+// OUTSIDE ENTRY POINTS:
+// The only (so far) functions defined here used outside of it are:
+// - single_root_view
+// - completeOrgnodeForest_collectingDefinitiveRequests
+// - execute_definitive_view_requests
+
 pub mod complete;
 pub mod expand;
 pub mod render;

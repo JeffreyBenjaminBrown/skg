@@ -1,13 +1,6 @@
 * RESUME REVIEW at
   rust/to_org/definitive_branch.rs
   (reading down in magit)
-* reviewing rust/to_org/expand/definitive.rs
-** good, no need to unify
-   rebuild_pair_from_disk_mostly_clobbering_the_org
-** unify?
-*** expand::definitive::add_last_generation_and_edit_previous
-    with
-    render::add_last_generation_truncated
 * what calls 'to_org::'
 ** single_root_view
 ** completeOrgnodeForest_collectingDefinitiveRequests

@@ -221,4 +221,3 @@ pub fn collect_generation_ids<T>(
   collect_at_depth (
     effective_root_noderef, 1, generation, &mut result);
   Ok (result) }
-

@@ -1,11 +1,10 @@
 /// SINGLE ENTRY POINT: 'execute_definitive_view_requests'.
 
-use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_generation_in_tree;
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_tree;
 use crate::to_org::util::{
   skgnode_and_orgnode_from_pid_and_source,
   fetch_and_append_child_pair,
   mark_visited_or_repeat_or_cycle,
-  rewrite_to_indefinitive,
   get_pid_in_pairtree,
   VisitedMap, is_indefinitive,
   content_ids_if_definitive_else_empty };
@@ -15,7 +14,6 @@ use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
-use std::cmp::min;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -167,7 +165,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
     if nodes_rendered + gen_with_children . len () >= limit {
       // Limit hit. Complete this sibling group
       // and truncate later parents.
-      add_last_generation_and_edit_previous (
+      add_last_generation_and_edit_previous_in_tree (
         tree, generation, &gen_with_children,
         limit - nodes_rendered,
         effective_root,
@@ -189,67 +187,6 @@ async fn extendDefinitiveSubtreeFromLeaf (
           next_gen . push ( (new_node_id, grandchild_id) ); }} }
     gen_with_children = next_gen;
     generation += 1; }
-  Ok (( )) }
-
-/// Returns the generation (depth) of a node relative to an effective root.
-/// The effective root is generation 1.
-/// If effective_root is None, uses the true tree root.
-/// Returns None if effective_root is Some but node_id is not a descendant of it
-/// (nor the effective root itself).
-#[allow(dead_code)] // May be useful for debugging
-fn node_generation (
-  tree           : &PairTree,
-  node_id        : NodeId,
-  effective_root : Option < NodeId >,
-) -> Result < Option < usize >, Box<dyn Error> > {
-  let mut depth : usize = 1;
-  let mut current : Option < NodeRef < NodePair > > =
-    Some ( tree . get ( node_id )
-           . ok_or ( "node_generation: NodeId not in tree" ) ? );
-  while let Some ( node ) = current {
-    if Some ( node.id () ) == effective_root {
-      return Ok ( Some ( depth ) ); }
-    depth += 1;
-    current = node . parent (); }
-  if effective_root . is_none () {
-    Ok ( Some ( depth - 1 ) ) // -1 because we incremented once after reaching the true root
-  } else {
-    Ok ( None ) }}
-
-/// Add children with truncation when limit is exceeded.
-/// - Adds children up to `space_left` as indefinitive nodes
-/// - Completes the sibling group of the limit-hitting node
-/// - Marks nodes after the limit-hitting node's parent as indefinitive
-/// Generation is relative to effective_root (which is generation 1).
-async fn add_last_generation_and_edit_previous (
-  tree           : &mut PairTree,
-  generation     : usize,
-  children       : &[(NodeId, ID)],
-  space_left     : usize,
-  effective_root : NodeId, // it had the definitive view request
-  visited        : &mut VisitedMap,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  if space_left < 1 { // shouldn't happen
-    return Ok (( )); }
-  let last_addable_index : usize =
-    min ( space_left, children . len () ) - 1;
-  let limit_parent_id : NodeId =
-    children [last_addable_index] . 0;
-  for (idx, (parent_nid, child_id))
-    in children . iter () . enumerate () {
-      if ( idx > last_addable_index && // past limit
-           *parent_nid != limit_parent_id ) // in new sibling group
-      { break; }
-      else {
-        let new_node_id : NodeId =
-          fetch_and_append_child_pair (
-            tree, *parent_nid, child_id, config, driver ) . await ?;
-        rewrite_to_indefinitive ( tree, new_node_id ) ?; }}
-  truncate_after_node_in_generation_in_tree (
-    tree, generation - 1, limit_parent_id,
-    effective_root, visited ) ?;
   Ok (( )) }
 
 /// Fetches fresh (SkgNode, OrgNode) from disk
