@@ -195,7 +195,9 @@ pub async fn fetch_and_append_child_pair (
     tree . get_mut ( parent_id )
     . ok_or ( "fetch_and_append_child_pair: parent not found" ) ?;
   let child_node_id : NodeId =
-    parent_mut . append ( (Some(child_skgnode), child_orgnode) ) . id ();
+    parent_mut . append ((Some(child_skgnode),
+                          child_orgnode))
+    . id ();
   Ok ( child_node_id ) }
 
 /// Collect content child IDs from a node in a PairTree.

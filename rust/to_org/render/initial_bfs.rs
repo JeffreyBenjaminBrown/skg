@@ -23,13 +23,13 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   fetch_and_append_child_pair,
   get_pid_in_pairtree, is_ancestor_id,
-  rewrite_to_indefinitive };
+  rewrite_to_indefinitive,
+  VisitedMap };
 use crate::types::{SkgConfig, ID};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut};
 use std::cmp::min;
-use std::collections::HashSet;
 use std::error::Error;
 use std::pin::Pin;
 use std::future::Future;
@@ -42,7 +42,7 @@ pub async fn render_initial_forest_bfs (
   driver   : &TypeDBDriver,
 ) -> Result < Vec < PairTree >,
   Box<dyn Error> > {
-  let mut visited : HashSet<ID> = HashSet::new();
+  let mut visited : VisitedMap = VisitedMap::new();
   let mut forest : Vec < PairTree > =
     stub_forest_from_root_ids (
       root_ids, config, driver ) . await ?;
@@ -72,7 +72,7 @@ fn render_generation_and_recurse<'a> (
   gen_int        : usize,
   rendered_count : usize,
   limit          : usize,
-  visited        : &'a mut HashSet<ID>,
+  visited        : &'a mut VisitedMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,
 ) -> Pin<Box<dyn Future<
@@ -146,7 +146,7 @@ fn mark_visited_or_repeat_or_cycle (
   forest     : &mut Vec<PairTree>,
   tree_idx   : usize,
   node_id    : NodeId,
-  visited    : &mut HashSet<ID>,
+  visited    : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   let tree = &mut forest[tree_idx];
   let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
@@ -157,10 +157,10 @@ fn mark_visited_or_repeat_or_cycle (
       tree . get_mut ( node_id )
       . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
     node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }
-  if visited . contains ( &pid ) {
+  if visited . contains_key ( &pid ) {
     rewrite_to_indefinitive ( tree, node_id ) ?; }
   else {
-    visited . insert ( pid ); }
+    visited . insert ( pid, (tree_idx, node_id) ); }
   Ok (( )) }
 
 /// Collect all children IDs from nodes in the current generation.
@@ -198,7 +198,7 @@ async fn add_last_generation_truncated (
   limit            : usize,
   config           : &SkgConfig,
   driver           : &TypeDBDriver,
-  visited          : &mut HashSet<ID>,
+  visited          : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   let space_left_before_limit : usize = limit - nodes_rendered;
   if space_left_before_limit < 1 { // shouldn't happen
@@ -226,7 +226,8 @@ async fn add_last_generation_truncated (
       if let Some(ref child_pid) =
         forest[*tree_idx] . get(child_node_id)
         . unwrap() . value() . 1 . metadata.id
-      { visited.insert(child_pid.clone()); }}
+      { visited.insert( child_pid.clone(),
+                        (*tree_idx, child_node_id)); }}
   truncate_after_node_in_generation_in_forest(
     forest, generation, limit_tree_idx, limit_parent_id )?;
   Ok (( )) }
