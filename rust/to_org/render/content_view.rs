@@ -1,3 +1,11 @@
+/// PURPOSE: Build a string intended as buffer-text,
+/// to represent an 'inital view' (content relationships only).
+///
+/// METHOD (very simple):
+/// - render_initial_forest_bfs
+/// - set_metadata_relationship_viewdata_in_forest
+/// - render to string
+
 use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::media::tree::map_snd_over_forest;
 use crate::org_to_text::orgnode_forest_to_string;
@@ -9,7 +17,8 @@ use std::error::Error;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
-/// Build a tree from a root ID and render it to org text.
+
+/// See file header comment.
 pub async fn single_root_view (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
@@ -20,7 +29,7 @@ pub async fn single_root_view (
     config,
     & [ root_id . clone () ] ) . await }
 
-/// Build a forest from multiple root IDs and render it to org text.
+/// See file header comment.
 pub async fn multi_root_view (
   driver   : &TypeDBDriver,
   config   : &SkgConfig,

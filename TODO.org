@@ -3,7 +3,6 @@
   (reading down in magit)
 * what calls 'to_org::'
 ** single_root_view
-** set_metadata_relationship_viewdata_in_forest
 ** completeOrgnodeForest_collectingDefinitiveRequests
 ** execute_definitive_view_requests
 * merge rust/to_org/bfs_shared.rs and rust/to_org/util.rs
