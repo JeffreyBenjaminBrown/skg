@@ -28,20 +28,8 @@ pub use render::{
   render_initial_forest_bfs,
 };
 
-
 pub use util::{
-  newline_to_space,
   skgnode_and_orgnode_from_id,
   skgnode_and_orgnode_from_pid_and_source,
   content_ids_from_skgnode,
-};
-
-pub use crate::org_to_text::{
-  org_bullet,
-  orgnode_forest_to_string,
-  orgnode_to_text,
-};
-
-pub use crate::compute_viewdata::{
-  set_metadata_relationship_viewdata_in_forest,
 };

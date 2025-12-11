@@ -64,7 +64,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
                  md . id = Some ( pid . clone () );
                  md . source = Some ( source . to_string () );
                  md },
-    title : newline_to_space ( & skgnode . title ),
+    title : ( & skgnode . title ) . replace ( '\n', " " ),
     body  : skgnode . body . clone (), };
   if orgnode . title . is_empty () { // Validate title
     return Err ( Box::new ( io::Error::new (
@@ -94,14 +94,6 @@ pub fn rewrite_to_indefinitive (
   node_mut . value () . 1 . metadata . code . indefinitive = true;
   node_mut . value () . 1 . body = None;
   Ok (( )) }
-
-
-// ==============================================
-// Text
-// ==============================================
-
-pub fn newline_to_space ( s: &str ) -> String {
-  s.replace ( '\n', " " ) }
 
 
 // ==============================================

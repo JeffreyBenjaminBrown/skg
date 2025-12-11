@@ -1,4 +1,6 @@
-/// Truncation logic for BFS rendering when node limit is hit.
+/// Truncate after a node in a generation of a tree or forest,
+/// possibly limiting scope to an effective branch of a tree.
+/// Truncated nodes are re-rendered using 'rewrite_to_indefinitive'.
 
 use crate::media::tree::collect_generation_ids;
 use crate::to_org::util::{
@@ -9,9 +11,9 @@ use crate::types::trees::PairTree;
 use ego_tree::NodeId;
 use std::error::Error;
 
-/// Truncate all nodes after a given node in a generation.
-/// Marks them as indefinitive.
-/// Generation is relative to effective_root (which is generation 1).
+/// PURPOSE: See file header comment.
+/// This one is for a single branch of a single tree.
+/// Effective_root is generation 1.
 pub fn truncate_after_node_in_generation_in_tree (
   tree           : &mut PairTree,
   generation     : usize,
@@ -28,8 +30,8 @@ pub fn truncate_after_node_in_generation_in_tree (
     rewrite_to_indefinitive ( tree, id ) ?; }
   Ok (( )) }
 
-/// Truncate all nodes after a given node in a generation
-/// across the forest.
+/// PURPOSE: See file header comment.
+/// This one is for an entire forest.
 /// For trees before tree_idx: skip (already fully rendered).
 /// For tree at tree_idx: truncate nodes after node_id.
 /// For trees after tree_idx: truncate entire generation.

@@ -1,7 +1,11 @@
+// DON'T IMPORT these re-exports. They are for documentation.
+// INSTEAD, imports in the codebase should use the original,
+// longer definition path. That makes it easier to find definitions.
+
 /// The 'buffer' referred to here
 /// is a Skg buffer from the Emacs client,
 /// read by the Rust server when the user saves it.
-/// The sole purpose of all the sub-libraries in 'save_buffer::'
+/// The sole purpose of all the sub-libraries in 'from_text::'
 /// is the function 'buffer_to_save_instructions' defined here.
 
 use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;

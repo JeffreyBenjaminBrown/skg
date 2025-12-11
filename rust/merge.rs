@@ -1,3 +1,7 @@
+// DON'T IMPORT these re-exports. They are for documentation.
+// INSTEAD, imports in the codebase should use the original,
+// longer definition path. That makes it easier to find definitions.
+
 mod typedb;
 mod fs;
 mod tantivy;

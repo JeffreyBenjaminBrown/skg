@@ -1,6 +1,6 @@
 pub mod content_view;
 pub mod initial_bfs;
-pub mod truncate;
+pub mod truncate_after_node_in_gen;
 
 pub use content_view::{
   multi_root_view,
