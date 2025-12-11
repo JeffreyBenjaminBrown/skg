@@ -1,18 +1,19 @@
 use crate::types::{OrgNode, orgnodemd_to_string};
+use crate::types::trees::{NodePair, PairTree};
 
-use ego_tree::Tree;
+use ego_tree::NodeRef;
 
-/// Render a forest of OrgNode trees to org-mode text.
+/// Render a forest of PairTrees to org-mode text.
 /// Each tree's root starts at level 1.
 /// Assumes metadata has already been enriched with relationship data.
 pub fn orgnode_forest_to_string (
-  forest : &[Tree < OrgNode >],
+  forest : &[PairTree],
 ) -> String {
   fn render_node_subtree_to_org (
-    node_ref : ego_tree::NodeRef < OrgNode >,
+    node_ref : NodeRef < NodePair >,
     level    : usize,
   ) -> String {
-    let node : &OrgNode = node_ref . value ();
+    let node : &OrgNode = & node_ref . value () . 1;
     let mut out : String =
       orgnode_to_text ( level, node );
     for child in node_ref . children () {

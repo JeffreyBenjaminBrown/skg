@@ -3,12 +3,13 @@ use crate::media::typedb::search::{
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::util::collect_ids_from_forest;
-use crate::types::{ID, SkgConfig, OrgNode};
+use crate::to_org::util::collect_ids_from_pair_forest;
+use crate::types::{ID, SkgConfig};
+use crate::types::trees::PairTree;
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
-use ego_tree::Tree;
+use ego_tree::NodeId;
 use typedb_driver::TypeDBDriver;
 
 /// Each of these describes some kind of relationship,
@@ -24,7 +25,7 @@ struct MapsFromIdForView {
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
 pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut [Tree < OrgNode >],
+  forest : &mut [PairTree],
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -32,7 +33,7 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
     mapsFromIdForView_from_forest (
       forest, config, driver ) . await ?;
   for tree in forest {
-    let root_id : ego_tree::NodeId =
+    let root_id : NodeId =
       tree . root () . id ();
     set_metadata_relationships_in_node_recursive (
       tree,
@@ -41,11 +42,11 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
       & rel_data ); }
   Ok (( )) }
 
-/// Build MapsFromIdForView from a forest of OrgNode trees.
+/// Build MapsFromIdForView from a forest of PairTrees.
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
 async fn mapsFromIdForView_from_forest (
-  forest : &[Tree < OrgNode >],
+  forest : &[PairTree],
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
@@ -53,7 +54,7 @@ async fn mapsFromIdForView_from_forest (
     // This function just collects IDs,
     // but in this context we know they are specifically PIDs,
     // because they all came from 'forest_from_root_ids'.
-    collect_ids_from_forest ( forest ));
+    collect_ids_from_pair_forest ( forest ));
   fetch_relationship_data (
     driver,
     & config . db_name,
@@ -87,44 +88,44 @@ async fn fetch_relationship_data (
   }) }
 
 fn set_metadata_relationships_in_node_recursive (
-  tree       : &mut Tree < OrgNode >,
-  node_id    : ego_tree::NodeId,
+  tree       : &mut PairTree,
+  node_id    : NodeId,
   parent_pid : Option < &ID >,
   rel_data   : &MapsFromIdForView,
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( node_id ) . unwrap ()
-    . value () . metadata . id . clone ();
+    . value () . 1 . metadata . id . clone ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
     // Update all relationship fields
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . viewData . relationships . numContainers =
+      . 1 . metadata . viewData . relationships . numContainers =
       rel_data . num_containers . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . viewData . relationships . numContents =
+      . 1 . metadata . viewData . relationships . numContents =
       rel_data . num_contents . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . metadata . viewData . relationships . numLinksIn =
+      . 1 . metadata . viewData . relationships . numLinksIn =
       rel_data . num_links_in . get ( node_pid ) . copied ();
     if let Some ( parent_id ) = parent_pid {
       // Set parent relationship flags if we have a parent.
       // TODO | PITFALL: If there is no parent,
       // these fields are meaningless.
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . metadata . viewData . relationships . parentIsContainer =
+        . 1 . metadata . viewData . relationships . parentIsContainer =
         rel_data . content_to_containers
         . get ( node_pid )
         . map_or ( false, | containers |
                    containers . contains ( parent_id ));
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . metadata . viewData . relationships . parentIsContent =
+        . 1 . metadata . viewData . relationships . parentIsContent =
         rel_data . container_to_contents
         . get ( node_pid )
         . map_or ( false, | contents |
                    contents . contains ( parent_id )); }}
   { // recurse
-    let child_ids : Vec < ego_tree::NodeId > =
+    let child_ids : Vec < NodeId > =
       tree . get ( node_id ) . unwrap ()
       . children () . map ( | c | c . id () ) . collect ();
     for child_id in child_ids {

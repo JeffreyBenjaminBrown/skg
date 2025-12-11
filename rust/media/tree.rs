@@ -8,54 +8,6 @@ pub use orgnode_skgnode::{
 use ego_tree::{Tree, NodeRef, NodeId};
 use std::error::Error;
 
-/// Converts Vec<Tree<(A, B)>> to Vec<Tree<B>> the obvious way.
-pub fn map_snd_over_forest<A, B>(
-  paired_forest: Vec<Tree<(A, B)>>
-) -> Vec<Tree<B>> where A: Clone,
-                        B: Clone, {
-  paired_forest . into_iter() . map(
-    |paired_tree| {
-      map_snd_over_tree( &paired_tree,
-                          paired_tree . root() . id())
-    } ).collect() }
-
-/// Converts a subtree of Tree<(A, B)> to Tree<B> the obvious way.
-pub fn map_snd_over_tree<A, B>(
-  paired_tree: &Tree<(A, B)>,
-  subtree_root: NodeId,
-) -> Tree<B> where A: Clone,
-                   B: Clone, {
-
-  fn copy_children_recursively<A, B>(
-    paired_tree: &Tree<(A, B)>,
-    paired_node_id: NodeId,
-    new_tree: &mut Tree<B>,
-    new_node_id: NodeId,
-  ) where A: Clone,
-          B: Clone, {
-    let child_ids: Vec<NodeId> =
-      paired_tree . get(paired_node_id) . unwrap()
-      . children() . map(|c| c.id())
-      . collect();
-    for child_id in child_ids {
-      let child_data: (A, B) =
-        paired_tree . get(child_id) . unwrap() . value() . clone();
-      let new_child_id: NodeId =
-        new_tree . get_mut(new_node_id) . unwrap()
-        . append(child_data.1) .  id();
-      copy_children_recursively( // recurse
-        paired_tree, child_id, new_tree, new_child_id); }}
-
-  let root_data: (A, B) =
-    paired_tree . get(subtree_root)
-    . unwrap() . value() . clone();
-  let mut new_tree: Tree<B> = Tree::new(root_data.1);
-  let new_root_id: NodeId = new_tree.root().id();
-  copy_children_recursively(
-    paired_tree, subtree_root, &mut new_tree, new_root_id);
-  new_tree
-}
-
 /// Returns the first node in the Nth generation of the tree.
 /// Generation 1 is the root; generation 2 is the next one; etc.
 /// Returns None if the Nth generation doesn't exist in the tree.

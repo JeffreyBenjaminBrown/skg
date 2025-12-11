@@ -171,8 +171,7 @@ fn detect_cycle_and_mark (
   let node_pid : ID =
     get_pid_in_pairtree ( tree, node_id ) ?;
   let is_cycle : bool = is_ancestor_id (
-    tree, node_id, &node_pid,
-    |n| n . 1 . metadata . id . as_ref () ) ?;
+    tree, node_id, &node_pid ) ?;
   let mut node_mut : NodeMut < NodePair > =
     tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?;

@@ -1,7 +1,6 @@
 use crate::init::{overwrite_new_empty_db, define_schema};
 use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
 use crate::media::tantivy::search_index;
-use crate::media::tree::map_snd_over_forest;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
@@ -285,7 +284,37 @@ fn compare_two_orgnodes_recursively_modulo_id (
   children1.len() == children2.len() &&
     children1 . iter() . zip ( children2.iter() )
     . all ( | ( c1, c2 ) |
-                compare_two_orgnodes_recursively_modulo_id ( *c1, *c2 ) ) }
+                compare_two_orgnodes_recursively_modulo_id (
+                  *c1, *c2 )) }
+
+/// This looks ridiculous, but it's convenient.
+pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
+  trees1 : & [PairTree],
+  trees2 : & [Tree<OrgNode>],
+) -> bool {
+  if trees1 . len () != trees2 . len () {
+    return false; }
+  fn compare_nodes (
+    node1 : NodeRef < (Option<SkgNode>, OrgNode) >,
+    node2 : NodeRef < OrgNode >
+  ) -> bool {
+    let n1 : & OrgNode = & node1 . value () . 1;
+    let n2 : & OrgNode = node2 . value ();
+    // Compare the OrgNode values
+    if n1 != n2 { return false; }
+    // Compare children recursively
+    let children1 : Vec < _ > = node1 . children () . collect ();
+    let children2 : Vec < _ > = node2 . children () . collect ();
+    children1 . len () == children2 . len () &&
+      children1 . iter () . zip ( children2 . iter () )
+      . all ( | ( c1, c2 ) | compare_nodes ( *c1, *c2 ) ) }
+  for ( tree1, tree2 )
+    in trees1 . iter ()
+    . zip ( trees2 . iter () ) {
+      if ! compare_nodes (
+        tree1 . root (), tree2 . root () )
+      { return false; }}
+  true }
 
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
@@ -386,13 +415,11 @@ pub fn strip_org_comments(s: &str) -> String {
     .collect::<Vec<String>>()
     .join("\n") }
 
-/// Render a paired forest to org text by first converting to OrgNode forest.
+/// Render a paired forest to org text.
 pub fn render_paired_forest_to_org (
   forest : &[PairTree],
 ) -> String {
-  let orgnode_forest : Vec < Tree < OrgNode > > =
-    map_snd_over_forest ( forest . to_vec () );
-  orgnode_forest_to_string ( & orgnode_forest ) }
+  orgnode_forest_to_string ( forest ) }
 
 /// Convert an OrgNode forest to a paired forest
 /// *with None for all SkgNodes*.

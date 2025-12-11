@@ -3,7 +3,6 @@ use crate::from_text::buffer_to_save_instructions;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
-use crate::media::tree::map_snd_over_forest;
 use crate::merge::merge_nodes_in_graph;
 use crate::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
 use crate::to_org::expand::definitive::execute_definitive_view_requests;
@@ -126,7 +125,9 @@ async fn update_from_and_rerender_buffer (
 ) -> Result<SaveResponse, Box<dyn Error>> {
 
   let (orgnode_forest, save_instructions, mergeInstructions)
-    : (Vec<Tree<OrgNode>>, Vec<SaveInstruction>, Vec<MergeInstructionTriple>)
+    : ( Vec<Tree<OrgNode>>,
+        Vec<SaveInstruction>,
+        Vec<MergeInstructionTriple> )
     = buffer_to_save_instructions (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
@@ -169,16 +170,12 @@ async fn update_from_and_rerender_buffer (
       &mut visited,
       &mut errors ) . await ?; }
 
-  // The SkgNode data is no longer needed.
-  let mut orgnode_forest : Vec < Tree < OrgNode > > =
-    map_snd_over_forest ( paired_forest );
-
   set_metadata_relationship_viewdata_in_forest (
-    &mut orgnode_forest,
+    &mut paired_forest,
     config,
     typedb_driver ) . await ?;
 
   let buffer_content : String =
-    orgnode_forest_to_string ( & orgnode_forest );
+    orgnode_forest_to_string ( & paired_forest );
 
   Ok ( SaveResponse { buffer_content, errors } ) }

@@ -6,7 +6,7 @@ use crate::types::orgnode::{default_metadata, RelToParent, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 use crate::util::path_from_pid_and_source;
 
-use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
+use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -108,8 +108,7 @@ pub fn mark_visited_or_repeat_or_cycle (
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
   let is_cycle : bool =
-    is_ancestor_id ( tree, node_id, &pid,
-                     |n| n . 1 . metadata . id . as_ref () ) ?;
+    is_ancestor_id ( tree, node_id, &pid ) ?;
   { let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
@@ -143,41 +142,33 @@ pub async fn stub_forest_from_root_ids (
     forest . push ( tree ); }
   Ok ( forest ) }
 
-/// Collect all PIDs from a forest of OrgNode trees.
-pub fn collect_ids_from_forest (
-  forest : &[Tree < OrgNode >],
+/// Collect all PIDs from a forest of PairTrees.
+pub fn collect_ids_from_pair_forest (
+  forest : &[PairTree],
 ) -> Vec < ID > {
   let mut pids : Vec < ID > = Vec::new ();
   for tree in forest {
     for edge in tree . root () . traverse () {
       if let ego_tree::iter::Edge::Open ( node_ref ) = edge {
         if let Some ( ref pid ) =
-          node_ref . value () . metadata . id {
+          node_ref . value () . 1 . metadata . id {
           pids . push ( pid . clone () ); }} }}
   pids }
 
 /// Check if `target_id` appears in the ancestor path of `node_id`.
 /// Used for cycle detection.
-///
-/// The `get_id` closure extracts an `Option<&ID>` from a node value,
-/// allowing this to work with different tree types:
-/// - `Tree<OrgNode>`: `|n| n.metadata.id.as_ref()`
-/// - `Tree<(SkgNode, OrgNode)>`: `|n| n.1.metadata.id.as_ref()`
-pub fn is_ancestor_id < T, F > (
-  tree      : &Tree < T >,
+pub fn is_ancestor_id (
+  tree      : &PairTree,
   node_id   : NodeId,
   target_id : &ID,
-  get_id    : F,
-) -> Result < bool, Box<dyn Error> >
-where F : Fn ( &T ) -> Option < &ID >
-{
-  let node_ref : NodeRef < T > =
+) -> Result < bool, Box<dyn Error> > {
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
-  let mut current : Option < NodeRef < T > > =
+  let mut current : Option < NodeRef < NodePair > > =
     node_ref . parent ();
   while let Some ( parent ) = current {
-    if let Some ( parent_id ) = get_id ( parent . value () ) {
+    if let Some ( parent_id ) = parent . value () . 1 . metadata . id . as_ref () {
       if parent_id == target_id {
         return Ok ( true ); }}
     current = parent . parent (); }

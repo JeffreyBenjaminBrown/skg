@@ -3,10 +3,9 @@
 use indoc::indoc;
 use skg::to_org::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::org_to_uninterpreted_nodes;
-use skg::test_utils::{compare_orgnode_forests, run_with_test_db, orgnode_forest_to_paired};
+use skg::test_utils::{compare_orgnode_portions_of_pairforest_and_orgnodeforest, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::{ID, OrgNode, SkgConfig};
 use skg::types::trees::PairTree;
-use skg::media::tree::map_snd_over_forest;
 
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -72,12 +71,8 @@ async fn test_path_with_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
-  // Convert paired trees back to OrgNode trees for comparison
-  let result_trees: Vec<Tree<OrgNode>> =
-    map_snd_over_forest(trees);
-
   assert!(
-    compare_orgnode_forests(&result_trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
     "Tree structure after integrating path with cycle should match expected"
   );
 
@@ -160,12 +155,8 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
-  // Convert paired trees back to OrgNode trees for comparison
-  let result_trees: Vec<Tree<OrgNode>> =
-    map_snd_over_forest(trees);
-
   assert!(
-    compare_orgnode_forests(&result_trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
     "Tree structure after integrating path with branches (no cycle) should match expected"
   );
 
@@ -248,12 +239,8 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_trees: Vec<Tree<OrgNode>> =
     org_to_uninterpreted_nodes(expected)?;
 
-  // Convert paired trees back to OrgNode trees for comparison
-  let result_trees: Vec<Tree<OrgNode>> =
-    map_snd_over_forest(trees);
-
   assert!(
-    compare_orgnode_forests(&result_trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
     "Tree structure after integrating path with branches (with cycle) should match expected"
   );
 
