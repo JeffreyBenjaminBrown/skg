@@ -16,16 +16,15 @@
 /// and re-render every node in P's generation after P as indefinitive.
 
 use crate::to_org::content_view::stub_forest_from_root_ids;
-use crate::to_org::bfs_shared::{
-  collect_content_children,
-  fetch_and_append_child_pair,
-  rewrite_to_indefinitive };
 use crate::to_org::truncate::truncate_after_node_in_generation_in_forest;
-use crate::to_org::util::{get_pid_in_pairtree, is_ancestor_id};
+use crate::to_org::util::{
+  get_pid_in_pairtree, is_ancestor_id,
+  collect_content_children, fetch_and_append_child_pair,
+  rewrite_to_indefinitive };
 use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
 use crate::types::trees::PairTree;
 
-use ego_tree::{NodeId, NodeMut, NodeRef};
+use ego_tree::{NodeId, NodeMut};
 use std::cmp::min;
 use std::collections::HashSet;
 use std::error::Error;

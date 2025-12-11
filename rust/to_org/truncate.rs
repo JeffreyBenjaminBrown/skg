@@ -1,10 +1,9 @@
 /// Truncation logic for BFS rendering when node limit is hit.
 
 use crate::media::tree::collect_generation_ids;
-use crate::to_org::bfs_shared::{
-  nodes_after_in_generation,
-  rewrite_to_indefinitive };
-use crate::to_org::util::{get_pid_in_pairtree, VisitedMap};
+use crate::to_org::util::{
+  get_pid_in_pairtree, VisitedMap,
+  nodes_after_in_generation, rewrite_to_indefinitive };
 use crate::types::trees::PairTree;
 
 use ego_tree::NodeId;

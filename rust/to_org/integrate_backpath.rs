@@ -9,7 +9,7 @@
 
 use crate::to_org::util::{
   get_pid_in_pairtree, skgnode_and_orgnode_from_id,
-  complete_view_request};
+  remove_completed_view_request};
 use crate::media::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
@@ -32,7 +32,7 @@ pub async fn wrapped_build_and_integrate_containerward_view (
 ) -> Result < (), Box<dyn Error> > {
   let result = build_and_integrate_containerward_path (
     tree, node_id, config, typedb_driver ) . await;
-  complete_view_request (
+  remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
     "Failed to integrate containerward path",
@@ -68,7 +68,7 @@ pub async fn wrapped_build_and_integrate_sourceward_view (
 ) -> Result < (), Box<dyn Error> > {
   let result = build_and_integrate_sourceward_path (
     tree, node_id, config, typedb_driver ) . await;
-  complete_view_request (
+  remove_completed_view_request (
     tree, node_id,
     ViewRequest::Sourceward,
     "Failed to integrate sourceward path",

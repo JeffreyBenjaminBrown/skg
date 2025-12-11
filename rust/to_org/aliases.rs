@@ -1,5 +1,5 @@
 use crate::media::file_io::one_node::fetch_aliases_from_file;
-use crate::to_org::util::{get_pid_in_pairtree, complete_view_request, orgnode_from_title_and_rel};
+use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, orgnode_from_title_and_rel};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
 use crate::types::trees::PairTree;
@@ -16,7 +16,7 @@ pub async fn wrapped_build_and_integrate_aliases_view (
 ) -> Result < (), Box<dyn Error> > {
   let result = build_and_integrate_aliases (
     tree, node_id, config, typedb_driver ) . await;
-  complete_view_request (
+  remove_completed_view_request (
     tree, node_id,
     ViewRequest::Aliases,
     "Failed to integrate aliases view",

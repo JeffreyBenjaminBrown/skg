@@ -3,7 +3,6 @@
 // longer definition path. That makes it easier to find definitions.
 
 pub mod aliases;
-pub mod bfs_shared;
 pub mod complete_aliascol;
 pub mod complete_contents;
 pub mod content_view;

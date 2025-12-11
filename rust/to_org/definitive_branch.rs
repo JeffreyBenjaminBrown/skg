@@ -1,10 +1,10 @@
 /// SINGLE ENTRY POINT: 'execute_definitive_view_requests'.
 
-use crate::to_org::bfs_shared::collect_content_children;
 use crate::to_org::truncate::truncate_after_node_in_generation_in_tree;
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source,
-  VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive };
+  VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive,
+  collect_content_children };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
