@@ -11,7 +11,7 @@ use crate::to_org::expand::backpath::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
-use crate::types::trees::PairTree;
+use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{HashSet, HashMap};
@@ -47,7 +47,7 @@ pub async fn completeOrgnodeForest_collectingDefinitiveRequests (
   Ok (( visited, definitive_requests )) }
 
 /// Completes a node, and then its children ('preorder DFS traversal').
-/// - For AliasCol nodes, delegate to 'completeAliasCol_in_mskg_org_tree'
+/// - For AliasCol nodes, delegate to 'completeAliasCol'
 ///   (which handles the whole subtree)
 /// - For other nodes, these happen (in order):
 ///   - futz with the node itself
@@ -73,7 +73,7 @@ fn completeNodePreorder_collectingDefinitiveRequests<'a> (
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     let treatment : RelToParent = {
-      let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+      let node_ref : NodeRef < NodePair > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
       node_ref.value () . 1 . metadata.code.relToParent . clone () };
@@ -110,7 +110,7 @@ fn completeNodePreorder_collectingDefinitiveRequests<'a> (
            instead of creating a duplicate child
            with treatment=ParentIgnores. */
         let view_requests : Vec < ViewRequest > = {
-          let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+          let node_ref : NodeRef < NodePair > =
             tree . get ( node_id )
             . ok_or ( "Node not found in tree" ) ?;
           node_ref . value () . 1 . metadata . code . viewRequests
@@ -145,7 +145,7 @@ pub async fn make_indefinitive_if_repeated (
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
   let is_indefinitive : bool = {
-    let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
@@ -153,7 +153,7 @@ pub async fn make_indefinitive_if_repeated (
     // It is a repeat. Mark it as indefinitive.
     // Its children are neither removed nor completed,
     // although their children might be completed.
-    let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
     node_mut . value () . 1 . metadata . code . indefinitive = true;
@@ -173,7 +173,7 @@ fn detect_cycle_and_mark (
   let is_cycle : bool = is_ancestor_id (
     tree, node_id, &node_pid,
     |n| n . 1 . metadata . id . as_ref () ) ?;
-  let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+  let mut node_mut : NodeMut < NodePair > =
     tree . get_mut ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   node_mut . value () . 1 . metadata . viewData . cycle =
@@ -202,7 +202,7 @@ pub async fn clobberIndefinitiveOrgnode (
 ) -> Result < (), Box<dyn Error> > {
   ensure_skgnode ( tree, node_id, config, driver ) . await ?;
   { // Update title, source, and clear body using the SkgNode
-    let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
     let (skgnode_opt, orgnode) = node_mut . value ();
@@ -239,7 +239,7 @@ pub async fn completeDefinitiveOrgnode (
   ensure_skgnode ( tree, node_id, config, driver ) . await ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
-      let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+      let node_ref : NodeRef < NodePair > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
       let skgnode : &SkgNode =
@@ -263,7 +263,7 @@ pub async fn completeDefinitiveOrgnode (
   let mut content_id_to_node_id : HashMap < ID, NodeId > =
     HashMap::new ();
   for child_id in & content_child_ids {
-    let child_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let child_ref : NodeRef < NodePair > =
       tree . get ( *child_id )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
@@ -280,7 +280,7 @@ pub async fn completeDefinitiveOrgnode (
     if ! content_from_disk . contains ( child_pid ) {
       invalid_content_ids . push ( *child_node_id ); }}
   for invalid_id in & invalid_content_ids {
-    let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_id )
       . ok_or ( "Invalid content child not found" ) ?;
     child_mut . value () . 1 . metadata . code.relToParent =
@@ -324,7 +324,7 @@ fn categorize_children_by_treatment (
     Vec::new ();
   let mut non_content_child_ids : Vec < NodeId > =
     Vec::new ();
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
@@ -347,10 +347,10 @@ async fn extend_content (
   let ( skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, id ) . await ?;
-  let mut parent_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+  let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_nid )
     . ok_or ( "Parent node not found" ) ?;
-  let new_child : NodeMut < (Option<SkgNode>, OrgNode) > =
+  let new_child : NodeMut < NodePair > =
     parent_mut . append ( (Some(skgnode), new_orgnode) );
   Ok ( new_child . id ( )) }
 
@@ -370,7 +370,7 @@ fn reorder_children (
 
   // Detach all children
   for child_id in & desired_order {
-    let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *child_id )
       . ok_or ( "Child not found for detaching" ) ?;
     child_mut . detach (); }
@@ -378,7 +378,7 @@ fn reorder_children (
   for child_id in & desired_order {
     // Re-append in desired order,
     // using append_id, which preserves entire subtrees.
-    let mut parent_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut parent_mut : NodeMut < NodePair > =
       tree . get_mut ( parent_id )
       . ok_or ( "Parent not found" ) ?;
     parent_mut . append_id ( *child_id ); }
@@ -414,14 +414,14 @@ async fn ensure_skgnode (
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
   let has_skgnode : bool = {
-    let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;
     node_ref . value () . 0 . is_some () };
   if ! has_skgnode {
     let (skgnode, _orgnode) : (SkgNode, OrgNode) =
       skgnode_and_orgnode_from_id ( config, driver, &node_pid ) . await ?;
-    let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;
     node_mut . value () . 0 = Some ( skgnode ); }

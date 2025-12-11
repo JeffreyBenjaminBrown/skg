@@ -3,7 +3,7 @@ use crate::media::tree::collect_generation_ids;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::types::orgnode::{default_metadata, RelToParent, ViewRequest};
-use crate::types::trees::PairTree;
+use crate::types::trees::{NodePair, PairTree};
 use crate::util::path_from_pid_and_source;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -88,7 +88,7 @@ pub fn rewrite_to_indefinitive (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+  let mut node_mut : NodeMut < NodePair > =
     tree . get_mut ( node_id )
     . ok_or ( "rewrite_to_indefinitive: node not found" ) ?;
   node_mut . value () . 1 . metadata . code . indefinitive = true;
@@ -112,7 +112,6 @@ pub fn org_bullet ( level: usize ) -> String {
 // ==============================================
 
 /// Create a minimal forest containing just root nodes (no children).
-/// Returns (Option<SkgNode>, OrgNode) trees to avoid multiple SkgNode lookups.
 pub async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
@@ -176,7 +175,7 @@ pub fn get_pid_in_pairtree (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "get_pid_in_pairtree: NodeId not in tree" ) ?;
   node_ref . value () . 1 . metadata . id . clone ()
@@ -187,7 +186,7 @@ pub fn get_pid_in_pairtree (
 /// Returns an error if the node has no ID.
 /// Use this when you already have a NodeRef to avoid redundant tree lookup.
 pub fn get_pid_from_pair_using_noderef (
-  node_ref : &NodeRef < (Option<SkgNode>, OrgNode) >,
+  node_ref : &NodeRef < NodePair >,
 ) -> Result < ID, Box<dyn Error> > {
   node_ref . value () . 1 . metadata . id . clone ()
     . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
@@ -203,7 +202,7 @@ pub async fn fetch_and_append_child_pair (
 ) -> Result < NodeId, Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id ( config, driver, child_id ) . await ?;
-  let mut parent_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+  let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_id )
     . ok_or ( "fetch_and_append_child_pair: parent not found" ) ?;
   let child_node_id : NodeId =
@@ -216,7 +215,7 @@ pub fn collect_content_children (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "collect_content_children: node not found" ) ?;
   if node_ref . value () . 1 . metadata . code . indefinitive {
@@ -261,7 +260,7 @@ pub fn is_indefinitive (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "is_indefinitive: NodeId not in tree" ) ?;
   Ok ( node_ref . value () . 1 . metadata . code . indefinitive ) }
@@ -279,7 +278,7 @@ pub fn collect_child_ids (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "collect_child_ids: NodeId not in tree" ) ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }

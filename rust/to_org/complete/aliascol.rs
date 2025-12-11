@@ -4,7 +4,7 @@ use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent};
-use crate::types::trees::PairTree;
+use crate::types::trees::{NodePair, PairTree};
 use crate::util::path_from_pid_and_source;
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::HashSet;
@@ -73,7 +73,7 @@ pub async fn completeAliasCol (
     aliascol_node_id,
     & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
-    let mut aliascol_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut aliascol_mut : NodeMut < NodePair > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for alias in missing_aliases_from_disk {
@@ -90,7 +90,7 @@ fn collect_alias_titles (
 ) -> Result < Vec < String >, Box<dyn Error> > {
   let mut aliases_from_tree : Vec < String > =
     Vec::new ();
-  let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let aliascol_ref : NodeRef < NodePair > =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
@@ -123,7 +123,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
   let mut focused_title : Option < String > = None;
 
   let children_to_remove : Vec < NodeId > = {
-    let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let aliascol_ref : NodeRef < NodePair > =
       tree . get ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     let mut children_to_remove_acc : Vec < NodeId > =
@@ -149,25 +149,25 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     children_to_remove_acc };
 
   for child_id in children_to_remove {
-    let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( child_id )
       . ok_or ( "Child node not found" ) ?;
     child_mut . detach (); }
 
   if let Some ( title ) = focused_title {
-    let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let aliascol_ref : NodeRef < NodePair > =
       tree . get ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for child in aliascol_ref . children () {
       if child . value () . 1 . title == title {
-        let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+        let mut child_mut : NodeMut < NodePair > =
           tree . get_mut ( child . id () )
           . ok_or ( "Child node not found" ) ?;
         child_mut . value () . 1 . metadata . viewData.focused = true;
         break; }}}
 
   if removed_focused {
-    let mut aliascol_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut aliascol_mut : NodeMut < NodePair > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     aliascol_mut . value () . 1 . metadata . viewData.focused = true; }

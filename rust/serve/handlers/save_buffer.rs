@@ -15,7 +15,7 @@ use crate::serve::util::{
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
-use crate::types::skgnode::SkgNode;
+use crate::types::trees::PairTree;
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -147,7 +147,7 @@ async fn update_from_and_rerender_buffer (
 
   let mut errors : Vec < String > = Vec::new ();
 
-  let mut paired_forest : Vec < Tree < (Option<SkgNode>, OrgNode) >> =
+  let mut paired_forest : Vec < PairTree > =
     pair_forest_with_save_instructions (
       // Definitive nodes get Some(skgnode), indefinitive get None.
       orgnode_forest,

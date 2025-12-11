@@ -4,6 +4,7 @@
 // These tests verify that when a node has a "Definitive" view request,
 // its content children are expanded from disk using BFS with truncation.
 
+use ego_tree::Tree;
 use indoc::indoc;
 use std::error::Error;
 
@@ -13,9 +14,9 @@ use skg::to_org::render::content_view::render_forest_to_org;
 use skg::media::tree::{pair_forest_with_save_instructions, map_snd_over_forest};
 use skg::read_buffer::buffer_to_save_instructions;
 use skg::test_utils::run_with_test_db;
-use skg::types::{OrgNode, SkgNode, SkgConfig};
+use skg::types::{OrgNode, SkgConfig};
+use skg::types::trees::PairTree;
 
-use ego_tree::Tree;
 
 /// Helper to run the full completion + definitive expansion pipeline.
 /// Returns the rendered org text.
@@ -31,7 +32,7 @@ async fn complete_and_expand_definitive (
     buffer_to_save_instructions ( input_org_text, &config, driver )
     . await ?;
   let mut errors : Vec < String > = Vec::new ();
-  let mut paired_forest : Vec < Tree < (Option<SkgNode>, OrgNode) > > =
+  let mut paired_forest : Vec < PairTree > =
     pair_forest_with_save_instructions (
       orgnode_forest,
       &save_instructions );

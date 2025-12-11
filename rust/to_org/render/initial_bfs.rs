@@ -21,8 +21,8 @@ use crate::to_org::util::{
   get_pid_in_pairtree, is_ancestor_id,
   collect_content_children, fetch_and_append_child_pair,
   rewrite_to_indefinitive };
-use crate::types::{SkgConfig, ID, OrgNode, SkgNode};
-use crate::types::trees::PairTree;
+use crate::types::{SkgConfig, ID};
+use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut};
 use std::cmp::min;
@@ -146,7 +146,7 @@ fn mark_cycles_and_repeats (
   let is_cycle : bool =
     is_ancestor_id ( tree, node_id, &pid,
                      |n| n . 1 . metadata . id . as_ref () ) ?;
-  { let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+  { let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "mark_cycles_and_repeats: node not found" ) ?;
     node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }

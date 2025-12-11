@@ -9,7 +9,7 @@ use crate::types::trees::PairTree;
 use ego_tree::{Tree, NodeId};
 use std::collections::HashMap;
 
-/// Convert a forest of OrgNode trees to (Option<SkgNode>, OrgNode) trees
+/// Convert an OrgNode forest to a NodePair forest
 /// using SkgNodes from SaveInstructions.
 ///
 /// Definitive nodes that generated SaveInstructions get Some(skgnode).

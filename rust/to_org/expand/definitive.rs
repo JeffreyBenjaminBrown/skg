@@ -8,7 +8,7 @@ use crate::to_org::util::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
-use crate::types::trees::PairTree;
+use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::cmp::min;
@@ -62,7 +62,7 @@ async fn execute_definitive_view_request (
     // Remove the ViewRequest, mark it definitive,
     // and rebuild from disk.
     let tree : &mut PairTree = &mut forest[tree_idx];
-    let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "execute_definitive_view_request: node not found" ) ?;
     node_mut . value () . 1 . metadata . code . viewRequests
@@ -90,10 +90,10 @@ fn indefinitize_content_subtree (
   node_id : NodeId,
   visited : &mut VisitedMap,
 ) -> Result < (), Box<dyn Error> > {
-  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+  let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-  let (skgnode_opt, orgnode) : &(Option<SkgNode>, OrgNode) =
+  let (skgnode_opt, orgnode) : &NodePair =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
     orgnode . metadata . id . clone ();
@@ -110,7 +110,7 @@ fn indefinitize_content_subtree (
     // It, or something very like it anyway, happens elsewhere too.
     let canonical_title : Option<String> =
       skgnode_opt . as_ref () . map ( |s| s . title . clone () );
-    let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
     node_mut . value () . 1 . metadata . code . indefinitive = true;
@@ -204,7 +204,7 @@ fn node_generation (
   effective_root : Option < NodeId >,
 ) -> Result < Option < usize >, Box<dyn Error> > {
   let mut depth : usize = 1;
-  let mut current : Option < NodeRef < (Option<SkgNode>, OrgNode) > > =
+  let mut current : Option < NodeRef < NodePair > > =
     Some ( tree . get ( node_id )
            . ok_or ( "node_generation: NodeId not in tree" ) ? );
   while let Some ( node ) = current {
@@ -251,7 +251,7 @@ async fn add_child_to_definitive_branch (
     orgnode . metadata . code . indefinitive = false; }
   orgnode . metadata . viewData . cycle = is_cycle;
   let new_node_id : NodeId = {
-    let mut parent_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
+    let mut parent_mut : NodeMut < NodePair > =
       tree . get_mut ( parent_nid )
       . ok_or ( "add_child_to_definitive_branch: parent not found" ) ?;
     parent_mut . append ( (Some(skgnode), orgnode) ) . id () };
@@ -308,7 +308,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
 ) -> Result < (), Box<dyn Error> > {
   let (pid, source, code) = {
     // Extract values to preserve from existing orgnode
-    let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" ) ?;
     let orgnode : &OrgNode = & node_ref . value () . 1;
@@ -323,7 +323,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
   orgnode . metadata . code = code;
-  let mut node_mut : NodeMut < (Option<SkgNode>, OrgNode) > = (
+  let mut node_mut : NodeMut < NodePair > = (
     // Replace node value in place
     tree . get_mut ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" )) ?;
