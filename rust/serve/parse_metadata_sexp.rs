@@ -1,7 +1,6 @@
-/// PURPOSE: Parse headlines:
-/// the bullet, the title, and the (s-expr) metadata.
+/// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 
-use crate::media::sexp::{extract_v_from_kv_pair_in_sexp, find_sexp_end, atom_to_string};
+use crate::media::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, EditRequest, ViewRequest, default_metadata};
 
@@ -10,99 +9,8 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 
-/// -------- Public entry point --------
-
-pub fn parse_headline_from_sexp (
-  request : &str
-) -> Result<( OrgnodeMetadata,
-             usize,   // level in org buffer
-             String), // title
-           String> {
-  let sexp : Sexp =
-    sexp::parse ( request )
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) ) ?;
-  let headline_text : String =
-    extract_v_from_kv_pair_in_sexp ( &sexp, "headline" ) ?;
-  let level : usize =
-    count_headline_level ( &headline_text )
-    . ok_or ( "Could not count asterisks in (supposed) headline." ) ?;
-  let line_after_bullet : &str =
-    extract_line_after_bullet ( &headline_text );
-  let (metadata, title) : (OrgnodeMetadata, String) =
-    parse_separating_metadata_and_title ( line_after_bullet ) ?;
-  Ok (( metadata, level, title )) }
-
-/* -------- Level 1: Direct dependencies of entry point -------- */
-
-/// Count the number of leading asterisks in a headline
-fn count_headline_level (
-  line : &str
-) -> Option<usize> {
-  let mut i : usize = 0;
-  let bytes : &[u8] = line.as_bytes();
-  while i < bytes.len() && bytes[i] == b'*' {
-    i += 1; } // count asterisks
-  if i == 0 { return None; } // no stars => not a headline
-  if i >= bytes.len() || (bytes[i] != b' ' && bytes[i] != b'\t') {
-    return None; } // At least one whitespace must follow asterisks.
-  Some ( i ) }
-
-/// Extract the part of the headline after the bullet and whitespace
-fn extract_line_after_bullet (
-  headline_text : &str
-) -> &str {
-  let mut i : usize = 0;
-  let bytes : &[u8] = headline_text.as_bytes();
-  while i < bytes.len() && bytes[i] == b'*' {
-    i += 1; } // skip asterisks
-  while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
-    i += 1; } // skip whitespace
-  &headline_text[i..] }
-
-/// Parse a headline string that might contain metadata and a title.
-/// Returns (OrgnodeMetadata, title)
-fn parse_separating_metadata_and_title (
-  line_after_bullet : &str
-) -> Result<(OrgnodeMetadata, String), String> {
-  let headline_with_metadata : &str =
-    line_after_bullet.trim_start ();
-
-  if headline_with_metadata.starts_with ( "(skg" ) {
-    // Find the end of the s-expression
-    if let Some ( sexp_end ) = find_sexp_end ( headline_with_metadata ) {
-      // Extract the s-expression substring
-      let sexp_str : &str = &headline_with_metadata[..sexp_end];
-
-      // Verify it's valid by attempting to parse it
-      if let Err ( e ) = sexp::parse ( sexp_str ) {
-        return Err ( format! ( "Invalid s-expression syntax: {}", e ) );
-      }
-
-      // Parse the metadata from the s-expression
-      let metadata : OrgnodeMetadata =
-        parse_metadata_to_orgnodemd ( sexp_str ) ?;
-
-      // The title is everything after the s-expression
-      let title : String =
-        headline_with_metadata[sexp_end..] . trim () . to_string ();
-
-      return Ok (( metadata, title ));
-    } else {
-      return Err ( "Unclosed metadata parentheses".to_string () );
-    }
-  }
-
-  // No metadata found - use defaults
-  Ok (( default_metadata (),
-        headline_with_metadata.to_string () )) }
-
-
-/* -------- Level 2: Dependencies of level 1 -------- */
-
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
 /// Format: "(skg (id xyz) (view ...) (code (requests ...) ...))"
-/// Now uses the sexp crate for proper s-expression parsing.
 /// Takes the full s-expression including the "(skg ...)" wrapper.
 pub fn parse_metadata_to_orgnodemd (
   sexp_str : &str
@@ -157,8 +65,6 @@ pub fn parse_metadata_to_orgnodemd (
         element, sexp_str )); }} }
   Ok ( result ) }
 
-
-/* -------- Level 3: Dependencies of level 2 -------- */
 
 /// Parse the (view ...) s-expression and update viewData.
 fn parse_view_sexp (
@@ -234,8 +140,6 @@ fn parse_code_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-
-/* -------- Level 4: Dependencies of level 3 -------- */
 
 /// Parse the (rels ...) s-expression and update relationships.
 fn parse_rels_sexp (

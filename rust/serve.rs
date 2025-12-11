@@ -3,8 +3,7 @@
 // longer definition path. That makes it easier to find definitions.
 
 pub mod handlers;
-pub mod parse_headline_md_sexp;
-pub use parse_headline_md_sexp::parse_headline_from_sexp;
+pub mod parse_metadata_sexp;
 pub mod util;
 
 // Re-export handlers for backwards compatibility
