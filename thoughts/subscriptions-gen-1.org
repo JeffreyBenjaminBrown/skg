@@ -5,7 +5,6 @@
 When rendering content for a node N that subscribes to anything, render a SubscribeeCol child. Just one generation - no children of the SubscribeeCol yet.
 
 * Structure
-Jeff: Let's put it first, not last:
 #+begin_example
 Content Node N (subscribes_to = [S1, S2, ...])
 └── SubscribeeCol
@@ -32,18 +31,16 @@ Add to the =RelToParent= enum:
 SubscribeeCol, // Collects subscribees for its parent
 #+end_src
 
-** 2. Update sexp parsing/rendering for the new variant
-Jeff: Let's ignore parsing for now, and just tackle rendering.
-
-File: =rust/serve/parse_metadata_sexp.rs=
-
-In =parse_code_sexp=, add case for "subscribeeCol" in the relToParent match.
+** 2. Update sexp rendering for the new variant
+(Parsing will be handled later.)
 
 File: =rust/types/orgnode.rs=
 
 In =orgnodemd_to_string= (or wherever relToParent is rendered to sexp), add case for SubscribeeCol.
 
 ** 3. Create the SubscribeeCol during content completion
+Jeff asks: This way it will be included both when generating an initial view, *and* when rebuilding after a save-buffer operation, yes?
+Claude: Yes, `completeDefinitiveOrgnode` is called from both code paths.
 
 File: =rust/to_org/complete/contents.rs=
 
@@ -76,8 +73,8 @@ The existing =categorize_children_by_treatment= already puts non-Content childre
 * Files to Modify
 
 1. =rust/types/orgnode.rs= - Add RelToParent::SubscribeeCol, update rendering
-2. =rust/serve/parse_metadata_sexp.rs= - Parse "subscribeeCol"
-3. =rust/to_org/complete/contents.rs= - Create SubscribeeCol during completion
+2. =rust/to_org/complete/contents.rs= - Create SubscribeeCol during completion
+3. =rust/serve/parse_metadata_sexp.rs= - Parse "subscribeeCol" (later)
 
 * Testing
 

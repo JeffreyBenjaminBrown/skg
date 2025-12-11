@@ -65,6 +65,7 @@ pub enum RelToParent {
   AliasCol, // The node collects aliases for its parent.
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
+  SubscribeeCol, // Collects subscribees for its parent.
 }
 
 /// Requests for editing operations on a node.
@@ -101,6 +102,7 @@ impl fmt::Display for RelToParent {
         RelToParent::AliasCol => "aliasCol",
         RelToParent::Alias => "alias",
         RelToParent::ParentIgnores => "parentIgnores",
+        RelToParent::SubscribeeCol => "subscribeeCol",
       };
     write! ( f, "{}", s ) } }
 
@@ -115,6 +117,7 @@ impl FromStr for RelToParent {
       "aliasCol"      => Ok ( RelToParent::AliasCol ),
       "alias"         => Ok ( RelToParent::Alias ),
       "parentIgnores" => Ok ( RelToParent::ParentIgnores ),
+      "subscribeeCol" => Ok ( RelToParent::SubscribeeCol ),
       _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
     }} }
 

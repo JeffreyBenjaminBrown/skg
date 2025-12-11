@@ -10,7 +10,7 @@ use crate::to_org::expand::backpath::{
   wrapped_build_and_integrate_sourceward_view, };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
+use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest, default_metadata};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -81,6 +81,9 @@ fn completeNodePreorder_collectingDefinitiveRequests<'a> (
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
+    } else if treatment == RelToParent::SubscribeeCol {
+      // For now, SubscribeeCol has no children to process.
+      // Future generations will add Subscribee children here.
     } else {
       { // futz with the OrgNode itself
         make_indefinitive_if_repeated (
@@ -222,6 +225,7 @@ pub async fn clobberIndefinitiveOrgnode (
 ///
 /// METHOD: Given a node N:
 /// - Get N's SkgNode (fetch from disk if needed)
+/// - Add SubscribeeCol if node subscribes to something and one is not already present
 /// - Categorize N's children into content/non-content
 /// - Mark 'invalid content' as parentIgnores and move to non-content
 ///   - 'invalid content' = nodes marked content that are not content.
@@ -236,6 +240,7 @@ pub async fn completeDefinitiveOrgnode (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   ensure_skgnode ( tree, node_id, config, driver ) . await ?;
+  maybe_add_subscribee_col ( tree, node_id ) ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
       let node_ref : NodeRef < NodePair > =
@@ -424,4 +429,44 @@ async fn ensure_skgnode (
       tree . get_mut ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;
     node_mut . value () . 0 = Some ( skgnode ); }
+  Ok (( )) }
+
+/// If node subscribes to something
+/// *and* doesn't have a SubscribeeCol child,
+/// then prepend one. The SubscribeeCol has no children (for now).
+fn maybe_add_subscribee_col (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+) -> Result < (), Box<dyn Error> > {
+  let has_subscriptions : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
+    let skgnode : &SkgNode =
+      node_ref . value () . 0 . as_ref ()
+      . ok_or ( "maybe_add_subscribee_col: SkgNode should exist" ) ?;
+    skgnode . subscribes_to . as_ref ()
+      . map ( | v | ! v . is_empty () )
+      . unwrap_or ( false ) };
+  if ! has_subscriptions { return Ok (( )); }
+  let has_subscribee_col : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
+    node_ref . children () . any ( | child |
+      child . value () . 1 . metadata . code . relToParent
+        == RelToParent::SubscribeeCol ) };
+  if has_subscribee_col { return Ok (( )); }
+  { // Prepend a subscribees collector
+    let subscribee_col_orgnode : OrgNode = {
+      let mut md = default_metadata ();
+      md . code . relToParent = RelToParent::SubscribeeCol;
+      OrgNode {
+        metadata : md,
+        title : "it subscribes to these" . to_string (),
+        body : None, } };
+    let mut node_mut : NodeMut < NodePair > = (
+      tree . get_mut ( node_id )
+        . ok_or ( "maybe_add_subscribee_col: node not found" )) ?;
+    node_mut . prepend ( (None, subscribee_col_orgnode) ); }
   Ok (( )) }
