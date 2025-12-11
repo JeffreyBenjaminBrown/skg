@@ -1,10 +1,7 @@
 pub mod aliascol;
 pub mod contents;
 
-pub use aliascol::{
-  completeAliasCol,
-  org_to_mskg_org_adaptor,
-};
+pub use aliascol::completeAliasCol;
 
 pub use contents::{
   completeDefinitiveOrgnode,

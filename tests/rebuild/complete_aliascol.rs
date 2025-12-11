@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete::aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
+use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
 use skg::types::OrgNode;
@@ -66,7 +66,7 @@ async fn test_completeAliasCol_logic (
   };
 
   // Test 1: First AliasCol should have c and b (deduped, valid only)
-  completeAliasCol_in_mskg_org_tree (
+  completeAliasCol (
     tree_a,
     aliascol_1_id,
     & config,
@@ -99,7 +99,7 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  completeAliasCol_in_mskg_org_tree (
+  completeAliasCol (
     tree_a,
     aliascol_2_id,
     & config,
@@ -144,7 +144,7 @@ async fn test_completeAliasCol_logic (
     tree_aliascol_3 . root () . id ();
 
   let result : Result < (), Box<dyn Error> > =
-    completeAliasCol_in_mskg_org_tree (
+    completeAliasCol (
       tree_aliascol_3,
       aliascol_3_id,
       & config,
@@ -207,7 +207,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   };
 
   // Test first AliasCol
-  completeAliasCol_in_mskg_org_tree (
+  completeAliasCol (
     tree,
     first_aliascol_id,
     & config,
@@ -248,7 +248,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   }
 
   // Test second AliasCol
-  completeAliasCol_in_mskg_org_tree (
+  completeAliasCol (
     tree,
     second_aliascol_id,
     & config,

@@ -1,13 +1,12 @@
-pub mod org_to_mskg_org_adaptor;
-
 use crate::media::file_io::one_node::read_node;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent};
+use crate::types::trees::PairTree;
 use crate::util::path_from_pid_and_source;
-use ego_tree::NodeId;
+use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -29,7 +28,7 @@ use typedb_driver::TypeDBDriver;
 /// - Transfers focus to C if any focused Alias is removed
 /// - Errors if C's parent has no ID or if non-Alias children are found
 pub async fn completeAliasCol (
-  tree             : &mut ego_tree::Tree < OrgNode >,
+  tree             : &mut PairTree,
   aliascol_node_id : NodeId,
   config           : &SkgConfig,
   driver           : &TypeDBDriver,
@@ -74,28 +73,29 @@ pub async fn completeAliasCol (
     aliascol_node_id,
     & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
-    let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
+    let mut aliascol_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for alias in missing_aliases_from_disk {
       aliascol_mut . append (
-        orgnode_from_title_and_rel ( RelToParent::Alias, alias )); }}
+        ( None,
+          orgnode_from_title_and_rel ( RelToParent::Alias, alias ))); }}
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.
 /// Errors if any non-Alias children are found.
 fn collect_alias_titles (
-  tree             : &ego_tree::Tree < OrgNode >,
+  tree             : &PairTree,
   aliascol_node_id : NodeId,
 ) -> Result < Vec < String >, Box<dyn Error> > {
   let mut aliases_from_tree : Vec < String > =
     Vec::new ();
-  let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+  let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
     let child_node : &OrgNode =
-      child . value ();
+      & child . value () . 1;
     if child_node . metadata . code.relToParent != RelToParent::Alias {
       return Err (
         format! ( "AliasCol has non-Alias child with relToParent: {:?}",
@@ -115,7 +115,7 @@ fn collect_alias_titles (
 /// If an invalid (non-existent on disk) alias has focus,
 /// focus is transferred to the AliasCol itself.
 fn remove_duplicates_and_false_aliases_handling_focus (
-  tree             : &mut ego_tree::Tree < OrgNode >,
+  tree             : &mut PairTree,
   aliascol_node_id : NodeId,
   good_aliases     : &HashSet < String >,
 ) -> Result < (), Box<dyn Error> > {
@@ -123,16 +123,16 @@ fn remove_duplicates_and_false_aliases_handling_focus (
   let mut focused_title : Option < String > = None;
 
   let children_to_remove : Vec < NodeId > = {
-    let aliascol_ref : ego_tree::NodeRef < OrgNode >
-      = ( tree . get ( aliascol_node_id )
-          . ok_or ( "AliasCol node not found" ) ) ?;
+    let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+      tree . get ( aliascol_node_id )
+      . ok_or ( "AliasCol node not found" ) ?;
     let mut children_to_remove_acc : Vec < NodeId > =
       Vec::new ();
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
       let child_node : &OrgNode =
-        child . value ();
+        & child . value () . 1;
       let title : &String =
         & child_node . title;
       let is_duplicate : bool =
@@ -149,41 +149,41 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     children_to_remove_acc };
 
   for child_id in children_to_remove {
-    let mut child_mut : ego_tree::NodeMut < OrgNode > =
+    let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
       tree . get_mut ( child_id )
       . ok_or ( "Child node not found" ) ?;
     child_mut . detach (); }
 
   if let Some ( title ) = focused_title {
-    let aliascol_ref : ego_tree::NodeRef < OrgNode > =
+    let aliascol_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
       tree . get ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for child in aliascol_ref . children () {
-      if child . value () . title == title {
-        let mut child_mut : ego_tree::NodeMut < OrgNode > =
+      if child . value () . 1 . title == title {
+        let mut child_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
           tree . get_mut ( child . id () )
           . ok_or ( "Child node not found" ) ?;
-        child_mut . value () . metadata . viewData.focused = true;
+        child_mut . value () . 1 . metadata . viewData.focused = true;
         break; }}}
 
   if removed_focused {
-    let mut aliascol_mut : ego_tree::NodeMut < OrgNode > =
+    let mut aliascol_mut : NodeMut < (Option<SkgNode>, OrgNode) > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . value () . metadata . viewData.focused = true; }
+    aliascol_mut . value () . 1 . metadata . viewData.focused = true; }
 
   Ok (( )) }
 
 /// Get the parent ID of an AliasCol node.
 /// Verifies the node is an AliasCol and its parent has an ID.
 fn get_aliascol_parent_id (
-  tree             : &ego_tree::Tree < OrgNode >,
+  tree             : &PairTree,
   aliascol_node_id : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
   let aliascol_node : &OrgNode =
-    tree . get ( aliascol_node_id )
+    & tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
-    . value ();
+    . value () . 1;
   if aliascol_node . metadata . code.relToParent != RelToParent::AliasCol {
     return Err (
       format! ( "Node is not an AliasCol: {:?}",
@@ -198,7 +198,7 @@ fn get_aliascol_parent_id (
   let parent_id : &ID =
     tree . get ( parent_node_id )
     . ok_or ( "Parent node not found" ) ?
-    . value ()
+    . value () . 1
     . metadata . id . as_ref ()
     . ok_or ( "Parent node has no ID" ) ?;
   Ok ( parent_id . clone () ) }

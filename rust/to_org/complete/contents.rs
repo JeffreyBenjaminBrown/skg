@@ -4,7 +4,7 @@ use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id,
   get_pid_in_pairtree, is_indefinitive, collect_child_ids };
 use crate::to_org::expand::aliases::wrapped_build_and_integrate_aliases_view;
-use crate::to_org::complete::aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
+use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::expand::backpath::{
   wrapped_build_and_integrate_containerward_view,
   wrapped_build_and_integrate_sourceward_view, };
@@ -78,9 +78,9 @@ fn completeNodePreorder_collectingDefinitiveRequests<'a> (
         . ok_or ( "Node not found in tree" ) ?;
       node_ref.value () . 1 . metadata.code.relToParent . clone () };
     if treatment == RelToParent::AliasCol {
-      completeAliasCol_in_mskg_org_tree (
+      completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
-      // Don't recurse; completeAliasCol_in_mskg_org_tree handles the whole subtree.
+      // Don't recurse; completeAliasCol handles the whole subtree.
     } else {
       { // futz with the OrgNode itself
         make_indefinitive_if_repeated (
