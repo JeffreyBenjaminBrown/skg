@@ -96,7 +96,7 @@ fn render_generation_and_recurse<'a> (
     if rendered_count + next_gen_count >= limit {
       add_last_generation_truncated (
         forest, gen_int, &parent_child_rels_to_add,
-        rendered_count, limit, config, driver, visited,
+        rendered_count, limit, config, driver,
       ) . await ?;
       return Ok(( )); }
     else {
@@ -174,7 +174,6 @@ async fn add_last_generation_truncated (
   limit            : usize,
   config           : &SkgConfig,
   driver           : &TypeDBDriver,
-  visited          : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   let space_left_before_limit : usize = limit - nodes_rendered;
   if space_left_before_limit < 1 { // shouldn't happen
@@ -195,15 +194,11 @@ async fn add_last_generation_truncated (
       { break; }
       let child_node_id : NodeId =
         fetch_and_append_child_pair (
-          &mut forest[*tree_idx], *parent_id, child_id, config, driver
+          &mut forest[*tree_idx], *parent_id, child_id,
+          config, driver
         ). await ?;
       rewrite_to_indefinitive (
-        &mut forest[*tree_idx], child_node_id ) ?;
-      if let Some(ref child_pid) =
-        forest[*tree_idx] . get(child_node_id)
-        . unwrap() . value() . 1 . metadata.id
-      { visited.insert( child_pid.clone(),
-                        (*tree_idx, child_node_id)); }}
+        &mut forest[*tree_idx], child_node_id ) ?; }
   truncate_after_node_in_generation_in_forest(
     forest, generation, limit_tree_idx, limit_parent_id )?;
   Ok (( )) }
