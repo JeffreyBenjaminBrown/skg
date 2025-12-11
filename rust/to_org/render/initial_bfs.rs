@@ -20,8 +20,9 @@
 use crate::to_org::util::stub_forest_from_root_ids;
 use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_generation_in_forest;
 use crate::to_org::util::{
+  content_ids_if_definitive_else_empty,
+  fetch_and_append_child_pair,
   get_pid_in_pairtree, is_ancestor_id,
-  collect_content_children, fetch_and_append_child_pair,
   rewrite_to_indefinitive };
 use crate::types::{SkgConfig, ID};
 use crate::types::trees::{NodePair, PairTree};
@@ -93,7 +94,7 @@ fn render_generation_and_recurse<'a> (
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count >= limit {
-      add_children_with_truncation (
+      add_last_generation_truncated (
         forest, gen_int, &parent_child_rels_to_add,
         rendered_count, limit, config, driver, visited,
       ) . await ?;
@@ -168,27 +169,28 @@ fn mark_visited_or_repeat_or_cycle (
 /// Returns (tree_idx, parent_node_id, child_id) tuples.
 fn collect_rels_to_children_from_generation(
   forest : &[PairTree],
-  nodes_in_gen :  &[(usize,         // which tree of the forest
-                     Vec<NodeId>)], // all in the same generation (even across trees, not just within them)
+  nodes_in_gen : &[(usize,         // which tree of the forest
+                    Vec<NodeId>)], // These are all in the same generation -- even across trees, not just within them.
 ) -> Vec<(usize,  // an index into the forest
           NodeId, // a parent from 'nodes_in_gen'
           ID)> {  // a child of that parent
   let mut children : Vec<(usize, NodeId, ID)> = Vec::new();
   for (tree_idx, node_ids) in nodes_in_gen {
     for node_id in node_ids {
-      // collect_content_children returns empty vec if indefinitive
       if let Ok ( child_ids ) =
-        collect_content_children (
+        content_ids_if_definitive_else_empty (
           &forest[*tree_idx], *node_id )
       { for child_id in child_ids {
-          children . push ( (*tree_idx, *node_id, child_id) ); }}}}
+        children . push ( (*tree_idx,
+                           *node_id, child_id) ); }} }}
   children }
 
-/// Add children with truncation when limit is exceeded. In order:
+/// Render the last generation because limit is hit. In order:
 /// - fetch and add children up to the limit as indefinitive nodes
 /// - complete the sibling group of the limit node
 /// - omit rest of generation (later would-be sibling groups)
-async fn add_children_with_truncation(
+/// - truncate the preceding generation after the limit-hitting node's parent
+async fn add_last_generation_truncated (
   forest           : &mut Vec<PairTree>,
   generation       : usize,
   children_to_add  : &[(usize, NodeId, ID)],
@@ -204,6 +206,7 @@ async fn add_children_with_truncation(
   let last_addable_index =
     min (space_left_before_limit, children_to_add . len()) - 1;
   let (limit_tree_idx, limit_parent_id) : (usize, NodeId) = {
+    // identify where limit is hit
     let (tree_idx, parent_id, _child_id) =
       &children_to_add [last_addable_index];
     (*tree_idx, *parent_id) };
@@ -212,14 +215,12 @@ async fn add_children_with_truncation(
       if idx > last_addable_index &&
         ( *tree_idx != limit_tree_idx ||
            *parent_id != limit_parent_id )
-      // That 'in a new tree' condition is needed because
-      // ego_tree does not permit comparison of
-      // node_ids from different trees.
+      // That 'in a new tree' condition is needed because ego_tree does not permit comparison of node_ids from different trees.
       { break; }
       let child_node_id : NodeId =
         fetch_and_append_child_pair (
           &mut forest[*tree_idx], *parent_id, child_id, config, driver
-        ) . await ?;
+        ). await ?;
       rewrite_to_indefinitive (
         &mut forest[*tree_idx], child_node_id ) ?;
       if let Some(ref child_pid) =

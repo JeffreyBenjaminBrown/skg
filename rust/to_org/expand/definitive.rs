@@ -4,7 +4,7 @@ use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_ge
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source,
   VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive,
-  collect_content_children };
+  content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
@@ -35,7 +35,7 @@ pub async fn execute_definitive_view_requests (
 /// Expands a definitive view request.
 ///
 /// This function:
-/// 1. 'Indefinitizes' any conflicting (same ID) OrgNode
+/// 1. 'Indefinitizes' any previously definitive OrgNode with that ID
 /// 2. Marks this OrgNode definitive
 /// 3. Expands its content from disk using BFS
 /// 4. Removes its ViewRequest::Definitive
@@ -152,7 +152,8 @@ async fn extendDefinitiveSubtreeFromLeaf (
   // effective_root is already in the tree and definitive.
   // Read content children from the SkgNode in the tree.
   let content_child_ids : Vec < ID > =
-    collect_content_children ( tree, effective_root ) ?;
+    content_ids_if_definitive_else_empty (
+      tree, effective_root ) ?;
   let mut gen_with_children : Vec < (NodeId, // effective root
                                      ID) > = // one of its children
     content_child_ids
@@ -179,17 +180,14 @@ async fn extendDefinitiveSubtreeFromLeaf (
           ForceIndefinitive ( false ),
           visited, config, driver ). await ?;
       nodes_rendered += 1;
-
-      // If the new node is definitive, collect its children for next gen
       if ! is_indefinitive ( tree, new_node_id ) ? {
-        // Read content children from the SkgNode we just added
         let grandchild_ids : Vec < ID > =
-          collect_content_children ( tree, new_node_id ) ?;
+          content_ids_if_definitive_else_empty (
+            tree, new_node_id ) ?;
         for grandchild_id in grandchild_ids {
-          next_gen . push ( (new_node_id, grandchild_id) ); }}}
+          next_gen . push ( (new_node_id, grandchild_id) ); }} }
     gen_with_children = next_gen;
     generation += 1; }
-
   Ok (( )) }
 
 /// Returns the generation (depth) of a node relative to an effective root.

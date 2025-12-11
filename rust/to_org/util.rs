@@ -200,13 +200,14 @@ pub async fn fetch_and_append_child_pair (
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
-pub fn collect_content_children (
+pub fn content_ids_if_definitive_else_empty (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
-    . ok_or ( "collect_content_children: node not found" ) ?;
+    . ok_or (
+      "content_ids_if_definitive_else_empty: node not found" ) ?;
   if node_ref . value () . 1 . metadata . code . indefinitive {
     return Ok ( Vec::new () ); }
   match & node_ref . value () . 0 {
