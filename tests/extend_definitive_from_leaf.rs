@@ -10,9 +10,9 @@ use std::error::Error;
 
 use skg::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
 use skg::to_org::expand::definitive::execute_definitive_view_requests;
-use skg::to_org::render::content_view::render_forest_to_org;
+use skg::org_to_text::orgnode_forest_to_string;
 use skg::media::tree::{pair_forest_with_save_instructions, map_snd_over_forest};
-use skg::read_buffer::buffer_to_save_instructions;
+use skg::from_text::buffer_to_save_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::{OrgNode, SkgConfig};
 use skg::types::trees::PairTree;
@@ -51,7 +51,7 @@ async fn complete_and_expand_definitive (
     &mut errors ) . await ?;
   let orgnode_forest : Vec < Tree < OrgNode > > =
     map_snd_over_forest ( paired_forest );
-  Ok ( render_forest_to_org ( & orgnode_forest ) ) }
+  Ok ( orgnode_forest_to_string ( & orgnode_forest ) ) }
 
 // ===================================================
 // Test: Definitive view with limit=10

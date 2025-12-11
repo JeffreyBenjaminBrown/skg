@@ -4,8 +4,8 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::read_buffer::{org_to_uninterpreted_nodes, interpret_orgnode_forest, find_inconsistent_instructions};
-use skg::read_buffer::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
+use skg::from_text::{org_to_uninterpreted_nodes, interpret_orgnode_forest, find_inconsistent_instructions};
+use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, NonMerge_NodeAction};
 use std::error::Error;

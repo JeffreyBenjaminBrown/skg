@@ -5,7 +5,7 @@ use skg::init::{overwrite_new_empty_db, define_schema};
 use skg::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
 use skg::media::typedb::nodes::create_all_nodes;
 use skg::media::typedb::relationships::create_all_relationships;
-use skg::read_buffer::buffer_to_save_instructions;
+use skg::from_text::buffer_to_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::{SkgConfig, SkgfileSource};
 use skg::types::skgnode::SkgNode;

@@ -1,5 +1,34 @@
 use crate::types::{OrgNode, orgnodemd_to_string};
-use crate::to_org::util::org_bullet;
+
+use ego_tree::Tree;
+
+/// Render a forest of OrgNode trees to org-mode text.
+/// Each tree's root starts at level 1.
+/// Assumes metadata has already been enriched with relationship data.
+pub fn orgnode_forest_to_string (
+  forest : &[Tree < OrgNode >],
+) -> String {
+  fn render_node_subtree_to_org (
+    node_ref : ego_tree::NodeRef < OrgNode >,
+    level    : usize,
+  ) -> String {
+    let node : &OrgNode = node_ref . value ();
+    let mut out : String =
+      orgnode_to_text ( level, node );
+    for child in node_ref . children () {
+      out . push_str (
+        & render_node_subtree_to_org (
+          child,
+          level + 1 )); }
+    out }
+  let mut result : String =
+    String::new ();
+  for tree in forest {
+    result . push_str (
+      & render_node_subtree_to_org (
+        tree . root (),
+        1 )); }
+  result }
 
 /// Renders an OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
@@ -38,3 +67,6 @@ pub fn orgnode_to_text (
       if ! body_text . ends_with ( '\n' ) {
         result . push ( '\n' ); }} }
   result }
+
+pub fn org_bullet ( level: usize ) -> String {
+  "*" . repeat ( level.max ( 1 )) }

@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::to_org::integrate_path_that_might_fork_or_cycle;
-use skg::read_buffer::org_to_uninterpreted_nodes;
+use skg::from_text::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_forests, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::{ID, OrgNode, SkgConfig};
 use skg::types::trees::PairTree;

@@ -1,8 +1,8 @@
-use crate::read_buffer::buffer_to_save_instructions;
+use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
+use crate::from_text::buffer_to_save_instructions;
+use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
-use crate::to_org::render::content_view::render_forest_to_org;
-use crate::to_org::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::media::tree::map_snd_over_forest;
 use crate::merge::merge_nodes_in_graph;
 use crate::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
@@ -179,6 +179,6 @@ async fn update_from_and_rerender_buffer (
     typedb_driver ) . await ?;
 
   let buffer_content : String =
-    render_forest_to_org ( & orgnode_forest );
+    orgnode_forest_to_string ( & orgnode_forest );
 
   Ok ( SaveResponse { buffer_content, errors } ) }

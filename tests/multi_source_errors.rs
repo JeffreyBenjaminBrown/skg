@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::read_buffer::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
+use skg::from_text::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
 use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode};
 use skg::media::file_io::{read_all_skg_files_from_sources, load_config};
 use skg::media::typedb::{create_all_nodes, create_all_relationships};
@@ -158,7 +158,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      use skg::read_buffer::buffer_to_save_instructions;
+      use skg::from_text::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -226,7 +226,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      use skg::read_buffer::buffer_to_save_instructions;
+      use skg::from_text::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -315,7 +315,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_conflict);
 
-      use skg::read_buffer::buffer_to_save_instructions;
+      use skg::from_text::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,
@@ -360,7 +360,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent_sources);
 
       // This should fail during validation (before indefinitives are filtered)
-      use skg::read_buffer::buffer_to_save_instructions;
+      use skg::from_text::buffer_to_save_instructions;
       let result = buffer_to_save_instructions(
         &buffer_text,
         &config,

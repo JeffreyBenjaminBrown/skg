@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::complete::aliascol::completeAliasCol;
-use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
 use skg::types::OrgNode;
 use skg::types::trees::PairTree;

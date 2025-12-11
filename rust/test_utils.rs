@@ -5,8 +5,8 @@ use crate::media::tree::map_snd_over_forest;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::read_buffer::{headline_to_triple, HeadlineInfo};
-use crate::to_org::render::content_view::render_forest_to_org;
+use crate::from_text::{headline_to_triple, HeadlineInfo};
+use crate::org_to_text::orgnode_forest_to_string;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
@@ -392,7 +392,7 @@ pub fn render_paired_forest_to_org (
 ) -> String {
   let orgnode_forest : Vec < Tree < OrgNode > > =
     map_snd_over_forest ( forest . to_vec () );
-  render_forest_to_org ( & orgnode_forest ) }
+  orgnode_forest_to_string ( & orgnode_forest ) }
 
 /// Convert an OrgNode forest to a paired forest
 /// *with None for all SkgNodes*.

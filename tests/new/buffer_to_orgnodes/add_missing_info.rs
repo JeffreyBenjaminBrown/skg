@@ -1,7 +1,7 @@
 // cargo test test_add_missing_info_comprehensive
 
 use indoc::indoc;
-use skg::read_buffer::{org_to_uninterpreted_nodes, add_missing_info_to_forest};
+use skg::from_text::{org_to_uninterpreted_nodes, add_missing_info_to_forest};
 use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id, compare_orgnode_forests};
 use skg::types::{OrgNode, SkgConfig, ID};
 use ego_tree::Tree;

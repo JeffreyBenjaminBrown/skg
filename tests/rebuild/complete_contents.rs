@@ -5,7 +5,7 @@ use std::error::Error;
 
 use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, make_indefinitive_if_repeated};
 use skg::to_org::util::VisitedMap;
-use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{
   run_with_test_db, orgnode_forest_to_paired, render_paired_forest_to_org};
 use skg::types::{ID, OrgNode, SkgConfig};
