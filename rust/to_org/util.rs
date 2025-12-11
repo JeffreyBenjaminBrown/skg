@@ -95,6 +95,31 @@ pub fn rewrite_to_indefinitive (
   node_mut . value () . 1 . body = None;
   Ok (( )) }
 
+/// Handles repetitions and the VisitedMap.
+/// - If node is a repeat or a cycle, mark it indefinitive.
+/// - If node is a cycle, mark that, too.
+/// - If neither*, add to visited.
+///   (* Every cycle is a repeat, but not vice-versa.)
+pub fn mark_visited_or_repeat_or_cycle (
+  tree     : &mut PairTree,
+  tree_idx : usize,
+  node_id  : NodeId,
+  visited  : &mut VisitedMap,
+) -> Result<(), Box<dyn Error>> {
+  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
+  let is_cycle : bool =
+    is_ancestor_id ( tree, node_id, &pid,
+                     |n| n . 1 . metadata . id . as_ref () ) ?;
+  { let mut node_mut : NodeMut < NodePair > =
+      tree . get_mut ( node_id )
+      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+    node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }
+  if visited . contains_key ( &pid ) {
+    rewrite_to_indefinitive ( tree, node_id ) ?; }
+  else {
+    visited . insert ( pid, (tree_idx, node_id) ); }
+  Ok (( )) }
+
 
 // ==============================================
 // Reading and manipulating trees, esp. via IDs

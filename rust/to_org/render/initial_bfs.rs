@@ -22,13 +22,13 @@ use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_ge
 use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   fetch_and_append_child_pair,
-  get_pid_in_pairtree, is_ancestor_id,
+  mark_visited_or_repeat_or_cycle,
   rewrite_to_indefinitive,
   VisitedMap };
 use crate::types::{SkgConfig, ID};
-use crate::types::trees::{NodePair, PairTree};
+use crate::types::trees::PairTree;
 
-use ego_tree::{NodeId, NodeMut};
+use ego_tree::NodeId;
 use std::cmp::min;
 use std::error::Error;
 use std::pin::Pin;
@@ -84,7 +84,7 @@ fn render_generation_and_recurse<'a> (
     for (tree_idx, node_ids) in &gen_nodeids {
       for node_id in node_ids {
         mark_visited_or_repeat_or_cycle(
-          forest, *tree_idx, *node_id, visited)?;
+          &mut forest[*tree_idx], *tree_idx, *node_id, visited)?;
         rendered_count += 1; }}
     let parent_child_rels_to_add : Vec<(usize, // the tree
                                         NodeId, // the parent
@@ -138,30 +138,6 @@ async fn add_children_and_collect_their_ids (
       . filter(|(_, ids)| ! ids.is_empty())
       . collect() );
   Ok(child_gen) }
-
-/// If node repeat, call rewrite_to_indefinitive on it.
-/// If it's a cycle, do that but also mark it a cycle.
-/// Otherwise add it to 'visited'.
-fn mark_visited_or_repeat_or_cycle (
-  forest     : &mut Vec<PairTree>,
-  tree_idx   : usize,
-  node_id    : NodeId,
-  visited    : &mut VisitedMap,
-) -> Result<(), Box<dyn Error>> {
-  let tree = &mut forest[tree_idx];
-  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  let is_cycle : bool =
-    is_ancestor_id ( tree, node_id, &pid,
-                     |n| n . 1 . metadata . id . as_ref () ) ?;
-  { let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
-    node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }
-  if visited . contains_key ( &pid ) {
-    rewrite_to_indefinitive ( tree, node_id ) ?; }
-  else {
-    visited . insert ( pid, (tree_idx, node_id) ); }
-  Ok (( )) }
 
 /// Collect all children IDs from nodes in the current generation.
 /// Passes over indefinitive nodes,

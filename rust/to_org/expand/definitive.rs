@@ -2,8 +2,12 @@
 
 use crate::to_org::render::truncate_after_node_in_gen::truncate_after_node_in_generation_in_tree;
 use crate::to_org::util::{
-  skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source,
-  VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive,
+  skgnode_and_orgnode_from_pid_and_source,
+  fetch_and_append_child_pair,
+  mark_visited_or_repeat_or_cycle,
+  rewrite_to_indefinitive,
+  get_pid_in_pairtree,
+  VisitedMap, is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -14,9 +18,6 @@ use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::cmp::min;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
-
-/// TODO : explain
-struct ForceIndefinitive ( bool );
 
 pub async fn execute_definitive_view_requests (
   forest        : &mut Vec < PairTree >,
@@ -167,7 +168,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
       // Limit hit. Complete this sibling group
       // and truncate later parents.
       add_last_generation_and_edit_previous (
-        tree, tree_idx, generation, &gen_with_children,
+        tree, generation, &gen_with_children,
         limit - nodes_rendered,
         effective_root,
         visited, config, driver ). await ?;
@@ -175,10 +176,10 @@ async fn extendDefinitiveSubtreeFromLeaf (
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_nid, child_id) in gen_with_children {
       let new_node_id : NodeId =
-        add_child_to_definitive_branch (
-          tree, tree_idx, parent_nid, &child_id,
-          ForceIndefinitive ( false ),
-          visited, config, driver ). await ?;
+        fetch_and_append_child_pair (
+          tree, parent_nid, &child_id, config, driver ). await ?;
+      mark_visited_or_repeat_or_cycle (
+        tree, tree_idx, new_node_id, visited ) ?;
       nodes_rendered += 1;
       if ! is_indefinitive ( tree, new_node_id ) ? {
         let grandchild_ids : Vec < ID > =
@@ -215,49 +216,6 @@ fn node_generation (
   } else {
     Ok ( None ) }}
 
-/// Add a single child during BFS expansion.
-/// If `force_indefinitive.0` is true, the node is always indefinitive.
-/// Otherwise, marks as indefinitive only if it's a repeat or cycle.
-/// Returns the new node's NodeId.
-///
-/// Note: This function still fetches from disk because the child
-/// doesn't exist in the tree yet. The SkgNode is stored in the
-/// paired tree for future reference.
-async fn add_child_to_definitive_branch (
-  tree               : &mut PairTree,
-  tree_idx           : usize,
-  parent_nid         : NodeId,
-  child_id           : &ID,
-  force_indefinitive : ForceIndefinitive,
-  visited            : &mut VisitedMap,
-  config             : &SkgConfig,
-  driver             : &TypeDBDriver,
-) -> Result < NodeId, Box<dyn Error> > {
-  let (skgnode, mut orgnode) : (SkgNode, OrgNode) =
-    skgnode_and_orgnode_from_id ( config, driver, child_id )
-    . await ?;
-  let is_repeat : bool = visited . contains_key ( child_id );
-  let is_cycle : bool =
-    is_ancestor_id ( tree, parent_nid, child_id,
-                     |n| n . 1 . metadata . id . as_ref () ) ?;
-  let should_be_indefinitive : bool =
-    force_indefinitive.0 || is_repeat || is_cycle;
-  if should_be_indefinitive {
-    orgnode . metadata . code . indefinitive = true;
-    orgnode . body = None;
-  } else {
-    orgnode . metadata . code . indefinitive = false; }
-  orgnode . metadata . viewData . cycle = is_cycle;
-  let new_node_id : NodeId = {
-    let mut parent_mut : NodeMut < NodePair > =
-      tree . get_mut ( parent_nid )
-      . ok_or ( "add_child_to_definitive_branch: parent not found" ) ?;
-    parent_mut . append ( (Some(skgnode), orgnode) ) . id () };
-  if ! should_be_indefinitive {
-    visited . insert ( child_id . clone(),
-                       (tree_idx, new_node_id) ); }
-  Ok ( new_node_id ) }
-
 /// Add children with truncation when limit is exceeded.
 /// - Adds children up to `space_left` as indefinitive nodes
 /// - Completes the sibling group of the limit-hitting node
@@ -265,7 +223,6 @@ async fn add_child_to_definitive_branch (
 /// Generation is relative to effective_root (which is generation 1).
 async fn add_last_generation_and_edit_previous (
   tree           : &mut PairTree,
-  tree_idx       : usize,
   generation     : usize,
   children       : &[(NodeId, ID)],
   space_left     : usize,
@@ -286,10 +243,10 @@ async fn add_last_generation_and_edit_previous (
            *parent_nid != limit_parent_id ) // in new sibling group
       { break; }
       else {
-        add_child_to_definitive_branch (
-          tree, tree_idx, *parent_nid, child_id,
-          ForceIndefinitive ( true ), // important
-          visited, config, driver ) . await ?; }}
+        let new_node_id : NodeId =
+          fetch_and_append_child_pair (
+            tree, *parent_nid, child_id, config, driver ) . await ?;
+        rewrite_to_indefinitive ( tree, new_node_id ) ?; }}
   truncate_after_node_in_generation_in_tree (
     tree, generation - 1, limit_parent_id,
     effective_root, visited ) ?;
