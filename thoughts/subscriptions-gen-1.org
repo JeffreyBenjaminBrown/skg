@@ -1,0 +1,93 @@
+=== Plan: Generation 1 - Simple SubscribeeCol ===
+
+* Goal
+
+When rendering content for a node N that subscribes to anything, render a SubscribeeCol child. Just one generation - no children of the SubscribeeCol yet.
+
+* Structure
+Jeff: Let's put it first, not last:
+#+begin_example
+Content Node N (subscribes_to = [S1, S2, ...])
+└── SubscribeeCol
+    - relToParent = SubscribeeCol
+    - indefinitive = false (definitive)
+    - title = "it subscribes to these"
+    - no source
+    - no id
+    - no SkgNode
+    - no children (for now)
+├── (normal content children)
+├── (normal content children)
+├── ...
+#+end_example
+
+* Required Changes
+
+** 1. Add =RelToParent::SubscribeeCol= variant
+
+File: =rust/types/orgnode.rs=
+
+Add to the =RelToParent= enum:
+#+begin_src rust
+SubscribeeCol, // Collects subscribees for its parent
+#+end_src
+
+** 2. Update sexp parsing/rendering for the new variant
+Jeff: Let's ignore parsing for now, and just tackle rendering.
+
+File: =rust/serve/parse_metadata_sexp.rs=
+
+In =parse_code_sexp=, add case for "subscribeeCol" in the relToParent match.
+
+File: =rust/types/orgnode.rs=
+
+In =orgnodemd_to_string= (or wherever relToParent is rendered to sexp), add case for SubscribeeCol.
+
+** 3. Create the SubscribeeCol during content completion
+
+File: =rust/to_org/complete/contents.rs=
+
+In =completeDefinitiveOrgnode=, after ensuring the SkgNode exists:
+- Check if =skgnode.subscribes_to= is non-empty
+- If so, check if a SubscribeeCol child already exists (similar pattern to aliases check)
+- If no SubscribeeCol exists, create one and prepend/append it to non-content children
+
+Helper function (either in =contents.rs= or a new =rust/to_org/complete/subscribeecol.rs=):
+#+begin_src rust
+fn maybe_add_subscribee_col (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+) -> Result<(), Box<dyn Error>>
+#+end_src
+
+** 4. Handle SubscribeeCol in traversal
+
+File: =rust/to_org/complete/contents.rs=
+
+In =completeNodePreorder_collectingDefinitiveRequests=:
+- Add case for =RelToParent::SubscribeeCol=
+- For now, just skip recursion (no children to process)
+- Or let it fall through to normal processing since it has no children anyway
+
+** 5. Ensure SubscribeeCol is treated as non-content
+
+The existing =categorize_children_by_treatment= already puts non-Content children in =non_content_child_ids=, so SubscribeeCol will automatically be placed before content children in the reordering step.
+
+* Files to Modify
+
+1. =rust/types/orgnode.rs= - Add RelToParent::SubscribeeCol, update rendering
+2. =rust/serve/parse_metadata_sexp.rs= - Parse "subscribeeCol"
+3. =rust/to_org/complete/contents.rs= - Create SubscribeeCol during completion
+
+* Testing
+
+- Create a test node that has =subscribes_to= with some IDs
+- Verify that after completion, it has a SubscribeeCol child
+- Verify the SubscribeeCol has correct properties (title, relToParent, definitive)
+- Verify nodes without subscriptions don't get a SubscribeeCol
+
+* Future Generations
+
+Generation 2 will add Subscribee children to the SubscribeeCol.
+Generation 3 will add Hidden/Unintegrated children to each Subscribee.
+Generation 4 will add actual content nodes under Hidden/Unintegrated.

@@ -15,11 +15,11 @@ pub use errors::{ TextLinkParseError,
                   BufferValidationError, };
 pub mod orgnode;
 pub use orgnode::{
-  OrgNode, // metadata, title, body
-    OrgnodeMetadata, // id, source, viewdata, code
+  OrgNode, // metadata, title, opt body
+    OrgnodeMetadata, // opt id, opt source, viewdata, code
       OrgnodeViewData, // cycle, focused, folded, relationships
-        OrgnodeRelationships, // 2 bools, 3 ints
-      OrgnodeCode, // relToParent, indef, editRequest, viewRequests
+        OrgnodeRelationships, // 2 bools, 3 opt ints
+      OrgnodeCode, // relToParent, indef, opt editRequest, viewRequests
         RelToParent, // content | for aliases | ignored
         EditRequest, // merge | delete
                      //   Mutually excclusive.
