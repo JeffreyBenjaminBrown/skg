@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::content_view::multi_root_view;
+use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::run_with_test_db;
 use skg::types::ID;
 

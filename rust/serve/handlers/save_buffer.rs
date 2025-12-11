@@ -1,13 +1,12 @@
 use crate::read_buffer::buffer_to_save_instructions;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
-use crate::to_org::content_view::{
-  render_forest_to_org,
-  set_metadata_relationship_viewdata_in_forest};
+use crate::to_org::render::content_view::render_forest_to_org;
+use crate::to_org::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::media::tree::map_snd_over_forest;
 use crate::merge::merge_nodes_in_graph;
-use crate::to_org::complete_contents::completeOrgnodeForest_collectingDefinitiveRequests;
-use crate::to_org::definitive_branch::execute_definitive_view_requests;
+use crate::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
+use crate::to_org::expand::definitive::execute_definitive_view_requests;
 use crate::media::tree::pair_forest_with_save_instructions;
 use crate::serve::util::{
   format_buffer_response_sexp,

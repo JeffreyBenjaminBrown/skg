@@ -3,9 +3,9 @@
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id,
   get_pid_in_pairtree, is_indefinitive, collect_child_ids };
-use crate::to_org::aliases::wrapped_build_and_integrate_aliases_view;
-use crate::to_org::complete_aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
-use crate::to_org::integrate_backpath::{
+use crate::to_org::expand::aliases::wrapped_build_and_integrate_aliases_view;
+use crate::to_org::complete::aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
+use crate::to_org::expand::backpath::{
   wrapped_build_and_integrate_containerward_view,
   wrapped_build_and_integrate_sourceward_view, };
 use crate::types::misc::{ID, SkgConfig};

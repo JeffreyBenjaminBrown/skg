@@ -1,6 +1,6 @@
 /// SINGLE ENTRY POINT: 'execute_definitive_view_requests'.
 
-use crate::to_org::truncate::truncate_after_node_in_generation_in_tree;
+use crate::to_org::render::truncate::truncate_after_node_in_generation_in_tree;
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source,
   VisitedMap, get_pid_in_pairtree, is_ancestor_id, is_indefinitive,

@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete_aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
+use skg::to_org::complete::aliascol::org_to_mskg_org_adaptor::completeAliasCol_in_mskg_org_tree;
 use skg::read_buffer::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
 use skg::types::OrgNode;

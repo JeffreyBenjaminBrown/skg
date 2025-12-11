@@ -2,42 +2,35 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
-pub mod aliases;
-pub mod complete_aliascol;
-pub mod complete_contents;
-pub mod content_view;
-pub mod definitive_branch;
-pub mod initial_view_bfs;
-pub mod integrate_backpath;
-pub mod orgnode;
-pub mod truncate;
+pub mod complete;
+pub mod expand;
+pub mod render;
+pub mod text;
 pub mod util;
+pub mod viewdata;
 
-pub use aliases::{
-  build_and_integrate_aliases,
-  wrapped_build_and_integrate_aliases_view, };
-
-pub use complete_contents::{
+pub use complete::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   make_indefinitive_if_repeated,
-  completeOrgnodeForest_collectingDefinitiveRequests, };
-
-pub use content_view::{
-  multi_root_view,
-  single_root_view,
+  completeOrgnodeForest_collectingDefinitiveRequests,
 };
 
-pub use initial_view_bfs::{
+pub use expand::{
+  build_and_integrate_aliases,
+  wrapped_build_and_integrate_aliases_view,
+  build_and_integrate_containerward_path,
+  build_and_integrate_sourceward_path,
+  integrate_path_that_might_fork_or_cycle,
+};
+
+pub use render::{
+  multi_root_view,
+  single_root_view,
   render_initial_forest_bfs,
 };
 
-pub use integrate_backpath::{
-  build_and_integrate_containerward_path,
-  build_and_integrate_sourceward_path,
-  integrate_path_that_might_fork_or_cycle };
-
-pub use orgnode::{
+pub use text::{
   orgnode_to_text,
 };
 

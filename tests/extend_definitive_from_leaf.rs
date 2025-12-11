@@ -7,9 +7,9 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete_contents::completeOrgnodeForest_collectingDefinitiveRequests;
-use skg::to_org::definitive_branch::execute_definitive_view_requests;
-use skg::to_org::content_view::render_forest_to_org;
+use skg::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
+use skg::to_org::expand::definitive::execute_definitive_view_requests;
+use skg::to_org::render::content_view::render_forest_to_org;
 use skg::media::tree::{pair_forest_with_save_instructions, map_snd_over_forest};
 use skg::read_buffer::buffer_to_save_instructions;
 use skg::test_utils::run_with_test_db;

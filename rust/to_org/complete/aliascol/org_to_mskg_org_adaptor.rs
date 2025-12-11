@@ -6,7 +6,7 @@
 /// and the AliasCol subtree, call 'completeAliasCol',
 /// then sync the changes back to the paired tree.
 
-use crate::to_org::complete_aliascol::completeAliasCol;
+use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::util::{get_pid_from_pair_using_noderef, collect_child_ids};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;

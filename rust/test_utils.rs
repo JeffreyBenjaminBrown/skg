@@ -6,7 +6,7 @@ use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::read_buffer::{headline_to_triple, HeadlineInfo};
-use crate::to_org::content_view::render_forest_to_org;
+use crate::to_org::render::content_view::render_forest_to_org;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;

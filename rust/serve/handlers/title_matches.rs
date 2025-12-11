@@ -3,7 +3,7 @@ use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::media::tantivy::search_index;
 use crate::types::orgnode::{OrgNode, RelToParent, default_metadata};
 use crate::types::misc::TantivyIndex;
-use crate::to_org::orgnode::orgnode_to_text;
+use crate::to_org::text::orgnode_to_text;
 
 use sexp::Sexp;
 use std::collections::HashMap;

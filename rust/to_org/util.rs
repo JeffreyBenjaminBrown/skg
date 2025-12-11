@@ -111,6 +111,38 @@ pub fn org_bullet ( level: usize ) -> String {
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
+/// Create a minimal forest containing just root nodes (no children).
+/// Returns (Option<SkgNode>, OrgNode) trees to avoid multiple SkgNode lookups.
+pub async fn stub_forest_from_root_ids (
+  root_ids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+) -> Result < Vec < PairTree >,
+              Box<dyn Error> > {
+  let mut forest : Vec < PairTree > =
+    Vec::new ();
+  for root_id in root_ids {
+    let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
+      skgnode_and_orgnode_from_id (
+        config, driver, root_id ) . await ?;
+    let tree : PairTree =
+      Tree::new ( (Some(root_skgnode), root_orgnode) );
+    forest . push ( tree ); }
+  Ok ( forest ) }
+
+/// Collect all PIDs from a forest of OrgNode trees.
+pub fn collect_ids_from_forest (
+  forest : &[Tree < OrgNode >],
+) -> Vec < ID > {
+  let mut pids : Vec < ID > = Vec::new ();
+  for tree in forest {
+    for edge in tree . root () . traverse () {
+      if let ego_tree::iter::Edge::Open ( node_ref ) = edge {
+        if let Some ( ref pid ) =
+          node_ref . value () . metadata . id {
+          pids . push ( pid . clone () ); }} }}
+  pids }
+
 /// Check if `target_id` appears in the ancestor path of `node_id`.
 /// Used for cycle detection.
 ///

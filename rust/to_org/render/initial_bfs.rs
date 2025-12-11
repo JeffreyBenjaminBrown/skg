@@ -15,8 +15,8 @@
 /// Then navigate up to L's parent P,
 /// and re-render every node in P's generation after P as indefinitive.
 
-use crate::to_org::content_view::stub_forest_from_root_ids;
-use crate::to_org::truncate::truncate_after_node_in_generation_in_forest;
+use crate::to_org::util::stub_forest_from_root_ids;
+use crate::to_org::render::truncate::truncate_after_node_in_generation_in_forest;
 use crate::to_org::util::{
   get_pid_in_pairtree, is_ancestor_id,
   collect_content_children, fetch_and_append_child_pair,

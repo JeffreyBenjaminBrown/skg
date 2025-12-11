@@ -1,14 +1,10 @@
-use crate::media::tree::map_snd_over_forest;
 use crate::media::typedb::search::{
   contains_from_pids,
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::initial_view_bfs::render_initial_forest_bfs;
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
-use crate::types::trees::PairTree;
-use crate::to_org::util::skgnode_and_orgnode_from_id;
-use crate::to_org::orgnode::orgnode_to_text;
+use crate::to_org::util::collect_ids_from_forest;
+use crate::types::{ID, SkgConfig, OrgNode};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -24,53 +20,6 @@ struct MapsFromIdForView {
   container_to_contents : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
   content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
 }
-
-/// Build a tree from a root ID and render it to org text.
-pub async fn single_root_view (
-  driver  : &TypeDBDriver,
-  config  : &SkgConfig,
-  root_id : &ID,
-) -> Result < String, Box<dyn Error> > {
-  multi_root_view (
-    driver,
-    config,
-    & [ root_id . clone () ] ) . await }
-
-/// Build a forest from multiple root IDs and render it to org text.
-pub async fn multi_root_view (
-  driver   : &TypeDBDriver,
-  config   : &SkgConfig,
-  root_ids : &[ID],
-) -> Result < String, Box<dyn Error> > {
-  let paired_forest : Vec < PairTree > =
-    render_initial_forest_bfs (
-      root_ids, config, driver ) . await ?;
-  let mut forest : Vec < Tree < OrgNode > > =
-    map_snd_over_forest ( paired_forest );
-  set_metadata_relationship_viewdata_in_forest (
-    &mut forest, config, driver ) . await ?;
-  let buffer_content : String =
-    render_forest_to_org ( & forest );
-  Ok ( buffer_content ) }
-
-/// Create a minimal forest containing just root nodes (no children).
-/// Returns (Option<SkgNode>, OrgNode) trees to avoid multiple SkgNode lookups.
-pub async fn stub_forest_from_root_ids (
-  root_ids : &[ID],
-  config   : &SkgConfig,
-  driver   : &TypeDBDriver,
-) -> Result < Vec < PairTree >,
-              Box<dyn Error> > {
-  let mut forest : Vec < PairTree > =
-    Vec::new ();
-  for root_id in root_ids {
-    let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
-      skgnode_and_orgnode_from_id (
-        config, driver, root_id ) . await ?;
-    let tree : PairTree =
-      Tree::new ( (Some(root_skgnode), root_orgnode) );
-    forest . push ( tree ); }
-  Ok ( forest ) }
 
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
@@ -110,19 +59,6 @@ async fn mapsFromIdForView_from_forest (
     & config . db_name,
     & pids
   ) . await }
-
-/// Collect all PIDs from a forest of OrgNode trees.
-fn collect_ids_from_forest (
-  forest : &[Tree < OrgNode >],
-) -> Vec < ID > {
-  let mut pids : Vec < ID > = Vec::new ();
-  for tree in forest {
-    for edge in tree . root () . traverse () {
-      if let ego_tree::iter::Edge::Open ( node_ref ) = edge {
-        if let Some ( ref pid ) =
-          node_ref . value () . metadata . id {
-          pids . push ( pid . clone () ); }} }}
-  pids }
 
 /// Run four batch queries to fetch all relationship data
 /// for the given PIDs.
@@ -197,31 +133,3 @@ fn set_metadata_relationships_in_node_recursive (
         child_id,
         node_pid_opt . as_ref (),
         rel_data ); }} }
-
-/// Render a forest of OrgNode trees to org-mode text.
-/// Each tree's root starts at level 1.
-/// Assumes metadata has already been enriched with relationship data.
-pub fn render_forest_to_org (
-  forest : &[Tree < OrgNode >],
-) -> String {
-  fn render_node_subtree_to_org (
-    node_ref : ego_tree::NodeRef < OrgNode >,
-    level    : usize,
-  ) -> String {
-    let node : &OrgNode = node_ref . value ();
-    let mut out : String =
-      orgnode_to_text ( level, node );
-    for child in node_ref . children () {
-      out . push_str (
-        & render_node_subtree_to_org (
-          child,
-          level + 1 )); }
-    out }
-  let mut result : String =
-    String::new ();
-  for tree in forest {
-    result . push_str (
-      & render_node_subtree_to_org (
-        tree . root (),
-        1 )); }
-  result }
