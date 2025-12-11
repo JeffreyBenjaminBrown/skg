@@ -121,20 +121,21 @@ async fn add_children_and_collect_their_ids (
                   Vec<NodeId>)>, // children added
             Box<dyn Error>> {
   let mut child_gen : Vec<(usize, Vec<NodeId>)> =
-    Vec::new();
+    (0 .. forest.len())
+    . map(|idx| (idx, Vec::new()))
+    . collect();
   for (tree_idx, parent_id, child_id) in rels_to_add {
     let child_node_id : NodeId =
       fetch_and_append_child_pair (
         &mut forest[tree_idx], parent_id, &child_id, config, driver
       ) . await ?;
-    if let Some((_, ids)) =
-      child_gen . iter_mut() . find(|(idx, _)| *idx == tree_idx) {
-        // Group by tree_idx
-        // todo ? Using 'find' is inefficient, but arguably safer,
-        // than simply accessing the 'idx'th element.
-        ids . push(child_node_id);
-    } else {
-      child_gen . push((tree_idx, vec![child_node_id])); }}
+    child_gen[tree_idx] . 1 . push(child_node_id); }
+  let child_gen : Vec<(usize, Vec<NodeId>)> = (
+    // Filter out trees with no children added,
+    // so that the caller can use .is_empty() to detect termination.
+    child_gen . into_iter()
+      . filter(|(_, ids)| ! ids.is_empty())
+      . collect() );
   Ok(child_gen) }
 
 /// If node repeat, call rewrite_to_indefinitive on it.
