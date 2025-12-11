@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 
-/* -------- Public entry points -------- */
+/// -------- Public entry point --------
 
 pub fn parse_headline_from_sexp (
   request : &str
@@ -33,7 +33,7 @@ pub fn parse_headline_from_sexp (
     parse_separating_metadata_and_title ( line_after_bullet ) ?;
   Ok (( metadata, level, title )) }
 
-/* -------- Level 1: Direct dependencies of entry points -------- */
+/* -------- Level 1: Direct dependencies of entry point -------- */
 
 /// Count the number of leading asterisks in a headline
 fn count_headline_level (

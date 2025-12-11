@@ -1,8 +1,7 @@
-/* PURPOSE:
-Add missing information to nodes in the forest.
-Namely, make it so when treatment should be Alias,
-and add missing IDs where treatment is Content.
-*/
+/// PURPOSE:
+/// Add missing information to nodes in the forest. Namely:
+/// - when treatment should be Alias, make it so
+/// - add missing IDs where treatment is Content
 
 use crate::types::{OrgNode, RelToParent, ID};
 use crate::media::typedb::util::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
@@ -13,15 +12,15 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
-/* Runs the following on each node:
-- assign_alias_relation_if_needed(
-- assign_id_if_needed(
-- assign_pid_if_possible(
-.
-PITFALL:
-Does not add *all* missing info.
-'clobber_none_fields_with_data_from_disk' does some of that, too,
-but it operates on SaveInstructions, downstream. */
+/// Runs the following on each node:
+/// - assign_alias_relation_if_needed(
+/// - assign_id_if_needed(
+/// - assign_pid_if_possible(
+/// .
+/// PITFALL:
+/// Does not add *all* missing info.
+/// 'clobber_none_fields_with_data_from_disk' does some of that, too,
+/// but it operates on SaveInstructions, downstream.
 pub async fn add_missing_info_to_forest(
   trees: &mut [Tree<OrgNode>],
   db_name: &str,
@@ -48,7 +47,7 @@ pub async fn add_missing_info_to_forest(
 
 fn add_missing_info_dfs (
   mut node_ref: ego_tree::NodeMut < OrgNode >,
-  parent_reltoparent: Option < RelToParent >, // Thanks to AliasCol, if N(ode) descends from P(arent) descends from G(randparent), then to process N, we need to know P's relationship to G.
+  parent_reltoparent: Option < RelToParent >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
   parent_source: Option < String >,
 ) {
   { // Process current node

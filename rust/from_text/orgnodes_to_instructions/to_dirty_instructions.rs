@@ -78,14 +78,14 @@ fn mk_skgnode (
     overrides_view_of: None,
   } ) }
 
-/* Collect aliases for a node using a double-loop:
-- For each child CA of N such that CA has treatment=AliasCol,
-  - for each child A of CA such that A has treatment=Alias,
-    - collect A into the list of aliases for N.
-This is programmed defensively:
-  'validate_tree' will not currently permit multiple 'AliasCol'
-  children under the same node,
-  but this function will work even if there are. */
+/// Collect aliases for a node using a double-loop:
+/// - for each child CA of N such that CA has treatment=AliasCol,
+///   - for each child A of CA such that A has treatment=Alias,
+///     - collect A into the list of aliases for N.
+/// This is programmed defensively:
+///   'validate_tree' will not currently permit multiple 'AliasCol'
+///   children under the same node,
+///   but this function will work even if there are.
 fn collect_aliases (
   node_ref: &NodeRef<OrgNode>
 ) -> Option<Vec<String>> {
