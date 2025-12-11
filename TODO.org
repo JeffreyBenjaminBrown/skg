@@ -1,6 +1,7 @@
 * RESUME REVIEW at
   rust/to_org/definitive_branch.rs
   (reading down in magit)
+* merge rust/to_org/bfs_shared.rs and rust/to_org/util.rs
 * add tests
 ** collect_generation_ids
    test the new effective root logic

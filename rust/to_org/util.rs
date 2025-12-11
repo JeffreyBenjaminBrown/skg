@@ -66,12 +66,6 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
                  pid ), )) ); }
   Ok (( skgnode, orgnode )) }
 
-pub fn newline_to_space ( s: &str ) -> String {
-  s.replace ( '\n', " " ) }
-
-pub fn org_bullet ( level: usize ) -> String {
-  "*" . repeat ( level.max ( 1 )) }
-
 /// Create an OrgNode with a given RelToParent and title.
 /// Body is set to None, and all other metadata fields use defaults.
 pub fn orgnode_from_title_and_rel (
@@ -81,6 +75,12 @@ pub fn orgnode_from_title_and_rel (
   let mut md = default_metadata ();
   md . code . relToParent = rel;
   OrgNode { metadata: md, title, body: None }}
+
+pub fn newline_to_space ( s: &str ) -> String {
+  s.replace ( '\n', " " ) }
+
+pub fn org_bullet ( level: usize ) -> String {
+  "*" . repeat ( level.max ( 1 )) }
 
 /// Check if `target_id` appears in the ancestor path of `node_id`.
 /// Used for cycle detection.
@@ -109,37 +109,18 @@ where F : Fn ( &T ) -> Option < &ID >
     current = parent . parent (); }
   Ok ( false ) }
 
-/// Extract the PID from a node in a tree.
-/// Returns an error if the node is not found or has no ID.
-///
-/// The `get_id` closure extracts an `Option<&ID>` from a node value,
-/// allowing this to work with different tree types:
-/// - `Tree<OrgNode>`: `|n| n.metadata.id.as_ref()`
-/// - `Tree<(SkgNode, OrgNode)>`: `|n| n.1.metadata.id.as_ref()`
-pub fn get_node_pid_generic < T, F > (
-  tree    : &Tree < T >,
-  node_id : NodeId,
-  get_id  : F,
-) -> Result < ID, Box<dyn Error> >
-where F : Fn ( &T ) -> Option < &ID >
-{
-  let node_ref : NodeRef < T > =
-    tree . get ( node_id )
-    . ok_or ( "get_node_pid_generic: NodeId not in tree" ) ?;
-  get_id ( node_ref . value () )
-    . cloned ()
-    . ok_or_else ( || "get_node_pid_generic: node has no ID" . into () ) }
-
 /// Extract the PID from a node in a PairTree.
 /// Returns an error if the node is not found or has no ID.
-/// (Convenience wrapper around get_node_pid_generic for PairTree.)
 pub fn get_pid_in_pairtree (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  get_node_pid_generic (
-    tree, node_id,
-    |n| n . 1 . metadata . id . as_ref () ) }
+  let node_ref : NodeRef < (Option<SkgNode>, OrgNode) > =
+    tree . get ( node_id )
+    . ok_or ( "get_pid_in_pairtree: NodeId not in tree" ) ?;
+  node_ref . value () . 1 . metadata . id . clone ()
+    . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
+                       . into () ) }
 
 /// Extract the PID from a PairTree NodeRef.
 /// Returns an error if the node has no ID.
