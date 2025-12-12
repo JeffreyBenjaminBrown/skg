@@ -228,9 +228,10 @@ fn find_child_by_id (
   target_id  : & ID,
 ) -> Option < ego_tree::NodeId > {
   for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid ) = child . value () . 1 . metadata . id {
-      if child_pid == target_id {
-        return Some ( child . id () ); } } }
+    if let Some ( ref child_pid ) =
+      child . value () . 1 . metadata . id {
+        if child_pid == target_id {
+          return Some ( child . id () ); }} }
   None }
 
 /// Find child nodes by their IDs.

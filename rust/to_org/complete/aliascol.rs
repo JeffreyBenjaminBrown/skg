@@ -18,10 +18,12 @@ use typedb_driver::TypeDBDriver;
 /// so the disk state is the source of truth.
 ///
 /// This function assumes the parent node P has been normalized
-/// so that its 'id' field is the PID (no need to call pid_from_id).
+/// so that its 'id' field is the PID.
 ///
 /// Given an AliasCol node C:
 /// - Fetches the parent P's SkgNode S from disk
+///   TODO ? This is inefficient.
+///   Climbing the tree, to where it already is, would be smarter.
 /// - Deduplicates C's Alias children (preserving order)
 /// - Removes invalid Alias children (those not in S.aliases)
 /// - Adds missing Alias children (those in S.aliases but not in C's children)
@@ -44,7 +46,8 @@ pub async fn completeAliasCol (
       "Parent ID '{}' not found in database", parent_id))?;
   let mut skgnode : SkgNode = {
     let path : String =
-      path_from_pid_and_source ( config, &parent_source, parent_pid );
+      path_from_pid_and_source (
+        config, &parent_source, parent_pid );
     read_node ( path )? };
   skgnode.source = parent_source;
   let aliases_from_disk : HashSet < String > = (
@@ -59,7 +62,8 @@ pub async fn completeAliasCol (
     // aliases in tree that match aliases on disk
     aliases_from_tree
       . iter ()
-      . filter ( |alias| aliases_from_disk . contains ( *alias ))
+      . filter ( |alias|
+                  aliases_from_disk . contains ( *alias ))
       . cloned ()
       . collect ( ));
   let missing_aliases_from_disk : HashSet < String > = (
@@ -79,7 +83,8 @@ pub async fn completeAliasCol (
     for alias in missing_aliases_from_disk {
       aliascol_mut . append (
         ( None,
-          orgnode_from_title_and_rel ( RelToParent::Alias, alias ))); }}
+          orgnode_from_title_and_rel (
+            RelToParent::Alias, alias ))); }}
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.
@@ -184,11 +189,12 @@ fn get_aliascol_parent_id (
     & tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
     . value () . 1;
-  if aliascol_node . metadata . code.relToParent != RelToParent::AliasCol {
-    return Err (
-      format! ( "Node is not an AliasCol: {:?}",
-                 aliascol_node . metadata . code.relToParent )
-        . into () ); }
+  if aliascol_node . metadata . code.relToParent
+    != RelToParent::AliasCol {
+      return Err (
+        format! ( "Node is not an AliasCol: {:?}",
+                   aliascol_node . metadata . code.relToParent )
+          . into () ); }
   let parent_node_id : NodeId =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?

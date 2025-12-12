@@ -212,7 +212,8 @@ pub async fn clobberIndefinitiveOrgnode (
       skgnode_opt . as_ref ()
       . ok_or ( "SkgNode should exist after fetch" ) ?;
     orgnode . title = skgnode . title . clone ();
-    orgnode . metadata . source = Some ( skgnode . source . clone () );
+    orgnode . metadata . source =
+      Some ( skgnode . source . clone () );
     orgnode . body = None; }
   Ok (( )) }
 
@@ -239,7 +240,8 @@ pub async fn completeDefinitiveOrgnode (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  ensure_skgnode ( tree, node_id, config, driver ) . await ?;
+  ensure_skgnode (
+    tree, node_id, config, driver ). await ?;
   maybe_add_subscribee_col ( tree, node_id ) ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {

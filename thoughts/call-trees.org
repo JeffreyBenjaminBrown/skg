@@ -1,0 +1,208 @@
+* single_root_view
+** multi_root_view
+*** render_initial_forest_bfs
+**** stub_forest_from_root_ids
+***** skgnode_and_orgnode_from_id
+****** pid_and_source_from_id
+****** skgnode_and_orgnode_from_pid_and_source
+**** render_generation_and_recurse
+***** mark_visited_or_repeat_or_cycle
+****** is_ancestor_id
+****** rewrite_to_indefinitive
+       indefinitive = true, body = None
+***** maybe_add_subscribee_col
+/// If the node: - subscribes to something
+///              - is definitive
+///              - doesn't have a SubscribeeCol child
+***** collect_rels_to_children_from_generation
+****** content_ids_if_definitive_else_empty
+***** add_last_generation_and_edit_previous_in_forest
+****** fetch_and_append_child_pair
+******* DUP skgnode_and_orgnode_from_id
+****** DUP rewrite_to_indefinitive
+****** truncate_after_node_in_generation_in_forest
+******* nodes_after_in_generation
+******** collect_generation_ids
+******* DUP collect_generation_ids
+******* rewrite_to_indefinitive
+***** add_children_and_collect_their_ids
+****** fetch_and_append_child_pair
+******* DUP skgnode_and_orgnode_from_id
+***** REC render_generation_and_recurse
+*** set_metadata_relationship_viewdata_in_forest
+**** mapsFromIdForView_from_forest
+***** collect_ids_from_pair_forest
+***** fetch_relationship_data
+****** count_containers
+******* count_relations
+****** count_contents
+******* DUP count_relations
+****** count_link_sources
+******* DUP count_relations
+****** contains_from_pids
+**** set_metadata_relationships_in_node_recursive
+***** REC set_metadata_relationships_in_node_recursive
+*** orgnode_forest_to_string
+* handle_save_buffer_request
+** read_length_prefixed_content
+** update_from_and_rerender_buffer
+*** buffer_to_save_instructions
+**** org_to_uninterpreted_nodes
+***** divide_into_orgNodeLineCols
+***** linecol_to_orgnode
+**** add_missing_info_to_forest
+***** add_missing_info_dfs
+****** assign_alias_relation_if_needed
+****** inherit_source_if_needed
+****** assign_new_id_if_needed
+****** REC add_missing_info_dfs
+***** collect_ids_in_tree
+****** REC collect_ids_in_tree
+***** pids_from_ids
+***** assign_pids_throughout_tree_from_map
+****** REC assign_pids_throughout_tree_from_map
+**** find_buffer_errors_for_saving
+     call tree omitted
+**** orgnodes_to_reconciled_save_instructions
+***** saveinstructions_from_forest
+****** saveinstructions_from_tree
+******* mk_skgnode
+******* REC saveinstructions_from_tree
+***** reconcile_same_id_instructions
+****** collect_dup_instructions
+****** reconcile_same_id_instructions_for_one_id
+******* read_node_from_id_optional
+******** read_node_from_id
+********* pid_and_source_from_id
+********* path_from_pid_and_source
+***** clobber_none_fields_with_data_from_disk
+**** validate_and_filter_foreign_instructions
+**** instructiontriples_from_the_merges_in_an_orgnode_forest
+***** saveinstructions_from_the_merge_in_an_orgnode
+****** create_acquiree_text_preserver
+****** three_merged_skgnodes
+******* setlike_vector_subtraction
+**** validate_merges_involve_only_owned_nodes
+*** update_graph
+**** update_typedb_from_saveinstructions
+***** delete_nodes_from_pids
+***** create_only_nodes_with_no_ids_present
+****** which_ids_exist
+***** delete_out_links
+***** create_all_relationships
+****** create_relationships_from_node
+******* insert_relationship_from_list
+**** update_fs_from_saveinstructions
+***** delete_all_nodes_from_fs
+***** write_all_nodes_to_fs
+****** write_node
+**** update_index_from_saveinstructions
+***** delete_nodes_from_index
+***** add_documents_to_tantivy_writer
+****** create_documents_from_node
+******* replace_each_link_with_its_label
+***** commit_with_status
+*** merge_nodes_in_three_systems
+**** merge_nodes_in_typedb
+***** merge_one_node_in_typedb
+****** reroute_relationships_for_merge
+****** drop_relationships_for_merge
+****** reroute_what_acquiree_hides
+******* drop_relationships_for_merge
+****** delete_extra_ids_for_node
+****** create_node
+****** create_relationships_from_node
+**** merge_nodes_in_fs
+/// PURPOSE: For each MergeInstructionTriple:
+///   - write the updated acquirer
+///   - write the new acquiree text preserver
+///   - delete the acquiree
+***** write_node
+**** merge_nodes_in_tantivy
+***** DUP update_index_from_saveinstructions
+*** pair_forest_with_save_instructions
+**** pairtree_from_orgnodetree_and_map
+***** pair_children_optional_recursive
+****** REC pair_children_optional_recursive
+*** completeOrgnodeForest_collectingDefinitiveRequests
+**** completeNodePreorder_collectingDefinitiveRequests
+***** completeAliasCol
+****** get_aliascol_parent_id
+****** DUP pid_and_source_from_id
+****** collect_alias_titles
+****** remove_duplicates_and_false_aliases_handling_focus
+****** orgnode_from_title_and_rel
+***** make_indefinitive_if_repeated
+***** detect_cycle_and_mark
+****** TODO get_pid_in_pairtree
+       seems unnecessary --
+       isn't the tree already normalized?
+***** clobberIndefinitiveOrgnode
+***** completeDefinitiveOrgnode
+****** ensure_skgnode
+****** DUP maybe_add_subscribee_col
+****** categorize_children_by_treatment
+****** reorder_children
+***** map_completeNodePreorderCollectingDefinitiveRequests_over_children
+****** TODO not sure this deserves definition
+****** collect_child_ids
+****** REC completeNodePreorder_collectingDefinitiveRequests
+***** wrapped_build_and_integrate_aliases_view
+****** TODO rename these 'wrapped' functions to 'do it and clean up'
+****** build_and_integrate_aliases
+******* fetch_aliases_from_file
+******** pid_and_source_from_id
+******** path_from_pid_and_source
+******* orgnode_from_title_and_rel
+****** remove_completed_view_request
+***** wrapped_build_and_integrate_containerward_view
+****** build_and_integrate_containerward_path
+******* DUP get_pid_in_pairtree
+******* path_containerward_to_end_cycle_and_or_branches
+******** path_to_end_cycle_and_or_branches
+********* find_related_nodes
+******* integrate_path_that_might_fork_or_cycle
+******** DUP get_pid_in_pairtree
+******** integrate_linear_portion_of_path
+********* find_child_by_id
+********* prepend_indefinitive_child_with_parent_ignores
+********** DUP skgnode_and_orgnode_from_id
+********* REC integrate_linear_portion_of_path
+******** integrate_branches_in_node
+********* find_children_by_ids
+********* prepend_indefinitive_child_with_parent_ignores
+********** DUP skgnode_and_orgnode_from_id
+******** integrate_cycle_in_node
+********* DUP prepend_indefinitive_child_with_parent_ignores
+****** DUP remove_completed_view_request
+***** wrapped_build_and_integrate_sourceward_view
+****** build_and_integrate_sourceward_path
+******* DUP get_pid_in_pairtree
+******* path_sourceward_to_end_cycle_and_or_branches
+******** DUP path_to_end_cycle_and_or_branches
+******* DUP integrate_path_that_might_fork_or_cycle
+****** DUP remove_completed_view_request
+*** execute_definitive_view_requests
+**** execute_definitive_view_request
+***** indefinitize_content_subtree
+****** REC indefinitize_content_subtree
+***** rebuild_pair_from_disk_mostly_clobbering_the_org
+****** DUP skgnode_and_orgnode_from_pid_and_source
+***** extendDefinitiveSubtreeFromLeaf
+****** DUP content_ids_if_definitive_else_empty
+****** add_last_generation_and_edit_previous_in_tree
+******* fetch_and_append_child_pair
+******** DUP skgnode_and_orgnode_from_id
+******* DUP rewrite_to_indefinitive
+******* truncate_after_node_in_generation_in_tree
+******** DUP nodes_after_in_generation
+******** DUP rewrite_to_indefinitive
+****** DUP fetch_and_append_child_pair
+****** DUP mark_visited_or_repeat_or_cycle
+****** content_ids_if_definitive_else_empty
+*** DUP set_metadata_relationship_viewdata_in_forest
+*** DUP orgnode_forest_to_string
+** format_save_error_as_org
+*** format_buffer_validation_error
+** empty_response_sexp
+** send_response

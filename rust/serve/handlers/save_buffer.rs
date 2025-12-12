@@ -83,7 +83,8 @@ pub fn handle_save_buffer_request (
                         response_sexp . len ( ));
             let full_response : String =
               format! ( "{}{}", header, response_sexp );
-            stream.write_all(full_response.as_bytes( )).unwrap();
+            stream.write_all(full_response.as_bytes( ))
+              . unwrap();
             stream.flush().unwrap();
           } else {
             let error_msg : String =

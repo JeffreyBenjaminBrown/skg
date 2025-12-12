@@ -59,7 +59,8 @@ pub async fn build_and_integrate_aliases (
       driver,
       node_id_val ) . await;
   let aliascol : OrgNode =
-    orgnode_from_title_and_rel ( RelToParent::AliasCol, String::new () );
+    orgnode_from_title_and_rel (
+      RelToParent::AliasCol, String::new () );
   let aliascol_id : ego_tree::NodeId = {
     // prepend an AliasCol to the node's children
     let mut node_mut =

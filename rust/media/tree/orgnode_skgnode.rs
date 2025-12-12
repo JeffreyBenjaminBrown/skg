@@ -42,17 +42,15 @@ fn pairtree_from_orgnodetree_and_map (
     orgnode_tree . root () . value () . clone ();
   let root_skgnode : Option<SkgNode> =
     root_orgnode . metadata . id . as_ref ()
-    . and_then ( |id| skgnode_map . get ( id ) . cloned () );
+    . and_then (
+      |id| skgnode_map . get (id) . cloned () );
   let mut new_tree : PairTree =
-    Tree::new ( (root_skgnode, root_orgnode) );
+    Tree::new ((root_skgnode, root_orgnode));
   let new_root_id : NodeId =
     new_tree . root () . id ();
   pair_children_optional_recursive (
-    &orgnode_tree,
-    old_root_id,
-    &mut new_tree,
-    new_root_id,
-    skgnode_map );
+    &orgnode_tree, old_root_id,
+    &mut new_tree, new_root_id, skgnode_map );
   new_tree }
 
 fn pair_children_optional_recursive (
@@ -70,10 +68,14 @@ fn pair_children_optional_recursive (
   for (old_child_id, child_orgnode) in child_orgnodes {
     let child_skgnode : Option<SkgNode> =
       child_orgnode . metadata . id . as_ref ()
-      . and_then ( |id| skgnode_map . get ( id ) . cloned () );
+      . and_then (
+        |id| skgnode_map . get ( id ) . cloned () );
     let new_child_id : NodeId = {
       let mut parent_mut =
         new_tree . get_mut ( new_node_id ) . unwrap ();
-      parent_mut . append ( (child_skgnode, child_orgnode) ) . id () };
+      parent_mut . append (
+        (child_skgnode, child_orgnode))
+        . id () };
     pair_children_optional_recursive (
-      old_tree, old_child_id, new_tree, new_child_id, skgnode_map ); }}
+      old_tree, old_child_id,
+      new_tree, new_child_id, skgnode_map ); }}
