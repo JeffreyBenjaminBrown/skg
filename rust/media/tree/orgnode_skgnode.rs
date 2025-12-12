@@ -28,11 +28,11 @@ pub fn pair_forest_with_save_instructions (
         . map ( |pid| (pid.clone(), skgnode.clone()) ) } )
     . collect ();
   orgnode_forest . into_iter ()
-    . map ( |tree| pair_tree_with_optional_skgnodes (
+    . map ( |tree| pairtree_from_orgnodetree_and_map (
       tree, &skgnode_map ) )
     . collect () }
 
-fn pair_tree_with_optional_skgnodes (
+fn pairtree_from_orgnodetree_and_map (
   orgnode_tree : Tree<OrgNode>,
   skgnode_map  : &HashMap<ID, SkgNode>,
 ) -> PairTree {
