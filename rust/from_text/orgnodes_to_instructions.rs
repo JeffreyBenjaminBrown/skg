@@ -4,7 +4,7 @@ pub mod none_node_fields_are_noops;
 
 pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 pub use reconcile_same_id_instructions::reconcile_same_id_instructions;
-pub use to_dirty_instructions::interpret_orgnode_forest;
+pub use to_dirty_instructions::saveinstructions_from_forest;
 
 use crate::types::{SkgNode, SkgConfig, SaveInstruction};
 use crate::types::orgnode::OrgNode;
@@ -22,7 +22,7 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
   let instructions : Vec<SaveInstruction> =
-    interpret_orgnode_forest ( forest . clone () ) ?;
+    saveinstructions_from_forest ( forest . clone () ) ?;
   let instructions_without_dups : Vec<SaveInstruction> =
     reconcile_same_id_instructions (
       config, driver, instructions ) . await ?;

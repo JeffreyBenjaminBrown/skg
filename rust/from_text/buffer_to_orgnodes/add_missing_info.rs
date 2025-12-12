@@ -64,7 +64,7 @@ fn add_missing_info_dfs (
         . metadata . code . relToParent . clone () );
   let its_source: Option < String > =
     node_ref . value () . metadata . source . clone ();
-  { // Process children, DFS.
+  { // Recurse : Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
     // PITFALL: don't confuse egoTree NodeIDs, which are all distinct,

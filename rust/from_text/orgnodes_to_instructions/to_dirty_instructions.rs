@@ -7,22 +7,22 @@ use ego_tree::{NodeRef, Tree};
 /// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
-pub fn interpret_orgnode_forest (
+pub fn saveinstructions_from_forest (
   trees: Vec<Tree<OrgNode>>
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
   for tree in trees {
-    interpret_node_dfs ( tree.root(),
+    saveinstructions_from_tree ( tree.root(),
                          &mut result )?; }
   Ok(result) }
 
-/// Appends another pair to 'result' and recurses.
+/// Appends another pair to 'result' and recurses (in DFS order).
 /// Skips AliasCol, Alias, and indefinitive nodes.
 /// (Aliases are handled by 'collect_aliases' in 'mk_skgnode',
-/// when 'interpret_node_dfs' is called on the orgnode ancestor they describe.)
+/// when 'saveinstructions_from_tree' is called on the orgnode ancestor they describe.)
 /// (Indefinitive nodes represent views and don't contribute to saves.)
-fn interpret_node_dfs(
+fn saveinstructions_from_tree(
   node_ref: NodeRef<OrgNode>,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
@@ -45,7 +45,7 @@ fn interpret_node_dfs(
     result . push (( skg_node, save_action )); }
   for child in node_ref.children() {
     // Recurse over children, even if their parent is indefinitive.
-    interpret_node_dfs ( child, result)?; }
+    saveinstructions_from_tree ( child, result)?; }
   Ok (( )) }
 
 fn mk_skgnode (

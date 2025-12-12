@@ -25,6 +25,13 @@
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
 * QA
+** add tests
+*** collect_generation_ids
+    test the new effective root logic
+** This seems like it could have been more efficient.
+   rust/to_org/definitive_branch.rs
+   sharing more code with
+   rust/to_org/initial_view_bfs.rs
 ** Appending from indef nodes moght be a misfeature.
 ** completeContents seems too long
 ** RelToParent could be generalized as RelToAncestor.

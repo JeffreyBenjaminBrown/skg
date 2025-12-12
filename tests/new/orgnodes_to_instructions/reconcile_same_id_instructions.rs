@@ -4,7 +4,7 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::from_text::{org_to_uninterpreted_nodes, interpret_orgnode_forest, find_inconsistent_instructions};
+use skg::from_text::{org_to_uninterpreted_nodes, saveinstructions_from_forest, find_inconsistent_instructions};
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::{ID, NonMerge_NodeAction};
@@ -23,7 +23,7 @@ fn test_inconsistent_delete() {
           "Should detect inconsistent toDelete");
 
   let instructions =
-    interpret_orgnode_forest(trees)
+    saveinstructions_from_forest(trees)
     . unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
@@ -52,7 +52,7 @@ fn test_deletions_excluded (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret_orgnode_forest(trees)?;
+      let instructions = saveinstructions_from_forest(trees)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
@@ -88,7 +88,7 @@ fn test_defining_node_defines (
         "};
 
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret_orgnode_forest(trees)?;
+      let instructions = saveinstructions_from_forest(trees)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -118,7 +118,7 @@ fn test_adding_without_definer (
             ** (skg (id 4) (source main) (code indefinitive)) 4 again
         "};
       let trees = org_to_uninterpreted_nodes(input)?;
-      let instructions = interpret_orgnode_forest(trees)?;
+      let instructions = saveinstructions_from_forest(trees)?;
       let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;
 
