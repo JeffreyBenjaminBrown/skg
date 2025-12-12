@@ -49,7 +49,7 @@
 focus-and-folded-markers
 fold-preservation
 ** redundancies
-*** mk_orgnode from save/buffer_to_orgnodes/uninterpreted.rs
+*** linecol_to_orgnode from save/buffer_to_orgnodes/uninterpreted.rs
     does something already done in mk_org_text/
 *** Buffer_Cannot_Be_Saved and SaveError
 ** use the tests at not_using/pids_from_ids/tests.rs

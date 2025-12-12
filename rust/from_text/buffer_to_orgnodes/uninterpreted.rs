@@ -30,7 +30,7 @@ pub fn org_to_uninterpreted_nodes(
   let mut node_stack: Vec<ego_tree::NodeId> = Vec::new();
   for org_node_line_col in &org_node_line_cols {
     let (level, node): (usize, OrgNode) =
-      mk_orgnode(org_node_line_col)?;
+      linecol_to_orgnode(org_node_line_col)?;
     if level == 1 { // Start a new tree.
       if let Some(tree) = current_tree.take() {
         result_trees.push(tree); }
@@ -100,7 +100,7 @@ fn divide_into_orgNodeLineCols (
 /// Create an OrgNode from an OrgNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
 /// Returns an error if the metadata cannot be parsed.
-fn mk_orgnode(
+fn linecol_to_orgnode(
   org_node_line_col: &OrgNodeLineCol
 ) -> Result<(usize, OrgNode), String> {
   let (level, metadata_option, title): HeadlineInfo =
