@@ -64,7 +64,7 @@ fn test_find_inconsistent_toDelete_instructions() {
 fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-multiple-def",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-multiple-def",
     |config, driver| Box::pin(async move {
       // Test input with multiple nodes having the same ID and indefinitive=false

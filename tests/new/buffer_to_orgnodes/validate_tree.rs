@@ -11,7 +11,7 @@ use std::error::Error;
 fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-errors",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-errors",
     |config, driver| Box::pin(async move {
       // Test input with various validation errors
@@ -114,7 +114,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
 fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-valid",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-valid",
     |config, driver| Box::pin(async move {
       // Test input with no validation errors
@@ -143,7 +143,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
 fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-empty",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver| Box::pin(async move {
       // Test empty input
@@ -160,7 +160,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
 fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-aliascols",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-aliascols",
     |config, driver| Box::pin(async move {
       // Test input with multiple AliasCol children
@@ -199,7 +199,7 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
 fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-duplicate",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-duplicate",
     |config, driver| Box::pin(async move {
       // Test input with duplicated Content children (same ID)
@@ -235,7 +235,7 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
 fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-validate-tree-no-dup",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-validate-tree-no-dup",
     |config, driver| Box::pin(async move {
       // Test input with different Content children IDs (should be valid)
@@ -267,7 +267,7 @@ fn test_root_without_source_validation(
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-root-without-source",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-root-without-source",
     |config, driver| Box::pin(async move {
       // root without source should be rejected
@@ -304,7 +304,7 @@ fn test_nonexistent_source_validation(
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-nonexistent-source",
-    "tests/merge/merge_nodes_in_graph/fixtures",
+    "tests/merge/merge_nodes_in_three_systems/fixtures",
     "/tmp/tantivy-test-nonexistent-source",
     |config, driver| Box::pin(async move {
       { // Node with nonexistent source should be rejected

@@ -62,9 +62,14 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
             let title_matches: bool = node.title == disk_node.title;
             let body_matches: bool = node.body == disk_node.body;
             let contains_matches: bool = normalize_id_vec(&node.contains) == normalize_id_vec(&disk_node.contains);
-            let aliases_matches: bool = node.aliases.is_none() ||
-              normalize_string_vec(&node.aliases) == normalize_string_vec(&disk_node.aliases);
-            if !(title_matches && body_matches && contains_matches && aliases_matches) {
+            let aliases_matches: bool =
+              node.aliases.is_none() ||
+              ( normalize_string_vec(&node.aliases) ==
+                normalize_string_vec(&disk_node.aliases) );
+            if !(title_matches &&
+                 body_matches &&
+                 contains_matches &&
+                 aliases_matches) {
               errors.push(BufferValidationError::ModifiedForeignNode(
                 node.ids[0].clone(),
                 SourceNickname::from(node.source.clone() )) ); }

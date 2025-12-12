@@ -1,8 +1,8 @@
-// cargo test merge::merge_nodes_in_graph
+// cargo test merge::merge_nodes_in_three_systems
 
 use skg::merge::{
   instructiontriples_from_the_merges_in_an_orgnode_forest,
-  merge_nodes_in_graph};
+  merge_nodes_in_three_systems};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
 use skg::media::file_io::read_node;
@@ -21,7 +21,7 @@ use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
-  let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_graph/fixtures");
+  let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_three_systems/fixtures");
   let temp_fixtures_path = PathBuf::from("/tmp/merge-test-2-into-1-fixtures");
   let tantivy_path = PathBuf::from("/tmp/tantivy-test-merge-2-into-1");
 
@@ -107,7 +107,7 @@ async fn test_merge_2_into_1_impl(
     title_or_alias_field,
     source_field, };
 
-  merge_nodes_in_graph(
+  merge_nodes_in_three_systems(
     merge_instructions.clone(),
     config.clone(),
     &tantivy_index_wrapper,
@@ -301,7 +301,7 @@ fn verify_tantivy_after_merge_2_into_1(
 
 #[test]
 fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
-  let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_graph/fixtures");
+  let fixtures_path = PathBuf::from("tests/merge/merge_nodes_in_three_systems/fixtures");
   let temp_fixtures_path = PathBuf::from("/tmp/merge-test-1-into-2-fixtures");
   let tantivy_path = PathBuf::from("/tmp/tantivy-test-merge-1-into-2");
 
@@ -386,7 +386,7 @@ async fn test_merge_1_into_2_impl(
     title_or_alias_field,
     source_field, };
 
-  merge_nodes_in_graph(
+  merge_nodes_in_three_systems(
     merge_instructions.clone(),
     config.clone(),
     &tantivy_index_wrapper,

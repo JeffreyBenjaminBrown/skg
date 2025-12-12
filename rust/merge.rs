@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
-pub async fn merge_nodes_in_graph (
+pub async fn merge_nodes_in_three_systems (
   merge_instructions : Vec<MergeInstructionTriple>,
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,

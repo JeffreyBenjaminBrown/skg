@@ -60,7 +60,8 @@ pub fn collect_dup_instructions(
     let (skg_node, save_action) // just for the type signature
       : (SkgNode, NonMerge_NodeAction)
       = instruction;
-    let primary_id_opt : Option<&ID> = skg_node.ids.first();
+    let primary_id_opt : Option<&ID> =
+      skg_node.ids.first();
     if let Some(primary_id) = primary_id_opt {
       grouped
         . entry (primary_id.clone())
@@ -102,7 +103,8 @@ pub async fn reconcile_same_id_instructions_for_one_id(
   let delete_opt: Option<SaveInstruction> = delete;
   if let Some(delete_instr) = delete_opt { // Return a Delete.
     if save.is_some() {
-      return Err("Cannot have both Delete and Save for same ID".into()); }
+      return Err("Cannot have both Delete and Save for same ID"
+                 . into() ); }
     return Ok(delete_instr); }
   { // Build and return a Save.
     let definer: SaveInstruction = save . ok_or( "No delete and no save instruction found. This should not be possible." )?;
@@ -111,7 +113,8 @@ pub async fn reconcile_same_id_instructions_for_one_id(
       . ok_or("No primary ID found")?.clone();
     let source : String = definer.0.source.clone();
     let disk_read_result: Option<(SkgNode, SourceNickname)> =
-      read_node_from_id_optional(config, driver, &pid).await?;
+      read_node_from_id_optional(
+        config, driver, &pid).await?;
     let from_disk: Option<SkgNode> = {
       match disk_read_result
       { Some(tuple) =>

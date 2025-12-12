@@ -15,13 +15,15 @@ pub async fn read_node_from_id (
   node_id : &ID
 ) -> Result<(SkgNode, SourceNickname), Box<dyn Error>> {
 
-  let (pid, source) : (ID, String) = pid_and_source_from_id (
-    & config.db_name, driver, node_id
+  let (pid, source) : (ID, String) =
+    pid_and_source_from_id (
+      & config.db_name, driver, node_id
   ). await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", node_id ) ) ?;
   let node_file_path : String =
-    path_from_pid_and_source ( config, &source, pid );
+    path_from_pid_and_source (
+      config, &source, pid );
   let mut node : SkgNode =
     read_node (node_file_path) ?;
   node.source = source.clone();

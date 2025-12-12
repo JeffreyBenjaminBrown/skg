@@ -190,9 +190,10 @@ async fn drop_relationships_for_merge (
   tx.query ( query ). await ?;
   Ok (( )) }
 
-/// Reroutes relationships where old_id plays old_role
-/// to have new_id play that role instead.
-/// Deletes the old relationship and creates a new one.
+/// Given a 'relation_name' between 'old_id' playing 'old_role'
+/// and 'other_id' playing 'other_role',
+/// deletes that relationship and makes a corresponding one
+/// substituting 'new_id' for 'old_id'.
 async fn reroute_relationships_for_merge (
   tx            : &Transaction,
   old_id        : &ID,

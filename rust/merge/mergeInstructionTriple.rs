@@ -111,7 +111,6 @@ fn three_merged_skgnodes(
     acquirer_from_disk.clone();
   let acquiree_text_preserver_id: &ID =
     &acquiree_text_preserver.ids[0];
-
   { // Append acquiree's IDs to acquirer's.
     let mut combined_ids : Vec<ID> =
       acquirer_from_disk.ids.clone();
@@ -120,7 +119,6 @@ fn three_merged_skgnodes(
     updated_acquirer.ids = (
       // this dedup is kind of absurdly defensive, but cheap
       dedup_vector(combined_ids) ); }
-
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
@@ -132,14 +130,12 @@ fn three_merged_skgnodes(
     dedup_vector(combined) };
   updated_acquirer.contains = // update 'contains'
     Some(new_contains.clone());
-
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
       acquirer_from_disk.subscribes_to.clone().unwrap_or_default();
     combined.extend(
       acquiree_from_disk.subscribes_to.clone().unwrap_or_default() );
     updated_acquirer.subscribes_to = Some(dedup_vector(combined)); }
-
   { // Combine hides_from_its_subscriptions,
     // filtering to hide nothing that the acquirer contains.
     let mut combined : Vec<ID> =
@@ -155,7 +151,6 @@ fn three_merged_skgnodes(
         &new_contains);
     updated_acquirer . hides_from_its_subscriptions =
       Some(deduped_and_filtered); }
-
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
       acquirer_from_disk . overrides_view_of
@@ -165,7 +160,6 @@ fn three_merged_skgnodes(
         . clone() . unwrap_or_default() );
     updated_acquirer . overrides_view_of =
       Some(dedup_vector(combined)); }
-
   updated_acquirer }
 
 /// Create an acquiree_text_preserver from the acquiree's data

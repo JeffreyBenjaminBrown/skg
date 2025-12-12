@@ -1,4 +1,7 @@
 * Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
+* Should 'merge_nodes_in_three_systems' be in 'update_graph'?
+* Why can't I use 'M-.' to find 'merge_nodes_in_typedb'?
+** and what does 'super' mean in its definition?
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * undoing that mis-feature shouldn't be hard
   Don't let indefinite nodes contribute at all to saving,
