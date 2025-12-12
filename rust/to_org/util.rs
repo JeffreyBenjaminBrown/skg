@@ -108,11 +108,12 @@ pub fn mark_visited_or_repeat_or_cycle (
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
   let is_cycle : bool =
-    is_ancestor_id ( tree, node_id, &pid ) ?;
-  { let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
-    node_mut . value () . 1 . metadata . viewData . cycle = is_cycle; }
+    is_ancestor_id ( tree, node_id, &pid ) ?; {
+      let mut node_mut : NodeMut < NodePair > =
+        tree . get_mut (node_id) . ok_or (
+          "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+      node_mut . value () . 1 . metadata . viewData . cycle =
+        is_cycle; }
   if visited . contains_key ( &pid ) {
     rewrite_to_indefinitive ( tree, node_id ) ?; }
   else {
@@ -168,9 +169,10 @@ pub fn is_ancestor_id (
   let mut current : Option < NodeRef < NodePair > > =
     node_ref . parent ();
   while let Some ( parent ) = current {
-    if let Some ( parent_id ) = parent . value () . 1 . metadata . id . as_ref () {
-      if parent_id == target_id {
-        return Ok ( true ); }}
+    if let Some ( parent_id ) =
+      parent . value () . 1 . metadata . id . as_ref () {
+        if parent_id == target_id {
+          return Ok ( true ); }}
     current = parent . parent (); }
   Ok ( false ) }
 
@@ -206,7 +208,8 @@ pub async fn fetch_and_append_child_pair (
   driver    : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
-    skgnode_and_orgnode_from_id ( config, driver, child_id ) . await ?;
+    skgnode_and_orgnode_from_id (
+      config, driver, child_id ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_id )
     . ok_or ( "fetch_and_append_child_pair: parent not found" ) ?;

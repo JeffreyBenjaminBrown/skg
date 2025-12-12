@@ -137,9 +137,9 @@ async fn add_children_and_collect_their_ids (
       . collect() );
   Ok(child_gen) }
 
-/// Collect all children IDs from nodes in the current generation.
-/// Passes over indefinitive nodes,
-///   as their contents do not need rendering.
+/// Collect all children IDs
+///   from defiitive nodes in the current generation.
+///   (Indefinitive nodes' contents do not need rendering.)
 /// Returns (tree_idx, parent_node_id, child_id) tuples.
 fn collect_rels_to_children_from_generation(
   forest : &[PairTree],
