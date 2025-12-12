@@ -2,7 +2,7 @@ pub mod pids_from_ids;
 pub use pids_from_ids::{
   pids_from_ids,
   collect_ids_in_tree,
-  assign_pids_from_map};
+  assign_pids_throughout_tree_from_map};
 
 pub mod concept_document;
 pub use concept_document::{

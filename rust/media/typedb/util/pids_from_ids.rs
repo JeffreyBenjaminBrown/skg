@@ -32,7 +32,7 @@ pub fn collect_ids_in_tree (
       ids_to_lookup ); } }
 
 /// Assign PIDs from the bulk lookup results
-pub fn assign_pids_from_map (
+pub fn assign_pids_throughout_tree_from_map (
   mut node_ref : NodeMut < OrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
@@ -53,7 +53,7 @@ pub fn assign_pids_from_map (
     for child_id in child_ids {
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_id )
-      { assign_pids_from_map (
+      { assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// PURPOSE: Run one TypeDB query, using nested subqueries,

@@ -4,7 +4,7 @@
 /// - add missing IDs where treatment is Content
 
 use crate::types::{OrgNode, RelToParent, ID};
-use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_from_map};
+use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::Tree;
 use std::boxed::Box;
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ pub async fn add_missing_info_to_forest(
     pids_from_ids (
       db_name, driver, & ids_to_lookup ). await ?;
   for tree in trees . iter_mut () {
-    assign_pids_from_map (
+    assign_pids_throughout_tree_from_map (
       tree . root_mut (),
       & pid_map ); }
   Ok (( )) }
