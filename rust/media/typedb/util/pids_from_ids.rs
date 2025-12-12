@@ -18,7 +18,7 @@ use crate::media::typedb::util::{
 
 
 /// Collect IDs for bulk PID lookup
-pub fn collect_ids_for_pid_lookup (
+pub fn collect_ids_in_tree (
   node_ref : NodeRef < OrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
@@ -27,7 +27,7 @@ pub fn collect_ids_for_pid_lookup (
   { // Collect ID if present
     ids_to_lookup . push ( id . clone () ); }
   for child in node_ref . children () { // Recurse
-    collect_ids_for_pid_lookup (
+    collect_ids_in_tree (
       child,
       ids_to_lookup ); } }
 

@@ -4,7 +4,7 @@
 /// - add missing IDs where treatment is Content
 
 use crate::types::{OrgNode, RelToParent, ID};
-use crate::media::typedb::util::{pids_from_ids, collect_ids_for_pid_lookup, assign_pids_from_map};
+use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_from_map};
 use ego_tree::Tree;
 use std::boxed::Box;
 use std::collections::HashMap;
@@ -33,7 +33,7 @@ pub async fn add_missing_info_to_forest(
       None ); } // its parent's source
   let mut ids_to_lookup : Vec < ID > = Vec::new ();
   for tree in trees . iter () {
-    collect_ids_for_pid_lookup (
+    collect_ids_in_tree (
       tree . root (),
       & mut ids_to_lookup ); }
   let pid_map : HashMap < ID, Option < ID > > =
