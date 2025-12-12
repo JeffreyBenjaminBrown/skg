@@ -21,8 +21,8 @@ struct OrgNodeLineCol {
 }
 
 pub fn org_to_uninterpreted_nodes(
-  input: &str)
-  -> Result<Vec<Tree<OrgNode>>, String> {
+  input: &str
+) -> Result<Vec<Tree<OrgNode>>, String> {
   let org_node_line_cols: Vec<OrgNodeLineCol> =
     divide_into_orgNodeLineCols(input)?;
   let mut result_trees: Vec<Tree<OrgNode>> = Vec::new();

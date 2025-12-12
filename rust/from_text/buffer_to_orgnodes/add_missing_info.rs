@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 /// Runs the following on each node:
 /// - assign_alias_relation_if_needed(
-/// - assign_id_if_needed(
+/// - assign_new_id_if_needed(
 /// - assign_pid_if_possible(
 /// .
 /// PITFALL:
@@ -55,7 +55,7 @@ fn add_missing_info_dfs (
       node_ref . value (), parent_reltoparent );
     inherit_source_if_needed (
       node_ref . value (), parent_source );
-    assign_id_if_needed (
+    assign_new_id_if_needed (
       node_ref . value () ); }
 
   let its_reltoparent: RelToParent =
@@ -95,7 +95,7 @@ fn assign_alias_relation_if_needed(
       node.metadata.code.relToParent = RelToParent::Alias; }} }
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
-fn assign_id_if_needed(
+fn assign_new_id_if_needed(
   node: &mut OrgNode
 ) {
   if ( node.metadata.code.relToParent == RelToParent::Content
