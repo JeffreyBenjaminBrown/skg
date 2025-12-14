@@ -1,3 +1,4 @@
+* extract cycle marking from  mark_visited_or_repeat_or_cycle
 * see test failure
 * Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
 * Should 'merge_nodes' be in 'update_graph'?

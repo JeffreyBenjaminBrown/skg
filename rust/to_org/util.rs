@@ -95,11 +95,11 @@ pub fn rewrite_to_indefinitive (
   node_mut . value () . 1 . body = None;
   Ok (( )) }
 
-/// Handles repetitions and the VisitedMap.
-/// - If node is a repeat or a cycle, mark it indefinitive.
-/// - If node is a cycle, mark that, too.
-/// - If neither*, add to visited.
-///   (* Every cycle is a repeat, but not vice-versa.)
+/// Handles repetitions, cycles, and the VisitedMap.
+/// - Check for cycle and mark viewData.cycle accordingly.
+/// - If node is a repeat (already in visited), mark it indefinitive.
+/// - If node is indefinitive, rewrite it (clear body, etc.).
+/// - If node is definitive, add it to visited.
 pub fn mark_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   tree_idx : usize,
@@ -107,16 +107,28 @@ pub fn mark_visited_or_repeat_or_cycle (
   visited  : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  let is_cycle : bool =
-    is_ancestor_id ( tree, node_id, &pid ) ?; {
-      let mut node_mut : NodeMut < NodePair > =
-        tree . get_mut (node_id) . ok_or (
-          "mark_visited_or_repeat_or_cycle: node not found" ) ?;
-      node_mut . value () . 1 . metadata . viewData . cycle =
-        is_cycle; }
+  { // mark it so if it's a cycle
+    let is_cycle : bool =
+      is_ancestor_id ( tree, node_id, &pid ) ?;
+    let mut node_mut : NodeMut < NodePair > =
+      tree . get_mut (node_id) . ok_or (
+        "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+    node_mut . value () . 1 . metadata . viewData . cycle =
+      is_cycle; }
   if visited . contains_key ( &pid ) {
-    rewrite_to_indefinitive ( tree, node_id ) ?; }
-  else {
+    // Mark as indefinitive (it's a repeat).
+    let mut node_mut : NodeMut < NodePair > =
+      tree . get_mut ( node_id )
+      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+    node_mut . value () . 1 . metadata . code . indefinitive = true; }
+  let is_indefinitive : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+    node_ref . value () . 1 . metadata . code . indefinitive };
+  if is_indefinitive {
+    rewrite_to_indefinitive ( tree, node_id ) ?;
+  } else {
     visited . insert ( pid, (tree_idx, node_id) ); }
   Ok (( )) }
 

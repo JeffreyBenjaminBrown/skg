@@ -3,8 +3,8 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode, make_indefinitive_if_repeated};
-use skg::to_org::util::VisitedMap;
+use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
+use skg::to_org::util::{VisitedMap, mark_visited_or_repeat_or_cycle};
 use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{
   run_with_test_db, orgnode_forest_to_paired, render_paired_forest_to_org};
@@ -12,7 +12,7 @@ use skg::types::{ID, OrgNode, SkgConfig};
 use skg::types::trees::PairTree;
 use ego_tree::{Tree, NodeId};
 
-/// Helper to call ensure_skgnode, make_indefinitive_if_repeated,
+/// Helper to call ensure_skgnode, mark_visited_or_repeat_or_cycle,
 /// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
 /// (matches the pattern used in completeAndRestoreNode_collectingDefinitiveRequests)
 async fn check_and_complete (
@@ -25,10 +25,10 @@ async fn check_and_complete (
 ) -> Result < (), Box<dyn Error> > {
   ensure_skgnode (
     tree, node_id, config, driver ) . await ?;
-  make_indefinitive_if_repeated (
-    tree, node_id, tree_idx, visited ) . await ?;
+  mark_visited_or_repeat_or_cycle (
+    tree, tree_idx, node_id, visited ) ?;
   let is_indefinitive : bool = {
-    // 'make_indefinitive_if_repeated' may have changed this value.
+    // 'mark_visited_or_repeat_or_cycle' may have changed this value.
     let node_ref = tree . get ( node_id )
       . ok_or ( "Node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
@@ -307,7 +307,7 @@ async fn test_visited_and_indefinitive_logic (
       let expected_output_from_second : &str =
         indoc! { "
           * (skg (id d) (code indefinitive)) d
-          ** (skg (id d) (source main) (code indefinitive)) d
+          ** (skg (id d) (source main) (view cycle) (code indefinitive)) d
           *** (skg (id d)) d
           **** (skg (id d)) d
         " };

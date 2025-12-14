@@ -1,8 +1,9 @@
 /// SINGLE ENTRY POINT: 'completeAndRestoreForest_collectingDefinitiveRequests'.
 
 use crate::to_org::util::{
-  skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id,
-  get_pid_in_pairtree, is_indefinitive, collect_child_ids };
+  skgnode_and_orgnode_from_id, VisitedMap,
+  get_pid_in_pairtree, is_indefinitive, collect_child_ids,
+  mark_visited_or_repeat_or_cycle };
 use crate::to_org::expand::aliases::wrapped_build_and_integrate_aliases_view;
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::expand::backpath::{
@@ -88,13 +89,8 @@ fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
-      { // handle indefinitive, cycle, mark fields
-        make_indefinitive_if_repeated (
-          // Maybe mark indefinitive, maybe update 'visited'.
-          tree, node_id, tree_idx, visited
-        ). await ?;
-        detect_cycle_and_mark (
-          tree, node_id ) ?; }
+      mark_visited_or_repeat_or_cycle (
+        tree, tree_idx, node_id, visited ) ?;
       { if is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, node_id ) ?;
@@ -138,58 +134,11 @@ fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
             }, }} }}
     Ok (( )) } ) }
 
-/// If this orgnode is a repeat, then modify its body and metadata
-///   (but change no descendents).
-/// If it is definitive, update 'visited' to include it.
-pub async fn make_indefinitive_if_repeated (
-  tree      : &mut PairTree,
-  node_id   : NodeId,
-  tree_idx  : usize,
-  visited   : &mut VisitedMap,
-) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
-  let is_indefinitive : bool = {
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    node_ref . value () . 1
-      . metadata . code . indefinitive };
-  if visited . contains_key ( & node_pid ) {
-    // It is a repeat. Mark it as indefinitive.
-    // Its children are neither removed nor completed,
-    // although their children might be completed.
-    let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "Node not found" ) ?;
-    node_mut . value () . 1 . metadata . code . indefinitive = true;
-    return Ok ( () ); }
-  if ! is_indefinitive { // Only definitive nodes count as visited.
-    visited . insert ( node_pid, (tree_idx, node_id) ); }
-  Ok ( () ) }
-
-/// Check if this node creates a cycle (its ID is an ancestor).
-/// If so, mark it with cycle=true; otherwise mark it with cycle=false.
-fn detect_cycle_and_mark (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
-  let is_cycle : bool = is_ancestor_id (
-    tree, node_id, &node_pid ) ?;
-  let mut node_mut : NodeMut < NodePair > =
-    tree . get_mut ( node_id )
-    . ok_or ( "Node not found in tree" ) ?;
-  node_mut . value () . 1 . metadata . viewData . cycle =
-    is_cycle;
-  Ok (( )) }
-
 /// Completes an indefinitive orgnode using its SkgNode.
 ///
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
 /// ASSUMES: ensure_skgnode has already been called
-/// ASSUMES: make_indefinitive_if_repeated has already been called
+/// ASSUMES: mark_visited_or_repeat_or_cycle has already been called
 /// ASSUMES: The input is indefinitive
 ///
 /// METHOD: Given an indefinitive node N:

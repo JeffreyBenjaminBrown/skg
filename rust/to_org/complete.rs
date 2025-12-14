@@ -7,6 +7,5 @@ pub use contents::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   ensure_skgnode,
-  make_indefinitive_if_repeated,
   completeAndRestoreForest_collectingDefinitiveRequests,
 };

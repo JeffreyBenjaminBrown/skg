@@ -135,14 +135,7 @@
 ***** collect_alias_titles
 ***** remove_duplicates_and_false_aliases_handling_focus
 ***** orgnode_from_title_and_rel
-**** TODO use 'mark_visited_or_repeat_or_cycle' instead of these
-***** make_indefinitive_if_repeated
-****** DUP get_pid_in_pairtree
-***** detect_cycle_and_mark
-****** DUP get_pid_in_pairtree
-       seems unnecessary --
-       isn't the tree already normalized?
-****** DUP is_ancestor_id
+**** DUP mark_visited_or_repeat_or_cycle
 **** clobberIndefinitiveOrgnode
      set title, source, body=None
      store skgnode in pair if needed
