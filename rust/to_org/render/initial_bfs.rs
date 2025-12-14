@@ -21,7 +21,7 @@ use crate::to_org::util::stub_forest_from_root_ids;
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_forest;
 use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
-  build_and_append_child_branch_minus_content,
+  build_node_branch_minus_content,
   VisitedMap };
 use crate::types::{SkgConfig, ID};
 use crate::types::trees::PairTree;
@@ -111,7 +111,7 @@ fn render_generation_and_recurse<'a> (
 /// Return their NodeIds grouped by tree.
 async fn add_children_and_collect_their_ids (
   forest      : &mut Vec<PairTree>,
-  rels_to_add : Vec<( usize,  // which tree
+  rels_to_next_gen_to_add : Vec<( usize,  // which tree
                       NodeId, // parent
                       ID )>,  // child of that parent
   visited     : &mut VisitedMap,
@@ -124,11 +124,11 @@ async fn add_children_and_collect_their_ids (
     (0 .. forest.len())
     . map(|idx| (idx, Vec::new()))
     . collect();
-  for (tree_idx, parent_id, child_id) in rels_to_add {
-    let child_node_id : NodeId =
-      build_and_append_child_branch_minus_content (
-        &mut forest[tree_idx], tree_idx, parent_id, &child_id,
-        config, driver, visited ) . await ?;
+  for (tree_idx, parent_id, child_id) in rels_to_next_gen_to_add {
+    let (_tree, child_node_id) =
+      build_node_branch_minus_content (
+        Some((&mut forest[tree_idx], parent_id)),
+        tree_idx, &child_id, config, driver, visited ) . await ?;
     child_gen[tree_idx] . 1 . push(child_node_id); }
   let child_gen : Vec<(usize, Vec<NodeId>)> = (
     // Filter out trees with no children added,

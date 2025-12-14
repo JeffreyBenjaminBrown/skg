@@ -1,29 +1,28 @@
 * render_initial_forest_bfs <- single|multi_root_view
 ** stub_forest_from_root_ids
-*** skgnode_and_orgnode_from_id
-**** pid_and_source_from_id
-**** skgnode_and_orgnode_from_pid_and_source
-***** path_from_pid_and_source
-***** read_skgnode
-*** complete_branch_minus_content
-**** mark_visited_or_repeat_or_cycle
-***** get_pid_in_pairtree
-***** detect_and_mark_cycle
-****** DUP get_pid_in_pairtree
-****** is_ancestor_id
-***** rewrite_to_indefinitive
-      indefinitive = true, body = None
-**** maybe_add_subscribee_col
-     If the node: - subscribes to something
-                  - is definitive
-                  - doesn't have a SubscribeeCol child
+*** build_node_branch_minus_content
+**** skgnode_and_orgnode_from_id
+***** pid_and_source_from_id
+***** skgnode_and_orgnode_from_pid_and_source
+****** path_from_pid_and_source
+****** read_skgnode
+**** TODO complete_branch_minus_content
+***** mark_visited_or_repeat_or_cycle
+****** get_pid_in_pairtree
+****** detect_and_mark_cycle
+******* DUP get_pid_in_pairtree
+******* is_ancestor_id
+****** rewrite_to_indefinitive
+       indefinitive = true, body = None
+***** maybe_add_subscribee_col
+      If the node: - subscribes to something
+                   - is definitive
+                   - doesn't have a SubscribeeCol child
 ** render_generation_and_recurse
 *** collect_rels_to_children_from_generation
 **** content_ids_if_definitive_else_empty
 *** add_children_and_collect_their_ids
-**** build_and_append_child_branch_minus_content
-***** DUP skgnode_and_orgnode_from_id
-***** DUP complete_branch_minus_content
+**** DUP build_node_branch_minus_content
 *** REC render_generation_and_recurse
 *** add_last_generation_and_edit_previous_in_forest
 **** make_and_append_child_pair
@@ -143,7 +142,8 @@
 **** DUP mark_visited_or_repeat_or_cycle
 **** clobberIndefinitiveOrgnode
      set title, source, body=None
-**** completeDefinitiveOrgnode
+**** TODO completeDefinitiveOrgnode
+     seems to overlap other code
 ***** DUP maybe_add_subscribee_col
 ***** categorize_children_by_treatment
 ***** extend_content
@@ -204,7 +204,7 @@
 ******* DUP nodes_after_in_generation
 ******* DUP get_pid_in_pairtree
 ******* DUP rewrite_to_indefinitive
-***** DUP build_and_append_child_branch_minus_content
+***** DUP build_node_branch_minus_content
 ***** is_indefinitive
 ***** DUP content_ids_if_definitive_else_empty
 ** DUP set_metadata_relationship_viewdata_in_forest

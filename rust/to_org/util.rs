@@ -178,14 +178,9 @@ pub async fn stub_forest_from_root_ids (
   let mut forest : Vec < PairTree > =
     Vec::new ();
   for (tree_idx, root_id) in root_ids . iter () . enumerate () {
-    let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
-      skgnode_and_orgnode_from_id (
-        config, driver, root_id ) . await ?;
-    let mut tree : PairTree =
-      Tree::new ( (Some(root_skgnode), root_orgnode) );
-    let root_node_id : NodeId = tree . root () . id ();
-    complete_branch_minus_content (
-      &mut tree, tree_idx, root_node_id, visited ) ?;
+    let (Some(tree), _) = build_node_branch_minus_content (
+      None, tree_idx, root_id, config, driver, visited
+    ) . await ? else { unreachable!() };
     forest . push ( tree ); }
   Ok ( forest ) }
 
@@ -249,7 +244,7 @@ pub fn get_pid_from_pair_using_noderef (
 /// and does *not* build any of its descendents.
 /// Those can be done later via 'complete_branch_minus_content',
 /// or they can all be done at once via
-/// 'build_and_append_child_branch_minus_content.
+/// 'build_node_branch_minus_content.
 /// Returns the new node's NodeId.
 pub async fn make_and_append_child_pair (
   tree      : &mut PairTree,
@@ -271,31 +266,41 @@ pub async fn make_and_append_child_pair (
     . id ();
   Ok ( child_node_id ) }
 
-/// Fetch a node from disk, append it as a child,
-/// and complete it via complete_branch_minus_content.
-/// Returns the new node's NodeId.
-pub async fn build_and_append_child_branch_minus_content (
-  tree      : &mut PairTree,
-  tree_idx  : usize,
-  parent_id : NodeId,
-  child_id  : &ID,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
-  visited   : &mut VisitedMap,
-) -> Result < NodeId, Box<dyn Error> > {
-  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+/// Builds a pair from disk, place it in a tree,
+/// complete the branch it implies except for 'content' descendents,
+/// and return the root of the new branch, but in its tree context:
+/// - If tree_and_parent is None:
+///   creates new tree, returns (Some(tree), branch_root_nodeid)
+/// - If tree_and_parent is Some:
+///   appends to tree, returns (None, branch_root_nodeid)
+pub async fn build_node_branch_minus_content (
+  tree_and_parent : Option<(&mut PairTree, NodeId)>, // if modifying an existing tree, attach as a child here
+  tree_idx        : usize, // for updating 'visited'
+  node_id         : &ID, // what to fetch
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
+  visited         : &mut VisitedMap,
+) -> Result < (Option<PairTree>, NodeId), Box<dyn Error> > {
+  let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_id ) . await ?;
-  let child_node_id : NodeId = {
-    let mut parent_mut : NodeMut < NodePair > =
-      tree . get_mut ( parent_id )
-      . ok_or ( "build_and_append_child_branch_minus_content: parent not found" ) ?;
-    parent_mut . append ((Some(child_skgnode),
-                          child_orgnode))
-      . id () };
-  complete_branch_minus_content (
-    tree, tree_idx, child_node_id, visited ) ?;
-  Ok ( child_node_id ) }
+      config, driver, node_id ) . await ?;
+  match tree_and_parent {
+    Some ( (tree, parent_id) ) => {
+      let child_node_id : NodeId = {
+        let mut parent_mut : NodeMut < NodePair > =
+          tree . get_mut ( parent_id ) . ok_or (
+            "build_node_branch_minus_content: parent not found" ) ?;
+        parent_mut . append ((Some(skgnode), orgnode)) . id () };
+      complete_branch_minus_content (
+        tree, tree_idx, child_node_id, visited ) ?;
+      Ok ( (None, child_node_id) ) },
+    None => {
+      let mut tree : PairTree =
+        Tree::new ( (Some(skgnode), orgnode) );
+      let root_node_id : NodeId = tree . root () . id ();
+      complete_branch_minus_content (
+        &mut tree, tree_idx, root_node_id, visited ) ?;
+      Ok ( (Some(tree), root_node_id) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.

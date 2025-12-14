@@ -7,7 +7,7 @@ use crate::to_org::expand::backpath::{
   build_and_integrate_sourceward_view_then_drop_request };
 use crate::to_org::util::{
   skgnode_and_orgnode_from_pid_and_source,
-  build_and_append_child_branch_minus_content,
+  build_node_branch_minus_content,
   get_pid_in_pairtree,
   VisitedMap, is_indefinitive,
   content_ids_if_definitive_else_empty };
@@ -190,10 +190,10 @@ async fn extendDefinitiveSubtreeFromLeaf (
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_nid, child_id) in gen_with_children {
-      let new_node_id : NodeId =
-        build_and_append_child_branch_minus_content (
-          tree, tree_idx, parent_nid, &child_id,
-          config, driver, visited ). await ?;
+      let (_tree, new_node_id) =
+        build_node_branch_minus_content (
+          Some((tree, parent_nid)),
+          tree_idx, &child_id, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! is_indefinitive ( tree, new_node_id ) ? {
         let grandchild_ids : Vec < ID > =
