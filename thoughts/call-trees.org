@@ -150,18 +150,16 @@
 ****** DUP skgnode_and_orgnode_from_id
 ***** reorder_children
 **** map_completeNodePreorderCollectingDefinitiveRequests_over_children
-***** TODO not sure this deserves definition
 ***** collect_child_ids
 ***** REC completeAndRestoreNode_collectingDefinitiveRequests
-**** wrapped_build_and_integrate_aliases_view
-***** TODO rename these 'wrapped' functions to 'do it and clean up'
+**** build_and_integrate_aliases_view_then_drop_request
 ***** build_and_integrate_aliases
 ****** fetch_aliases_from_file
 ******* DUP pid_and_source_from_id
 ******* DUP path_from_pid_and_source
 ****** DUP orgnode_from_title_and_rel
 ***** remove_completed_view_request
-**** wrapped_build_and_integrate_containerward_view
+**** build_and_integrate_containerward_view_then_drop_request
 ***** build_and_integrate_containerward_path
 ****** DUP get_pid_in_pairtree
 ****** path_containerward_to_end_cycle_and_or_branches
@@ -180,7 +178,7 @@
 ******* integrate_cycle_in_node
 ******** DUP prepend_indefinitive_child_with_parent_ignores
 ***** DUP remove_completed_view_request
-**** wrapped_build_and_integrate_sourceward_view
+**** build_and_integrate_sourceward_view_then_drop_request
 ***** build_and_integrate_sourceward_path
 ****** DUP get_pid_in_pairtree
 ****** path_sourceward_to_end_cycle_and_or_branches

@@ -23,7 +23,7 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-pub async fn wrapped_build_and_integrate_containerward_view (
+pub async fn build_and_integrate_containerward_view_then_drop_request (
   tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
@@ -59,7 +59,7 @@ pub async fn build_and_integrate_containerward_path (
     tree, node_id, path, branches, cycle_node, config, driver
   ). await }
 
-pub async fn wrapped_build_and_integrate_sourceward_view (
+pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,

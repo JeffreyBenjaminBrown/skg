@@ -22,7 +22,7 @@ pub use complete::{
 
 pub use expand::{
   build_and_integrate_aliases,
-  wrapped_build_and_integrate_aliases_view,
+  build_and_integrate_aliases_view_then_drop_request,
   build_and_integrate_containerward_path,
   build_and_integrate_sourceward_path,
   integrate_path_that_might_fork_or_cycle,

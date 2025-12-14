@@ -7,7 +7,7 @@ use crate::types::trees::PairTree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-pub async fn wrapped_build_and_integrate_aliases_view (
+pub async fn build_and_integrate_aliases_view_then_drop_request (
   tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,

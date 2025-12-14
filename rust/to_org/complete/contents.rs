@@ -4,11 +4,11 @@ use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
   get_pid_in_pairtree, is_indefinitive, collect_child_ids,
   mark_visited_or_repeat_or_cycle };
-use crate::to_org::expand::aliases::wrapped_build_and_integrate_aliases_view;
+use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::expand::backpath::{
-  wrapped_build_and_integrate_containerward_view,
-  wrapped_build_and_integrate_sourceward_view, };
+  build_and_integrate_containerward_view_then_drop_request,
+  build_and_integrate_sourceward_view_then_drop_request, };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest, default_metadata};
@@ -118,15 +118,15 @@ fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
         for request in view_requests {
           match request {
             ViewRequest::Aliases => {
-              wrapped_build_and_integrate_aliases_view (
+              build_and_integrate_aliases_view_then_drop_request (
                 tree, node_id, config, typedb_driver, errors )
                 . await ?; },
             ViewRequest::Containerward => {
-              wrapped_build_and_integrate_containerward_view (
+              build_and_integrate_containerward_view_then_drop_request (
                 tree, node_id, config, typedb_driver, errors )
                 . await ?; },
             ViewRequest::Sourceward => {
-              wrapped_build_and_integrate_sourceward_view (
+              build_and_integrate_sourceward_view_then_drop_request (
                 tree, node_id, config, typedb_driver, errors )
                 . await ?; },
             ViewRequest::Definitive => { // Collect for processing after all trees are traversed, so that `visited` is fully populated when they are traveresed.
