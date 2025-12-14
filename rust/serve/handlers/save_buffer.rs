@@ -4,7 +4,7 @@ use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
 use crate::merge::merge_nodes;
-use crate::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
+use crate::to_org::complete::contents::completeAndRestoreForest_collectingDefinitiveRequests;
 use crate::to_org::expand::definitive::execute_definitive_view_requests;
 use crate::media::tree::pair_forest_with_save_instructions;
 use crate::serve::util::{
@@ -157,7 +157,7 @@ async fn update_from_and_rerender_buffer (
 
   { // modify the paired forest before re-rendering it
     let (mut visited, definitive_requests) =
-      completeOrgnodeForest_collectingDefinitiveRequests (
+      completeAndRestoreForest_collectingDefinitiveRequests (
         &mut paired_forest,
         config,
         typedb_driver,

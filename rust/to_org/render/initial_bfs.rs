@@ -1,7 +1,7 @@
 /// PURPOSE: BFS rendering of content views with node count limit.
 ///
 /// MOTIVATION: Avoids some complexities of
-/// 'completeOrgnodeForest_collectingDefinitiveRequests',
+/// 'completeAndRestoreForest_collectingDefinitiveRequests',
 /// because in an initial view the only kind of child is content.
 ///
 /// THE ALGORITHM:

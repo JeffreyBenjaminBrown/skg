@@ -13,7 +13,7 @@ use skg::types::trees::PairTree;
 use ego_tree::{Tree, NodeId};
 
 /// Helper to call make_indefinitive_if_repeated followed by completeContents
-/// (matches the pattern used in completeNodePreorder_collectingDefinitiveRequests)
+/// (matches the pattern used in completeAndRestoreNode_collectingDefinitiveRequests)
 async fn check_and_complete (
   tree     : &mut PairTree,
   node_id  : NodeId,

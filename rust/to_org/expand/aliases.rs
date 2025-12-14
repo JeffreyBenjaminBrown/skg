@@ -28,7 +28,7 @@ pub async fn wrapped_build_and_integrate_aliases_view (
 /// PITFALL: This function fetches aliases from disk and populates them immediately,
 /// whereas 'completeAliasCol' is only called on an AliasCol already in the tree.
 /// These two distinct ways of populating an AliasCol are necessary,
-/// because in 'completeNodePreorder_collectingDefinitiveRequests',
+/// because in 'completeAndRestoreNode_collectingDefinitiveRequests',
 /// view requests are only processed AFTER recursing to children
 /// (for reasons explained in that function's header comment),
 /// so any newly-created empty AliasCol

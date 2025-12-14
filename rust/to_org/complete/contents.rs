@@ -1,4 +1,4 @@
-/// SINGLE ENTRY POINT: 'completeOrgnodeForest_collectingDefinitiveRequests'.
+/// SINGLE ENTRY POINT: 'completeAndRestoreForest_collectingDefinitiveRequests'.
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap, is_ancestor_id,
@@ -20,13 +20,13 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// CALLS 'completeNodePreorder_collectingDefinitiveRequests'
+/// CALLS 'completeAndRestoreNode_collectingDefinitiveRequests'
 ///   on each tree, and thus on each node in the forest,
 /// threading 'visited' through the forest (rather than
 /// restarting with an empty 'visited' set in each tree).
 ///
 /// RETURNS (visited, definitive_requests).
-pub async fn completeOrgnodeForest_collectingDefinitiveRequests (
+pub async fn completeAndRestoreForest_collectingDefinitiveRequests (
   forest        : &mut Vec < PairTree >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -41,7 +41,7 @@ pub async fn completeOrgnodeForest_collectingDefinitiveRequests (
   for (tree_idx, tree) in forest . iter_mut () . enumerate () {
     let root_id : NodeId =
       tree . root () . id ();
-    completeNodePreorder_collectingDefinitiveRequests (
+    completeAndRestoreNode_collectingDefinitiveRequests (
       tree, root_id, tree_idx, config, typedb_driver,
       &mut visited, &mut definitive_requests,
       errors ) . await ?; }
@@ -61,7 +61,7 @@ pub async fn completeOrgnodeForest_collectingDefinitiveRequests (
 ///     - recurse via 'map_completeNodePreorderCollectingDefinitiveRequests_over_children'. (No, this is not the last step).
 ///     - integrate any view requests except definitive view ones
 ///     - collect definitive view requests
-fn completeNodePreorder_collectingDefinitiveRequests<'a> (
+fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
   tree_idx             : usize,
@@ -407,7 +407,7 @@ fn map_completeNodePreorderCollectingDefinitiveRequests_over_children<'a> (
     let child_ids : Vec < NodeId > =
       collect_child_ids ( tree, node_id ) ?;
     for child_id in child_ids {
-      completeNodePreorder_collectingDefinitiveRequests (
+      completeAndRestoreNode_collectingDefinitiveRequests (
         tree, child_id, tree_idx, config, typedb_driver,
         visited, definitive_requests, errors ) . await ?; }
     Ok (( )) }) }

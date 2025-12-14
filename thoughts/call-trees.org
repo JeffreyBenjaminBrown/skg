@@ -119,13 +119,13 @@
 *** pairtree_from_orgnodetree_and_map
 **** pair_children_optional_recursive
 ***** REC pair_children_optional_recursive
-** TODO completeOrgnodeForest_collectingDefinitiveRequests
-*** completeNodePreorder_collectingDefinitiveRequests
+** TODO completeAndRestoreForest_collectingDefinitiveRequests
+*** completeAndRestoreNode_collectingDefinitiveRequests
 **** TODO separate definitive request handling from this
      and do that in
        update_from_and_rerender_buffer
      right after
-       completeOrgnodeForest_collectingDefinitiveRequests
+       completeAndRestoreForest_collectingDefinitiveRequests
 **** TODO completes and *restores*, too
      e.g. w/ clobberIndefinitiveOrgnode
 **** completeAliasCol
@@ -162,7 +162,7 @@
 **** map_completeNodePreorderCollectingDefinitiveRequests_over_children
 ***** TODO not sure this deserves definition
 ***** collect_child_ids
-***** REC completeNodePreorder_collectingDefinitiveRequests
+***** REC completeAndRestoreNode_collectingDefinitiveRequests
 **** wrapped_build_and_integrate_aliases_view
 ***** TODO rename these 'wrapped' functions to 'do it and clean up'
 ***** build_and_integrate_aliases

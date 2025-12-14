@@ -61,7 +61,7 @@ fn maybe_add_subscribee_col (
 
 File: =rust/to_org/complete/contents.rs=
 
-In =completeNodePreorder_collectingDefinitiveRequests=:
+In =completeAndRestoreNode_collectingDefinitiveRequests=:
 - Add case for =RelToParent::SubscribeeCol=
 - For now, just skip recursion (no children to process)
 - Or let it fall through to normal processing since it has no children anyway

@@ -14,7 +14,7 @@ Content Node N
 ** Two code paths for creating/maintaining AliasCol
 1. =to_org/expand/aliases.rs::build_and_integrate_aliases= - Creates AliasCol from scratch when a =ViewRequest::Aliases= is processed. Fetches aliases from disk and populates the tree immediately.
 
-2. =to_org/complete/aliascol.rs::completeAliasCol= - Reconciles an existing AliasCol in the tree with disk state. Called during =completeOrgnodeForest_collectingDefinitiveRequests= when an AliasCol node is encountered.
+2. =to_org/complete/aliascol.rs::completeAliasCol= - Reconciles an existing AliasCol in the tree with disk state. Called during =completeAndRestoreForest_collectingDefinitiveRequests= when an AliasCol node is encountered.
 
 ** Key patterns
 - Aliases have no children - they are leaf nodes
@@ -108,7 +108,7 @@ pub async fn build_and_integrate_subscriptions (
 Similar to =aliascol.rs=, for reconciling existing SubscriptionCol with disk state.
 
 ** 6. Update =to_org/complete/contents.rs=
-In =completeNodePreorder_collectingDefinitiveRequests=:
+In =completeAndRestoreNode_collectingDefinitiveRequests=:
 - Add case for =RelToParent::SubscriptionCol= similar to =AliasCol=
 - Add handling of =ViewRequest::Subscriptions= in the view request processing section
 

@@ -7,7 +7,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
+use skg::to_org::complete::contents::completeAndRestoreForest_collectingDefinitiveRequests;
 use skg::to_org::expand::definitive::execute_definitive_view_requests;
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::media::tree::pair_forest_with_save_instructions;
@@ -36,7 +36,7 @@ async fn complete_and_expand_definitive (
       orgnode_forest,
       &save_instructions );
   let (mut visited, definitive_requests) =
-    completeOrgnodeForest_collectingDefinitiveRequests (
+    completeAndRestoreForest_collectingDefinitiveRequests (
       &mut paired_forest,
       &config,
       driver,

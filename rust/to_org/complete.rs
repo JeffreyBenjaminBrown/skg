@@ -7,5 +7,5 @@ pub use contents::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   make_indefinitive_if_repeated,
-  completeOrgnodeForest_collectingDefinitiveRequests,
+  completeAndRestoreForest_collectingDefinitiveRequests,
 };
