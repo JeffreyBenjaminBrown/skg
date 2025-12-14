@@ -1,6 +1,6 @@
 // cargo test --test save parentIgnores_and_indefinitive
 
-use skg::media::file_io::one_node::read_node_from_id;
+use skg::media::file_io::one_node::skgnode_and_source_from_id;
 use skg::from_text::buffer_to_save_instructions;
 use skg::save::fs::update_fs_from_saveinstructions;
 use skg::save::typedb::update_typedb_from_saveinstructions;
@@ -59,7 +59,7 @@ fn test_parentignores_and_indefinitive(
 
         { // verify indefinitive is treated correctly
           let (node2, _source): (SkgNode, _) =
-          read_node_from_id(
+          skgnode_and_source_from_id(
             config, driver, &ID("2".to_string() ))
           .await?;
         assert_eq!(
@@ -69,7 +69,7 @@ fn test_parentignores_and_indefinitive(
 
         { // verify parentIgnores is treated correctly
           let (node1, _source): (SkgNode, _) =
-          read_node_from_id(config, driver, &ID("1".to_string()))
+          skgnode_and_source_from_id(config, driver, &ID("1".to_string()))
             .await?;
         assert_eq!(
           node1.contains,

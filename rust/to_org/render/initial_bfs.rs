@@ -90,13 +90,7 @@ fn render_generation_and_recurse<'a> (
         forest, &gen_nodeids ));
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
-    if rendered_count + next_gen_count >= limit {
-      add_last_generation_and_edit_previous_in_forest (
-        forest, gen_int, &parent_child_rels_to_add,
-        rendered_count, limit, config, driver,
-      ) . await ?;
-      return Ok(( )); }
-    else {
+    if rendered_count + next_gen_count < limit {
       let next_gen : Vec<(usize, Vec<NodeId>)> =
         add_children_and_collect_their_ids (
           forest, parent_child_rels_to_add, visited, config, driver
@@ -104,7 +98,14 @@ fn render_generation_and_recurse<'a> (
       render_generation_and_recurse (
         forest, next_gen, gen_int + 1,
         rendered_count, limit, visited, config, driver,
-      ) . await }} ) }
+      ) . await }
+    else {
+      add_last_generation_and_edit_previous_in_forest (
+        forest, gen_int, &parent_child_rels_to_add,
+        rendered_count, limit, config, driver,
+      ) . await ?;
+      return Ok(( )); }
+  } ) }
 
 /// Add children to the forest.
 /// Return their NodeIds grouped by tree.

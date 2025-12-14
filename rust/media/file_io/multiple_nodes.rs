@@ -1,4 +1,4 @@
-use crate::media::file_io::one_node::{read_node, write_node};
+use crate::media::file_io::one_node::{read_skgnode, write_skgnode};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
@@ -105,7 +105,7 @@ fn read_skg_files_from_folder
          path . extension () . map_or (
            false,                // None => no extension found
            |ext| ext == "skg") ) // Some
-    { let mut node: SkgNode = read_node (&path) ?; // Placeholder - caller always overwrites with actual source
+    { let mut node: SkgNode = read_skgnode (&path) ?; // Placeholder - caller always overwrites with actual source
       node.source = String::new();
       nodes.push (node); }}
   Ok (nodes) }
@@ -215,7 +215,7 @@ pub fn write_all_nodes_to_fs (
            io::ErrorKind::InvalidInput,
            "SkgNode has no IDs" ))?
       . clone ();
-    write_node (
+    write_skgnode (
       & node,
       & Path::new (
         & path_from_pid_and_source (

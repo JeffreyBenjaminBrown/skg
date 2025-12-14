@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use skg::media::file_io::{
-  read_node, write_node, fetch_aliases_from_file};
+  read_skgnode, write_skgnode, fetch_aliases_from_file};
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 use skg::test_utils::run_with_test_db;
 
@@ -25,20 +25,20 @@ fn test_node_io() {
                       .ids[0] // the primary id
                       .0      // the string part of it
                       .clone() );
-  write_node ( &example, &out_filename )
+  write_skgnode ( &example, &out_filename )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let mut read_node : SkgNode = read_node (
+  let mut read_skgnode : SkgNode = read_skgnode (
     & out_filename ). unwrap ();
-  read_node.source = "main".to_string();
-  let mut reversed = reverse_some_of_node(&read_node);
+  read_skgnode.source = "main".to_string();
+  let mut reversed = reverse_some_of_node(&read_skgnode);
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
 
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
-  write_node(&reversed, reversed_filename).unwrap();
+  write_skgnode(&reversed, reversed_filename).unwrap();
 
   let expected_example_path = "tests/file_io/fixtures/example.skg";
   let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
@@ -73,12 +73,12 @@ fn verify_body_not_needed() {
   // If a SkgNode's `body` is the empty string,
   // then that field need not be written to disk.
 
-  let mut node = read_node (
+  let mut node = read_skgnode (
     "tests/file_io/fixtures/example.skg" ) . unwrap();
   node.source = "main".to_string();
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
-  write_node(
+  write_skgnode(
     &node, "/tmp/file_io_test/no_unindexed.skg" ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
@@ -152,10 +152,10 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
           e.to_string()))?;
     let mut file = File::create( &file_path )?;
     file.write_all(yaml.as_bytes())?; }
-  let mut read_node = // Read it back from the file.
-    read_node(&file_path)?;
-  read_node.source = "main".to_string();
-  assert_eq!( test_node, read_node,
+  let mut read_skgnode = // Read it back from the file.
+    read_skgnode(&file_path)?;
+  read_skgnode.source = "main".to_string();
+  assert_eq!( test_node, read_skgnode,
               "Nodes should have matched." );
   Ok (( ))
 }

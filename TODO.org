@@ -1,11 +1,8 @@
+* Unify execute_definitive_view_request and render_initial_forest_bfs
+  see thoughts/call-trees.org
 * Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
 * Should 'merge_nodes' be in 'update_graph'?
-* Why can't I use 'M-.' to find 'merge_nodes_in_typedb'?
-** and what does 'super' mean in its definition?
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
-* undoing that mis-feature shouldn't be hard
-  Don't let indefinite nodes contribute at all to saving,
-  but recognize that their children might.
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * aliases_to_org should rebuild the whole buffer
   like request containerward view

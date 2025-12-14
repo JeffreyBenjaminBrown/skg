@@ -5,7 +5,7 @@ use std::fs;
 use tempfile::tempdir;
 
 use skg::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use skg::media::file_io::one_node::write_node;
+use skg::media::file_io::one_node::write_skgnode;
 use skg::types::misc::SkgfileSource;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::misc::ID;
@@ -20,7 +20,7 @@ fn test_load_from_single_source() {
   let mut node = empty_skgnode();
   node.ids = vec![ID::new("test1")];
   node.title = "Test Node 1".to_string();
-  write_node(&node, &source_path.join("test1.skg")).unwrap();
+  write_skgnode(&node, &source_path.join("test1.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
@@ -55,18 +55,18 @@ fn test_load_from_multiple_sources() {
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("main1")];
   node1.title = "Main Node 1".to_string();
-  write_node(&node1, &main_path.join("main1.skg")).unwrap();
+  write_skgnode(&node1, &main_path.join("main1.skg")).unwrap();
 
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("main2")];
   node2.title = "Main Node 2".to_string();
-  write_node(&node2, &main_path.join("main2.skg")).unwrap();
+  write_skgnode(&node2, &main_path.join("main2.skg")).unwrap();
 
   // Create nodes in shared source
   let mut node3 = empty_skgnode();
   node3.ids = vec![ID::new("shared1")];
   node3.title = "Shared Node 1".to_string();
-  write_node(&node3, &shared_path.join("shared1.skg")).unwrap();
+  write_skgnode(&node3, &shared_path.join("shared1.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
@@ -118,12 +118,12 @@ fn test_duplicate_id_detection_across_sources() {
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("duplicate_id")];
   node1.title = "Node in Main".to_string();
-  write_node(&node1, &main_path.join("duplicate_id.skg")).unwrap();
+  write_skgnode(&node1, &main_path.join("duplicate_id.skg")).unwrap();
 
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("duplicate_id")];
   node2.title = "Node in Shared".to_string();
-  write_node(&node2, &shared_path.join("duplicate_id.skg")).unwrap();
+  write_skgnode(&node2, &shared_path.join("duplicate_id.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
@@ -167,13 +167,13 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("id1"), ID::new("id2")];
   node1.title = "Node with Multiple IDs".to_string();
-  write_node(&node1, &main_path.join("id1.skg")).unwrap();
+  write_skgnode(&node1, &main_path.join("id1.skg")).unwrap();
 
   // Create node in shared that has one overlapping ID
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("id2"), ID::new("id3")];
   node2.title = "Another Node".to_string();
-  write_node(&node2, &shared_path.join("id2.skg")).unwrap();
+  write_skgnode(&node2, &shared_path.join("id2.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
@@ -237,12 +237,12 @@ fn test_source_field_set_correctly() {
   let mut node_a = empty_skgnode();
   node_a.ids = vec![ID::new("node_a")];
   node_a.title = "Node A".to_string();
-  write_node(&node_a, &source_a.join("node_a.skg")).unwrap();
+  write_skgnode(&node_a, &source_a.join("node_a.skg")).unwrap();
 
   let mut node_b = empty_skgnode();
   node_b.ids = vec![ID::new("node_b")];
   node_b.title = "Node B".to_string();
-  write_node(&node_b, &source_b.join("node_b.skg")).unwrap();
+  write_skgnode(&node_b, &source_b.join("node_b.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
@@ -298,9 +298,9 @@ fn test_many_duplicate_ids_creates_org_file() {
     node_b.ids = vec![ID::new(&id)];
     node_a.title = format!("Node A {}", i);
     node_b.title = format!("Node B {}", i);
-    write_node( &node_a,
+    write_skgnode( &node_a,
                 &source_a.join(format!("{}.skg", id))) . unwrap();
-    write_node( &node_b,
+    write_skgnode( &node_b,
                 &source_b.join(format!("{}.skg", id))) . unwrap(); }
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
@@ -375,7 +375,7 @@ fn test_unreadable_files_creates_org_file() {
   let mut node = empty_skgnode();
   node.ids = vec![ID::new("test1")];
   node.title = "Test Node".to_string();
-  write_node(&node, &source_good.join("test1.skg")).unwrap();
+  write_skgnode(&node, &source_good.join("test1.skg")).unwrap();
 
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(

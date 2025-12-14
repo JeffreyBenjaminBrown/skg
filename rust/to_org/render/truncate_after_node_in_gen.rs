@@ -25,7 +25,7 @@ use typedb_driver::TypeDBDriver;
 
 /// PURPOSE: See section header comment.
 /// Generation is relative to effective_root (which is generation 1).
-pub async fn add_last_generation_and_edit_previous_in_tree (
+pub async fn add_last_generation_and_truncate_some_of_previous (
   tree           : &mut PairTree,
   generation     : usize,
   children       : &[(NodeId, ID)],

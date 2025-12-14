@@ -1,6 +1,6 @@
 /// SINGLE ENTRY POINT: 'execute_view_requests'.
 
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_tree;
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
@@ -182,7 +182,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
     if nodes_rendered + gen_with_children . len () >= limit {
       // Limit hit. Complete this sibling group
       // and truncate later parents.
-      add_last_generation_and_edit_previous_in_tree (
+      add_last_generation_and_truncate_some_of_previous (
         tree, generation, &gen_with_children,
         limit - nodes_rendered,
         effective_root,

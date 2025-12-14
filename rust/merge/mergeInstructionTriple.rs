@@ -1,4 +1,4 @@
-use crate::media::file_io::read_node;
+use crate::media::file_io::read_skgnode;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
 use crate::util::{path_from_pid_and_source, dedup_vector, setlike_vector_subtraction};
@@ -61,7 +61,7 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
           "Acquirer ID '{}' not found in database", acquirer_id))?;
       let mut acquirer_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
-        read_node ( &path_from_pid_and_source (
+        read_skgnode ( &path_from_pid_and_source (
           config, &acquirer_source, acquirer_pid ))?;
       acquirer_from_disk.source = acquirer_source;
       let (acquiree_pid, acquiree_source) : (ID, String) =
@@ -72,7 +72,7 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
           "Acquiree ID '{}' not found in database", acquiree_id))?;
       let mut acquiree_from_disk: SkgNode =
         // TODO: If this fails, it should report how.
-        read_node ( &path_from_pid_and_source (
+        read_skgnode ( &path_from_pid_and_source (
           config, &acquiree_source, acquiree_pid ))?;
       acquiree_from_disk.source = acquiree_source;
       let acquiree_text_preserver: SkgNode =

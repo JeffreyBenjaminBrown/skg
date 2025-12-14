@@ -5,6 +5,7 @@ use crate::to_org::util::{
   get_pid_in_pairtree, is_indefinitive, collect_child_ids,
   mark_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
+use crate::media::file_io::skgnode_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest, default_metadata};
@@ -351,8 +352,8 @@ pub async fn ensure_skgnode (
       . ok_or ( "ensure_skgnode: node not found" ) ?;
     node_ref . value () . 0 . is_some () };
   if ! has_skgnode {
-    let (skgnode, _orgnode) : (SkgNode, OrgNode) =
-      skgnode_and_orgnode_from_id ( config, driver, &node_pid ) . await ?;
+    let (skgnode, _source) =
+      skgnode_and_source_from_id ( config, driver, &node_pid ) . await ?;
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;

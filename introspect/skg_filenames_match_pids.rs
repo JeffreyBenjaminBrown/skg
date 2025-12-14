@@ -1,5 +1,7 @@
 // cargo run --bin skg_filenames_match_pids [optional_directory]
 
+use skg::file_io::read_skgnode;
+
 use std::path::Path;
 use std::fs;
 
@@ -33,7 +35,7 @@ fn main() {
 
       // Process each .skg file individually
       for file_path in &actual_files {
-        match skg::file_io::read_node(file_path) {
+        match read_skgnode(file_path) {
           Ok(node) => {
             total_files += 1;
             let primary_id = &node.ids[0].0; // First ID is primary

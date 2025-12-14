@@ -5,7 +5,7 @@ use skg::merge::{
   merge_nodes};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
-use skg::media::file_io::read_node;
+use skg::media::file_io::read_skgnode;
 use skg::util::path_from_pid_and_source;
 use skg::media::typedb::search::{
   contains_from_pids,
@@ -189,7 +189,7 @@ fn verify_filesystem_after_merge_2_into_1(
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
-  let node_1: SkgNode = read_node(
+  let node_1: SkgNode = read_skgnode(
     &Path::new(&path_from_pid_and_source(config, "main", ID::from("1")) )) ?;
   assert_eq!(node_1.ids.len(), 3, "Node 1 should have 3 ids");
   assert_eq!(&node_1.ids[0], &ID::from("1"));
@@ -251,7 +251,7 @@ fn verify_filesystem_after_merge_2_into_1(
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: SkgNode = read_node(
+  let acquiree_text_preserver: SkgNode = read_skgnode(
     &Path::new(&acquiree_text_preserver_path )) ?;
   assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
   assert_eq!(acquiree_text_preserver.title, "MERGED: 2");
@@ -546,7 +546,7 @@ fn verify_filesystem_after_merge_1_into_2(
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
-  let node_2: SkgNode = read_node(
+  let node_2: SkgNode = read_skgnode(
     &Path::new(&path_from_pid_and_source(config, "main", ID::from("2")) )) ?;
 
   // Should have 3 ids: [2, 2-extra-id, 1]
@@ -608,7 +608,7 @@ fn verify_filesystem_after_merge_1_into_2(
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: SkgNode = read_node(
+  let acquiree_text_preserver: SkgNode = read_skgnode(
     &Path::new(&acquiree_text_preserver_path))?;
   assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
   assert_eq!(acquiree_text_preserver.title, "MERGED: 1");

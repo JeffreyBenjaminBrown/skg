@@ -18,7 +18,7 @@ pub fn update_fs_from_saveinstructions (
     to_delete . into_iter ()
     . map ( |(node, _)| node )
     . collect ();
-  let write_nodes : Vec<SkgNode> = // functional; no IO
+  let write_skgnodes : Vec<SkgNode> = // functional; no IO
     to_write . into_iter ()
     . map ( |(node, _)| node )
     . collect ();
@@ -30,8 +30,8 @@ pub fn update_fs_from_saveinstructions (
           delete_nodes, config . clone () ) ?
       } else { 0 };
     let written : usize =
-      if ! write_nodes . is_empty () {
+      if ! write_skgnodes . is_empty () {
         write_all_nodes_to_fs (
-          write_nodes, config ) ?
+          write_skgnodes, config ) ?
       } else { 0 };
     Ok ( (deleted, written) ) }}

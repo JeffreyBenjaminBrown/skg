@@ -10,11 +10,11 @@
 
 pub mod one_node;
 pub use one_node::{
-    read_node_from_id,
-    read_node_from_id_optional,
+    skgnode_and_source_from_id,
+    skgnode_and_source_from_id_optional,
     fetch_aliases_from_file,
-    read_node,
-    write_node, };
+    read_skgnode,
+    write_skgnode, };
 pub mod multiple_nodes;
 pub use multiple_nodes::{
     read_all_skg_files_from_sources,

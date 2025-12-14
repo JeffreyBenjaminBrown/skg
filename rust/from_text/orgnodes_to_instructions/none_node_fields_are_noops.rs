@@ -17,7 +17,7 @@ use std::io;
 use std::path::Path;
 
 use crate::types::{ ID, SkgConfig, SkgNode };
-use crate::media::file_io::read_node;
+use crate::media::file_io::read_skgnode;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
@@ -44,7 +44,7 @@ pub async fn clobber_none_fields_with_data_from_disk (
         None => { // No such node in database. Return input unchanged.
           return Ok(from_user); }} );
   let from_disk : Result<SkgNode, io::Error> =
-    read_node (
+    read_skgnode (
       & Path::new (
         & path_from_pid_and_source (
           config, &source, pid_resolved )) );

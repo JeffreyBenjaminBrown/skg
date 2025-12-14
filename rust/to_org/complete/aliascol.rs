@@ -1,4 +1,4 @@
-use crate::media::file_io::one_node::read_node;
+use crate::media::file_io::one_node::read_skgnode;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
@@ -48,7 +48,7 @@ pub async fn completeAliasCol (
     let path : String =
       path_from_pid_and_source (
         config, &parent_source, parent_pid );
-    read_node ( path )? };
+    read_skgnode ( path )? };
   skgnode.source = parent_source;
   let aliases_from_disk : HashSet < String > = (
     // source of truth

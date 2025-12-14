@@ -1,4 +1,4 @@
-use crate::media::file_io::read_node;
+use crate::media::file_io::read_skgnode;
 use crate::media::tree::collect_generation_ids;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::to_org::complete::contents::maybe_add_subscribee_col;
@@ -58,7 +58,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
   let path : String =
     path_from_pid_and_source (
       config, source, pid.clone() );
-  let mut skgnode : SkgNode = read_node ( path ) ?;
+  let mut skgnode : SkgNode = read_skgnode ( path ) ?;
   skgnode.source = source.to_string();
   let orgnode : OrgNode = OrgNode {
     metadata : { let mut md = default_metadata ();

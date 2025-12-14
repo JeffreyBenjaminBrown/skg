@@ -1,6 +1,6 @@
 use crate::types::{ID, SkgConfig, BufferValidationError, SourceNickname};
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction, MergeInstructionTriple};
-use crate::media::file_io::one_node::read_node_from_id_optional;
+use crate::media::file_io::one_node::skgnode_and_source_from_id_optional;
 use typedb_driver::TypeDBDriver;
 
 /// Normalize Option<Vec<ID>> for comparison: Some([]) and None are equivalent
@@ -45,7 +45,7 @@ pub async fn validate_and_filter_foreign_instructions(
       NonMerge_NodeAction::Save => {
         // Check if node has been modified.
         // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
-        match read_node_from_id_optional(
+        match skgnode_and_source_from_id_optional(
           config, driver, &node.ids[0]).await {
           Ok(Some((disk_node, _disk_source))) => {
             /* Compare definitive fields (title, body, contains) and non-definitive fields (aliases).

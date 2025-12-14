@@ -9,7 +9,7 @@ use std::fs;
 use serde_yaml;
 use typedb_driver::TypeDBDriver;
 
-pub async fn read_node_from_id (
+pub async fn skgnode_and_source_from_id (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   node_id : &ID
@@ -25,19 +25,19 @@ pub async fn read_node_from_id (
     path_from_pid_and_source (
       config, &source, pid );
   let mut node : SkgNode =
-    read_node (node_file_path) ?;
+    read_skgnode (node_file_path) ?;
   node.source = source.clone();
   Ok ((node, SourceNickname::from(source))) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// Other errors are propagated.
-pub async fn read_node_from_id_optional(
+pub async fn skgnode_and_source_from_id_optional(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   node_id: &ID
 ) -> Result<Option<(SkgNode, SourceNickname)>, Box<dyn Error>> {
-  match read_node_from_id(config, driver, node_id).await {
+  match skgnode_and_source_from_id(config, driver, node_id).await {
     Ok((node, source)) => Ok(Some((node, source))),
     Err(e)   => {
       let error_msg: String = e.to_string();
@@ -65,14 +65,14 @@ pub async fn fetch_aliases_from_file (
       let file_path : String =
         path_from_pid_and_source (
           config, &source, pid );
-      match read_node ( &Path::new ( &file_path )) {
+      match read_skgnode ( &Path::new ( &file_path )) {
         Ok ( mut node ) => {
           node.source = source;
           node.aliases.unwrap_or_default() },
         Err ( _ )   => Vec::new(), }},
     _ => Vec::new(), }}
 
-pub fn read_node
+pub fn read_skgnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P)
    -> io::Result <SkgNode>
@@ -98,7 +98,7 @@ pub fn read_node
     )); }
   Ok ( node ) }
 
-pub fn write_node
+pub fn write_skgnode
   <P : AsRef<Path>>
   ( node      : &SkgNode,
     file_path : P

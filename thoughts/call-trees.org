@@ -4,7 +4,7 @@
 **** pid_and_source_from_id
 **** skgnode_and_orgnode_from_pid_and_source
 ***** path_from_pid_and_source
-***** read_node
+***** read_skgnode
 *** complete_branch_minus_content
 **** mark_visited_or_repeat_or_cycle
 ***** get_pid_in_pairtree
@@ -20,6 +20,11 @@
 ** render_generation_and_recurse
 *** collect_rels_to_children_from_generation
 **** content_ids_if_definitive_else_empty
+*** add_children_and_collect_their_ids
+**** build_and_append_child_branch_minus_content
+***** DUP skgnode_and_orgnode_from_id
+***** DUP complete_branch_minus_content
+*** REC render_generation_and_recurse
 *** add_last_generation_and_edit_previous_in_forest
 **** make_and_append_child_pair
 ***** DUP skgnode_and_orgnode_from_id
@@ -29,11 +34,6 @@
 ****** collect_generation_ids
 ***** DUP collect_generation_ids
 ***** DUP rewrite_to_indefinitive
-*** add_children_and_collect_their_ids
-**** build_and_append_child_branch_minus_content
-***** DUP skgnode_and_orgnode_from_id
-***** DUP complete_branch_minus_content
-*** REC render_generation_and_recurse
 * update_from_and_rerender_buffer
 ** buffer_to_save_instructions
 *** org_to_uninterpreted_nodes
@@ -70,8 +70,8 @@
 **** reconcile_same_id_instructions
 ***** collect_dup_instructions
 ***** reconcile_same_id_instructions_for_one_id
-****** read_node_from_id_optional
-******* read_node_from_id
+****** skgnode_and_source_from_id_optional
+******* skgnode_and_source_from_id
 ******** DUP pid_and_source_from_id
 ******** DUP path_from_pid_and_source
 **** clobber_none_fields_with_data_from_disk
@@ -94,7 +94,7 @@
 *** update_fs_from_saveinstructions
 **** delete_all_nodes_from_fs
 **** write_all_nodes_to_fs
-***** write_node
+***** write_skgnode
 *** update_index_from_saveinstructions
 **** delete_nodes_from_index
 **** add_documents_to_tantivy_writer
@@ -116,7 +116,7 @@
 ///   - write the updated acquirer
 ///   - write the new acquiree text preserver
 ///   - delete the acquiree
-**** DUP write_node
+**** DUP write_skgnode
 *** merge_nodes_in_tantivy
 **** DUP update_index_from_saveinstructions
 ** pair_forest_with_save_instructions
@@ -136,7 +136,10 @@
 ***** orgnode_from_title_and_rel
 **** ensure_skgnode
 ***** DUP get_pid_in_pairtree
-***** DUP skgnode_and_orgnode_from_id
+***** skgnode_and_source_from_id
+****** DUP pid_and_source_from_id
+****** DUP path_from_pid_and_source
+****** read_skgnode
 **** DUP mark_visited_or_repeat_or_cycle
 **** clobberIndefinitiveOrgnode
      set title, source, body=None
@@ -194,7 +197,7 @@
 ***** DUP skgnode_and_orgnode_from_pid_and_source
 **** extendDefinitiveSubtreeFromLeaf
 ***** DUP content_ids_if_definitive_else_empty
-***** add_last_generation_and_edit_previous_in_tree
+***** add_last_generation_and_truncate_some_of_previous
 ****** DUP make_and_append_child_pair
 ****** DUP rewrite_to_indefinitive
 ****** truncate_after_node_in_generation_in_tree

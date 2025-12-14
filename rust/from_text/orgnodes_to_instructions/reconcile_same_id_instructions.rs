@@ -24,7 +24,7 @@ So this module only handles the simple case: supplement one instruction with dis
 
 use crate::types::{
   ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig, BufferValidationError, SourceNickname};
-use crate::media::file_io::read_node_from_id_optional;
+use crate::media::file_io::skgnode_and_source_from_id_optional;
 use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -113,7 +113,7 @@ pub async fn reconcile_same_id_instructions_for_one_id(
       . ok_or("No primary ID found")?.clone();
     let source : String = definer.0.source.clone();
     let disk_read_result: Option<(SkgNode, SourceNickname)> =
-      read_node_from_id_optional(
+      skgnode_and_source_from_id_optional(
         config, driver, &pid).await?;
     let from_disk: Option<SkgNode> = {
       match disk_read_result
