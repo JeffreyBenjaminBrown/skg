@@ -93,16 +93,26 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, tree_idx, config, typedb_driver,
           visited, view_requests_out ) . await ?; }
-      { // collect view requests
-        let node_view_requests : Vec < ViewRequest > = {
-          let node_ref : NodeRef < NodePair > =
-            tree . get ( node_id )
-            . ok_or ( "Node not found in tree" ) ?;
-          node_ref . value () . 1 . metadata . code . viewRequests
-            . iter () . cloned () . collect () };
-        for request in node_view_requests {
-          view_requests_out . push ( (tree_idx, node_id, request) ); } }}
+      collect_view_requests (
+        tree, node_id, tree_idx, view_requests_out ) ?; }
     Ok (( )) } ) }
+
+/// Collect all view requests from a node and append them to the output vector.
+fn collect_view_requests (
+  tree              : &PairTree,
+  node_id           : NodeId,
+  tree_idx          : usize,
+  view_requests_out : &mut Vec < (usize, NodeId, ViewRequest) >,
+) -> Result < (), Box<dyn Error> > {
+  let node_view_requests : Vec < ViewRequest > = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "collect_view_requests: node not found" ) ?;
+    node_ref . value () . 1 . metadata . code . viewRequests
+      . iter () . cloned () . collect () };
+  for request in node_view_requests {
+    view_requests_out . push ( (tree_idx, node_id, request) ); }
+  Ok (( )) }
 
 /// Completes an indefinitive orgnode using its SkgNode.
 ///

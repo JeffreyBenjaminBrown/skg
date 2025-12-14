@@ -7,8 +7,10 @@
 # Rust regexes - capture just the identifier name
 RUST_REGEXES=(
   --regex='/^[ \t]*pub[ \t]+fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
+  --regex='/^[ \t]*pub([a-z]+)[ \t]+fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*pub[ \t]+async[ \t]+fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
+  --regex='/^[ \t]*pub([a-z]+)[ \t]+async[ \t]+fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*async[ \t]+fn[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*pub[ \t]+struct[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*struct[ \t]+\([a-zA-Z0-9_]+\)/\1/'

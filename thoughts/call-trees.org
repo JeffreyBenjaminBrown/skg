@@ -147,7 +147,7 @@
 **** map_completeAndRestoreNodeCollectingViewRequests_over_children
 ***** collect_child_ids
 ***** REC completeAndRestoreNode_collectingViewRequests
-**** (collect view requests into output vector)
+**** collect_view_requests
 ** execute_view_requests
    Executes all view requests collected by the completion phase.
 *** build_and_integrate_aliases_view_then_drop_request

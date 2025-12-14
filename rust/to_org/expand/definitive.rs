@@ -150,9 +150,9 @@ fn indefinitize_content_subtree (
 /// - Marks repeats (nodes already in `visited`) as indefinitive
 /// - Adds new definitive nodes to `visited`
 /// - Truncates when the node limit is exceeded:
-///   - Adds children up to the limit as indefinitive
+///   - Adds children in that last gen up to the limit as indefinitive
 ///   - Completes the sibling group of the limit-hitting node
-///   - Marks nodes after the limit-hitting node's parent as indefinitive
+///   - After limit-hitting node's parent, rewrite nodes in that second-to-last gen as indefinitive
 ///
 /// Generations are relative to the effective root (generation 1),
 /// *not* the tree's true root. This way, truncation only affects

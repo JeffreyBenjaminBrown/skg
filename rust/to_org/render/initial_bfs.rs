@@ -53,9 +53,9 @@ pub async fn render_initial_forest_bfs (
     . collect();
   render_generation_and_recurse (
     &mut forest,
-    root_nodes,
-    1,  // generation
-    0,  // nodes_rendered
+    root_nodes, // the last complete generation
+    1,          // the last complete generation
+    0, // nodes_rendered
     config.initial_node_limit,
     &mut visited,
     config,
@@ -66,9 +66,10 @@ pub async fn render_initial_forest_bfs (
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
   forest         : &'a mut Vec<PairTree>,
-  gen_nodeids    : Vec<(usize, // which tree (index into forest)
-                        Vec<NodeId>)>,
-  gen_int        : usize,
+  gen_nodeids    : Vec< // deepest generation rendered so far
+      (usize, // which tree (index into forest)
+       Vec<NodeId>)>,
+  gen_int        : usize, // deepest generation rendered so far
   rendered_count : usize,
   limit          : usize,
   visited        : &'a mut VisitedMap,

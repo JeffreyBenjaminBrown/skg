@@ -1,5 +1,3 @@
-* from completeAndRestoreNode_collectingViewRequests extract 'collect view requests' into a function (at the end)
-* see test failure
 * Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
 * Should 'merge_nodes' be in 'update_graph'?
 * Why can't I use 'M-.' to find 'merge_nodes_in_typedb'?
