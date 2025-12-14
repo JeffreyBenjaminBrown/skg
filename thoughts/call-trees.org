@@ -5,22 +5,23 @@
 **** skgnode_and_orgnode_from_pid_and_source
 ***** path_from_pid_and_source
 ***** read_node
+*** complete_branch_minus_content
+**** mark_visited_or_repeat_or_cycle
+***** get_pid_in_pairtree
+***** detect_and_mark_cycle
+****** DUP get_pid_in_pairtree
+****** is_ancestor_id
+***** rewrite_to_indefinitive
+      indefinitive = true, body = None
+**** maybe_add_subscribee_col
+     If the node: - subscribes to something
+                  - is definitive
+                  - doesn't have a SubscribeeCol child
 ** render_generation_and_recurse
-*** mark_visited_or_repeat_or_cycle
-**** get_pid_in_pairtree
-**** detect_and_mark_cycle
-***** DUP get_pid_in_pairtree
-***** is_ancestor_id
-**** rewrite_to_indefinitive
-     indefinitive = true, body = None
-*** maybe_add_subscribee_col
-/// If the node: - subscribes to something
-///              - is definitive
-///              - doesn't have a SubscribeeCol child
 *** collect_rels_to_children_from_generation
 **** content_ids_if_definitive_else_empty
 *** add_last_generation_and_edit_previous_in_forest
-**** fetch_and_append_child_pair
+**** make_and_append_child_pair
 ***** DUP skgnode_and_orgnode_from_id
 **** DUP rewrite_to_indefinitive
 **** truncate_after_node_in_generation_in_forest
@@ -29,8 +30,9 @@
 ***** DUP collect_generation_ids
 ***** DUP rewrite_to_indefinitive
 *** add_children_and_collect_their_ids
-**** fetch_and_append_child_pair
+**** build_and_append_child_branch_minus_content
 ***** DUP skgnode_and_orgnode_from_id
+***** DUP complete_branch_minus_content
 *** REC render_generation_and_recurse
 * update_from_and_rerender_buffer
 ** buffer_to_save_instructions
@@ -184,7 +186,6 @@
 ***** DUP integrate_path_that_might_fork_or_cycle
 **** DUP remove_completed_view_request
 *** execute_definitive_view_request
-**** TODO should also do the subscribee col
 **** TODO make this more like render_initial_forest_bfs
 **** DUP get_pid_in_pairtree
 **** indefinitize_content_subtree
@@ -194,14 +195,13 @@
 **** extendDefinitiveSubtreeFromLeaf
 ***** DUP content_ids_if_definitive_else_empty
 ***** add_last_generation_and_edit_previous_in_tree
-****** DUP fetch_and_append_child_pair
+****** DUP make_and_append_child_pair
 ****** DUP rewrite_to_indefinitive
 ****** truncate_after_node_in_generation_in_tree
 ******* DUP nodes_after_in_generation
 ******* DUP get_pid_in_pairtree
 ******* DUP rewrite_to_indefinitive
-***** DUP fetch_and_append_child_pair
-***** DUP mark_visited_or_repeat_or_cycle
+***** DUP build_and_append_child_branch_minus_content
 ***** is_indefinitive
 ***** DUP content_ids_if_definitive_else_empty
 ** DUP set_metadata_relationship_viewdata_in_forest

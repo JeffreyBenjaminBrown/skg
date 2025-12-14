@@ -1,6 +1,6 @@
 use crate::media::tree::collect_generation_ids;
 use crate::to_org::util::{
-  fetch_and_append_child_pair,
+  make_and_append_child_pair,
   get_pid_in_pairtree, VisitedMap,
   nodes_after_in_generation, rewrite_to_indefinitive };
 use crate::types::misc::{ID, SkgConfig};
@@ -48,7 +48,7 @@ pub async fn add_last_generation_and_edit_previous_in_tree (
       { break; }
       else {
         let new_node_id : NodeId =
-          fetch_and_append_child_pair (
+          make_and_append_child_pair (
             tree, *parent_nid, child_id, config, driver ) . await ?;
         rewrite_to_indefinitive ( tree, new_node_id ) ?; }}
   truncate_after_node_in_generation_in_tree (
@@ -84,7 +84,7 @@ pub async fn add_last_generation_and_edit_previous_in_forest (
       // That 'in a new tree' condition is needed because ego_tree does not permit comparison of node_ids from different trees.
       { break; }
       let child_node_id : NodeId =
-        fetch_and_append_child_pair (
+        make_and_append_child_pair (
           &mut forest[*tree_idx], *parent_id, child_id,
           config, driver
         ). await ?;

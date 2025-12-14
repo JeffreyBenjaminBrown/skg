@@ -1,9 +1,10 @@
 use crate::media::file_io::read_node;
 use crate::media::tree::collect_generation_ids;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
+use crate::to_org::complete::contents::maybe_add_subscribee_col;
 use crate::types::orgnode::{default_metadata, RelToParent, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
+use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::util::path_from_pid_and_source;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
@@ -95,6 +96,25 @@ pub fn rewrite_to_indefinitive (
   node_mut . value () . 1 . body = None;
   Ok (( )) }
 
+/// This function's callers add a pristine, out-of-context
+/// (skgnode, orgnode) pair to the tree.
+/// Integrating the pair into the tree requires more work
+/// (and later will require even more, probably),
+/// which this function does:
+/// - handle repeats, cycles and the visited map
+/// - build a subscribee branch if needed
+pub fn complete_branch_minus_content (
+  tree     : &mut PairTree,
+  tree_idx : usize,
+  node_id  : NodeId,
+  visited  : &mut VisitedMap,
+) -> Result<(), Box<dyn Error>> {
+  mark_visited_or_repeat_or_cycle (
+    tree, tree_idx, node_id, visited ) ?;
+  maybe_add_subscribee_col (
+    tree, node_id ) ?;
+  Ok (( )) }
+
 /// Handles repetitions, cycles, and the VisitedMap.
 /// - Check for cycle and mark viewData.cycle accordingly.
 /// - If node is a repeat (already in visited), mark it indefinitive.
@@ -146,21 +166,26 @@ pub fn detect_and_mark_cycle (
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
-/// Create a minimal forest containing just root nodes (no children).
+/// Create a forest containing just root nodes (no children),
+/// and complete each root via complete_branch_minus_content.
 pub async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
+  visited  : &mut VisitedMap,
 ) -> Result < Vec < PairTree >,
               Box<dyn Error> > {
   let mut forest : Vec < PairTree > =
     Vec::new ();
-  for root_id in root_ids {
+  for (tree_idx, root_id) in root_ids . iter () . enumerate () {
     let (root_skgnode, root_orgnode) : ( SkgNode, OrgNode ) =
       skgnode_and_orgnode_from_id (
         config, driver, root_id ) . await ?;
-    let tree : PairTree =
+    let mut tree : PairTree =
       Tree::new ( (Some(root_skgnode), root_orgnode) );
+    let root_node_id : NodeId = tree . root () . id ();
+    complete_branch_minus_content (
+      &mut tree, tree_idx, root_node_id, visited ) ?;
     forest . push ( tree ); }
   Ok ( forest ) }
 
@@ -219,25 +244,57 @@ pub fn get_pid_from_pair_using_noderef (
   node_ref . value () . 1 . metadata . id . clone ()
     . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
 
-/// Fetch a node from disk and append it as a child.
+/// Build a node from disk and append it at 'parent_id' as a child.
+/// Does *not* take its ancestors into account,
+/// and does *not* build any of its descendents.
+/// Those can be done later via 'complete_branch_minus_content',
+/// or they can all be done at once via
+/// 'build_and_append_child_branch_minus_content.
 /// Returns the new node's NodeId.
-pub async fn fetch_and_append_child_pair (
+pub async fn make_and_append_child_pair (
   tree      : &mut PairTree,
-  parent_id : NodeId,
-  child_id  : &ID,
+  parent_id : NodeId, // will parent the new node
+  child_id  : &ID, // how to find the new node
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
-) -> Result < NodeId, Box<dyn Error> > {
+) -> Result < NodeId, // the new node
+              Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_id ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_id )
-    . ok_or ( "fetch_and_append_child_pair: parent not found" ) ?;
+    . ok_or ( "make_and_append_child_pair: parent not found" ) ?;
   let child_node_id : NodeId =
     parent_mut . append ((Some(child_skgnode),
                           child_orgnode))
     . id ();
+  Ok ( child_node_id ) }
+
+/// Fetch a node from disk, append it as a child,
+/// and complete it via complete_branch_minus_content.
+/// Returns the new node's NodeId.
+pub async fn build_and_append_child_branch_minus_content (
+  tree      : &mut PairTree,
+  tree_idx  : usize,
+  parent_id : NodeId,
+  child_id  : &ID,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+  visited   : &mut VisitedMap,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+    skgnode_and_orgnode_from_id (
+      config, driver, child_id ) . await ?;
+  let child_node_id : NodeId = {
+    let mut parent_mut : NodeMut < NodePair > =
+      tree . get_mut ( parent_id )
+      . ok_or ( "build_and_append_child_branch_minus_content: parent not found" ) ?;
+    parent_mut . append ((Some(child_skgnode),
+                          child_orgnode))
+      . id () };
+  complete_branch_minus_content (
+    tree, tree_idx, child_node_id, visited ) ?;
   Ok ( child_node_id ) }
 
 /// Collect content child IDs from a node in a PairTree.
