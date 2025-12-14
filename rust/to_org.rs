@@ -5,8 +5,8 @@
 // OUTSIDE ENTRY POINTS:
 // The only (so far) functions defined here used outside of it are:
 // - single_root_view
-// - completeAndRestoreForest_collectingDefinitiveRequests
-// - execute_definitive_view_requests
+// - completeAndRestoreForest_collectingViewRequests
+// - execute_view_requests
 
 pub mod complete;
 pub mod expand;
@@ -17,7 +17,7 @@ pub use complete::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   ensure_skgnode,
-  completeAndRestoreForest_collectingDefinitiveRequests,
+  completeAndRestoreForest_collectingViewRequests,
 };
 
 pub use expand::{

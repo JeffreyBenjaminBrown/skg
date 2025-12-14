@@ -1,4 +1,5 @@
-* extract cycle marking from  mark_visited_or_repeat_or_cycle
+* extract cycle marking from mark_visited_or_repeat_or_cycle
+* from completeAndRestoreNode_collectingViewRequests extract 'collect view requests' into a function (at the end)
 * see test failure
 * Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
 * Should 'merge_nodes' be in 'update_graph'?

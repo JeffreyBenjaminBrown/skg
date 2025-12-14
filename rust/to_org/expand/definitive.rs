@@ -1,6 +1,10 @@
-/// SINGLE ENTRY POINT: 'execute_definitive_view_requests'.
+/// SINGLE ENTRY POINT: 'execute_view_requests'.
 
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_tree;
+use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
+use crate::to_org::expand::backpath::{
+  build_and_integrate_containerward_view_then_drop_request,
+  build_and_integrate_sourceward_view_then_drop_request };
 use crate::to_org::util::{
   skgnode_and_orgnode_from_pid_and_source,
   fetch_and_append_child_pair,
@@ -17,18 +21,32 @@ use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-pub async fn execute_definitive_view_requests (
+pub async fn execute_view_requests (
   forest        : &mut Vec < PairTree >,
-  requests      : Vec < (usize, NodeId) >,
+  requests      : Vec < (usize, NodeId, ViewRequest) >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   visited       : &mut VisitedMap,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  for (tree_idx, node_id) in requests {
-    execute_definitive_view_request (
-      forest, tree_idx, node_id, config, typedb_driver,
-      visited, errors ) . await ?; }
+  for (tree_idx, node_id, request) in requests {
+    match request {
+      ViewRequest::Aliases => {
+        build_and_integrate_aliases_view_then_drop_request (
+          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          . await ?; },
+      ViewRequest::Containerward => {
+        build_and_integrate_containerward_view_then_drop_request (
+          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          . await ?; },
+      ViewRequest::Sourceward => {
+        build_and_integrate_sourceward_view_then_drop_request (
+          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          . await ?; },
+      ViewRequest::Definitive => {
+        execute_definitive_view_request (
+          forest, tree_idx, node_id, config, typedb_driver,
+          visited, errors ) . await ?; }, } }
   Ok (( )) }
 
 /// Expands a definitive view request.

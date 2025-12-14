@@ -119,73 +119,68 @@
 *** pairtree_from_orgnodetree_and_map
 **** pair_children_optional_recursive
 ***** REC pair_children_optional_recursive
-** TODO completeAndRestoreForest_collectingDefinitiveRequests
-*** completeAndRestoreNode_collectingDefinitiveRequests
-**** TODO separate definitive request handling from this
-     and do that in
-       update_from_and_rerender_buffer
-     right after
-       completeAndRestoreForest_collectingDefinitiveRequests
+** completeAndRestoreForest_collectingViewRequests
+*** completeAndRestoreNode_collectingViewRequests
 **** completeAliasCol
-     Called only if one is present,
-     Ensure it has all the aliases,
+     Called only if one is present.
+     Ensures it has all the aliases,
      and removes any other children.
 ***** get_aliascol_parent_id
 ***** DUP pid_and_source_from_id
 ***** collect_alias_titles
 ***** remove_duplicates_and_false_aliases_handling_focus
 ***** orgnode_from_title_and_rel
+**** ensure_skgnode
+***** DUP get_pid_in_pairtree
+***** DUP skgnode_and_orgnode_from_id
 **** DUP mark_visited_or_repeat_or_cycle
 **** clobberIndefinitiveOrgnode
      set title, source, body=None
-     store skgnode in pair if needed
-***** ensure_skgnode
-****** DUP get_pid_in_pairtree
-****** DUP skgnode_and_orgnode_from_id
 **** completeDefinitiveOrgnode
-***** DUP ensure_skgnode
 ***** DUP maybe_add_subscribee_col
 ***** categorize_children_by_treatment
 ***** extend_content
 ****** DUP skgnode_and_orgnode_from_id
 ***** reorder_children
-**** map_completeNodePreorderCollectingDefinitiveRequests_over_children
+**** map_completeAndRestoreNodeCollectingViewRequests_over_children
 ***** collect_child_ids
-***** REC completeAndRestoreNode_collectingDefinitiveRequests
-**** build_and_integrate_aliases_view_then_drop_request
-***** build_and_integrate_aliases
-****** fetch_aliases_from_file
-******* DUP pid_and_source_from_id
-******* DUP path_from_pid_and_source
-****** DUP orgnode_from_title_and_rel
-***** remove_completed_view_request
-**** build_and_integrate_containerward_view_then_drop_request
-***** build_and_integrate_containerward_path
+***** REC completeAndRestoreNode_collectingViewRequests
+**** (collect view requests into output vector)
+** execute_view_requests
+   Executes all view requests collected by the completion phase.
+*** build_and_integrate_aliases_view_then_drop_request
+**** build_and_integrate_aliases
+***** fetch_aliases_from_file
+****** DUP pid_and_source_from_id
+****** DUP path_from_pid_and_source
+***** DUP orgnode_from_title_and_rel
+**** remove_completed_view_request
+*** build_and_integrate_containerward_view_then_drop_request
+**** build_and_integrate_containerward_path
+***** DUP get_pid_in_pairtree
+***** path_containerward_to_end_cycle_and_or_branches
+****** path_to_end_cycle_and_or_branches
+******* find_related_nodes
+***** integrate_path_that_might_fork_or_cycle
 ****** DUP get_pid_in_pairtree
-****** path_containerward_to_end_cycle_and_or_branches
-******* path_to_end_cycle_and_or_branches
-******** find_related_nodes
-****** integrate_path_that_might_fork_or_cycle
-******* DUP get_pid_in_pairtree
-******* integrate_linear_portion_of_path
-******** find_child_by_id
-******** prepend_indefinitive_child_with_parent_ignores
-********* DUP skgnode_and_orgnode_from_id
-******** REC integrate_linear_portion_of_path
-******* integrate_branches_in_node
-******** find_children_by_ids
-******** DUP prepend_indefinitive_child_with_parent_ignores
-******* integrate_cycle_in_node
-******** DUP prepend_indefinitive_child_with_parent_ignores
-***** DUP remove_completed_view_request
-**** build_and_integrate_sourceward_view_then_drop_request
-***** build_and_integrate_sourceward_path
-****** DUP get_pid_in_pairtree
-****** path_sourceward_to_end_cycle_and_or_branches
-******* DUP path_to_end_cycle_and_or_branches
-****** DUP integrate_path_that_might_fork_or_cycle
-***** DUP remove_completed_view_request
-** TODO execute_definitive_view_requests
+****** integrate_linear_portion_of_path
+******* find_child_by_id
+******* prepend_indefinitive_child_with_parent_ignores
+******** DUP skgnode_and_orgnode_from_id
+******* REC integrate_linear_portion_of_path
+****** integrate_branches_in_node
+******* find_children_by_ids
+******* DUP prepend_indefinitive_child_with_parent_ignores
+****** integrate_cycle_in_node
+******* DUP prepend_indefinitive_child_with_parent_ignores
+**** DUP remove_completed_view_request
+*** build_and_integrate_sourceward_view_then_drop_request
+**** build_and_integrate_sourceward_path
+***** DUP get_pid_in_pairtree
+***** path_sourceward_to_end_cycle_and_or_branches
+****** DUP path_to_end_cycle_and_or_branches
+***** DUP integrate_path_that_might_fork_or_cycle
+**** DUP remove_completed_view_request
 *** execute_definitive_view_request
 **** TODO should also do the subscribee col
 **** TODO make this more like render_initial_forest_bfs

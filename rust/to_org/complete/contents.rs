@@ -1,14 +1,10 @@
-/// SINGLE ENTRY POINT: 'completeAndRestoreForest_collectingDefinitiveRequests'.
+/// SINGLE ENTRY POINT: 'completeAndRestoreForest_collectingViewRequests'.
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
   get_pid_in_pairtree, is_indefinitive, collect_child_ids,
   mark_visited_or_repeat_or_cycle };
-use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::to_org::expand::backpath::{
-  build_and_integrate_containerward_view_then_drop_request,
-  build_and_integrate_sourceward_view_then_drop_request, };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest, default_metadata};
@@ -21,56 +17,52 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// CALLS 'completeAndRestoreNode_collectingDefinitiveRequests'
+/// CALLS 'completeAndRestoreNode_collectingViewRequests'
 ///   on each tree, and thus on each node in the forest,
 /// threading 'visited' through the forest (rather than
 /// restarting with an empty 'visited' set in each tree).
 ///
-/// RETURNS (visited, definitive_requests).
-pub async fn completeAndRestoreForest_collectingDefinitiveRequests (
+/// RETURNS (visited, view_requests).
+pub async fn completeAndRestoreForest_collectingViewRequests (
   forest        : &mut Vec < PairTree >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
 ) -> Result < ( VisitedMap,
-                Vec < // definitive_requests
+                Vec < // view_requests
                     ( usize, // which tree in the forest
-                      NodeId ) > ),
+                      NodeId,
+                      ViewRequest ) > ),
               Box<dyn Error> > {
   let mut visited : VisitedMap = VisitedMap::new ();
-  let mut definitive_requests : Vec < (usize, NodeId) > = Vec::new ();
+  let mut view_requests : Vec < (usize, NodeId, ViewRequest) > = Vec::new ();
   for (tree_idx, tree) in forest . iter_mut () . enumerate () {
     let root_id : NodeId =
       tree . root () . id ();
-    completeAndRestoreNode_collectingDefinitiveRequests (
+    completeAndRestoreNode_collectingViewRequests (
       tree, root_id, tree_idx, config, typedb_driver,
-      &mut visited, &mut definitive_requests,
-      errors ) . await ?; }
-  Ok (( visited, definitive_requests )) }
+      &mut visited, &mut view_requests ) . await ?; }
+  Ok (( visited, view_requests )) }
 
 /// Completes a node, and then its children ('preorder DFS traversal').
 /// - For AliasCol nodes, delegate to 'completeAliasCol'
 ///   (which handles the whole subtree)
 /// - For other nodes, these happen (in order):
 ///   - futz with the node itself
-///     - check for repetition via 'make_indefinitive_if_repeated'
+///     - check for repetition via 'mark_visited_or_repeat_or_cycle'
 ///       (if repeated, modify body and metadata, update 'visited')
-///     - detect cycles via 'is_ancestor_id'
 ///   - futz with its descendents
 ///     - if definitive, call completeDefinitiveOrgnode
 ///       - else call clobberIndefinitiveOrgnode
-///     - recurse via 'map_completeNodePreorderCollectingDefinitiveRequests_over_children'. (No, this is not the last step).
-///     - integrate any view requests except definitive view ones
-///     - collect definitive view requests
-fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
+///     - recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
+///     - collect all view requests for later processing
+fn completeAndRestoreNode_collectingViewRequests<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
   tree_idx             : usize,
   config               : &'a SkgConfig,
   typedb_driver        : &'a TypeDBDriver,
   visited              : &'a mut VisitedMap,
-  definitive_requests  : &'a mut Vec < (usize, NodeId) >, // collected for processing after traversal
-  errors               : &'a mut Vec < String >,
+  view_requests_out    : &'a mut Vec < (usize, NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -97,41 +89,19 @@ fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
         } else { // futz with the orgnode and its content children
           completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
-        map_completeNodePreorderCollectingDefinitiveRequests_over_children (
+        map_completeAndRestoreNodeCollectingViewRequests_over_children (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, tree_idx, config, typedb_driver,
-          visited, definitive_requests, errors ) . await ?; }
-
-      { /* Integrate view requests.
-           PITFALL: Do this *after* completing children, because
-           if a content child added during completion
-           matches the head of the path, then
-           the path will be integrated there (where treatment=Content),
-           instead of creating a duplicate child
-           with treatment=ParentIgnores. */
-        let view_requests : Vec < ViewRequest > = {
+          visited, view_requests_out ) . await ?; }
+      { // collect view requests
+        let node_view_requests : Vec < ViewRequest > = {
           let node_ref : NodeRef < NodePair > =
             tree . get ( node_id )
             . ok_or ( "Node not found in tree" ) ?;
           node_ref . value () . 1 . metadata . code . viewRequests
             . iter () . cloned () . collect () };
-        for request in view_requests {
-          match request {
-            ViewRequest::Aliases => {
-              build_and_integrate_aliases_view_then_drop_request (
-                tree, node_id, config, typedb_driver, errors )
-                . await ?; },
-            ViewRequest::Containerward => {
-              build_and_integrate_containerward_view_then_drop_request (
-                tree, node_id, config, typedb_driver, errors )
-                . await ?; },
-            ViewRequest::Sourceward => {
-              build_and_integrate_sourceward_view_then_drop_request (
-                tree, node_id, config, typedb_driver, errors )
-                . await ?; },
-            ViewRequest::Definitive => { // Collect for processing after all trees are traversed, so that `visited` is fully populated when they are traveresed.
-              definitive_requests . push ( (tree_idx, node_id) );
-            }, }} }}
+        for request in node_view_requests {
+          view_requests_out . push ( (tree_idx, node_id, request) ); } }}
     Ok (( )) } ) }
 
 /// Completes an indefinitive orgnode using its SkgNode.
@@ -337,23 +307,22 @@ fn reorder_children (
     parent_mut . append_id ( *child_id ); }
   Ok (( )) }
 
-fn map_completeNodePreorderCollectingDefinitiveRequests_over_children<'a> (
+fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
   tree_idx             : usize,
   config               : &'a SkgConfig,
   typedb_driver        : &'a TypeDBDriver,
   visited              : &'a mut VisitedMap,
-  definitive_requests  : &'a mut Vec < (usize, NodeId) >,
-  errors               : &'a mut Vec < String >,
+  view_requests_out    : &'a mut Vec < (usize, NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     let child_ids : Vec < NodeId > =
       collect_child_ids ( tree, node_id ) ?;
     for child_id in child_ids {
-      completeAndRestoreNode_collectingDefinitiveRequests (
+      completeAndRestoreNode_collectingViewRequests (
         tree, child_id, tree_idx, config, typedb_driver,
-        visited, definitive_requests, errors ) . await ?; }
+        visited, view_requests_out ) . await ?; }
     Ok (( )) }) }
 
 /// Ensure a node in a PairTree has an SkgNode.

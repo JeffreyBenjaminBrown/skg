@@ -4,8 +4,8 @@ use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
 use crate::merge::merge_nodes;
-use crate::to_org::complete::contents::completeAndRestoreForest_collectingDefinitiveRequests;
-use crate::to_org::expand::definitive::execute_definitive_view_requests;
+use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
+use crate::to_org::expand::definitive::execute_view_requests;
 use crate::media::tree::pair_forest_with_save_instructions;
 use crate::serve::util::{
   format_buffer_response_sexp,
@@ -156,16 +156,16 @@ async fn update_from_and_rerender_buffer (
       & save_instructions );
 
   { // modify the paired forest before re-rendering it
-    let (mut visited, definitive_requests) =
-      completeAndRestoreForest_collectingDefinitiveRequests (
+    let (mut visited, view_requests) =
+      completeAndRestoreForest_collectingViewRequests (
         &mut paired_forest,
         config,
-        typedb_driver,
-        &mut errors ) . await ?;
+        typedb_driver ) . await ?;
 
-    execute_definitive_view_requests (
+    execute_view_requests ( // PITFALL: Should follow completion.
+      // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
       &mut paired_forest,
-      definitive_requests,
+      view_requests,
       config,
       typedb_driver,
       &mut visited,

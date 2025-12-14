@@ -16,5 +16,5 @@ pub use backpath::{
 };
 
 pub use definitive::{
-  execute_definitive_view_requests,
+  execute_view_requests,
 };
