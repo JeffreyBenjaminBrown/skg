@@ -1,7 +1,7 @@
 use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::from_text::buffer_to_save_instructions;
 use crate::org_to_text::orgnode_forest_to_string;
-use crate::save::update_graph;
+use crate::save::update_graph_minus_merges;
 use crate::types::errors::SaveError;
 use crate::merge::merge_nodes;
 use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
@@ -116,7 +116,7 @@ fn empty_response_sexp (
 Steps:
 - Put the text through `buffer_to_save_instructions` to get orgnode forest and save instructions.
 - Extract root IDs from the orgnode forest.
-- Runs `update_graph` on the save instructions.
+- Runs `update_graph_minus_merges` on the save instructions.
 - Returns a multi-root content view. */
 async fn update_from_and_rerender_buffer (
   org_buffer_text : &str,
@@ -135,12 +135,12 @@ async fn update_from_and_rerender_buffer (
       |e| Box::new(e) as Box<dyn Error> ) ?;
   if orgnode_forest.is_empty() { return Err (
     "No valid org nodes found in org_buffer_text" . into( )); }
-  update_graph (
+
+  update_graph_minus_merges (
     save_instructions.clone(),
     config.clone(),
     tantivy_index,
     typedb_driver ) . await ?;
-
   merge_nodes (
     mergeInstructions,
     config.clone(),
@@ -148,20 +148,17 @@ async fn update_from_and_rerender_buffer (
     typedb_driver ) . await ?;
 
   let mut errors : Vec < String > = Vec::new ();
-
   let mut paired_forest : Vec < PairTree > =
     pair_forest_with_save_instructions (
       // Definitive nodes get Some(skgnode), indefinitive get None.
       orgnode_forest,
       & save_instructions );
-
   { // modify the paired forest before re-rendering it
     let (mut visited, view_requests) =
       completeAndRestoreForest_collectingViewRequests (
         &mut paired_forest,
         config,
         typedb_driver ) . await ?;
-
     execute_view_requests ( // PITFALL: Should follow completion.
       // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
       &mut paired_forest,
@@ -170,7 +167,6 @@ async fn update_from_and_rerender_buffer (
       typedb_driver,
       &mut visited,
       &mut errors ) . await ?; }
-
   set_metadata_relationship_viewdata_in_forest (
     &mut paired_forest,
     config,

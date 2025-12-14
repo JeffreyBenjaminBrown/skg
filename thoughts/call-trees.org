@@ -81,7 +81,7 @@
 ***** three_merged_skgnodes
 ****** setlike_vector_subtraction
 *** validate_merges_involve_only_owned_nodes
-** update_graph
+** update_graph_minus_merges
 *** update_typedb_from_saveinstructions
 **** delete_nodes_from_pids
 **** create_only_nodes_with_no_ids_present

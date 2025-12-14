@@ -1,7 +1,3 @@
-* Unify execute_definitive_view_request and render_initial_forest_bfs
-  see thoughts/call-trees.org
-* Move 'clobberIndefinitiveOrgnode' to neighor file 'util.rs'
-* Should 'merge_nodes' be in 'update_graph'?
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * aliases_to_org should rebuild the whole buffer

@@ -21,7 +21,7 @@ use typedb_driver::TypeDBDriver;
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
-pub async fn update_graph (
+pub async fn update_graph_minus_merges (
   instructions  : Vec<SaveInstruction>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
