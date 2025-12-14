@@ -8,7 +8,9 @@
 ** render_generation_and_recurse
 *** mark_visited_or_repeat_or_cycle
 **** get_pid_in_pairtree
-**** is_ancestor_id
+**** detect_and_mark_cycle
+***** DUP get_pid_in_pairtree
+***** is_ancestor_id
 **** rewrite_to_indefinitive
      indefinitive = true, body = None
 *** maybe_add_subscribee_col

@@ -107,14 +107,7 @@ pub fn mark_visited_or_repeat_or_cycle (
   visited  : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  { // mark it so if it's a cycle
-    let is_cycle : bool =
-      is_ancestor_id ( tree, node_id, &pid ) ?;
-    let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut (node_id) . ok_or (
-        "mark_visited_or_repeat_or_cycle: node not found" ) ?;
-    node_mut . value () . 1 . metadata . viewData . cycle =
-      is_cycle; }
+  detect_and_mark_cycle ( tree, node_id ) ?;
   if visited . contains_key ( &pid ) {
     // Mark as indefinitive (it's a repeat).
     let mut node_mut : NodeMut < NodePair > =
@@ -130,6 +123,22 @@ pub fn mark_visited_or_repeat_or_cycle (
     rewrite_to_indefinitive ( tree, node_id ) ?;
   } else {
     visited . insert ( pid, (tree_idx, node_id) ); }
+  Ok (( )) }
+
+/// Check if the node's PID appears in its ancestors,
+/// and if so, mark viewData.cycle = true.
+pub fn detect_and_mark_cycle (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
+  let is_cycle : bool =
+    is_ancestor_id ( tree, node_id, &pid ) ?;
+  let mut node_mut : NodeMut < NodePair > =
+    tree . get_mut ( node_id ) . ok_or (
+      "detect_and_mark_cycle: node not found" ) ?;
+  node_mut . value () . 1 . metadata . viewData . cycle =
+    is_cycle;
   Ok (( )) }
 
 
