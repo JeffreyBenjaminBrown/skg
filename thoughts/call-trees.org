@@ -126,8 +126,6 @@
        update_from_and_rerender_buffer
      right after
        completeAndRestoreForest_collectingDefinitiveRequests
-**** TODO completes and *restores*, too
-     e.g. w/ clobberIndefinitiveOrgnode
 **** completeAliasCol
      Called only if one is present,
      Ensure it has all the aliases,
@@ -145,20 +143,19 @@
        seems unnecessary --
        isn't the tree already normalized?
 ****** DUP is_ancestor_id
-**** TODO call 'ensure_skgnode' here rather than in these
-***** clobberIndefinitiveOrgnode
-      set title, source, body=None
-      store skgnode in pair if needed
-****** ensure_skgnode
-******* DUP get_pid_in_pairtree
-******* DUP skgnode_and_orgnode_from_id
-***** completeDefinitiveOrgnode
-****** DUP ensure_skgnode
-****** DUP maybe_add_subscribee_col
-****** categorize_children_by_treatment
-****** extend_content
-******* DUP skgnode_and_orgnode_from_id
-****** reorder_children
+**** clobberIndefinitiveOrgnode
+     set title, source, body=None
+     store skgnode in pair if needed
+***** ensure_skgnode
+****** DUP get_pid_in_pairtree
+****** DUP skgnode_and_orgnode_from_id
+**** completeDefinitiveOrgnode
+***** DUP ensure_skgnode
+***** DUP maybe_add_subscribee_col
+***** categorize_children_by_treatment
+***** extend_content
+****** DUP skgnode_and_orgnode_from_id
+***** reorder_children
 **** map_completeNodePreorderCollectingDefinitiveRequests_over_children
 ***** TODO not sure this deserves definition
 ***** collect_child_ids

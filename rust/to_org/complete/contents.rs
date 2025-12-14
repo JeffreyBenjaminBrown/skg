@@ -86,18 +86,18 @@ fn completeAndRestoreNode_collectingDefinitiveRequests<'a> (
       // For now, SubscribeeCol has no children to process.
       // Future generations will add Subscribee children here.
     } else {
-      { // futz with the OrgNode itself
+      ensure_skgnode (
+        tree, node_id, config, typedb_driver ). await ?;
+      { // handle indefinitive, cycle, mark fields
         make_indefinitive_if_repeated (
           // Maybe mark indefinitive, maybe update 'visited'.
           tree, node_id, tree_idx, visited
         ). await ?;
         detect_cycle_and_mark (
           tree, node_id ) ?; }
-
-      { // 'make_indefinitive_if_repeated' may have just changed this value.
-        if is_indefinitive ( tree, node_id ) ? {
+      { if is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
-            tree, node_id, config, typedb_driver ). await ?;
+            tree, node_id ) ?;
         } else { // futz with the orgnode and its content children
           completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
@@ -185,27 +185,24 @@ fn detect_cycle_and_mark (
     is_cycle;
   Ok (( )) }
 
-/// Completes an indefinitive orgnode by fetching its canonical title and source from disk.
+/// Completes an indefinitive orgnode using its SkgNode.
 ///
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
+/// ASSUMES: ensure_skgnode has already been called
 /// ASSUMES: make_indefinitive_if_repeated has already been called
 /// ASSUMES: The input is indefinitive
 ///
 /// METHOD: Given an indefinitive node N:
-/// - If N has no SkgNode, fetch from disk and store it
 /// - Set orgnode's title to the canonical title from the SkgNode
 /// - Set orgnode's source (a field of its metadata)
 /// - Set orgnode's body to None
 ///
 /// Note: Children are unaffected by this function,
 /// and will be recursed into separately by the caller.
-pub async fn clobberIndefinitiveOrgnode (
+pub fn clobberIndefinitiveOrgnode (
   tree   : &mut PairTree,
   node_id : NodeId,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  ensure_skgnode ( tree, node_id, config, driver ) . await ?;
   { // Update title, source, and clear body using the SkgNode
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
@@ -224,11 +221,11 @@ pub async fn clobberIndefinitiveOrgnode (
 /// with the 'contains' relationships found in the SkgNode.
 ///
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
+/// ASSUMES: ensure_skgnode has already been called
 /// ASSUMES: make_indefinitive_if_repeated has already been called
 /// ASSUMES: Input is definitive
 ///
 /// METHOD: Given a node N:
-/// - Get N's SkgNode (fetch from disk if needed)
 /// - Add SubscribeeCol if node subscribes to something and one is not already present
 /// - Categorize N's children into content/non-content
 /// - Mark 'invalid content' as parentIgnores and move to non-content
@@ -243,8 +240,6 @@ pub async fn completeDefinitiveOrgnode (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  ensure_skgnode (
-    tree, node_id, config, driver ). await ?;
   maybe_add_subscribee_col ( tree, node_id ) ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
@@ -415,7 +410,7 @@ fn map_completeNodePreorderCollectingDefinitiveRequests_over_children<'a> (
 /// Ensure a node in a PairTree has an SkgNode.
 /// If the node already has Some(skgnode), does nothing.
 /// Otherwise fetches from disk and stores it.
-async fn ensure_skgnode (
+pub async fn ensure_skgnode (
   tree    : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,

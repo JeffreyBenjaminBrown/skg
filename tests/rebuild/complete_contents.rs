@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, make_indefinitive_if_repeated};
+use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode, make_indefinitive_if_repeated};
 use skg::to_org::util::VisitedMap;
 use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{
@@ -12,7 +12,8 @@ use skg::types::{ID, OrgNode, SkgConfig};
 use skg::types::trees::PairTree;
 use ego_tree::{Tree, NodeId};
 
-/// Helper to call make_indefinitive_if_repeated followed by completeContents
+/// Helper to call ensure_skgnode, make_indefinitive_if_repeated,
+/// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
 /// (matches the pattern used in completeAndRestoreNode_collectingDefinitiveRequests)
 async fn check_and_complete (
   tree     : &mut PairTree,
@@ -22,6 +23,8 @@ async fn check_and_complete (
   driver   : &typedb_driver::TypeDBDriver,
   visited  : &mut VisitedMap,
 ) -> Result < (), Box<dyn Error> > {
+  ensure_skgnode (
+    tree, node_id, config, driver ) . await ?;
   make_indefinitive_if_repeated (
     tree, node_id, tree_idx, visited ) . await ?;
   let is_indefinitive : bool = {
@@ -31,7 +34,7 @@ async fn check_and_complete (
     node_ref . value () . 1 . metadata . code . indefinitive };
   if is_indefinitive {
     clobberIndefinitiveOrgnode (
-      tree, node_id, config, driver ) . await ?;
+      tree, node_id ) ?;
   } else {
     completeDefinitiveOrgnode (
       tree, node_id, config, driver ) . await ?; }
