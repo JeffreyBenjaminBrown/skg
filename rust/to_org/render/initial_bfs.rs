@@ -24,6 +24,7 @@ use crate::to_org::util::{
   fetch_and_append_child_pair,
   mark_visited_or_repeat_or_cycle,
   VisitedMap };
+use crate::to_org::complete::contents::maybe_add_subscribee_col;
 use crate::types::{SkgConfig, ID};
 use crate::types::trees::PairTree;
 
@@ -83,6 +84,8 @@ fn render_generation_and_recurse<'a> (
       for node_id in node_ids {
         mark_visited_or_repeat_or_cycle(
           &mut forest[*tree_idx], *tree_idx, *node_id, visited)?;
+        maybe_add_subscribee_col(
+          &mut forest[*tree_idx], *node_id)?;
         rendered_count += 1; }}
     let parent_child_rels_to_add : Vec<(usize, // the tree
                                         NodeId, // the parent

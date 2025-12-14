@@ -232,9 +232,10 @@ pub fn content_ids_if_definitive_else_empty (
   if node_ref . value () . 1 . metadata . code . indefinitive {
     return Ok ( Vec::new () ); }
   match & node_ref . value () . 0 {
-    Some ( skgnode ) => Ok ( content_ids_from_skgnode ( skgnode ) ),
+    Some ( skgnode ) => Ok (
+      skgnode . contains . clone () . unwrap_or_default () ),
     None => Ok ( Vec::new () ), // No SkgNode yet
-  } }
+  }}
 
 /// Collect NodeIds after a target node in a generation.
 /// 'effective_root' should be some ancestor.
@@ -275,13 +276,6 @@ pub fn is_indefinitive (
     tree . get ( node_id )
     . ok_or ( "is_indefinitive: NodeId not in tree" ) ?;
   Ok ( node_ref . value () . 1 . metadata . code . indefinitive ) }
-
-/// Extract the content child IDs from an SkgNode.
-/// Returns an empty Vec if there are no contents.
-pub fn content_ids_from_skgnode (
-  skgnode : &SkgNode
-) -> Vec < ID > {
-  skgnode . contains . clone () . unwrap_or_default () }
 
 /// Collect all child NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.

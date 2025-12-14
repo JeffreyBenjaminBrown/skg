@@ -20,7 +20,8 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// CALLS 'completeNodePreorder_collectingDefinitiveRequests' on each tree,
+/// CALLS 'completeNodePreorder_collectingDefinitiveRequests'
+///   on each tree, and thus on each node in the forest,
 /// threading 'visited' through the forest (rather than
 /// restarting with an empty 'visited' set in each tree).
 ///
@@ -57,7 +58,7 @@ pub async fn completeOrgnodeForest_collectingDefinitiveRequests (
 ///   - futz with its descendents
 ///     - if definitive, call completeDefinitiveOrgnode
 ///       - else call clobberIndefinitiveOrgnode
-///     - recurse via 'map_completeNodePreorderCollectingDefinitiveRequests_over_children'
+///     - recurse via 'map_completeNodePreorderCollectingDefinitiveRequests_over_children'. (No, this is not the last step).
 ///     - integrate any view requests except definitive view ones
 ///     - collect definitive view requests
 fn completeNodePreorder_collectingDefinitiveRequests<'a> (
@@ -146,12 +147,14 @@ pub async fn make_indefinitive_if_repeated (
   tree_idx  : usize,
   visited   : &mut VisitedMap,
 ) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
+  let node_pid : ID =
+    get_pid_in_pairtree ( tree, node_id ) ?;
   let is_indefinitive : bool = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    node_ref . value () . 1 . metadata . code . indefinitive };
+    node_ref . value () . 1
+      . metadata . code . indefinitive };
   if visited . contains_key ( & node_pid ) {
     // It is a repeat. Mark it as indefinitive.
     // Its children are neither removed nor completed,
@@ -433,13 +436,21 @@ async fn ensure_skgnode (
     node_mut . value () . 0 = Some ( skgnode ); }
   Ok (( )) }
 
-/// If node subscribes to something
-/// *and* doesn't have a SubscribeeCol child,
-/// then prepend one. The SubscribeeCol has no children (for now).
-fn maybe_add_subscribee_col (
+/// If the node: - subscribes to something
+///              - is definitive
+///              - doesn't have a SubscribeeCol child
+/// then prepend a SubscribeeCol child,
+/// with (for now) no children of its own.
+pub fn maybe_add_subscribee_col (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
+  let is_indefinitive : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
+    node_ref . value () . 1 . metadata . code . indefinitive };
+  if is_indefinitive { return Ok (( )); }
   let has_subscriptions : bool = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
