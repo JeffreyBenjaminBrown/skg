@@ -59,8 +59,7 @@
 *** orgnodes_to_reconciled_save_instructions
 **** saveinstructions_from_forest
 ***** saveinstructions_from_tree
-****** mk_skgnode
-******* TODO rename skgnode_for_orgnode_in_tree
+****** skgnode_for_orgnode_in_tree
 ******* collect_aliases
 ******* collect_contents
 ****** REC saveinstructions_from_tree

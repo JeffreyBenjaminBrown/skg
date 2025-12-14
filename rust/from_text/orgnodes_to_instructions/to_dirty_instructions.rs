@@ -19,7 +19,7 @@ pub fn saveinstructions_from_forest (
 
 /// Appends another pair to 'result' and recurses (in DFS order).
 /// Skips AliasCol, Alias, and indefinitive nodes.
-/// (Aliases are handled by 'collect_aliases' in 'mk_skgnode',
+/// (Aliases are handled by 'collect_aliases' in 'skgnode_for_orgnode_in_tree',
 /// when 'saveinstructions_from_tree' is called on the orgnode ancestor they describe.)
 /// (Indefinitive nodes represent views and don't contribute to saves.)
 fn saveinstructions_from_tree(
@@ -41,14 +41,14 @@ fn saveinstructions_from_tree(
       } else {
         NonMerge_NodeAction::Save };
     let skg_node: SkgNode =
-      mk_skgnode ( node_data, &node_ref )?;
+      skgnode_for_orgnode_in_tree ( node_data, &node_ref )?;
     result . push (( skg_node, save_action )); }
   for child in node_ref.children() {
     // Recurse over children, even if their parent is indefinitive.
     saveinstructions_from_tree ( child, result)?; }
   Ok (( )) }
 
-fn mk_skgnode (
+fn skgnode_for_orgnode_in_tree (
   orgnode: &OrgNode,
   noderef: &NodeRef<OrgNode> // the same node, but in the tree
 ) -> Result<SkgNode, String> {
