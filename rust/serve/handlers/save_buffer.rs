@@ -3,7 +3,7 @@ use crate::from_text::buffer_to_save_instructions;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph;
 use crate::types::errors::SaveError;
-use crate::merge::merge_nodes_in_three_systems;
+use crate::merge::merge_nodes;
 use crate::to_org::complete::contents::completeOrgnodeForest_collectingDefinitiveRequests;
 use crate::to_org::expand::definitive::execute_definitive_view_requests;
 use crate::media::tree::pair_forest_with_save_instructions;
@@ -141,7 +141,7 @@ async fn update_from_and_rerender_buffer (
     tantivy_index,
     typedb_driver ) . await ?;
 
-  merge_nodes_in_three_systems (
+  merge_nodes (
     mergeInstructions,
     config.clone(),
     tantivy_index,

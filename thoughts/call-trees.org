@@ -17,8 +17,6 @@
 ///              - doesn't have a SubscribeeCol child
 *** collect_rels_to_children_from_generation
 **** content_ids_if_definitive_else_empty
-***** content_ids_from_skgnode
-****** TODO does not deserve definition
 *** add_last_generation_and_edit_previous_in_forest
 **** fetch_and_append_child_pair
 ***** DUP skgnode_and_orgnode_from_id
@@ -100,7 +98,7 @@
 ***** create_documents_from_node
 ****** replace_each_link_with_its_label
 **** commit_with_status
-** merge_nodes_in_three_systems
+** merge_nodes
 *** merge_nodes_in_typedb
 **** merge_one_node_in_typedb
 ***** reroute_relationships_for_merge
