@@ -18,9 +18,9 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
                     * (skg (id 1) (code (merge 2))) 1
                 "};
 
-                let trees = org_to_uninterpreted_nodes(input)?;
+                let forest = org_to_uninterpreted_nodes(input)?;
                 let merge_instructions =
-                    instructiontriples_from_the_merges_in_an_orgnode_forest(&trees, config, driver)
+                    instructiontriples_from_the_merges_in_an_orgnode_forest(&forest, config, driver)
                         .await?;
 
                 // Should produce exactly 1 MergeInstructionTriple

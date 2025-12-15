@@ -40,7 +40,7 @@ pub use validate_foreign_nodes::{
   validate_merges_involve_only_owned_nodes,
 };
 
-/// Builds a forest of OrgNodes:
+/// Builds a "forest" (a tree with a ForestRoot) of OrgNodes:
 ///   - Fills in information via 'add_missing_info_to_forest'.
 ///   - Reconciles duplicates via 'reconcile_same_id_instructions'
 /// Outputs that plus a forest of SaveInstructions, plus MergeInstructionTriples.
@@ -49,11 +49,11 @@ pub async fn buffer_to_save_instructions (
   config      : &SkgConfig,
   driver      : &TypeDBDriver
 ) -> Result<
-    ( Vec<Tree<OrgNode>>,
+    ( Tree<OrgNode>,
       Vec<SaveInstruction>,
       Vec<MergeInstructionTriple>
     ), SaveError> {
-  let mut orgnode_forest : Vec<Tree<OrgNode>> =
+  let mut orgnode_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
   add_missing_info_to_forest (

@@ -50,13 +50,13 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut trees: Vec<Tree<OrgNode>> =
+    let mut forest: Tree<OrgNode> =
       org_to_uninterpreted_nodes (&buffer_text)?;
     add_missing_info_to_forest(
-      &mut trees, &config.db_name, &driver).await?;
+      &mut forest, &config.db_name, &driver).await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
-        &trees, &config, &driver).await?;
+        &forest, &config, &driver).await?;
 
     { let root_without_source_errors: Vec<&BufferValidationError>
       = ( errors.iter()

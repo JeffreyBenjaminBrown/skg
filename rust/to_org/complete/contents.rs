@@ -19,28 +19,26 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 /// CALLS 'completeAndRestoreNode_collectingViewRequests'
-///   on each tree, and thus on each node in the forest,
-/// threading 'visited' through the forest (rather than
-/// restarting with an empty 'visited' set in each tree).
+///   on each "tree root" (child of ForestRoot) in the forest,
+/// threading 'visited' through the forest.
 ///
 /// RETURNS (visited, view_requests).
 pub async fn completeAndRestoreForest_collectingViewRequests (
-  forest        : &mut Vec < PairTree >,
+  forest        : &mut PairTree,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
 ) -> Result < ( VisitedMap,
-                Vec < // view_requests
-                    ( usize, // which tree in the forest
-                      NodeId,
-                      ViewRequest ) > ),
+                Vec < ( NodeId, ViewRequest ) > ),
               Box<dyn Error> > {
   let mut visited : VisitedMap = VisitedMap::new ();
-  let mut view_requests : Vec < (usize, NodeId, ViewRequest) > = Vec::new ();
-  for (tree_idx, tree) in forest . iter_mut () . enumerate () {
-    let root_id : NodeId =
-      tree . root () . id ();
+  let mut view_requests : Vec < (NodeId, ViewRequest) > = Vec::new ();
+  let tree_root_ids : Vec < NodeId > =
+    forest . root () . children ()
+    . map ( |c| c . id () )
+    . collect ();
+  for tree_root_id in tree_root_ids {
     completeAndRestoreNode_collectingViewRequests (
-      tree, root_id, tree_idx, config, typedb_driver,
+      forest, tree_root_id, config, typedb_driver,
       &mut visited, &mut view_requests ) . await ?; }
   Ok (( visited, view_requests )) }
 
@@ -59,11 +57,10 @@ pub async fn completeAndRestoreForest_collectingViewRequests (
 fn completeAndRestoreNode_collectingViewRequests<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
-  tree_idx             : usize,
   config               : &'a SkgConfig,
   typedb_driver        : &'a TypeDBDriver,
   visited              : &'a mut VisitedMap,
-  view_requests_out    : &'a mut Vec < (usize, NodeId, ViewRequest) >,
+  view_requests_out    : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -83,7 +80,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
       mark_visited_or_repeat_or_cycle (
-        tree, tree_idx, node_id, visited ) ?;
+        tree, node_id, visited ) ?;
       { if is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, node_id ) ?;
@@ -92,18 +89,17 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
             tree, node_id, config, typedb_driver ). await ?; }
         map_completeAndRestoreNodeCollectingViewRequests_over_children (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
-          tree, node_id, tree_idx, config, typedb_driver,
+          tree, node_id, config, typedb_driver,
           visited, view_requests_out ) . await ?; }
       collect_view_requests (
-        tree, node_id, tree_idx, view_requests_out ) ?; }
+        tree, node_id, view_requests_out ) ?; }
     Ok (( )) } ) }
 
 /// Collect all view requests from a node and append them to the output vector.
 fn collect_view_requests (
   tree              : &PairTree,
   node_id           : NodeId,
-  tree_idx          : usize,
-  view_requests_out : &mut Vec < (usize, NodeId, ViewRequest) >,
+  view_requests_out : &mut Vec < (NodeId, ViewRequest) >,
 ) -> Result < (), Box<dyn Error> > {
   let node_view_requests : Vec < ViewRequest > = {
     let node_ref : NodeRef < NodePair > =
@@ -112,7 +108,7 @@ fn collect_view_requests (
     node_ref . value () . 1 . metadata . code . viewRequests
       . iter () . cloned () . collect () };
   for request in node_view_requests {
-    view_requests_out . push ( (tree_idx, node_id, request) ); }
+    view_requests_out . push ( (node_id, request) ); }
   Ok (( )) }
 
 /// Completes an indefinitive orgnode using its SkgNode.
@@ -321,18 +317,17 @@ fn reorder_children (
 fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
-  tree_idx             : usize,
   config               : &'a SkgConfig,
   typedb_driver        : &'a TypeDBDriver,
   visited              : &'a mut VisitedMap,
-  view_requests_out    : &'a mut Vec < (usize, NodeId, ViewRequest) >,
+  view_requests_out    : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     let child_ids : Vec < NodeId > =
       collect_child_ids ( tree, node_id ) ?;
     for child_id in child_ids {
       completeAndRestoreNode_collectingViewRequests (
-        tree, child_id, tree_idx, config, typedb_driver,
+        tree, child_id, config, typedb_driver,
         visited, view_requests_out ) . await ?; }
     Ok (( )) }) }
 

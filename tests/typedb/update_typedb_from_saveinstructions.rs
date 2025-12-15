@@ -28,13 +28,12 @@ fn test_update_nodes_and_relationships2 (
       ** (skg (id 1) (source main) (code indefinitive)) 1
     "};
 
-    // Parse org text to uninterpreted nodes
-    let trees : Vec<Tree<OrgNode>> =
+    let forest : Tree<OrgNode> =
       org_to_uninterpreted_nodes ( org_text )?;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
-      find_inconsistent_instructions ( & trees );
+      find_inconsistent_instructions ( & forest );
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
              inconsistent_deletions );
@@ -48,7 +47,7 @@ fn test_update_nodes_and_relationships2 (
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<SaveInstruction> =
       orgnodes_to_reconciled_save_instructions (
-        & trees, & config, & driver ) . await ?;
+        & forest, & config, & driver ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (

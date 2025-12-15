@@ -10,34 +10,33 @@ enum WhetherToDelete {
   DoNotDelete,
 }
 
-/* ASSUMES:
-The same thing 'find_buffer_errors_for_saving' assumes.
-.
-PURPOSE:
-Find contradictory instructions in a buffer the user has tried to save.
-.
-The specific problems it finds are:
-- There's a node with 'toDelete' true,
-  but another node with the same ID that has 'toDelete' false.
-- Two nodes with the same ID 'define their contents'
-  (i.e. their 'indefinitive' fields are both false).
-- Two nodes with the same ID have different sources,
-  even if some are indefinitive.
-.
-STRATEGY:
-Builds a map from IDs to sets of WhetherToDelete.
-After traversing the tree, reports every key (ID)
-for which the associated value (set) has size 2.
-Also builds a map from IDs to count of defining containers,
-and a map from IDs to sets of sources. */
+/// ASSUMES:
+/// everything 'find_buffer_errors_for_saving' assumes.
+/// .
+/// PURPOSE:
+/// Find contradictory instructions in a buffer the user asked to save.
+/// The specific problems it finds are:
+/// - There's a node with 'toDelete' true,
+///   but another node with the same ID that has 'toDelete' false.
+/// - Two nodes with the same ID 'define their contents'
+///   (i.e. their 'indefinitive' fields are both false).
+/// - Two nodes with the same ID have different sources,
+///   even if some are indefinitive.
+/// .
+/// STRATEGY:
+/// Builds a map from IDs to sets of WhetherToDelete.
+/// After traversing the tree, reports every key (ID)
+/// for which the associated value (set) has size 2.
+/// Also builds a map from IDs to count of defining containers,
+/// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  trees: &[Tree<OrgNode>]
+  forest: &Tree<OrgNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, HashSet<SourceNickname>)>) { // IDs with inconsistent sources
   let (id_toDelete_instructions, id_to_definer_count, id_to_sources) =
     // Find the problems
-    traverse_forest_and_collect(trees);
+    traverse_forest_and_collect(forest);
   let mut inconsistent_deletion_ids: Vec<ID> = Vec::new();
   let mut problematic_defining_ids: Vec<ID> = Vec::new();
   let mut inconsistent_source_ids: Vec<(ID, HashSet<SourceNickname>)> =
@@ -61,9 +60,9 @@ pub fn find_inconsistent_instructions(
     problematic_defining_ids,
     inconsistent_source_ids ) }
 
-/// Traverse all trees to collect delete instructions, defining containers, and sources
+/// Collect delete instructions, defining containers, and sources.
 fn traverse_forest_and_collect(
-  trees: &[Tree<OrgNode>]
+  forest: &Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // contradictory deletes
       HashMap<ID, usize>, // multiple defining containers
       HashMap<ID, HashSet<SourceNickname>>) { // inconsistent sources
@@ -76,12 +75,11 @@ fn traverse_forest_and_collect(
   let mut id_to_sources
     : HashMap<ID, HashSet<SourceNickname>>
     = HashMap::new();
-  for tree in trees {
-    traverse_node_recursively_and_collect(
-      tree.root(),
-      &mut id_toDelete_instructions,
-      &mut id_to_definer_count,
-      &mut id_to_sources); }
+  traverse_node_recursively_and_collect(
+    forest.root(),
+    &mut id_toDelete_instructions,
+    &mut id_to_definer_count,
+    &mut id_to_sources);
   (id_toDelete_instructions, id_to_definer_count, id_to_sources) }
 
 /// Traverse a single node and its children to collect delete instructions, defining containers, and sources

@@ -15,21 +15,20 @@ use typedb_driver::TypeDBDriver;
 /// TODO ? This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
 pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
-  forest: &[Tree<OrgNode>],
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
             Box<dyn Error>> {
   let mut triples: Vec<MergeInstructionTriple> =
     Vec::new();
-  for tree in forest {
-    for edge in tree.root().traverse() {
-      if let ego_tree::iter::Edge::Open(node_ref) = edge {
-        let node: &OrgNode = node_ref.value();
-        let node_triples : Vec<MergeInstructionTriple> =
-          saveinstructions_from_the_merge_in_an_orgnode(
-            node, config, driver).await?;
-        triples.extend(node_triples); }} }
+  for edge in forest.root().traverse() {
+    if let ego_tree::iter::Edge::Open(node_ref) = edge {
+      let node: &OrgNode = node_ref.value();
+      let node_triples : Vec<MergeInstructionTriple> =
+        saveinstructions_from_the_merge_in_an_orgnode(
+          node, config, driver).await?;
+      triples.extend(node_triples); } }
   Ok(triples) }
 
 /// PURPOSE: The name and type signature say it all.

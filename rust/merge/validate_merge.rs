@@ -26,7 +26,7 @@ struct MergeValidationData<'a> {
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_merge_requests(
-  forest: &[Tree<OrgNode>],
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
@@ -62,7 +62,7 @@ pub async fn validate_merge_requests(
   Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
-  forest: &'a [Tree<OrgNode>],
+  forest: &'a Tree<OrgNode>,
 ) -> MergeValidationData<'a> {
   let mut acquirer_orgnodes: Vec<&OrgNode> =
     Vec::new();
@@ -72,9 +72,8 @@ fn collect_merge_validation_data<'a>(
     HashMap::new();
   let mut to_delete_ids: HashSet<ID> =
     HashSet::new();
-  for tree in forest {
-    for edge in tree.root().traverse() {
-      if let ego_tree::iter::Edge::Open(node_ref) = edge {
+  for edge in forest.root().traverse() {
+    if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let orgnode: &OrgNode = node_ref.value();
         if matches!(orgnode.metadata.code.editRequest,
                     Some(EditRequest::Delete)) {
@@ -93,7 +92,7 @@ fn collect_merge_validation_data<'a>(
               acquiree_to_acquirers // Mutate!
                 .entry(acquiree_id.clone())
                 .or_insert_with(HashSet::new)
-                .insert(acquirer_id.clone()); }} }} }
+                .insert(acquirer_id.clone()); }} }}
   MergeValidationData { acquirer_orgnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,

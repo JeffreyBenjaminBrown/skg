@@ -13,8 +13,8 @@ fn test_first_in_generation_root() -> Result<(), Box<dyn Error>> {
   let tree: Tree<String> =
     build_binary_tree(1);
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 1)?;
-  assert!(result.is_some(), "Generation 1 should exist (root)");
+    first_in_generation(&tree, 0)?;
+  assert!(result.is_some(), "Generation 0 should exist (root)");
   assert_eq!(result.unwrap().value(), "1");
   Ok(())
 }
@@ -25,9 +25,9 @@ fn test_first_in_generation_first_child(
   let tree: Tree<String> =
     build_binary_tree(2);
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 2)?;
+    first_in_generation(&tree, 1)?;
   assert!(result.is_some(),
-          "Generation 2 should exist (first child)");
+          "Generation 1 should exist (first child)");
   assert_eq!(result.unwrap().value(), "11",
              "Should return first child");
   Ok(()) }
@@ -38,9 +38,9 @@ fn test_first_in_generation_grandchild(
   let tree: Tree<String> =
     build_binary_tree(3);
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 3)?;
+    first_in_generation(&tree, 2)?;
   assert!(result.is_some(),
-          "Generation 3 should exist (grandchild)");
+          "Generation 2 should exist (grandchild)");
   assert_eq!(result.unwrap().value(), "111",
              "Should return first grandchild");
   Ok(()) }
@@ -51,11 +51,11 @@ fn test_first_in_generation_deep_tree(
   let tree: Tree<String> =
     build_binary_tree(5);
   for (generation_num, expected_value) in [
-    (1, "1"),
-    (2, "11"),
-    (3, "111"),
-    (4, "1111"),
-    (5, "11111")
+    (0, "1"),
+    (1, "11"),
+    (2, "111"),
+    (3, "1111"),
+    (4, "11111")
   ] {
     let result: Option<ego_tree::NodeRef<String>> =
       first_in_generation(&tree, generation_num)?;
@@ -70,21 +70,24 @@ fn test_first_in_generation_nonexistent(
   let tree: Tree<String> =
     build_binary_tree(1);
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 2)?;
-  assert!(result.is_none(), "Generation 2 should not exist");
+    first_in_generation(&tree, 1)?;
+  assert!(result.is_none(), "Generation 1 should not exist");
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 10)?;
-  assert!(result.is_none(), "Generation 10 should not exist");
+    first_in_generation(&tree, 9)?;
+  assert!(result.is_none(), "Generation 9 should not exist");
   Ok(()) }
 
 #[test]
-fn test_first_in_generation_invalid_input() {
+fn test_first_in_generation_zero_is_valid(
+) -> Result<(), Box<dyn Error>> {
+  // Generation 0 is valid, and returns the root
   let tree: Tree<String> =
     build_binary_tree(1);
-  let result: Result<Option<ego_tree::NodeRef<String>>, Box<dyn Error>>
-    = first_in_generation(&tree, 0);
-  assert!(result.is_err(), "Generation 0 should return an error");
-  assert!(result.unwrap_err().to_string().contains("must be >= 1")); }
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation(&tree, 0)?;
+  assert!(result.is_some(), "Generation 0 should return the root");
+  assert_eq!(result.unwrap().value(), "1");
+  Ok(()) }
 
 #[test]
 fn test_first_in_generation_skips_childless_nodes(
@@ -102,13 +105,13 @@ fn test_first_in_generation_skips_childless_nodes(
     tree.root_mut().append(3).id();
   tree.get_mut(child2_id).unwrap().append(4);
 
-  // Generation 3 exists!
+  // Generation 2 exists.
   // Algorithm should skip node 2 (no children) and find 4 via node 3
   let result: Option<ego_tree::NodeRef<i32>> =
-    first_in_generation(&tree, 3)?;
-  assert!(result.is_some(), "Generation 3 should exist");
+    first_in_generation(&tree, 2)?;
+  assert!(result.is_some(), "Generation 2 should exist");
   assert_eq!(result.unwrap().value(), &4,
-             "Should find node 4 by searching through generation 2");
+             "Should find node 4 by searching through generation 1");
   Ok(()) }
 
 #[test]
@@ -135,25 +138,25 @@ fn test_first_in_generation_with_deleted_subtrees(
     while node_121_mut.first_child().is_some() {
       node_121_mut.first_child().unwrap().detach(); }}
 
+  let gen1: Option<ego_tree::NodeRef<String>> =
+    first_in_generation(&tree, 1)?;
+  assert_eq!(gen1.unwrap().value(), "11",
+    "First in generation 1 should be 11");
+
   let gen2: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&tree, 2)?;
-  assert_eq!(gen2.unwrap().value(), "11",
-    "First in generation 2 should be 11");
+  assert_eq!(gen2.unwrap().value(), "121",
+    "First in generation 2 should be 121 (11 has no children)");
 
   let gen3: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&tree, 3)?;
-  assert_eq!(gen3.unwrap().value(), "121",
-    "First in generation 3 should be 121 (11 has no children)");
+  assert_eq!(gen3.unwrap().value(), "1221",
+    "First in generation 3 should be 1221 (121 has no children)");
 
   let gen4: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&tree, 4)?;
-  assert_eq!(gen4.unwrap().value(), "1221",
-    "First in generation 4 should be 1221 (121 has no children)");
-
-  let gen5: Option<ego_tree::NodeRef<String>> =
-    first_in_generation(&tree, 5)?;
-  assert_eq!(gen5.unwrap().value(), "12211",
-    "First in generation 5 should be 12211");
+  assert_eq!(gen4.unwrap().value(), "12211",
+    "First in generation 4 should be 12211");
 
   Ok(()) }
 
@@ -350,56 +353,57 @@ fn test_first_in_generation_in_forest() -> Result<(), Box<dyn Error>> {
   let forest: Vec<Tree<String>> =
     vec![tree_a, tree_b, tree_c];
 
-  // Search for generation 1 - should find Tree A's root
+  // Search for generation 0 - should find Tree A's root
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation_in_forest(&forest, 0)?;
+  assert_eq!(result.unwrap().value(), "A",
+    "Generation 0 should be first tree's root");
+
+  // Search for generation 1 - should find A1 in Tree A
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation_in_forest(&forest, 1)?;
-  assert_eq!(result.unwrap().value(), "A",
-    "Generation 1 should be first tree's root");
+  assert_eq!(result.unwrap().value(), "A1",
+    "Generation 1 should be A1");
 
-  // Search for generation 2 - should find A1 in Tree A
+  // Search for generation 2 - Tree A doesn't have it, should find B11 in Tree B
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation_in_forest(&forest, 2)?;
-  assert_eq!(result.unwrap().value(), "A1",
-    "Generation 2 should be A1");
+  assert_eq!(result.unwrap().value(), "B11",
+    "Generation 2 should be B11 from Tree B");
 
-  // Search for generation 3 - Tree A doesn't have it, should find B11 in Tree B
+  // Search for generation 3 - only Tree B has it (B111)
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation_in_forest(&forest, 3)?;
-  assert_eq!(result.unwrap().value(), "B11",
-    "Generation 3 should be B11 from Tree B");
+  assert_eq!(result.unwrap().value(), "B111",
+    "Generation 3 should be B111 from Tree B");
 
-  // Search for generation 4 - only Tree B has it (B111)
+  // Search for generation 4 - no tree has it
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation_in_forest(&forest, 4)?;
-  assert_eq!(result.unwrap().value(), "B111",
-    "Generation 4 should be B111 from Tree B");
-
-  // Search for generation 5 - no tree has it
-  let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 5)?;
   assert!(result.is_none(),
-    "Generation 5 should not exist in any tree");
+    "Generation 4 should not exist in any tree");
 
   Ok(()) }
 
 #[test]
-fn test_collect_generation_ids_error_on_zero() {
+fn test_collect_generation_ids_zero_is_valid() {
+  // Generation 0 is valid and returns the root
   let tree: Tree<i32> = Tree::new(1);
   let result = collect_generation_ids(&tree, 0, None);
-  assert!(result.is_err());
-  assert_eq!(result.unwrap_err().to_string(), "Generation must be >= 1");
+  assert!(result.is_ok());
+  let ids = result.unwrap();
+  assert_eq!(ids.len(), 1);
+  assert_eq!(tree.get(ids[0]).unwrap().value(), &1);
 }
-
 
 #[test]
 fn test_collect_generation_ids_success() {
   let tree: Tree<i32> = Tree::new(1);
-  let result = collect_generation_ids(&tree, 1, None);
+  let result = collect_generation_ids(&tree, 0, None);
   assert!(result.is_ok());
   let ids = result.unwrap();
   assert_eq!(ids.len(), 1);
 }
-
 
 // Helper function to find a node by its label
 fn find_node_by_label<'a>(

@@ -3,7 +3,7 @@ use crate::media::typedb::search::{
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::util::collect_ids_from_pair_forest;
+use crate::to_org::util::collect_ids_from_pair_tree;
 use crate::types::{ID, SkgConfig};
 use crate::types::trees::PairTree;
 
@@ -24,29 +24,29 @@ struct MapsFromIdForView {
 
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
+/// Forest is a single tree with ForestRoot at root.
 pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut [PairTree],
+  forest : &mut PairTree,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let rel_data : MapsFromIdForView =
     mapsFromIdForView_from_forest (
       forest, config, driver ) . await ?;
-  for tree in forest {
-    let root_id : NodeId =
-      tree . root () . id ();
-    set_metadata_relationships_in_node_recursive (
-      tree,
-      root_id,
-      None,
-      & rel_data ); }
+  let root_id : NodeId = forest . root () . id ();
+  set_metadata_relationships_in_node_recursive (
+    forest,
+    root_id,
+    None,
+    & rel_data );
   Ok (( )) }
 
-/// Build MapsFromIdForView from a forest of PairTrees.
+/// Build MapsFromIdForView from a forest
+/// (a single tree with ForestRoot as root).
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
 async fn mapsFromIdForView_from_forest (
-  forest : &[PairTree],
+  forest : &PairTree,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
@@ -54,7 +54,7 @@ async fn mapsFromIdForView_from_forest (
     // This function just collects IDs,
     // but in this context we know they are specifically PIDs,
     // because they all came from 'forest_from_root_ids'.
-    collect_ids_from_pair_forest ( forest ));
+    collect_ids_from_pair_tree ( forest ));
   fetch_relationship_data (
     driver,
     & config . db_name,

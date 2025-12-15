@@ -10,7 +10,7 @@ use std::error::Error;
 use skg::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
 use skg::to_org::expand::definitive::execute_view_requests;
 use skg::org_to_text::orgnode_forest_to_string;
-use skg::media::tree::pair_forest_with_save_instructions;
+use skg::media::tree::pair_orgnode_forest_with_save_instructions;
 use skg::from_text::buffer_to_save_instructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::SkgConfig;
@@ -31,9 +31,9 @@ async fn complete_and_expand_definitive (
     buffer_to_save_instructions ( input_org_text, &config, driver )
     . await ?;
   let mut errors : Vec < String > = Vec::new ();
-  let mut paired_forest : Vec < PairTree > =
-    pair_forest_with_save_instructions (
-      orgnode_forest,
+  let mut paired_forest : PairTree =
+    pair_orgnode_forest_with_save_instructions (
+      &orgnode_forest,
       &save_instructions );
   let (mut visited, view_requests) =
     completeAndRestoreForest_collectingViewRequests (
@@ -47,7 +47,7 @@ async fn complete_and_expand_definitive (
     driver,
     &mut visited,
     &mut errors ) . await ?;
-  Ok ( orgnode_forest_to_string ( & paired_forest ) ) }
+  orgnode_forest_to_string ( & paired_forest ) }
 
 // ===================================================
 // Test: Definitive view with limit=10

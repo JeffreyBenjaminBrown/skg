@@ -3,22 +3,26 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
-use skg::to_org::util::{VisitedMap, mark_visited_or_repeat_or_cycle};
-use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
-use skg::test_utils::{
-  run_with_test_db, orgnode_forest_to_paired, render_paired_forest_to_org};
-use skg::types::{ID, OrgNode, SkgConfig};
-use skg::types::trees::PairTree;
 use ego_tree::{Tree, NodeId};
+use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
+use skg::org_to_text::orgnode_forest_to_string;
+use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
+use skg::to_org::util::{VisitedMap, mark_visited_or_repeat_or_cycle};
+use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
+use skg::types::trees::PairTree;
+use skg::types::{ID, OrgNode, SkgConfig};
+
+/// Get the NodeId of the first "tree root" (child of ForestRoot)
+fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
+  forest . root () . first_child () . unwrap () . id () }
 
 /// Helper to call ensure_skgnode, mark_visited_or_repeat_or_cycle,
 /// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
-/// (matches the pattern used in completeAndRestoreNode_collectingDefinitiveRequests)
+/// (matches the pattern used in completeAndRestoreNode_collectingViewRequests).
+/// TODO: Unify with completeAndRestoreNode_collectingViewRequests.
 async fn check_and_complete (
   tree     : &mut PairTree,
   node_id  : NodeId,
-  tree_idx : usize,
   config   : &SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
   visited  : &mut VisitedMap,
@@ -26,7 +30,7 @@ async fn check_and_complete (
   ensure_skgnode (
     tree, node_id, config, driver ) . await ?;
   mark_visited_or_repeat_or_cycle (
-    tree, tree_idx, node_id, visited ) ?;
+    tree, node_id, visited ) ?;
   let is_indefinitive : bool = {
     // 'mark_visited_or_repeat_or_cycle' may have changed this value.
     let node_ref = tree . get ( node_id )
@@ -64,18 +68,16 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     " };
 
   { // Test running on root with empty visited
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
-      tree . root () . id ();
+      first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
     check_and_complete ( // processes root but *not* its descendents
-      tree, root_id, 0, config, driver, &mut visited ) . await ?;
+      &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -84,7 +86,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
         *** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
-      render_paired_forest_to_org ( & forest );
+      orgnode_forest_to_string ( & forest ) ?;
     assert_eq! (
       output_org_text, expected_output,
       "Running on root with empty visited should fetch canonical info for indefinitive node" );
@@ -93,20 +95,18 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       "Visited should be empty, because we only ran it on the indefinitive root" ); }
 
   { // Test running on root with 'a' in visited
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
-      tree . root () . id ();
+      first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
     // Pre-populate visited with 'a' at a dummy location
-    visited . insert ( ID::new ( "a" ), (0, root_id) );
+    visited . insert ( ID::new ( "a" ), root_id );
     check_and_complete (
-      tree, root_id, 0, config, driver, &mut visited ). await ?;
+      &mut forest, root_id, config, driver, &mut visited ). await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -115,7 +115,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
         *** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
-      render_paired_forest_to_org ( & forest );
+      orgnode_forest_to_string ( & forest ) ?;
     assert_eq! (
       output_org_text, expected_output,
       "Since ID 'a' was in 'visited', orgnode for 'a' should be marked 'indefinitive' with source, but children preserved." );
@@ -128,21 +128,20 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
   }
 
   { // Test running on second node (c)
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let second_node_id : ego_tree::NodeId =
-      tree . root ()
-      . first_child () . unwrap ()
+      forest . root ()
+      . first_child () . unwrap () // first "tree root"
+      . first_child () . unwrap () // first child of that
       . id ();
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
     check_and_complete (
-      tree, second_node_id, 0, config, driver, &mut visited ) . await ?;
+      &mut forest, second_node_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -151,7 +150,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
         *** (skg (id d) (code (interp parentIgnores))) d
       " };
     assert_eq! (
-      render_paired_forest_to_org ( & forest ),
+      orgnode_forest_to_string ( & forest ) ?,
       expected_output,
       "Running on second indefinitive node should fetch canonical info from disk" );
   }
@@ -185,19 +184,17 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with empty visited
     {
-      let orgnode_forest : Vec < Tree < OrgNode > > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
-      let mut forest : Vec < PairTree > =
+      let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
-      let tree : &mut PairTree =
-        & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
-        tree . root () . id ();
+        first_tree_root_id ( &forest );
       let mut visited : VisitedMap =
         VisitedMap::new ();
 
       check_and_complete (
-        tree, root_id, 0, config, driver, &mut visited ) . await ?;
+        &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -206,7 +203,7 @@ async fn test_visited_and_indefinitive_logic (
           *** (skg (id d) (code (interp parentIgnores))) d
         " };
       let output_org_text : String =
-        render_paired_forest_to_org ( & forest );
+        orgnode_forest_to_string ( & forest ) ?;
       assert_eq! (
         output_org_text, expected_output,
         "indefinitive root with empty visited should fetch canonical info from disk" );
@@ -214,20 +211,18 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with 'a' in visited - should mark as repeated
     {
-      let orgnode_forest : Vec < Tree < OrgNode > > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
-      let mut forest : Vec < PairTree > =
+      let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
-      let tree : &mut PairTree =
-        & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
-        tree . root () . id ();
+        first_tree_root_id ( &forest );
       let mut visited : VisitedMap =
         VisitedMap::new ();
-      visited . insert ( ID::new ( "a" ), (0, root_id) );
+      visited . insert ( ID::new ( "a" ), root_id );
 
       check_and_complete (
-        tree, root_id, 0, config, driver, &mut visited ) . await ?;
+        &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -236,7 +231,7 @@ async fn test_visited_and_indefinitive_logic (
           *** (skg (id d) (code (interp parentIgnores))) d
         " };
       let output_org_text : String =
-        render_paired_forest_to_org ( & forest );
+        orgnode_forest_to_string ( & forest ) ?;
       assert_eq! (
         output_org_text, expected_output,
         "indefinitive root with ID in visited should get canonical info from disk" );
@@ -255,19 +250,17 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from root
     {
-      let orgnode_forest : Vec < Tree < OrgNode > > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
-      let mut forest : Vec < PairTree > =
+      let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
-      let tree : &mut PairTree =
-        & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
-        tree . root () . id ();
+        first_tree_root_id ( &forest );
       let mut visited : VisitedMap =
         VisitedMap::new ();
 
       check_and_complete (
-        tree, root_id, 0, config, driver, &mut visited ) . await ?;
+        &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
         indoc! { "
@@ -277,7 +270,7 @@ async fn test_visited_and_indefinitive_logic (
           **** (skg (id d)) d
         " };
       let output_org_text : String =
-        render_paired_forest_to_org ( & forest );
+        orgnode_forest_to_string ( & forest ) ?;
       assert_eq! (
         output_org_text, expected_output,
         "Self-referential indefinitive root should fetch canonical info from disk" );
@@ -285,24 +278,23 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from second node
     {
-      let orgnode_forest : Vec < Tree < OrgNode > > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
-      let mut forest : Vec < PairTree > =
+      let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
-      let tree : &mut PairTree =
-        & mut forest [ 0 ];
       let root_id : ego_tree::NodeId =
-        tree . root () . id ();
+        first_tree_root_id ( &forest );
       let second_node_id : ego_tree::NodeId =
-        tree . root ()
-        . first_child () . unwrap ()
+        forest . root ()
+        . first_child () . unwrap () // first "tree root"
+        . first_child () . unwrap () // first child
         . id ();
       let mut visited : VisitedMap =
         VisitedMap::new ();
-      visited . insert ( ID::new ( "d" ), (0, root_id) );
+      visited . insert ( ID::new ( "d" ), root_id );
 
       check_and_complete (
-        tree, second_node_id, 0, config, driver, &mut visited ) . await ?;
+        &mut forest, second_node_id, config, driver, &mut visited ) . await ?;
 
       let expected_output_from_second : &str =
         indoc! { "
@@ -312,7 +304,7 @@ async fn test_visited_and_indefinitive_logic (
           **** (skg (id d)) d
         " };
       let output_org_text : String =
-        render_paired_forest_to_org ( & forest );
+        orgnode_forest_to_string ( & forest ) ?;
       assert_eq! (
         output_org_text, expected_output_from_second,
         "Self-referential second node should become indefinitive with source, but children preserved" );
@@ -346,22 +338,20 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with 'a' in visited
   {
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
-      tree . root () . id ();
+      first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
-    visited . insert ( ID::new ( "a" ), (0, root_id) );
+    visited . insert ( ID::new ( "a" ), root_id );
     let visited_keys_before : Vec < ID > =
       visited . keys () . cloned () . collect ();
 
     check_and_complete (
-      tree, root_id, 0, config, driver, &mut visited ) . await ?;
+      &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -370,7 +360,7 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
-      render_paired_forest_to_org ( & forest );
+      orgnode_forest_to_string ( & forest ) ?;
     assert_eq! (
       output_org_text, expected_output,
       "Node 'a' in visited should become indefinitive with source, but children preserved" );
@@ -383,19 +373,17 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with empty visited
   {
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
-      tree . root () . id ();
+      first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
     check_and_complete (
-      tree, root_id, 0, config, driver, &mut visited ) . await ?;
+      &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -405,7 +393,7 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id c)) c
       " };
     let output_org_text : String =
-      render_paired_forest_to_org ( & forest );
+      orgnode_forest_to_string ( & forest ) ?;
     assert_eq! (
       output_org_text, expected_output,
       "Node 'a' not in visited should be completed from disk" );
@@ -423,19 +411,17 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id d) (code (interp parentIgnores))) d
       " };
 
-    let orgnode_forest : Vec < Tree < OrgNode > > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_with_existing_content ) ?;
-    let mut forest : Vec < PairTree > =
+    let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
-    let tree : &mut PairTree =
-      & mut forest [ 0 ];
     let root_id : ego_tree::NodeId =
-      tree . root () . id ();
+      first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
     check_and_complete (
-      tree, root_id, 0, config, driver, &mut visited ) . await ?;
+      &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
       indoc! { "
@@ -445,7 +431,7 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id c) (source main)) c
       " };
     let output_org_text : String =
-      render_paired_forest_to_org ( & forest );
+      orgnode_forest_to_string ( & forest ) ?;
     assert_eq! (
       output_org_text, expected_output,
       "Content should be reordered and completed from disk" );
@@ -476,19 +462,17 @@ async fn test_false_content_logic (
       ** (skg (id d)) d
     " };
 
-  let orgnode_forest : Vec < Tree < OrgNode > > =
+  let orgnode_forest : Tree < OrgNode > =
     org_to_uninterpreted_nodes ( input_org_text ) ?;
-  let mut forest : Vec < PairTree > =
+  let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );
-  let tree : &mut PairTree =
-    & mut forest [ 0 ];
   let root_id : ego_tree::NodeId =
-    tree . root () . id ();
+    first_tree_root_id ( &forest );
   let mut visited : VisitedMap =
     VisitedMap::new ();
 
   check_and_complete (
-    tree, root_id, 0, config, driver, &mut visited ) . await ?;
+    &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
   let expected_output : &str =
     indoc! { "
@@ -498,7 +482,7 @@ async fn test_false_content_logic (
       ** (skg (id c)) c
     " };
   let output_org_text : String =
-    render_paired_forest_to_org ( & forest );
+    orgnode_forest_to_string ( & forest ) ?;
   assert_eq! (
     output_org_text, expected_output,
     "False content 'd' should be marked parentIgnores and moved first" );

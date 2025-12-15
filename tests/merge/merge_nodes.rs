@@ -5,6 +5,7 @@ use skg::merge::{
   merge_nodes};
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
+use skg::types::orgnode::forest_root_orgnode;
 use skg::media::file_io::read_skgnode;
 use skg::util::path_from_pid_and_source;
 use skg::media::typedb::search::{
@@ -71,8 +72,8 @@ async fn test_merge_2_into_1_impl(
         viewRequests: HashSet::new(), }, },
     title: "1".to_string(),
     body: None, };
-  let forest: Vec<Tree<OrgNode>> =
-    vec![Tree::new(org_node_1)];
+  let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  forest.root_mut().append(org_node_1);
 
   // Generate MergeInstructionTriple from merge request
   let merge_instructions: Vec<MergeInstructionTriple> =
@@ -351,8 +352,8 @@ async fn test_merge_1_into_2_impl(
         viewRequests: HashSet::new(), }, },
     title: "2".to_string(),
     body: None, };
-  let forest: Vec<Tree<OrgNode>> =
-    vec![Tree::new(org_node_2)];
+  let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  forest.root_mut().append(org_node_2);
 
   // Generate MergeInstructionTriple from merge request
   let merge_instructions: Vec<MergeInstructionTriple> =

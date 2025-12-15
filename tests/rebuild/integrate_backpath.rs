@@ -35,14 +35,16 @@ async fn test_path_with_cycle_impl(
     *** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.root().children().count(), 1,
+             "Should have exactly 1 tree");
 
-  let mut trees: Vec<PairTree> =
+  let mut forest: PairTree =
     orgnode_forest_to_paired(orgnode_trees);
-  let tree = &mut trees[0];
-  let root_id = tree.root().id();
+  let tree_root_id =
+    forest . root () . first_child () . unwrap () . id ();
+  let root_id = tree_root_id;
 
   // Setup backpath data
   let path = vec![
@@ -56,7 +58,7 @@ async fn test_path_with_cycle_impl(
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree, root_id, path, branches,
+    &mut forest, root_id, path, branches,
     cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
@@ -68,11 +70,12 @@ async fn test_path_with_cycle_impl(
     *** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Vec<Tree<OrgNode>> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
+      &forest, &expected_trees),
     "Tree structure after integrating path with cycle should match expected"
   );
 
@@ -102,17 +105,17 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.root().children().count(), 1,
+             "Should have exactly 1 tree");
 
-  let mut trees: Vec<PairTree> =
+  let mut forest: PairTree =
     orgnode_forest_to_paired(orgnode_trees);
-  let tree = &mut trees[0];
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
-  for edge in tree.root().traverse() {
+  for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
       if let Some(ref id) = node_ref.value().1.metadata.id {
         if id.0 == "1" {
@@ -138,7 +141,7 @@ async fn test_path_with_branches_no_cycle_impl(
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree, node_1_id, path, branches,
+    &mut forest, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
@@ -152,11 +155,12 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Vec<Tree<OrgNode>> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
+      &forest, &expected_trees),
     "Tree structure after integrating path with branches (no cycle) should match expected"
   );
 
@@ -186,17 +190,17 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Vec<Tree<OrgNode>> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
-  assert_eq!(orgnode_trees.len(), 1, "Should have exactly 1 tree");
+  assert_eq!(orgnode_trees.root().children().count(), 1,
+             "Should have exactly 1 tree");
 
-  let mut trees: Vec<PairTree> =
+  let mut forest: PairTree =
     orgnode_forest_to_paired(orgnode_trees);
-  let tree = &mut trees[0];
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
-  for edge in tree.root().traverse() {
+  for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
       if let Some(ref id) = node_ref.value().1.metadata.id {
         if id.0 == "1" {
@@ -222,7 +226,7 @@ async fn test_path_with_branches_with_cycle_impl(
 
   // Integrate the path
   integrate_path_that_might_fork_or_cycle(
-    tree, node_1_id, path, branches,
+    &mut forest, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
@@ -236,11 +240,12 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Vec<Tree<OrgNode>> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(&trees, &expected_trees),
+    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
+      &forest, &expected_trees),
     "Tree structure after integrating path with branches (with cycle) should match expected"
   );
 

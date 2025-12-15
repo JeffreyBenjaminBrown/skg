@@ -8,6 +8,7 @@ use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::util::path_from_pid_and_source;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use ego_tree::iter::Edge;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -16,15 +17,44 @@ use typedb_driver::TypeDBDriver;
 
 /// Tracks which IDs have been rendered definitively and where.
 /// - Key: the ID that was visited
-/// - Value: ( index identifying a tree in the forest,
-///            NodeId within that tree )
+/// - Value: NodeId within the forest tree
 ///
 /// Uses:
 /// - prevent duplicate definitive expansions
 /// - locate the conflict when an earlier definitive view
 ///   conflicts with a new definitive view request
 pub type VisitedMap =
-  HashMap < ID, (usize, NodeId) >;
+  HashMap < ID, NodeId >;
+
+
+// ======================================================
+// ForestRoot utilities
+// ======================================================
+
+/// Create a NodePair representing a ForestRoot.
+/// It is never rendered; it just makes forests easier to process.
+pub fn forest_root_pair () -> NodePair {
+  let mut md = default_metadata ();
+  md . code . interp = Interp::ForestRoot;
+  ( None,
+    OrgNode { metadata: md,
+              title: String::new (),
+              body: None } ) }
+
+/// Create a new forest (a tree with a ForestRoot root).
+/// The "tree roots" will be children of this root.
+pub fn new_forest () -> PairTree {
+  Tree::new ( forest_root_pair () ) }
+
+/// Check if a node is a ForestRoot.
+pub fn is_forest_root (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> bool {
+  tree . get ( node_id )
+    . map ( |node_ref| node_ref . value () . 1 . metadata . code . interp
+                        == Interp::ForestRoot )
+    . unwrap_or ( false ) }
 
 
 // ======================================================
@@ -105,12 +135,11 @@ pub fn rewrite_to_indefinitive (
 /// - build a subscribee branch if needed
 pub fn complete_branch_minus_content (
   tree     : &mut PairTree,
-  tree_idx : usize,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
   mark_visited_or_repeat_or_cycle (
-    tree, tree_idx, node_id, visited ) ?;
+    tree, node_id, visited ) ?;
   maybe_add_subscribee_col (
     tree, node_id ) ?;
   Ok (( )) }
@@ -122,7 +151,6 @@ pub fn complete_branch_minus_content (
 /// - If node is definitive, add it to visited.
 pub fn mark_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
-  tree_idx : usize,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
@@ -142,7 +170,7 @@ pub fn mark_visited_or_repeat_or_cycle (
   if is_indefinitive {
     rewrite_to_indefinitive ( tree, node_id ) ?;
   } else {
-    visited . insert ( pid, (tree_idx, node_id) ); }
+    visited . insert ( pid, node_id ); }
   Ok (( )) }
 
 /// Check if the node's PID appears in its ancestors,
@@ -166,35 +194,33 @@ pub fn detect_and_mark_cycle (
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
-/// Create a forest containing just root nodes (no children),
-/// and complete each root via complete_branch_minus_content.
+/// Create a forest (single tree with ForestRoot at root)
+/// containing just "tree root" nodes (no grandchildren yet),
+/// and complete each via complete_branch_minus_content.
 pub async fn stub_forest_from_root_ids (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut VisitedMap,
-) -> Result < Vec < PairTree >,
-              Box<dyn Error> > {
-  let mut forest : Vec < PairTree > =
-    Vec::new ();
-  for (tree_idx, root_id) in root_ids . iter () . enumerate () {
-    let (Some(tree), _) = build_node_branch_minus_content (
-      None, tree_idx, root_id, config, driver, visited
-    ) . await ? else { unreachable!() };
-    forest . push ( tree ); }
+) -> Result < PairTree, Box<dyn Error> > {
+  let mut forest : PairTree = new_forest ();
+  let forest_root_id : NodeId = forest . root () . id ();
+  for root_id in root_ids {
+    build_node_branch_minus_content (
+      Some ( (&mut forest, forest_root_id) ),
+      root_id, config, driver, visited
+    ) . await ?; }
   Ok ( forest ) }
 
-/// Collect all PIDs from a forest of PairTrees.
-pub fn collect_ids_from_pair_forest (
-  forest : &[PairTree],
+pub fn collect_ids_from_pair_tree (
+  tree : &PairTree,
 ) -> Vec < ID > {
   let mut pids : Vec < ID > = Vec::new ();
-  for tree in forest {
-    for edge in tree . root () . traverse () {
-      if let ego_tree::iter::Edge::Open ( node_ref ) = edge {
-        if let Some ( ref pid ) =
-          node_ref . value () . 1 . metadata . id {
-          pids . push ( pid . clone () ); }} }}
+  for edge in tree . root () . traverse () {
+    if let Edge::Open ( node_ref ) = edge {
+      if let Some ( ref pid ) =
+        node_ref . value () . 1 . metadata . id {
+        pids . push ( pid . clone () ); }} }
   pids }
 
 /// Check if `target_id` appears in the ancestor path of `node_id`.
@@ -275,7 +301,6 @@ pub async fn make_and_append_child_pair (
 ///   appends to tree, returns (None, branch_root_nodeid)
 pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut PairTree, NodeId)>, // if modifying an existing tree, attach as a child here
-  tree_idx        : usize, // for updating 'visited'
   node_id         : &ID, // what to fetch
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
@@ -292,14 +317,14 @@ pub async fn build_node_branch_minus_content (
             "build_node_branch_minus_content: parent not found" ) ?;
         parent_mut . append ((Some(skgnode), orgnode)) . id () };
       complete_branch_minus_content (
-        tree, tree_idx, child_node_id, visited ) ?;
+        tree, child_node_id, visited ) ?;
       Ok ( (None, child_node_id) ) },
     None => {
       let mut tree : PairTree =
         Tree::new ( (Some(skgnode), orgnode) );
       let root_node_id : NodeId = tree . root () . id ();
       complete_branch_minus_content (
-        &mut tree, tree_idx, root_node_id, visited ) ?;
+        &mut tree, root_node_id, visited ) ?;
       Ok ( (Some(tree), root_node_id) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.

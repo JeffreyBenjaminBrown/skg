@@ -33,11 +33,11 @@ pub async fn multi_root_view (
   config   : &SkgConfig,
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> > {
-  let mut forest : Vec < PairTree > =
+  let mut forest : PairTree =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
   set_metadata_relationship_viewdata_in_forest (
     &mut forest, config, driver ) . await ?;
   let buffer_content : String =
-    orgnode_forest_to_string ( & forest );
+    orgnode_forest_to_string ( & forest ) ?;
   Ok ( buffer_content ) }

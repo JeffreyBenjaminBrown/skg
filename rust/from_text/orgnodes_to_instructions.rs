@@ -17,7 +17,7 @@ use std::error::Error;
 /// (which filters out indefinitive instructions),
 /// and clobbering None fields with data from disk.
 pub async fn orgnodes_to_reconciled_save_instructions (
-  forest  : &Vec<Tree<OrgNode>>,
+  forest  : &Tree<OrgNode>, // "forest" = tree with ForestRoot
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {

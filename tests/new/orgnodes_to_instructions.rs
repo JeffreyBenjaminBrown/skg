@@ -6,6 +6,7 @@
 use indoc::indoc;
 use skg::from_text::{org_to_uninterpreted_nodes, saveinstructions_from_forest};
 use skg::types::{OrgNode, ID, SkgNode, NonMerge_NodeAction};
+use skg::types::orgnode::forest_root_orgnode;
 use ego_tree::Tree;
 
 #[test]
@@ -20,10 +21,10 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
             Root 2 body
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 3, "Should have 3 instructions");
 
@@ -66,10 +67,10 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
             Content body
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   // Should have 2 instructions: main node and content_child
   // AliasCol and Alias nodes should not appear in output
@@ -101,10 +102,10 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
             Child body
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 2);
 
@@ -126,10 +127,10 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
             ** (skg (id content1) (source main)) content node
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 2); // main and content1
 
@@ -151,10 +152,10 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
             ** (skg (id none_rel) (source main) (code (interp parentIgnores))) parentIgnores relation child
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   // Should have instructions for: root, parentIgnores, content1, content2, none_rel
   // AliasCol and Alias should be skipped
@@ -177,10 +178,10 @@ fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
             ** (skg (id level2b) (source main)) level 2b
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 5);
 
@@ -209,9 +210,9 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
             * node without ID
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let result = saveinstructions_from_forest(trees);
+  let result = saveinstructions_from_forest(forest);
 
   assert!(result.is_err(), "Should return error for missing ID");
   let error_msg = result.unwrap_err();
@@ -221,9 +222,9 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
 
 #[test]
 fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
-  let trees: Vec<Tree<OrgNode>> = vec![];
+  let forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
 }
@@ -238,10 +239,10 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
             *** (skg (id alias2) (source main) (code (interp alias))) alias two
         "};
 
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 1); // Only main node
 
@@ -267,10 +268,10 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
             * (skg (id doc2) (source main)) Document 2
             ** (skg (id ref_section) (source main) (code (interp parentIgnores))) Reference Section
         "};
-  let trees: Vec<Tree<OrgNode>> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    saveinstructions_from_forest(trees).unwrap();
+    saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 

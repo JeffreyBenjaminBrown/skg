@@ -67,7 +67,7 @@ pub enum Interp {
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
   SubscribeeCol, // Collects subscribees for its parent.
-  // TODO : SubscribeeCol is not entirely implemented yet.
+  ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
 }
 
 /// Requests for editing operations on a node.
@@ -105,6 +105,7 @@ impl fmt::Display for Interp {
         Interp::Alias => "alias",
         Interp::ParentIgnores => "parentIgnores",
         Interp::SubscribeeCol => "subscribeeCol",
+        Interp::ForestRoot => "forestRoot", // Should never be rendered
       };
     write! ( f, "{}", s ) } }
 
@@ -120,6 +121,7 @@ impl FromStr for Interp {
       "alias"         => Ok ( Interp::Alias ),
       "parentIgnores" => Ok ( Interp::ParentIgnores ),
       "subscribeeCol" => Ok ( Interp::SubscribeeCol ),
+      "forestRoot"    => Ok ( Interp::ForestRoot ),
       _ => Err ( format! ( "Unknown Interp value: {}", s )),
     }} }
 
@@ -210,6 +212,15 @@ pub fn default_metadata () -> OrgnodeMetadata {
     viewData : OrgnodeViewData::default (),
     code : OrgnodeCode::default (),
   }}
+
+/// Create an OrgNode representing a ForestRoot.
+/// This is not rendered; it just makes forests easier to process.
+pub fn forest_root_orgnode () -> OrgNode {
+  let mut md = default_metadata ();
+  md . code . interp = Interp::ForestRoot;
+  OrgNode { metadata: md,
+            title: String::new (),
+            body: None } }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_orgnodemd.

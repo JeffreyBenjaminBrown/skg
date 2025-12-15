@@ -3,6 +3,7 @@
 use indoc::indoc;
 use ego_tree::Tree;
 use skg::types::{OrgNode, BufferValidationError};
+use skg::types::orgnode::forest_root_orgnode;
 use skg::from_text::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving};
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
@@ -31,11 +32,11 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(
           input_with_errors).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
 
   assert_eq!(errors.len(), 9,
              "Should find exactly 9 validation errors (8 original + 1 Multiple_Defining_Orgnodes)");
@@ -129,9 +130,9 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(valid_input).unwrap();
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&trees, config, driver).await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
       Ok(())
@@ -146,9 +147,9 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver| Box::pin(async move {
-      // Test empty input
-      let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_trees, config, driver).await?;
+      // Test empty input (forest with just ForestRoot, no tree roots)
+      let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no errors in empty input");
       Ok(())
@@ -174,10 +175,10 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
                 ** Normal child
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       let multiple_aliascols_errors: Vec<&BufferValidationError> = errors.iter()
         .filter(|e| matches!(e, BufferValidationError::Multiple_AliasCols_in_Children(_)))
@@ -210,10 +211,10 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
                 ** (skg (id 1)) 1
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
         .filter(|e| matches!(e, BufferValidationError::DuplicatedContent(_)))
@@ -246,10 +247,10 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
                 ** (skg (id 2)) 2
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
         .filter(|e| matches!(e, BufferValidationError::DuplicatedContent(_)))
@@ -277,10 +278,10 @@ fn test_root_without_source_validation(
                 * (skg (id root2)) Root without source (invalid)
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
       assert_eq!(errors.len(), 1,
                  "Should find 1 RootWithoutSource error");
 
@@ -314,10 +315,10 @@ fn test_nonexistent_source_validation(
                   ** (skg (id child1) (source nonexistent)) Child with invalid source
                   * (skg (id root2) (source invalid_source)) Root with nonexistent source
               "};
-        let trees: Vec<Tree<OrgNode>> =
+        let forest: Tree<OrgNode> =
           org_to_uninterpreted_nodes(input).unwrap();
         let errors: Vec<BufferValidationError> =
-          find_buffer_errors_for_saving(&trees, config, driver).await?;
+          find_buffer_errors_for_saving(&forest, config, driver).await?;
         let nonexistent_source_errors: Vec<&BufferValidationError> =
           errors.iter()
           .filter(

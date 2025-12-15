@@ -1,81 +1,69 @@
 /// Functions for pairing OrgNode trees with SkgNode data.
 
+use crate::to_org::util::forest_root_pair;
 use crate::types::misc::ID;
 use crate::types::orgnode::OrgNode;
 use crate::types::save::SaveInstruction;
 use crate::types::skgnode::SkgNode;
 use crate::types::trees::PairTree;
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::HashMap;
 
-/// Convert an OrgNode forest to a NodePair forest
-/// using SkgNodes from SaveInstructions.
+/// Converts an OrgNode forest to a PairTree forest
+/// (both represented as Trees, via ForestRoot).
 ///
 /// Definitive nodes that generated SaveInstructions get Some(skgnode).
 /// Indefinitive nodes (views) get None.
-///
-/// This avoids redundant disk fetches: the SkgNodes from SaveInstructions
-/// already reflect what will be saved, supplemented with disk data.
-pub fn pair_forest_with_save_instructions (
-  orgnode_forest : Vec<Tree<OrgNode>>,
-  instructions   : &[SaveInstruction],
-) -> Vec<PairTree> {
+pub fn pair_orgnode_forest_with_save_instructions (
+  orgnode_tree : &Tree<OrgNode>,
+  instructions : &[SaveInstruction],
+) -> PairTree {
   let skgnode_map : HashMap<ID, SkgNode> =
     instructions . iter ()
     . filter_map ( |(skgnode, _action)| {
       skgnode . ids . first ()
         . map ( |pid| (pid.clone(), skgnode.clone()) ) } )
     . collect ();
-  orgnode_forest . into_iter ()
-    . map ( |tree| pairtree_from_orgnodetree_and_map (
-      tree, &skgnode_map ) )
-    . collect () }
+  let mut pair_tree : PairTree = Tree::new (
+    // PITFALL: Discards the forest's root OrgNode.
+    forest_root_pair () );
+  let forest_root_id : NodeId = pair_tree . root () . id ();
+  for tree_root in orgnode_tree.root().children() {
+    add_paired_subtree_as_child (
+      &mut pair_tree,
+      forest_root_id,
+      orgnode_tree, tree_root . id (),
+      &skgnode_map ); }
+  pair_tree }
 
-fn pairtree_from_orgnodetree_and_map (
-  orgnode_tree : Tree<OrgNode>,
-  skgnode_map  : &HashMap<ID, SkgNode>,
-) -> PairTree {
-  let old_root_id : NodeId =
-    orgnode_tree . root () . id ();
-  let root_orgnode : OrgNode =
-    orgnode_tree . root () . value () . clone ();
-  let root_skgnode : Option<SkgNode> =
-    root_orgnode . metadata . id . as_ref ()
+/// Add an OrgNode subtree as a child of a parent in the PairTree,
+/// pairing each node with its SkgNode from the map.
+fn add_paired_subtree_as_child (
+  pair_tree       : &mut PairTree,
+  parent_id       : NodeId,
+  orgnode_tree    : &Tree<OrgNode>,
+  orgnode_node_id : NodeId,
+  skgnode_map     : &HashMap<ID, SkgNode>,
+) {
+  let orgnode : OrgNode =
+    orgnode_tree . get ( orgnode_node_id ) . unwrap ()
+    . value () . clone ();
+  let skgnode : Option<SkgNode> =
+    orgnode . metadata . id . as_ref ()
     . and_then (
       |id| skgnode_map . get (id) . cloned () );
-  let mut new_tree : PairTree =
-    Tree::new ((root_skgnode, root_orgnode));
-  let new_root_id : NodeId =
-    new_tree . root () . id ();
-  pair_children_optional_recursive (
-    &orgnode_tree, old_root_id,
-    &mut new_tree, new_root_id, skgnode_map );
-  new_tree }
-
-fn pair_children_optional_recursive (
-  old_tree    : &Tree<OrgNode>,
-  old_node_id : NodeId,
-  new_tree    : &mut PairTree,
-  new_node_id : NodeId,
-  skgnode_map : &HashMap<ID, SkgNode>,
-) {
-  let child_orgnodes : Vec<(NodeId, OrgNode)> =
-    old_tree . get ( old_node_id ) . unwrap ()
-    . children ()
-    . map ( |c| (c.id(), c.value().clone()) )
-    . collect ();
-  for (old_child_id, child_orgnode) in child_orgnodes {
-    let child_skgnode : Option<SkgNode> =
-      child_orgnode . metadata . id . as_ref ()
-      . and_then (
-        |id| skgnode_map . get ( id ) . cloned () );
-    let new_child_id : NodeId = {
-      let mut parent_mut =
-        new_tree . get_mut ( new_node_id ) . unwrap ();
-      parent_mut . append (
-        (child_skgnode, child_orgnode))
-        . id () };
-    pair_children_optional_recursive (
-      old_tree, old_child_id,
-      new_tree, new_child_id, skgnode_map ); }}
+  let new_node_id : NodeId = {
+    let mut parent_mut : NodeMut < _ > =
+      pair_tree . get_mut ( parent_id ) . unwrap ();
+    parent_mut . append ( // add new node
+      (skgnode, orgnode) ) . id () };
+  { // recurse in new node
+    let child_ids : Vec < NodeId > =
+      orgnode_tree . get ( orgnode_node_id ) . unwrap ()
+      . children () . map ( |c| c . id () ) . collect ();
+    for child_id in child_ids {
+      add_paired_subtree_as_child (
+        pair_tree, new_node_id,
+        orgnode_tree, child_id,
+        skgnode_map ); }} }

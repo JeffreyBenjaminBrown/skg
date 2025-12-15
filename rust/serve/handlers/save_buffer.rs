@@ -6,7 +6,7 @@ use crate::types::errors::SaveError;
 use crate::merge::merge_nodes;
 use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
 use crate::to_org::expand::definitive::execute_view_requests;
-use crate::media::tree::pair_forest_with_save_instructions;
+use crate::media::tree::pair_orgnode_forest_with_save_instructions;
 use crate::serve::util::{
   format_buffer_response_sexp,
   read_length_prefixed_content,
@@ -126,15 +126,15 @@ async fn update_from_and_rerender_buffer (
 ) -> Result<SaveResponse, Box<dyn Error>> {
 
   let (orgnode_forest, save_instructions, mergeInstructions)
-    : ( Vec<Tree<OrgNode>>,
+    : ( Tree<OrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
     = buffer_to_save_instructions (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;
-  if orgnode_forest.is_empty() { return Err (
-    "No valid org nodes found in org_buffer_text" . into( )); }
+  if orgnode_forest.root().children().next().is_none() { return Err (
+    "Nothing to save found in org_buffer_text" . into( )); }
 
   update_graph_minus_merges (
     save_instructions.clone(),
@@ -148,10 +148,10 @@ async fn update_from_and_rerender_buffer (
     typedb_driver ) . await ?;
 
   let mut errors : Vec < String > = Vec::new ();
-  let mut paired_forest : Vec < PairTree > =
-    pair_forest_with_save_instructions (
+  let mut paired_forest : PairTree =
+    pair_orgnode_forest_with_save_instructions (
       // Definitive nodes get Some(skgnode), indefinitive get None.
-      orgnode_forest,
+      &orgnode_forest,
       & save_instructions );
   { // modify the paired forest before re-rendering it
     let (mut visited, view_requests) =
@@ -173,6 +173,6 @@ async fn update_from_and_rerender_buffer (
     typedb_driver ) . await ?;
 
   let buffer_content : String =
-    orgnode_forest_to_string ( & paired_forest );
+    orgnode_forest_to_string ( & paired_forest ) ?;
 
   Ok ( SaveResponse { buffer_content, errors } ) }

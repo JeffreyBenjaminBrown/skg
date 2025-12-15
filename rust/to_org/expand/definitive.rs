@@ -21,30 +21,30 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  forest        : &mut Vec < PairTree >,
-  requests      : Vec < (usize, NodeId, ViewRequest) >,
+  forest        : &mut PairTree,
+  requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   visited       : &mut VisitedMap,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  for (tree_idx, node_id, request) in requests {
+  for (node_id, request) in requests {
     match request {
       ViewRequest::Aliases => {
         build_and_integrate_aliases_view_then_drop_request (
-          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
         build_and_integrate_containerward_view_then_drop_request (
-          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Sourceward => {
         build_and_integrate_sourceward_view_then_drop_request (
-          &mut forest[tree_idx], node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
-          forest, tree_idx, node_id, config, typedb_driver,
+          forest, node_id, config, typedb_driver,
           visited, errors ) . await ?; }, } }
   Ok (( )) }
 
@@ -56,8 +56,7 @@ pub async fn execute_view_requests (
 /// 3. Expands its content from disk using BFS
 /// 4. Removes its ViewRequest::Definitive
 async fn execute_definitive_view_request (
-  forest        : &mut Vec < PairTree >,
-  tree_idx      : usize,
+  forest        : &mut PairTree, // "forest" = tree with ForestRoot
   node_id       : NodeId, // had the request
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -65,32 +64,29 @@ async fn execute_definitive_view_request (
   _errors       : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_pid_in_pairtree (
-    &forest[tree_idx], node_id ) ?;
-  if let Some ( &(existing_tree_idx, existing_node_id) ) =
+    forest, node_id ) ?;
+  if let Some ( &existing_node_id ) =
     visited . get ( & node_pid )
-  { if ( existing_tree_idx != tree_idx ||
-         existing_node_id != node_id ) {
+  { if existing_node_id != node_id {
     // indefinitize the previous definitive view
-    indefinitize_content_subtree ( &mut forest[existing_tree_idx],
+    indefinitize_content_subtree ( forest,
                                     existing_node_id,
                                     visited ) ?; }}
   { // Mutate the root of the definitive view request:
     // Remove the ViewRequest, mark it definitive,
     // and rebuild from disk.
-    let tree : &mut PairTree = &mut forest[tree_idx];
     let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
+      forest . get_mut ( node_id )
       . ok_or ( "execute_definitive_view_request: node not found" ) ?;
     node_mut . value () . 1 . metadata . code . viewRequests
       . remove ( & ViewRequest::Definitive );
     node_mut.value () . 1 . metadata.code.indefinitive = false;
     rebuild_pair_from_disk_mostly_clobbering_the_org (
       // preserves relevant orgnode fields
-      &mut forest[tree_idx], node_id, config ) ?; }
-  visited . insert ( node_pid.clone(),
-                     (tree_idx, node_id) );
+      forest, node_id, config ) ?; }
+  visited . insert ( node_pid.clone(), node_id );
   extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
-    &mut forest[tree_idx], node_id, tree_idx,
+    forest, node_id,
     config.initial_node_limit, visited, config, typedb_driver
   ) . await ?;
   Ok (( )) }
@@ -153,13 +149,12 @@ fn indefinitize_content_subtree (
 ///   - Completes the sibling group of the limit-hitting node
 ///   - After limit-hitting node's parent, rewrite nodes in that second-to-last gen as indefinitive
 ///
-/// Generations are relative to the effective root (generation 1),
+/// Generations are relative to the effective root (generation 0),
 /// *not* the tree's true root. This way, truncation only affects
 /// nodes within this subtree, not siblings of ancestors.
 async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut PairTree,
   effective_root : NodeId, // it contained the request
-  tree_idx       : usize,
   limit          : usize,
   visited        : &mut VisitedMap,
   config         : &SkgConfig,
@@ -177,7 +172,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
     . map ( |child_id| (effective_root, child_id) )
     . collect ();
   let mut nodes_rendered : usize = 0;
-  let mut generation : usize = 2; // children of effective root
+  let mut generation : usize = 1; // children of effective root
   while ! gen_with_children . is_empty () {
     if nodes_rendered + gen_with_children . len () >= limit {
       // Limit hit. Complete this sibling group
@@ -193,7 +188,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
       let (_tree, new_node_id) =
         build_node_branch_minus_content (
           Some((tree, parent_nid)),
-          tree_idx, &child_id, config, driver, visited ). await ?;
+          &child_id, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! is_indefinitive ( tree, new_node_id ) ? {
         let grandchild_ids : Vec < ID > =

@@ -18,7 +18,7 @@
 /// and re-render as indefinitive every node in P's generation after P.
 
 use crate::to_org::util::stub_forest_from_root_ids;
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_edit_previous_in_forest;
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   build_node_branch_minus_content,
@@ -33,28 +33,28 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 /// See file header comment.
+/// Returns a "forest" (tree with ForestRoot).
 pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Vec < PairTree >,
-  Box<dyn Error> > {
+) -> Result < PairTree, Box<dyn Error> > {
   let mut visited : VisitedMap = VisitedMap::new();
-  let mut forest : Vec < PairTree > =
+  let mut forest : PairTree =
     stub_forest_from_root_ids (
       root_ids, config, driver, &mut visited ) . await ?;
-  let root_nodes : Vec<(usize, Vec<NodeId>)> =
-    forest . iter() . enumerate()
-    . map(|(idx, tree)|
-          // 'enumerate' creates 'idx', which starts at 0.
-          (idx, vec![tree.root().id()]))
-    . collect();
+  let forest_root_id : NodeId = forest . root () . id ();
+  let root_nodes : Vec < NodeId > =
+    forest . root () . children ()
+    . map ( |c| c . id () )
+    . collect ();
   render_generation_and_recurse (
     &mut forest,
     root_nodes, // the last complete generation
-    1,          // the last complete generation
-    0, // nodes_rendered
+    1,          // the last complete generation's number
+    0, // nodes_rendered (ForestRoot doesn't count)
     config.initial_node_limit,
+    forest_root_id, // effective_root for truncation
     &mut visited,
     config,
     driver,
@@ -63,13 +63,12 @@ pub async fn render_initial_forest_bfs (
 
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
-  forest         : &'a mut Vec<PairTree>,
-  gen_nodeids    : Vec< // deepest generation rendered so far
-      (usize, // which tree (index into forest)
-       Vec<NodeId>)>,
-  gen_int        : usize, // deepest generation rendered so far
+  forest         : &'a mut PairTree,
+  gen_nodeids    : Vec < NodeId >, // nodes of deepest generation rendered so far
+  gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
   rendered_count : usize,
   limit          : usize,
+  effective_root : NodeId,         // ForestRoot for initial rendering
   visited        : &'a mut VisitedMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,
@@ -78,84 +77,63 @@ fn render_generation_and_recurse<'a> (
   Box::pin ( async move {
     if gen_nodeids.is_empty() {
       return Ok(( )); }
-    let nodes_in_gen : usize =
-      gen_nodeids . iter ()
-      . map ( |(_, ids)| ids . len () )
-      . sum ();
+    let nodes_in_gen : usize = gen_nodeids . len ();
     let rendered_count : usize = rendered_count + nodes_in_gen;
-    let parent_child_rels_to_add : Vec<(usize, // the tree
-                                        NodeId, // the parent
-                                        ID)> = ( // the child
-      collect_rels_to_children_from_generation(
-        forest, &gen_nodeids ));
+    let parent_child_rels_to_add : Vec < (NodeId, ID) > =
+      collect_rels_to_children_from_generation (
+        forest, &gen_nodeids );
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count < limit {
-      let next_gen : Vec<(usize, Vec<NodeId>)> =
+      let next_gen : Vec < NodeId > =
         add_children_and_collect_their_ids (
           forest, parent_child_rels_to_add, visited, config, driver
         ) . await ?;
       render_generation_and_recurse (
         forest, next_gen, gen_int + 1,
-        rendered_count, limit, visited, config, driver,
+        rendered_count, limit, effective_root,
+        visited, config, driver,
       ) . await }
     else {
-      add_last_generation_and_edit_previous_in_forest (
-        forest, gen_int, &parent_child_rels_to_add,
-        rendered_count, limit, config, driver,
+      add_last_generation_and_truncate_some_of_previous (
+        forest, gen_int + 1, &parent_child_rels_to_add,
+        limit - rendered_count, effective_root,
+        visited, config, driver,
       ) . await ?;
       return Ok(( )); }
   } ) }
 
 /// Add children to the forest.
-/// Return their NodeIds grouped by tree.
+/// Return their NodeIds.
 async fn add_children_and_collect_their_ids (
-  forest      : &mut Vec<PairTree>,
-  rels_to_next_gen_to_add : Vec<( usize,  // which tree
-                      NodeId, // parent
-                      ID )>,  // child of that parent
+  forest      : &mut PairTree,
+  rels_to_add : Vec < (NodeId, ID) >,
   visited     : &mut VisitedMap,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-) -> Result<Vec<( usize,         // which tree
-                  Vec<NodeId>)>, // children added
-            Box<dyn Error>> {
-  let mut child_gen : Vec<(usize, Vec<NodeId>)> =
-    (0 .. forest.len())
-    . map(|idx| (idx, Vec::new()))
-    . collect();
-  for (tree_idx, parent_id, child_id) in rels_to_next_gen_to_add {
-    let (_tree, child_node_id) =
+) -> Result < Vec < NodeId >, Box<dyn Error> > {
+  let mut child_ids : Vec < NodeId > = Vec::new ();
+  for (parent_id, child_id) in rels_to_add {
+    let (_, child_node_id) =
       build_node_branch_minus_content (
-        Some((&mut forest[tree_idx], parent_id)),
-        tree_idx, &child_id, config, driver, visited ) . await ?;
-    child_gen[tree_idx] . 1 . push(child_node_id); }
-  let child_gen : Vec<(usize, Vec<NodeId>)> = (
-    // Filter out trees with no children added,
-    // so that the caller can use .is_empty() to detect termination.
-    child_gen . into_iter()
-      . filter(|(_, ids)| ! ids.is_empty())
-      . collect() );
-  Ok(child_gen) }
+        Some ( (&mut *forest, parent_id) ),
+        &child_id, config, driver, visited ) . await ?;
+    child_ids . push ( child_node_id ); }
+  Ok ( child_ids ) }
 
 /// Collect all children IDs
-///   from defiitive nodes in the current generation.
+///   from definitive nodes in the input generation.
 ///   (Indefinitive nodes' contents do not need rendering.)
-/// Returns (tree_idx, parent_node_id, child_id) tuples.
-fn collect_rels_to_children_from_generation(
-  forest : &[PairTree],
-  nodes_in_gen : &[(usize,         // which tree of the forest
-                    Vec<NodeId>)], // These are all in the same generation -- even across trees, not just within them.
-) -> Vec<(usize,  // an index into the forest
-          NodeId, // a parent from 'nodes_in_gen'
-          ID)> {  // a child of that parent
-  let mut children : Vec<(usize, NodeId, ID)> = Vec::new();
-  for (tree_idx, node_ids) in nodes_in_gen {
-    for node_id in node_ids {
-      if let Ok ( child_ids ) =
-        content_ids_if_definitive_else_empty (
-          &forest[*tree_idx], *node_id )
-      { for child_id in child_ids {
-        children . push ( (*tree_idx,
-                           *node_id, child_id) ); }} }}
+/// Returns (parent_node_id, child_id) tuples.
+fn collect_rels_to_children_from_generation (
+  forest       : &PairTree,
+  nodes_in_gen : &[NodeId],
+) -> Vec < (NodeId, ID) > {
+  let mut children : Vec < (NodeId, ID) > = Vec::new ();
+  for node_id in nodes_in_gen {
+    if let Ok ( child_ids ) =
+      content_ids_if_definitive_else_empty (
+        forest, *node_id )
+    { for child_id in child_ids {
+      children . push ( (*node_id, child_id) ); }} }
   children }

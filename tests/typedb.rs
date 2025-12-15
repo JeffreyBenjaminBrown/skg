@@ -355,16 +355,17 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Vec<Tree<OrgNode>> =
+  let result_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
 
-  // Verify structure by checking key properties
-  assert_eq! ( result_forest.len (), 1,
+  let tree_roots : Vec<_> =
+    result_forest.root().children().collect();
+  assert_eq! ( tree_roots.len (), 1,
     "Expected exactly 1 root node" );
 
-  let root : &Tree<OrgNode> = & result_forest [ 0 ];
-  let root_node : &OrgNode = root . root () . value ();
+  let root_node_ref = &tree_roots[0];
+  let root_node : &OrgNode = root_node_ref . value ();
 
   // Root node should be "a"
   assert_eq! ( root_node.metadata.id, Some ( ID::from ("a") ),
@@ -373,7 +374,7 @@ async fn test_recursive_document (
     "Root node should have title 'a'" );
 
   // Root should have 1 child: "b"
-  let mut root_children = root . root () . children ();
+  let mut root_children = root_node_ref . children ();
   let b_node_ref = root_children . next ()
     . expect ( "Root should have child 'b'" );
   let b_node : &OrgNode = b_node_ref . value ();

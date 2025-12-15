@@ -8,5 +8,12 @@ use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
 use ego_tree::Tree;
 
-pub type NodePair = (Option<SkgNode>, OrgNode);
+/// PairTree is the primary way an org-buffer is represented.
+/// Most OrgNodes have an associated SkgNode, but not all,
+/// which is why the SkgNode is optional.
+/// Each PairTree comes from an OrgNode tree,
+/// and eventually becomes one before being sent to Emacs,
+/// but carrying the SkgNode between those two phases
+/// lets us avoid redundant disk lookups.
 pub type PairTree = Tree < NodePair >;
+pub type NodePair = (Option<SkgNode>, OrgNode);

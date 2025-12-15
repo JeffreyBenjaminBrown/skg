@@ -5,7 +5,7 @@
 
 use crate::types::{OrgNode, Interp, ID};
 use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
-use ego_tree::Tree;
+use ego_tree::{Tree, NodeId};
 use std::boxed::Box;
 use std::collections::HashMap;
 use std::error::Error;
@@ -21,29 +21,37 @@ use uuid::Uuid;
 /// Does not add *all* missing info.
 /// 'clobber_none_fields_with_data_from_disk' does some of that, too,
 /// but it operates on SaveInstructions, downstream.
+///
+/// Input forest has ForestRoot at root; tree roots are its children.
 pub async fn add_missing_info_to_forest(
-  trees: &mut [Tree<OrgNode>],
+  forest: &mut Tree<OrgNode>,
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  for tree in trees . iter_mut () {
-    add_missing_info_dfs (
-      tree . root_mut (),
-      None,     // its parent's Interp
-      None ); } // its parent's source
-  let mut ids_to_lookup : Vec < ID > = Vec::new ();
-  for tree in trees . iter () {
-    collect_ids_in_tree (
-      tree . root (),
-      & mut ids_to_lookup ); }
-  let pid_map : HashMap < ID, Option < ID > > =
-    pids_from_ids (
-      db_name, driver, & ids_to_lookup ). await ?;
-  for tree in trees . iter_mut () {
-    assign_pids_throughout_tree_from_map (
-      tree . root_mut (),
-      & pid_map ); }
-  Ok (( )) }
+  let tree_root_ids: Vec<NodeId> =
+    forest.root().children().map(|c| c.id()).collect();
+  for tree_root_id in &tree_root_ids {
+    if let Some(tree_root_mut) = forest.get_mut(*tree_root_id) {
+      add_missing_info_dfs(
+        tree_root_mut,
+        None,     // its parent's Interp
+        None ); } } // its parent's source
+
+  // collect IDs
+  let mut ids_to_lookup: Vec<ID> = Vec::new();
+  for tree_root_id in &tree_root_ids {
+    if let Some(tree_root_ref) = forest.get(*tree_root_id) {
+      collect_ids_in_tree(tree_root_ref,
+                          &mut ids_to_lookup); }}
+
+  // assign PIDs
+  let pid_map: HashMap<ID, Option<ID>> =
+    pids_from_ids(db_name, driver, &ids_to_lookup).await?;
+  for tree_root_id in &tree_root_ids {
+    if let Some(tree_root_mut) = forest.get_mut(*tree_root_id) {
+      assign_pids_throughout_tree_from_map(
+        tree_root_mut, &pid_map); } }
+  Ok(()) }
 
 fn add_missing_info_dfs (
   mut node_ref: ego_tree::NodeMut < OrgNode >,

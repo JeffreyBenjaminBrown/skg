@@ -1,14 +1,18 @@
-use crate::types::{OrgNode, orgnodemd_to_string};
+use crate::types::{OrgNode, orgnodemd_to_string, Interp};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::NodeRef;
+use std::error::Error;
 
-/// Render a forest of PairTrees to org-mode text.
-/// Each tree's root starts at level 1.
-/// Assumes metadata has already been enriched with relationship data.
+/// PURPOSE: Render a "forest" -- a tree with ForestRoot at root
+/// -- to org-mode text.
+/// ForestRoot is not rendered; its children start at level 1.
+///
+/// ASSUMES: metadata has already been enriched with relationship data.
+/// ERRORS: if root is not a ForestRoot.
 pub fn orgnode_forest_to_string (
-  forest : &[PairTree],
-) -> String {
+  forest : &PairTree,
+) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
     node_ref : NodeRef < NodePair >,
     level    : usize,
@@ -22,14 +26,17 @@ pub fn orgnode_forest_to_string (
           child,
           level + 1 )); }
     out }
+  let root_ref = forest . root ();
+  if root_ref . value () . 1 . metadata . code . interp
+     != Interp::ForestRoot {
+    return Err (
+      "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
   let mut result : String =
     String::new ();
-  for tree in forest {
+  for child in root_ref . children () {
     result . push_str (
-      & render_node_subtree_to_org (
-        tree . root (),
-        1 )); }
-  result }
+      & render_node_subtree_to_org ( child, 1 )); }
+  Ok ( result ) }
 
 /// Renders an OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.

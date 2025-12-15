@@ -1,9 +1,12 @@
+/// DANGER: This was vibe-coded without much oversight.
+/// I *believe* the tests constrain its behavior sufficiently.
+
 use crate::media::sexp::find_sexp_end;
 use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
-use crate::types::orgnode::default_metadata;
+use crate::types::orgnode::{default_metadata, forest_root_orgnode};
 use crate::types::{OrgNode, OrgnodeMetadata};
 
-use ego_tree::Tree;
+use ego_tree::{Tree, NodeId};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -20,43 +23,37 @@ struct OrgNodeLineCol {
   body: Vec<String>,
 }
 
+/// Parse org text into a "forest": a tree with a ForestRoot.
+/// Each level-1 headline becomes a child of the ForestRoot.
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result<Vec<Tree<OrgNode>>, String> {
+) -> Result<Tree<OrgNode>, String> {
   let org_node_line_cols: Vec<OrgNodeLineCol> =
     divide_into_orgNodeLineCols(input)?;
-  let mut result_trees: Vec<Tree<OrgNode>> = Vec::new();
-  let mut current_tree: Option<Tree<OrgNode>> = None;
-  let mut node_stack: Vec<ego_tree::NodeId> = Vec::new();
+  let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  let forest_root_id: NodeId = forest.root().id();
+  // node_stack[0] is the ForestRoot, node_stack[1] is the current tree root, etc.
+  let mut node_stack: Vec<NodeId> = vec![forest_root_id];
   for org_node_line_col in &org_node_line_cols {
     let (level, node): (usize, OrgNode) =
       linecol_to_orgnode(org_node_line_col)?;
-    if level == 1 { // Start a new tree.
-      if let Some(tree) = current_tree.take() {
-        result_trees.push(tree); }
-      current_tree = Some(Tree::new(node));
-      node_stack = vec![
-        current_tree . as_mut() . unwrap() . root_mut() . id() ];
-    } else { // Insert in the current tree.
-      if let Some(ref mut tree) = current_tree {
-        // Adjust node_stack to proper level
-        while node_stack.len() >= level {
-          node_stack.pop(); }
-        let parent_id: ego_tree::NodeId =
-          *node_stack.last().unwrap();
-        let mut parent_node: ego_tree::NodeMut<OrgNode> =
-          tree.get_mut(parent_id).unwrap();
-        let new_node_id: ego_tree::NodeId =
-          parent_node.append(node).id();
-        node_stack.push(new_node_id);
-      } else {
-        // No current tree means this nested node is orphaned
-        return Err(format!("Invalid org structure: headline at level {} appears without a preceding level 1 headline. The org text jumps too far between levels.", level));
-      }} }
-  if let Some(tree) = current_tree {
-    // Add the last tree if it exists
-    result_trees.push(tree); }
-  Ok (result_trees) }
+    // Adjust node_stack to proper level (ForestRoot is level 0, tree roots are level 1)
+    while node_stack.len() > level {
+      node_stack.pop(); }
+    // Check for orphaned headlines (e.g., ** without preceding *)
+    // node_stack.len() should equal level (because ForestRoot is at level 0)
+    if node_stack.len() < level {
+      return Err(format!(
+        "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
+        node.title, level, level - 1));
+    }
+    let parent_id: NodeId = *node_stack.last().unwrap();
+    let new_node_id: NodeId = {
+      let mut parent_node = forest.get_mut(parent_id).unwrap();
+      parent_node.append(node).id() };
+    node_stack.push(new_node_id);
+  }
+  Ok(forest) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.

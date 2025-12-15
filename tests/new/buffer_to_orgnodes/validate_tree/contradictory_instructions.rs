@@ -3,6 +3,7 @@
 use ego_tree::Tree;
 use indoc::indoc;
 use skg::types::{OrgNode, ID, BufferValidationError};
+use skg::types::orgnode::forest_root_orgnode;
 use skg::from_text::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
@@ -17,10 +18,10 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id node1) (code toDelete)) duplicate of first node (same delete instruction)
         "};
 
-  let trees_consistent: Vec<Tree<OrgNode>> =
+  let forest_consistent: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input_consistent).unwrap();
   let (inconsistent_ids_consistent, _, _) =
-    find_inconsistent_instructions(&trees_consistent);
+    find_inconsistent_instructions(&forest_consistent);
   assert_eq!(inconsistent_ids_consistent.len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
 
   // Test case with inconsistent toDelete instructions (conflicts)
@@ -33,9 +34,9 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id conflict2)) another conflict end
         "};
 
-  let trees_inconsistent: Vec<Tree<OrgNode>> =
+  let forest_inconsistent: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input_inconsistent).unwrap();
-  let (inconsistent_ids, _, _) = find_inconsistent_instructions(&trees_inconsistent);
+  let (inconsistent_ids, _, _) = find_inconsistent_instructions(&forest_inconsistent);
 
   assert_eq!(inconsistent_ids.len(), 2, "Should find exactly 2 conflicting IDs");
   assert!(inconsistent_ids.contains(&ID::from("conflict1")), "Should include conflict1 ID");
@@ -49,14 +50,14 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id valid_node)) only node with id
         "};
 
-  let trees_no_ids: Vec<Tree<OrgNode>> =
+  let forest_no_ids: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input_no_ids).unwrap();
-  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&trees_no_ids);
+  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
-  // Test empty forest
-  let empty_trees: Vec<Tree<OrgNode>> = Vec::new();
-  let (inconsistent_empty, _, _) = find_inconsistent_instructions(&empty_trees);
+  // Test empty forest (just ForestRoot, no tree roots)
+  let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  let (inconsistent_empty, _, _) = find_inconsistent_instructions(&empty_forest);
   assert_eq!(inconsistent_empty.len(), 0, "Should have no conflicts in empty forest");
 }
 
@@ -82,10 +83,10 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let trees: Vec<Tree<OrgNode>> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&trees, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
         .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))

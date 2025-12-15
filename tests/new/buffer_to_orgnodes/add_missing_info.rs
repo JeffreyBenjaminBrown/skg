@@ -47,18 +47,18 @@ async fn test_add_missing_info_logic (
             ** (skg (id unpredictable) (source main)) no id
             *** (skg (id unpredictable) (source main)) also no id
         "};
-  let mut after_adding_missing_info: Vec<Tree<OrgNode>> =
+  let mut after_adding_missing_info: Tree<OrgNode> =
     org_to_uninterpreted_nodes(
       with_missing_info).unwrap();
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
     &config.db_name,
     driver ).await ?;
-  let expected_forest: Vec<Tree<OrgNode>> =
+  let expected_forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(
       without_missing_info ). unwrap();
   assert_eq!(
-    expected_forest.len(),
+    expected_forest.root().children().count(),
     1,
     "Expected exactly one tree in the expected forest" );
   assert!(
@@ -68,7 +68,7 @@ async fn test_add_missing_info_logic (
     "add_missing_info_to_forest: Forests not equivalent modulo ID." );
 
   { let actual_root : &OrgNode =
-      after_adding_missing_info[0] . root() . value();
+      after_adding_missing_info.root().first_child().unwrap().value();
     let actual_root_id : &ID =
       actual_root . metadata . id.as_ref() . unwrap();
     assert_eq!(
@@ -121,13 +121,13 @@ async fn test_source_inheritance_logic (
             ** (skg (id 22)) _
         "};
 
-  let mut actual_forest: Vec<Tree<OrgNode>> =
+  let mut actual_forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes( input ).unwrap();
   add_missing_info_to_forest(
     &mut actual_forest,
     &config.db_name,
     driver ).await ?;
-  let expected_forest: Vec<Tree<OrgNode>> =
+  let expected_forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes( expected ).unwrap();
 
   assert!(

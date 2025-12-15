@@ -8,13 +8,12 @@ use ego_tree::{NodeRef, Tree};
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
 pub fn saveinstructions_from_forest (
-  trees: Vec<Tree<OrgNode>>
+  forest: Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
-  for tree in trees {
-    saveinstructions_from_tree ( tree.root(),
-                         &mut result )?; }
+  saveinstructions_from_tree ( forest.root(),
+                               &mut result )?;
   Ok(result) }
 
 /// Appends another pair to 'result' and recurses (in DFS order).
@@ -28,9 +27,13 @@ fn saveinstructions_from_tree(
 ) -> Result<(), String> {
   let node_data = node_ref.value();
   let rel_to_parent = &node_data.metadata.code.interp;
-  if matches!(rel_to_parent, ( Interp::AliasCol |
+  if matches!(rel_to_parent, ( Interp::ForestRoot |
+                               Interp::AliasCol |
                                Interp::Alias )) {
-    // Skip. Should never execute, because a predecessor in the tree should have already processed any alias node.
+    // ForestRoot: just recurse into children.
+    // AliasCol/Alias: should never execute, because a predecessor in the tree should have already processed any alias node.
+    for child in node_ref.children() {
+      saveinstructions_from_tree ( child, result )?; }
     return Ok(( )); }
   if !node_data.metadata.code.indefinitive {
     // push another pair

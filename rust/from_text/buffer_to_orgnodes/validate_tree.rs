@@ -13,12 +13,12 @@ pub use contradictory_instructions::find_inconsistent_instructions;
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
 ///
-/// ASSUMES that in the forest:
+/// ASSUMES that in the "forest" (tree with ForestRoot):
 /// - IDs have been replaced with PIDs. Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.
 /// - Where missing, source has been inherited from an ancestor.
 pub async fn find_buffer_errors_for_saving (
-  trees: &[Tree<OrgNode>],
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -26,7 +26,7 @@ pub async fn find_buffer_errors_for_saving (
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion, defining containers, and sources)
     let (ambiguous_deletion_ids, problematic_defining_ids, inconsistent_source_ids) =
-      find_inconsistent_instructions(trees);
+      find_inconsistent_instructions(forest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
         errors.push (
@@ -40,30 +40,31 @@ pub async fn find_buffer_errors_for_saving (
       }} }
   { // merge validation
     let merge_errors: Vec<String> =
-      validate_merge_requests(trees, config, driver).await?;
+      validate_merge_requests(forest, config, driver).await?;
     for error_msg in merge_errors {
       errors.push(
         BufferValidationError::Other(error_msg)); }}
   validate_definitive_view_requests(
-    trees, &mut errors);
+    forest, &mut errors);
   validate_roots_have_sources(
-    trees, &mut errors);
-  for tree in trees { // other kinds of error
+    forest, &mut errors);
+  for tree_root in forest.root().children() {
     validate_node_and_children (
-      tree.root(),
-      None, // because a root has no parent
+      tree_root,
+      None, // because a tree root has no meaningful parent
       config,
       &mut errors); }
   Ok(errors) }
 
-/// Validate that all root nodes (top-level in forest) have sources.
-/// After Phase 6 source inheritance, only roots can be without sources.
+/// Validate that all roots of the "forest" (children of ForestRoot)
+/// have sources. After source inheritance,
+/// only tree roots can be without sources.
 fn validate_roots_have_sources(
-  trees: &[Tree<OrgNode>],
+  forest: &Tree<OrgNode>,
   errors: &mut Vec<BufferValidationError>
 ) {
-  for tree in trees {
-    let root: &OrgNode = tree.root().value();
+  for tree_root in forest.root().children() {
+    let root: &OrgNode = tree_root.value();
     if root.metadata.source.is_none() {
       errors.push(
         BufferValidationError::RootWithoutSource(
@@ -72,7 +73,7 @@ fn validate_roots_have_sources(
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children (
   node_ref: ego_tree::NodeRef<OrgNode>,
-  parent_treatment : Option<Interp>, // that is, the treatment of the parent of what node_ref points to
+  parent_interp : Option<Interp>, // interp of parent of node_ref
   config: &SkgConfig,
   errors: &mut Vec<BufferValidationError>
 ) {
@@ -90,7 +91,7 @@ fn validate_node_and_children (
         errors.push(
           BufferValidationError::Body_of_Alias(
             node.clone() )); }
-      if let Some(ref parent_rel) = parent_treatment {
+      if let Some(ref parent_rel) = parent_interp {
         if *parent_rel != Interp::AliasCol {
           errors.push(
             BufferValidationError::Alias_with_no_AliasCol_Parent(
@@ -102,7 +103,7 @@ fn validate_node_and_children (
             node.clone() )); }},
     _ => {} }
 
-  if let Some(parent_rel) = parent_treatment {
+  if let Some(parent_rel) = parent_interp {
     match parent_rel {
       Interp::AliasCol => {
         // Children of AliasCol should not have IDs
@@ -176,14 +177,13 @@ fn validate_node_and_children (
 /// - Must be on a childless orgnode
 /// - At most one request of this kind per ID
 fn validate_definitive_view_requests (
-  trees  : &[Tree<OrgNode>],
+  forest : &Tree<OrgNode>, // "forest" = tree with ForestRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
-  for tree in trees {
-    for edge in tree.root().traverse() {
-      if let Edge::Open(node_ref) = edge {
+  for edge in forest.root().traverse() {
+    if let Edge::Open(node_ref) = edge {
         let node : &OrgNode =
           node_ref.value();
         if node.metadata.code.viewRequests.contains(
@@ -203,4 +203,4 @@ fn validate_definitive_view_requests (
               if ! ids_with_requests.insert(id.clone()) {
                 errors.push(
                   BufferValidationError::MultipleDefinitiveRequestsForSameId(
-                    id.clone() )); }} }} }} }}
+                    id.clone() )); }} }} }} }

@@ -118,7 +118,7 @@
 **** DUP write_skgnode
 *** merge_nodes_in_tantivy
 **** DUP update_index_from_saveinstructions
-** pair_forest_with_save_instructions
+** pair_orgnode_forest_with_save_instructions
 *** pairtree_from_orgnodetree_and_map
 **** pair_children_optional_recursive
 ***** REC pair_children_optional_recursive
@@ -214,7 +214,7 @@
 *** DUP render_initial_forest_bfs
 *** set_metadata_relationship_viewdata_in_forest
 **** mapsFromIdForView_from_forest
-***** collect_ids_from_pair_forest
+***** collect_ids_from_pair_tree
 ***** fetch_relationship_data
 ****** count_containers
 ******* count_relations
