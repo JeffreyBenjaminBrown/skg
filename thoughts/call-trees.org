@@ -24,11 +24,11 @@
 *** add_children_and_collect_their_ids
 **** DUP build_node_branch_minus_content
 *** REC render_generation_and_recurse
-*** add_last_generation_and_edit_previous_in_forest
+*** add_last_generation_and_truncate_some_of_previous
 **** make_and_append_child_pair
 ***** DUP skgnode_and_orgnode_from_id
 **** DUP rewrite_to_indefinitive
-**** truncate_after_node_in_generation_in_forest
+**** truncate_after_node_in_generation_in_tree
 ***** nodes_after_in_generation
 ****** collect_generation_ids
 ***** DUP collect_generation_ids

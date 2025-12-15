@@ -1,9 +1,7 @@
 use ego_tree::Tree;
 use skg::media::tree::{
   first_in_generation,
-  first_in_generation_in_forest,
   next_in_generation,
-  next_in_generation_in_forest,
   collect_generation_ids,
 };
 use std::error::Error;
@@ -279,109 +277,127 @@ fn test_next_in_generation_with_deleted_node() {
 }
 
 #[test]
-fn test_next_in_generation_in_forest() {
-  // Create a forest: Vec of 3 trees
+fn test_next_in_generation_across_forest_roots() {
   // Tree A (depth 2), Tree B (depth 3), Tree C (depth 2)
-  let mut tree_a: Tree<String> =
-    Tree::new("A".to_string());
-  tree_a.root_mut().append("A1".to_string());
-  tree_a.root_mut().append("A2".to_string());
+  let mut forest: Tree<String> =
+    // This 'forest root' is like ForestRoot from types::orgnode
+    Tree::new("ForestRoot".to_string());
 
-  let mut tree_b: Tree<String> =
-    Tree::new("B".to_string());
+  // Add "tree" A with children A1, A2
+  let a_id: ego_tree::NodeId =
+    forest.root_mut().append("A".to_string()).id();
+  forest.get_mut(a_id).unwrap().append("A1".to_string());
+  forest.get_mut(a_id).unwrap().append("A2".to_string());
+
+  // Add "tree" B with children B1, B2 and grandchildren B11, B21
+  let b_id: ego_tree::NodeId =
+    forest.root_mut().append("B".to_string()).id();
   let b1_id: ego_tree::NodeId =
-    tree_b.root_mut().append("B1".to_string()).id();
+    forest.get_mut(b_id).unwrap().append("B1".to_string()).id();
   let b2_id: ego_tree::NodeId =
-    tree_b.root_mut().append("B2".to_string()).id();
-  tree_b.get_mut(b1_id).unwrap().append("B11".to_string());
-  tree_b.get_mut(b2_id).unwrap().append("B21".to_string());
+    forest.get_mut(b_id).unwrap().append("B2".to_string()).id();
+  forest.get_mut(b1_id).unwrap().append("B11".to_string());
+  forest.get_mut(b2_id).unwrap().append("B21".to_string());
 
-  let mut tree_c: Tree<String> =
-    Tree::new("C".to_string());
-  tree_c.root_mut().append("C1".to_string());
-  tree_c.root_mut().append("C2".to_string());
+  // Add "tree" C with children C1, C2
+  let c_id: ego_tree::NodeId =
+    forest.root_mut().append("C".to_string()).id();
+  forest.get_mut(c_id).unwrap().append("C1".to_string());
+  forest.get_mut(c_id).unwrap().append("C2".to_string());
 
-  let forest: Vec<Tree<String>> =
-    vec![tree_a, tree_b, tree_c];
-
-  // Test: from A2 (last in Tree A's generation 2), next should be B1 (first in Tree B's generation 2)
+  // Test: from A2 (generation 2 from ForestRoot), next should be B1
+  // A2 is at depth 2: ForestRoot -> A -> A2
   let node_a2: ego_tree::NodeRef<String> =
-    forest[0].root().children().nth(1).unwrap();
+    find_node_by_label(&forest, "A2").unwrap();
   let next: ego_tree::NodeRef<String> =
-    next_in_generation_in_forest(&forest, 0, node_a2).unwrap();
-  assert_eq!(next.value(), "B1", "Next after A2 should be B1 (crossing to next tree)");
+    next_in_generation(node_a2).unwrap();
+  assert_eq!(next.value(), "B1", "Next after A2 should be B1 (crossing to next subtree)");
 
-  // Test: from B2, next should be C1 (skipping to Tree C)
+  // Test: from B2, next should be C1
   let node_b2: ego_tree::NodeRef<String> =
-    forest[1].root().children().nth(1).unwrap();
+    find_node_by_label(&forest, "B2").unwrap();
   let next: ego_tree::NodeRef<String> =
-    next_in_generation_in_forest(&forest, 1, node_b2).unwrap();
+    next_in_generation(node_b2).unwrap();
   assert_eq!(next.value(), "C1", "Next after B2 should be C1");
 
-  // Test: from C2 (last node in last tree), next should be None
+  // Test: from C2 (last node at generation 2), next should be None
   let node_c2: ego_tree::NodeRef<String> =
-    forest[2].root().children().nth(1).unwrap();
+    find_node_by_label(&forest, "C2").unwrap();
   let next: Option<ego_tree::NodeRef<String>> =
-    next_in_generation_in_forest(&forest, 2, node_c2);
-  assert!(next.is_none(), "C2 is last in the forest's generation 2");
+    next_in_generation(node_c2);
+  assert!(next.is_none(), "C2 is last in forest's generation 2");
 }
 
 #[test]
-fn test_first_in_generation_in_forest() -> Result<(), Box<dyn Error>> {
-  // Create a forest with 3 trees
+fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> {
   // Tree A: only has depth 2 (A -> A1)
   // Tree B: has depth 4 (B -> B1 -> B11 -> B111)
   // Tree C: has depth 3 (C -> C1 -> C11)
-  let mut tree_a: Tree<String> =
-    Tree::new("A".to_string());
-  tree_a.root_mut().append("A1".to_string());
+  let mut forest: Tree<String> =
+    // This 'forest root' is like ForestRoot from types::orgnode
+    Tree::new("ForestRoot".to_string());
 
-  let mut tree_b: Tree<String> =
-    Tree::new("B".to_string());
+  // Add "tree" A with child A1
+  let a_id: ego_tree::NodeId =
+    forest.root_mut().append("A".to_string()).id();
+  forest.get_mut(a_id).unwrap().append("A1".to_string());
+
+  // Add "tree" B with deeper nesting: B -> B1 -> B11 -> B111
+  let b_id: ego_tree::NodeId =
+    forest.root_mut().append("B".to_string()).id();
   let b1_id: ego_tree::NodeId =
-    tree_b.root_mut().append("B1".to_string()).id();
+    forest.get_mut(b_id).unwrap().append("B1".to_string()).id();
   let b11_id: ego_tree::NodeId =
-    tree_b.get_mut(b1_id).unwrap().append("B11".to_string()).id();
-  tree_b.get_mut(b11_id).unwrap().append("B111".to_string());
+    forest.get_mut(b1_id).unwrap().append("B11".to_string()).id();
+  forest.get_mut(b11_id).unwrap().append("B111".to_string());
 
-  let mut tree_c: Tree<String> =
-    Tree::new("C".to_string());
+  // Add "tree" C: C -> C1 -> C11
+  let c_id: ego_tree::NodeId =
+    forest.root_mut().append("C".to_string()).id();
   let c1_id: ego_tree::NodeId =
-    tree_c.root_mut().append("C1".to_string()).id();
-  tree_c.get_mut(c1_id).unwrap().append("C11".to_string());
+    forest.get_mut(c_id).unwrap().append("C1".to_string()).id();
+  forest.get_mut(c1_id).unwrap().append("C11".to_string());
 
-  let forest: Vec<Tree<String>> =
-    vec![tree_a, tree_b, tree_c];
-
-  // Search for generation 0 - should find Tree A's root
+  // Generation 0 = ForestRoot
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 0)?;
+    first_in_generation(&forest, 0)?;
+  assert_eq!(result.unwrap().value(), "ForestRoot",
+    "Generation 0 should be ForestRoot");
+
+  // Generation 1 = A (first child of ForestRoot)
+  let result: Option<ego_tree::NodeRef<String>> =
+    first_in_generation(&forest, 1)?;
   assert_eq!(result.unwrap().value(), "A",
-    "Generation 0 should be first tree's root");
+    "Generation 1 should be A");
 
-  // Search for generation 1 - should find A1 in Tree A
+  // Generation 2 = A1 (first grandchild of ForestRoot)
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 1)?;
+    first_in_generation(&forest, 2)?;
   assert_eq!(result.unwrap().value(), "A1",
-    "Generation 1 should be A1");
+    "Generation 2 should be A1");
 
-  // Search for generation 2 - Tree A doesn't have it, should find B11 in Tree B
+  // Generation 3 - A1 has no children, should find B11 via B -> B1
+  // Tree structure:
+  //   ForestRoot (0)
+  //   ├── A (1) -> A1 (2)
+  //   ├── B (1) -> B1 (2) -> B11 (3) -> B111 (4)
+  //   └── C (1) -> C1 (2) -> C11 (3)
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 2)?;
+    first_in_generation(&forest, 3)?;
   assert_eq!(result.unwrap().value(), "B11",
-    "Generation 2 should be B11 from Tree B");
+    "Generation 3 should be B11 (since A1 has no children)");
 
-  // Search for generation 3 - only Tree B has it (B111)
+  // Generation 4 - should find B111
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 3)?;
+    first_in_generation(&forest, 4)?;
   assert_eq!(result.unwrap().value(), "B111",
-    "Generation 3 should be B111 from Tree B");
+    "Generation 4 should be B111");
 
-  // Search for generation 4 - no tree has it
+  // Generation 5 - no node has it
   let result: Option<ego_tree::NodeRef<String>> =
-    first_in_generation_in_forest(&forest, 4)?;
+    first_in_generation(&forest, 5)?;
   assert!(result.is_none(),
-    "Generation 4 should not exist in any tree");
+    "Generation 5 should not exist");
 
   Ok(()) }
 

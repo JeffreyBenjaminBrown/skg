@@ -48,19 +48,6 @@ pub fn first_in_nth_generation_of_descendents<T>(
   Ok ( dfs_find_at_depth (
     node, 0, generations )) }
 
-/// Runs 'first_in_nth_generation' on (potentially) each tree,
-/// stopping and returning at the first success.
-pub fn first_in_generation_in_forest<'a, T>(
-  forest: &'a [Tree<T>],
-  generations: usize,
-) -> Result<Option<NodeRef<'a, T>>, Box<dyn Error>> {
-  for tree in forest {
-    if let Some(result)
-      = first_in_nth_generation_of_descendents(
-        tree.root(), generations)?
-    { return Ok(Some(result)); }}
-  Ok(None) }
-
 /// Returns the next node in the same generation as the given node.
 ///
 /// Algorithm:
@@ -97,32 +84,6 @@ pub fn next_in_generation<T>(
       sibling_after_ancestor = next_sib.next_sibling(); }
     // None found from this ancestor's next siblings. Climb yet higher.
   }}
-
-/// Runs 'next_in_generation' on the current tree,
-/// and failing that, 'first_in_generation'
-/// on the subsequent trees.
-pub fn next_in_generation_in_forest<'a, T>(
-  forest: &'a [Tree<T>],
-  tree_index: usize, // where in 'forest' to find the tree containing 'node'
-  node: NodeRef<'a, T>
-) -> Option<NodeRef<'a, T>> {
-  if let Some(result) // try this tree
-    = next_in_generation(node)
-  { return Some(result); }
-  { // try subsequent trees
-    let depth : usize = {
-      let mut depth_count: usize = 0;
-      let mut ancestor: NodeRef<'_, T> = node;
-      while let Some(parent) = ancestor.parent() {
-        depth_count += 1;
-        ancestor = parent; }
-      depth_count };
-    for tree in &forest[tree_index + 1..] {
-      if let Ok(Some(result))
-        = first_in_nth_generation_of_descendents(
-          tree.root(), depth )
-      { return Some(result); }} }
-  None }
 
 //
 // NodeId-based utilities for mutable access
