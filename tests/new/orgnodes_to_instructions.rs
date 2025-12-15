@@ -60,9 +60,9 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
     indoc! {"
             * (skg (id main) (source main)) main node
             Main body
-            ** (skg (id alias_col) (source main) (code (interp aliasCol))) aliases
-            *** (skg (id alias1) (source main) (code (interp alias))) first alias
-            *** (skg (id alias2) (source main) (code (interp alias))) second alias
+            ** (skg (code (interp aliasCol))) aliases
+            *** (skg (code (interp alias))) first alias
+            *** (skg (code (interp alias))) second alias
             ** (skg (id content_child) (source main)) content child
             Content body
         "};
@@ -119,11 +119,11 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
   let input: &str =
     indoc! {"
             * (skg (id main) (source main)) main node
-            ** (skg (id alias_col1) (source main) (code (interp aliasCol))) first alias collection
-            *** (skg (id alias1) (source main) (code (interp alias))) alias one
-            *** (skg (id alias2) (source main) (code (interp alias))) alias two
-            ** (skg (id alias_col2) (source main) (code (interp aliasCol))) second alias collection
-            *** (skg (id alias3) (source main) (code (interp alias))) alias three
+            ** (skg (code (interp aliasCol))) first alias collection
+            *** (skg (code (interp alias))) alias one
+            *** (skg (code (interp alias))) alias two
+            ** (skg (code (interp aliasCol))) second alias collection
+            *** (skg (code (interp alias))) alias three
             ** (skg (id content1) (source main)) content node
         "};
 
@@ -146,8 +146,8 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
             * (skg (id root) (source main)) root node
             ** (skg (id parentIgnores) (source main) (code (interp parentIgnores))) parentIgnores child
             ** (skg (id content1) (source main)) content child 1
-            ** (skg (id alias_col) (source main) (code (interp aliasCol))) aliases
-            *** (skg (id alias1) (source main) (code (interp alias))) my alias
+            ** (skg (code (interp aliasCol))) aliases
+            *** (skg (code (interp alias))) my alias
             ** (skg (id content2) (source main)) content child 2
             ** (skg (id none_rel) (source main) (code (interp parentIgnores))) parentIgnores relation child
         "};
@@ -234,9 +234,9 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (id main) (source main)) main node
-            ** (skg (id alias_col) (source main) (code (interp aliasCol))) aliases only
-            *** (skg (id alias1) (source main) (code (interp alias))) alias one
-            *** (skg (id alias2) (source main) (code (interp alias))) alias two
+            ** (skg (code (interp aliasCol))) aliases only
+            *** (skg (code (interp alias))) alias one
+            *** (skg (code (interp alias))) alias two
         "};
 
   let forest: Tree<OrgNode> =
@@ -257,9 +257,9 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
     indoc! {"
             * (skg (id doc1) (source main)) Document 1
             Document body
-            ** (skg (id aliases1) (source main) (code (interp aliasCol))) Doc1 Aliases
-            *** (skg (id alias_a) (source main) (code (interp alias))) First Document
-            *** (skg (id alias_b) (source main) (code (interp alias))) Primary Doc
+            ** (skg (code (interp aliasCol))) Doc1 Aliases
+            *** (skg (code (interp alias))) First Document
+            *** (skg (code (interp alias))) Primary Doc
             ** (skg (id section1) (source main)) Section 1
             Section 1 body
             *** (skg (id subsection1a) (source main)) Subsection 1a

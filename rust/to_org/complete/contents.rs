@@ -360,7 +360,7 @@ pub async fn ensure_skgnode (
 ///              - is definitive
 ///              - doesn't have a SubscribeeCol child
 /// then prepend a SubscribeeCol child,
-/// with (for now) no children of its own.
+/// with an indefinitive Subscribee child for each subscribee.
 pub fn maybe_add_subscribee_col (
   tree    : &mut PairTree,
   node_id : NodeId,
@@ -371,17 +371,16 @@ pub fn maybe_add_subscribee_col (
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
   if is_indefinitive { return Ok (( )); }
-  let has_subscriptions : bool = {
+  let subscribee_ids : Vec < ID > = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     let skgnode : &SkgNode =
       node_ref . value () . 0 . as_ref ()
       . ok_or ( "maybe_add_subscribee_col: SkgNode should exist" ) ?;
-    skgnode . subscribes_to . as_ref ()
-      . map ( | v | ! v . is_empty () )
-      . unwrap_or ( false ) };
-  if ! has_subscriptions { return Ok (( )); }
+    skgnode . subscribes_to . clone ()
+      . unwrap_or_default () };
+  if subscribee_ids . is_empty () { return Ok (( )); }
   let has_subscribee_col : bool = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
@@ -390,7 +389,7 @@ pub fn maybe_add_subscribee_col (
       child . value () . 1 . metadata . code . interp
         == Interp::SubscribeeCol ) };
   if has_subscribee_col { return Ok (( )); }
-  { // Prepend a subscribees collector
+  let subscribee_col_nid : NodeId = { // the subscribee collector
     let subscribee_col_orgnode : OrgNode = {
       let mut md = default_metadata ();
       md . code . interp = Interp::SubscribeeCol;
@@ -401,5 +400,21 @@ pub fn maybe_add_subscribee_col (
     let mut node_mut : NodeMut < NodePair > = (
       tree . get_mut ( node_id )
         . ok_or ( "maybe_add_subscribee_col: node not found" )) ?;
-    node_mut . prepend ( (None, subscribee_col_orgnode) ); }
+    node_mut . prepend ( (None, subscribee_col_orgnode) ) . id () };
+  { // the subscribees
+    let mut col_mut : NodeMut < NodePair > =
+      tree . get_mut ( subscribee_col_nid )
+      . ok_or (
+        "maybe_add_subscribee_col: SubscribeeCol not found" )?;
+    for subscribee_id in subscribee_ids {
+      let subscribee_orgnode : OrgNode = {
+        let mut md = default_metadata ();
+        md . id = Some ( subscribee_id . clone () );
+        md . code . interp = Interp::Subscribee;
+        md . code . indefinitive = true;
+        OrgNode {
+          metadata : md,
+          title : subscribee_id . 0, // Use the ID as the title
+          body : None, } };
+      col_mut . append ( (None, subscribee_orgnode) ); }}
   Ok (( )) }

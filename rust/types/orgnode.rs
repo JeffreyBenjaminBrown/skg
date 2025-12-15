@@ -62,12 +62,13 @@ pub struct OrgnodeCode {
 /// between the node and its parent.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Interp {
+  ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   Content, // Most nodes are this. Parents 'contain' most children.
   AliasCol, // The node collects (as children) aliases for its parent.
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
   SubscribeeCol, // Collects subscribees for its parent.
-  ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
+  Subscribee, // The node represents a subscribee of its grandparent. Its ID identifies the subscribed node.
 }
 
 /// Requests for editing operations on a node.
@@ -105,6 +106,7 @@ impl fmt::Display for Interp {
         Interp::Alias => "alias",
         Interp::ParentIgnores => "parentIgnores",
         Interp::SubscribeeCol => "subscribeeCol",
+        Interp::Subscribee => "subscribee",
         Interp::ForestRoot => "forestRoot", // Should never be rendered
       };
     write! ( f, "{}", s ) } }
@@ -121,6 +123,7 @@ impl FromStr for Interp {
       "alias"         => Ok ( Interp::Alias ),
       "parentIgnores" => Ok ( Interp::ParentIgnores ),
       "subscribeeCol" => Ok ( Interp::SubscribeeCol ),
+      "subscribee"    => Ok ( Interp::Subscribee ),
       "forestRoot"    => Ok ( Interp::ForestRoot ),
       _ => Err ( format! ( "Unknown Interp value: {}", s )),
     }} }

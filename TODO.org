@@ -1,3 +1,4 @@
+* add 'numSubscribees' near 'numLinksIn'
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
 * aliases_to_org should rebuild the whole buffer

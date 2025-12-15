@@ -181,18 +181,24 @@ fn test_multi_root_view_with_shared_nodes
 
       // BFS processes all roots (generation 1) before children (generation 2),
       // so node 2 appears first as a root, then as a child (marked indefinitive).
-      // Definitive nodes with subscriptions get SubscribeeCol children.
-      let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
-                              This one string could span pages,
-                              and it can include newlines, no problem.
-                              ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
-                              ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
-                              this one string could span pages
-                              *** (skg (code (interp subscribeeCol))) it subscribes to these
-                              * (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
-                              this one string could span pages
-                              ** (skg (code (interp subscribeeCol))) it subscribes to these
-                              "};
+      // Definitive nodes with subscriptions get SubscribeeCol children,
+      // and each SubscribeeCol has Subscribee children with the subscribed IDs.
+      let expected = indoc! {
+        "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
+         This one string could span pages,
+         and it can include newlines, no problem.
+         ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+         ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
+         this one string could span pages
+         *** (skg (code (interp subscribeeCol))) it subscribes to these
+         **** (skg (id 44) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) 44
+         **** (skg (id 55) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) 55
+         * (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
+         this one string could span pages
+         ** (skg (code (interp subscribeeCol))) it subscribes to these
+         *** (skg (id 4) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) 4
+         *** (skg (id 5) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) 5
+         "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
 
@@ -233,15 +239,19 @@ fn test_multi_root_view_with_node_limit
       // Then truncate everything after node 1 in gen 1 - which includes root node 2
       // Note: Root node 2 has SubscribeeCol added before truncation (when it was definitive),
       // but since it becomes indefinitive after truncation, this is somewhat inconsistent.
+      // The SubscribeeCol includes Subscribee children created when the node was definitive.
       // For now we accept this behavior.
-      let expected = indoc! {"* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
-                              This one string could span pages,
-                              and it can include newlines, no problem.
-                              ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
-                              ** (skg (id 3) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 3
-                              * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
-                              ** (skg (code (interp subscribeeCol))) it subscribes to these
-                              "};
+      let expected = indoc! {
+        "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) title 1
+         This one string could span pages,
+         and it can include newlines, no problem.
+         ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+         ** (skg (id 3) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 3
+         * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
+         ** (skg (code (interp subscribeeCol))) it subscribes to these
+         *** (skg (id 4) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) 4
+         *** (skg (id 5) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) 5
+         "};
       assert_eq!(result, expected,
                  "Multi root view with limit=3 should truncate generation 2 sibling group");
 
