@@ -3,7 +3,7 @@ use crate::media::typedb::util::pid_and_source_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, RelToParent};
+use crate::types::orgnode::{OrgNode, Interp};
 use crate::types::trees::{NodePair, PairTree};
 use crate::util::path_from_pid_and_source;
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -84,7 +84,7 @@ pub async fn completeAliasCol (
       aliascol_mut . append (
         ( None,
           orgnode_from_title_and_rel (
-            RelToParent::Alias, alias ))); }}
+            Interp::Alias, alias ))); }}
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.
@@ -101,10 +101,10 @@ fn collect_alias_titles (
   for child in aliascol_ref . children () {
     let child_node : &OrgNode =
       & child . value () . 1;
-    if child_node . metadata . code.relToParent != RelToParent::Alias {
+    if child_node . metadata . code.interp != Interp::Alias {
       return Err (
-        format! ( "AliasCol has non-Alias child with relToParent: {:?}",
-                  child_node . metadata . code.relToParent )
+        format! ( "AliasCol has non-Alias child with interp: {:?}",
+                  child_node . metadata . code.interp )
         . into () ); }
     aliases_from_tree . push (
       child_node . title . clone () );
@@ -189,11 +189,11 @@ fn get_aliascol_parent_id (
     & tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
     . value () . 1;
-  if aliascol_node . metadata . code.relToParent
-    != RelToParent::AliasCol {
+  if aliascol_node . metadata . code.interp
+    != Interp::AliasCol {
       return Err (
         format! ( "Node is not an AliasCol: {:?}",
-                   aliascol_node . metadata . code.relToParent )
+                   aliascol_node . metadata . code.interp )
           . into () ); }
   let parent_node_id : NodeId =
     tree . get ( aliascol_node_id )

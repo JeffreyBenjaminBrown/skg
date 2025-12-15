@@ -84,14 +84,14 @@ Returns the parsed s-expression or nil if not found."
   ;; Test adding indefinitive to headline with existing code section
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (id 2) (code (relToParent content))) title")
+    (insert "* (skg (id 2) (code (interp content))) title")
     (goto-char (point-min))
     (skg-set-metadata-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in code section
       (should (skg-sexp-subtree-p result '(skg (code indefinitive))))
       ;; Verify existing code content is preserved
-      (should (skg-sexp-subtree-p result '(skg (code (relToParent content)))))
+      (should (skg-sexp-subtree-p result '(skg (code (interp content)))))
       ;; Verify id is preserved
       (should (skg-sexp-subtree-p result '(skg (id 2))))))
 

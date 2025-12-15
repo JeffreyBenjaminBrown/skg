@@ -3,7 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::{OrgNode, RelToParent, ID};
+use crate::types::{OrgNode, Interp, ID};
 use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::Tree;
 use std::boxed::Box;
@@ -29,7 +29,7 @@ pub async fn add_missing_info_to_forest(
   for tree in trees . iter_mut () {
     add_missing_info_dfs (
       tree . root_mut (),
-      None,     // its parent's RelToParent
+      None,     // its parent's Interp
       None ); } // its parent's source
   let mut ids_to_lookup : Vec < ID > = Vec::new ();
   for tree in trees . iter () {
@@ -47,7 +47,7 @@ pub async fn add_missing_info_to_forest(
 
 fn add_missing_info_dfs (
   mut node_ref: ego_tree::NodeMut < OrgNode >,
-  parent_reltoparent: Option < RelToParent >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
+  parent_reltoparent: Option < Interp >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
   parent_source: Option < String >,
 ) {
   { // Process current node
@@ -58,10 +58,10 @@ fn add_missing_info_dfs (
     assign_new_id_if_needed (
       node_ref . value () ); }
 
-  let its_reltoparent: RelToParent =
+  let its_reltoparent: Interp =
     ( // Used to process each child.
       node_ref . value ()
-        . metadata . code . relToParent . clone () );
+        . metadata . code . interp . clone () );
   let its_source: Option < String > =
     node_ref . value () . metadata . source . clone ();
   { // Recurse : Process children, DFS.
@@ -88,17 +88,17 @@ fn add_missing_info_dfs (
 /// to nodes whose parent has treatment=AliasCol
 fn assign_alias_relation_if_needed(
   node: &mut OrgNode,
-  parent_treatment: Option<RelToParent>
+  parent_treatment: Option<Interp>
 ) {
   if let Some(parent_rel) = parent_treatment {
-    if parent_rel == RelToParent::AliasCol {
-      node.metadata.code.relToParent = RelToParent::Alias; }} }
+    if parent_rel == Interp::AliasCol {
+      node.metadata.code.interp = Interp::Alias; }} }
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_new_id_if_needed(
   node: &mut OrgNode
 ) {
-  if ( node.metadata.code.relToParent == RelToParent::Content
+  if ( node.metadata.code.interp == Interp::Content
        && node.metadata.id . is_none() ) {
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}

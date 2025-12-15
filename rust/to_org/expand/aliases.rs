@@ -1,7 +1,7 @@
 use crate::media::file_io::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, orgnode_from_title_and_rel};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
+use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::trees::PairTree;
 
 use std::error::Error;
@@ -49,8 +49,8 @@ pub async fn build_and_integrate_aliases (
         . ok_or ( "Node not found in tree" ) ?;
       node_ref . children ()
         . any ( |child|
-                 child . value () . 1 . metadata . code.relToParent
-                 == RelToParent::AliasCol ) };
+                 child . value () . 1 . metadata . code.interp
+                 == Interp::AliasCol ) };
     if has_aliascol {
       return Ok (( )); }}
   let aliases : Vec < String > =
@@ -60,7 +60,7 @@ pub async fn build_and_integrate_aliases (
       node_id_val ) . await;
   let aliascol : OrgNode =
     orgnode_from_title_and_rel (
-      RelToParent::AliasCol, String::new () );
+      Interp::AliasCol, String::new () );
   let aliascol_id : ego_tree::NodeId = {
     // prepend an AliasCol to the node's children
     let mut node_mut =
@@ -70,7 +70,7 @@ pub async fn build_and_integrate_aliases (
   for alias in aliases {
     // append each Alias to the AliasCol's children
     let alias_node : OrgNode =
-      orgnode_from_title_and_rel ( RelToParent::Alias, alias );
+      orgnode_from_title_and_rel ( Interp::Alias, alias );
     let mut aliascol_mut =
       tree . get_mut ( aliascol_id )
       . ok_or ( "AliasCol node not found" ) ?;

@@ -20,7 +20,7 @@
                 (containers (ANY IT "{"))
                 (contents (ANY "{" IT))
                 (linksIn (ANY IT "→"))))
-        (GREEN code (relToParent
+        (GREEN code (interp
                 (content) ;; ignored
                 (aliasCol "aliases")
                 (alias "alias")

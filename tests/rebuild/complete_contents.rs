@@ -60,7 +60,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     indoc! { "
       * (skg (id a) (code indefinitive)) a
       ** (skg (id c) (code indefinitive)) c
-      *** (skg (id d) (code (relToParent parentIgnores))) d
+      *** (skg (id d) (code (interp parentIgnores))) d
     " };
 
   { // Test running on root with empty visited
@@ -81,7 +81,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       indoc! { "
         * (skg (id a) (source main) (code indefinitive)) a
         ** (skg (id c) (code indefinitive)) c
-        *** (skg (id d) (code (relToParent parentIgnores))) d
+        *** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
       render_paired_forest_to_org ( & forest );
@@ -112,7 +112,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       indoc! { "
         * (skg (id a) (source main) (code indefinitive)) a
         ** (skg (id c) (code indefinitive)) c
-        *** (skg (id d) (code (relToParent parentIgnores))) d
+        *** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
       render_paired_forest_to_org ( & forest );
@@ -148,7 +148,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       indoc! { "
         * (skg (id a) (code indefinitive)) a
         ** (skg (id c) (source main) (code indefinitive)) c
-        *** (skg (id d) (code (relToParent parentIgnores))) d
+        *** (skg (id d) (code (interp parentIgnores))) d
       " };
     assert_eq! (
       render_paired_forest_to_org ( & forest ),
@@ -180,7 +180,7 @@ async fn test_visited_and_indefinitive_logic (
       indoc! { "
         * (skg (id a) (code indefinitive)) a
         ** (skg (id c)) c
-        *** (skg (id d) (code (relToParent parentIgnores))) d
+        *** (skg (id d) (code (interp parentIgnores))) d
       " };
 
     // Test with empty visited
@@ -203,7 +203,7 @@ async fn test_visited_and_indefinitive_logic (
         indoc! { "
           * (skg (id a) (source main) (code indefinitive)) a
           ** (skg (id c)) c
-          *** (skg (id d) (code (relToParent parentIgnores))) d
+          *** (skg (id d) (code (interp parentIgnores))) d
         " };
       let output_org_text : String =
         render_paired_forest_to_org ( & forest );
@@ -233,7 +233,7 @@ async fn test_visited_and_indefinitive_logic (
         indoc! { "
           * (skg (id a) (source main) (code indefinitive)) a
           ** (skg (id c)) c
-          *** (skg (id d) (code (relToParent parentIgnores))) d
+          *** (skg (id d) (code (interp parentIgnores))) d
         " };
       let output_org_text : String =
         render_paired_forest_to_org ( & forest );
@@ -341,7 +341,7 @@ async fn test_visited_and_not_indefinitive_logic (
     indoc! { "
       * (skg (id a)) a
       ** (skg (id c)) c
-      ** (skg (id d) (code (relToParent parentIgnores))) d
+      ** (skg (id d) (code (interp parentIgnores))) d
     " };
 
   // Test with 'a' in visited
@@ -367,7 +367,7 @@ async fn test_visited_and_not_indefinitive_logic (
       indoc! { "
         * (skg (id a) (source main) (code indefinitive)) a
         ** (skg (id c)) c
-        ** (skg (id d) (code (relToParent parentIgnores))) d
+        ** (skg (id d) (code (interp parentIgnores))) d
       " };
     let output_org_text : String =
       render_paired_forest_to_org ( & forest );
@@ -400,7 +400,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a)) a
-        ** (skg (id d) (code (relToParent parentIgnores))) d
+        ** (skg (id d) (code (interp parentIgnores))) d
         ** (skg (id b) (source main)) b
         ** (skg (id c)) c
       " };
@@ -420,7 +420,7 @@ async fn test_visited_and_not_indefinitive_logic (
       indoc! { "
         * (skg (id a)) a
         ** (skg (id b)) b
-        ** (skg (id d) (code (relToParent parentIgnores))) d
+        ** (skg (id d) (code (interp parentIgnores))) d
       " };
 
     let orgnode_forest : Vec < Tree < OrgNode > > =
@@ -440,7 +440,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let expected_output : &str =
       indoc! { "
         * (skg (id a)) a
-        ** (skg (id d) (code (relToParent parentIgnores))) d
+        ** (skg (id d) (code (interp parentIgnores))) d
         ** (skg (id b)) b
         ** (skg (id c) (source main)) c
       " };
@@ -493,7 +493,7 @@ async fn test_false_content_logic (
   let expected_output : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (id d) (code (relToParent parentIgnores))) d
+      ** (skg (id d) (code (interp parentIgnores))) d
       ** (skg (id b) (source main)) b
       ** (skg (id c)) c
     " };

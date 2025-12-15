@@ -41,7 +41,7 @@ fn test_parentignores_and_indefinitive(
         // Node 2 should NOT affect node 1 because treatment=parentIgnores
         let org_text = indoc! {"
           * (skg (id 1) (source main)) 1
-          ** (skg (id 2) (source main) (code (relToParent parentIgnores) indefinitive)) 2
+          ** (skg (id 2) (source main) (code (interp parentIgnores) indefinitive)) 2
           *** (skg (id 4) (source main)) 4
         "};
         let (_orgnode_forest, save_instructions, _merge_instructions) =

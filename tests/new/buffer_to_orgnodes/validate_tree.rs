@@ -18,15 +18,15 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       let input_with_errors: &str =
         indoc! {"
                 * (skg (id root) (source main)) Valid root node
-                ** (skg (code (relToParent aliasCol))) AliasCol with body problem
+                ** (skg (code (interp aliasCol))) AliasCol with body problem
                 This body should not exist on AliasCol
                 *** (skg (id bad_child)) Child of AliasCol with ID
                 *** Regular child without ID
-                ** (skg (code (relToParent alias))) Alias with body problem and orphaned
+                ** (skg (code (interp alias))) Alias with body problem and orphaned
                 This body should not exist on Alias
                 *** Any child of Alias (bad)
-                ** (skg (code (relToParent alias))) Alias under non-AliasCol parent
-                * (skg (code (relToParent alias)) (source main)) Root level Alias (bad)
+                ** (skg (code (interp alias))) Alias under non-AliasCol parent
+                * (skg (code (interp alias)) (source main)) Root level Alias (bad)
                 * (skg (id conflict) (code toDelete) (source main)) Node with deletion conflict
                 * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
@@ -121,10 +121,10 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
       let valid_input: &str =
         indoc! {"
                 * (skg (id root) (source main)) Valid root node
-                ** (skg (code (relToParent aliasCol))) AliasCol without body
+                ** (skg (code (interp aliasCol))) AliasCol without body
                 *** Regular child without ID
                 *** Another child without ID
-                *** (skg (code (relToParent alias))) Alias without body
+                *** (skg (code (interp alias))) Alias without body
                 ** (skg (id normal)) Normal node with body
                 This body is allowed on normal nodes
             "};
@@ -167,10 +167,10 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
       let input_with_multiple_aliascols: &str =
         indoc! {"
                 * (skg (id root)) Node with multiple AliasCol children
-                ** (skg (code (relToParent aliasCol))) First AliasCol
-                *** (skg (code (relToParent alias))) First alias
-                ** (skg (code (relToParent aliasCol))) Second AliasCol
-                *** (skg (code (relToParent alias))) Second alias
+                ** (skg (code (interp aliasCol))) First AliasCol
+                *** (skg (code (interp alias))) First alias
+                ** (skg (code (interp aliasCol))) Second AliasCol
+                *** (skg (code (interp alias))) Second alias
                 ** Normal child
             "};
 

@@ -8,7 +8,7 @@ use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::media::file_io::skgnode_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest, default_metadata};
+use crate::types::orgnode::{OrgNode, Interp, ViewRequest, default_metadata};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -67,16 +67,16 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let treatment : RelToParent = {
+    let treatment : Interp = {
       let node_ref : NodeRef < NodePair > =
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
-      node_ref.value () . 1 . metadata.code.relToParent . clone () };
-    if treatment == RelToParent::AliasCol {
+      node_ref.value () . 1 . metadata.code.interp . clone () };
+    if treatment == Interp::AliasCol {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if treatment == RelToParent::SubscribeeCol {
+    } else if treatment == Interp::SubscribeeCol {
       // For now, SubscribeeCol has no children to process.
       // Future generations will add Subscribee children here.
     } else {
@@ -217,8 +217,8 @@ pub async fn completeDefinitiveOrgnode (
     let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_id )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . 1 . metadata . code.relToParent =
-      RelToParent::ParentIgnores;
+    child_mut . value () . 1 . metadata . code.interp =
+      Interp::ParentIgnores;
     content_id_to_node_id . remove (
       & child_mut . value () . 1
         . metadata . id . clone () . unwrap () );
@@ -262,8 +262,8 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . 1 . metadata . code.relToParent
-      == RelToParent::Content
+    if child . value () . 1 . metadata . code.interp
+      == Interp::Content
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}
@@ -392,13 +392,13 @@ pub fn maybe_add_subscribee_col (
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     node_ref . children () . any ( | child |
-      child . value () . 1 . metadata . code . relToParent
-        == RelToParent::SubscribeeCol ) };
+      child . value () . 1 . metadata . code . interp
+        == Interp::SubscribeeCol ) };
   if has_subscribee_col { return Ok (( )); }
   { // Prepend a subscribees collector
     let subscribee_col_orgnode : OrgNode = {
       let mut md = default_metadata ();
-      md . code . relToParent = RelToParent::SubscribeeCol;
+      md . code . interp = Interp::SubscribeeCol;
       OrgNode {
         metadata : md,
         title : "it subscribes to these" . to_string (),

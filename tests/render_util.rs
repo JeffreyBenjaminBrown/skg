@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::org_to_text::orgnode_to_text;
-use skg::types::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, ID};
+use skg::types::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, ID};
 use skg::types::orgnode::default_metadata;
 use std::collections::HashSet;
 
@@ -34,14 +34,14 @@ fn test_orgnode_to_text_with_metadata () {
   let node : OrgNode =
     OrgNode {
       metadata : { let mut md = default_metadata ();
-                   md.code.relToParent = RelToParent::AliasCol;
+                   md.code.interp = Interp::AliasCol;
                    md.viewData.folded = true;
                    md },
       title : "Test Title".to_string (),
       body : None, };
   let result : String =
     orgnode_to_text ( 1, &node );
-  assert_eq! ( result, "* (skg (view folded) (code (relToParent aliasCol))) Test Title\n" ); }
+  assert_eq! ( result, "* (skg (view folded) (code (interp aliasCol))) Test Title\n" ); }
 
 #[test]
 fn test_orgnode_to_text_with_id_metadata () {
@@ -73,7 +73,7 @@ fn test_metadata_ordering () {
               parentIsContainer : false,
               .. OrgnodeRelationships::default () }, },
           code : OrgnodeCode {
-            relToParent : RelToParent::Content,
+            interp : Interp::Content,
             indefinitive : false,
             editRequest  : None,
             viewRequests : HashSet::new (), }, },

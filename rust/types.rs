@@ -19,8 +19,8 @@ pub use orgnode::{
     OrgnodeMetadata, // opt id, opt source, viewdata, code
       OrgnodeViewData, // cycle, focused, folded, relationships
         OrgnodeRelationships, // 2 bools, 3 opt ints
-      OrgnodeCode, // relToParent, indef, opt editRequest, viewRequests
-        RelToParent, // content | for aliases | ignored
+      OrgnodeCode, // interp, indef, opt editRequest, viewRequests
+        Interp, // content | for aliases | ignored
         EditRequest, // merge | delete
                      //   Mutually excclusive.
         ViewRequest, // aliases | containerward | sourceward

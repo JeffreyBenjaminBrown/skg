@@ -2,7 +2,7 @@
 
 use crate::media::sexp::atom_to_string;
 use crate::types::misc::ID;
-use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, RelToParent, EditRequest, ViewRequest, default_metadata};
+use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, EditRequest, ViewRequest, default_metadata};
 
 use sexp::Sexp;
 use std::collections::HashSet;
@@ -106,16 +106,16 @@ fn parse_code_sexp (
         let key : String =
           atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
-          "relToParent" => {
+          "interp" => {
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            code . relToParent = match value . as_str () {
-              "alias"         => RelToParent::Alias,
-              "aliasCol"      => RelToParent::AliasCol,
-              "content"       => RelToParent::Content,
-              "parentIgnores" => RelToParent::ParentIgnores,
+            code . interp = match value . as_str () {
+              "alias"         => Interp::Alias,
+              "aliasCol"      => Interp::AliasCol,
+              "content"       => Interp::Content,
+              "parentIgnores" => Interp::ParentIgnores,
               _ => return Err (
-                format! ( "Unknown relToParent value: {}", value )),
+                format! ( "Unknown interp value: {}", value )),
             }; },
           "merge" => {
             // (merge id) sets editRequest to Merge(id)

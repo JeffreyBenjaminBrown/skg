@@ -13,7 +13,7 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (id 123) (view (cycle) (relationships (numContents 2))) (code (relToParent aliasCol))) herald\n")
+      (insert "Test line with (skg (id 123) (view (cycle) (relationships (numContents 2))) (code (interp aliasCol))) herald\n")
       (insert "Another line (skg (id 456) (view (relationships (numContainers 1) (numLinksIn 3))) (code (toDelete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode

@@ -9,7 +9,7 @@
        - No node can be involved in more than one merge.
 */
 
-use crate::types::{OrgNode, RelToParent, ID, EditRequest, SkgConfig};
+use crate::types::{OrgNode, Interp, ID, EditRequest, SkgConfig};
 use crate::media::typedb::util::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -37,8 +37,8 @@ pub async fn validate_merge_requests(
     let acquirer_id : &ID =
       node.metadata.id.as_ref()
       .ok_or("Acquirer node must have an ID")?;
-    if node.metadata.code.relToParent == RelToParent::Alias
-      || node.metadata.code.relToParent == RelToParent::AliasCol {
+    if node.metadata.code.interp == Interp::Alias
+      || node.metadata.code.interp == Interp::AliasCol {
         errors.push(
           format!(
             "Acquirer node '{}' cannot be an Alias or AliasCol",

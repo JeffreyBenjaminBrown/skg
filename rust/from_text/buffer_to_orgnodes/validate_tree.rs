@@ -1,6 +1,6 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, RelToParent, BufferValidationError, SkgConfig, SourceNickname, ViewRequest};
+use crate::types::{ID, OrgNode, Interp, BufferValidationError, SkgConfig, SourceNickname, ViewRequest};
 use crate::merge::validate_merge_requests;
 use ego_tree::Tree;
 use ego_tree::iter::Edge;
@@ -72,26 +72,26 @@ fn validate_roots_have_sources(
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children (
   node_ref: ego_tree::NodeRef<OrgNode>,
-  parent_treatment : Option<RelToParent>, // that is, the treatment of the parent of what node_ref points to
+  parent_treatment : Option<Interp>, // that is, the treatment of the parent of what node_ref points to
   config: &SkgConfig,
   errors: &mut Vec<BufferValidationError>
 ) {
 
   let node: &OrgNode = node_ref.value();
-  match node.metadata.code.relToParent {
-    RelToParent::AliasCol => {
+  match node.metadata.code.interp {
+    Interp::AliasCol => {
       if node.body.is_some() {
         errors.push(
           BufferValidationError::Body_of_AliasCol(
             node.clone() )); }},
 
-    RelToParent::Alias => {
+    Interp::Alias => {
       if node.body.is_some() {
         errors.push(
           BufferValidationError::Body_of_Alias(
             node.clone() )); }
       if let Some(ref parent_rel) = parent_treatment {
-        if *parent_rel != RelToParent::AliasCol {
+        if *parent_rel != Interp::AliasCol {
           errors.push(
             BufferValidationError::Alias_with_no_AliasCol_Parent(
               node.clone() )); }
@@ -104,13 +104,13 @@ fn validate_node_and_children (
 
   if let Some(parent_rel) = parent_treatment {
     match parent_rel {
-      RelToParent::AliasCol => {
+      Interp::AliasCol => {
         // Children of AliasCol should not have IDs
         if node.metadata.id.is_some() {
           errors.push(
             BufferValidationError::Child_of_AliasCol_with_ID(
               node.clone() )); }},
-      RelToParent::Alias => {
+      Interp::Alias => {
         // Children of Alias should not exist at all
         errors.push(
           BufferValidationError::Child_of_Alias(
@@ -121,8 +121,8 @@ fn validate_node_and_children (
     let aliasCol_children_count: usize =
       node_ref . children()
       . filter ( |child|
-                  child.value() . metadata.code.relToParent
-                  == RelToParent::AliasCol )
+                  child.value() . metadata.code.interp
+                  == Interp::AliasCol )
       . count();
     if aliasCol_children_count > 1 {
       errors.push (
@@ -137,7 +137,7 @@ fn validate_node_and_children (
       for child in node_ref . children () {
         let child_node : &OrgNode =
           child . value ();
-        if child_node . metadata . code.relToParent == RelToParent::Content {
+        if child_node . metadata . code.interp == Interp::Content {
           if let Some ( ref child_id ) = child_node . metadata . id {
             if ! seen_content_ids . insert ( child_id . clone () ) {
               errors . push (
@@ -165,8 +165,8 @@ fn validate_node_and_children (
           node.clone() )); }}
 
   for child in node_ref.children() { // recurse
-    let cloned_rel: RelToParent =
-      node.metadata.code.relToParent.clone();
+    let cloned_rel: Interp =
+      node.metadata.code.interp.clone();
     validate_node_and_children(
       child, Some(cloned_rel), config, errors);
   }}

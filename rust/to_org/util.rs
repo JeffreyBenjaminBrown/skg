@@ -2,7 +2,7 @@ use crate::media::file_io::read_skgnode;
 use crate::media::tree::collect_generation_ids;
 use crate::media::typedb::util::pid_and_source_from_id;
 use crate::to_org::complete::contents::maybe_add_subscribee_col;
-use crate::types::orgnode::{default_metadata, RelToParent, ViewRequest};
+use crate::types::orgnode::{default_metadata, Interp, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::util::path_from_pid_and_source;
@@ -74,14 +74,14 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
                  pid ), )) ); }
   Ok (( skgnode, orgnode )) }
 
-/// Create an OrgNode with a given RelToParent and title.
+/// Create an OrgNode with a given Interp and title.
 /// Body is set to None, and all other metadata fields use defaults.
 pub fn orgnode_from_title_and_rel (
-  rel: RelToParent,
+  rel: Interp,
   title: String
 ) -> OrgNode {
   let mut md = default_metadata ();
-  md . code . relToParent = rel;
+  md . code . interp = rel;
   OrgNode { metadata: md, title, body: None }}
 
 /// Mark a node as indefinitive and clear its body.

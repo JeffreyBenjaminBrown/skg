@@ -31,16 +31,16 @@ async fn test_completeAliasCol_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (code (relToParent aliasCol))) aliases 1
-      *** (skg (code (relToParent alias))) c
-      *** (skg (code (relToParent alias))) d
-      *** (skg (code (relToParent alias))) c
-      *** (skg (code (relToParent alias))) d
-      ** (skg (code (relToParent aliasCol))) aliases 2
-      *** (skg (code (relToParent alias))) b
-      *** (skg (view focused) (code (relToParent alias))) d
-      * (skg (code (relToParent aliasCol))) aliases 3
-      ** (skg (code (relToParent alias))) the above should break
+      ** (skg (code (interp aliasCol))) aliases 1
+      *** (skg (code (interp alias))) c
+      *** (skg (code (interp alias))) d
+      *** (skg (code (interp alias))) c
+      *** (skg (code (interp alias))) d
+      ** (skg (code (interp aliasCol))) aliases 2
+      *** (skg (code (interp alias))) b
+      *** (skg (view focused) (code (interp alias))) d
+      * (skg (code (interp aliasCol))) aliases 3
+      ** (skg (code (interp alias))) the above should break
     " };
 
   let orgnode_forest : Vec < Tree < OrgNode > > =
@@ -177,12 +177,12 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   let org_text : &str =
     indoc! { "
       * (skg (id a)) a
-      ** (skg (code (relToParent aliasCol))) aliases
-      *** (skg (code (relToParent alias))) b
-      *** (skg (view focused) (code (relToParent alias))) b
-      ** (skg (code (relToParent aliasCol))) aliases
-      *** (skg (view focused) (code (relToParent alias))) b
-      *** (skg (code (relToParent alias))) b
+      ** (skg (code (interp aliasCol))) aliases
+      *** (skg (code (interp alias))) b
+      *** (skg (view focused) (code (interp alias))) b
+      ** (skg (code (interp aliasCol))) aliases
+      *** (skg (view focused) (code (interp alias))) b
+      *** (skg (code (interp alias))) b
     " };
 
   let orgnode_forest : Vec < Tree < OrgNode > > =

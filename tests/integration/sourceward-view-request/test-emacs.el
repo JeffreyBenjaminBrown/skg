@@ -79,7 +79,7 @@ LINE-NUMBER is zero-based."
         (expected-changed
          (concat "* (skg (id 1) (source main) (view (rels (containers 0) (contents 2)))) 1\n"
                  "** (skg (id 11) (source main) (view (rels (linksIn 1)))) 11\n"
-                 "*** (skg (id l-11) (source main) (view (rels notInParent (containers 0))) (code (relToParent parentIgnores) indefinitive)) [[id:11][a link to 11]]\n"
+                 "*** (skg (id l-11) (source main) (view (rels notInParent (containers 0))) (code (interp parentIgnores) indefinitive)) [[id:11][a link to 11]]\n"
                  "** (skg (id 12) (source main)) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))

@@ -47,25 +47,27 @@ pub struct OrgnodeRelationships {
 /// These data determine how the node is treated when saved.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeCode {
-  pub relToParent: RelToParent,
+  pub interp: Interp,
   pub indefinitive: bool, // Describes a node's relationship to those of its children that are content. A definitive node defines the title, body and initial contents, if present. So changing which nodes are its children can change its contents. Indefinitive nodes, by contrast, do not permit the user to modify the node they represent. If it has children, they are kept in the view when the user saves, but saving does not create a 'contains' relationship from the indefinitive parent to the child.
   // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
   pub editRequest: Option<EditRequest>,
   pub viewRequests: HashSet<ViewRequest>,
 }
 
-/// 'RelToParent' describes how a node relates to its parent.
+/// 'Interp' describes the meaning of a node --
+/// how it relates to its ancestors and its descendents in the tree.
 /// It influences both how the user should read it,
 /// and how Rust should treat the data when it is saved.
 /// PITFALL: It does not describe every potential relationship
 /// between the node and its parent.
 #[derive(Debug, Clone, PartialEq)]
-pub enum RelToParent {
-  Content, // The default relationship: parents 'contain' most children.
-  AliasCol, // The node collects aliases for its parent.
+pub enum Interp {
+  Content, // Most nodes are this. Parents 'contain' most children.
+  AliasCol, // The node collects (as children) aliases for its parent.
   Alias, // The node is an alias for its grandparent.
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
   SubscribeeCol, // Collects subscribees for its parent.
+  // TODO : SubscribeeCol is not entirely implemented yet.
 }
 
 /// Requests for editing operations on a node.
@@ -91,34 +93,34 @@ pub enum ViewRequest {
 // Implementations
 //
 
-impl fmt::Display for RelToParent {
+impl fmt::Display for Interp {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     let s : &str =
       match self {
-        RelToParent::Content => "content",
-        RelToParent::AliasCol => "aliasCol",
-        RelToParent::Alias => "alias",
-        RelToParent::ParentIgnores => "parentIgnores",
-        RelToParent::SubscribeeCol => "subscribeeCol",
+        Interp::Content => "content",
+        Interp::AliasCol => "aliasCol",
+        Interp::Alias => "alias",
+        Interp::ParentIgnores => "parentIgnores",
+        Interp::SubscribeeCol => "subscribeeCol",
       };
     write! ( f, "{}", s ) } }
 
-impl FromStr for RelToParent {
+impl FromStr for Interp {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "content"       => Ok ( RelToParent::Content ),
-      "aliasCol"      => Ok ( RelToParent::AliasCol ),
-      "alias"         => Ok ( RelToParent::Alias ),
-      "parentIgnores" => Ok ( RelToParent::ParentIgnores ),
-      "subscribeeCol" => Ok ( RelToParent::SubscribeeCol ),
-      _ => Err ( format! ( "Unknown RelToParent value: {}", s )),
+      "content"       => Ok ( Interp::Content ),
+      "aliasCol"      => Ok ( Interp::AliasCol ),
+      "alias"         => Ok ( Interp::Alias ),
+      "parentIgnores" => Ok ( Interp::ParentIgnores ),
+      "subscribeeCol" => Ok ( Interp::SubscribeeCol ),
+      _ => Err ( format! ( "Unknown Interp value: {}", s )),
     }} }
 
 impl fmt::Display for EditRequest {
@@ -195,7 +197,7 @@ impl Default for OrgnodeViewData {
 impl Default for OrgnodeCode {
   fn default () -> Self {
     OrgnodeCode {
-      relToParent : RelToParent::Content,
+      interp : Interp::Content,
       indefinitive : false,
       editRequest : None,
       viewRequests : HashSet::new (),
@@ -265,9 +267,9 @@ pub fn orgnodemd_to_string (
 
   // Build code s-expr
   let mut code_parts : Vec<String> = Vec::new ();
-  if metadata.code.relToParent != RelToParent::Content {
+  if metadata.code.interp != Interp::Content {
     code_parts.push ( format! (
-      "(relToParent {})", metadata.code.relToParent )); }
+      "(interp {})", metadata.code.interp )); }
   if metadata.code.indefinitive {
     code_parts.push ( "indefinitive".to_string () ); }
 

@@ -13,7 +13,7 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, RelToParent, ViewRequest};
+use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -98,7 +98,7 @@ async fn execute_definitive_view_request (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
 /// - Remove them from `visited`.
-/// Only recurses into content children (relToParent == Content).
+/// Only recurses into content children (interp == Content).
 ///   Non-content children (AliasCol, ParentIgnores, etc.)
 ///   persist unchanged.
 fn indefinitize_content_subtree (
@@ -115,8 +115,8 @@ fn indefinitize_content_subtree (
     orgnode . metadata . id . clone ();
   let content_child_ids : Vec < NodeId > =
     node_ref . children ()
-    . filter ( |c| c . value () . 1 . metadata . code . relToParent
-                   == RelToParent::Content )
+    . filter ( |c| c . value () . 1 . metadata . code . interp
+                   == Interp::Content )
     . map ( |c| c . id () )
     . collect ();
   if let Some(ref pid) = node_pid_opt { // remove from visited

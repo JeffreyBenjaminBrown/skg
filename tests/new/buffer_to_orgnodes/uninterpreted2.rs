@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::from_text::org_to_uninterpreted_nodes;
-use skg::types::{ID, OrgNode, RelToParent};
+use skg::types::{ID, OrgNode, Interp};
 use ego_tree::Tree;
 
 #[test]
@@ -68,7 +68,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg (id child1) (view folded)) child1
             Child1 body
-            * (skg (code (relToParent parentIgnores) indefinitive)) parentIgnores node
+            * (skg (code (interp parentIgnores) indefinitive)) parentIgnores node
             ParentIgnores body
             * (skg (view cycle)) cycling node
             This node has cycle flag
@@ -90,7 +90,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test parentIgnores node
   let parentIgnores_node = trees[1].root().value();
   assert_eq!(parentIgnores_node.title, "parentIgnores node");
-  assert_eq!(parentIgnores_node.metadata.code.relToParent, RelToParent::ParentIgnores);
+  assert_eq!(parentIgnores_node.metadata.code.interp, Interp::ParentIgnores);
   assert_eq!(parentIgnores_node.metadata.code.indefinitive, true);
   assert_eq!(parentIgnores_node.body, Some("ParentIgnores body".to_string()));
 
@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title, "simple node");
   assert_eq!(first_node.body, Some("Simple body".to_string()));
   assert_eq!(first_node.metadata.id, None);
-  assert_eq!(first_node.metadata.code.relToParent, RelToParent::Content);
+  assert_eq!(first_node.metadata.code.interp, Interp::Content);
   assert_eq!(first_node.metadata.viewData.cycle, false);
   assert_eq!(first_node.metadata.viewData.focused, false);
   assert_eq!(first_node.metadata.viewData.folded, false);
@@ -228,7 +228,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * (skg invalidKey:value) invalid key
-            * (skg (code (relToParent invalidValue)) invalid value
+            * (skg (code (interp invalidValue)) invalid value
             * (skg unknownFlag) unknown flag
         "};
 
@@ -238,11 +238,11 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
 
-  // Test invalid relToParent value
-  let input_invalid_value = "* (skg (code (relToParent invalidValue))) invalid value";
+  // Test invalid interp value
+  let input_invalid_value = "* (skg (code (interp invalidValue))) invalid value";
   let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unknown relToParent value: invalidValue"));
+  assert!(result.unwrap_err().contains("Unknown interp value: invalidValue"));
 
   // Test unknown flag
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";

@@ -90,10 +90,10 @@ fn test_subscribee_col_appears_for_subscribers(
     let expected = indoc! {
       "* (skg (id 1) (source home) (view (rels (containers 0) (contents 4)))) 1
       ** (skg (id 11) (source home) (view (rels (contents 1)))) 11
-      *** (skg (code (relToParent subscribeeCol))) it subscribes to these
+      *** (skg (code (interp subscribeeCol))) it subscribes to these
       *** (skg (id 111) (source home)) 111
       ** (skg (id 12) (source home)) 12
-      *** (skg (code (relToParent subscribeeCol))) it subscribes to these
+      *** (skg (code (interp subscribeeCol))) it subscribes to these
       ** (skg (id 13) (source home)) 13
       ** (skg (id 14) (source home) (view (rels (contents 1)))) 14
       *** (skg (id 141) (source home)) 141

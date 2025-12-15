@@ -188,10 +188,10 @@ fn test_multi_root_view_with_shared_nodes
                               ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
                               ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
                               this one string could span pages
-                              *** (skg (code (relToParent subscribeeCol))) it subscribes to these
+                              *** (skg (code (interp subscribeeCol))) it subscribes to these
                               * (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
                               this one string could span pages
-                              ** (skg (code (relToParent subscribeeCol))) it subscribes to these
+                              ** (skg (code (interp subscribeeCol))) it subscribes to these
                               "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -240,7 +240,7 @@ fn test_multi_root_view_with_node_limit
                               ** (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
                               ** (skg (id 3) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 3
                               * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
-                              ** (skg (code (relToParent subscribeeCol))) it subscribes to these
+                              ** (skg (code (interp subscribeeCol))) it subscribes to these
                               "};
       assert_eq!(result, expected,
                  "Multi root view with limit=3 should truncate generation 2 sibling group");

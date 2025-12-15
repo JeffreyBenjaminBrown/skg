@@ -1,4 +1,4 @@
-use crate::types::{OrgNode, RelToParent, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
+use crate::types::{OrgNode, Interp, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
 use ego_tree::{NodeRef, Tree};
 
 /// Converts a forest of OrgNodes to SaveInstructions,
@@ -27,9 +27,9 @@ fn saveinstructions_from_tree(
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
   let node_data = node_ref.value();
-  let rel_to_parent = &node_data.metadata.code.relToParent;
-  if matches!(rel_to_parent, ( RelToParent::AliasCol |
-                               RelToParent::Alias )) {
+  let rel_to_parent = &node_data.metadata.code.interp;
+  if matches!(rel_to_parent, ( Interp::AliasCol |
+                               Interp::Alias )) {
     // Skip. Should never execute, because a predecessor in the tree should have already processed any alias node.
     return Ok(( )); }
   if !node_data.metadata.code.indefinitive {
@@ -91,11 +91,11 @@ fn collect_aliases (
 ) -> Option<Vec<String>> {
   let mut aliases: Vec<String> = Vec::new();
   for alias_col_child in node_ref.children()
-  { if ( alias_col_child . value() . metadata . code.relToParent
-         == RelToParent::AliasCol ) // child of interest
+  { if ( alias_col_child . value() . metadata . code.interp
+         == Interp::AliasCol ) // child of interest
     { for alias_child in alias_col_child.children() {
-      if ( alias_child . value() . metadata . code.relToParent
-           == RelToParent::Alias ) // grandchild of interest
+      if ( alias_child . value() . metadata . code.interp
+           == Interp::Alias ) // grandchild of interest
       { aliases . push(
         alias_child . value() . title . clone() ); }} }}
   if aliases.is_empty() { None }
@@ -111,8 +111,8 @@ fn collect_contents (
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if (( child . value() . metadata . code.relToParent
-          == RelToParent::Content )
+    if (( child . value() . metadata . code.interp
+          == Interp::Content )
         && ( ! matches!(
           child . value() . metadata . code . editRequest,
           Some(EditRequest::Delete)) )) {

@@ -73,9 +73,9 @@ LINE-NUMBER is zero-based."
 
   (let ((expected-with-aliases
          (concat "* (skg (id test-node) (source main) (view (rels (containers 0)))) Test Node\n"
-                 "** (skg (code (relToParent aliasCol)))\n"
-                 "*** (skg (code (relToParent alias))) first alias\n"
-                 "*** (skg (code (relToParent alias))) second alias\n"))
+                 "** (skg (code (interp aliasCol)))\n"
+                 "*** (skg (code (interp alias))) first alias\n"
+                 "*** (skg (code (interp alias))) second alias\n"))
         (expected-stripped
          (concat "* Test Node\n"
                  "*** first alias\n"

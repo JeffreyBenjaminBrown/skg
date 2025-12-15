@@ -65,7 +65,7 @@ async fn test_merge_2_into_1_impl(
       source: None,
       viewData: Default::default(),
       code: skg::types::OrgnodeCode {
-        relToParent: skg::types::RelToParent::Content,
+        interp: skg::types::Interp::Content,
         indefinitive: false,
         editRequest: Some(EditRequest::Merge(ID::from("2"))),
         viewRequests: HashSet::new(), }, },
@@ -345,7 +345,7 @@ async fn test_merge_1_into_2_impl(
       source: None,
       viewData: Default::default(),
       code: skg::types::OrgnodeCode {
-        relToParent: skg::types::RelToParent::Content,
+        interp: skg::types::Interp::Content,
         indefinitive: false,
         editRequest: Some(EditRequest::Merge(ID::from("1"))),
         viewRequests: HashSet::new(), }, },

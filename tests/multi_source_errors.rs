@@ -144,7 +144,7 @@ fn test_foreign_node_modification_errors(
     {
       let buffer_with_errors: &str = indoc! {"
         * (skg (id ext-1) (source ext)) ext-1
-        ** (skg (code (relToParent aliasCol))) aliases         # edit to aliases (set to empty)
+        ** (skg (code (interp aliasCol))) aliases         # edit to aliases (set to empty)
         * (skg (id ext-2) (source ext)) ext-2-edited           # edit to title
         * (skg (id ext-3) (source ext)) ext-3
         new body                                               # edit to body
