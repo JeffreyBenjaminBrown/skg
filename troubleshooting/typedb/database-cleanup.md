@@ -135,12 +135,19 @@ Very helpful before deciding what to clean up.
 
 Check current databases:
 ```bash
-ls -la /opt/typedb/core/server/data/ | grep skg
+ls /opt/typedb/core/server/data/ | grep skg
 ```
 
 Count test databases:
 ```bash
-ls -la /opt/typedb/core/server/data/ | grep skg-test | wc -l
+ls /opt/typedb/core/server/data/ | grep skg-test | wc -l
+```
+
+Nuclear cleanup (when TypeDB is crashed):
+```bash
+pkill -9 -f typedb_server_bin
+rm -rf /opt/typedb/core/server/data/skg-test*
+nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
 ```
 
 ## Failure Modes

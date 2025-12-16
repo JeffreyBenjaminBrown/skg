@@ -1,3 +1,48 @@
+* subscription branches
+** PITFALL: Hiding is not ternary.
+   SubscribeR node R Hides node H from *all* its subscriptions.
+   When the nodes R hides are *displayed*,
+     they can be grouped by their parents,
+     and orphaned hidden nodes can be grouped separately,
+   but in the graph they are not represented that way.
+** Just like locally-owned nodes, make Content top-level children.
+** Collect each subscribee's hidden in a HiddenCol midparent.
+   The HiddenCol midparent is indefinitive.
+   Its contents can be modified, and it can be deleted entirely,
+   to no effect.
+   Its contents respawn from disk on each save.
+     (The user should perhaps be warned if that happens.)
+** to populate Content and Hidden in a subscription branch, filter each subscribee's Contents into
+**** Hidden = intersects with what the subscriber hides
+**** Content = intersects not
+** Collect hidden nodes that belong to no subscribee separately.
+   in a midparent titled 'hidden outside of subscribees'.
+   This one is also indefinite, respawning on each save.
+** Saving can change a subscription's contents in two ways.
+*** via deletion
+    Deleting a top-level node adds it to 'hidden'.
+*** via insertion
+**** Only something from 'hidden' can be inserted.
+     This un-hides it.
+**** Order does not matter.
+     When saving,
+     the subscribee branch'scontents are treated as a set,
+     and intersected with the set of contents of the
+       (foreign) subscribee.
+** When the user edits a subscribeeCol
+   Its children determine what is subscribed to.
+   The Contents of its children can be edited to change Hides relationships.
+   The rest of the SubscribeeCol branch are respawned on save,
+     and have no effect if edited before saving.
+* for lossless smsn-encoding
+** title, body and contents translate directly
+** each alias is a child with text "(skg-as-smsn : alias) the-alias"
+** sharing relationships are midparented
+*** subscribes-to relationships are mediated by a '(skg-as-smsn : subscribes-to)' node
+*** hides relationships are mediated by a '(skg-as-smsn : hides)' node
+*** overrides relationships are mediated by a '(skg-as-smsn : overrides-to)' node
+** ? omit extra_ids
+   SmSn can't follow those links anyway.
 * add 'numSubscribees' near 'numLinksIn'
 * Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]

@@ -92,10 +92,15 @@ This issue was fixed in `/home/ubuntu/bash/run-servers.sh` on 2025-10-14. If you
 If TypeDB fails to start with "Too many open files" errors:
 
 #+begin_src bash
-# Modern approach (recommended) - uses TypeDB API
-cargo run --bin cleanup-test-dbs
+# Nuclear option - when TypeDB is crashed and won't start
+pkill -9 -f typedb_server_bin
+rm -rf /opt/typedb/core/server/data/skg-test*
+nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
+#+end_src
 
-# Then restart TypeDB
+If TypeDB is still running (but struggling), use the API-based cleanup:
+#+begin_src bash
+cargo run --bin cleanup-test-dbs
 pkill -f typedb
 nohup typedb server > /home/ubuntu/logs/typedb.log 2>&1 < /dev/null &
 #+end_src
@@ -127,11 +132,11 @@ Shows: count of test/corrupt/okay databases, recommendations
 ** Legacy Approach (Filesystem-Based)
 
 *WARNING*: Manual filesystem deletion can cause TypeDB to crash if databases are open.
-Use the Rust utilities above instead when possible.
+Only use if TypeDB is NOT running.
 
 #+begin_src bash
 # Only use if TypeDB is NOT running
-cd /var/lib/typedb/core/data && rm -rf skg-test*
+rm -rf /opt/typedb/core/server/data/skg-test*
 #+end_src
 
 * Database Corruption (Non-Accumulation Issues)

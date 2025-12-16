@@ -69,6 +69,9 @@ pub enum Interp {
   ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
   SubscribeeCol, // Collects subscribees for its parent.
   Subscribee, // The node represents a subscribee of its grandparent. Its ID identifies the subscribed node.
+  HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
+  HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
+  HiddenFromSubscribees, // Child of HiddenOutsideOfSubscribeeCol or HiddenInSubscribeeCol. Represents a node hidden from the subscriber's subscriptions.
 }
 
 /// Requests for editing operations on a node.
@@ -108,6 +111,9 @@ impl fmt::Display for Interp {
         Interp::SubscribeeCol => "subscribeeCol",
         Interp::Subscribee => "subscribee",
         Interp::ForestRoot => "forestRoot", // Should never be rendered
+        Interp::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
+        Interp::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
+        Interp::HiddenFromSubscribees => "hiddenFromSubscribees",
       };
     write! ( f, "{}", s ) } }
 
@@ -125,6 +131,9 @@ impl FromStr for Interp {
       "subscribeeCol" => Ok ( Interp::SubscribeeCol ),
       "subscribee"    => Ok ( Interp::Subscribee ),
       "forestRoot"    => Ok ( Interp::ForestRoot ),
+      "hiddenOutsideOfSubscribeeCol" => Ok ( Interp::HiddenOutsideOfSubscribeeCol ),
+      "hiddenInSubscribeeCol"        => Ok ( Interp::HiddenInSubscribeeCol ),
+      "hiddenFromSubscribees"        => Ok ( Interp::HiddenFromSubscribees ),
       _ => Err ( format! ( "Unknown Interp value: {}", s )),
     }} }
 

@@ -17,6 +17,7 @@ use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -55,6 +56,9 @@ pub async fn execute_view_requests (
 /// 2. Marks this OrgNode definitive
 /// 3. Expands its content from disk using BFS
 /// 4. Removes its ViewRequest::Definitive
+///
+/// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
+/// list is used to filter out content that should be hidden.
 async fn execute_definitive_view_request (
   forest        : &mut PairTree, // "forest" = tree with ForestRoot
   node_id       : NodeId, // had the request
@@ -65,13 +69,15 @@ async fn execute_definitive_view_request (
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_pid_in_pairtree (
     forest, node_id ) ?;
-  if let Some ( &existing_node_id ) =
+  let hidden_ids : HashSet < ID > =
+    // If node is a subscribee, we may need to hide some content.
+    get_hidden_ids_if_subscribee ( forest, node_id ) ?;
+  if let Some ( &preexisting_node_id ) =
     visited . get ( & node_pid )
-  { if existing_node_id != node_id {
-    // indefinitize the previous definitive view
+  { if preexisting_node_id != node_id {
     indefinitize_content_subtree ( forest,
-                                    existing_node_id,
-                                    visited ) ?; }}
+                                   preexisting_node_id,
+                                   visited ) ?; }}
   { // Mutate the root of the definitive view request:
     // Remove the ViewRequest, mark it definitive,
     // and rebuild from disk.
@@ -87,9 +93,39 @@ async fn execute_definitive_view_request (
   visited . insert ( node_pid.clone(), node_id );
   extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
     forest, node_id,
-    config.initial_node_limit, visited, config, typedb_driver
+    config.initial_node_limit, visited, config, typedb_driver,
+    &hidden_ids,
   ) . await ?;
   Ok (( )) }
+
+/// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
+/// return the Subscriber's 'hides_from_its_subscriptions' as a HashSet.
+/// Otherwise return an empty set.
+fn get_hidden_ids_if_subscribee (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < HashSet < ID >, Box<dyn Error> > {
+  let node_ref : NodeRef < NodePair > =
+    tree . get ( node_id )
+    . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
+  let interp : &Interp =
+    & node_ref . value () . 1 . metadata . code . interp;
+  if *interp != Interp::Subscribee {
+    return Ok ( HashSet::new () ); }
+  else {
+    let subscribee_col : NodeRef < NodePair > =
+      node_ref . parent ()
+      . ok_or ( "get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)" ) ?;
+    let subscriber : NodeRef < NodePair > =
+      subscribee_col . parent ()
+      . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
+    let hidden_ids : HashSet < ID > =
+      match & subscriber . value () . 0 {
+        Some ( skgnode ) =>
+          skgnode . hides_from_its_subscriptions . clone ()
+          . unwrap_or_default () . into_iter () . collect (),
+        None => HashSet::new (), };
+    Ok ( hidden_ids ) }}
 
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
@@ -152,23 +188,26 @@ fn indefinitize_content_subtree (
 /// Generations are relative to the effective root (generation 0),
 /// *not* the tree's true root. This way, truncation only affects
 /// nodes within this subtree, not siblings of ancestors.
+///
+/// `hidden_ids` contains IDs to filter from a subscribee's
+/// top-level children (without recursing into grandchildren, etc.)
+/// If the view was requested from a non-subscribee,
+/// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut PairTree,
-  effective_root : NodeId, // it contained the request
+  effective_root : NodeId, // it contained the request, is already in the tree, and although it was indefinitive when the request was issued, it was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
   visited        : &mut VisitedMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
+  hidden_ids     : &HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  // effective_root is already in the tree and definitive.
-  // Read content children from the SkgNode in the tree.
-  let content_child_ids : Vec < ID > =
-    content_ids_if_definitive_else_empty (
-      tree, effective_root ) ?;
   let mut gen_with_children : Vec < (NodeId, // effective root
                                      ID) > = // one of its children
-    content_child_ids
+    content_ids_if_definitive_else_empty (
+      tree, effective_root ) ?
     . into_iter ()
+    . filter ( |id| ! hidden_ids . contains ( id ) )
     . map ( |child_id| (effective_root, child_id) )
     . collect ();
   let mut nodes_rendered : usize = 0;
@@ -191,6 +230,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
           &child_id, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! is_indefinitive ( tree, new_node_id ) ? {
+        // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_ids : Vec < ID > =
           content_ids_if_definitive_else_empty (
             tree, new_node_id ) ?;
