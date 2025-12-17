@@ -133,15 +133,17 @@ pub fn rewrite_to_indefinitive (
 /// which this function does:
 /// - handle repeats, cycles and the visited map
 /// - build a subscribee branch if needed
-pub fn complete_branch_minus_content (
+pub async fn complete_branch_minus_content (
   tree     : &mut PairTree,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
+  db_name  : &str,
+  driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   mark_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
   maybe_add_subscribee_col (
-    tree, node_id ) ?;
+    tree, node_id, db_name, driver ) . await ?;
   Ok (( )) }
 
 /// Handles repetitions, cycles, and the VisitedMap.
@@ -317,14 +319,16 @@ pub async fn build_node_branch_minus_content (
             "build_node_branch_minus_content: parent not found" ) ?;
         parent_mut . append ((Some(skgnode), orgnode)) . id () };
       complete_branch_minus_content (
-        tree, child_node_id, visited ) ?;
+        tree, child_node_id, visited,
+        & config . db_name, driver ) . await ?;
       Ok ( (None, child_node_id) ) },
     None => {
       let mut tree : PairTree =
         Tree::new ( (Some(skgnode), orgnode) );
       let root_node_id : NodeId = tree . root () . id ();
       complete_branch_minus_content (
-        &mut tree, root_node_id, visited ) ?;
+        &mut tree, root_node_id, visited,
+        & config . db_name, driver ) . await ?;
       Ok ( (Some(tree), root_node_id) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.

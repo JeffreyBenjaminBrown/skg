@@ -7,6 +7,9 @@ pub use count_relationships::{
   count_contents,
   count_link_sources};
 
+pub mod hidden_in_subscribee_content;
+pub use hidden_in_subscribee_content::hidden_ids_in_subscribee_content;
+
 use std::collections::HashSet;
 use futures::StreamExt;
 use std::error::Error;
