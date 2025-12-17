@@ -1,0 +1,10 @@
+ids:
+  - R
+title: R
+contains:
+  - R1
+subscribes_to:
+  - E1
+  - E2
+hides_from_its_subscriptions:
+  - H
