@@ -1,3 +1,21 @@
+* maybe_add_hidden_in_subscribee_col should integrate
+  if it finds the subscribee col,
+  it can't assume that col is still accurate
+* 'content' count is wrong in Subsribees if any are hidden
+* Don't delete those *Col branches.
+  The user probably does not want them to disappear.
+* fn tree_nodepair_has_interp_subscribee
+  and call it everywhere a passage like this appears
+```
+    let is_subscribee : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id ) . ok_or (
+        "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+    node_ref . value () . 1 . metadata . code . interp
+      == Interp::Subscribee };
+```
+* extend completeAndRestoreNode_collectingViewRequests
+  to complete a SubscribeeCol, and within one
 * subscription branches
 ** PITFALL: Hiding is not ternary.
    SubscribeR node R Hides node H from *all* its subscriptions.

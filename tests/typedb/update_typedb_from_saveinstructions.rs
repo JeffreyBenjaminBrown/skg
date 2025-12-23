@@ -19,7 +19,7 @@ fn test_update_nodes_and_relationships2 (
     "skg-test-update2",
     "tests/typedb/update_typedb_from_saveinstructions/fixtures",
     "/tmp/tantivy-test-update2",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
@@ -79,7 +79,7 @@ fn test_update_nodes_and_relationships2 (
     let node1_contains : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & ID("1".to_string()),
+      & [ ID("1".to_string()) ],
       "contains",
       "container",
       "contained"
@@ -96,7 +96,7 @@ fn test_update_nodes_and_relationships2 (
     let node2_contains : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & ID("2".to_string()),
+      & [ ID("2".to_string()) ],
       "contains",
       "container",
       "contained"

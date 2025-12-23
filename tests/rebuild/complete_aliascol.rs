@@ -18,7 +18,7 @@ fn test_completeAliasCol
     "skg-test-complete-aliascol",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_completeAliasCol_logic ( config, driver ) . await
     } )) }
 
@@ -166,7 +166,7 @@ fn test_completeAliasCol_duplicate_aliases_different_orders
     "skg-test-complete-aliascol-duplicates",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol-duplicates",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_completeAliasCol_duplicate_aliases_different_orders_logic (
         config, driver ). await } )) }
 

@@ -44,7 +44,7 @@ fn test_deletions_excluded (
     "skg-test-deletions-excluded",
     "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-deletions-excluded",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
             * (skg (id 1) (source main)) 1
             ** (skg (id 2) (source main) (code toDelete)) 2
@@ -78,7 +78,7 @@ fn test_defining_node_defines (
     "skg-test-defining-node",
     "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-defining-node",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
             * (skg (id 1) (source main) (code indefinitive)) 1 adder
             Ignored body.
@@ -110,7 +110,7 @@ fn test_adding_without_definer (
     "skg-test-adding-without-definer",
     "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-adding-without-definer",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
             * (skg (id 1) (source main) (code indefinitive)) 1 adder
             ** (skg (id 2) (source main)) 2

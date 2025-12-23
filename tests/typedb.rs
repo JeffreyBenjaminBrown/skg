@@ -36,7 +36,7 @@ fn test_typedb_all_relationships (
     "skg-test-typedb-relationships",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-typedb-relationships",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_all_relationships ( config, driver ) . await ?;
       Ok (( )) } ) ) }
 
@@ -47,7 +47,7 @@ fn test_typedb_recursive_document (
     "skg-test-typedb-recursive",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-typedb-recursive",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_recursive_document ( driver, config ) . await ?;
       Ok (( )) } ) ) }
 
@@ -58,7 +58,7 @@ fn test_typedb_create_only_nodes (
     "skg-test-typedb-create-nodes",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-typedb-create-nodes",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_create_only_nodes_with_no_ids_present (
         & config . db_name, driver ) . await ?;
       Ok (( )) } ) ) }
@@ -70,7 +70,7 @@ fn test_typedb_delete_out_links (
     "skg-test-typedb-delete-links",
     "tests/typedb/fixtures-2",
     "/tmp/tantivy-test-typedb-delete-links",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_delete_out_links_contains_container (
         & config . db_name, driver ) . await ?;
       Ok (( )) } ) ) }

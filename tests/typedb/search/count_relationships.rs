@@ -15,7 +15,7 @@ fn the_tests (
     "skg-test-typedb-search-count-relationships",
     "tests/typedb/search/contains_from_pids/fixtures",
     "/tmp/tantivy-test-typedb-search-count-relationships",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_count_containers (
         config, driver ) . await ?;
       test_count_contents (

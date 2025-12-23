@@ -1,12 +1,12 @@
-ids:
-  - R
 title: R
+ids:
+- R
 contains:
-  - R1
+- R1
 subscribes_to:
-  - E1
-  - E2
+- E1
+- E2
 hides_from_its_subscriptions:
-  - hidden-in-E1
-  - hidden-in-E2
-  - hidden-for-no-reason
+- hidden-in-E1
+- hidden-in-E2
+- hidden-for-no-reason

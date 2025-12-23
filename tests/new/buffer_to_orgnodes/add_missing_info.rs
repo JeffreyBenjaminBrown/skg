@@ -16,7 +16,7 @@ fn test_add_missing_info_comprehensive(
     "skg-test-add-missing-info",
     "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
     "/tmp/tantivy-test-add-missing-info",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_add_missing_info_logic ( config, driver ) . await ?;
       Ok (( )) } )
   ) }
@@ -41,9 +41,9 @@ async fn test_add_missing_info_logic (
   let without_missing_info: &str =
     indoc! {"
             * (skg (id root-pid) (source main)) root
-            ** (skg (code (interp aliasCol)) (source main)) aliases
-            *** (skg (code (interp alias)) (source main)) new alias
-            *** (skg (code (interp alias)) (source main)) preexisting alias
+            ** (skg (code (interp aliasCol))) aliases
+            *** (skg (code (interp alias))) new alias
+            *** (skg (code (interp alias))) preexisting alias
             ** (skg (id unpredictable) (source main)) no id
             *** (skg (id unpredictable) (source main)) also no id
         "};
@@ -86,7 +86,7 @@ fn test_source_inheritance_multi_level(
     "skg-test-source-inheritance",
     "tests/new/buffer_to_orgnodes/add_missing_info/fixtures",
     "/tmp/tantivy-test-source-inheritance",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_source_inheritance_logic ( config, driver ) . await ?;
       Ok (( )) } )
   ) }

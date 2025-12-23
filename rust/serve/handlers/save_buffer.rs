@@ -26,9 +26,9 @@ use typedb_driver::TypeDBDriver;
 
 /// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
-struct SaveResponse {
-  buffer_content : String,
-  errors         : Vec < String >,
+pub struct SaveResponse {
+  pub buffer_content : String,
+  pub errors         : Vec < String >,
 }
 
 impl SaveResponse {
@@ -118,7 +118,7 @@ Steps:
 - Extract root IDs from the orgnode forest.
 - Runs `update_graph_minus_merges` on the save instructions.
 - Returns a multi-root content view. */
-async fn update_from_and_rerender_buffer (
+pub async fn update_from_and_rerender_buffer (
   org_buffer_text : &str,
   typedb_driver   : &TypeDBDriver,
   config          : &SkgConfig,

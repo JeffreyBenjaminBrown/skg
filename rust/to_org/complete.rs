@@ -7,5 +7,6 @@ pub use contents::{
   completeDefinitiveOrgnode,
   clobberIndefinitiveOrgnode,
   ensure_skgnode,
+  ensure_source,
   completeAndRestoreForest_collectingViewRequests,
 };

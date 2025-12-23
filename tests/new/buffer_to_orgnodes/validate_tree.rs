@@ -14,7 +14,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
     "skg-test-validate-tree-errors",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-errors",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with various validation errors
       let input_with_errors: &str =
         indoc! {"
@@ -27,7 +27,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 This body should not exist on Alias
                 *** Any child of Alias (bad)
                 ** (skg (code (interp alias))) Alias under non-AliasCol parent
-                * (skg (code (interp alias)) (source main)) Root level Alias (bad)
+                * (skg (code (interp alias))) Root level Alias (bad)
                 * (skg (id conflict) (code toDelete) (source main)) Node with deletion conflict
                 * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
@@ -38,8 +38,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
-  assert_eq!(errors.len(), 9,
-             "Should find exactly 9 validation errors (8 original + 1 Multiple_Defining_Orgnodes)");
+  assert_eq!(errors.len(), 10,
+             "Should find exactly 10 validation errors (8 original + 1 Multiple_Defining_Orgnodes + 1 RootWithoutSource for sourceless Alias)");
 
   { let aliasCol_body_errors: Vec<&BufferValidationError> =
     errors.iter()
@@ -117,7 +117,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
     "skg-test-validate-tree-valid",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-valid",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with no validation errors
       let valid_input: &str =
         indoc! {"
@@ -146,7 +146,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "skg-test-validate-tree-empty",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-empty",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (forest with just ForestRoot, no tree roots)
       let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
@@ -163,7 +163,7 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
     "skg-test-validate-tree-aliascols",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-aliascols",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with multiple AliasCol children
       let input_with_multiple_aliascols: &str =
         indoc! {"
@@ -202,7 +202,7 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
     "skg-test-validate-tree-duplicate",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-duplicate",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with duplicated Content children (same ID)
       let input_with_duplicated_content: &str =
         indoc! {"
@@ -238,7 +238,7 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
     "skg-test-validate-tree-no-dup",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-no-dup",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with different Content children IDs (should be valid)
       let input_without_duplicated_content: &str =
         indoc! {"
@@ -270,7 +270,7 @@ fn test_root_without_source_validation(
     "skg-test-root-without-source",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-root-without-source",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // root without source should be rejected
       let input: &str =
         indoc! {"
@@ -307,7 +307,7 @@ fn test_nonexistent_source_validation(
     "skg-test-nonexistent-source",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-nonexistent-source",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       { // Node with nonexistent source should be rejected
         let input: &str =
           indoc! {"

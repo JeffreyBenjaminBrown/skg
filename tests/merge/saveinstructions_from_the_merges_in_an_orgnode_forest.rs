@@ -11,7 +11,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         "skg-test-merge-single",
         "tests/merge/saveinstructions_from_the_merges_in_an_orgnode_forest/fixtures",
         "/tmp/tantivy-test-merge-single",
-        |config, driver| {
+        |config, driver, _tantivy| {
             Box::pin(async move {
                 // Create a forest with node 1 requesting to merge node 2
                 let input = indoc! {"

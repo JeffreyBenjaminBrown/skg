@@ -6,7 +6,11 @@ use crate::to_org::util::{
   mark_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::media::file_io::skgnode_and_source_from_id;
-use crate::media::typedb::search::hidden_ids_in_subscribee_content;
+use crate::media::typedb::util::pid_and_source_from_id;
+use crate::media::typedb::search::{
+  partition_subscribee_content_for_subscriber,
+  what_node_hides,
+  what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest, default_metadata};
@@ -74,9 +78,14 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if treatment == Interp::SubscribeeCol {
-      // For now, SubscribeeCol has no children to process.
-      // Future generations will add Subscribee children here.
+    } else if treatment == Interp::SubscribeeCol
+           || treatment == Interp::HiddenOutsideOfSubscribeeCol
+           || treatment == Interp::HiddenInSubscribeeCol {
+      // Recurse into children to collect view requests (e.g. from Subscribee nodes)
+      // but don't try to complete the SubscribeeCol node itself.
+      map_completeAndRestoreNodeCollectingViewRequests_over_children (
+        tree, node_id, config, typedb_driver,
+        visited, view_requests_out ) . await ?;
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
@@ -154,6 +163,7 @@ pub fn clobberIndefinitiveOrgnode (
 ///
 /// METHOD: Given a node N:
 /// - Add SubscribeeCol if node subscribes to something and one is not already present
+/// - If node is a Subscribee, and its predecessor Subscriber hides any of its content, then add a HiddenInSubscribeeCol
 /// - Categorize N's children into content/non-content
 /// - Mark 'invalid content' as parentIgnores and move to non-content
 ///   - 'invalid content' = nodes marked content that are not content.
@@ -168,7 +178,7 @@ pub async fn completeDefinitiveOrgnode (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   maybe_add_subscribee_col (
-    tree, node_id, & config . db_name, driver ) . await ?;
+    tree, node_id, config, driver ) . await ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
       let node_ref : NodeRef < NodePair > =
@@ -358,6 +368,36 @@ pub async fn ensure_skgnode (
     node_mut . value () . 0 = Some ( skgnode ); }
   Ok (( )) }
 
+/// Ensure a node in a PairTree has a source in its metadata.
+/// If the node already has Some(source), does nothing.
+/// Otherwise fetches from TypeDB and stores it.
+pub async fn ensure_source (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let has_source : bool = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id )
+      . ok_or ( "ensure_source: node not found" ) ?;
+    node_ref . value () . 1 . metadata . source . is_some () };
+  if ! has_source {
+    let node_pid : ID =
+      get_pid_in_pairtree ( tree, node_id ) ?;
+    let (_pid, source) : (ID, String) =
+      pid_and_source_from_id (
+        db_name, driver, &node_pid ) . await ?
+      . ok_or_else ( || format! (
+        "ensure_source: could not find source for ID {:?}",
+        node_pid ) ) ?;
+    let mut node_mut : NodeMut < NodePair > =
+      tree . get_mut ( node_id )
+      . ok_or ( "ensure_source: node not found" ) ?;
+    node_mut . value () . 1 . metadata . source =
+      Some ( source ); }
+  Ok (( )) }
+
 /// If the node: - subscribes to something
 ///              - is definitive
 ///              - doesn't have a SubscribeeCol child
@@ -367,7 +407,7 @@ pub async fn ensure_skgnode (
 pub async fn maybe_add_subscribee_col (
   tree    : &mut PairTree,
   node_id : NodeId,
-  db_name : &str,
+  config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let is_indefinitive : bool = {
@@ -376,16 +416,15 @@ pub async fn maybe_add_subscribee_col (
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
   if is_indefinitive { return Ok (( )); }
-  let ( subscribee_ids, hidden_ids ) : ( Vec < ID >, Vec < ID > ) = {
+  let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     let skgnode : &SkgNode =
       node_ref . value () . 0 . as_ref ()
       . ok_or ( "maybe_add_subscribee_col: SkgNode should exist" ) ?;
-    ( skgnode . subscribes_to . clone () . unwrap_or_default (),
-      skgnode . hides_from_its_subscriptions . clone ()
-        . unwrap_or_default () ) };
+    ( skgnode . ids [ 0 ] . clone (),
+      skgnode . subscribes_to . clone () . unwrap_or_default () ) };
   if subscribee_ids . is_empty () { return Ok (( )); }
   let has_subscribee_col : bool = {
     let node_ref : NodeRef < NodePair > =
@@ -396,15 +435,16 @@ pub async fn maybe_add_subscribee_col (
         == Interp::SubscribeeCol ) };
   if has_subscribee_col { return Ok (( )); }
 
-  let hidden_outside_content : Vec < ID > = {
+  let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content
-    // TODO: move the filtering into 'hidden_ids_in_subscribee_content'
-    // (and rename that to 'hidden_ids_not_in_subscribee_content').
-    let hidden_in_content : HashSet < ID > =
-      hidden_ids_in_subscribee_content (
-        db_name, driver, & hidden_ids, & subscribee_ids ) . await ?;
-    hidden_ids . iter ()
-      . filter ( | id | ! hidden_in_content . contains ( id ) )
+    let r_hides : HashSet < ID > =
+      what_node_hides (
+        &config.db_name, driver, & subscriber_pid ) . await ?;
+    let all_subscribee_content : HashSet < ID > =
+      what_nodes_contain (
+        &config.db_name, driver, & subscribee_ids ) . await ?;
+    r_hides . iter ()
+      . filter ( | id | ! all_subscribee_content . contains ( id ) )
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId = { // the subscribee collector
@@ -434,23 +474,19 @@ pub async fn maybe_add_subscribee_col (
         tree . get_mut ( subscribee_col_nid ) . ok_or (
           "maybe_add_subscribee_col: SubscribeeCol not found" )?;
       col_mut . append ((None, hidden_outside_col_orgnode)) . id () };
-    { // its children
-      let mut hidden_col_mut : NodeMut < NodePair > =
-        tree . get_mut ( hidden_outside_col_nid ) . ok_or (
-          "maybe_add_subscribee_col: HiddenOutsideOfSubscribeeCol not found" )?;
+    { // its children: HiddenFromSubscribees nodes
       for hidden_id in hidden_outside_content {
-        let hidden_orgnode : OrgNode = {
-          let mut md = default_metadata ();
-          md . id = Some ( hidden_id . clone () );
-          md . code . interp = Interp::HiddenFromSubscribees;
-          md . code . indefinitive = true;
-          OrgNode {
-            metadata : md,
-            title : hidden_id . 0,
-            body : None, } };
-        hidden_col_mut . append ( (None, hidden_orgnode) ); }} }
-
-  { // the subscribees
+        let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+          skgnode_and_orgnode_from_id (
+            config, driver, & hidden_id ) . await ?;
+        orgnode . metadata . code . interp = Interp::HiddenFromSubscribees;
+        orgnode . metadata . code . indefinitive = true;
+        orgnode . body = None;
+        let mut hidden_col_mut : NodeMut < NodePair > =
+          tree . get_mut ( hidden_outside_col_nid ) . ok_or (
+            "maybe_add_subscribee_col: HiddenOutsideOfSubscribeeCol not found" ) ?;
+        hidden_col_mut . append (( Some ( skgnode ), orgnode )); }} }
+  { // The subscribees. These are indefinitive leaves (trivial 'branches'). They can be expanded by requesting definitive expansion, the same way one would do for ordinary content.
     let mut col_mut : NodeMut < NodePair > =
       tree . get_mut ( subscribee_col_nid )
       . ok_or (
@@ -466,4 +502,91 @@ pub async fn maybe_add_subscribee_col (
           title : subscribee_id . 0, // Use the ID as the title
           body : None, } };
       col_mut . append ( (None, subscribee_orgnode) ); }}
+  Ok (( )) }
+
+/// If this node is a Subscribee,
+/// and the corresponding subscriber hides any of its content,
+/// then prepend a HiddenInSubscribeeCol to hold those hidden nodes.
+/// The subscriber is the Subscribee's grandparent:
+///   subscriber -> SubsribeeCol -> Subscribee
+pub async fn maybe_add_hidden_in_subscribee_col (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  { // error if not a Subscribee
+    let is_subscribee : bool = {
+      let node_ref : NodeRef < NodePair > =
+        tree . get ( node_id ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+      node_ref . value () . 1 . metadata . code . interp
+        == Interp::Subscribee };
+    if ! is_subscribee { return Err (
+      "maybe_add_hidden_in_subscribee_col called on non-subscribee"
+        . into () ); }}
+  { // Do nothing if it already has a HiddenInSubscribeeCol.
+    let has_hidden_col : bool = {
+      let node_ref : NodeRef < NodePair > =
+        tree . get ( node_id ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+      node_ref . children () . any (
+        | child | child . value () . 1 . metadata . code . interp
+          == Interp::HiddenInSubscribeeCol ) };
+    if has_hidden_col { return Ok (( )); }}
+  let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( node_id ) . ok_or (
+        "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+    let subscribee_pid : ID =
+      node_ref . value () . 1 . metadata . id . clone ()
+      . ok_or ( "Subscribee has no ID" ) ?;
+    let parent_ref : NodeRef < NodePair > =
+      node_ref . parent ()
+      . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
+    if parent_ref . value () . 1 . metadata . code . interp
+      != Interp::SubscribeeCol {
+        return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                      into () ); }
+    let grandparent_ref : NodeRef < NodePair > =
+      parent_ref . parent ()
+      . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
+    let skgnode : &SkgNode =
+      grandparent_ref . value () . 0 . as_ref ()
+      . ok_or ( "Subscriber has no SkgNode" ) ?;
+    ( subscribee_pid,
+      skgnode . ids [ 0 ] . clone () ) };
+  let ( _visible, hidden_in_content )
+    : ( HashSet < ID >, HashSet < ID > )
+    = partition_subscribee_content_for_subscriber (
+      &config.db_name, driver,
+      & subscriber_pid,
+      & subscribee_pid ) . await ?;
+  if hidden_in_content . is_empty () {
+    return Ok (( )); }
+  let hidden_col_nid : NodeId = {
+    // Create HiddenInSubscribeeCol and prepend to this subscribee
+    let hidden_col_orgnode : OrgNode = {
+      let mut md = default_metadata ();
+      md . code . interp = Interp::HiddenInSubscribeeCol;
+      OrgNode {
+        metadata : md,
+        title : "hidden from this subscription" . to_string (),
+        body : None, } };
+    let mut node_mut : NodeMut < NodePair > =
+      tree . get_mut ( node_id ) . ok_or (
+        "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+    node_mut . prepend ( (None, hidden_col_orgnode) ) . id () };
+  { // Add HiddenFromSubscribees children
+    for hidden_id in hidden_in_content {
+      let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+        skgnode_and_orgnode_from_id (
+          config, driver, & hidden_id ) . await ?;
+      orgnode . metadata . code . interp = Interp::HiddenFromSubscribees;
+      orgnode . metadata . code . indefinitive = true;
+      orgnode . body = None;
+      let mut hidden_col_mut : NodeMut < NodePair > =
+        tree . get_mut ( hidden_col_nid ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: HiddenInSubscribeeCol not found" ) ?;
+      hidden_col_mut . append (( Some ( skgnode ), orgnode )); }}
   Ok (( )) }

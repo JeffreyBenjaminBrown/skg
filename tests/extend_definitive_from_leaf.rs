@@ -7,47 +7,8 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
-use skg::to_org::expand::definitive::execute_view_requests;
-use skg::org_to_text::orgnode_forest_to_string;
-use skg::media::tree::pair_orgnode_forest_with_save_instructions;
-use skg::from_text::buffer_to_save_instructions;
 use skg::test_utils::run_with_test_db;
-use skg::types::SkgConfig;
-use skg::types::trees::PairTree;
-
-
-/// Helper to run the full completion + definitive expansion pipeline.
-/// Returns the rendered org text.
-async fn complete_and_expand_definitive (
-  input_org_text : &str,
-  config         : &SkgConfig,
-  driver         : &typedb_driver::TypeDBDriver,
-  node_limit     : usize,
-) -> Result < String, Box<dyn Error> > {
-  let mut config = config.clone();
-  config.initial_node_limit = node_limit;
-  let (orgnode_forest, save_instructions, _merge_instructions) =
-    buffer_to_save_instructions ( input_org_text, &config, driver )
-    . await ?;
-  let mut errors : Vec < String > = Vec::new ();
-  let mut paired_forest : PairTree =
-    pair_orgnode_forest_with_save_instructions (
-      &orgnode_forest,
-      &save_instructions );
-  let (mut visited, view_requests) =
-    completeAndRestoreForest_collectingViewRequests (
-      &mut paired_forest,
-      &config,
-      driver ) . await ?;
-  execute_view_requests (
-    &mut paired_forest,
-    view_requests,
-    &config,
-    driver,
-    &mut visited,
-    &mut errors ) . await ?;
-  orgnode_forest_to_string ( & paired_forest ) }
+use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 
 // ===================================================
 // Test: Definitive view with limit=10
@@ -60,7 +21,7 @@ fn test_definitive_view_limit_10
     "skg-test-definitive-view-limit-10",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-10",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (id 1) (source main)) 1
         ** (skg (id 11)) 11
@@ -69,24 +30,28 @@ fn test_definitive_view_limit_10
         * (skg (id 2) (source main)) 2
       "};
 
-      let result = complete_and_expand_definitive (
-        input_org_text, config, driver, 10 ) . await ?;
+      let result = {
+        let mut config = config.clone();
+        config.initial_node_limit = 10;
+        let response = update_from_and_rerender_buffer (
+          input_org_text, driver, &config, tantivy ) . await ?;
+        response.buffer_content };
 
       println!("Result with limit=10:\n{}", result);
 
       // With limit=10, all children should be expanded
       let expected = indoc! {"
-        * (skg (id 1) (source main)) 1
+        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
         ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main)) 12
+        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main)) 121
+        *** (skg (id 121) (source main) (view (rels (contents 2)))) 121
         121 body
         **** (skg (id 1211) (source main)) 1211
         1211 body
         **** (skg (id 1212) (source main)) 1212
         1212 body
-        *** (skg (id 122) (source main)) 122
+        *** (skg (id 122) (source main) (view (rels (contents 1)))) 122
         122 body
         **** (skg (id 1221) (source main)) 1221
         1221 body
@@ -95,7 +60,7 @@ fn test_definitive_view_limit_10
         *** (skg (id 124) (source main)) 124
         124 body
         ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
       "};
 
       assert_eq!(result, expected,
@@ -117,7 +82,7 @@ fn test_definitive_view_limit_5_or_6
     "skg-test-definitive-view-limit-5-or-6",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-5-or-6",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (id 1) (source main)) 1
         ** (skg (id 11)) 11
@@ -126,10 +91,18 @@ fn test_definitive_view_limit_5_or_6
         * (skg (id 2) (source main)) 2
       "};
 
-      let result_5 = complete_and_expand_definitive (
-        input_org_text, config, driver, 5 ) . await ?;
-      let result_6 = complete_and_expand_definitive (
-        input_org_text, config, driver, 6 ) . await ?;
+      let result_5 = {
+        let mut config5 = config.clone();
+        config5.initial_node_limit = 5;
+        let response_5 = update_from_and_rerender_buffer (
+          input_org_text, driver, &config5, tantivy ) . await ?;
+        response_5.buffer_content };
+      let result_6 = {
+        let mut config6 = config.clone();
+        config6.initial_node_limit = 6;
+        let response_6 = update_from_and_rerender_buffer (
+          input_org_text, driver, &config6, tantivy ) . await ?;
+        response_6.buffer_content };
 
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
@@ -142,19 +115,19 @@ fn test_definitive_view_limit_5_or_6
       // Both limits produce the same result because truncation
       // completes the sibling group.
       let expected = indoc! {"
-        * (skg (id 1) (source main)) 1
+        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
         ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main)) 12
+        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main)) 121
+        *** (skg (id 121) (source main) (view (rels (contents 2)))) 121
         121 body
         **** (skg (id 1211) (source main) (code indefinitive)) 1211
         **** (skg (id 1212) (source main) (code indefinitive)) 1212
-        *** (skg (id 122) (source main) (code indefinitive)) 122
+        *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
         *** (skg (id 123) (source main) (code indefinitive)) 123
         *** (skg (id 124) (source main) (code indefinitive)) 124
         ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
       "};
 
       assert_eq!(result_5, expected,
@@ -179,7 +152,7 @@ fn test_definitive_view_limit_1_to_4
     "skg-test-definitive-view-limit-1-to-4",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-1-to-4",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (id 1) (source main)) 1
         ** (skg (id 11)) 11
@@ -188,10 +161,18 @@ fn test_definitive_view_limit_1_to_4
         * (skg (id 2) (source main)) 2
       "};
 
-      let result_1 = complete_and_expand_definitive (
-        input_org_text, config, driver, 1 ) . await ?;
-      let result_4 = complete_and_expand_definitive (
-        input_org_text, config, driver, 4 ) . await ?;
+      let result_1 = {
+        let mut config1 = config.clone();
+        config1.initial_node_limit = 1;
+        let response_1 = update_from_and_rerender_buffer (
+          input_org_text, driver, &config1, tantivy ) . await ?;
+        response_1.buffer_content };
+      let result_4 = {
+        let mut config4 = config.clone();
+        config4.initial_node_limit = 4;
+        let response_4 = update_from_and_rerender_buffer (
+          input_org_text, driver, &config4, tantivy ) . await ?;
+        response_4.buffer_content };
 
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
@@ -201,16 +182,16 @@ fn test_definitive_view_limit_1_to_4
       // - Limit is hit on the first generation
       // - Sibling group is completed, all are indefinitive
       let expected = indoc! {"
-        * (skg (id 1) (source main)) 1
+        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
         ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main)) 12
+        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main) (code indefinitive)) 121
-        *** (skg (id 122) (source main) (code indefinitive)) 122
+        *** (skg (id 121) (source main) (view (rels (contents 2))) (code indefinitive)) 121
+        *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
         *** (skg (id 123) (source main) (code indefinitive)) 123
         *** (skg (id 124) (source main) (code indefinitive)) 124
         ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
       "};
 
       assert_eq!(result_1, expected,
@@ -234,45 +215,39 @@ fn test_definitive_view_conflicting
     "skg-test-definitive-view-conflict",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-conflict",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       // Node 12 appears twice:
       // - First as a regular child of 1 (will be definitive after completion)
       // - Second with a definitive view request
-      // The first instance should become indefinitive
       let input_org_text = indoc! {"
         * (skg (id 1) (source main)) 1
         ** (skg (id 12)) 12
+        *** (skg (id 122) (code indefinitive)) 122
         * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12 copy
       "};
 
-      let result = complete_and_expand_definitive (
-        input_org_text, config, driver, 100 ) . await ?;
+      let result = {
+        let mut config = config.clone();
+        config.initial_node_limit = 100;
+        let response = update_from_and_rerender_buffer (
+          input_org_text, driver, &config, tantivy ) . await ?;
+        response.buffer_content };
 
       println!("Result with conflict:\n{}", result);
 
-      // The first 12 (child of 1) should become indefinitive
-      // The second 12 (root with request) should be expanded
-      // NOTE: Title comes from disk ("12"), not from buffer ("12 copy"),
-      // because rebuild_node_as_definitive fetches canonical data from disk.
-      let expected = indoc! {"
-        * (skg (id 1) (source main)) 1
-        ** (skg (id 12) (source main) (code indefinitive)) 12
-        * (skg (id 12) (source main)) 12
-        12 body
-        ** (skg (id 121) (source main)) 121
-        121 body
-        *** (skg (id 1211) (source main)) 1211
-        1211 body
-        *** (skg (id 1212) (source main)) 1212
-        1212 body
-        ** (skg (id 122) (source main)) 122
-        122 body
-        *** (skg (id 1221) (source main)) 1221
-        1221 body
-        ** (skg (id 123) (source main)) 123
-        123 body
-        ** (skg (id 124) (source main)) 124
-        124 body
+      let expected = indoc! {
+        // The first 12 (child of 1) should become indefinitive.
+        // The second 12 (root with request) should be expanded.
+        // NOTE: The first 12 redefines the children of 12 as [122]
+        // rather than [121,122,123,124].
+        "* (skg (id 1) (source main) (view (rels (containers 0) (contents 1)))) 1
+         ** (skg (id 12) (source main) (view (rels (contents 1))) (code indefinitive)) 12
+         *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
+         * (skg (id 12) (source main) (view (rels (contents 1)))) 12
+         ** (skg (id 122) (source main) (view (rels (contents 1)))) 122
+         122 body
+         *** (skg (id 1221) (source main)) 1221
+         1221 body
       "};
 
       assert_eq!(result, expected,
@@ -292,25 +267,29 @@ fn test_definitive_view_with_cycle
     "skg-test-definitive-view-cycle",
     "tests/extend_definitive_from_leaf/fixtures-cycle",
     "/tmp/tantivy-test-definitive-view-cycle",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       // Node a has definitive request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
         * (skg (id cyc-a) (source main) (code indefinitive (viewRequests definitiveView))) cyc-a
       "};
 
-      let result = complete_and_expand_definitive (
-        input_org_text, config, driver, 100 ) . await ?;
+      let result = {
+        let mut config = config.clone();
+        config.initial_node_limit = 100;
+        let response = update_from_and_rerender_buffer (
+          input_org_text, driver, &config, tantivy ) . await ?;
+        response.buffer_content };
 
       println!("Result with cycle:\n{}", result);
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (id cyc-a) (source main)) cyc-a
+        * (skg (id cyc-a) (source main) (view (rels (contents 1)))) cyc-a
         cyc-a body
-        ** (skg (id cyc-b) (source main)) cyc-b
+        ** (skg (id cyc-b) (source main) (view (rels containsParent (contents 1)))) cyc-b
         cyc-b body
-        *** (skg (id cyc-a) (source main) (view cycle) (code indefinitive)) cyc-a
+        *** (skg (id cyc-a) (source main) (view cycle (rels containsParent (contents 1))) (code indefinitive)) cyc-a
       "};
 
       assert_eq!(result, expected,
@@ -331,38 +310,38 @@ fn test_definitive_view_with_repeat
     "skg-test-definitive-view-repeat",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-repeat",
-    |config, driver| Box::pin ( async move {
-      // Node 121 appears first as a root (definitive)
-      // Then 12 has a definitive view request, which contains 121
-      // When 121 is encountered during expansion of 12, it should be indefinitive
+    |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (id 121) (source main)) 121
         * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12
       "};
 
-      let result = complete_and_expand_definitive (
-        input_org_text, config, driver, 100 ) . await ?;
+      let result = {
+        let mut config = config.clone();
+        config.initial_node_limit = 100;
+        let response = update_from_and_rerender_buffer (
+          input_org_text, driver, &config, tantivy ) . await ?;
+        response.buffer_content };
 
       println!("Result with repeat:\n{}", result);
 
-      // 121 is definitive as first root
-      // When 12 expands, its child 121 should be indefinitive (repeat)
-      // NOTE: Node 121 from buffer doesn't get body populated because
-      // completeDefinitiveOrgnode doesn't set body from SkgNode.
-      // This is a separate issue from definitive view requests.
-      let expected = indoc! {"
-        * (skg (id 121) (source main)) 121
-        * (skg (id 12) (source main)) 12
-        12 body
-        ** (skg (id 121) (source main) (code indefinitive)) 121
-        ** (skg (id 122) (source main)) 122
-        122 body
-        *** (skg (id 1221) (source main)) 1221
-        1221 body
-        ** (skg (id 123) (source main)) 123
-        123 body
-        ** (skg (id 124) (source main)) 124
-        124 body
+      let expected = indoc! {
+        // Upon saving, the indefinitive view of node 12 had no effect,
+        // but the definitive view of 121 deleted its children.
+        // The new 121 under 12 is rendered indefinitive,
+        // because it was already rendered as a sibling of 12.
+        "* (skg (id 121) (source main)) 121
+         * (skg (id 12) (source main) (view (rels (contents 4)))) 12
+         12 body
+         ** (skg (id 121) (source main) (code indefinitive)) 121
+         ** (skg (id 122) (source main) (view (rels (contents 1)))) 122
+         122 body
+         *** (skg (id 1221) (source main)) 1221
+         1221 body
+         ** (skg (id 123) (source main)) 123
+         123 body
+         ** (skg (id 124) (source main)) 124
+         124 body
       "};
 
       assert_eq!(result, expected,
@@ -381,13 +360,17 @@ fn test_definitive_view_request_cleared
     "skg-test-definitive-view-cleared",
     "tests/extend_definitive_from_leaf/fixtures",
     "/tmp/tantivy-test-definitive-view-cleared",
-    |config, driver| Box::pin ( async move {
+    |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12
       "};
 
-      let result = complete_and_expand_definitive (
-        input_org_text, config, driver, 100 ) . await ?;
+      let result = {
+        let mut config = config.clone();
+        config.initial_node_limit = 100;
+        let response = update_from_and_rerender_buffer (
+          input_org_text, driver, &config, tantivy ) . await ?;
+        response.buffer_content };
 
       println!("Result:\n{}", result);
 

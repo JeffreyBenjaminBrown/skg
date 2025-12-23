@@ -5,6 +5,9 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request };
+use crate::to_org::complete::contents::{
+  maybe_add_hidden_in_subscribee_col,
+  ensure_source };
 use crate::to_org::util::{
   skgnode_and_orgnode_from_pid_and_source,
   build_node_branch_minus_content,
@@ -54,7 +57,7 @@ pub async fn execute_view_requests (
 /// This function:
 /// 1. 'Indefinitizes' any previously definitive OrgNode with that ID
 /// 2. Marks this OrgNode definitive
-/// 3. Expands its content from disk using BFS
+/// 3. Expands (BFS) its content from disk, applying the node limit
 /// 4. Removes its ViewRequest::Definitive
 ///
 /// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
@@ -78,6 +81,9 @@ async fn execute_definitive_view_request (
     indefinitize_content_subtree ( forest,
                                    preexisting_node_id,
                                    visited ) ?; }}
+  // Ensure node has a source (Subscribee nodes may not have one yet)
+  ensure_source (
+    forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
     // Remove the ViewRequest, mark it definitive,
     // and rebuild from disk.
@@ -96,6 +102,16 @@ async fn execute_definitive_view_request (
     config.initial_node_limit, visited, config, typedb_driver,
     &hidden_ids,
   ) . await ?;
+  { // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
+    let is_subscribee : bool = {
+      let node_ref : NodeRef < NodePair > =
+        forest . get ( node_id ) . ok_or (
+          "execute_definitive_view_request: node not found" ) ?;
+      node_ref . value () . 1 . metadata . code . interp
+        == Interp::Subscribee };
+    if is_subscribee {
+      maybe_add_hidden_in_subscribee_col (
+        forest, node_id, config, typedb_driver ) . await ?; }}
   Ok (( )) }
 
 /// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
@@ -195,7 +211,7 @@ fn indefinitize_content_subtree (
 /// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut PairTree,
-  effective_root : NodeId, // it contained the request, is already in the tree, and although it was indefinitive when the request was issued, it was made definitive by 'execute_definitive_view_request'.
+  effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
   visited        : &mut VisitedMap,
   config         : &SkgConfig,

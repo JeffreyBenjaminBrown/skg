@@ -14,7 +14,7 @@ fn test_bfs_limit_across_multiple_trees
     "skg-test-bfs-limit-multi-tree",
     "tests/initial_view_bfs/fixtures",
     "/tmp/tantivy-test-bfs-limit-multi-tree",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Tree structure across 3 roots:
       // 1
       //   11
@@ -93,7 +93,7 @@ fn test_bfs_limit_9_three_branches
     "skg-test-bfs-limit-9-three-branches",
     "tests/initial_view_bfs/fixtures",
     "/tmp/tantivy-test-bfs-limit-9-three-branches",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // With limit=9: [1,2,3,11,12,13,21,22,23] = exactly 9 nodes
       // Generation 1: [1, 2, 3] = 3 nodes
       // Generation 2: [11,12,13,21,22,23,31,32,33] = 9 nodes
@@ -150,7 +150,7 @@ fn test_bfs_limit_8_two_branches
     "skg-test-bfs-limit-8-two-branches",
     "tests/initial_view_bfs/fixtures",
     "/tmp/tantivy-test-bfs-limit-8-two-branches",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // With limit=8 and only branches 1 and 2 (no branch 3):
       // [1,2,11,12,13,21,22,23] = exactly 8 nodes
       // Generation 1: [1, 2] = 2 nodes

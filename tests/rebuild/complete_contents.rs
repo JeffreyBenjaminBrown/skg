@@ -51,7 +51,7 @@ fn test_indefinitive_identity_at_multiple_levels
     "skg-test-complete-contents-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-indefinitive",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_indefinitive_identity_at_multiple_levels_logic (
         config, driver ) . await
     } )) }
@@ -164,7 +164,7 @@ fn test_visited_and_indefinitive
     "skg-test-complete-contents-visited-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-indefinitive",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_visited_and_indefinitive_logic (
         config, driver ) . await
     } )) }
@@ -320,7 +320,7 @@ fn test_visited_and_not_indefinitive
     "skg-test-complete-contents-visited-not-indefinitive",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-not-indefinitive",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_visited_and_not_indefinitive_logic (
         config, driver ) . await
     } )) }
@@ -446,7 +446,7 @@ fn test_false_content
     "skg-test-complete-contents-false-content",
     "tests/rebuild/complete_contents/fixtures",
     "/tmp/tantivy-test-complete-contents-false-content",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_false_content_logic (
         config, driver ) . await
     } )) }

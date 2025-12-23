@@ -18,7 +18,7 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
     "skg-test-integrate-backpath-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-cycle",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       test_path_with_cycle_impl(config, driver).await
     })
   )
@@ -89,7 +89,7 @@ fn test_path_with_branches_no_cycle(
     "skg-test-integrate-backpath-branches-no-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-branches-no-cycle",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       test_path_with_branches_no_cycle_impl(config, driver).await
     } )) }
 
@@ -174,7 +174,7 @@ fn test_path_with_branches_with_cycle(
     "skg-test-integrate-backpath-branches-with-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-branches-with-cycle",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       test_path_with_branches_with_cycle_impl(config, driver).await
     } )) }
 

@@ -8,10 +8,13 @@ pub use count_relationships::{
   count_link_sources};
 
 pub mod hidden_in_subscribee_content;
-pub use hidden_in_subscribee_content::hidden_ids_in_subscribee_content;
+pub use hidden_in_subscribee_content::{
+  partition_subscribee_content_for_subscriber,
+  what_node_hides,
+  what_nodes_contain };
 
-use std::collections::HashSet;
 use futures::StreamExt;
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer},
@@ -20,17 +23,19 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-use crate::types::ID;
+use crate::media::typedb::util::build_id_disjunction;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::types::ID;
 
-/* Searches containerward recursively until reaching the first node
-which is either uncontained or multiply contained. Returns that node's ID.
-So for instance, if the input is uncontained, it just returns the input.
-.
-PITFALL: This just takes the last element of the path
-returned by `path_containerward_to_end_cycle_and_or_branches`,
-throwing away the rest of the information.
-*/
+/// Searches containerward recursively until reaching the first node
+/// which is either uncontained or multiply contained.
+/// Returns that node's ID.
+/// So for instance, if the input is uncontained,
+/// it just returns the input.
+/// .
+/// PITFALL: This just takes the last element of the path
+/// returned by `path_containerward_to_end_cycle_and_or_branches`,
+/// throwing away the rest of the information.
 pub async fn climb_containerward_and_fetch_rootish_context (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -99,7 +104,7 @@ pub async fn find_containers_of (
   find_related_nodes (
     db_name,
     driver,
-    node,
+    & [ node . clone () ],
     "contains",
     "contained",
     "container"
@@ -115,7 +120,7 @@ pub async fn find_links_to (
   find_related_nodes (
     db_name,
     driver,
-    node,
+    & [ node . clone () ],
     "textlinks_to",
     "dest",
     "source"
@@ -162,7 +167,7 @@ pub async fn path_to_end_cycle_and_or_branches (
   loop {
     let related_nodes : HashSet<ID> =
       find_related_nodes (
-        db_name, driver, &current_node,
+        db_name, driver, & [ current_node . clone () ],
         relation, input_role, output_role ). await ?;
     if related_nodes.is_empty () {
       // No related node found, so this is the end.
@@ -191,33 +196,41 @@ pub async fn path_to_end_cycle_and_or_branches (
         }} }}
 
 /// Generalized function to find related nodes via a specified relationship.
-/// Returns the IDs of nodes in the `output_role` position related to the input node.
+/// Returns the IDs of nodes in the `output_role` position
+/// related to any of the input nodes.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
-  node        : &ID,
+  nodes       : &[ID],
   relation    : &str,
   input_role  : &str,
   output_role : &str
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
-
+  if nodes . is_empty () {
+    return Ok ( HashSet::new () ); }
   let tx : Transaction =
     driver.transaction (
       db_name, TransactionType::Read
     ). await ?;
+  let input_id_var : String =
+    format!("{}_id", input_role);
   let output_id_var : String =
     format!("{}_id", output_role);
+  let input_disjunction : String =
+    build_id_disjunction ( nodes, &input_id_var );
   let match_clause : String =
     format!( r#" match
                      ${} isa node, has id ${};
-                  {{ ${} isa node, has id "{}"; }} or
+                  {{ ${} isa node, has id ${}; }} or
                   {{ ${} isa node;
-                     $e isa extra_id, has id "{}";
+                     $e isa extra_id, has id ${};
                      $extra_rel isa has_extra_id ( node:     ${},
-                                                   extra_id: $e ); }};"#,
+                                                   extra_id: $e ); }};
+                  {};"#,
                    output_role, output_id_var,
-                   input_role, node,
-                   input_role, node, input_role );
+                   input_role, input_id_var,
+                   input_role, input_id_var, input_role,
+                   input_disjunction );
   let relationship_and_select : String = format!( r#"
                      $rel isa {} ( {}: ${},
                                    {}: ${} );

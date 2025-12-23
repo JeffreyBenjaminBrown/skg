@@ -27,7 +27,7 @@ fn test_delete_container_node (
     "skg-test-delete-container",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-delete-container",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
 
     // Verify nodes 1, 2 and 3 exist
     let initial_ids : BTreeSet<String> =
@@ -48,7 +48,7 @@ fn test_delete_container_node (
     let initially_contained : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & ID("1".to_string()),
+      & [ ID("1".to_string()) ],
       "contains",
       "container",
       "contained"
@@ -116,7 +116,7 @@ fn test_delete_contained_node (
     "skg-test-delete-contained",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-delete-contained",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
 
     // Verify nodes 1, 2, 3 exist
     let initial_ids : BTreeSet<String> =
@@ -134,7 +134,7 @@ fn test_delete_contained_node (
     let initially_contained : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & ID("1".to_string()),
+      & [ ID("1".to_string()) ],
       "contains",
       "container",
       "contained"
@@ -179,7 +179,7 @@ fn test_delete_contained_node (
     let finally_contained : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & ID("1".to_string()),
+      & [ ID("1".to_string()) ],
       "contains",
       "container",
       "contained"

@@ -1,7 +1,7 @@
 use crate::from_text::{headline_to_triple, HeadlineInfo};
 use crate::init::{overwrite_new_empty_db, define_schema};
 use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use crate::media::tantivy::search_index;
+use crate::media::tantivy::{search_index, mk_tantivy_schema};
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
@@ -10,6 +10,8 @@ use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::trees::PairTree;
+
+use std::sync::Arc;
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use futures::StreamExt;
@@ -27,11 +29,12 @@ use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, Trans
 /// Run tests with automatic database setup and cleanup.
 ///
 /// This helper function encapsulates the common pattern of:
-/// 1. Setting up a test database and Tantivy index
-/// 2. Running test functions
-/// 3. Cleaning up the database and index
+/// 1. Copying fixtures to a temp directory (so saves don't corrupt originals)
+/// 2. Setting up a test database and Tantivy index
+/// 3. Running test functions
+/// 4. Cleaning up the database, index, and temp fixtures
 ///
-/// The test_fn closure receives references to SkgConfig and TypeDBDriver
+/// The test_fn closure receives references to SkgConfig, TypeDBDriver, and TantivyIndex
 /// and can run multiple test functions sequentially.
 ///
 /// Example:
@@ -42,9 +45,9 @@ use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, Trans
 ///     "skg-test-my-test",
 ///     "tests/my_test/fixtures",
 ///     "/tmp/tantivy-test-my-test",
-///     |config, driver| Box::pin(async move {
-///       test_function_1(config, driver).await?;
-///       test_function_2(config, driver).await?;
+///     |config, driver, tantivy| Box::pin(async move {
+///       test_function_1(config, driver, tantivy).await?;
+///       test_function_2(config, driver, tantivy).await?;
 ///       Ok(())
 ///     } )) }
 /// ```
@@ -56,22 +59,58 @@ pub fn run_with_test_db<F>(
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a TypeDBDriver)
+  FnOnce(&'a SkgConfig, &'a TypeDBDriver, &'a TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
-  block_on(async {
-    let (config, driver): (SkgConfig, TypeDBDriver) =
+  // Copy fixtures to temp so saves don't corrupt originals
+  let temp_fixtures = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
+  if temp_fixtures.exists() {
+    fs::remove_dir_all(&temp_fixtures)?;
+  }
+  copy_dir_all(
+    &PathBuf::from(fixtures_folder),
+    &temp_fixtures)?;
+
+  let result = block_on(async {
+    let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
       setup_test_tantivy_and_typedb_dbs(
-        db_name, fixtures_folder, tantivy_folder ). await?;
-    let result = test_fn(&config, &driver).await;
+        db_name,
+        temp_fixtures.to_str().unwrap(),
+        tantivy_folder ). await?;
+    let result = test_fn(&config, &driver, &tantivy).await;
     cleanup_test_tantivy_and_typedb_dbs(
       db_name,
       &driver,
       Some(config.tantivy_folder.as_path())
     ).await?;
     result
-  } ) }
+  });
+
+  // Clean up temp fixtures
+  if temp_fixtures.exists() {
+    fs::remove_dir_all(&temp_fixtures)?;
+  }
+
+  result
+}
+
+/// Recursively copy a directory and its contents.
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
+  fs::create_dir_all(dst)?;
+  for entry in fs::read_dir(src)? {
+    let entry = entry?;
+    let ty = entry.file_type()?;
+    let src_path = entry.path();
+    let dst_path = dst.join(entry.file_name());
+    if ty.is_dir() {
+      copy_dir_all(&src_path, &dst_path)?;
+    } else {
+      fs::copy(&src_path, &dst_path)?;
+    }
+  }
+  Ok(())
+}
 
 /// A helper function for tests.
 pub async fn populate_test_db_from_fixtures (
@@ -113,7 +152,7 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
   db_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
+) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
   let mut sources : HashMap<String, SkgfileSource> =
     HashMap::new ();
   sources.insert (
@@ -141,7 +180,20 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     db_name,
     &driver
   ). await?;
-  Ok ((config, driver)) }
+  // Create TantivyIndex (clean up first if exists)
+  if config.tantivy_folder.exists() {
+    fs::remove_dir_all(&config.tantivy_folder)?;
+  }
+  fs::create_dir_all(&config.tantivy_folder)?;
+  let tantivy_schema: tantivy::schema::Schema = mk_tantivy_schema();
+  let tantivy_index: TantivyIndex = TantivyIndex {
+    index: Arc::new(tantivy::Index::create_in_dir(
+      &config.tantivy_folder, tantivy_schema.clone())?),
+    id_field: tantivy_schema.get_field("id").unwrap(),
+    title_or_alias_field: tantivy_schema.get_field("title_or_alias").unwrap(),
+    source_field: tantivy_schema.get_field("source").unwrap(),
+  };
+  Ok ((config, driver, tantivy_index)) }
 
 /// Clean up test database and tantivy index after a test completes.
 ///
@@ -449,3 +501,4 @@ pub fn orgnode_forest_to_paired (
     add_orgnode_tree_as_child_of_forest_root (
       &mut result, forest_root_id, &forest, tree_root . id () ); }
   result }
+

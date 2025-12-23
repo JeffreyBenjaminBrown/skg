@@ -97,6 +97,17 @@ pub enum ViewRequest {
 // Implementations
 //
 
+impl Interp {
+  /// Returns true if nodes with this Interp should not have a source.
+  /// These are synthetic containers that don't correspond to .skg files.
+  pub fn should_be_sourceless ( &self ) -> bool {
+    matches! ( self,
+      Interp::AliasCol                     |
+      Interp::Alias                        |
+      Interp::SubscribeeCol                |
+      Interp::HiddenOutsideOfSubscribeeCol |
+      Interp::HiddenInSubscribeeCol ) } }
+
 impl fmt::Display for Interp {
   fn fmt (
     &self,

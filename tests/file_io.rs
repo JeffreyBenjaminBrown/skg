@@ -167,7 +167,7 @@ fn test_fetch_aliases_from_file(
     "skg-test-fetch-aliases",
     "tests/file_io/fixtures",
     "/tmp/tantivy-test-fetch-aliases",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       test_fetch_aliases_from_file_impl(config, driver).await
     } )) }
 

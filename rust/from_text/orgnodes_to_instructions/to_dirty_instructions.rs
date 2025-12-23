@@ -180,8 +180,13 @@ fn collect_subscribees_and_delete_collector (
         for subscribee_child in subscribee_col_child.children() {
           let child_interp =
             &subscribee_child . value() . metadata . code.interp;
+          // Skip HiddenOutsideOfSubscribeeCol - it's allowed as a child of a SubscribeeCol, but it's not a subscribee
+          if *child_interp == Interp::HiddenOutsideOfSubscribeeCol {
+            continue; }
           if *child_interp != Interp::Subscribee {
-            return Err ( format! ( "SubscribeeCol has non-Subscribee child with interp: {:?}", child_interp )); }
+            return Err ( format! (
+              "SubscribeeCol has non-Subscribee child with interp: {:?}",
+              child_interp )); }
           match &subscribee_child.value().metadata.id {
             Some(id) => subscribees . push( id . clone() ),
             None => return Err ( format! (

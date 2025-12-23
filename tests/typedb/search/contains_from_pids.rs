@@ -15,7 +15,7 @@ fn the_tests (
     "skg-test-typedb-search-contains-from-pids",
     "tests/typedb/search/contains_from_pids/fixtures",
     "/tmp/tantivy-test-typedb-search-contains-from-pids",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_contains_from_pids (
         config, driver ) . await ?;
       Ok (( )) } )

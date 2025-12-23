@@ -19,7 +19,7 @@ fn the_tests (
     "skg-test-typedb-search-robust",
     "tests/typedb/search/robust/fixtures",
     "/tmp/tantivy-test-typedb-search-robust",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_find_containers_of (
         config, driver ) . await ?;
       test_path_containerward_to_end_cycle_and_or_branches (

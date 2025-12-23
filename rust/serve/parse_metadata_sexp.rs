@@ -116,6 +116,9 @@ fn parse_code_sexp (
               "parentIgnores" => Interp::ParentIgnores,
               "subscribeeCol" => Interp::SubscribeeCol,
               "subscribee"    => Interp::Subscribee,
+              "hiddenOutsideOfSubscribeeCol" => Interp::HiddenOutsideOfSubscribeeCol,
+              "hiddenInSubscribeeCol"        => Interp::HiddenInSubscribeeCol,
+              "hiddenFromSubscribees"        => Interp::HiddenFromSubscribees,
               _ => return Err (
                 format! ( "Unknown interp value: {}", value )),
             }; },

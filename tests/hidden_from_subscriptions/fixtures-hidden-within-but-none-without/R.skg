@@ -1,9 +1,9 @@
-ids:
-  - R
 title: R
+ids:
+- R
 contains:
-  - R1
+- R1
 subscribes_to:
-  - E1
+- E1
 hides_from_its_subscriptions:
-  - H
+- H

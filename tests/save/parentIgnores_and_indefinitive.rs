@@ -34,7 +34,7 @@ fn test_parentignores_and_indefinitive(
       "skg-test-parentignores",
       "tests/save/parentIgnores_and_indefinitive/fixtures",
       "/tmp/tantivy-test-parentignores",
-      | config, driver | Box::pin ( async move {
+      |config, driver, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
         // Node 1 contains node 2 (which has treatment=parentIgnores and indefinitive)
         // Node 2 contains node 3 (already) and should contain node 4 (new)

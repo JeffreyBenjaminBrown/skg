@@ -25,7 +25,7 @@ fn test_pid_from_id (
     "skg-test-typedb-search-util",
     "tests/typedb/search/util/fixtures",
     "/tmp/tantivy-test-typedb-search-util",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       let (pid_for_4, source_for_4) = pid_and_source_from_id (
         & config . db_name,
         & driver,
@@ -49,7 +49,7 @@ fn test_pids_from_ids (
     "skg-test-typedb-pids-from-ids",
     "tests/typedb/search/util/fixtures",
     "/tmp/tantivy-test-typedb-pids-from-ids",
-    | config, driver | Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Test bulk lookup of multiple IDs using nested subqueries
       let input_ids = vec![
         ID("4".to_string()),

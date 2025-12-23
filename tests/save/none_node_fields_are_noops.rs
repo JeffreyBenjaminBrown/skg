@@ -14,7 +14,7 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
     "skg-test-none-aliases",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-aliases",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_none_aliases_get_replaced_with_disk_aliases_logic (
         config, driver ) . await
     } )) }
@@ -70,7 +70,7 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
     "skg-test-none-subscribes",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-subscribes",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
         config, driver ) . await
     } )) }
@@ -126,7 +126,7 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
     "skg-test-none-hides",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-hides",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
         config, driver ) . await
     } )) }
@@ -181,7 +181,7 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
     "skg-test-none-overrides",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-overrides",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
         config, driver ) . await
     } )) }

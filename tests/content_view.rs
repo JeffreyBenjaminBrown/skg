@@ -17,7 +17,7 @@ fn test_a_mess_of_stuff
     "skg-test-content-view",
     "tests/content_view/fixtures",
     "/tmp/tantivy-test-content-view",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       run_path_and_root_tests ( config, driver ) . await
     } )) }
 
@@ -28,7 +28,7 @@ fn test_multi_root_view
     "skg-test-multi-root-view",
     "tests/content_view/fixtures-2",
     "/tmp/tantivy-test-multi-root-view",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       test_multi_root_view_logic ( config, driver ) . await
     } )) }
 
@@ -137,7 +137,7 @@ fn test_single_root_view_with_cycle
     "skg-test-single-root-view-cycle",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-single-root-view-cycle",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
       let result : String = single_root_view (
         driver,
@@ -165,7 +165,7 @@ fn test_multi_root_view_with_shared_nodes
     "skg-test-multi-root-view-shared",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-multi-root-view-shared",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Test with multiple roots that share a node
       let focii = vec![
         ID ( "1".to_string () ),
@@ -211,7 +211,7 @@ fn test_multi_root_view_with_node_limit
     "skg-test-multi-root-view-limit",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-multi-root-view-limit",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Test with two roots that share a node, with node limit
       // Tree structure: 1 -> (2, 3), 2 (standalone root)
       // Generations: 1: [1, 2], 2: [2 (repeated), 3]
@@ -264,7 +264,7 @@ fn test_limit_with_multiple_sibling_groups
     "skg-test-multiple-sibling-groups",
     "tests/content_view/fixtures-3",
     "/tmp/tantivy-test-multiple-sibling-groups",
-    |config, driver| Box::pin ( async move {
+    |config, driver, _tantivy| Box::pin ( async move {
       // Test that truncation correctly stops at sibling group boundaries
       // Tree structure:
       //   1 (gen 1)

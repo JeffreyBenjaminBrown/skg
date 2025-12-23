@@ -137,13 +137,13 @@ pub async fn complete_branch_minus_content (
   tree     : &mut PairTree,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
-  db_name  : &str,
+  config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   mark_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
   maybe_add_subscribee_col (
-    tree, node_id, db_name, driver ) . await ?;
+    tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 
 /// Handles repetitions, cycles, and the VisitedMap.
@@ -320,7 +320,7 @@ pub async fn build_node_branch_minus_content (
         parent_mut . append ((Some(skgnode), orgnode)) . id () };
       complete_branch_minus_content (
         tree, child_node_id, visited,
-        & config . db_name, driver ) . await ?;
+        config, driver ) . await ?;
       Ok ( (None, child_node_id) ) },
     None => {
       let mut tree : PairTree =
@@ -328,7 +328,7 @@ pub async fn build_node_branch_minus_content (
       let root_node_id : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, root_node_id, visited,
-        & config . db_name, driver ) . await ?;
+        config, driver ) . await ?;
       Ok ( (Some(tree), root_node_id) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.

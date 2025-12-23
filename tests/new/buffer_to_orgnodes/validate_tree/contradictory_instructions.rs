@@ -67,7 +67,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
     "skg-test-validate-multiple-def",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-multiple-def",
-    |config, driver| Box::pin(async move {
+    |config, driver, _tantivy| Box::pin(async move {
       // Test input with multiple nodes having the same ID and indefinitive=false
       let input_with_multiple_defining_containers: &str =
         indoc! {"

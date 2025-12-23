@@ -1,37 +1,40 @@
 pub mod nodes;
 pub use nodes::{
-    create_all_nodes,
-    create_only_nodes_with_no_ids_present,
-    create_node,
-    insert_extra_ids,
-    which_ids_exist,
-    delete_nodes_from_pids,
+  create_all_nodes,
+  create_node,
+  create_only_nodes_with_no_ids_present,
+  delete_nodes_from_pids,
+  insert_extra_ids,
+  which_ids_exist,
 };
 
 pub mod relationships;
 pub use relationships::{
-    create_all_relationships,
-    create_relationships_from_node,
-    delete_out_links,
+  create_all_relationships,
+  create_relationships_from_node,
+  delete_out_links,
 };
 
 pub mod search;
 pub use search::{
-    climb_containerward_and_fetch_rootish_context,
-    path_containerward_to_end_cycle_and_or_branches,
-    path_sourceward_to_end_cycle_and_or_branches,
-    path_to_end_cycle_and_or_branches,
-    find_containers_of,
-    find_links_to,
-    find_related_nodes,
-    contains_from_pids,
-    count_containers,
-    count_contents,
-    count_link_sources,
+  climb_containerward_and_fetch_rootish_context,
+  contains_from_pids,
+  count_containers,
+  count_contents,
+  count_link_sources,
+  find_containers_of,
+  find_links_to,
+  find_related_nodes,
+  path_containerward_to_end_cycle_and_or_branches,
+  path_sourceward_to_end_cycle_and_or_branches,
+  path_to_end_cycle_and_or_branches,
+  what_nodes_contain,
+  what_node_hides,
 };
 
 pub mod util;
 pub use util::{
+  conjugate_binary_role,
   extract_payload_from_typedb_string_rep,
   pids_from_ids,
-  conjugate_binary_role};
+};

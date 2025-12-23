@@ -42,8 +42,8 @@ fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
     "skg-test-merge-2-into-1",
     "/tmp/merge-test-2-into-1-fixtures",
     "/tmp/tantivy-test-merge-2-into-1",
-    |config, driver| Box::pin(async move {
-      test_merge_2_into_1_impl(config, driver).await?;
+    |config, driver, tantivy| Box::pin(async move {
+      test_merge_2_into_1_impl(config, driver, tantivy).await?;
       Ok(( ))
     } ));
 
@@ -58,6 +58,7 @@ fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
 async fn test_merge_2_into_1_impl(
   config: &SkgConfig,
   driver: &TypeDBDriver,
+  tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 1 requesting to merge node 2
   let org_node_1: OrgNode = OrgNode {
@@ -88,30 +89,10 @@ async fn test_merge_2_into_1_impl(
              1,
              "Should have 1 MergeInstructionTriple");
 
-  // Create a temporary Tantivy index for testing,
-  // in the same directory that 'run_with_test_db' uses.
-  fs::create_dir_all(&config.tantivy_folder)?;
-  let tantivy_schema: tantivy::schema::Schema =
-    skg::media::tantivy::mk_tantivy_schema();
-  let id_field: tantivy::schema::Field =
-    tantivy_schema.get_field("id").unwrap();
-  let title_or_alias_field: tantivy::schema::Field =
-    tantivy_schema.get_field("title_or_alias").unwrap();
-  let source_field: tantivy::schema::Field =
-    tantivy_schema.get_field("source").unwrap();
-  let tantivy_index: tantivy::Index =
-    tantivy::Index::create_in_dir(
-      &config.tantivy_folder, tantivy_schema)?;
-  let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
-    index: std::sync::Arc::new(tantivy_index),
-    id_field,
-    title_or_alias_field,
-    source_field, };
-
   merge_nodes(
     merge_instructions.clone(),
     config.clone(),
-    &tantivy_index_wrapper,
+    tantivy,
     driver,
   ).await?;
 
@@ -121,7 +102,7 @@ async fn test_merge_2_into_1_impl(
   verify_filesystem_after_merge_2_into_1(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
-    &tantivy_index_wrapper, &merge_instructions )?;
+    tantivy, &merge_instructions )?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_2_into_1 (
@@ -322,8 +303,8 @@ fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
     "skg-test-merge-1-into-2",
     "/tmp/merge-test-1-into-2-fixtures",
     "/tmp/tantivy-test-merge-1-into-2",
-    |config, driver| Box::pin(async move {
-      test_merge_1_into_2_impl(config, driver).await?;
+    |config, driver, tantivy| Box::pin(async move {
+      test_merge_1_into_2_impl(config, driver, tantivy).await?;
       Ok(( ))
     } ));
 
@@ -338,6 +319,7 @@ fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
 async fn test_merge_1_into_2_impl(
   config: &SkgConfig,
   driver: &TypeDBDriver,
+  tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 2 requesting to merge node 1
   let org_node_2: OrgNode = OrgNode {
@@ -368,29 +350,10 @@ async fn test_merge_1_into_2_impl(
              1,
              "Should have 1 MergeInstructionTriple");
 
-  // Create a temporary Tantivy index for testing
-  fs::create_dir_all(&config.tantivy_folder)?;
-  let tantivy_schema: tantivy::schema::Schema =
-    skg::media::tantivy::mk_tantivy_schema();
-  let id_field: tantivy::schema::Field =
-    tantivy_schema.get_field("id").unwrap();
-  let title_or_alias_field: tantivy::schema::Field =
-    tantivy_schema.get_field("title_or_alias").unwrap();
-  let source_field: tantivy::schema::Field =
-    tantivy_schema.get_field("source").unwrap();
-  let tantivy_index: tantivy::Index =
-    tantivy::Index::create_in_dir(
-      &config.tantivy_folder, tantivy_schema)?;
-  let tantivy_index_wrapper: TantivyIndex = TantivyIndex {
-    index: std::sync::Arc::new(tantivy_index),
-    id_field,
-    title_or_alias_field,
-    source_field, };
-
   merge_nodes(
     merge_instructions.clone(),
     config.clone(),
-    &tantivy_index_wrapper,
+    tantivy,
     driver,
   ).await?;
 
@@ -400,7 +363,7 @@ async fn test_merge_1_into_2_impl(
   verify_filesystem_after_merge_1_into_2(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
-    &tantivy_index_wrapper, &merge_instructions)?;
+    tantivy, &merge_instructions)?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_1_into_2 (
@@ -456,7 +419,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // because acquiree_text_preserver has what was node 1's body text.
   let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
   let acquiree_text_preserver_textlink_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, acquiree_text_preserver_id,
+    db_name, driver, & [ acquiree_text_preserver_id . clone () ],
     "textlinks_to", "source", "dest" ). await ?;
   assert!(
     acquiree_text_preserver_textlink_dests.contains(&ID::from("1-links-to")),
@@ -465,7 +428,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - Node 2 should NOT have the outbound textlink from node 1
   //   (the textlink is in the text, which went to acquiree_text_preserver)
   let node_2_textlink_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("2"),
+    db_name, driver, & [ ID::from("2") ],
     "textlinks_to", "source", "dest" ). await ?;
   assert!(
     !node_2_textlink_dests.contains(&ID::from("1-links-to")),
@@ -474,7 +437,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - The textlink from links-to-1 to 1 should now be from links-to-1 to 2
   //   (inbound textlinks target the acquirer because acquiree's ID becomes an extra_id)
   let links_to_1_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("links-to-1"),
+    db_name, driver, & [ ID::from("links-to-1") ],
     "textlinks_to", "source", "dest" ). await ?;
   assert!(links_to_1_dests.contains(&ID::from("2")),
           "links-to-1 should textlink to 2 (rerouted from 1)");
@@ -484,7 +447,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Subscribes relationships should be rerouted
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2
   let node_2_subscribes_to: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("2"),
+    db_name, driver, & [ ID::from("2") ],
     "subscribes", "subscriber", "subscribee" ). await ?;
   assert!(node_2_subscribes_to.contains(&ID::from("1-subscribes-to")),
           "Node 2 should subscribe to 1-subscribes-to");
@@ -492,7 +455,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - subscribes-to-1, which subscribed to [1],
   // should now subscribe to [2]
   let subscribes_to_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("subscribes-to-1"),
+    db_name, driver, & [ ID::from("subscribes-to-1") ],
     "subscribes", "subscriber", "subscribee" ). await ?;
   assert!(subscribes_to_1_targets.contains(&ID::from("2")),
           "subscribes-to-1 should subscribe to 2 (rerouted from 1)");
@@ -504,7 +467,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - After merge: Node 2 should hide [hidden-from-1s-subscriptions] but NOT [hidden-from-subscriptions-of-1-but-in-content-of-2]
   //   because hidden-from-subscriptions-of-1-but-in-content-of-2 IS in node 2's contents.
   let node_2_hides: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("2"), "hides_from_its_subscriptions", "hider", "hidden"
+    db_name, driver, & [ ID::from("2") ], "hides_from_its_subscriptions", "hider", "hidden"
   ).await?;
   assert!(node_2_hides.contains(&ID::from("hidden-from-1s-subscriptions")),
           "Node 2 should hide hidden-from-1s-subscriptions (transferred from node 1)");
@@ -513,7 +476,7 @@ async fn verify_typedb_after_merge_1_into_2 (
 
   // - hides-1-from-subscriptions hid [1, 11] → should now hide [11] only (relationship hiding 1 is DROPPED)
   let hides_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("hides-1-from-subscriptions"), "hides_from_its_subscriptions", "hider", "hidden"
+    db_name, driver, & [ ID::from("hides-1-from-subscriptions") ], "hides_from_its_subscriptions", "hider", "hidden"
   ).await?;
   assert!(hides_1_targets.contains(&ID::from("11")),
           "hides-1-from-subscriptions should still hide 11");
@@ -523,14 +486,14 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Overrides relationships should be processed correctly
   // - Node 1's overrides [1-overrides-view-of] should transfer to node 2
   let node_2_overrides: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("2"), "overrides_view_of", "replacement", "replaced"
+    db_name, driver, & [ ID::from("2") ], "overrides_view_of", "replacement", "replaced"
   ).await?;
   assert!(node_2_overrides.contains(&ID::from("1-overrides-view-of")),
           "Node 2 should override view of 1-overrides-view-of (transferred from node 1)");
 
   // - overrides-view-of-1 that overrode [1] should have that relationship DROPPED (1 no longer exists to be replaced)
   let overrides_view_of_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, &ID::from("overrides-view-of-1"),
+    db_name, driver, & [ ID::from("overrides-view-of-1") ],
     "overrides_view_of", "replacement", "replaced" ). await ?;
   assert!(!overrides_view_of_1_targets.contains(&ID::from("1")) &&
           !overrides_view_of_1_targets.contains(&ID::from("2")),

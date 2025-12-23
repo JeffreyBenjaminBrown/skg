@@ -1,67 +1,68 @@
-/// Find which hidden IDs are in any subscribee's content.
+/// Partition a subscribee's content based on what the subscriber hides.
 ///
-/// Given a list of hidden IDs and a list of subscribee IDs,
-/// returns the subset of hidden IDs that appear as direct content
-/// of any subscribee.
+/// Given subscriber R and subscribee E, returns two sets:
+/// - visible: what E contains that R does NOT hide
+/// - hidden: what E contains that R hides
 
 use std::collections::HashSet;
 use std::error::Error;
-use futures::StreamExt;
-use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer},
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
+use typedb_driver::TypeDBDriver;
 
 use crate::types::ID;
-use crate::media::typedb::util::{
-  build_id_disjunction,
-  extract_payload_from_typedb_string_rep};
+use crate::media::typedb::search::find_related_nodes;
 
-/// Returns the hidden IDs that ARE in any subscribee's direct content.
-/// The caller can compute the complement (hidden outside content)
-/// by subtracting from the original hidden set.
-pub async fn hidden_ids_in_subscribee_content (
+/// Partition E's direct content into visible and hidden portions,
+/// based on what R hides_from_its_subscriptions.
+///
+/// Returns (visible, hidden) where:
+/// - visible = E_content - R_hides
+/// - hidden = E_content ∩ R_hides
+pub async fn partition_subscribee_content_for_subscriber (
   db_name        : &str,
   driver         : &TypeDBDriver,
-  hidden_ids     : &[ID],
-  subscribee_ids : &[ID],
+  subscriber_pid : &ID,
+  subscribee_pid : &ID,
+) -> Result < ( HashSet < ID >,   // visible
+               HashSet < ID > ),  // hidden
+             Box < dyn Error > > {
+  let subscriber_hides : HashSet < ID > =
+    what_node_hides (
+      db_name, driver, subscriber_pid ) . await ?;
+  let subscribee_content : HashSet < ID > =
+    what_nodes_contain (
+      db_name, driver, & [ subscribee_pid . clone () ] ) . await ?;
+  let visible : HashSet < ID > =
+    subscribee_content . iter ()
+    . filter ( | id | ! subscriber_hides . contains ( id ) )
+    . cloned () . collect ();
+  let hidden : HashSet < ID > =
+    subscribee_content . iter ()
+    . filter ( | id | subscriber_hides . contains ( id ) )
+    . cloned () . collect ();
+  Ok (( visible, hidden )) }
+
+/// Returns all IDs that the subscriber hides_from_its_subscriptions.
+pub async fn what_node_hides (
+  db_name        : &str,
+  driver         : &TypeDBDriver,
+  subscriber_pid : &ID,
 ) -> Result < HashSet < ID >, Box < dyn Error > > {
-  if hidden_ids . is_empty () || subscribee_ids . is_empty () {
-    return Ok ( HashSet::new () ); }
+  find_related_nodes (
+    db_name, driver,
+    & [ subscriber_pid . clone () ],
+    "hides_from_its_subscriptions",
+    "hider",
+    "hidden" ) . await }
 
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-
-  let hidden_disjunction : String =
-    build_id_disjunction ( hidden_ids, "hidden_id" );
-  let subscribee_disjunction : String =
-    build_id_disjunction ( subscribee_ids, "subscribee_id" );
-
-  // Query: find hidden nodes that are direct content of any subscribee
-  let query : String = format! ( r#"match
-      $hidden isa node, has id $hidden_id;
-      $subscribee isa node, has id $subscribee_id;
-      $rel isa contains ( container: $subscribee,
-                          contained: $hidden );
-      {};
-      {};
-      select $hidden_id;"#,
-    hidden_disjunction,
-    subscribee_disjunction );
-
-  let answer : QueryAnswer = tx . query ( query ) . await ?;
-  let mut stream = answer . into_rows ();
-  let mut result : HashSet < ID > = HashSet::new ();
-
-  while let Some ( row_result ) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some ( concept ) = row . get ( "hidden_id" ) ? {
-      result . insert ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () ) ) ); } }
-
-  Ok ( result ) }
+/// Returns the union of all subscribees' direct content.
+/// Uses a single batched query.
+pub async fn what_nodes_contain (
+  db_name         : &str,
+  driver          : &TypeDBDriver,
+  subscribee_pids : &[ID],
+) -> Result < HashSet < ID >, Box < dyn Error > > {
+  find_related_nodes (
+    db_name, driver, subscribee_pids,
+    "contains",
+    "container",
+    "contained" ) . await }

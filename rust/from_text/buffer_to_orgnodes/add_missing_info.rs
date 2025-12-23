@@ -66,12 +66,13 @@ fn add_missing_info_dfs (
     assign_new_id_if_needed (
       node_ref . value () ); }
 
-  let its_reltoparent: Interp =
-    ( // Used to process each child.
-      node_ref . value ()
-        . metadata . code . interp . clone () );
+  let its_interp: Interp =
+    node_ref . value ()
+    . metadata . code . interp . clone ();
   let its_source: Option < String > =
-    node_ref . value () . metadata . source . clone ();
+    // Sourceless nodes don't propagate source to children.
+    if its_interp . should_be_sourceless () { None }
+    else { node_ref . value () . metadata . source . clone () };
   { // Recurse : Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
@@ -89,7 +90,7 @@ fn add_missing_info_dfs (
         node_ref . tree () . get_mut ( child_id )
       { add_missing_info_dfs (
         child_mut,
-        Some ( its_reltoparent . clone () ),
+        Some ( its_interp . clone () ),
         its_source . clone () ); }} }}
 
 /// Assign treatment=Alias
@@ -111,7 +112,9 @@ fn assign_new_id_if_needed(
     let new_id: String = Uuid::new_v4().to_string();
     node.metadata.id = Some(ID(new_id)); }}
 
-/// Inherit source from parent if node doesn't have one
+/// Inherit source from parent if node doesn't have one.
+/// (The caller is responsible for recognizing, if it's true,
+/// that the parent should have no associated source.)
 fn inherit_source_if_needed(
   node: &mut OrgNode,
   parent_source: Option<String>
