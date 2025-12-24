@@ -94,26 +94,18 @@ pub fn initialize_typedb_from_nodes (
   println!("TypeDB database initialized successfully.");
   Arc::new( driver ) }
 
-/// Build a schema,
-/// then run `in_fs_wipe_index_then_create_it`.
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
   nodes  : & [SkgNode],
 ) -> TantivyIndex {
   println!("Initializing Tantivy index...");
-
-  // Define the schema.
-  let schema: schema::Schema =
-    crate::media::tantivy::mk_tantivy_schema();
-
   let index_path : &Path =
     Path::new ( & config . tantivy_folder );
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
     in_fs_wipe_index_then_create_it (
       nodes,
-      index_path,
-      schema )
+      index_path )
     . unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1); } );
@@ -122,25 +114,15 @@ pub fn initialize_tantivy_from_nodes (
     indexed_count);
   tantivy_index }
 
-/// Removes any existing index at given path.
-/// creates a new one there,
-/// and populates it.
-///
-/// PITFALL: The index is not the data it indexes.
-/// This only deletes the former.
-pub fn in_fs_wipe_index_then_create_it (
-  nodes                : &[SkgNode],
-  index_path           : &Path,
-  schema               : schema::Schema,
-) -> Result<(TantivyIndex,
-             usize), // number of documents indexed
-            Box<dyn Error>> {
-
+/// Create an empty TantivyIndex, cleaning up any existing index first.
+pub fn create_empty_tantivy_index (
+  index_path : &Path,
+) -> Result<TantivyIndex, Box<dyn Error>> {
   if index_path.exists() {
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all ( index_path )?;
-
-  // Get field handles from schema
+  let schema : schema::Schema =
+    crate::media::tantivy::mk_tantivy_schema();
   let id_field: schema::Field =
     schema.get_field("id")
     .ok_or("Schema missing 'id' field")?;
@@ -150,17 +132,30 @@ pub fn in_fs_wipe_index_then_create_it (
   let source_field: schema::Field =
     schema.get_field("source")
     .ok_or("Schema missing 'source' field")?;
-
   let index : Index =
     Index::create_in_dir ( index_path, schema )?;
-  let tantivy_index : TantivyIndex = TantivyIndex {
+  Ok ( TantivyIndex {
     index: Arc::new(index),
     id_field,
     title_or_alias_field,
-    source_field, };
-  let indexed_count: usize = // populate it
-    update_index_with_nodes ( nodes,
-                              & tantivy_index )?;
+    source_field, }) }
+
+/// Removes any existing index at given path,
+/// creates a new one there,
+/// and populates it.
+///
+/// PITFALL: The index is not the data it indexes.
+/// This only deletes the former.
+pub fn in_fs_wipe_index_then_create_it (
+  nodes      : &[SkgNode],
+  index_path : &Path,
+) -> Result<(TantivyIndex,
+             usize), // number of documents indexed
+            Box<dyn Error>> {
+  let tantivy_index : TantivyIndex =
+    create_empty_tantivy_index ( index_path )?;
+  let indexed_count: usize =
+    update_index_with_nodes ( nodes, & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
 pub async fn overwrite_new_empty_db (

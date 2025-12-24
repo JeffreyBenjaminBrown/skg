@@ -7,9 +7,8 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::init::{overwrite_new_empty_db, define_schema};
+use skg::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use skg::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use skg::media::tantivy::mk_tantivy_schema;
 use skg::media::typedb::nodes::create_all_nodes;
 use skg::media::typedb::relationships::create_all_relationships;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
@@ -19,9 +18,7 @@ use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 async fn setup_test(
@@ -59,16 +56,8 @@ async fn setup_test(
   define_schema(db_name, &driver).await?;
   create_all_nodes(db_name, &driver, &nodes).await?;
   create_all_relationships(db_name, &driver, &nodes).await?;
-  // Create TantivyIndex
-  fs::create_dir_all(&config.tantivy_folder)?;
-  let tantivy_schema: tantivy::schema::Schema = mk_tantivy_schema();
-  let tantivy_index: TantivyIndex = TantivyIndex {
-    index: Arc::new(tantivy::Index::create_in_dir(
-      &config.tantivy_folder, tantivy_schema.clone())?),
-    id_field: tantivy_schema.get_field("id").unwrap(),
-    title_or_alias_field: tantivy_schema.get_field(
-      "title_or_alias").unwrap(),
-    source_field: tantivy_schema.get_field("source").unwrap() };
+  let tantivy_index: TantivyIndex =
+    create_empty_tantivy_index(&config.tantivy_folder)?;
   Ok((config, driver, tantivy_index)) }
 
 async fn cleanup_test(

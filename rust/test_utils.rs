@@ -1,7 +1,7 @@
 use crate::from_text::{headline_to_triple, HeadlineInfo};
-use crate::init::{overwrite_new_empty_db, define_schema};
+use crate::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use crate::media::tantivy::{search_index, mk_tantivy_schema};
+use crate::media::tantivy::search_index;
 use crate::media::typedb::nodes::create_all_nodes;
 use crate::media::typedb::relationships::create_all_relationships;
 use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
@@ -10,8 +10,6 @@ use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
 use crate::types::trees::PairTree;
-
-use std::sync::Arc;
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use futures::StreamExt;
@@ -180,19 +178,8 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     db_name,
     &driver
   ). await?;
-  // Create TantivyIndex (clean up first if exists)
-  if config.tantivy_folder.exists() {
-    fs::remove_dir_all(&config.tantivy_folder)?;
-  }
-  fs::create_dir_all(&config.tantivy_folder)?;
-  let tantivy_schema: tantivy::schema::Schema = mk_tantivy_schema();
-  let tantivy_index: TantivyIndex = TantivyIndex {
-    index: Arc::new(tantivy::Index::create_in_dir(
-      &config.tantivy_folder, tantivy_schema.clone())?),
-    id_field: tantivy_schema.get_field("id").unwrap(),
-    title_or_alias_field: tantivy_schema.get_field("title_or_alias").unwrap(),
-    source_field: tantivy_schema.get_field("source").unwrap(),
-  };
+  let tantivy_index: TantivyIndex =
+    create_empty_tantivy_index(&config.tantivy_folder)?;
   Ok ((config, driver, tantivy_index)) }
 
 /// Clean up test database and tantivy index after a test completes.

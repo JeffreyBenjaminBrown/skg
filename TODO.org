@@ -1,9 +1,11 @@
+* Don't delete those *Col branches.
+  The user probably does not want them to disappear.
+collect_aliases_and_delete_collector
+collect_subscribees_and_delete_collector
 * maybe_add_hidden_in_subscribee_col should integrate
   if it finds the subscribee col,
   it can't assume that col is still accurate
 * 'content' count is wrong in Subsribees if any are hidden
-* Don't delete those *Col branches.
-  The user probably does not want them to disappear.
 * fn tree_nodepair_has_interp_subscribee
   and call it everywhere a passage like this appears
 ```

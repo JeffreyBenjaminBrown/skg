@@ -3,7 +3,6 @@
 use skg::types::{ID, empty_skgnode, SkgNode, TantivyIndex};
 use skg::init::in_fs_wipe_index_then_create_it;
 use skg::serve::title_matches::generate_title_matches_response;
-use tantivy::schema;
 use std::path::Path;
 use std::fs;
 
@@ -17,18 +16,11 @@ fn test_title_matches_org_format (
 
   let index_dir : &str =
     "tests/serve_title_matches_test/temp_index";
-  if Path::new ( index_dir ) . exists () {
-    fs::remove_dir_all ( index_dir ) ?;
-  }
-  fs::create_dir_all ( index_dir ) ?;
 
   // Test logic. (Cleanup follows it.)
   let test_result
     : Result < (), Box < dyn std::error::Error >>
     = ( || {
-      // Create schema
-      let schema : schema::Schema =
-        skg::media::tantivy::mk_tantivy_schema();
 
       // Create test nodes with overlapping titles/aliases
       let mut node1 : SkgNode = // the best match
@@ -63,8 +55,7 @@ fn test_title_matches_org_format (
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         in_fs_wipe_index_then_create_it (
           &nodes,
-          Path::new ( index_dir ),
-          schema ) ?;
+          Path::new ( index_dir ) ) ?;
       let search_terms : &str =
         "the bear eats cheese";
       let result : String =

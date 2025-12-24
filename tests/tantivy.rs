@@ -13,33 +13,28 @@ fn test_many_tantivy_things (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let index_dir : &str =
     "/tmp/tantivy-test-many-things";
-
-  // Define the schema
-  let schema: schema::Schema =
-    skg::media::tantivy::mk_tantivy_schema();
-  let id_field: schema::Field =
-    schema.get_field("id").unwrap();
-  let title_or_alias_field: schema::Field =
-    schema.get_field("title_or_alias").unwrap();
-
   let index_path: &Path =
     Path::new ( index_dir );
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+  let mut sources: HashMap<String, SkgfileSource> =
+    HashMap::new();
   sources.insert( // just one source
     "test".to_string(),
     SkgfileSource {
       nickname: "test".to_string(),
       path: PathBuf::from("tests/tantivy/fixtures"),
       user_owns_it: true, } );
-  let nodes: Vec<skg::types::SkgNode> =
+  let nodes: Vec<SkgNode> =
     read_all_skg_files_from_sources(&sources)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (
       &nodes,
-      index_path,
-      schema )?;
+      index_path )?;
+  let id_field: schema::Field =
+    tantivy_index.id_field;
+  let title_or_alias_field: schema::Field =
+    tantivy_index.title_or_alias_field;
   assert!( indexed_count > 0,
            "Expected to index at least one title" );
 
@@ -154,9 +149,8 @@ pub fn print_search_results(
   if best_matches.is_empty() {
     println!("No matches found.");
   } else {
-    let mut path_to_results: std::collections::HashMap
-      <String, Vec<(f32, String)>> =
-      std::collections::HashMap::new();
+    let mut path_to_results: HashMap <String, Vec<(f32, String)>> =
+      HashMap::new();
     for (score, doc_address) in best_matches {
       let retrieved_doc: tantivy::Document =
         searcher.doc(doc_address)?;
@@ -201,14 +195,10 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let index_dir : &str =
     "/tmp/tantivy-test-aliases";
 
-  let schema: schema::Schema =
-    skg::media::tantivy::mk_tantivy_schema();
-
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it(
       &nodes,
-      Path::new(index_dir),
-      schema)?;
+      Path::new(index_dir) )?;
 
   println!("Indexed {} documents", _indexed_count);
 
