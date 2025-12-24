@@ -5,7 +5,7 @@
 
 use crate::types::{OrgNode, Interp, ID};
 use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 use std::boxed::Box;
 use std::collections::HashMap;
 use std::error::Error;
@@ -54,15 +54,16 @@ pub async fn add_missing_info_to_forest(
   Ok(()) }
 
 fn add_missing_info_dfs (
-  mut node_ref: ego_tree::NodeMut < OrgNode >,
+  mut node_ref: NodeMut < OrgNode >,
   parent_reltoparent: Option < Interp >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
   parent_source: Option < String >,
 ) {
   { // Process current node
     assign_alias_relation_if_needed (
       node_ref . value (), parent_reltoparent );
-    inherit_source_if_needed (
-      node_ref . value (), parent_source );
+    if ! node_ref . value () . metadata . code . interp . should_be_sourceless () {
+      inherit_source_if_needed (
+        node_ref . value (), parent_source ); }
     assign_new_id_if_needed (
       node_ref . value () ); }
 

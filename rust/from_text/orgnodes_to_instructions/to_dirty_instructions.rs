@@ -21,8 +21,8 @@ pub fn saveinstructions_from_forest (
 /// Appends another pair to 'result' and recurses (in DFS order).
 /// Skips some nodes, because:
 /// - indefinitive nodes don't generate instructions
-/// - aliases     are handled by 'collect_aliases_and_delete_collector'
-/// - subscribees are handled by 'collect_subscribees_and_delete_collector'
+/// - aliases     are handled by 'collect_aliases'
+/// - subscribees are handled by 'collect_subscribees'
 fn saveinstructions_from_tree(
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
@@ -40,20 +40,18 @@ fn saveinstructions_from_tree(
     for child_id in child_ids {
       saveinstructions_from_tree(tree, child_id, result)?; }
     return Ok(()); }
-  if matches!(interp, Interp::AliasCol      |
-                      Interp::Alias         |
-                      Interp::SubscribeeCol |
-                      Interp::Subscribee) {
-    let title = tree.get(node_id)
-      .map(|n| n.value().title.clone())
-      .unwrap_or_default();
-    return Err ( format! (
-      "Unexpected {:?} node '{}' in saveinstructions_from_tree. Should have already been collected into a predecessor node and deleted.",
-      interp, title )); }
+  if matches!(interp, Interp::AliasCol                     |
+                      Interp::Alias                        |
+                      Interp::SubscribeeCol                |
+                      Interp::Subscribee                   |
+                      Interp::HiddenOutsideOfSubscribeeCol |
+                      Interp::HiddenInSubscribeeCol        |
+                      Interp::HiddenFromSubscribees ) {
+    return Ok(()); } // Skip - these don't generate SaveInstructions
   let aliases =
-    collect_aliases_and_delete_collector(tree, node_id)?;
+    collect_aliases(tree, node_id)?;
   let subscribees =
-    collect_subscribees_and_delete_collector(tree, node_id)?;
+    collect_subscribees(tree, node_id)?;
   let skg_node_opt = if !is_indefinitive {
     let node_ref = tree.get(node_id) . ok_or(
       "saveinstructions_from_tree: node not found after deletion")?;
@@ -122,13 +120,13 @@ fn skgnode_for_orgnode_in_tree<'a> (
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None ("no opinion") if no AliasCol found.
 /// Returns Some(vec) if AliasCol found, even if empty.
-fn collect_aliases_and_delete_collector (
+fn collect_aliases (
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let (aliases, alias_col_ids): (Vec<String>, Vec<NodeId>) = {
     let node_ref = tree.get(node_id).expect(
-      "collect_aliases_and_delete_collector: node not found");
+      "collect_aliases: node not found");
     let mut aliases: Vec<String> = Vec::new();
     let mut alias_col_ids: Vec<NodeId> = Vec::new();
     for alias_col_child in node_ref.children()
@@ -145,9 +143,6 @@ fn collect_aliases_and_delete_collector (
           aliases . push(
             alias_child . value() . title . clone() ); } }}
     (aliases, alias_col_ids) };
-  for col_id in &alias_col_ids { // delete AliasCol branch(es)
-    if let Some(mut col_node) = tree.get_mut(*col_id) {
-      col_node.detach(); } }
   { // return
     if alias_col_ids.is_empty() { Ok(None) }
     else { Ok(Some(dedup_vector(aliases))) }} }
@@ -164,13 +159,13 @@ fn collect_aliases_and_delete_collector (
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None if no SubscribeeCol found (no opinion).
 /// Returns Some(vec) if SubscribeeCol found - even if empty (user wants no subscribees).
-fn collect_subscribees_and_delete_collector (
+fn collect_subscribees (
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let (subscribees, subscribee_col_ids): (Vec<ID>, Vec<NodeId>) = {
     let node_ref = tree.get(node_id).expect(
-      "collect_subscribees_and_delete_collector: node not found");
+      "collect_subscribees: node not found");
     let mut subscribees: Vec<ID> = Vec::new();
     let mut subscribee_col_ids: Vec<NodeId> = Vec::new();
     for subscribee_col_child in node_ref.children()
@@ -194,10 +189,6 @@ fn collect_subscribees_and_delete_collector (
               subscribee_child.value().title )),
           }} }}
     (subscribees, subscribee_col_ids) };
-  for col_id in &subscribee_col_ids {
-    // delete SubscribeeCol branche(es)
-    if let Some(mut col_node) = tree.get_mut(*col_id) {
-      col_node.detach(); } }
   { // return
     if subscribee_col_ids.is_empty() { Ok(None) }
     else { Ok(Some(dedup_vector(subscribees) )) }} }

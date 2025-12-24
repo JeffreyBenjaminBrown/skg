@@ -1,7 +1,12 @@
-* Don't delete those *Col branches.
-  The user probably does not want them to disappear.
-collect_aliases_and_delete_collector
-collect_subscribees_and_delete_collector
+* In saveinstructions_from_tree, recurse into subscribees
+  if matches!(interp, Interp::AliasCol                     |
+                      Interp::Alias                        |
+                      Interp::SubscribeeCol                | // TODO: Recurse into these
+                      Interp::Subscribee                   | // TODO: Recurse into these
+                      Interp::HiddenOutsideOfSubscribeeCol |
+                      Interp::HiddenInSubscribeeCol        |
+                      Interp::HiddenFromSubscribees ) {
+    return Ok(()); } // Skip - these don't generate SaveInstructions
 * maybe_add_hidden_in_subscribee_col should integrate
   if it finds the subscribee col,
   it can't assume that col is still accurate
