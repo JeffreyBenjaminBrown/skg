@@ -26,6 +26,10 @@ path = "rust/bin/delete-one-db.rs"
 name = "smsn-keywords"
 path = "discoveries/smsn/find-keywords.rs"
 
+[[bin]]
+name = "call-graph"
+path = "introspect/call_graph.rs"
+
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }
 ctrlc = "3.4"
@@ -49,6 +53,8 @@ typedb-driver = "3.4.4"
 uuid = { version = "1.4.1", features = ["v4"] }
 walkdir = "2.4"
 zstd = "0.13"
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [lints.rust]
 unused_parens = "allow"

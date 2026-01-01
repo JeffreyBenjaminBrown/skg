@@ -1,20 +1,28 @@
 * In saveinstructions_from_tree, recurse into subscribees
-  if matches!(interp, Interp::AliasCol                     |
-                      Interp::Alias                        |
-                      Interp::SubscribeeCol                | // TODO: Recurse into these
-                      Interp::Subscribee                   | // TODO: Recurse into these
-                      Interp::HiddenOutsideOfSubscribeeCol |
-                      Interp::HiddenInSubscribeeCol        |
-                      Interp::HiddenFromSubscribees ) {
-    return Ok(()); } // Skip - these don't generate SaveInstructions
+** change this passage in saveinstructions_from_tree
+   if matches!(interp, Interp::AliasCol                     |
+                       Interp::Alias                        |
+                       Interp::SubscribeeCol                | // TODO: Recurse into these
+                       Interp::Subscribee                   | // TODO: Recurse into these
+                       Interp::HiddenOutsideOfSubscribeeCol |
+                       Interp::HiddenInSubscribeeCol        |
+                       Interp::HiddenFromSubscribees ) {
+     return Ok(()); } // Skip - these don't generate SaveInstructions
+** how to treat Subscribees
+If indefinitive, visit descendents but otherwise ignore.
+If definitive, treat its content list as a set,
+  and hide in the subscriber anything not included.
+** how to treat foreign content
+Compare content to what's on disk.
+If there's a discrepancy, override and subscribe.
 * maybe_add_hidden_in_subscribee_col should integrate
   if it finds the subscribee col,
   it can't assume that col is still accurate
 * 'content' count is wrong in Subsribees if any are hidden
-* fn tree_nodepair_has_interp_subscribee
+* add 'fn tree_nodepair_has_interp_subscribee'
   and call it everywhere a passage like this appears
 ```
-    let is_subscribee : bool = {
+  let is_subscribee : bool = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id ) . ok_or (
         "maybe_add_hidden_in_subscribee_col: node not found" ) ?;

@@ -153,11 +153,12 @@ pub fn clobberIndefinitiveOrgnode (
     orgnode . body = None; }
   Ok (( )) }
 
-/// Completes a definitive Content node's children by reconciling them
-/// with the 'contains' relationships found in the SkgNode.
+/// Completes a definitive Content node's children,
+/// by reconciling them with the 'contains' relationships
+/// found in the SkgNode.
 ///
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
-/// ASSUMES: ensure_skgnode has already been called
+/// ASSUMES: the PairTree has a SkgNode here (via ensure_skgnode)
 /// ASSUMES: make_indefinitive_if_repeated has already been called
 /// ASSUMES: Input is definitive
 ///

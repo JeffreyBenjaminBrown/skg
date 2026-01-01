@@ -28,12 +28,13 @@ fn saveinstructions_from_tree(
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
-  let (interp, is_indefinitive) = {
-    let node_ref = tree.get(node_id)
-      .ok_or("saveinstructions_from_tree: node not found")?;
-    let node_data = node_ref.value();
-    (node_data.metadata.code.interp.clone(),
-     node_data.metadata.code.indefinitive) };
+  let (interp, is_indefinitive)
+    : (Interp, bool) = {
+      let node_ref = tree.get(node_id)
+        .ok_or("saveinstructions_from_tree: node not found")?;
+      let node_data = node_ref.value();
+      ( node_data.metadata.code.interp.clone(),
+        node_data.metadata.code.indefinitive ) };
   if interp == Interp::ForestRoot {
     let child_ids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
