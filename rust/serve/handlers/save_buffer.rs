@@ -1,19 +1,16 @@
 use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
-use crate::from_text::buffer_to_save_instructions;
+use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
+use crate::media::tree::pair_orgnode_forest_with_save_instructions;
+use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
-use crate::types::errors::SaveError;
-use crate::merge::merge_nodes;
+use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
 use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
 use crate::to_org::expand::definitive::execute_view_requests;
-use crate::media::tree::pair_orgnode_forest_with_save_instructions;
-use crate::serve::util::{
-  format_buffer_response_sexp,
-  read_length_prefixed_content,
-  send_response};
+use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::orgnode::OrgNode;
+use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::trees::PairTree;
 
 use ego_tree::Tree;
@@ -112,24 +109,30 @@ fn empty_response_sexp (
         Sexp::Atom ( Atom::S (
           error_buffer_content . to_string () )) ] ) ] ) ] ) }
 
-/* Update dbs and filesystem, and generate text for a new org-buffer.
-Steps:
-- Put the text through `buffer_to_save_instructions` to get orgnode forest and save instructions.
-- Extract root IDs from the orgnode forest.
-- Runs `update_graph_minus_merges` on the save instructions.
-- Returns a multi-root content view. */
+/// Update dbs and filesystem, and generate text for a new org-buffer.
+/// Steps:
+/// - Build an orgnode forest and save instructions,
+///   via `buffer_to_orgnode_forest_and_save_instructions`.
+/// - Update the graph:
+///   - 'update_graph_minus_merges'
+///   - 'merge_nodes'
+/// - Modify the orgnode forest:
+///   - 'pair_orgnode_forest_with_save_instructions'
+///   - 'completeAndRestoreForest_collectingViewRequests'
+///   - 'execute_view_requests'
+///   - 'set_metadata_relationship_viewdata_in_forest'
+/// - Return a content view, via 'orgnode_forest_to_string'.
 pub async fn update_from_and_rerender_buffer (
   org_buffer_text : &str,
   typedb_driver   : &TypeDBDriver,
   config          : &SkgConfig,
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
-
   let (orgnode_forest, save_instructions, mergeInstructions)
     : ( Tree<OrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
-    = buffer_to_save_instructions (
+    = buffer_to_orgnode_forest_and_save_instructions (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;

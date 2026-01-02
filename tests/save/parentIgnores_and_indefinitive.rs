@@ -1,7 +1,7 @@
 // cargo test --test save parentIgnores_and_indefinitive
 
 use skg::media::file_io::one_node::skgnode_and_source_from_id;
-use skg::from_text::buffer_to_save_instructions;
+use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::save::fs::update_fs_from_saveinstructions;
 use skg::save::typedb::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
@@ -45,7 +45,7 @@ fn test_parentignores_and_indefinitive(
           *** (skg (id 4) (source main)) 4
         "};
         let (_orgnode_forest, save_instructions, _merge_instructions) =
-          buffer_to_save_instructions(
+          buffer_to_orgnode_forest_and_save_instructions(
             org_text,
             config,
             driver, ). await?;

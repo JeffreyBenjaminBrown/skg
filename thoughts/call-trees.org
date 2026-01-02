@@ -61,7 +61,7 @@
 ***** DUP rewrite_to_indefinitive
 * update_from_and_rerender_buffer
   58 LOC
-** buffer_to_save_instructions
+** buffer_to_orgnode_forest_and_save_instructions
    47 LOC
 *** org_to_uninterpreted_nodes
     29 LOC

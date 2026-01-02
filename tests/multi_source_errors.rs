@@ -2,8 +2,8 @@
 
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::from_text::{org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
-use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode};
+use skg::from_text::{ buffer_to_orgnode_forest_and_save_instructions, org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
+use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode, SaveError};
 use skg::media::file_io::{read_all_skg_files_from_sources, load_config};
 use skg::media::typedb::{create_all_nodes, create_all_relationships};
 use skg::init::{overwrite_new_empty_db, define_schema};
@@ -45,7 +45,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       indoc! {"
         * (skg (id pub-1)) pub-1                                      # root with no source
         * (skg (id dub-1) (source dub)) dub-1                         # source does not exist
-        * (skg (id priv-1) (source public)) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_save_instructions', as verified by 'test_reconciliation_errors'.
+        * (skg (id priv-1) (source public)) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_orgnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
         * (skg (id priv-1) (source private)) priv-1                   # error: multiple defining orgnodes for this id
       "};
     let buffer_text: String =
@@ -158,8 +158,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      use skg::from_text::buffer_to_save_instructions;
-      let result = buffer_to_save_instructions(
+      let result = buffer_to_orgnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -168,7 +167,6 @@ fn test_foreign_node_modification_errors(
       assert!(result.is_err(), "Expected errors for foreign node modifications");
 
       if let Err(e) = result {
-        use skg::types::SaveError;
         if let SaveError::BufferValidationErrors(errors) = e {
           println!("\n=== Foreign node modification errors ({} total) ===", errors.len());
           for (i, error) in errors.iter().enumerate() {
@@ -226,8 +224,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      use skg::from_text::buffer_to_save_instructions;
-      let result = buffer_to_save_instructions(
+      let result = buffer_to_orgnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -237,7 +234,6 @@ fn test_foreign_node_modification_errors(
               "Expected errors for foreign merge operations");
 
       if let Err(e) = result {
-        use skg::types::SaveError;
         if let SaveError::BufferValidationErrors(errors) = e {
           println!("\n=== Foreign merge errors ({} total) ===", errors.len());
           for (i, error) in errors.iter().enumerate() {
@@ -315,8 +311,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_conflict);
 
-      use skg::from_text::buffer_to_save_instructions;
-      let result = buffer_to_save_instructions(
+      let result = buffer_to_orgnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -329,7 +324,6 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         println!("Error: {:?}", e);
 
         // Should be a BufferValidationError wrapped in SaveError
-        use skg::types::SaveError;
         match e {
           SaveError::BufferValidationErrors(errors) => {
             let conflict_errors: Vec<&BufferValidationError> = errors.iter()
@@ -360,8 +354,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent_sources);
 
       // This should fail during validation (before indefinitives are filtered)
-      use skg::from_text::buffer_to_save_instructions;
-      let result = buffer_to_save_instructions(
+      let result = buffer_to_orgnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -374,7 +367,6 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       if let Err(e) = result {
         println!("Error: {:?}", e);
 
-        use skg::types::SaveError;
         match e {
           SaveError::BufferValidationErrors(errors) => {
             // Should contain InconsistentSources error

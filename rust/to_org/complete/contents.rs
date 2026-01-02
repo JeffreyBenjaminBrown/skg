@@ -23,11 +23,10 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// CALLS 'completeAndRestoreNode_collectingViewRequests'
-///   on each "tree root" (child of ForestRoot) in the forest,
-/// threading 'visited' through the forest.
-///
-/// RETURNS (visited, view_requests).
+/// TRIVIAL: Just a wrapper for
+///   'completeAndRestoreNode_collectingViewRequests',
+/// which it calls on each "tree root" (child of the ForestRoot),
+///   threading 'visited' through the forest.
 pub async fn completeAndRestoreForest_collectingViewRequests (
   forest        : &mut PairTree,
   config        : &SkgConfig,
@@ -51,21 +50,21 @@ pub async fn completeAndRestoreForest_collectingViewRequests (
 /// - For AliasCol nodes, delegate to 'completeAliasCol'
 ///   (which handles the whole subtree)
 /// - For other nodes, these happen (in order):
-///   - futz with the node itself
-///     - check for repetition via 'mark_visited_or_repeat_or_cycle'
+///   - Futz with the node itself
+///     - Check for repetition via 'mark_visited_or_repeat_or_cycle'
 ///       (if repeated, modify body and metadata, update 'visited')
-///   - futz with its descendents
-///     - if definitive, call completeDefinitiveOrgnode
-///       - else call clobberIndefinitiveOrgnode
-///     - recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
-///     - collect all view requests for later processing
+///   - Futz with its descendents
+///     - If definitive, call completeDefinitiveOrgnode.
+///       Else, call clobberIndefinitiveOrgnode.
+///     - Recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
+///     - Collect all view requests for later processing.
 fn completeAndRestoreNode_collectingViewRequests<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
   config               : &'a SkgConfig,
   typedb_driver        : &'a TypeDBDriver,
   visited              : &'a mut VisitedMap,
-  view_requests_out    : &'a mut Vec < (NodeId, ViewRequest) >,
+  view_requests    : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -85,7 +84,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
       // but don't try to complete the SubscribeeCol node itself.
       map_completeAndRestoreNodeCollectingViewRequests_over_children (
         tree, node_id, config, typedb_driver,
-        visited, view_requests_out ) . await ?;
+        visited, view_requests ) . await ?;
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
@@ -100,9 +99,9 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
         map_completeAndRestoreNodeCollectingViewRequests_over_children (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver,
-          visited, view_requests_out ) . await ?; }
+          visited, view_requests ) . await ?; }
       collect_view_requests (
-        tree, node_id, view_requests_out ) ?; }
+        tree, node_id, view_requests ) ?; }
     Ok (( )) } ) }
 
 /// Collect all view requests from a node and append them to the output vector.
@@ -157,9 +156,9 @@ pub fn clobberIndefinitiveOrgnode (
 /// by reconciling them with the 'contains' relationships
 /// found in the SkgNode.
 ///
-/// ASSUMES: Node has been normalized so its 'id' field is the PID
-/// ASSUMES: the PairTree has a SkgNode here (via ensure_skgnode)
-/// ASSUMES: make_indefinitive_if_repeated has already been called
+/// ASSUMES: Node has been normalized so its "id" field is the PID
+/// ASSUMES: the PairTree has a SkgNode here (via "ensure_skgnode")
+/// ASSUMES: 'mark_visited_or_repeat_or_cycle' was already called
 /// ASSUMES: Input is definitive
 ///
 /// METHOD: Given a node N:
