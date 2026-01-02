@@ -1,7 +1,9 @@
 use crate::to_org::util::{
+  VisitedMap,
+  get_pid_in_pairtree,
+  makeIndefinitiveAndClobber,
   make_and_append_child_pair,
-  get_pid_in_pairtree, VisitedMap,
-  nodes_after_in_generation, rewrite_to_indefinitive };
+  nodes_after_in_generation };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::trees::PairTree;
 
@@ -44,7 +46,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
         let new_node_id : NodeId =
           make_and_append_child_pair (
             tree, *parent_nid, child_id, config, driver ) . await ?;
-        rewrite_to_indefinitive ( tree, new_node_id ) ?; }}
+        makeIndefinitiveAndClobber ( tree, new_node_id ) ?; }}
   truncate_after_node_in_generation_in_tree (
     tree, generation - 1, limit_parent_id,
     effective_root, visited ) ?;
@@ -53,7 +55,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
 /// PURPOSE:
 /// Truncate after a node in a generation of a tree or forest,
 /// possibly limiting scope to an effective branch of a tree.
-/// Truncated nodes are re-rendered using 'rewrite_to_indefinitive'.
+/// Truncated nodes are re-rendered using 'makeIndefinitiveAndClobber'.
 /// Effective_root is generation 0.
 pub fn truncate_after_node_in_generation_in_tree (
   tree           : &mut PairTree,
@@ -68,5 +70,5 @@ pub fn truncate_after_node_in_generation_in_tree (
   for id in nodes_to_truncate {
     if let Ok ( pid ) = get_pid_in_pairtree ( tree, id ) {
       visited . remove ( &pid ); }
-    rewrite_to_indefinitive ( tree, id ) ?; }
+    makeIndefinitiveAndClobber ( tree, id ) ?; }
   Ok (( )) }

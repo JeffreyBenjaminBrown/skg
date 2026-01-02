@@ -49,10 +49,12 @@ pub async fn completeAndRestoreForest_collectingViewRequests (
 /// Completes a node, and then its children ('preorder DFS traversal').
 /// - For most nodes, these happen (in order):
 ///   - Futz with the node itself
+///     - Fetch a skgnode from disk if needed ('ensure_skgnode')
 ///     - Check for repetition via 'mark_if_visited_or_repeat_or_cycle'
 ///       (if repeated, modify body and metadata, update 'visited')
 ///   - Futz with its descendents
 ///     - If definitive, call completeDefinitiveOrgnode.
+///         LOTS OF WORK happens here.
 ///       Else, call clobberIndefinitiveOrgnode.
 ///     - Recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
 ///     - Collect all view requests for later processing.
@@ -122,24 +124,21 @@ fn collect_view_requests (
   Ok (( )) }
 
 /// Completes an indefinitive orgnode using its SkgNode.
+/// Affects only the input node, not its tree-children.
 ///
-/// ASSUMES: Node has been normalized so its 'id' field is the PID
-/// ASSUMES: ensure_skgnode has already been called
-/// ASSUMES: mark_if_visited_or_repeat_or_cycle has already been called
-/// ASSUMES: The input is indefinitive
+/// ASSUMES: Node's 'id' field is its PID.
+/// ASSUMES: The SkgNode at that tree node is accurate.
+/// ASSUMES: The input is indefinitive.
 ///
 /// METHOD: Given an indefinitive node N:
-/// - Set orgnode's title to the canonical title from the SkgNode
-/// - Set orgnode's source (a field of its metadata)
-/// - Set orgnode's body to None
-///
-/// Note: Children are unaffected by this function,
-/// and will be recursed into separately by the caller.
+/// - Reset title.
+/// - Reset source.
+/// - Set body to None.
 pub fn clobberIndefinitiveOrgnode (
   tree   : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  { // Update title, source, and clear body using the SkgNode
+  { // Update title, source. Clear body. Get data from the SkgNode.
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
@@ -399,15 +398,17 @@ pub async fn ensure_source (
       Some ( source ); }
   Ok (( )) }
 
-/// If the node: - subscribes to something
-///              - is definitive
-///              - doesn't have a SubscribeeCol child
-/// then prepend a SubscribeeCol child, containing:
-/// - HiddenOutsideOfSubscribeeCol (if any hidden nodes are outside subscribee content)
-/// - an indefinitive Subscribee child for each subscribee
+/// If the node:
+///   - subscribes to something
+///   - is definitive
+///   - doesn't have a SubscribeeCol child
+/// then prepend a SubscribeeCol child containing:
+///   - for each subscribee, an indefinitive Subscribee child
+///   - if any hidden nodes are outside subscribee content,
+///     a HiddenOutsideOfSubscribeeCol
 pub async fn maybe_add_subscribee_col (
   tree    : &mut PairTree,
-  node_id : NodeId,
+  node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -449,43 +450,48 @@ pub async fn maybe_add_subscribee_col (
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId = { // the subscribee collector
-    let subscribee_col_orgnode : OrgNode = {
+    let subscribee_col_orgnode : OrgNode = { // build it
       let mut md = default_metadata ();
       md . code . interp = Interp::SubscribeeCol;
       OrgNode {
         metadata : md,
         title : "it subscribes to these" . to_string (),
         body : None, } };
-    let mut node_mut : NodeMut < NodePair > = (
-      tree . get_mut ( node_id )
-        . ok_or ( "maybe_add_subscribee_col: node not found" )) ?;
-    node_mut . prepend ( (None, subscribee_col_orgnode) ) . id () };
+    { // prepend it among the branches
+      let mut node_mut : NodeMut < NodePair > = (
+        tree . get_mut ( node_id )
+          . ok_or ( "maybe_add_subscribee_col: node not found" )) ?;
+      node_mut . prepend (
+        (None, subscribee_col_orgnode) ) . id () }};
 
   if ! hidden_outside_content . is_empty () {
     // the HiddenOutsideOfSubscribeeCol
     let hidden_outside_col_nid : NodeId = {
-      let hidden_outside_col_orgnode : OrgNode = {
+      let hidden_outside_col_orgnode : OrgNode = { // build it
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenOutsideOfSubscribeeCol;
         OrgNode {
           metadata : md,
           title : "hidden from all subscriptions" . to_string (),
           body : None, }};
-      let mut col_mut : NodeMut < NodePair > =
-        tree . get_mut ( subscribee_col_nid ) . ok_or (
-          "maybe_add_subscribee_col: SubscribeeCol not found" )?;
-      col_mut . append ((None, hidden_outside_col_orgnode)) . id () };
-    { // its children: HiddenFromSubscribees nodes
+      { // append it
+        let mut col_mut : NodeMut < NodePair > =
+          tree . get_mut ( subscribee_col_nid ) . ok_or (
+            "maybe_add_subscribee_col: SubscribeeCol not found" )?;
+        col_mut . append ((None, hidden_outside_col_orgnode))
+          . id () }};
+    { // its children, HiddenFromSubscribees (although since no subscribee contains them, they are not actually hidden anywhere)
       for hidden_id in hidden_outside_content {
         let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
           skgnode_and_orgnode_from_id (
             config, driver, & hidden_id ) . await ?;
-        orgnode . metadata . code . interp = Interp::HiddenFromSubscribees;
+        orgnode . metadata . code . interp =
+          Interp::HiddenFromSubscribees;
         orgnode . metadata . code . indefinitive = true;
         orgnode . body = None;
         let mut hidden_col_mut : NodeMut < NodePair > =
-          tree . get_mut ( hidden_outside_col_nid ) . ok_or (
-            "maybe_add_subscribee_col: HiddenOutsideOfSubscribeeCol not found" ) ?;
+          tree . get_mut ( hidden_outside_col_nid )
+          . ok_or ( "maybe_add_subscribee_col: HiddenOutsideOfSubscribeeCol not found" ) ?;
         hidden_col_mut . append (( Some ( skgnode ), orgnode )); }} }
   { // The subscribees. These are indefinitive leaves (trivial 'branches'). They can be expanded by requesting definitive expansion, the same way one would do for ordinary content.
     let mut col_mut : NodeMut < NodePair > =

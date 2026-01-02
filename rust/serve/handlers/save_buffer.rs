@@ -154,7 +154,7 @@ pub async fn update_from_and_rerender_buffer (
   let mut paired_forest : PairTree =
     pair_orgnode_forest_with_save_instructions (
       // Definitive nodes get Some(skgnode), indefinitive get None.
-      &orgnode_forest,
+      & orgnode_forest,
       & save_instructions );
   { // modify the paired forest before re-rendering it
     let (mut visited, view_requests) =

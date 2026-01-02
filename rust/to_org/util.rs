@@ -1,7 +1,7 @@
 use crate::media::file_io::read_skgnode;
 use crate::media::tree::collect_generation_ids;
 use crate::media::typedb::util::pid_and_source_from_id;
-use crate::to_org::complete::contents::maybe_add_subscribee_col;
+use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest};
 use crate::types::trees::{NodePair, PairTree};
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
@@ -114,14 +114,16 @@ pub fn orgnode_from_title_and_rel (
   md . code . interp = rel;
   OrgNode { metadata: md, title, body: None }}
 
-/// Mark a node as indefinitive and clear its body.
-pub fn rewrite_to_indefinitive (
+/// Set 'indefinitive' to true,
+/// reset title and source,
+/// and set body to None.
+pub fn makeIndefinitiveAndClobber (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   let mut node_mut : NodeMut < NodePair > =
     tree . get_mut ( node_id )
-    . ok_or ( "rewrite_to_indefinitive: node not found" ) ?;
+    . ok_or ( "makeIndefinitiveAndClobber: node not found" ) ?;
   node_mut . value () . 1 . metadata . code . indefinitive = true;
   node_mut . value () . 1 . body = None;
   Ok (( )) }
@@ -172,7 +174,7 @@ pub fn mark_if_visited_or_repeat_or_cycle (
       . ok_or ( "mark_if_visited_or_repeat_or_cycle: node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
   if is_indefinitive {
-    rewrite_to_indefinitive ( tree, node_id ) ?;
+    clobberIndefinitiveOrgnode ( tree, node_id ) ?;
   } else {
     visited . insert ( pid, node_id ); }
   Ok (( )) }

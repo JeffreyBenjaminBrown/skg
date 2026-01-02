@@ -1,3 +1,29 @@
+* Is this redundant?
+** as of this commit
+   dce37c085b5457953fa076dd2500a05e8635c87b
+** this passage
+   mark_if_visited_or_repeat_or_cycle (
+     tree, node_id, visited ) ?;
+   { if is_indefinitive ( tree, node_id ) ? {
+       clobberIndefinitiveOrgnode (
+** in this function
+   completeAndRestoreNode_collectingViewRequests
+** seems problematic
+   because we're rewriting the node as indefinitive twice.
+** solution
+   Don't call makeIndefinitiveAndClobber in
+     mark_if_visited_or_repeat_or_cycle.
+   Instead do it only in clobberIndefinitiveOrgnode.
+   And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
+   instead of essentially restating its definition.
+* what if 'ensure_skgnode' is omitted?
+** omitted from completeAndRestoreNode_collectingViewRequests
+** elaboration
+   It seems like an absent skgnode where ensure_skgnode is called
+   might be an unreachable state.
+* On what Interps can 'completeDefinitiveOrgnode' be validly called?
+  The comment says only Content nodes.
+  If that's right (I think so) the name should reflect it.
 * simple refactors
 ** make NodePair a type, not an alias
    Currently, pub type NodePair = (Option<SkgNode>, OrgNode).
@@ -5,7 +31,7 @@
      'mskgnode' ('m' for 'maybe') and 'orgnode'.
 ** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
   if is_indefinitive {
-    rewrite_to_indefinitive ( tree, node_id ) ?;
+    makeIndefinitiveAndClobber ( tree, node_id ) ?;
   } else { // here, it might already be in visited, which would be bad
     visited . insert ( pid, node_id ); }
 * What does the SkgNode in a PairTree represent?
