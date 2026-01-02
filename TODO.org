@@ -1,3 +1,16 @@
+* simple refactors
+** make NodePair a type, not an alias
+   Currently, pub type NodePair = (Option<SkgNode>, OrgNode).
+   It would be better to use explicit field names
+     'mskgnode' ('m' for 'maybe') and 'orgnode'.
+** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
+  if is_indefinitive {
+    rewrite_to_indefinitive ( tree, node_id ) ?;
+  } else { // here, it might already be in visited, which would be bad
+    visited . insert ( pid, node_id ); }
+* What does the SkgNode in a PairTree represent?
+  If it's written by ensure_skgnode, it's from disk.
+  But sometimes it's generated from the org tree.
 * In saveinstructions_from_tree, recurse into subscribees
 ** change this passage in saveinstructions_from_tree
    if matches!(interp, Interp::AliasCol                     |

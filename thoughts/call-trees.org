@@ -16,7 +16,7 @@
        25 LOC
 **** TODO complete_branch_minus_content
      12 LOC
-***** mark_visited_or_repeat_or_cycle
+***** mark_if_visited_or_repeat_or_cycle
       23 LOC
 ****** get_pid_in_pairtree
        10 LOC
@@ -245,7 +245,7 @@
 ****** DUP path_from_pid_and_source
 ****** read_skgnode
        25 LOC
-**** DUP mark_visited_or_repeat_or_cycle
+**** DUP mark_if_visited_or_repeat_or_cycle
 **** clobberIndefinitiveOrgnode
      17 LOC
      set title, source, body=None

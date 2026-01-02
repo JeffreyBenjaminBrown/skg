@@ -3,7 +3,7 @@
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
   get_pid_in_pairtree, is_indefinitive, collect_child_ids,
-  mark_visited_or_repeat_or_cycle };
+  mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::media::file_io::skgnode_and_source_from_id;
 use crate::media::typedb::util::pid_and_source_from_id;
@@ -26,7 +26,7 @@ use typedb_driver::TypeDBDriver;
 /// TRIVIAL: Just a wrapper for
 ///   'completeAndRestoreNode_collectingViewRequests',
 /// which it calls on each "tree root" (child of the ForestRoot),
-///   threading 'visited' through the forest.
+/// threading 'visited' through the forest.
 pub async fn completeAndRestoreForest_collectingViewRequests (
   forest        : &mut PairTree,
   config        : &SkgConfig,
@@ -47,17 +47,19 @@ pub async fn completeAndRestoreForest_collectingViewRequests (
   Ok (( visited, view_requests )) }
 
 /// Completes a node, and then its children ('preorder DFS traversal').
-/// - For AliasCol nodes, delegate to 'completeAliasCol'
-///   (which handles the whole subtree)
-/// - For other nodes, these happen (in order):
+/// - For most nodes, these happen (in order):
 ///   - Futz with the node itself
-///     - Check for repetition via 'mark_visited_or_repeat_or_cycle'
+///     - Check for repetition via 'mark_if_visited_or_repeat_or_cycle'
 ///       (if repeated, modify body and metadata, update 'visited')
 ///   - Futz with its descendents
 ///     - If definitive, call completeDefinitiveOrgnode.
 ///       Else, call clobberIndefinitiveOrgnode.
 ///     - Recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
 ///     - Collect all view requests for later processing.
+/// - For AliasCol nodes, this delegates to 'completeAliasCol'.
+///   It handles the whole subtree, so don't recurse into children.
+/// - For *Col Interps that don't generate instructions themselves,
+///   merely recurse into children, otherwise ignoring.
 fn completeAndRestoreNode_collectingViewRequests<'a> (
   tree                 : &'a mut PairTree,
   node_id              : NodeId,
@@ -80,15 +82,14 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
     } else if treatment == Interp::SubscribeeCol
            || treatment == Interp::HiddenOutsideOfSubscribeeCol
            || treatment == Interp::HiddenInSubscribeeCol {
-      // Recurse into children to collect view requests (e.g. from Subscribee nodes)
-      // but don't try to complete the SubscribeeCol node itself.
+      // Recurse into children to collect view requests (e.g. from Subscribee nodes) but don't try to complete the SubscribeeCol node itself.
       map_completeAndRestoreNodeCollectingViewRequests_over_children (
         tree, node_id, config, typedb_driver,
         visited, view_requests ) . await ?;
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
-      mark_visited_or_repeat_or_cycle (
+      mark_if_visited_or_repeat_or_cycle (
         tree, node_id, visited ) ?;
       { if is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
@@ -124,7 +125,7 @@ fn collect_view_requests (
 ///
 /// ASSUMES: Node has been normalized so its 'id' field is the PID
 /// ASSUMES: ensure_skgnode has already been called
-/// ASSUMES: mark_visited_or_repeat_or_cycle has already been called
+/// ASSUMES: mark_if_visited_or_repeat_or_cycle has already been called
 /// ASSUMES: The input is indefinitive
 ///
 /// METHOD: Given an indefinitive node N:
@@ -158,7 +159,7 @@ pub fn clobberIndefinitiveOrgnode (
 ///
 /// ASSUMES: Node has been normalized so its "id" field is the PID
 /// ASSUMES: the PairTree has a SkgNode here (via "ensure_skgnode")
-/// ASSUMES: 'mark_visited_or_repeat_or_cycle' was already called
+/// ASSUMES: 'mark_if_visited_or_repeat_or_cycle' was already called
 /// ASSUMES: Input is definitive
 ///
 /// METHOD: Given a node N:

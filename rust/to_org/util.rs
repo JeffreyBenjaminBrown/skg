@@ -140,18 +140,20 @@ pub async fn complete_branch_minus_content (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  mark_visited_or_repeat_or_cycle (
+  mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
   maybe_add_subscribee_col (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 
 /// Handles repetitions, cycles, and the VisitedMap.
+/// Contains no surprising of complex logic.
 /// - Check for cycle and mark viewData.cycle accordingly.
 /// - If node is a repeat (already in visited), mark it indefinitive.
 /// - If node is indefinitive, rewrite it (clear body, etc.).
+///   (repeat should imply indefinitive. The reverse need not hold.)
 /// - If node is definitive, add it to visited.
-pub fn mark_visited_or_repeat_or_cycle (
+pub fn mark_if_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
@@ -162,12 +164,12 @@ pub fn mark_visited_or_repeat_or_cycle (
     // Mark as indefinitive (it's a repeat).
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
-      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+      . ok_or ( "mark_if_visited_or_repeat_or_cycle: node not found" ) ?;
     node_mut . value () . 1 . metadata . code . indefinitive = true; }
   let is_indefinitive : bool = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
-      . ok_or ( "mark_visited_or_repeat_or_cycle: node not found" ) ?;
+      . ok_or ( "mark_if_visited_or_repeat_or_cycle: node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
   if is_indefinitive {
     rewrite_to_indefinitive ( tree, node_id ) ?;

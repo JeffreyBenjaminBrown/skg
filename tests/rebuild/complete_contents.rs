@@ -7,7 +7,7 @@ use ego_tree::{Tree, NodeId};
 use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
-use skg::to_org::util::{VisitedMap, mark_visited_or_repeat_or_cycle};
+use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
 use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::trees::PairTree;
 use skg::types::{ID, OrgNode, SkgConfig};
@@ -16,7 +16,7 @@ use skg::types::{ID, OrgNode, SkgConfig};
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
   forest . root () . first_child () . unwrap () . id () }
 
-/// Helper to call ensure_skgnode, mark_visited_or_repeat_or_cycle,
+/// Helper to call ensure_skgnode, mark_if_visited_or_repeat_or_cycle,
 /// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
 /// (matches the pattern used in completeAndRestoreNode_collectingViewRequests).
 /// TODO: Unify with completeAndRestoreNode_collectingViewRequests.
@@ -29,10 +29,10 @@ async fn check_and_complete (
 ) -> Result < (), Box<dyn Error> > {
   ensure_skgnode (
     tree, node_id, config, driver ) . await ?;
-  mark_visited_or_repeat_or_cycle (
+  mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
   let is_indefinitive : bool = {
-    // 'mark_visited_or_repeat_or_cycle' may have changed this value.
+    // 'mark_if_visited_or_repeat_or_cycle' may have changed this value.
     let node_ref = tree . get ( node_id )
       . ok_or ( "Node not found" ) ?;
     node_ref . value () . 1 . metadata . code . indefinitive };
