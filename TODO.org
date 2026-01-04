@@ -1,3 +1,9 @@
+* TODO BLOCKER : maybe_add_subscribee_col needs a lot of work
+  It's so complex I can't see past it.
+** Subdivide it.
+** maybe_add_subscribee_col should integrate existing SubscribeeCol
+   if it exists, rather than assuming it is correct
+** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribee_col?
 * Is this redundant?
 ** as of this commit
    dce37c085b5457953fa076dd2500a05e8635c87b
@@ -16,6 +22,13 @@
    Instead do it only in clobberIndefinitiveOrgnode.
    And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
    instead of essentially restating its definition.
+* completeAndRestoreNode_collectingViewRequests must handle Subscribees
+* After 'collect_view_requests', is there any reason to keep the view requests in the node?
+  The function pushes the node's requests onto 'view_requests_out'.
+  If they should be deleted from the node thereafter,
+  the function should be renamed something like 'transfer_requests'.
+* break up completeDefinitiveOrgnode
+  it's super-long
 * what if 'ensure_skgnode' is omitted?
 ** omitted from completeAndRestoreNode_collectingViewRequests
 ** elaboration

@@ -1,4 +1,6 @@
-# Does it use plaintext? Is it interoperable with Emacs org-mode?
+# Plaintext And Interoperability
+
+## Does it use plaintext? Is it interoperable with Emacs org-mode?
 
 Yes and yes.
 
@@ -13,7 +15,7 @@ provides the side-benefit of making diffs much easier to understand (described i
 
 In Skg every node in a tree has an ID, whereas in org-mode, a node generally only has an ID if it is a top-level file node or if it is linked to from somewhere. Therefore, naively translating an org-file into skg and then back into org-mode will make it bigger. But don't worry! It will not be hard to strip extraneous IDs from the org data.
 
-# The `contains` relationship and nesting org-mode headlines
+## The `contains` relationship and nesting org-mode headlines
 
 The Skg containment relationship is identical to the org-mode relationship from a headline to one of its subheadlines. (I might rename it "shows" or "presents" or something, to make clear that it is the relationship that defines a "document" or a "view".)
 

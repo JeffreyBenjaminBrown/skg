@@ -1,3 +1,5 @@
+# Recursive Privacy Embarrassment Example
+
 For instance, you might have a note on "motivation", with safely publishable sections about hope, commitment, confidence, realism, etc. And you might want to give it a private branch called "embarrassing ambitions", with branches like "Speak on behalf of the trees" or "Immortality through identity loss".
 
 Skg will let you make "embarrassing ambitions" a private branch of your public "motivation" document. Nobody else will see your private branch, but to you it will appear alongside your other thoughts on motivation.

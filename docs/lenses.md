@@ -1,8 +1,10 @@
-# "Lenses": Subscription and overriding in detail
+# Lenses
+
+## "Lenses": Subscription and overriding in detail
 
 TODO: These examples are goofy. I intend to use more plausible ones.
 
-## An example
+### An example
 Suppose this document, `mysticism`, is yours:
 ```
   * mysticism
@@ -68,5 +70,5 @@ Since [branches can be folded](tree-folding-is-powerful.md), even if Egg Man has
 
 You can of course unsubscribe from Egg Man's changes to that branch if you want, or even unsubscribe from Egg Man's writings entirely.
 
-# Conlcusion
+## Conlcusion
 You and Egg Man can thus focus on exactly what you care about. Your "changes" to Egg Man's data don't have to affect Egg Man's experience at all. However, if you make public the fact that you integrated Egg Man's note into yours, and Egg Man has chosen to see such information, then an indicator in Egg Man's view of `eggs` will show that his `mystical` branch is part of a document owned by you. If Egg Man is curious, he can follow that indicator to discover your `mysticism` document.

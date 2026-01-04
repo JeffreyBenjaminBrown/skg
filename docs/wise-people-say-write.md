@@ -1,10 +1,12 @@
+# Wise People Say Write
+
 Knowledge mapping is [easier than traditional writing](it-will-be-fun.md), but it is, at root, writing.
 
-# Why writing matters
+## Why writing matters
 
 A remarkable number of people have said that writing improves thinking, memory, self-awareness, comprehension of others, and even raw perception.
 
-# Who says?
+## Who says?
 
 - Anne Frank
 - Anne Lamott

@@ -25,4 +25,4 @@ First start the TypeDB server
 In a separate shell, run `cargo run`.
 This starts the Rust server.
 
-Now you can use the [Emacs client](../elisp/client.el).
+Now you can use the [Emacs client](../elisp/skg-client.el).
