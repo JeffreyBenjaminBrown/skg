@@ -1,11 +1,10 @@
-use crate::dbs::filesystem::read_skgnode;
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::tree::collect_generation_ids;
 use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
-use crate::util::path_from_pid_and_source;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use ego_tree::iter::Edge;
@@ -86,11 +85,8 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
   pid    : &ID,
   source : &str,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
-  let path : String =
-    path_from_pid_and_source (
-      config, source, pid.clone() );
-  let mut skgnode : SkgNode = read_skgnode ( path ) ?;
-  skgnode.source = source.to_string();
+  let skgnode : SkgNode =
+    skgnode_from_pid_and_source( config, pid.clone(), source )?;
   let orgnode : OrgNode = OrgNode {
     metadata : { let mut md = default_metadata ();
                  md . id = Some ( pid . clone () );

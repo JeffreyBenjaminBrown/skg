@@ -10,8 +10,9 @@
 
 pub mod one_node;
 pub use one_node::{
-    skgnode_and_source_from_id,
-    skgnode_and_source_from_id_optional,
+    skgnode_from_id,
+    optskgnode_from_id,
+    skgnode_from_pid_and_source,
     fetch_aliases_from_file,
     read_skgnode,
     write_skgnode, };

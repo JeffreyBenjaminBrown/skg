@@ -5,7 +5,7 @@ use crate::to_org::util::{
   get_pid_in_pairtree, is_indefinitive, collect_child_treeids,
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::dbs::filesystem::skgnode_and_source_from_id;
+use crate::dbs::filesystem::skgnode_from_id;
 use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::dbs::typedb::search::{
   partition_subscribee_content_for_subscriber,
@@ -356,8 +356,8 @@ pub async fn ensure_skgnode (
       . ok_or ( "ensure_skgnode: node not found" ) ?;
     node_ref . value () . mskgnode . is_some () };
   if ! has_skgnode {
-    let (skgnode, _source) =
-      skgnode_and_source_from_id (
+    let skgnode : SkgNode =
+      skgnode_from_id (
         config, driver, &node_pid ) . await ?;
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )

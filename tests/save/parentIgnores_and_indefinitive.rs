@@ -1,6 +1,6 @@
 // cargo test --test save parentIgnores_and_indefinitive
 
-use skg::dbs::filesystem::one_node::skgnode_and_source_from_id;
+use skg::dbs::filesystem::one_node::skgnode_from_id;
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::save::fs::update_fs_from_saveinstructions;
 use skg::save::typedb::update_typedb_from_saveinstructions;
@@ -58,18 +58,19 @@ fn test_parentignores_and_indefinitive(
           config.clone(), )?;
 
         { // verify indefinitive is treated correctly
-          let (node2, _source): (SkgNode, _) =
-          skgnode_and_source_from_id(
-            config, driver, &ID("2".to_string() ))
-          .await?;
+          let node2 : SkgNode =
+            skgnode_from_id(
+              config, driver, &ID("2".to_string() ))
+            .await?;
         assert_eq!(
           node2.contains,
           Some(vec![ ID("3".to_string()) ]),
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 
         { // verify parentIgnores is treated correctly
-          let (node1, _source): (SkgNode, _) =
-          skgnode_and_source_from_id(config, driver, &ID("1".to_string()))
+          let node1 : SkgNode =
+            skgnode_from_id(
+              config, driver, &ID("1".to_string() ))
             .await?;
         assert_eq!(
           node1.contains,

@@ -28,7 +28,7 @@ pub fn initialize_dbs (
 
   println!("Reading .skg files from all sources...");
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&config.sources)
+    read_all_skg_files_from_sources(config)
     . unwrap_or_else(|e| {
       eprintln!("Failed to read .skg files: {}", e);
       std::process::exit(1); });

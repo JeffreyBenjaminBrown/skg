@@ -125,7 +125,8 @@ pub async fn populate_test_db_from_fixtures (
       path: PathBuf::from(data_folder),
       user_owns_it: true, } );
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&sources)?;
+    read_all_skg_files_from_sources(
+      &SkgConfig::dummyFromSources( sources ))?;
   overwrite_new_empty_db (
     db_name, driver ). await ?;
   define_schema (

@@ -50,8 +50,7 @@ async fn setup_test(
     DriverOptions::new(false, None)?,
   ).await?;
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(
-      &config.sources)?;
+    read_all_skg_files_from_sources(&config)?;
   overwrite_new_empty_db(db_name, &driver).await?;
   define_schema(db_name, &driver).await?;
   create_all_nodes(db_name, &driver, &nodes).await?;

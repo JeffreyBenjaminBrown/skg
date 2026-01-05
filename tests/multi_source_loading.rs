@@ -6,9 +6,13 @@ use tempfile::tempdir;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_skgnode;
-use skg::types::misc::SkgfileSource;
+use skg::types::misc::{SkgfileSource, SkgConfig, ID};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
-use skg::types::misc::ID;
+
+/// Helper to create a minimal SkgConfig for tests.
+fn test_config(sources: HashMap<String, SkgfileSource>
+) -> SkgConfig {
+  SkgConfig::dummyFromSources(sources) }
 
 #[test]
 fn test_load_from_single_source() {
@@ -32,7 +36,8 @@ fn test_load_from_single_source() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(
+    &test_config(sources));
   assert!(result.is_ok(), "Should successfully load from single source");
 
   let nodes = result.unwrap();
@@ -86,7 +91,8 @@ fn test_load_from_multiple_sources() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(
+    &test_config(sources));
   assert!(result.is_ok(), "Should successfully load from multiple sources");
 
   let nodes = result.unwrap();
@@ -143,7 +149,8 @@ fn test_duplicate_id_detection_across_sources() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(
+    &test_config(sources));
   assert!(result.is_err(), "Should fail due to duplicate ID");
 
   let err = result.unwrap_err();
@@ -193,7 +200,8 @@ fn test_node_with_multiple_ids_duplicate_detection() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(
+    &test_config(sources));
   assert!(result.is_err(), "Should fail due to overlapping ID");
 
   let err = result.unwrap_err();
@@ -217,7 +225,7 @@ fn test_load_from_empty_sources() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(&test_config(sources));
   assert!(result.is_ok(), "Should successfully handle empty source");
 
   let nodes = result.unwrap();
@@ -262,7 +270,7 @@ fn test_source_field_set_correctly() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(&test_config(sources));
   assert!(result.is_ok());
 
   let nodes = result.unwrap();
@@ -321,7 +329,7 @@ fn test_many_duplicate_ids_creates_org_file() {
     }
   );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(&test_config(sources));
   assert!(result.is_err(), "Should fail due to duplicate IDs");
 
   let err = result.unwrap_err();
@@ -391,7 +399,7 @@ fn test_unreadable_files_creates_org_file() {
       path: source_bad.clone(),
       user_owns_it: true, } );
 
-  let result = read_all_skg_files_from_sources(&sources);
+  let result = read_all_skg_files_from_sources(&test_config(sources));
   assert!(result.is_err(), "Should fail due to unreadable source");
 
   let err = result.unwrap_err();

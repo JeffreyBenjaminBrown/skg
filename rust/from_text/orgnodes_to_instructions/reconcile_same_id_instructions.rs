@@ -24,7 +24,7 @@ So this module only handles the simple case: supplement one instruction with dis
 
 use crate::types::{
   ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig, BufferValidationError, SourceNickname};
-use crate::dbs::filesystem::skgnode_and_source_from_id_optional;
+use crate::dbs::filesystem::optskgnode_from_id;
 use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -112,22 +112,16 @@ pub async fn reconcile_same_id_instructions_for_one_id(
       definer.0.ids.first()
       . ok_or("No primary ID found")?.clone();
     let source : String = definer.0.source.clone();
-    let disk_read_result: Option<(SkgNode, SourceNickname)> =
-      skgnode_and_source_from_id_optional(
+    let from_disk: Option<SkgNode> =
+      optskgnode_from_id(
         config, driver, &pid).await?;
-    let from_disk: Option<SkgNode> = {
-      match disk_read_result
-      { Some(tuple) =>
-        { let (disk_node, disk_source)
-          : (SkgNode, SourceNickname) = tuple;
-          if source != disk_source.as_str() {
-            return Err(Box::new( // sources don't match
-              BufferValidationError::DiskSourceBufferSourceConflict(
-                pid.clone(),
-                disk_source,
-                SourceNickname::from(source.clone() )) )); }
-          Some(disk_node) }
-        None => None }};
+    if let Some(ref disk_node) = from_disk {
+      if source != disk_node.source { // sources don't match
+        return Err(Box::new(
+          BufferValidationError::DiskSourceBufferSourceConflict(
+            pid.clone(),
+            SourceNickname::from( disk_node.source.clone() ),
+            SourceNickname::from( source.clone() )) )); }}
 
     let supplemented_node: SkgNode = SkgNode {
       title         : definer.0.title.clone(),

@@ -13,7 +13,7 @@ use std::fs::{self, DirEntry, ReadDir};
 /// Detects duplicate IDs across sources and collects all errors.
 /// If errors are found, writes detailed error reports to org files.
 pub fn read_all_skg_files_from_sources (
-  sources: &HashMap<String, SkgfileSource>
+  config: &SkgConfig
 ) -> io::Result<Vec<SkgNode>> {
   let mut all_nodes: Vec<SkgNode> = Vec::new();
   let mut seen_ids: HashMap < String,       // ID
@@ -25,21 +25,10 @@ pub fn read_all_skg_files_from_sources (
                             String)> // error message
     = Vec::new();
 
-  for (nickname, source) in sources.iter() {
-    // Load from all sources, collecting any errors
-    let path_str: &str = match source.path.to_str() {
-      Some(s) => s,
-      None => {
-        load_errors.push((
-          nickname.clone(),
-          source.path.display().to_string(),
-          "Invalid UTF-8 in source path".to_string() ));
-        continue; }};
-
-    match read_skg_files_from_folder (path_str) {
+  for (nickname, source) in config.sources.iter() {
+    match read_skg_files_from_folder (nickname, config) {
       Ok(mut nodes) => {
-        for node in &mut nodes {
-          node.source = nickname.clone();
+        for node in &nodes {
           for id in &node.ids {
             // Track which sources contain each ID
             let id_str: String = id.as_str().to_string();
@@ -50,7 +39,7 @@ pub fn read_all_skg_files_from_sources (
       Err(e) => {
         load_errors.push((
           nickname.clone(),
-          path_str.to_string(),
+          source.path.display().to_string(),
           e.to_string()
         )); }} }
 
@@ -89,15 +78,18 @@ pub fn read_all_skg_files_from_sources (
       err_parts.join("; ") )); }
   Ok(all_nodes) }
 
-fn read_skg_files_from_folder
-  <P : AsRef<Path> > (
-    dir_path : P )
-  -> io::Result < Vec<SkgNode> >
-{ // Reads all relevant files from a single directory path.
-
+fn read_skg_files_from_folder (
+  source_nickname : &str,
+  config          : &SkgConfig,
+) -> io::Result < Vec<SkgNode> > {
+  let source : &SkgfileSource =
+    config.sources.get(source_nickname)
+    .ok_or_else(|| io::Error::new(
+      io::ErrorKind::NotFound,
+      format!("Source '{}' not found in config", source_nickname)))?;
   let mut nodes : Vec<SkgNode> = Vec::new ();
   let entries : ReadDir = // an iterator
-    fs::read_dir (dir_path) ?;
+    fs::read_dir (&source.path) ?;
   for entry in entries {
     let entry : DirEntry = entry ?;
     let path : PathBuf = entry.path () ;
@@ -106,9 +98,8 @@ fn read_skg_files_from_folder
            false,                  // None => no extension found
            |ext| ext == "skg") ) { // Some
       let mut skgnode: SkgNode =
-        // Placeholder - caller always overwrites with actual source
         read_skgnode (&path) ?;
-      skgnode.source = String::new();
+      skgnode.source = source_nickname.to_string();
       nodes.push (skgnode); }}
   Ok (nodes) }
 

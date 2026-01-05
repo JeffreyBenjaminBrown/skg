@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::skgnode_and_source_from_id;
+use crate::dbs::filesystem::skgnode_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -94,8 +94,8 @@ async fn ancestor_skgnode_from_disk (
     . ok_or_else(
       || -> Box<dyn Error> {
         "Ancestor node has no ID" . into () })?;
-  let (skgnode, _) : (SkgNode, _) =
-    skgnode_and_source_from_id(
+  let skgnode : SkgNode =
+    skgnode_from_id(
       config, driver, &ancestor_skgid ) . await?;
   Ok ( skgnode ) }
 

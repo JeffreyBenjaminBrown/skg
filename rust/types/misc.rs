@@ -152,6 +152,19 @@ impl From <&str> for SourceNickname {
     SourceNickname ( s.to_string () ) }}
 
 impl SkgConfig {
+  /// Creates a SkgConfig with dummy values for everything except sources.
+  /// Useful for tests that only need to read .skg files.
+  pub fn dummyFromSources (
+    sources : HashMap<String, SkgfileSource>
+  ) -> Self {
+    SkgConfig {
+      db_name            : "unused".to_string(),
+      tantivy_folder     : PathBuf::from("/tmp/unused"),
+      sources,
+      port               : 0,
+      delete_on_quit     : false,
+      initial_node_limit : 100, }}
+
   pub fn get_source (
     &self,
     nickname : &str

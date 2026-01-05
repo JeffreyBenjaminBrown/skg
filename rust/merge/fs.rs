@@ -33,7 +33,8 @@ pub(super) fn merge_nodes_in_fs (
         path_from_pid_and_source (&config,
                        &updated_acquirer.source,
                        updated_acquirer.ids[0].clone() );
-      write_skgnode(updated_acquirer, &acquirer_path)?; }
+      write_skgnode(
+        updated_acquirer, &acquirer_path)?; }
     { // Delete acquiree from disk
       let acquiree_path : String =
         path_from_pid_and_source (&config,

@@ -33,7 +33,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
-      read_all_skg_files_from_sources (&config.sources)?;
+      read_all_skg_files_from_sources (&config)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
     create_all_nodes(&config.db_name, &driver, &nodes).await?;
@@ -132,7 +132,7 @@ fn test_foreign_node_modification_errors(
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
-      read_all_skg_files_from_sources (&config.sources)?;
+      read_all_skg_files_from_sources (&config)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
     create_all_nodes(&config.db_name, &driver, &nodes).await?;
@@ -295,7 +295,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
-      read_all_skg_files_from_sources (&config.sources)?;
+      read_all_skg_files_from_sources (&config)?;
     overwrite_new_empty_db(&config.db_name, &driver).await?;
     define_schema(&config.db_name, &driver).await?;
     create_all_nodes(&config.db_name, &driver, &nodes).await?;

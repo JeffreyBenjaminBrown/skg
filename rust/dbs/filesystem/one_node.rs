@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -9,67 +9,67 @@ use std::fs;
 use serde_yaml;
 use typedb_driver::TypeDBDriver;
 
-pub async fn skgnode_and_source_from_id (
+pub async fn skgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skgid : &ID
-) -> Result<(SkgNode, SourceNickname), Box<dyn Error>> {
-
+  skgid  : &ID
+) -> Result<SkgNode, Box<dyn Error>> {
   let (pid, source) : (ID, String) =
     pid_and_source_from_id (
       & config.db_name, driver, skgid
-  ). await ?
+    ). await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", skgid ) ) ?;
-  let node_file_path : String =
-    path_from_pid_and_source (
-      config, &source, pid );
+  Ok ( skgnode_from_pid_and_source (
+    config, pid, &source )? ) }
+
+/// Reads a SkgNode from disk given its PID and source.
+pub fn skgnode_from_pid_and_source (
+  config : &SkgConfig,
+  pid    : ID,
+  source : &str,
+) -> io::Result<SkgNode> {
+  let path : String =
+    path_from_pid_and_source( config, source, pid );
   let mut skgnode : SkgNode =
-    read_skgnode (node_file_path) ?;
-  skgnode.source = source.clone();
-  Ok ((skgnode, SourceNickname::from(source))) }
+    read_skgnode( path )?;
+  skgnode.source = // needed because it's not serialized
+    source.to_string();
+  Ok ( skgnode ) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// Other errors are propagated.
-pub async fn skgnode_and_source_from_id_optional(
+pub async fn optskgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skgid : &ID
-) -> Result<Option<(SkgNode, SourceNickname)>, Box<dyn Error>> {
-  match skgnode_and_source_from_id(config, driver, skgid).await {
-    Ok((skgnode, source)) => Ok(Some((skgnode, source))),
-    Err(e)   => {
+  skgid  : &ID
+) -> Result<Option<SkgNode>, Box<dyn Error>> {
+  match skgnode_from_id(
+    config, driver, skgid
+  ). await {
+    Ok(skgnode) => Ok(Some(skgnode)),
+    Err(e)      => {
       let error_msg: String = e.to_string();
-      // Check if this is a "not found" error
       if error_msg.contains("not found")
         || error_msg.contains("No such file")
         || error_msg.contains("does not exist") {
-          Ok(None)
-        } else {
-          // Propagate other errors
-          Err(e) }} }}
+          // TODO : This is kludgey. Find a better way to test for this kind of error.
+          Ok (None) }
+      else { Err(e) }} }}
 
 /// If there's no such .skg file at path,
 /// returns the empty vector.
 pub async fn fetch_aliases_from_file (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skgid : ID,
+  skgid  : ID,
 ) -> Vec<String> {
-  match pid_and_source_from_id (
-    // Query TypeDB to get PID and source
-    &config.db_name, driver, &skgid
+  match optskgnode_from_id(
+    config, driver, &skgid
   ). await {
-    Ok ( Some (( pid, source )) ) => {
-      let file_path : String =
-        path_from_pid_and_source (
-          config, &source, pid );
-      match read_skgnode ( &Path::new ( &file_path )) {
-        Ok ( mut skgnode ) => {
-          skgnode.source = source;
-          skgnode.aliases.unwrap_or_default() },
-        Err ( _ )   => Vec::new(), }},
+    Ok ( Some ( skgnode )) =>
+      skgnode.aliases.unwrap_or_default(),
     _ => Vec::new(), }}
 
 pub fn read_skgnode
