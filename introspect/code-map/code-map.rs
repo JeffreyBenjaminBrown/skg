@@ -39,16 +39,8 @@ fn process_directory(dir: &Path, output: &mut String, level: usize, org_path: &s
         .filter_map(|e| e.ok())
         .collect();
 
-    // Sort: directories first, then files, alphabetically
-    entries.sort_by(|a, b| {
-        let a_is_dir = a.path().is_dir();
-        let b_is_dir = b.path().is_dir();
-        match (a_is_dir, b_is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.file_name().cmp(b.file_name()),
-        }
-    });
+    // Sort alphabetically (so typedb.rs appears next to typedb/)
+    entries.sort_by(|a, b| a.file_name().cmp(b.file_name()));
 
     let stars = "*".repeat(level);
 
