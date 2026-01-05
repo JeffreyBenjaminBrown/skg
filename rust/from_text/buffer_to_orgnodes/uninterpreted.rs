@@ -1,7 +1,7 @@
 /// DANGER: This was vibe-coded without much oversight.
 /// I *believe* the tests constrain its behavior sufficiently.
 
-use crate::media::sexp::find_sexp_end;
+use crate::types::sexp::find_sexp_end;
 use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
 use crate::types::orgnode::{default_metadata, forest_root_orgnode};
 use crate::types::{OrgNode, OrgnodeMetadata};

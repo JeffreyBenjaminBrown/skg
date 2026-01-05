@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::Field;
@@ -26,13 +25,6 @@ pub struct ID ( pub String );
 /// used in OrgNode metadata to track provenance.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SourceNickname ( pub String );
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextLink {
-  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
-  pub id: ID,
-  pub label: String,
-}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
@@ -158,45 +150,6 @@ impl From <&str> for ID {
 impl From <&str> for SourceNickname {
   fn from(s: &str) -> Self {
     SourceNickname ( s.to_string () ) }}
-
-impl TextLink {
-  pub fn new ( skg_id : impl Into<String>,
-               label  : impl Into<String>)
-             -> Self {
-    TextLink { id    : ID ( skg_id.into () ),
-               label : label.into (),
-    }} }
-
-impl fmt::Display for TextLink {
-  // Format: [[id:ID][LABEL]], where allcaps terms are variables.
-  // This is the same format org-roam uses.
-  fn fmt ( &self,
-            f : &mut fmt::Formatter <'_> )
-            -> fmt::Result {
-    write! ( f, "[[id:{}][{}]]", self.id, self.label ) }}
-
-impl FromStr for TextLink {
-  type Err = super::errors::TextLinkParseError;
-
-  fn from_str ( text: &str )
-                -> Result <Self, Self::Err> {
-    use super::errors::TextLinkParseError;
-    if ( !text.starts_with("[[id:") ||
-          !text.ends_with("]]") ) {
-      return Err(TextLinkParseError::InvalidFormat); }
-
-    let interior : &str = &text [5 .. text.len () - 2];
-
-    if let Some ( idx ) = interior.find ( "][" ) {
-      let skg_id : &str = &interior [0..idx];
-      let label  : &str = &interior [idx+2..];
-      Ok ( TextLink {
-        id    : ID ( skg_id.to_string () ),
-        label : label.to_string (),
-      } )
-    } else {
-      Err ( TextLinkParseError::MissingDivider )
-    } } }
 
 impl SkgConfig {
   pub fn get_source (

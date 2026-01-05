@@ -1,5 +1,5 @@
 use crate::types::{OrgNode, orgnodemd_to_string, Interp};
-use crate::types::trees::{NodePair, PairTree};
+use crate::types::tree::{NodePair, PairTree};
 
 use ego_tree::NodeRef;
 use std::error::Error;

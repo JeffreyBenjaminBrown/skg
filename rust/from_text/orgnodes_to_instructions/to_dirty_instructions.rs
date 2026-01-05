@@ -1,5 +1,5 @@
 use crate::types::{OrgNode, Interp, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
-use crate::types::trees::read_at_node_in_tree;
+use crate::types::tree::read_at_node_in_tree;
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 

@@ -104,6 +104,19 @@
       node_ref . value () . 1 . metadata . code . interp
         == Interp::Subscribee };
   ```
+** build, use the tree library
+*** refs
+    That library is currently at types/trees.
+    Which seems okay.
+    I had intended types to only be Skg types,
+    but that doesn't seem important.
+*** make something for is_ancestor_id to call
+    Should find the first ancestor to which a lambda holds,
+    and returns its ego_tree::NodeId.
+*** replace get_pid_in_pairtree with the generic read_in_tree function
+*** these should be generic
+    nodes_after_in_generation
+    collect_child_tree_ids
 ** ONGOING subscription branches
 *** PITFALL: Hiding is not ternary.
     SubscribeR node R Hides node H from *all* its subscriptions.

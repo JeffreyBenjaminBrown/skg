@@ -5,7 +5,7 @@ use skg::to_org::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_portions_of_pairforest_and_orgnodeforest, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::{ID, OrgNode, SkgConfig};
-use skg::types::trees::PairTree;
+use skg::types::tree::PairTree;
 
 use ego_tree::Tree;
 use std::collections::HashSet;

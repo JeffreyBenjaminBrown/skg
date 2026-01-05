@@ -10,12 +10,12 @@
 use crate::to_org::util::{
   get_pid_in_pairtree, skgnode_and_orgnode_from_id,
   remove_completed_view_request};
-use crate::media::typedb::search::{
+use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::trees::{PairTree, NodePair};
+use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;

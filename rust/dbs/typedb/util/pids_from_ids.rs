@@ -11,7 +11,7 @@ use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId};
 
 use crate::types::{OrgNode, ID};
-use crate::media::typedb::util::{
+use crate::dbs::typedb::util::{
   extract_id_from_node,
   extract_id_from_map,
   build_id_disjunction};

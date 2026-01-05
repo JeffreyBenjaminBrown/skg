@@ -1,6 +1,6 @@
 use crate::serve::util::send_response;
-use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::media::tantivy::search_index;
+use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::dbs::tantivy::search_index;
 use crate::types::orgnode::{OrgNode, Interp, default_metadata};
 use crate::types::misc::TantivyIndex;
 use crate::org_to_text::orgnode_to_text;

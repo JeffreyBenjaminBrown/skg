@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::StreamExt;
 
 use crate::types::ID;
-use crate::media::typedb::util::{
+use crate::dbs::typedb::util::{
   extract_id_from_node,
   extract_id_from_map,
   build_id_disjunction};

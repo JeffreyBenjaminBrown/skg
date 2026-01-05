@@ -1,6 +1,6 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 
-use crate::media::sexp::atom_to_string;
+use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, EditRequest, ViewRequest, default_metadata};
 

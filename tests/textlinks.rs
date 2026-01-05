@@ -1,6 +1,6 @@
 // Tests for rust/textlinks.rs
 
-use skg::media::textlinks::{
+use skg::types::textlinks::{
   textlinks_from_node,
   textlinks_from_text,
   replace_each_link_with_its_label,

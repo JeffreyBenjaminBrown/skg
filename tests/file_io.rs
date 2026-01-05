@@ -5,7 +5,7 @@ use indoc::indoc; // A macro, which acts like an unused import.
 use std::fs;
 use std::path::PathBuf;
 
-use skg::media::file_io::{
+use skg::dbs::filesystem::{
   read_skgnode, write_skgnode, fetch_aliases_from_file};
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 use skg::test_utils::run_with_test_db;

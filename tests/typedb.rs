@@ -15,9 +15,9 @@ use skg::from_text::org_to_uninterpreted_nodes;
 use skg::types::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
-use skg::media::typedb::nodes::create_only_nodes_with_no_ids_present;
-use skg::media::typedb::relationships::delete_out_links;
-use skg::media::typedb::util::{extract_payload_from_typedb_string_rep, pid_and_source_from_id};
+use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
+use skg::dbs::typedb::relationships::delete_out_links;
+use skg::dbs::typedb::util::{extract_payload_from_typedb_string_rep, pid_and_source_from_id};
 use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
 
 use futures::StreamExt;

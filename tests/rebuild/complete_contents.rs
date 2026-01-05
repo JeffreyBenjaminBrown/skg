@@ -9,7 +9,7 @@ use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
 use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
 use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
-use skg::types::trees::PairTree;
+use skg::types::tree::PairTree;
 use skg::types::{ID, OrgNode, SkgConfig};
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)

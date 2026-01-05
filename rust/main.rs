@@ -4,7 +4,7 @@ See the SkgConfig type at rust/types/misc.rs,
 or the example at data/skgconfig.toml.
 */
 
-use skg::file_io::load_config;
+use skg::filesystem::load_config;
 use skg::serve::serve;
 use skg::types::{ SkgConfig };
 

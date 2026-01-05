@@ -1,7 +1,7 @@
 use typedb_driver::answer::concept_document::{Node, Leaf};
 
 use crate::types::ID;
-use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 
 
 /// Extract ID from a TypeDB ConceptDocument Node.

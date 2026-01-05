@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::skgnode::SkgNode;
-use crate::media::typedb::util::pid_and_source_from_id;
+use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use std::io;

@@ -23,8 +23,8 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-use crate::media::typedb::util::build_id_disjunction;
-use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::dbs::typedb::util::build_id_disjunction;
+use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::ID;
 
 /// Searches containerward recursively until reaching the first node

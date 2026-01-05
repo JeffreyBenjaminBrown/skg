@@ -1,10 +1,10 @@
-use crate::media::file_io::one_node::read_skgnode;
-use crate::media::typedb::util::pid_and_source_from_id;
+use crate::dbs::filesystem::one_node::read_skgnode;
+use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp};
-use crate::types::trees::{NodePair, PairTree};
+use crate::types::tree::{NodePair, PairTree};
 use crate::util::path_from_pid_and_source;
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::HashSet;

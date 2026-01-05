@@ -5,7 +5,7 @@ use crate::types::misc::ID;
 use crate::types::orgnode::OrgNode;
 use crate::types::save::SaveInstruction;
 use crate::types::skgnode::SkgNode;
-use crate::types::trees::{PairTree, NodePair};
+use super::{PairTree, NodePair};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::HashMap;

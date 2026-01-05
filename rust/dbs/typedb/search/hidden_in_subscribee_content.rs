@@ -9,7 +9,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 use crate::types::ID;
-use crate::media::typedb::search::find_related_nodes;
+use crate::dbs::typedb::search::find_related_nodes;
 
 /// Partition E's direct content into visible and hidden portions,
 /// based on what R hides_from_its_subscriptions.

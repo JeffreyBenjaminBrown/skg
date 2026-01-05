@@ -1,15 +1,15 @@
 use crate::from_text::{headline_to_triple, HeadlineInfo};
 use crate::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use crate::media::tantivy::search_index;
-use crate::media::typedb::nodes::create_all_nodes;
-use crate::media::typedb::relationships::create_all_relationships;
-use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::tantivy::search_index;
+use crate::dbs::typedb::nodes::create_all_nodes;
+use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
-use crate::types::trees::{PairTree, NodePair};
+use crate::types::tree::{PairTree, NodePair};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use futures::StreamExt;
@@ -469,7 +469,7 @@ pub fn orgnode_forest_to_paired (
     orgnode_tree    : &Tree < OrgNode >,
     orgnode_tree_id : NodeId,
   ) {
-    let orgnode_data : OrgNode =
+    let orgnode : OrgNode =
       orgnode_tree . get ( orgnode_tree_id )
       . unwrap () . value () . clone ();
     let new_tree_id : NodeId = {
@@ -477,7 +477,7 @@ pub fn orgnode_forest_to_paired (
         forest . get_mut ( parent_tree_id ) . unwrap ();
       parent_mut
         . append ( NodePair { mskgnode: None,
-                              orgnode: orgnode_data } )
+                              orgnode: orgnode } )
         . id () };
     let child_tree_ids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_tree_id ) . unwrap ()

@@ -6,9 +6,9 @@ use skg::merge::{
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
 use skg::types::orgnode::forest_root_orgnode;
-use skg::media::file_io::read_skgnode;
+use skg::dbs::filesystem::read_skgnode;
 use skg::util::path_from_pid_and_source;
-use skg::media::typedb::search::{
+use skg::dbs::typedb::search::{
   contains_from_pids,
   find_related_nodes};
 use skg::types::TantivyIndex;

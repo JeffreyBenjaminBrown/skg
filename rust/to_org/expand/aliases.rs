@@ -1,8 +1,8 @@
-use crate::media::file_io::one_node::fetch_aliases_from_file;
+use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, orgnode_from_title_and_rel};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::trees::{PairTree, NodePair};
+use crate::types::tree::{PairTree, NodePair};
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;

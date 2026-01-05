@@ -7,7 +7,7 @@ use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
 use skg::types::OrgNode;
-use skg::types::trees::PairTree;
+use skg::types::tree::PairTree;
 
 use ego_tree::{Tree, NodeId};
 

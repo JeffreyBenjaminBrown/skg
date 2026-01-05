@@ -1,7 +1,7 @@
 use crate::types::{MergeInstructionTriple, SkgNode, ID};
-use crate::media::typedb::nodes::create_node;
-use crate::media::typedb::relationships::create_relationships_from_node;
-use crate::media::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::dbs::typedb::nodes::create_node;
+use crate::dbs::typedb::relationships::create_relationships_from_node;
+use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;

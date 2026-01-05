@@ -24,7 +24,7 @@ use crate::to_org::util::{
   build_node_branch_minus_content,
   VisitedMap };
 use crate::types::{SkgConfig, ID};
-use crate::types::trees::PairTree;
+use crate::types::tree::PairTree;
 
 use ego_tree::NodeId;
 use std::error::Error;

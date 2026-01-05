@@ -2,13 +2,15 @@
 // INSTEAD, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
+pub mod sexp;
+pub mod textlinks;
+pub use textlinks::TextLink;
 pub mod misc;
 pub use misc::{ ID,
                 SourceNickname,
                 SkgConfig,
                 SkgfileSource,
-                TantivyIndex,
-                TextLink, };
+                TantivyIndex, };
 pub mod errors;
 pub use errors::{ TextLinkParseError,
                   SaveError,
@@ -35,5 +37,5 @@ pub mod save;
 pub use save::{ NonMerge_NodeAction,
                 SaveInstruction,
                 MergeInstructionTriple, };
-pub mod trees;
-pub use trees::PairTree;
+pub mod tree;
+pub use tree::PairTree;

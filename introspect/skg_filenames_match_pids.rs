@@ -1,6 +1,6 @@
 // cargo run --bin skg_filenames_match_pids [optional_directory]
 
-use skg::file_io::read_skgnode;
+use skg::filesystem::read_skgnode;
 
 use std::path::Path;
 use std::fs;

@@ -1,9 +1,9 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
-use crate::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use crate::media::tantivy::update_index_with_nodes;
-use crate::media::typedb::nodes::create_all_nodes;
-use crate::media::typedb::relationships::create_all_relationships;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::tantivy::update_index_with_nodes;
+use crate::dbs::typedb::nodes::create_all_nodes;
+use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::types::{SkgNode, SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
@@ -122,7 +122,7 @@ pub fn create_empty_tantivy_index (
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all ( index_path )?;
   let schema : schema::Schema =
-    crate::media::tantivy::mk_tantivy_schema();
+    crate::dbs::tantivy::mk_tantivy_schema();
   let id_field: schema::Field =
     schema.get_field("id")
     .ok_or("Schema missing 'id' field")?;

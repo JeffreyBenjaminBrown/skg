@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use tantivy::schema as schema;
-use skg::media::file_io::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::read_all_skg_files_from_sources;
 use skg::init::in_fs_wipe_index_then_create_it;
-use skg::media::tantivy::{search_index, update_index_with_nodes};
+use skg::dbs::tantivy::{search_index, update_index_with_nodes};
 use skg::types::{TantivyIndex, SkgNode, SkgfileSource, ID, empty_skgnode};
 
 #[test]

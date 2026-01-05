@@ -1,9 +1,9 @@
-use crate::media::file_io::read_skgnode;
-use crate::media::tree::collect_generation_ids;
-use crate::media::typedb::util::pid_and_source_from_id;
+use crate::dbs::filesystem::read_skgnode;
+use crate::types::tree::collect_generation_ids;
+use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest};
-use crate::types::trees::{NodePair, PairTree};
+use crate::types::tree::{NodePair, PairTree};
 use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
 use crate::util::path_from_pid_and_source;
 

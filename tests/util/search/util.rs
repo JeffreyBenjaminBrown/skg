@@ -1,7 +1,7 @@
 // cargo test typedb::search::util
 
 use skg::test_utils::run_with_test_db;
-use skg::media::typedb::util::{pid_and_source_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
+use skg::dbs::typedb::util::{pid_and_source_from_id, extract_payload_from_typedb_string_rep, pids_from_ids};
 use skg::types::ID;
 
 use std::error::Error;

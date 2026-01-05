@@ -1,11 +1,11 @@
-use crate::media::typedb::search::{
+use crate::dbs::typedb::search::{
   contains_from_pids,
   count_containers,
   count_contents,
   count_link_sources};
 use crate::to_org::util::collect_ids_from_pair_tree;
 use crate::types::{ID, SkgConfig};
-use crate::types::trees::PairTree;
+use crate::types::tree::PairTree;
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;

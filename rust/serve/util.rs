@@ -1,4 +1,4 @@
-use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;

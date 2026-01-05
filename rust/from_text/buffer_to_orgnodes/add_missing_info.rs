@@ -4,7 +4,7 @@
 /// - add missing IDs where treatment is Content
 
 use crate::types::{OrgNode, Interp, ID};
-use crate::media::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
+use crate::dbs::typedb::util::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::boxed::Box;
 use std::collections::HashMap;

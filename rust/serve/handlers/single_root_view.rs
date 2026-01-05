@@ -3,7 +3,7 @@ use crate::serve::util::{
   send_response,
   send_response_with_length_prefix,
   format_buffer_response_sexp};
-use crate::media::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::SkgConfig;
 use crate::types::ID;
 

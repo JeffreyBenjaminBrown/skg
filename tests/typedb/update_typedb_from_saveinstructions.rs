@@ -2,8 +2,8 @@
 
 use skg::test_utils::run_with_test_db;
 use skg::save::typedb::update_typedb_from_saveinstructions;
-use skg::media::typedb::search::find_related_nodes;
-use skg::media::typedb::nodes::which_ids_exist;
+use skg::dbs::typedb::search::find_related_nodes;
+use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::{org_to_uninterpreted_nodes, orgnodes_to_reconciled_save_instructions, find_inconsistent_instructions};
 use skg::types::{ID, OrgNode, SaveInstruction};
 use ego_tree::Tree;

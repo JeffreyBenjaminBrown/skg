@@ -8,9 +8,9 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use skg::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use skg::media::typedb::nodes::create_all_nodes;
-use skg::media::typedb::relationships::create_all_relationships;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::typedb::nodes::create_all_nodes;
+use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};

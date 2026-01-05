@@ -5,7 +5,7 @@ use crate::to_org::util::{
   make_and_append_child_pair,
   nodes_after_in_generation };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::trees::PairTree;
+use crate::types::tree::PairTree;
 
 use ego_tree::NodeId;
 use std::cmp::min;

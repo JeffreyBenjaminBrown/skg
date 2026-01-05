@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::fs;
 use tempfile::tempdir;
 
-use skg::media::file_io::multiple_nodes::read_all_skg_files_from_sources;
-use skg::media::file_io::one_node::write_skgnode;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::one_node::write_skgnode;
 use skg::types::misc::SkgfileSource;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::misc::ID;

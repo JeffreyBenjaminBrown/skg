@@ -1,6 +1,6 @@
 use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
-use crate::media::tree::pair_orgnode_forest_with_save_instructions;
+use crate::types::tree::pair_orgnode_forest_with_save_instructions;
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
@@ -11,7 +11,7 @@ use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::orgnode::OrgNode;
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
-use crate::types::trees::PairTree;
+use crate::types::tree::PairTree;
 
 use ego_tree::Tree;
 use futures::executor::block_on;

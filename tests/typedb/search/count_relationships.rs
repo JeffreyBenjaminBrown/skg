@@ -1,7 +1,7 @@
 // cargo test typedb::search::count_relationships
 
 use skg::test_utils::run_with_test_db;
-use skg::media::typedb::search::{count_containers, count_contents, count_link_sources};
+use skg::dbs::typedb::search::{count_containers, count_contents, count_link_sources};
 use skg::types::{ID, SkgConfig};
 
 use std::collections::HashMap;

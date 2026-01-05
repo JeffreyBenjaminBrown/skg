@@ -1,6 +1,67 @@
 use regex::{Regex, Match};
+use std::fmt;
+use std::str::FromStr;
 
-use crate::types::{TextLink, SkgNode};
+use crate::types::misc::ID;
+use crate::types::errors::TextLinkParseError;
+use crate::types::SkgNode;
+
+//
+// Type Definitions
+//
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextLink {
+  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
+  pub id: ID,
+  pub label: String,
+}
+
+//
+// Implementations
+//
+
+impl TextLink {
+  pub fn new ( skg_id : impl Into<String>,
+               label  : impl Into<String>)
+             -> Self {
+    TextLink { id    : ID ( skg_id.into () ),
+               label : label.into (),
+    }} }
+
+impl fmt::Display for TextLink {
+  // Format: [[id:ID][LABEL]], where allcaps terms are variables.
+  // This is the same format org-roam uses.
+  fn fmt ( &self,
+            f : &mut fmt::Formatter <'_> )
+            -> fmt::Result {
+    write! ( f, "[[id:{}][{}]]", self.id, self.label ) }}
+
+impl FromStr for TextLink {
+  type Err = TextLinkParseError;
+
+  fn from_str ( text: &str )
+                -> Result <Self, Self::Err> {
+    if ( !text.starts_with("[[id:") ||
+          !text.ends_with("]]") ) {
+      return Err(TextLinkParseError::InvalidFormat); }
+
+    let interior : &str = &text [5 .. text.len () - 2];
+
+    if let Some ( idx ) = interior.find ( "][" ) {
+      let skg_id : &str = &interior [0..idx];
+      let label  : &str = &interior [idx+2..];
+      Ok ( TextLink {
+        id    : ID ( skg_id.to_string () ),
+        label : label.to_string (),
+      } )
+    } else {
+      Err ( TextLinkParseError::MissingDivider )
+    } } }
+
+//
+// Functions
+//
 
 pub fn textlinks_from_node (
   node : &SkgNode )
