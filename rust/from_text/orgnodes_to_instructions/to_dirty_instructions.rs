@@ -1,4 +1,5 @@
 use crate::types::{OrgNode, Interp, ID, SkgNode, NonMerge_NodeAction, SaveInstruction, EditRequest};
+use crate::types::trees::read_at_node_in_tree;
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -28,13 +29,11 @@ fn saveinstructions_from_tree(
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
-  let (interp, is_indefinitive)
-    : (Interp, bool) = {
-      let node_ref = tree.get(node_id)
-        .ok_or("saveinstructions_from_tree: node not found")?;
-      let node_data = node_ref.value();
-      ( node_data.metadata.code.interp.clone(),
-        node_data.metadata.code.indefinitive ) };
+  let (interp, is_indefinitive): (Interp, bool) =
+    read_at_node_in_tree(tree, node_id, |node| {
+      ( node.metadata.code.interp.clone(),
+        node.metadata.code.indefinitive )
+    })?;
   if interp == Interp::ForestRoot {
     let child_ids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
@@ -61,14 +60,14 @@ fn saveinstructions_from_tree(
   } else { None };
   if let Some(skg_node) = skg_node_opt {
     // Push SaveInstruction if applicable
-    let save_action: NonMerge_NodeAction = {
-      let node_ref = tree.get(node_id)
-        .ok_or("saveinstructions_from_tree: node not found")?;
-      if matches!(node_ref.value().metadata.code.editRequest,
-                  Some(EditRequest::Delete)) {
-        NonMerge_NodeAction::Delete
-      } else {
-        NonMerge_NodeAction::Save } };
+    let save_action: NonMerge_NodeAction =
+      read_at_node_in_tree(tree, node_id, |node| {
+        if matches!(node.metadata.code.editRequest,
+                    Some(EditRequest::Delete)) {
+          NonMerge_NodeAction::Delete
+        } else {
+          NonMerge_NodeAction::Save }
+      })?;
     result.push((skg_node, save_action)); }
   { // recurse
     let child_ids: Vec<NodeId> = tree.get(node_id).unwrap()

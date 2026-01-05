@@ -14,7 +14,7 @@ use crate::media::typedb::search::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest, default_metadata};
-use crate::types::trees::{NodePair, PairTree};
+use crate::types::trees::{NodePair, PairTree, read_at_node_in_tree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{HashSet, HashMap};
@@ -72,11 +72,10 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let treatment : Interp = {
-      let node_ref : NodeRef < NodePair > =
-        tree . get ( node_id )
-        . ok_or ( "Node not found in tree" ) ?;
-      node_ref.value () . 1 . metadata.code.interp . clone () };
+    let treatment: Interp =
+      read_at_node_in_tree(tree, node_id, |node| {
+        node.1.metadata.code.interp.clone()
+      })?;
     if treatment == Interp::AliasCol {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
@@ -523,12 +522,10 @@ pub async fn maybe_add_hidden_in_subscribee_col (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { // error if not a Subscribee
-    let is_subscribee : bool = {
-      let node_ref : NodeRef < NodePair > =
-        tree . get ( node_id ) . ok_or (
-          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-      node_ref . value () . 1 . metadata . code . interp
-        == Interp::Subscribee };
+    let is_subscribee: bool =
+      read_at_node_in_tree(tree, node_id, |node| {
+        node.1.metadata.code.interp == Interp::Subscribee
+      })?;
     if ! is_subscribee { return Err (
       "maybe_add_hidden_in_subscribee_col called on non-subscribee"
         . into () ); }}
