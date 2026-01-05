@@ -74,8 +74,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let treatment: Interp =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode.metadata.code.interp.clone()
-      })?;
+        node.orgnode.metadata.code.interp.clone() })?;
     if treatment == Interp::AliasCol {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
@@ -341,7 +340,7 @@ fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
         visited, view_requests_out ) . await ?; }
     Ok (( )) }) }
 
-/// Ensure a node in a PairTree has an SkgNode.
+/// Ensure a node in a PairTree has a SkgNode.
 /// If the node already has Some(skgnode), does nothing.
 /// Otherwise fetches from disk and stores it.
 pub async fn ensure_skgnode (

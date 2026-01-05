@@ -31,11 +31,12 @@ pub async fn add_missing_info_to_forest(
   let tree_root_ids: Vec<NodeId> =
     forest.root().children().map(|c| c.id()).collect();
   for tree_root_id in &tree_root_ids {
-    if let Some(tree_root_mut) = forest.get_mut(*tree_root_id) {
-      add_missing_info_dfs(
-        tree_root_mut,
-        None,     // its parent's Interp
-        None ); } } // its parent's source
+    if let Some(tree_root_mut) =
+      forest.get_mut(*tree_root_id) {
+        add_missing_info_dfs(
+          tree_root_mut,
+          None,       // parent's Interp
+          None ); } } // parent's source
 
   // collect IDs
   let mut ids_to_lookup: Vec<ID> = Vec::new();
@@ -61,25 +62,20 @@ fn add_missing_info_dfs (
   parent_reltoparent: Option < Interp >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
   parent_source: Option < String >,
 ) {
-  { // Process current node
+  { // process this node
     assign_alias_relation_if_needed (
       node_ref . value (), parent_reltoparent );
-    if ! node_ref . value () . metadata . code . interp . should_be_sourceless () {
+    if ! ( node_ref . value ()
+           . metadata . code . interp . should_be_sourceless () {
       inherit_source_if_needed (
         node_ref . value (), parent_source ); }
     assign_new_id_if_needed (
       node_ref . value () ); }
-
-  { // Recurse : Process children, DFS.
-    // First collect child NodeIDs,
-    // by reading from the immutable node reference.
-    // PITFALL: don't confuse egoTree NodeIDs, which are all distinct,
-    // from Skg IDs (which might not be).
+  { // recurse into children DFS
     let its_interp: Interp =
       node_ref . value ()
       . metadata . code . interp . clone ();
     let its_source: Option < String > = (
-      // Sourceless nodes don't propagate source to children.
       if its_interp . should_be_sourceless () { None }
       else { node_ref . value () . metadata . source . clone () } );
     let treeid: ego_tree::NodeId = node_ref . id ();
