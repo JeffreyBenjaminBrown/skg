@@ -1,0 +1,13 @@
+[package]
+name = "code-map"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "code-map"
+path = "code-map.rs"
+
+[dependencies]
+syn = { version = "2", features = ["full", "parsing"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+walkdir = "2"

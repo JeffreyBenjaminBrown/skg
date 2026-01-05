@@ -1,3 +1,6 @@
+[workspace]
+members = ["introspect/code-map", "introspect/call-graph"]
+
 [package]
 name = "skg"
 version = "0.1.0"
@@ -25,10 +28,6 @@ path = "rust/bin/delete-one-db.rs"
 [[bin]]
 name = "smsn-keywords"
 path = "discoveries/smsn/find-keywords.rs"
-
-[[bin]]
-name = "call-graph"
-path = "introspect/call_graph.rs"
 
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }

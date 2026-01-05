@@ -1,0 +1,13 @@
+[package]
+name = "call-graph"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "call-graph"
+path = "call-graph.rs"
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+walkdir = "2"

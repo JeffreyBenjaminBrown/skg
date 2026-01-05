@@ -18,6 +18,9 @@
 /tests/**/generated/
 /tests/tantivy/generated_aliases/
 TAGS
+introspect/call-graph/db/
+introspect/call-graph/main.org
+introspect/code-map/code-map.org
 temp-*
 temp/
 tools/md-to-org/.org-id-db.json

@@ -1,16 +1,40 @@
-/// USAGE: cargo run --bin call-graph [function_name]
+/// USAGE: cargo run -p call-graph [-- function_name]
 ///
-/// PURPOSE: Generate a 'call tree' document. That's an .org file, saved to call-trees/function-name.org, for some function name. Each headline is a function name. The root headline is the same as the file's basename. Each headline calls each of its child headlines. The first appearance of a function lists what it calls; subsequent appearances merely indicate that it was already described earlier (thereby avoiding infinite regress). Only functions that are part of the library are listed; functions from other libraries ('std::collections', etc.) are not listed.
-/// The program creates a simple .csv database, saved to a folder called call-trees/db/, with two files: 'functions.csv' and 'calls.csv'. 'functions' has one row per function, containing the name of the function, the full filepath (minus /home/ubuntu/) it appears in, and how many LOC it has. The other has one row for each function call, with four columns: caller-file, caller (function name), callee-file, and callee (function name). (I'm including file names in that second file to make it robust to filename collisions.)
-/// If a function F calls a function G more than once, only one row is recorded in calls.csv to relate the pair (F,G). (But if G in turn calls F, a second row will need to be included to encode the reverse relationship.)
-/// For implementations, the name used is 'TypeName::method_name'. The line count includes everything, even the header comment, except blank lines. Some especially boring implementations are ignored -- namely "new", "default", "from", and "from_str".
+/// PURPOSE: Generate a 'call tree' document. That's an .org file, saved to
+/// introspect/call-graph/function-name.org, for some function name. Each headline
+/// is a function name. The root headline is the same as the file's basename. Each
+/// headline calls each of its child headlines. The first appearance of a function
+/// lists what it calls; subsequent appearances merely indicate that it was already
+/// described earlier (thereby avoiding infinite regress). Only functions that are
+/// part of the library are listed; functions from other libraries ('std::collections',
+/// etc.) are not listed.
+///
+/// The program creates a simple .csv database, saved to introspect/call-graph/db/,
+/// with two files: 'functions.csv' and 'calls.csv'. 'functions' has one row per
+/// function, containing the name of the function, the full filepath (minus project
+/// root) it appears in, and how many LOC it has. The other has one row for each
+/// function call, with four columns: caller-file, caller (function name), callee-file,
+/// and callee (function name).
+///
+/// If a function F calls a function G more than once, only one row is recorded in
+/// calls.csv to relate the pair (F,G). (But if G in turn calls F, a second row will
+/// need to be included to encode the reverse relationship.)
+///
+/// For implementations, the name used is 'TypeName::method_name'. The line count
+/// includes everything, even the header comment, except blank lines. Some especially
+/// boring implementations are ignored -- namely "new", "default", "from", and "from_str".
+///
 /// The program only analyzes rust/. It ignores macros.
-/// By default it starts from 'main', and saves that analysis to 'call-trees/main.org'. But if the user supplies an alternative function name, it looks for a function of that name, and if there's only one, starts from there instead, and save it at 'call-trees/FUNCITON-NAME.org'. If it finds more than one function definition with that name, it just reports that fact, letting the user rename one of them.
+///
+/// By default it starts from 'main'. But if the user supplies an alternative function
+/// name, it looks for a function of that name, and if there's only one, starts from
+/// there instead. If it finds more than one function definition with that name, it
+/// just reports that fact, letting the user rename one of them.
 
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{File, ImplItem, ItemFn, ItemImpl};
@@ -371,14 +395,14 @@ impl CallGraph {
         .push(caller);
     }
 
-    // Deduplicate
+    // Deduplicate (preserving first-appearance order)
     for callees in graph.calls.values_mut() {
-      callees.sort();
-      callees.dedup();
+      let mut seen = HashSet::new();
+      callees.retain(|c| seen.insert(c.clone()));
     }
     for callers in graph.callers.values_mut() {
-      callers.sort();
-      callers.dedup();
+      let mut seen = HashSet::new();
+      callers.retain(|c| seen.insert(c.clone()));
     }
 
     graph
@@ -448,10 +472,15 @@ impl CallGraph {
     // Mark as described
     described.insert(func_name.to_string());
 
-    // Get callees and recurse
+    // Get callees and recurse (recursive calls last)
     if let Some(callees) = self.calls.get(func_name) {
-      for callee in callees {
-        ancestors.push(callee.clone());
+      // Partition: non-recursive first, recursive last
+      let (recursive, non_recursive): (Vec<_>, Vec<_>) = callees
+        .iter()
+        .partition(|c| ancestors.contains(c));
+
+      for callee in non_recursive.iter().chain(recursive.iter()) {
+        ancestors.push((*callee).clone());
         self.write_node(output, callee, depth + 1, described, ancestors);
         ancestors.pop();
       }
@@ -475,13 +504,16 @@ fn main() {
   let args: Vec<String> = env::args().collect();
   let target_function = args.get(1).map(|s| s.as_str()).unwrap_or("main");
 
-  let home = Path::new("/home/ubuntu");
-  let rust_dir = home.join("rust");
-  let calltrees_dir = home.join("call-trees");
-  let db_dir = calltrees_dir.join("db");
+  // Find project root via CARGO_MANIFEST_DIR
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  let project_root = manifest_dir.parent().unwrap().parent().unwrap();
+
+  let rust_dir = project_root.join("rust");
+  let output_dir = &manifest_dir;  // introspect/call-graph/
+  let db_dir = output_dir.join("db");
 
   // Create output directories
-  fs::create_dir_all(&db_dir).expect("Failed to create call-trees/db/ directory");
+  fs::create_dir_all(&db_dir).expect("Failed to create db/ directory");
 
   //
   // PHASE 1: Parse codebase and write CSVs
@@ -498,10 +530,10 @@ fn main() {
     .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
   {
     let path = entry.path();
-    match parse_file(path, home) {
+    match parse_file(path, project_root) {
       Ok((functions, source)) => {
         let rel_path = path
-          .strip_prefix(home)
+          .strip_prefix(project_root)
           .unwrap_or(path)
           .to_string_lossy()
           .to_string();
@@ -611,7 +643,7 @@ fn main() {
 
   let org_content = graph.generate_org_tree(target_function);
 
-  let output_file = calltrees_dir.join(format!("{}.org", target_function));
+  let output_file = output_dir.join(format!("{}.org", target_function));
   fs::write(&output_file, org_content).expect("Failed to write org file");
   println!("Wrote {}", output_file.display());
 }

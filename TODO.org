@@ -1,6 +1,7 @@
 * NOTE TO READER: Most plans are online.
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+* reorg
 * s, by urgency
 ** Completion is complex.
 *** break up completeDefinitiveOrgnode
@@ -79,6 +80,25 @@
 ** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 ** aliases_to_org should rebuild the whole buffer
    like request containerward view
+** reading pub async fn completeAliasCol (
+ // Validate this is an AliasCol
+ let mut parent_skgnode : SkgNode = {
+ parent_skgnode.source = parent_source; // BUG ?
+ let aliases_from_disk : HashSet < String > = (
+ let aliases_from_tree : Vec < String > =
+ let good_aliases_in_tree : HashSet < String > = (
+   // aliases in tree that match aliases on disk
+ let missing_aliases_from_disk : HashSet < String > = (
+   // aliases on disk but not in tree
+ remove_duplicates_and_false_aliases_handling_focus (
+   tree, // PITFALL: Gets modified.
+   aliascol_node_id,
+   & good_aliases_in_tree ) ?;
+ { // Append new Alias nodes for missing aliases
+** likely helpful to generalize
+*** remove_duplicates_and_false_aliases_handling_focus
+    could be generalized to something that takes lambdas
+    indicating whether something deserves removal
 ** ONGOING simple refactors
 *** write helpers to simplify egotree boilerplate
 *** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
