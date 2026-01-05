@@ -1,0 +1,61 @@
+* Markdown to Org-roam Converter
+
+Converts Markdown files to Org-roam format with ID-based links.
+
+** Most likely needed usage
+
+#+begin_src bash
+python3 md-to-org-converter.py
+#+end_src
+
+But it can do other stuff -- see 'Files'.
+
+** Files
+*** md-to-org-converter.py   : Main converter script
+**** purpose
+Converts =README.md= and =docs/*.md= files to =.org= format with:
+
+- Org-roam headers (=:PROPERTIES:= block with =:ID:=, =#+title:=)
+- ID-based links (=[[id:uuid][text]]=) instead of file paths
+- Standard org formatting (headings, code blocks, inline markup)
+**** It's idempotent.
+
+  The converter reuses existing UUIDs from =.org-id-db.json=. Running it twice on the same input produces identical output.
+
+**** Output format
+
+  #+begin_example
+    :PROPERTIES:
+    :ID:       846207ef-11d6-49e4-89b4-4558b2989a60
+    :END:
+    #+title: Document Title
+    * Document Title
+      Content...
+    ** Section
+    More content...
+  #+end_example
+
+**** how it works
+***** It requires two passes.
+  1. *Pass 1*: Scans all =.md= files, generates UUIDs, builds a mapping database
+  2. *Pass 2*: Converts files, resolving =.md= links to =[[id:uuid]]= format
+*** test-org-links.el        : validate org-roam links in some data
+*** restructure-md-files.py  : Ensure each .md has single root heading
+**** That heading matches its title.
+**** why I need this
+     A line like '#+title: music'
+     does not render on GitHub,
+     and I want these notes to be readable by others.
+*** restructure-org-files.py : (Probably obsolete)
+    If I want to be able to edit them easily,
+    then the .org format I use has to be org-roam.
+    This used another kind of link.
+*** .org-id-db.json: UUID database
+    This is not part of the code but the code will generate it here.
+    It can be safely left in place; it's small and maybe speeds up the process.
+**** TODO ? That smells unnecessary.
+** Requirements
+
+- Python 3
+- Input: =.md= files with single =#= root heading
+- The =restructure-md-files.py= script can fix multi-root files

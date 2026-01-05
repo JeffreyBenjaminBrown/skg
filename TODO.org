@@ -1,3 +1,39 @@
+* *Write an unRust module.*
+** / definition & example /
+*** Write a function doToPairTreeNode
+**** Hides all the node id fetching ogic
+**** Can take a lambda
+** Maybe do it lazily, only where I want to be more readable.
+** Maybe do it to all boilerplate.
+* midparent in text : options
+** some examples
+*** music */ THE MIDPARENT */ "the edge where ideas deserve ..."
+**** its rendering into org-roam
+     #+title: music
+     * / & [[id:0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d][justice]] & [[id:1e0eb0bc-1d40-4a78-9c81-dbcef73d005e][distance]] /
+     ** the edge where ideas deserve not formal encoding yet in music
+        :PROPERTIES:
+        :ID:       eec10382-0ce9-4326-a1c7-f2ff477f19f0
+        :END:
+**** to read the midparent
+     justice and distance are both routes from music to "the edge ..."
+**** later
+     could consider letting a similar midparent encode the unordered set (music, justice, distance)
+*** a general one I like
+**** a messed-up attempt at explicit syntax
+***** [[..][/*predecessoor generation number]/name of relationship/
+**** "/", "..", and ("ni" where the "i" is a running variable)
+     It owuld look like a mix of slash-separated "ni"s and ".."s,
+     such that in any sequence n1/n2   , n1 > n2
+     and       in any sequence n1/../n2, n1 > n2
+     i is usually greater than 0, so signifies predecessors;
+     negative i signify descendents.
+     If it starts with a / the entire predecessor chain is specified.
+       "ni" is the alternative way to start.
+       There is no reason to start or end with "..".
+     If it ends with a / the entire descendent chain is specified.
+       Not sure this is needed.
+* Can I download my git repo and read it ony phone with goto definition, find uses, etc?
 * TODO BLOCKER : maybe_add_subscribee_col needs a lot of work
   It's so complex I can't see past it.
 ** Subdivide it.
