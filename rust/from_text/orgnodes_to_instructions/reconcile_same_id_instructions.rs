@@ -1,26 +1,25 @@
-/* PITFALL: ASSUMES IDs have been replaced by PIDs
-in the 'id' field of every OrgNode.
-(Currently, 'add_missing_info_to_forest' does this.)
-.
-THE IDEA
-After validation, we have:
-- At most ONE Save per ID (validation ensures this)
-- Possibly multiple Delete instructions (all equivalent)
-.
-This module does two things:
-1. Deduplicates Delete instructions (all are equivalent, keep one)
-2. Supplements each Save with data from disk:
-   - Use instruction's value if present (Some)
-   - Otherwise use disk's value as fallback
-   - Append any extra IDs from disk
-.
-Validation (find_buffer_errors_for_saving) runs BEFORE this module
-and blocks saves if:
-- Multiple definitive nodes have the same ID
-- Nodes with same ID have inconsistent toDelete values
-.
-So this module only handles the simple case: supplement one instruction with disk.
-*/
+/// PITFALL: ASSUMES IDs have been replaced by PIDs
+/// in the 'id' field of every OrgNode.
+/// (Currently, 'add_missing_info_to_forest' does this.)
+/// .
+/// THE IDEA
+/// After validation, we have:
+/// - At most ONE Save per ID (validation ensures this)
+/// - Possibly multiple Delete instructions (all equivalent)
+/// .
+/// This module does two things:
+/// 1. Deduplicates Delete instructions (all are equivalent, keep one)
+/// 2. Supplements each Save with data from disk:
+///    - Use instruction's value if present (Some)
+///    - Otherwise use disk's value as fallback
+///    - Append any extra IDs from disk
+/// .
+/// Validation (find_buffer_errors_for_saving) runs BEFORE this module
+/// and blocks saves if:
+/// - Multiple definitive nodes have the same ID
+/// - Nodes with same ID have inconsistent toDelete values
+/// .
+/// So this module only handles the simple case: supplement one instruction with disk.
 
 use crate::types::{
   ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig, BufferValidationError, SourceNickname};
