@@ -81,13 +81,6 @@
    like request containerward view
 ** ONGOING simple refactors
 *** write helpers to simplify egotree boilerplate
-**** 'do to ancestor'
-     Takes a treenode id, an int 'generation' (0 is valid), and a lambda.
-     Does the lambda to the ancestor.
-     0 represents the input node.
-     read_at_node_in_tree and write_at_node_in_tree should call this,
-       supplying generation 0.
-*** orgnode_data is a terrible name
 *** TODO Rewrite clobberIndefinitiveOrgnoe to use them.
 *** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
    if is_indefinitive {
@@ -117,7 +110,7 @@
 *** these should be generic
     nodes_after_in_generation
     collect_child_tree_ids
-** ONGOING subscription branches
+** AWAITS subscription branches
 *** PITFALL: Hiding is not ternary.
     SubscribeR node R Hides node H from *all* its subscriptions.
     When the nodes R hides are *displayed*,
