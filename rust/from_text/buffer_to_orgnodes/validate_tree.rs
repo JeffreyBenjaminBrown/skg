@@ -78,44 +78,44 @@ fn validate_node_and_children (
   errors: &mut Vec<BufferValidationError>
 ) {
 
-  let node: &OrgNode = node_ref.value();
-  match node.metadata.code.interp {
+  let orgnode: &OrgNode = node_ref.value();
+  match orgnode.metadata.code.interp {
     Interp::AliasCol => {
-      if node.body.is_some() {
+      if orgnode.body.is_some() {
         errors.push(
           BufferValidationError::Body_of_AliasCol(
-            node.clone() )); }},
+            orgnode.clone() )); }},
 
     Interp::Alias => {
-      if node.body.is_some() {
+      if orgnode.body.is_some() {
         errors.push(
           BufferValidationError::Body_of_Alias(
-            node.clone() )); }
+            orgnode.clone() )); }
       if let Some(ref parent_rel) = parent_interp {
         if *parent_rel != Interp::AliasCol {
           errors.push(
             BufferValidationError::Alias_with_no_AliasCol_Parent(
-              node.clone() )); }
+              orgnode.clone() )); }
       } else {
         // Root level Alias is also invalid
         errors.push(
           BufferValidationError::Alias_with_no_AliasCol_Parent(
-            node.clone() )); }},
+            orgnode.clone() )); }},
     _ => {} }
 
   if let Some(parent_rel) = parent_interp {
     match parent_rel {
       Interp::AliasCol => {
         // Children of AliasCol should not have IDs
-        if node.metadata.id.is_some() {
+        if orgnode.metadata.id.is_some() {
           errors.push(
             BufferValidationError::Child_of_AliasCol_with_ID(
-              node.clone() )); }},
+              orgnode.clone() )); }},
       Interp::Alias => {
         // Children of Alias should not exist at all
         errors.push(
           BufferValidationError::Child_of_Alias(
-            node.clone() )); },
+            orgnode.clone() )); },
         _ => {} }}
 
   { // At most one child should have treatment=AliasCol
@@ -128,11 +128,11 @@ fn validate_node_and_children (
     if aliasCol_children_count > 1 {
       errors.push (
         BufferValidationError::Multiple_AliasCols_in_Children (
-          node.clone() )); }}
+          orgnode.clone() )); }}
 
   { // If a node is definitive, it should have
     // no two treatment=Content children with the same ID.
-    if ! node . metadata . code.indefinitive {
+    if ! orgnode . metadata . code.indefinitive {
       let mut seen_content_ids : HashSet < ID > =
         HashSet::new ();
       for child in node_ref . children () {
@@ -147,27 +147,27 @@ fn validate_node_and_children (
 
   { // Validate that the source exists in config
     // todo ? For speed, we could restrict this check to those nodes that have a source specified in the original buffer-text, excluding nodes for which source is inherited from an ancestor.
-    if let Some(ref source_str) = node.metadata.source {
+    if let Some(ref source_str) = orgnode.metadata.source {
       if ! config.sources.contains_key(source_str) {
         let source_nickname: SourceNickname =
           SourceNickname::from ( source_str.as_str() );
         let node_id: ID =
-          node.metadata.id.clone()
+          orgnode.metadata.id.clone()
           .unwrap_or_else(|| ID::from("<no ID>"));
         errors.push(
           BufferValidationError::SourceNotInConfig(
             node_id,
             source_nickname )); }} }
 
-  if node.metadata.code.indefinitive { // indef + edit = error
-    if node.metadata.code.editRequest.is_some() {
+  if orgnode.metadata.code.indefinitive { // indef + edit = error
+    if orgnode.metadata.code.editRequest.is_some() {
       errors.push(
         BufferValidationError::IndefinitiveWithEditRequest(
-          node.clone() )); }}
+          orgnode.clone() )); }}
 
   for child in node_ref.children() { // recurse
     let cloned_rel: Interp =
-      node.metadata.code.interp.clone();
+      orgnode.metadata.code.interp.clone();
     validate_node_and_children(
       child, Some(cloned_rel), config, errors);
   }}
