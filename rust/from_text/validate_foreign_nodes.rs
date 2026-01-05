@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::misc::{SkgConfig, SourceNickname};
 use crate::types::errors::BufferValidationError;
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction, MergeInstructionTriple};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
@@ -44,17 +44,19 @@ Some([]) and None are equivalent, so normalize them for comparison.
 But for *non-definitive* fields -- aliases currently,
 and eventually also overrides_view_of, subscribes_to,
 and hides_from_its_subscriptions -- None means "no opinion"
-(the user did not mention it in the buffer),
+(because the user did not mention it in the buffer),
 and therefore does not represent an edit.
 .
 TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare implemented, apply the same "no opinion" logic */
             let title_matches: bool = node.title == disk_node.title;
             let body_matches: bool = node.body == disk_node.body;
-            let contains_matches: bool = flatten_id_vec(&node.contains) == flatten_id_vec(&disk_node.contains);
+            let contains_matches: bool =
+              flatten_opt_vec(&node.contains) ==
+              flatten_opt_vec(&disk_node.contains);
             let aliases_matches: bool =
               node.aliases.is_none() ||
-              ( flatten_string_vec(&node.aliases) ==
-                flatten_string_vec(&disk_node.aliases) );
+              ( flatten_opt_vec(&node.aliases) ==
+                flatten_opt_vec(&disk_node.aliases) );
             if !(title_matches &&
                  body_matches &&
                  contains_matches &&
@@ -112,16 +114,9 @@ pub fn validate_merges_involve_only_owned_nodes(
   } else { Err(errors) }}
 
 /// Lets us treat Some([]) and None as equivalent.
-fn flatten_id_vec(v: &Option<Vec<ID>>
-) -> Option<Vec<ID>> {
-  match v {
-    Some(vec) if vec.is_empty() => None,
-    other => other.clone(), }}
-
-/// Lets us treat Some([]) and None as equivalent.
-fn flatten_string_vec(
-  v : &Option<Vec<String>>
-) -> Option<Vec<String>> {
+fn flatten_opt_vec<T: Clone>(
+  v: &Option<Vec<T>>
+) -> Option<Vec<T>> {
   match v {
     Some(vec) if vec.is_empty() => None,
     other => other.clone(), }}
