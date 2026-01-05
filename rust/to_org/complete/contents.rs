@@ -297,31 +297,31 @@ async fn extend_content (
 /// Reorder a node's children by detaching all
 /// and re-appending in desired order.
 fn reorder_children (
-  tree                      : &mut PairTree,
-  parent_id                 : NodeId,
-  non_content_child_ids     : &Vec < NodeId >,
-  completed_content_node_ids : &Vec < NodeId >,
+  tree                       : &mut PairTree,
+  parent_treeid              : NodeId,
+  non_content_child_treeids  : &Vec < NodeId >,
+  completed_content_treeids  : &Vec < NodeId >,
 ) -> Result < (), Box<dyn Error> > {
   // Collect all child NodeIds in desired order
   let mut desired_order : Vec < NodeId > =
     Vec::new ();
-  desired_order . extend ( non_content_child_ids );
-  desired_order . extend ( completed_content_node_ids );
+  desired_order . extend ( non_content_child_treeids );
+  desired_order . extend ( completed_content_treeids );
 
   // Detach all children
-  for child_id in & desired_order {
+  for child_treeid in & desired_order {
     let mut child_mut : NodeMut < NodePair > =
-      tree . get_mut ( *child_id )
+      tree . get_mut ( *child_treeid )
       . ok_or ( "Child not found for detaching" ) ?;
     child_mut . detach (); }
 
-  for child_id in & desired_order {
+  for child_treeid in & desired_order {
     // Re-append in desired order,
     // using append_id, which preserves entire subtrees.
     let mut parent_mut : NodeMut < NodePair > =
-      tree . get_mut ( parent_id )
+      tree . get_mut ( parent_treeid )
       . ok_or ( "Parent not found" ) ?;
-    parent_mut . append_id ( *child_id ); }
+    parent_mut . append_id ( *child_treeid ); }
   Ok (( )) }
 
 fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (

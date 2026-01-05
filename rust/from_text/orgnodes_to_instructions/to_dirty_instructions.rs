@@ -35,10 +35,10 @@ fn saveinstructions_from_tree(
         node.metadata.code.indefinitive )
     })?;
   if interp == Interp::ForestRoot {
-    let child_ids: Vec<NodeId> = tree.get(node_id).unwrap()
+    let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
-    for child_id in child_ids {
-      saveinstructions_from_tree(tree, child_id, result)?; }
+    for child_treeid in child_treeids {
+      saveinstructions_from_tree(tree, child_treeid, result)?; }
     return Ok(()); }
   if matches!(interp, Interp::AliasCol                     |
                       Interp::Alias                        |
@@ -70,10 +70,10 @@ fn saveinstructions_from_tree(
       })?;
     result.push((skg_node, save_action)); }
   { // recurse
-    let child_ids: Vec<NodeId> = tree.get(node_id).unwrap()
+    let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
-    for child_id in child_ids {
-      saveinstructions_from_tree(tree, child_id, result)?; }}
+    for child_treeid in child_treeids {
+      saveinstructions_from_tree(tree, child_treeid, result)?; }}
   Ok (()) }
 
 fn skgnode_for_orgnode_in_tree<'a> (

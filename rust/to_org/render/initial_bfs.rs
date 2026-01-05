@@ -112,28 +112,28 @@ async fn add_children_and_collect_their_ids (
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let mut child_ids : Vec < NodeId > = Vec::new ();
-  for (parent_id, child_id) in rels_to_add {
-    let (_, child_node_id) =
+  let mut child_treeids : Vec < NodeId > = Vec::new ();
+  for (parent_treeid, child_skgid) in rels_to_add {
+    let (_, child_treeid) =
       build_node_branch_minus_content (
-        Some ( (&mut *forest, parent_id) ),
-        &child_id, config, driver, visited ) . await ?;
-    child_ids . push ( child_node_id ); }
-  Ok ( child_ids ) }
+        Some ( (&mut *forest, parent_treeid) ),
+        &child_skgid, config, driver, visited ) . await ?;
+    child_treeids . push ( child_treeid ); }
+  Ok ( child_treeids ) }
 
 /// Collect all children IDs
 ///   from definitive nodes in the input generation.
 ///   (Indefinitive nodes' contents do not need rendering.)
-/// Returns (parent_node_id, child_id) tuples.
+/// Returns (parent_treeid, child_skgid) tuples.
 fn collect_rels_to_children_from_generation (
   forest       : &PairTree,
   nodes_in_gen : &[NodeId],
 ) -> Vec < (NodeId, ID) > {
   let mut children : Vec < (NodeId, ID) > = Vec::new ();
-  for node_id in nodes_in_gen {
-    if let Ok ( child_ids ) =
+  for treeid in nodes_in_gen {
+    if let Ok ( child_skgids ) =
       content_ids_if_definitive_else_empty (
-        forest, *node_id )
-    { for child_id in child_ids {
-      children . push ( (*node_id, child_id) ); }} }
+        forest, *treeid )
+    { for child_skgid in child_skgids {
+      children . push ( (*treeid, child_skgid) ); }} }
   children }

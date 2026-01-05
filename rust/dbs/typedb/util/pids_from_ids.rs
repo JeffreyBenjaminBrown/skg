@@ -45,14 +45,14 @@ pub fn assign_pids_throughout_tree_from_map (
       Some ( pid . clone () ); }}
   { // Process children recursively
     let treeid : NodeId = node_ref . id ();
-    let child_ids : Vec < NodeId > = {
+    let child_treeids : Vec < NodeId > = {
       let tree = node_ref . tree ();
       tree . get ( treeid ) . unwrap ()
         . children () . map ( | child | child . id () )
         . collect () };
-    for child_id in child_ids {
+    for child_treeid in child_treeids {
       if let Some ( child_mut )
-        = node_ref . tree () . get_mut ( child_id )
+        = node_ref . tree () . get_mut ( child_treeid )
       { assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 

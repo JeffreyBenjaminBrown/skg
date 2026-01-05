@@ -161,7 +161,7 @@ fn indefinitize_content_subtree (
     node_ref . value ();
   let node_pid_opt : Option < ID > =
     pair . orgnode . metadata . id . clone ();
-  let content_child_ids : Vec < NodeId > =
+  let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
     . filter ( |c| c . value () . orgnode . metadata . code . interp
                    == Interp::Content )
@@ -181,9 +181,9 @@ fn indefinitize_content_subtree (
     if let Some(title) = canonical_title {
       node_mut . value () . orgnode . title = title; }
     node_mut . value () . orgnode . body = None; }
-  for child_id in content_child_ids { // recurse
+  for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
-      tree, child_id, visited ) ?; }
+      tree, child_treeid, visited ) ?; }
   Ok (( )) }
 
 /// Expands content for a node using BFS with a node limit.
@@ -223,8 +223,8 @@ async fn extendDefinitiveSubtreeFromLeaf (
     content_ids_if_definitive_else_empty (
       tree, effective_root ) ?
     . into_iter ()
-    . filter ( |id| ! hidden_ids . contains ( id ) )
-    . map ( |child_id| (effective_root, child_id) )
+    . filter ( |skgid| ! hidden_ids . contains ( skgid ) )
+    . map ( |child_skgid| (effective_root, child_skgid) )
     . collect ();
   let mut nodes_rendered : usize = 0;
   let mut generation : usize = 1; // children of effective root
@@ -239,19 +239,19 @@ async fn extendDefinitiveSubtreeFromLeaf (
         visited, config, driver ). await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
-    for (parent_nid, child_id) in gen_with_children {
-      let (_tree, new_node_id) =
+    for (parent_treeid, child_skgid) in gen_with_children {
+      let (_tree, new_treeid) =
         build_node_branch_minus_content (
-          Some((tree, parent_nid)),
-          &child_id, config, driver, visited ). await ?;
+          Some((tree, parent_treeid)),
+          &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
-      if ! is_indefinitive ( tree, new_node_id ) ? {
+      if ! is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
-        let grandchild_ids : Vec < ID > =
+        let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (
-            tree, new_node_id ) ?;
-        for grandchild_id in grandchild_ids {
-          next_gen . push ( (new_node_id, grandchild_id) ); }} }
+            tree, new_treeid ) ?;
+        for grandchild_skgid in grandchild_skgids {
+          next_gen . push ( (new_treeid, grandchild_skgid) ); }} }
     gen_with_children = next_gen;
     generation += 1; }
   Ok (( )) }

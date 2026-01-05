@@ -89,9 +89,9 @@ fn add_missing_info_dfs (
         . children () . map ( | child |
                              child . id () )
         . collect () };
-    for child_id in child_treeids {
+    for child_treeid in child_treeids {
       if let Some ( child_mut )
-        = node_ref . tree () . get_mut ( child_id ) {
+        = node_ref . tree () . get_mut ( child_treeid ) {
           add_missing_info_dfs (
             child_mut,
             Some ( its_interp . clone () ),

@@ -440,7 +440,7 @@ fn build_binary_tree(
 ) -> Tree<String> {
   fn build_subtree(
     tree: &mut Tree<String>,
-    parent_id: ego_tree::NodeId,
+    parent_treeid: ego_tree::NodeId,
     label: String,
     current_generation: usize,
     max_generations: usize
@@ -451,15 +451,15 @@ fn build_binary_tree(
       format!("{}1", label);
     let right_label: String =
       format!("{}2", label);
-    let left_id: ego_tree::NodeId =
-      tree . get_mut (parent_id) . unwrap()
+    let left_treeid: ego_tree::NodeId =
+      tree . get_mut (parent_treeid) . unwrap()
       . append (left_label.clone()) . id();
-    let right_id: ego_tree::NodeId =
-      tree.get_mut (parent_id) . unwrap()
+    let right_treeid: ego_tree::NodeId =
+      tree.get_mut (parent_treeid) . unwrap()
       . append (right_label.clone()) . id();
-    build_subtree ( tree, left_id, left_label,
+    build_subtree ( tree, left_treeid, left_label,
                     current_generation + 1, max_generations);
-    build_subtree ( tree, right_id, right_label,
+    build_subtree ( tree, right_treeid, right_label,
                     current_generation + 1, max_generations); }
 
   let mut tree: Tree<String> =

@@ -35,20 +35,20 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
     return Ok (( )); }
   let last_addable_index : usize =
     min ( space_left, children . len () ) - 1;
-  let limit_parent_id : NodeId =
+  let limit_parent_treeid : NodeId =
     children [last_addable_index] . 0;
-  for (idx, (parent_nid, child_id))
+  for (idx, (parent_treeid, child_skgid))
     in children . iter () . enumerate () {
       if ( idx > last_addable_index && // past limit
-           *parent_nid != limit_parent_id ) // in new sibling group
+           *parent_treeid != limit_parent_treeid ) // in new sibling group
       { break; }
       else {
-        let new_node_id : NodeId =
+        let new_treeid : NodeId =
           make_and_append_child_pair (
-            tree, *parent_nid, child_id, config, driver ) . await ?;
-        makeIndefinitiveAndClobber ( tree, new_node_id ) ?; }}
+            tree, *parent_treeid, child_skgid, config, driver ) . await ?;
+        makeIndefinitiveAndClobber ( tree, new_treeid ) ?; }}
   truncate_after_node_in_generation_in_tree (
-    tree, generation - 1, limit_parent_id,
+    tree, generation - 1, limit_parent_treeid,
     effective_root, visited ) ?;
   Ok (( )) }
 

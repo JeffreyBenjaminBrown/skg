@@ -136,14 +136,15 @@ fn validate_node_and_children (
       let mut seen_content_ids : HashSet < ID > =
         HashSet::new ();
       for child in node_ref . children () {
-        let child_node : &OrgNode =
+        let child_orgnode : &OrgNode =
           child . value ();
-        if child_node . metadata . code.interp == Interp::Content {
-          if let Some ( ref child_id ) = child_node . metadata . id {
-            if ! seen_content_ids . insert ( child_id . clone () ) {
-              errors . push (
-                BufferValidationError::DuplicatedContent (
-                  child_id . clone () )); }} }} }}
+        if child_orgnode . metadata . code.interp == Interp::Content {
+          if let Some ( ref child_skgid )
+            = child_orgnode . metadata . id
+          { if ! seen_content_ids . insert ( child_skgid . clone () ) {
+            errors . push (
+              BufferValidationError::DuplicatedContent (
+                child_skgid . clone () )); }} }} }}
 
   { // Validate that the source exists in config
     // todo ? For speed, we could restrict this check to those nodes that have a source specified in the original buffer-text, excluding nodes for which source is inherited from an ancestor.

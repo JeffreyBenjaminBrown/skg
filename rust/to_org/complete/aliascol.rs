@@ -35,15 +35,15 @@ pub async fn completeAliasCol (
   config           : &SkgConfig,
   driver           : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let parent_id : ID =
+  let parent_skgid : ID =
     get_aliascol_parent_id (
       tree,
       aliascol_node_id ) ?;
   let (parent_pid, parent_source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, &parent_id).await?
+      &config.db_name, driver, &parent_skgid).await?
     . ok_or_else( || format!(
-      "Parent ID '{}' not found in database", parent_id))?;
+      "Parent ID '{}' not found in database", parent_skgid))?;
   let mut skgnode : SkgNode = {
     let path : String =
       path_from_pid_and_source (
@@ -99,15 +99,15 @@ fn collect_alias_titles (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
-    let child_node : &OrgNode =
+    let child_orgnode : &OrgNode =
       & child . value () . orgnode;
-    if child_node . metadata . code.interp != Interp::Alias {
+    if child_orgnode . metadata . code.interp != Interp::Alias {
       return Err (
         format! ( "AliasCol has non-Alias child with interp: {:?}",
-                  child_node . metadata . code.interp )
+                  child_orgnode . metadata . code.interp )
         . into () ); }
     aliases_from_tree . push (
-      child_node . title . clone () );
+      child_orgnode . title . clone () );
   }
   Ok ( aliases_from_tree ) }
 
@@ -136,26 +136,26 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
-      let child_node : &OrgNode =
+      let child_orgnode : &OrgNode =
         & child . value () . orgnode;
       let title : &String =
-        & child_node . title;
+        & child_orgnode . title;
       let is_duplicate : bool =
         ! seen . insert ( title . clone () );
       let is_invalid : bool =
         ! good_aliases . contains ( title );
       if is_duplicate || is_invalid {
         children_to_remove_acc . push ( child . id () );
-        if child_node . metadata . viewData.focused {
+        if child_orgnode . metadata . viewData.focused {
           if is_duplicate {
             focused_title = Some ( title . clone () ); }
           else {
             removed_focused = true; }}} }
     children_to_remove_acc };
 
-  for child_id in children_to_remove {
+  for child_treeid in children_to_remove {
     let mut child_mut : NodeMut < NodePair > =
-      tree . get_mut ( child_id )
+      tree . get_mut ( child_treeid )
       . ok_or ( "Child node not found" ) ?;
     child_mut . detach (); }
 
@@ -195,16 +195,16 @@ fn get_aliascol_parent_id (
         format! ( "Node is not an AliasCol: {:?}",
                    aliascol_node . metadata . code.interp )
           . into () ); }
-  let parent_node_id : NodeId =
+  let parent_treeid : NodeId =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?
     . parent ()
     . ok_or ( "AliasCol node has no parent" ) ?
     . id ();
-  let parent_id : &ID =
-    tree . get ( parent_node_id )
+  let parent_skgid : &ID =
+    tree . get ( parent_treeid )
     . ok_or ( "Parent node not found" ) ?
     . value () . orgnode
     . metadata . id . as_ref ()
     . ok_or ( "Parent node has no ID" ) ?;
-  Ok ( parent_id . clone () ) }
+  Ok ( parent_skgid . clone () ) }

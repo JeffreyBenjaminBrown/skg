@@ -146,7 +146,7 @@ fn integrate_linear_portion_of_path<'a> (
     let path_tail : &[ID] = &path[1..];
     let next_node_id : ego_tree::NodeId =
       match find_child_by_id ( tree, node_id, path_head ) {
-        Some ( child_id ) => child_id,
+        Some ( child_treeid ) => child_treeid,
         None => {
           prepend_indefinitive_child_with_parent_ignores (
             tree, node_id, path_head, config, driver ) . await ? } };
@@ -201,37 +201,37 @@ async fn integrate_cycle_in_node (
 /// TODO: This procedure could later be improved to
 /// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
-  tree       : &mut PairTree,
-  parent_id  : ego_tree::NodeId,
-  child_id   : &ID,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
+  tree           : &mut PairTree,
+  parent_treeid  : ego_tree::NodeId,
+  child_skgid    : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
   let ( _, mut child_orgnode ) : ( _, OrgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_id
+      config, driver, child_skgid
     ). await ?;
   child_orgnode . metadata . code . interp =
     Interp::ParentIgnores;
   child_orgnode . metadata . code . indefinitive =
     true;
-  let new_child_id : ego_tree::NodeId =
-    tree . get_mut ( parent_id ) . unwrap ()
+  let new_child_treeid : ego_tree::NodeId =
+    tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode: None,
                            orgnode: child_orgnode } ) . id ();
-  Ok ( new_child_id ) }
+  Ok ( new_child_treeid ) }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
 fn find_child_by_id (
-  tree       : & PairTree,
-  parent_id  : ego_tree::NodeId,
-  target_id  : & ID,
+  tree          : & PairTree,
+  parent_treeid : ego_tree::NodeId,
+  target_skgid  : & ID,
 ) -> Option < ego_tree::NodeId > {
-  for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid ) =
+  for child in tree . get ( parent_treeid ) . unwrap () . children () {
+    if let Some ( ref child_skgpid ) =
       child . value () . orgnode . metadata . id {
-        if child_pid == target_id {
+        if child_skgpid == target_skgid {
           return Some ( child . id () ); }} }
   None }
 
@@ -239,15 +239,15 @@ fn find_child_by_id (
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 fn find_children_by_ids (
-  tree       : & PairTree,
-  parent_id  : ego_tree::NodeId,
-  target_ids : & HashSet < ID >,
+  tree          : & PairTree,
+  parent_treeid : ego_tree::NodeId,
+  target_skgids : & HashSet < ID >,
 ) -> HashMap < ID, ego_tree::NodeId > {
   let mut result : HashMap < ID, ego_tree::NodeId > =
     HashMap::new ();
-  for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid )
+  for child in tree . get ( parent_treeid ) . unwrap () . children () {
+    if let Some ( ref child_skgpid )
       = child . value () . orgnode . metadata . id
-    { if target_ids . contains ( child_pid )
-      { result . insert ( child_pid . clone (), child . id () ); }} }
+    { if target_skgids . contains ( child_skgpid )
+      { result . insert ( child_skgpid . clone (), child . id () ); }} }
   result }
