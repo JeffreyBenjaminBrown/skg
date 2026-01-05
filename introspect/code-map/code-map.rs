@@ -90,57 +90,48 @@ fn process_rust_file(path: &Path, output: &mut String, level: usize, org_path: &
             Item::Fn(f) => {
                 let name = &f.sig.ident;
                 let line = line_of_span(&content, f.sig.fn_token.span);
-                output.push_str(&format!("{} fn {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][fn {}]]\n", stars, org_path, line, name));
             }
             Item::Struct(s) => {
                 let name = &s.ident;
                 let line = line_of_span(&content, s.struct_token.span);
-                output.push_str(&format!("{} struct {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][struct {}]]\n", stars, org_path, line, name));
             }
             Item::Enum(e) => {
                 let name = &e.ident;
                 let line = line_of_span(&content, e.enum_token.span);
-                output.push_str(&format!("{} enum {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][enum {}]]\n", stars, org_path, line, name));
             }
             Item::Type(t) => {
                 let name = &t.ident;
                 let line = line_of_span(&content, t.type_token.span);
-                output.push_str(&format!("{} type {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][type {}]]\n", stars, org_path, line, name));
             }
             Item::Trait(t) => {
                 let name = &t.ident;
                 let line = line_of_span(&content, t.trait_token.span);
-                output.push_str(&format!("{} trait {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][trait {}]]\n", stars, org_path, line, name));
             }
             Item::Const(c) => {
                 let name = &c.ident;
                 let line = line_of_span(&content, c.const_token.span);
-                output.push_str(&format!("{} const {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][const {}]]\n", stars, org_path, line, name));
             }
             Item::Static(s) => {
                 let name = &s.ident;
                 let line = line_of_span(&content, s.static_token.span);
-                output.push_str(&format!("{} static {}\n", stars, name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][static {}]]\n", stars, org_path, line, name));
             }
             Item::Macro(m) => {
                 if let Some(ident) = &m.ident {
                     let line = line_of_span(&content, m.mac.path.segments[0].ident.span());
-                    output.push_str(&format!("{} macro {}\n", stars, ident));
-                    output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                    output.push_str(&format!("{} [[file:{}::{}][macro {}]]\n", stars, org_path, line, ident));
                 }
             }
             Item::Impl(imp) => {
                 let impl_name = format_impl_name(imp);
                 let line = line_of_span(&content, imp.impl_token.span);
-                output.push_str(&format!("{} impl {}\n", stars, impl_name));
-                output.push_str(&format!("[[file:{}::{}]]\n", org_path, line));
+                output.push_str(&format!("{} [[file:{}::{}][impl {}]]\n", stars, org_path, line, impl_name));
 
                 // Process impl items
                 for impl_item in &imp.items {
@@ -148,20 +139,17 @@ fn process_rust_file(path: &Path, output: &mut String, level: usize, org_path: &
                         ImplItem::Fn(f) => {
                             let name = &f.sig.ident;
                             let iline = line_of_span(&content, f.sig.fn_token.span);
-                            output.push_str(&format!("{} fn {}\n", child_stars, name));
-                            output.push_str(&format!("[[file:{}::{}]]\n", org_path, iline));
+                            output.push_str(&format!("{} [[file:{}::{}][fn {}]]\n", child_stars, org_path, iline, name));
                         }
                         ImplItem::Type(t) => {
                             let name = &t.ident;
                             let iline = line_of_span(&content, t.type_token.span);
-                            output.push_str(&format!("{} type {}\n", child_stars, name));
-                            output.push_str(&format!("[[file:{}::{}]]\n", org_path, iline));
+                            output.push_str(&format!("{} [[file:{}::{}][type {}]]\n", child_stars, org_path, iline, name));
                         }
                         ImplItem::Const(c) => {
                             let name = &c.ident;
                             let iline = line_of_span(&content, c.const_token.span);
-                            output.push_str(&format!("{} const {}\n", child_stars, name));
-                            output.push_str(&format!("[[file:{}::{}]]\n", org_path, iline));
+                            output.push_str(&format!("{} [[file:{}::{}][const {}]]\n", child_stars, org_path, iline, name));
                         }
                         _ => {}
                     }
