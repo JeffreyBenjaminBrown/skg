@@ -14,8 +14,7 @@ pub use one_node::{
     optskgnode_from_id,
     skgnode_from_pid_and_source,
     fetch_aliases_from_file,
-    read_skgnode,
-    write_skgnode, };
+    write_skgnode_to_source, };
 pub mod multiple_nodes;
 pub use multiple_nodes::{
     read_all_skg_files_from_sources,
@@ -23,4 +22,5 @@ pub use multiple_nodes::{
     delete_all_nodes_from_fs, };
 pub mod misc;
 pub use misc::{
-    load_config, };
+    load_config,
+    load_config_with_overrides, };

@@ -1,0 +1,8 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+port = 1730
+
+[[sources]]
+nickname = "main"
+path = "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within"
+user_owns_it = true

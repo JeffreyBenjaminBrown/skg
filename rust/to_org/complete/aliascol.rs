@@ -49,24 +49,24 @@ pub async fn completeAliasCol (
   let aliases_from_disk : HashSet < String > = (
     parent_skgnode . aliases // source of truth
       . unwrap_or_default () . into_iter () . collect ( ));
-  let aliases_from_tree : Vec < String > =
+  let aliases_from_branch : Vec < String > =
     collect_alias_titles ( tree, aliascol_node_id ) ?;
-  let good_aliases_in_tree : HashSet < String > = (
+  let good_aliases_in_branch : HashSet < String > = (
     // aliases in tree that match aliases on disk
-    aliases_from_tree . iter ()
+    aliases_from_branch . iter ()
       . filter ( |alias|
                   aliases_from_disk . contains ( *alias ))
       . cloned () . collect ( ));
   let missing_aliases_from_disk : HashSet < String > = (
     // aliases on disk but not in tree
     aliases_from_disk
-      . difference ( & good_aliases_in_tree )
+      . difference ( & good_aliases_in_branch )
       . cloned ()
       . collect ( ));
   remove_duplicates_and_false_aliases_handling_focus (
     tree, // PITFALL: Gets modified.
     aliascol_node_id,
-    & good_aliases_in_tree ) ?;
+    & good_aliases_in_branch ) ?;
   { // Append new Alias nodes for missing aliases
     let mut aliascol_mut : NodeMut < NodePair > =
       tree . get_mut ( aliascol_node_id )
@@ -119,8 +119,7 @@ fn collect_alias_titles (
                   child_orgnode . metadata . code.interp )
         . into () ); }
     aliases_from_tree . push (
-      child_orgnode . title . clone () );
-  }
+      child_orgnode . title . clone () ); }
   Ok ( aliases_from_tree ) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,

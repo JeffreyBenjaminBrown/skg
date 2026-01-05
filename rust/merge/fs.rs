@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::write_skgnode;
+use crate::dbs::filesystem::one_node::write_skgnode_to_source;
 use crate::types::{MergeInstructionTriple, SkgConfig, SkgNode};
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
@@ -21,20 +21,10 @@ pub(super) fn merge_nodes_in_fs (
     let acquiree : &SkgNode =
       &merge.acquiree_to_delete.0;
 
-    { // Write acquiree_text_preserver to disk
-      let acquiree_text_preserver_path : String =
-        path_from_pid_and_source (&config,
-                       &acquiree_text_preserver.source,
-                       acquiree_text_preserver.ids[0].clone() );
-      write_skgnode(
-        acquiree_text_preserver, &acquiree_text_preserver_path)?; }
-    { // Write updated acquirer to disk
-      let acquirer_path : String =
-        path_from_pid_and_source (&config,
-                       &updated_acquirer.source,
-                       updated_acquirer.ids[0].clone() );
-      write_skgnode(
-        updated_acquirer, &acquirer_path)?; }
+    write_skgnode_to_source(
+      acquiree_text_preserver, &config)?;
+    write_skgnode_to_source(
+      updated_acquirer, &config)?;
     { // Delete acquiree from disk
       let acquiree_path : String =
         path_from_pid_and_source (&config,

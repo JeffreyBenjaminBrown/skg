@@ -1,7 +1,5 @@
 // cargo run --bin skg_filenames_match_pids [optional_directory]
 
-use skg::filesystem::read_skgnode;
-
 use std::path::Path;
 use std::fs;
 
@@ -35,10 +33,9 @@ fn main() {
 
       // Process each .skg file individually
       for file_path in &actual_files {
-        match read_skgnode(file_path) {
-          Ok(node) => {
+        match extract_primary_id(file_path) {
+          Ok(primary_id) => {
             total_files += 1;
-            let primary_id = &node.ids[0].0; // First ID is primary
 
             // Expected filename based on primary ID (in any subdirectory of dir)
             let expected_filename = format!("{}.skg", primary_id);
@@ -105,4 +102,22 @@ fn get_skg_files_in_dir(dir: &str) -> Vec<String> {
   }
 
   skg_files
+}
+
+/// Extract the primary ID from a .skg file by parsing its YAML content.
+/// Returns the first ID in the ids list.
+fn extract_primary_id(skgfile_path: &str) -> Result<String, String> {
+  let contents = fs::read_to_string(skgfile_path)
+    .map_err(|e| e.to_string())?;
+  let yaml: serde_yaml::Value = serde_yaml::from_str(&contents)
+    .map_err(|e| e.to_string())?;
+  let ids = yaml.get("ids")
+    .ok_or_else(|| "No 'ids' field found".to_string())?;
+  let ids_seq = ids.as_sequence()
+    .ok_or_else(|| "'ids' is not a list".to_string())?;
+  let first_id = ids_seq.first()
+    .ok_or_else(|| "'ids' list is empty".to_string())?;
+  let id_str = first_id.as_str()
+    .ok_or_else(|| "First ID is not a string".to_string())?;
+  Ok(id_str.to_string())
 }

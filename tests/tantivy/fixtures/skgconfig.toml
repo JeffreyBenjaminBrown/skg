@@ -1,0 +1,8 @@
+db_name = "unused"
+tantivy_folder = "/tmp/unused"
+port = 0
+
+[[sources]]
+nickname = "test"
+path = "tests/tantivy/fixtures"
+user_owns_it = true

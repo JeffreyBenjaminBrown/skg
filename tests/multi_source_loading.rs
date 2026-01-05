@@ -5,7 +5,7 @@ use std::fs;
 use tempfile::tempdir;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::filesystem::one_node::write_skgnode;
+use skg::dbs::filesystem::one_node::write_skgnode_to_source;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
@@ -20,25 +20,26 @@ fn test_load_from_single_source() {
   let source_path = temp_dir.path().join("main");
   fs::create_dir_all(&source_path).unwrap();
 
+  let config = { // Needed by write_skgnode_to_source
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "main".to_string(),
+      SkgfileSource {
+        nickname: "main".to_string(),
+        path: source_path.clone(),
+        user_owns_it: true, } );
+    test_config(sources) };
+
   // Create a test node
   let mut node = empty_skgnode();
   node.ids = vec![ID::new("test1")];
   node.title = "Test Node 1".to_string();
-  write_skgnode(&node, &source_path.join("test1.skg")).unwrap();
+  node.source = "main".to_string();
+  write_skgnode_to_source(&node, &config).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: source_path.clone(),
-      user_owns_it: true,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(
-    &test_config(sources));
-  assert!(result.is_ok(), "Should successfully load from single source");
+  let result = read_all_skg_files_from_sources(&config);
+  assert!(result.is_ok(),
+          "Should successfully load from single source");
 
   let nodes = result.unwrap();
   assert_eq!(nodes.len(), 1, "Should have loaded 1 node");
@@ -56,43 +57,43 @@ fn test_load_from_multiple_sources() {
   fs::create_dir_all(&main_path).unwrap();
   fs::create_dir_all(&shared_path).unwrap();
 
+  let config = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "main".to_string(),
+      SkgfileSource {
+        nickname: "main".to_string(),
+        path: main_path,
+        user_owns_it: true, } );
+    sources.insert(
+      "shared".to_string(),
+      SkgfileSource {
+        nickname: "shared".to_string(),
+        path: shared_path,
+        user_owns_it: false, } );
+    test_config(sources) };
+
   // Create nodes in main source
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("main1")];
   node1.title = "Main Node 1".to_string();
-  write_skgnode(&node1, &main_path.join("main1.skg")).unwrap();
+  node1.source = "main".to_string();
+  write_skgnode_to_source(&node1, &config).unwrap();
 
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("main2")];
   node2.title = "Main Node 2".to_string();
-  write_skgnode(&node2, &main_path.join("main2.skg")).unwrap();
+  node2.source = "main".to_string();
+  write_skgnode_to_source(&node2, &config).unwrap();
 
   // Create nodes in shared source
   let mut node3 = empty_skgnode();
   node3.ids = vec![ID::new("shared1")];
   node3.title = "Shared Node 1".to_string();
-  write_skgnode(&node3, &shared_path.join("shared1.skg")).unwrap();
+  node3.source = "shared".to_string();
+  write_skgnode_to_source(&node3, &config).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: main_path,
-      user_owns_it: true,
-    }
-  );
-  sources.insert(
-    "shared".to_string(),
-    SkgfileSource {
-      nickname: "shared".to_string(),
-      path: shared_path,
-      user_owns_it: false,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(
-    &test_config(sources));
+  let result = read_all_skg_files_from_sources(&config);
   assert!(result.is_ok(), "Should successfully load from multiple sources");
 
   let nodes = result.unwrap();
@@ -120,37 +121,36 @@ fn test_duplicate_id_detection_across_sources() {
   fs::create_dir_all(&main_path).unwrap();
   fs::create_dir_all(&shared_path).unwrap();
 
+  let config = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "main".to_string(),
+      SkgfileSource {
+        nickname: "main".to_string(),
+        path: main_path,
+        user_owns_it: true, } );
+    sources.insert(
+      "shared".to_string(),
+      SkgfileSource {
+        nickname: "shared".to_string(),
+        path: shared_path,
+        user_owns_it: false, } );
+    test_config(sources) };
+
   // Create node with same ID in both sources
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("duplicate_id")];
   node1.title = "Node in Main".to_string();
-  write_skgnode(&node1, &main_path.join("duplicate_id.skg")).unwrap();
+  node1.source = "main".to_string();
+  write_skgnode_to_source(&node1, &config).unwrap();
 
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("duplicate_id")];
   node2.title = "Node in Shared".to_string();
-  write_skgnode(&node2, &shared_path.join("duplicate_id.skg")).unwrap();
+  node2.source = "shared".to_string();
+  write_skgnode_to_source(&node2, &config).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: main_path,
-      user_owns_it: true,
-    }
-  );
-  sources.insert(
-    "shared".to_string(),
-    SkgfileSource {
-      nickname: "shared".to_string(),
-      path: shared_path,
-      user_owns_it: false,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(
-    &test_config(sources));
+  let result = read_all_skg_files_from_sources(&config);
   assert!(result.is_err(), "Should fail due to duplicate ID");
 
   let err = result.unwrap_err();
@@ -170,38 +170,37 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   fs::create_dir_all(&main_path).unwrap();
   fs::create_dir_all(&shared_path).unwrap();
 
+  let config = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "main".to_string(),
+      SkgfileSource {
+        nickname: "main".to_string(),
+        path: main_path,
+        user_owns_it: true, } );
+    sources.insert(
+      "shared".to_string(),
+      SkgfileSource {
+        nickname: "shared".to_string(),
+        path: shared_path,
+        user_owns_it: false, } );
+    test_config(sources) };
+
   // Create node in main with multiple IDs
   let mut node1 = empty_skgnode();
   node1.ids = vec![ID::new("id1"), ID::new("id2")];
   node1.title = "Node with Multiple IDs".to_string();
-  write_skgnode(&node1, &main_path.join("id1.skg")).unwrap();
+  node1.source = "main".to_string();
+  write_skgnode_to_source(&node1, &config).unwrap();
 
   // Create node in shared that has one overlapping ID
   let mut node2 = empty_skgnode();
   node2.ids = vec![ID::new("id2"), ID::new("id3")];
   node2.title = "Another Node".to_string();
-  write_skgnode(&node2, &shared_path.join("id2.skg")).unwrap();
+  node2.source = "shared".to_string();
+  write_skgnode_to_source(&node2, &config).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: main_path,
-      user_owns_it: true,
-    }
-  );
-  sources.insert(
-    "shared".to_string(),
-    SkgfileSource {
-      nickname: "shared".to_string(),
-      path: shared_path,
-      user_owns_it: false,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(
-    &test_config(sources));
+  let result = read_all_skg_files_from_sources(&config);
   assert!(result.is_err(), "Should fail due to overlapping ID");
 
   let err = result.unwrap_err();
@@ -215,17 +214,15 @@ fn test_load_from_empty_sources() {
   let source_path = temp_dir.path().join("empty_source");
   fs::create_dir_all(&source_path).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "empty".to_string(),
-    SkgfileSource {
-      nickname: "empty".to_string(),
-      path: source_path,
-      user_owns_it: true,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(&test_config(sources));
+  let result = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "empty".to_string(),
+      SkgfileSource {
+        nickname: "empty".to_string(),
+        path: source_path,
+        user_owns_it: true, } );
+    read_all_skg_files_from_sources(&test_config(sources)) };
   assert!(result.is_ok(), "Should successfully handle empty source");
 
   let nodes = result.unwrap();
@@ -241,36 +238,36 @@ fn test_source_field_set_correctly() {
   fs::create_dir_all(&source_a).unwrap();
   fs::create_dir_all(&source_b).unwrap();
 
+  let config = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "source_a".to_string(),
+      SkgfileSource {
+        nickname: "source_a".to_string(),
+        path: source_a,
+        user_owns_it: true, } );
+    sources.insert(
+      "source_b".to_string(),
+      SkgfileSource {
+        nickname: "source_b".to_string(),
+        path: source_b,
+        user_owns_it: true, } );
+    test_config(sources) };
+
   // Create nodes
   let mut node_a = empty_skgnode();
   node_a.ids = vec![ID::new("node_a")];
   node_a.title = "Node A".to_string();
-  write_skgnode(&node_a, &source_a.join("node_a.skg")).unwrap();
+  node_a.source = "source_a".to_string();
+  write_skgnode_to_source(&node_a, &config).unwrap();
 
   let mut node_b = empty_skgnode();
   node_b.ids = vec![ID::new("node_b")];
   node_b.title = "Node B".to_string();
-  write_skgnode(&node_b, &source_b.join("node_b.skg")).unwrap();
+  node_b.source = "source_b".to_string();
+  write_skgnode_to_source(&node_b, &config).unwrap();
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "source_a".to_string(),
-    SkgfileSource {
-      nickname: "source_a".to_string(),
-      path: source_a,
-      user_owns_it: true,
-    }
-  );
-  sources.insert(
-    "source_b".to_string(),
-    SkgfileSource {
-      nickname: "source_b".to_string(),
-      path: source_b,
-      user_owns_it: true,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(&test_config(sources));
+  let result = read_all_skg_files_from_sources(&config);
   assert!(result.is_ok());
 
   let nodes = result.unwrap();
@@ -297,6 +294,23 @@ fn test_many_duplicate_ids_creates_org_file() {
   fs::create_dir_all(&source_a).unwrap();
   fs::create_dir_all(&source_b).unwrap();
 
+  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+  sources.insert(
+    "source_a".to_string(),
+    SkgfileSource {
+      nickname: "source_a".to_string(),
+      path: source_a,
+      user_owns_it: true, } );
+  sources.insert(
+    "source_b".to_string(),
+    SkgfileSource {
+      nickname: "source_b".to_string(),
+      path: source_b,
+      user_owns_it: true,
+    }
+  );
+  let config = test_config(sources);
+
   // Create 15 nodes with duplicate IDs
   for i in 1..=15 {
     let id = format!("dup_id_{}", i);
@@ -306,30 +320,12 @@ fn test_many_duplicate_ids_creates_org_file() {
     node_b.ids = vec![ID::new(&id)];
     node_a.title = format!("Node A {}", i);
     node_b.title = format!("Node B {}", i);
-    write_skgnode( &node_a,
-                &source_a.join(format!("{}.skg", id))) . unwrap();
-    write_skgnode( &node_b,
-                &source_b.join(format!("{}.skg", id))) . unwrap(); }
+    node_a.source = "source_a".to_string();
+    node_b.source = "source_b".to_string();
+    write_skgnode_to_source(&node_a, &config).unwrap();
+    write_skgnode_to_source(&node_b, &config).unwrap(); }
 
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "source_a".to_string(),
-    SkgfileSource {
-      nickname: "source_a".to_string(),
-      path: source_a,
-      user_owns_it: true,
-    }
-  );
-  sources.insert(
-    "source_b".to_string(),
-    SkgfileSource {
-      nickname: "source_b".to_string(),
-      path: source_b,
-      user_owns_it: true,
-    }
-  );
-
-  let result = read_all_skg_files_from_sources(&test_config(sources));
+  let result = read_all_skg_files_from_sources(&config);
   assert!(result.is_err(), "Should fail due to duplicate IDs");
 
   let err = result.unwrap_err();
@@ -379,12 +375,24 @@ fn test_unreadable_files_creates_org_file() {
   fs::create_dir_all(&source_good).unwrap();
   // Don't create source_bad directory - it should cause an error
 
+  // Create config with only the good source for writing
+  let mut write_sources: HashMap<String, SkgfileSource> = HashMap::new();
+  write_sources.insert(
+    "source_good".to_string(),
+    SkgfileSource {
+      nickname: "source_good".to_string(),
+      path: source_good.clone(),
+      user_owns_it: true, } );
+  let write_config = test_config(write_sources);
+
   // Create a valid node in the good source
   let mut node = empty_skgnode();
   node.ids = vec![ID::new("test1")];
   node.title = "Test Node".to_string();
-  write_skgnode(&node, &source_good.join("test1.skg")).unwrap();
+  node.source = "source_good".to_string();
+  write_skgnode_to_source(&node, &write_config).unwrap();
 
+  // Create config with both sources for reading (including the bad one)
   let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
   sources.insert(
     "source_good".to_string(),

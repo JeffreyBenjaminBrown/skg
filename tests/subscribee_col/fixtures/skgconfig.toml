@@ -1,0 +1,13 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+port = 1730
+
+[[sources]]
+nickname = "home"
+path = "tests/subscribee_col/fixtures/home"
+user_owns_it = true
+
+[[sources]]
+nickname = "away"
+path = "tests/subscribee_col/fixtures/away"
+user_owns_it = false

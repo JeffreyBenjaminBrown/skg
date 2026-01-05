@@ -2,49 +2,26 @@
 
 use indoc::indoc;
 use skg::init::{overwrite_new_empty_db, define_schema};
+use skg::dbs::filesystem::misc::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, SkgfileSource};
+use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
-use std::collections::HashMap;
 use std::error::Error;
-use std::path::PathBuf;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+
+const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 
 /// Helper to set up multi-source test environment
 async fn setup_multi_source_test(
   db_name: &str,
 ) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
-  let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: PathBuf::from("tests/save/validate_foreign_nodes/fixtures/main"),
-      user_owns_it: true,
-    },
-  );
-  sources.insert(
-    "foreign".to_string(),
-    SkgfileSource {
-      nickname: "foreign".to_string(),
-      path: PathBuf::from("tests/save/validate_foreign_nodes/fixtures/foreign"),
-      user_owns_it: false,
-    },
-  );
-
-  let config: SkgConfig = SkgConfig {
-    db_name: db_name.to_string(),
-    tantivy_folder: PathBuf::from(format!("/tmp/tantivy-{}", db_name)),
-    sources,
-    port: 1730,
-    delete_on_quit: false,
-    initial_node_limit: 1000,
-  };
+  let config: SkgConfig =
+    load_config_with_overrides(CONFIG_PATH, Some(db_name), &[])?;
 
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",

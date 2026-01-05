@@ -6,9 +6,13 @@ use std::fs;
 use std::path::PathBuf;
 
 use skg::dbs::filesystem::{
-  read_skgnode, write_skgnode, fetch_aliases_from_file};
+  fetch_aliases_from_file,
+  misc::load_config_with_overrides,
+  one_node::{skgnode_from_pid_and_source, write_skgnode_to_source}};
 use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
 use skg::test_utils::run_with_test_db;
+
+const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
 #[test]
 fn test_node_io() {
@@ -18,27 +22,31 @@ fn test_node_io() {
   fs::create_dir_all ( &test_dir )
     . unwrap ();
 
+  // Load config, overriding "output" to point to temp dir
+  let config: SkgConfig = load_config_with_overrides(
+    CONFIG_PATH,
+    None,
+    &[("output", test_dir.clone())],
+  ).unwrap();
+
   // Write the example node to a file
-  let example : SkgNode = skgnode_example();
-  let out_filename: PathBuf =
-    test_dir . join ( example
-                      .ids[0] // the primary id
-                      .0      // the string part of it
-                      .clone() );
-  write_skgnode ( &example, &out_filename )
+  let mut example : SkgNode = skgnode_example();
+  example.source = "output".to_string();
+  write_skgnode_to_source ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let mut read_skgnode : SkgNode = read_skgnode (
-    & out_filename ). unwrap ();
-  read_skgnode.source = "main".to_string();
-  let mut reversed = reverse_some_of_node(&read_skgnode);
+  let read_node : SkgNode = skgnode_from_pid_and_source (
+    &config, example.ids[0].clone(), "output" ). unwrap ();
+  let mut reversed = reverse_some_of_node(&read_node);
+  reversed.source = "output".to_string();
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
 
+  write_skgnode_to_source(&reversed, &config).unwrap();
+  let out_filename: PathBuf = test_dir.join(&example.ids[0].0);
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
-  write_skgnode(&reversed, reversed_filename).unwrap();
 
   let expected_example_path = "tests/file_io/fixtures/example.skg";
   let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
@@ -73,13 +81,20 @@ fn verify_body_not_needed() {
   // If a SkgNode's `body` is the empty string,
   // then that field need not be written to disk.
 
-  let mut node = read_skgnode (
-    "tests/file_io/fixtures/example.skg" ) . unwrap();
-  node.source = "main".to_string();
+  // Load config, overriding "output" to point to temp dir
+  let config: SkgConfig = load_config_with_overrides(
+    CONFIG_PATH,
+    None,
+    &[("output", PathBuf::from("/tmp/file_io_test"))],
+  ).unwrap();
+
+  let mut node = skgnode_from_pid_and_source (
+    &config, ID::new("example"), "fixtures" ) . unwrap();
+  node.source = "output".to_string();
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
-  write_skgnode(
-    &node, "/tmp/file_io_test/no_unindexed.skg" ) . unwrap();
+  write_skgnode_to_source(
+    &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
     serde_yaml::from_str (
@@ -128,13 +143,21 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
 
 #[test]
 fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
-  use std::fs::File;
-  use std::io::Write;
+  use std::collections::HashMap;
+  use skg::types::SkgfileSource;
   use tempfile::tempdir;
 
   // Create a temporary directory
   let dir = tempdir()?;
-  let file_path = dir.path().join("test_node.skg");
+
+  // Create a config with the temp directory as a source
+  let config: SkgConfig = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert("temp".to_string(), SkgfileSource {
+      nickname: "temp".to_string(),
+      path: dir.path().to_path_buf(),
+      user_owns_it: true, });
+    SkgConfig::dummyFromSources(sources) };
 
   let mut test_node : SkgNode = empty_skgnode ();
   { test_node.title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
@@ -142,21 +165,15 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
     test_node.aliases = Some(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
     test_node.ids = vec![ID::new("test123")];
+    test_node.source = "temp".to_string();
     test_node.body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]".to_string()); }
 
-  { // Write the node to a file
-    let yaml = serde_yaml::to_string(&test_node)
-      .map_err (
-        |e| std::io::Error::new(
-          std::io::ErrorKind::InvalidData,
-          e.to_string()))?;
-    let mut file = File::create( &file_path )?;
-    file.write_all(yaml.as_bytes())?; }
-  let mut read_skgnode = // Read it back from the file.
-    read_skgnode(&file_path)?;
-  read_skgnode.source = "main".to_string();
-  assert_eq!( test_node, read_skgnode,
-              "Nodes should have matched." );
+  { // Write to a file and read it back.
+    write_skgnode_to_source(&test_node, &config)?;
+    let read_node = skgnode_from_pid_and_source(
+      &config, ID::new("test123"), "temp")?;
+    assert_eq!( test_node, read_node,
+                "Nodes should have matched." ); }
   Ok (( ))
 }
 

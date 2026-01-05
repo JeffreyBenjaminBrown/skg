@@ -72,11 +72,23 @@ pub async fn fetch_aliases_from_file (
       skgnode.aliases.unwrap_or_default(),
     _ => Vec::new(), }}
 
-pub fn read_skgnode
+pub fn write_skgnode_to_source (
+  skgnode : &SkgNode,
+  config  : &SkgConfig,
+) -> io::Result<()> {
+  let pid : &ID = skgnode.ids.get(0)
+    .ok_or_else(|| io::Error::new(
+      io::ErrorKind::InvalidInput,
+      "SkgNode has no IDs"))?;
+  let path : String =
+    path_from_pid_and_source( config, &skgnode.source, pid.clone() );
+  write_skgnode( skgnode, &path ) }
+
+/// Effectively private.
+pub(super) fn read_skgnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
-  (file_path : P)
-   -> io::Result <SkgNode>
-{ // The type signature explains everything.
+  (file_path : P
+  ) -> io::Result <SkgNode> {
 
   let file_path : &Path = file_path.as_ref ();
   let contents  : String = fs::read_to_string ( file_path )?;
@@ -98,12 +110,12 @@ pub fn read_skgnode
     )); }
   Ok ( skgnode ) }
 
-pub fn write_skgnode
+/// Effectively private.
+pub(super) fn write_skgnode
   <P : AsRef<Path>>
   ( skgnode   : &SkgNode,
     file_path : P
-  ) -> io::Result<()>
-{ // Writes `skgnode` to `path`.
+  ) -> io::Result<()> {
 
   let yaml_string : String =
     serde_yaml::to_string ( skgnode )

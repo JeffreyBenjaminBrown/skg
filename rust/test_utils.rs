@@ -116,17 +116,16 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let mut sources: HashMap<String, SkgfileSource> =
-    HashMap::new();
-  sources.insert( // just one source
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: PathBuf::from(data_folder),
-      user_owns_it: true, } );
-  let nodes: Vec<SkgNode> =
+  let nodes: Vec<SkgNode> = {
+    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert(
+      "main".to_string(),
+      SkgfileSource {
+        nickname: "main".to_string(),
+        path: PathBuf::from(data_folder),
+        user_owns_it: true, } );
     read_all_skg_files_from_sources(
-      &SkgConfig::dummyFromSources( sources ))?;
+      &SkgConfig::dummyFromSources( sources ))? };
   overwrite_new_empty_db (
     db_name, driver ). await ?;
   define_schema (
@@ -152,23 +151,18 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
-  let mut sources : HashMap<String, SkgfileSource> =
-    HashMap::new ();
-  sources.insert (
-    "main".to_string (),
-    SkgfileSource {
-      nickname     : "main".to_string (),
-      path         : PathBuf::from ( fixtures_folder ),
-      user_owns_it : true,
-    });
-  let config: SkgConfig = SkgConfig {
-    db_name: db_name.to_string(),
-    tantivy_folder: PathBuf::from(tantivy_folder),
-    sources,
-    port: 1730,
-    delete_on_quit: false, // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs, not via delete_on_quit, because there's no server to quit.
-    initial_node_limit: 1000,
-  };
+  // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs,
+  // not via delete_on_quit, because there's no server to quit.
+  let config: SkgConfig = {
+    let mut sources : HashMap<String, SkgfileSource> = HashMap::new();
+    sources.insert (
+      "main".to_string (),
+      SkgfileSource {
+        nickname     : "main".to_string (),
+        path         : PathBuf::from ( fixtures_folder ),
+        user_owns_it : true, });
+    SkgConfig::fromSourcesAndDbName (
+      sources, db_name, tantivy_folder ) };
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),

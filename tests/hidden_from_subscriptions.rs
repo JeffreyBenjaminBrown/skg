@@ -8,42 +8,27 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use skg::dbs::filesystem::misc::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
-use skg::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
-use std::collections::HashMap;
 use std::error::Error;
-use std::path::PathBuf;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 async fn setup_test(
   db_name: &str,
-  fixtures_path: &str,
+  config_path: &str,
 ) -> Result<(SkgConfig,
              TypeDBDriver,
              TantivyIndex),
             Box<dyn Error>> {
-  let mut sources: HashMap<String, SkgfileSource> =
-    HashMap::new();
-  sources.insert(
-    "main".to_string(),
-    SkgfileSource {
-      nickname: "main".to_string(),
-      path: PathBuf::from(fixtures_path),
-      user_owns_it: true, }, );
-  let config: SkgConfig = SkgConfig {
-    db_name: db_name.to_string(),
-    tantivy_folder: PathBuf::from(format!("/tmp/tantivy-{}",
-                                          db_name)),
-    sources,
-    port: 1730,
-    delete_on_quit: false,
-    initial_node_limit: 1000, };
+  let config: SkgConfig =
+    load_config_with_overrides(config_path, Some(db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
@@ -109,7 +94,7 @@ fn test_every_kind_of_col(
     let db_name = "skg-test-hidden-every-kind-of-col";
     let (config, driver, tantivy) = setup_test(
       db_name,
-      "tests/hidden_from_subscriptions/fixtures-every-kind-of-col"
+      "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
     ).await?;
 
     let initial_view: String = single_root_view(
@@ -181,7 +166,7 @@ fn test_hidden_within_but_none_without(
   block_on(async {
     let db_name = "skg-test-hidden-within-but-none-without";
     let (config, driver, tantivy) = setup_test(
-      db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without" ). await?;
+      db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ). await?;
     let initial_view: String = single_root_view(
       &driver,
       &config,
@@ -248,7 +233,7 @@ fn test_hidden_without_but_none_within(
     let db_name = "skg-test-hidden-without-but-none-within";
     let (config, driver, tantivy) =
       setup_test(db_name,
-                 "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within").await?;
+                 "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml").await?;
     let initial_view: String = single_root_view(
       &driver,
       &config,
@@ -314,7 +299,7 @@ fn test_overlapping_hidden_within(
     let db_name = "skg-test-overlapping-hidden-within";
     let (config, driver, tantivy) =
       setup_test(db_name,
-                 "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within").await?;
+                 "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml").await?;
     let initial_view: String = single_root_view(
       &driver,
       &config,

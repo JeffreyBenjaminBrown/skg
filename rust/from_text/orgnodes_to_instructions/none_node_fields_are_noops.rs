@@ -14,12 +14,10 @@ rather than the None value that the user's input would suggest.
 */
 
 use std::io;
-use std::path::Path;
 
 use crate::types::{ ID, SkgConfig, SkgNode };
-use crate::dbs::filesystem::read_skgnode;
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::typedb::util::pid_and_source_from_id;
-use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -44,15 +42,12 @@ pub async fn clobber_none_fields_with_data_from_disk (
         None => { // No such node in database. Return input unchanged.
           return Ok(from_user); }} );
   let from_disk : Result<SkgNode, io::Error> =
-    read_skgnode (
-      & Path::new (
-        & path_from_pid_and_source (
-          config, &source, pid_resolved )) );
+    skgnode_from_pid_and_source(
+      config, pid_resolved, &source );
   match from_disk {
     Err (_) => { // No such file => return input unchanged.
       Ok ( from_user ) },
-    Ok ( mut disk_node ) => {
-      disk_node.source = source;
+    Ok ( disk_node ) => {
       let mut result : SkgNode =
         from_user;
       if result.aliases.is_none () {

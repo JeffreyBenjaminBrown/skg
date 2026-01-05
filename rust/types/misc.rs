@@ -165,6 +165,21 @@ impl SkgConfig {
       delete_on_quit     : false,
       initial_node_limit : 100, }}
 
+  /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
+  /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
+  pub fn fromSourcesAndDbName (
+    sources        : HashMap<String, SkgfileSource>,
+    db_name        : &str,
+    tantivy_folder : &str,
+  ) -> Self {
+    SkgConfig {
+      db_name            : db_name.to_string(),
+      tantivy_folder     : PathBuf::from(tantivy_folder),
+      sources,
+      port               : 1730,
+      delete_on_quit     : false,
+      initial_node_limit : 1000, }}
+
   pub fn get_source (
     &self,
     nickname : &str
