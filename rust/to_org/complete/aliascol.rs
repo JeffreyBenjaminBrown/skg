@@ -5,6 +5,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp};
 use crate::types::tree::{NodePair, PairTree};
+use crate::types::tree::accessors::{read_at_ancestor_in_tree, read_at_node_in_tree};
 use crate::util::path_from_pid_and_source;
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::HashSet;
@@ -35,10 +36,23 @@ pub async fn completeAliasCol (
   config           : &SkgConfig,
   driver           : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let parent_skgid : ID =
-    get_aliascol_parent_id (
-      tree,
-      aliascol_node_id ) ?;
+  { // Validate this is an AliasCol
+    let interp : Interp =
+      read_at_node_in_tree(
+        tree, aliascol_node_id,
+        |np| np . orgnode . metadata . code . interp . clone () )
+      . map_err( |e| -> Box<dyn Error> { e . into () })?;
+    if interp != Interp::AliasCol {
+      return Err( format!(
+        "Node is not an AliasCol: {:?}", interp ) . into () ); }}
+  let parent_skgid : ID = {
+    read_at_ancestor_in_tree
+      ( tree, aliascol_node_id, 1,
+        |np| np . orgnode . metadata . id . clone () )
+      . map_err( |e| -> Box<dyn Error> { e . into () })?
+      . ok_or_else(
+        || -> Box<dyn Error> {
+          "Parent node has no ID" . into () })? };
   let (parent_pid, parent_source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, &parent_skgid).await?
@@ -51,11 +65,8 @@ pub async fn completeAliasCol (
     read_skgnode ( path )? };
   skgnode.source = parent_source;
   let aliases_from_disk : HashSet < String > = (
-    // source of truth
-    skgnode . aliases
-      . unwrap_or_default ()
-      . into_iter ()
-      . collect ( ));
+    skgnode . aliases // source of truth
+      . unwrap_or_default () . into_iter () . collect ( ));
   let aliases_from_tree : Vec < String > =
     collect_alias_titles ( tree, aliascol_node_id ) ?;
   let good_aliases_in_tree : HashSet < String > = (
@@ -178,33 +189,3 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     aliascol_mut . value () . orgnode . metadata . viewData.focused = true; }
 
   Ok (( )) }
-
-/// Get the parent ID of an AliasCol node.
-/// Verifies the node is an AliasCol and its parent has an ID.
-fn get_aliascol_parent_id (
-  tree             : &PairTree,
-  aliascol_node_id : NodeId,
-) -> Result < ID, Box<dyn Error> > {
-  let aliascol_node : &OrgNode =
-    & tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found in tree" ) ?
-    . value () . orgnode;
-  if aliascol_node . metadata . code.interp
-    != Interp::AliasCol {
-      return Err (
-        format! ( "Node is not an AliasCol: {:?}",
-                   aliascol_node . metadata . code.interp )
-          . into () ); }
-  let parent_treeid : NodeId =
-    tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found" ) ?
-    . parent ()
-    . ok_or ( "AliasCol node has no parent" ) ?
-    . id ();
-  let parent_skgid : &ID =
-    tree . get ( parent_treeid )
-    . ok_or ( "Parent node not found" ) ?
-    . value () . orgnode
-    . metadata . id . as_ref ()
-    . ok_or ( "Parent node has no ID" ) ?;
-  Ok ( parent_skgid . clone () ) }
