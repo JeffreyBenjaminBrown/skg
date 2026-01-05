@@ -1,12 +1,10 @@
-use crate::dbs::filesystem::one_node::read_skgnode;
-use crate::dbs::typedb::util::pid_and_source_from_id;
+use crate::dbs::filesystem::skgnode_and_source_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::accessors::{read_at_ancestor_in_tree, read_at_node_in_tree};
-use crate::util::path_from_pid_and_source;
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
@@ -45,38 +43,20 @@ pub async fn completeAliasCol (
     if interp != Interp::AliasCol {
       return Err( format!(
         "Node is not an AliasCol: {:?}", interp ) . into () ); }}
-  let parent_skgid : ID = {
-    read_at_ancestor_in_tree
-      ( tree, aliascol_node_id, 1,
-        |np| np . orgnode . metadata . id . clone () )
-      . map_err( |e| -> Box<dyn Error> { e . into () })?
-      . ok_or_else(
-        || -> Box<dyn Error> {
-          "Parent node has no ID" . into () })? };
-  let (parent_pid, parent_source) : (ID, String) =
-    pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, &parent_skgid).await?
-    . ok_or_else( || format!(
-      "Parent ID '{}' not found in database", parent_skgid))?;
-  let mut skgnode : SkgNode = {
-    let path : String =
-      path_from_pid_and_source (
-        config, &parent_source, parent_pid );
-    read_skgnode ( path )? };
-  skgnode.source = parent_source;
+  let parent_skgnode : SkgNode =
+    ancestor_skgnode_from_disk(
+      tree, aliascol_node_id, 1, config, driver ) . await?;
   let aliases_from_disk : HashSet < String > = (
-    skgnode . aliases // source of truth
+    parent_skgnode . aliases // source of truth
       . unwrap_or_default () . into_iter () . collect ( ));
   let aliases_from_tree : Vec < String > =
     collect_alias_titles ( tree, aliascol_node_id ) ?;
   let good_aliases_in_tree : HashSet < String > = (
     // aliases in tree that match aliases on disk
-    aliases_from_tree
-      . iter ()
+    aliases_from_tree . iter ()
       . filter ( |alias|
                   aliases_from_disk . contains ( *alias ))
-      . cloned ()
-      . collect ( ));
+      . cloned () . collect ( ));
   let missing_aliases_from_disk : HashSet < String > = (
     // aliases on disk but not in tree
     aliases_from_disk
@@ -97,6 +77,27 @@ pub async fn completeAliasCol (
                    orgnode: orgnode_from_title_and_rel (
                      Interp::Alias, alias ) }); }}
   Ok (( )) }
+
+/// Reads from disk the SkgNode
+/// for a node or for one of its tree-ancestors.
+async fn ancestor_skgnode_from_disk (
+  tree       : &PairTree,
+  treeid     : NodeId,
+  generation : usize, // 0 = self, 1 = parent, etc.
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < SkgNode, Box<dyn Error> > {
+  let ancestor_skgid : ID =
+    read_at_ancestor_in_tree( tree, treeid, generation,
+      |np| np . orgnode . metadata . id . clone () )
+    . map_err( |e| -> Box<dyn Error> { e . into () })?
+    . ok_or_else(
+      || -> Box<dyn Error> {
+        "Ancestor node has no ID" . into () })?;
+  let (skgnode, _) : (SkgNode, _) =
+    skgnode_and_source_from_id(
+      config, driver, &ancestor_skgid ) . await?;
+  Ok ( skgnode ) }
 
 /// Collect titles from Alias children of an AliasCol node.
 /// Errors if any non-Alias children are found.
@@ -123,7 +124,8 @@ fn collect_alias_titles (
   Ok ( aliases_from_tree ) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,
-/// preserving focus information.
+/// preserving focus information,
+/// where 'invalid' means not found on disk.
 ///
 /// If a duplicate node has focus, after it is removed,
 /// the remaining node with the same title gets focus.

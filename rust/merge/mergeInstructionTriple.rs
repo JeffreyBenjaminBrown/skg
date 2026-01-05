@@ -1,7 +1,6 @@
-use crate::dbs::filesystem::read_skgnode;
-use crate::dbs::typedb::util::pid_and_source_from_id;
+use crate::dbs::filesystem::skgnode_and_source_from_id;
 use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
-use crate::util::{path_from_pid_and_source, dedup_vector, setlike_vector_subtraction};
+use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -51,29 +50,12 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
       let acquirer_id : &ID =
         node.metadata.id.as_ref()
         .ok_or("Node with merge request must have an ID")?;
-      // Query TypeDB for acquirer PID and source
-      let (acquirer_pid, acquirer_source) : (ID, String) =
-        pid_and_source_from_id (&config.db_name,
-                                driver,
-                                acquirer_id ). await?
-        .ok_or_else( || format!(
-          "Acquirer ID '{}' not found in database", acquirer_id))?;
-      let mut acquirer_from_disk: SkgNode =
-        // TODO: If this fails, it should report how.
-        read_skgnode ( &path_from_pid_and_source (
-          config, &acquirer_source, acquirer_pid ))?;
-      acquirer_from_disk.source = acquirer_source;
-      let (acquiree_pid, acquiree_source) : (ID, String) =
-        pid_and_source_from_id (&config.db_name,
-                                driver,
-                                acquiree_id ). await?
-        .ok_or_else(|| format!(
-          "Acquiree ID '{}' not found in database", acquiree_id))?;
-      let mut acquiree_from_disk: SkgNode =
-        // TODO: If this fails, it should report how.
-        read_skgnode ( &path_from_pid_and_source (
-          config, &acquiree_source, acquiree_pid ))?;
-      acquiree_from_disk.source = acquiree_source;
+      let (acquirer_from_disk, _) : (SkgNode, _) =
+        skgnode_and_source_from_id(
+          config, driver, acquirer_id ) . await?;
+      let (acquiree_from_disk, _) : (SkgNode, _) =
+        skgnode_and_source_from_id(
+          config, driver, acquiree_id ) . await?;
       let acquiree_text_preserver: SkgNode =
         create_acquiree_text_preserver ( &acquiree_from_disk );
       let updated_acquirer: SkgNode =
