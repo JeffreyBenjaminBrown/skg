@@ -205,17 +205,17 @@ pub fn detect_and_mark_cycle (
 /// containing just "tree root" nodes (no grandchildren yet),
 /// and complete each via complete_branch_minus_content.
 pub async fn stub_forest_from_root_ids (
-  root_skg_ids : &[ID],
+  root_skgids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut VisitedMap,
 ) -> Result < PairTree, Box<dyn Error> > {
   let mut forest : PairTree = new_forest ();
-  let forest_root_tree_id : NodeId = forest . root () . id ();
-  for root_skg_id in root_skg_ids {
+  let forest_root_treeid : NodeId = forest . root () . id ();
+  for root_skgid in root_skgids {
     build_node_branch_minus_content (
-      Some ( (&mut forest, forest_root_tree_id) ),
-      root_skg_id, config, driver, visited
+      Some ( (&mut forest, forest_root_treeid) ),
+      root_skgid, config, driver, visited
     ) . await ?; }
   Ok ( forest ) }
 
@@ -230,22 +230,22 @@ pub fn collect_ids_from_pair_tree (
         pids . push ( pid . clone () ); }} }
   pids }
 
-/// Check if `target_skg_id` appears in the ancestor path of `treeid`.
+/// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
 pub fn is_ancestor_id (
   tree           : &PairTree,
-  origin_tree_id : NodeId, // start looking from here
-  target_skg_id  : &ID,    // look for this
+  origin_treeid : NodeId, // start looking from here
+  target_skgid  : &ID,    // look for this
 ) -> Result < bool, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( origin_tree_id )
+    tree . get ( origin_treeid )
     . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
   let mut current : Option < NodeRef < NodePair > > =
     node_ref . parent ();
   while let Some ( parent ) = current {
-    if let Some ( parent_skg_id ) =
+    if let Some ( parent_skgid ) =
       parent . value () . orgnode . metadata . id . as_ref () {
-        if parent_skg_id == target_skg_id {
+        if parent_skgid == target_skgid {
           return Ok ( true ); }}
     current = parent . parent (); }
   Ok ( false ) }
@@ -273,7 +273,7 @@ pub fn get_pid_from_pair_using_noderef (
     . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
 
 /// Build a node from disk and
-/// append it at 'parent_tree_id' as a child.
+/// append it at 'parent_treeid' as a child.
 /// Returns the new node's ego_tree::NodeId.
 ///
 /// Does *not* take its ancestors into account,
@@ -283,23 +283,23 @@ pub fn get_pid_from_pair_using_noderef (
 /// 'build_node_branch_minus_content.
 pub async fn make_and_append_child_pair (
   tree           : &mut PairTree,
-  parent_tree_id : NodeId, // will parent the new node
-  child_skg_id   : &ID, // how to find the new node
+  parent_treeid : NodeId, // will parent the new node
+  child_skgid   : &ID, // how to find the new node
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_skg_id ) . await ?;
+      config, driver, child_skgid ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
-    tree . get_mut ( parent_tree_id )
+    tree . get_mut ( parent_treeid )
     . ok_or ( "make_and_append_child_pair: parent not found" ) ?;
-  let child_tree_id : NodeId =
+  let child_treeid : NodeId =
     parent_mut . append ( NodePair { mskgnode: Some(child_skgnode),
                                      orgnode: child_orgnode } )
     . id ();
-  Ok ( child_tree_id ) }
+  Ok ( child_treeid ) }
 
 /// Builds a pair from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
@@ -319,25 +319,25 @@ pub async fn build_node_branch_minus_content (
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
   match tree_and_parent {
-    Some ( (tree, parent_tree_id) ) => {
-      let child_tree_id : NodeId = {
+    Some ( (tree, parent_treeid) ) => {
+      let child_treeid : NodeId = {
         let mut parent_mut : NodeMut < NodePair > =
-          tree . get_mut ( parent_tree_id ) . ok_or (
+          tree . get_mut ( parent_treeid ) . ok_or (
             "build_node_branch_minus_content: parent not found" ) ?;
         parent_mut . append ( NodePair { mskgnode: Some(skgnode),
                                          orgnode } ) . id () };
       complete_branch_minus_content (
-        tree, child_tree_id, visited,
+        tree, child_treeid, visited,
         config, driver ) . await ?;
-      Ok ( (None, child_tree_id) ) },
+      Ok ( (None, child_treeid) ) },
     None => {
       let mut tree : PairTree =
         Tree::new ( NodePair { mskgnode: Some(skgnode), orgnode } );
-      let root_tree_id : NodeId = tree . root () . id ();
+      let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
-        &mut tree, root_tree_id, visited,
+        &mut tree, root_treeid, visited,
         config, driver ) . await ?;
-      Ok ( (Some(tree), root_tree_id) ) }, } }
+      Ok ( (Some(tree), root_treeid) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
@@ -371,11 +371,11 @@ pub fn nodes_after_in_generation (
   generation_member_treeid : NodeId,
   effective_root           : Option < NodeId >,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let tree_ids_in_gen : Vec < NodeId > =
+  let treeids_in_gen : Vec < NodeId > =
     collect_generation_ids ( tree, generation, effective_root ) ?;
   let mut result : Vec < NodeId > = Vec::new ();
   let mut found_target : bool = false;
-  for treeid in tree_ids_in_gen {
+  for treeid in treeids_in_gen {
     if found_target {
       result . push ( treeid );
     } else if treeid == generation_member_treeid {
@@ -401,13 +401,13 @@ pub fn is_indefinitive (
 
 /// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.
-pub fn collect_child_tree_ids (
+pub fn collect_child_treeids (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
     tree . get ( treeid )
-    . ok_or ( "collect_child_tree_ids: NodeId not in tree" ) ?;
+    . ok_or ( "collect_child_treeids: NodeId not in tree" ) ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
 
 

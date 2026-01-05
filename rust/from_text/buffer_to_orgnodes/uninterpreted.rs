@@ -31,27 +31,27 @@ pub fn org_to_uninterpreted_nodes(
   let org_node_line_cols: Vec<OrgNodeLineCol> =
     divide_into_orgNodeLineCols(input)?;
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
-  let forest_root_tree_id: NodeId = forest.root().id();
-  // tree_id_stack[0] is the ForestRoot, tree_id_stack[1] is the current tree root, etc.
-  let mut tree_id_stack: Vec<NodeId> = vec![forest_root_tree_id];
+  let forest_root_treeid: NodeId = forest.root().id();
+  // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
+  let mut treeid_stack: Vec<NodeId> = vec![forest_root_treeid];
   for org_node_line_col in &org_node_line_cols {
     let (level, orgnode): (usize, OrgNode) =
       linecol_to_orgnode(org_node_line_col)?;
-    // Adjust tree_id_stack to proper level (ForestRoot is level 0, tree roots are level 1)
-    while tree_id_stack.len() > level {
-      tree_id_stack.pop(); }
+    // Adjust treeid_stack to proper level (ForestRoot is level 0, tree roots are level 1)
+    while treeid_stack.len() > level {
+      treeid_stack.pop(); }
     // Check for orphaned headlines (e.g., ** without preceding *)
-    // tree_id_stack.len() should equal level (because ForestRoot is at level 0)
-    if tree_id_stack.len() < level {
+    // treeid_stack.len() should equal level (because ForestRoot is at level 0)
+    if treeid_stack.len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
         orgnode.title, level, level - 1));
     }
-    let parent_tree_id: NodeId = *tree_id_stack.last().unwrap();
-    let new_tree_id: NodeId = {
-      let mut parent_mut = forest.get_mut(parent_tree_id).unwrap();
+    let parent_treeid: NodeId = *treeid_stack.last().unwrap();
+    let new_treeid: NodeId = {
+      let mut parent_mut = forest.get_mut(parent_treeid).unwrap();
       parent_mut.append(orgnode).id() };
-    tree_id_stack.push(new_tree_id);
+    treeid_stack.push(new_treeid);
   }
   Ok(forest) }
 

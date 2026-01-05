@@ -28,11 +28,11 @@ pub fn pair_orgnode_forest_with_save_instructions (
   let mut pair_tree : PairTree = Tree::new (
     // PITFALL: Discards the forest's root OrgNode.
     forest_root_pair () );
-  let forest_root_tree_id : NodeId = pair_tree . root () . id ();
+  let forest_root_treeid : NodeId = pair_tree . root () . id ();
   for tree_root in orgnode_tree.root().children() {
     add_paired_subtree_as_child (
       &mut pair_tree,
-      forest_root_tree_id,
+      forest_root_treeid,
       orgnode_tree, tree_root . id (),
       &skgnode_map ); }
   pair_tree }
@@ -41,29 +41,29 @@ pub fn pair_orgnode_forest_with_save_instructions (
 /// pairing each node with its SkgNode from the map.
 fn add_paired_subtree_as_child (
   pair_tree       : &mut PairTree,
-  parent_tree_id  : NodeId,
+  parent_treeid  : NodeId,
   orgnode_tree    : &Tree<OrgNode>,
-  orgnode_tree_id : NodeId,
+  orgnode_treeid : NodeId,
   skgnode_map     : &HashMap<ID, SkgNode>,
 ) {
   let orgnode : OrgNode =
-    orgnode_tree . get ( orgnode_tree_id ) . unwrap ()
+    orgnode_tree . get ( orgnode_treeid ) . unwrap ()
     . value () . clone ();
   let mskgnode : Option<SkgNode> =
     orgnode . metadata . id . as_ref ()
     . and_then (
       |id| skgnode_map . get (id) . cloned () );
-  let new_tree_id : NodeId = {
+  let new_treeid : NodeId = {
     let mut parent_mut : NodeMut < _ > =
-      pair_tree . get_mut ( parent_tree_id ) . unwrap ();
+      pair_tree . get_mut ( parent_treeid ) . unwrap ();
     parent_mut . append ( // add new node
       NodePair { mskgnode, orgnode } ) . id () };
   { // recurse in new node
-    let child_tree_ids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_tree_id ) . unwrap ()
+    let child_treeids : Vec < NodeId > =
+      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
-    for child_tree_id in child_tree_ids {
+    for child_treeid in child_treeids {
       add_paired_subtree_as_child (
-        pair_tree, new_tree_id,
-        orgnode_tree, child_tree_id,
+        pair_tree, new_treeid,
+        orgnode_tree, child_treeid,
         skgnode_map ); }} }

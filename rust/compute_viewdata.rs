@@ -33,10 +33,10 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
   let rel_data : MapsFromIdForView =
     mapsFromIdForView_from_forest (
       forest, config, driver ) . await ?;
-  let root_tree_id : NodeId = forest . root () . id ();
+  let root_treeid : NodeId = forest . root () . id ();
   set_metadata_relationships_in_node_recursive (
     forest,
-    root_tree_id,
+    root_treeid,
     None,
     & rel_data );
   Ok (( )) }
@@ -108,7 +108,7 @@ fn set_metadata_relationships_in_node_recursive (
     tree . get_mut ( treeid ) . unwrap () . value ()
       . orgnode . metadata . viewData . relationships . numLinksIn =
       rel_data . num_links_in . get ( node_pid ) . copied ();
-    if let Some ( parent_skg_id ) = parent_pid {
+    if let Some ( parent_skgid ) = parent_pid {
       // Set parent relationship flags if we have a parent.
       // TODO | PITFALL: If there is no parent,
       // these fields are meaningless.
@@ -117,20 +117,20 @@ fn set_metadata_relationships_in_node_recursive (
         rel_data . content_to_containers
         . get ( node_pid )
         . map_or ( false, | containers |
-                   containers . contains ( parent_skg_id ));
+                   containers . contains ( parent_skgid ));
       tree . get_mut ( treeid ) . unwrap () . value ()
         . orgnode . metadata . viewData . relationships . parentIsContent =
         rel_data . container_to_contents
         . get ( node_pid )
         . map_or ( false, | contents |
-                   contents . contains ( parent_skg_id )); }}
+                   contents . contains ( parent_skgid )); }}
   { // recurse
-    let child_tree_ids : Vec < NodeId > =
+    let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()
       . children () . map ( | c | c . id () ) . collect ();
-    for child_tree_id in child_tree_ids {
+    for child_treeid in child_treeids {
       set_metadata_relationships_in_node_recursive (
         tree,
-        child_tree_id,
+        child_treeid,
         node_pid_opt . as_ref (),
         rel_data ); }} }

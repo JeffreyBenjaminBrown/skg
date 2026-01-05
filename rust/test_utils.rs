@@ -465,30 +465,30 @@ pub fn orgnode_forest_to_paired (
 ) -> PairTree {
   fn add_orgnode_tree_as_child_of_forest_root (
     forest          : &mut PairTree,
-    parent_tree_id  : NodeId,
+    parent_treeid  : NodeId,
     orgnode_tree    : &Tree < OrgNode >,
-    orgnode_tree_id : NodeId,
+    orgnode_treeid : NodeId,
   ) {
     let orgnode : OrgNode =
-      orgnode_tree . get ( orgnode_tree_id )
+      orgnode_tree . get ( orgnode_treeid )
       . unwrap () . value () . clone ();
-    let new_tree_id : NodeId = {
+    let new_treeid : NodeId = {
       let mut parent_mut =
-        forest . get_mut ( parent_tree_id ) . unwrap ();
+        forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
         . append ( NodePair { mskgnode: None,
                               orgnode: orgnode } )
         . id () };
-    let child_tree_ids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_tree_id ) . unwrap ()
+    let child_treeids : Vec < NodeId > =
+      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
-    for child_tree_id in child_tree_ids {
+    for child_treeid in child_treeids {
       add_orgnode_tree_as_child_of_forest_root (
-        forest, new_tree_id, orgnode_tree, child_tree_id ); } }
+        forest, new_treeid, orgnode_tree, child_treeid ); } }
   let mut result : PairTree = Tree::new ( forest_root_pair () );
-  let forest_root_tree_id = result . root () . id ();
+  let forest_root_treeid = result . root () . id ();
   // Iterate over tree roots (children of ForestRoot)
   for tree_root in forest . root () . children () {
     add_orgnode_tree_as_child_of_forest_root (
-      &mut result, forest_root_tree_id, &forest, tree_root . id () ); }
+      &mut result, forest_root_treeid, &forest, tree_root . id () ); }
   result }

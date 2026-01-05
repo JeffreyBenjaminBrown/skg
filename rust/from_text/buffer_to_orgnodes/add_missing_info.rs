@@ -83,13 +83,13 @@ fn add_missing_info_dfs (
       if its_interp . should_be_sourceless () { None }
       else { node_ref . value () . metadata . source . clone () } );
     let treeid: ego_tree::NodeId = node_ref . id ();
-    let child_tree_ids: Vec < ego_tree::NodeId > = {
+    let child_treeids: Vec < ego_tree::NodeId > = {
       let tree = node_ref . tree ();
       tree . get ( treeid ) . unwrap ()
         . children () . map ( | child |
                              child . id () )
         . collect () };
-    for child_id in child_tree_ids {
+    for child_id in child_treeids {
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_id ) {
           add_missing_info_dfs (
