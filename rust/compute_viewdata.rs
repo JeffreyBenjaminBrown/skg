@@ -33,10 +33,10 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
   let rel_data : MapsFromIdForView =
     mapsFromIdForView_from_forest (
       forest, config, driver ) . await ?;
-  let root_id : NodeId = forest . root () . id ();
+  let root_tree_id : NodeId = forest . root () . id ();
   set_metadata_relationships_in_node_recursive (
     forest,
-    root_id,
+    root_tree_id,
     None,
     & rel_data );
   Ok (( )) }
@@ -89,48 +89,48 @@ async fn fetch_relationship_data (
 
 fn set_metadata_relationships_in_node_recursive (
   tree       : &mut PairTree,
-  node_id    : NodeId,
+  tree_id    : NodeId,
   parent_pid : Option < &ID >,
   rel_data   : &MapsFromIdForView,
 ) {
   let node_pid_opt : Option < ID > =
-    tree . get ( node_id ) . unwrap ()
+    tree . get ( tree_id ) . unwrap ()
     . value () . orgnode . metadata . id . clone ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
     // Update all relationship fields
-    tree . get_mut ( node_id ) . unwrap () . value ()
+    tree . get_mut ( tree_id ) . unwrap () . value ()
       . orgnode . metadata . viewData . relationships . numContainers =
       rel_data . num_containers . get ( node_pid ) . copied ();
-    tree . get_mut ( node_id ) . unwrap () . value ()
+    tree . get_mut ( tree_id ) . unwrap () . value ()
       . orgnode . metadata . viewData . relationships . numContents =
       rel_data . num_contents . get ( node_pid ) . copied ();
-    tree . get_mut ( node_id ) . unwrap () . value ()
+    tree . get_mut ( tree_id ) . unwrap () . value ()
       . orgnode . metadata . viewData . relationships . numLinksIn =
       rel_data . num_links_in . get ( node_pid ) . copied ();
-    if let Some ( parent_id ) = parent_pid {
+    if let Some ( parent_skg_id ) = parent_pid {
       // Set parent relationship flags if we have a parent.
       // TODO | PITFALL: If there is no parent,
       // these fields are meaningless.
-      tree . get_mut ( node_id ) . unwrap () . value ()
+      tree . get_mut ( tree_id ) . unwrap () . value ()
         . orgnode . metadata . viewData . relationships . parentIsContainer =
         rel_data . content_to_containers
         . get ( node_pid )
         . map_or ( false, | containers |
-                   containers . contains ( parent_id ));
-      tree . get_mut ( node_id ) . unwrap () . value ()
+                   containers . contains ( parent_skg_id ));
+      tree . get_mut ( tree_id ) . unwrap () . value ()
         . orgnode . metadata . viewData . relationships . parentIsContent =
         rel_data . container_to_contents
         . get ( node_pid )
         . map_or ( false, | contents |
-                   contents . contains ( parent_id )); }}
+                   contents . contains ( parent_skg_id )); }}
   { // recurse
-    let child_ids : Vec < NodeId > =
-      tree . get ( node_id ) . unwrap ()
+    let child_tree_ids : Vec < NodeId > =
+      tree . get ( tree_id ) . unwrap ()
       . children () . map ( | c | c . id () ) . collect ();
-    for child_id in child_ids {
+    for child_tree_id in child_tree_ids {
       set_metadata_relationships_in_node_recursive (
         tree,
-        child_id,
+        child_tree_id,
         node_pid_opt . as_ref (),
         rel_data ); }} }

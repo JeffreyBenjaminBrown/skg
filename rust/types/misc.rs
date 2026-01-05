@@ -160,11 +160,11 @@ impl From <&str> for SourceNickname {
     SourceNickname ( s.to_string () ) }}
 
 impl TextLink {
-  pub fn new ( id     : impl Into<String>,
+  pub fn new ( skg_id : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
-    TextLink { id    : ID ( id.into () ),
-                label : label.into (),
+    TextLink { id    : ID ( skg_id.into () ),
+               label : label.into (),
     }} }
 
 impl fmt::Display for TextLink {
@@ -188,10 +188,10 @@ impl FromStr for TextLink {
     let interior : &str = &text [5 .. text.len () - 2];
 
     if let Some ( idx ) = interior.find ( "][" ) {
-      let id    : &str = &interior [0..idx];
-      let label : &str = &interior [idx+2..];
+      let skg_id : &str = &interior [0..idx];
+      let label  : &str = &interior [idx+2..];
       Ok ( TextLink {
-        id    : ID ( id.to_string () ),
+        id    : ID ( skg_id.to_string () ),
         label : label.to_string (),
       } )
     } else {

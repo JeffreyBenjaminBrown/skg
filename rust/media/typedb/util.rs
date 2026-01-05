@@ -37,7 +37,7 @@ pub async fn delete_database (
 pub async fn pid_and_source_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
-  node_id : &ID
+  skg_id  : &ID
 ) -> Result < Option<(ID, String)>, Box<dyn Error> > {
   use Node;
 
@@ -58,8 +58,8 @@ pub async fn pid_and_source_from_id (
         "primary_id": $primary_id,
         "source": $source
       }};"#,
-    node_id,
-    node_id );
+    skg_id,
+    skg_id );
   let answer : QueryAnswer = tx.query ( query ). await ?;
 
   if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =

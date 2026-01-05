@@ -92,10 +92,10 @@ fn traverse_node_recursively_and_collect(
   id_to_sources: &mut
     HashMap<ID, HashSet<SourceNickname>>
 ) {
-  let node: &OrgNode = node_ref.value();
-  if let Some(id) = &node.metadata.id {
+  let orgnode: &OrgNode = node_ref.value();
+  if let Some(id) = &orgnode.metadata.id {
     let delete_instruction: WhetherToDelete =
-      if matches!(node.metadata.code.editRequest,
+      if matches!(orgnode.metadata.code.editRequest,
                   Some(EditRequest::Delete)) {
         WhetherToDelete::Delete
       } else { WhetherToDelete::DoNotDelete };
@@ -103,11 +103,11 @@ fn traverse_node_recursively_and_collect(
       . entry(id.clone())
       . or_insert_with(HashSet::new)
       . insert(delete_instruction);
-    if !node.metadata.code.indefinitive {
+    if !orgnode.metadata.code.indefinitive {
       // Increment the count for this defining container
       *id_defining_count . entry (id.clone())
         . or_insert(0) += 1; }
-    if let Some(ref source_str) = node.metadata.source {
+    if let Some(ref source_str) = orgnode.metadata.source {
       // Collect source for this ID
       let source : SourceNickname =
         SourceNickname::from(source_str.as_str());

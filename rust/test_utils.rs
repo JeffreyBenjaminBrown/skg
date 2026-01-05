@@ -395,7 +395,7 @@ pub async fn all_pids_from_typedb(
 pub async fn extra_ids_from_pid(
   db_name: &str,
   driver: &TypeDBDriver,
-  node_id: &ID,
+  skg_id: &ID,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let tx: Transaction = driver.transaction(
     db_name, TransactionType::Read ). await?;
@@ -405,7 +405,7 @@ pub async fn extra_ids_from_pid(
        $rel isa has_extra_id (node: $node, extra_id: $e);
        $e has id $extra_id_value;
        select $extra_id_value;"#,
-    node_id.0 );
+    skg_id.0 );
   let answer: QueryAnswer = tx.query(query).await?;
   let mut extra_ids = Vec::new();
   let mut stream = answer.into_rows();
@@ -465,27 +465,30 @@ pub fn orgnode_forest_to_paired (
 ) -> PairTree {
   fn add_orgnode_tree_as_child_of_forest_root (
     forest          : &mut PairTree,
-    parent_id       : NodeId,
+    parent_tree_id  : NodeId,
     orgnode_tree    : &Tree < OrgNode >,
-    orgnode_node_id : NodeId,
+    orgnode_tree_id : NodeId,
   ) {
     let orgnode_data : OrgNode =
-      orgnode_tree . get ( orgnode_node_id )
+      orgnode_tree . get ( orgnode_tree_id )
       . unwrap () . value () . clone ();
-    let new_node_id : NodeId = {
-      let mut parent_mut = forest . get_mut ( parent_id ) . unwrap ();
-      parent_mut . append ( NodePair { mskgnode: None, orgnode: orgnode_data } ) . id () };
-    let child_ids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_node_id ) . unwrap ()
+    let new_tree_id : NodeId = {
+      let mut parent_mut =
+        forest . get_mut ( parent_tree_id ) . unwrap ();
+      parent_mut
+        . append ( NodePair { mskgnode: None,
+                              orgnode: orgnode_data } )
+        . id () };
+    let child_tree_ids : Vec < NodeId > =
+      orgnode_tree . get ( orgnode_tree_id ) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
-    for child_id in child_ids {
+    for child_tree_id in child_tree_ids {
       add_orgnode_tree_as_child_of_forest_root (
-        forest, new_node_id, orgnode_tree, child_id ); } }
+        forest, new_tree_id, orgnode_tree, child_tree_id ); } }
   let mut result : PairTree = Tree::new ( forest_root_pair () );
-  let forest_root_id = result . root () . id ();
+  let forest_root_tree_id = result . root () . id ();
   // Iterate over tree roots (children of ForestRoot)
   for tree_root in forest . root () . children () {
     add_orgnode_tree_as_child_of_forest_root (
-      &mut result, forest_root_id, &forest, tree_root . id () ); }
+      &mut result, forest_root_tree_id, &forest, tree_root . id () ); }
   result }
-

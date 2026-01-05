@@ -1,20 +1,11 @@
-* *Write an unRust module.*
-** / definition & example /
+* NOTE TO READER: Most plans are online.
+  e.g. here:
+  github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
-** What does the SkgNode in a PairTree represent?
-   If it's written by ensure_skgnode, it's from disk.
-   But sometimes it's generated from the org tree.
-   If this varies it should be encoded in the type --
-   maybe with a boolean 'complete' flag,
-   or a product of bools 'completionState'
-   with, maybe, fields like
-     id_present
-     can_be_saved_this_way
-     was_completed
 ** Completion is complex.
-*** completeAndRestoreNode_collectingViewRequests must handle Subscribees
 *** break up completeDefinitiveOrgnode
     it's super-long
+*** completeAndRestoreNode_collectingViewRequests must handle Subscribees
 *** maybe_add_subscribee_col is impenetrable
     so complex I can't see past it
 **** Subdivide it.
@@ -57,6 +48,16 @@
     it can't assume that col is still accurate
 *** extend completeAndRestoreNode_collectingViewRequests
     to complete a SubscribeeCol, and within one
+** What does the SkgNode in a PairTree represent?
+   If it's written by ensure_skgnode, it's from disk.
+   But sometimes it's generated from the org tree.
+   If this varies it should be encoded in the type --
+   maybe with a boolean 'complete' flag,
+   or a product of bools 'completionState'
+   with, maybe, fields like
+     id_present
+     can_be_saved_this_way
+     was_completed
 ** extend saving for sharing relations
 *** In saveinstructions_from_tree, recurse into subscribees
 **** change this passage in saveinstructions_from_tree
@@ -75,21 +76,19 @@
 **** how to treat foreign content
   Compare content to what's on disk.
   If there's a discrepancy, override and subscribe.
+** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
+** aliases_to_org should rebuild the whole buffer
+   like request containerward view
 ** ONGOING simple refactors
-*** ONGOING make NodePair a type, not an alias
-**** 1
- Wonderful.
-
- Next, let's make NodePair a type, not an alias. Currently, pub type NodePair = (Option<SkgNode>, OrgNode). (And for all I know there might be the same type with the order swapped somewhere in the code, so please search for both cases, and replace them with this single case:
-
- It would be better to use a true type, with explicit field names:
-      mskgnode : Option<SkgNode> // the 'm' is for 'maybe'
-      orgnode  : OrgNode
-**** TODO Rewrite clobberIndefinitiveOrgnoe to use them.
-*** rename each 'node' to skgnode, mskgnode or orgnode if that's what it is
-**** or else write a comment 'name collistion' if that renaming can't be done because something else is already using the name
-**** also rename each skgnode to mskgnode if that's what it is
-**** orgnode_data is a terrible name
+*** write helpers to simplify egotree boilerplate
+**** 'do to ancestor'
+     Takes a treenode id, an int 'generation' (0 is valid), and a lambda.
+     Does the lambda to the ancestor.
+     0 represents the input node.
+     read_at_node_in_tree and write_at_node_in_tree should call this,
+       supplying generation 0.
+*** orgnode_data is a terrible name
+*** TODO Rewrite clobberIndefinitiveOrgnoe to use them.
 *** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
    if is_indefinitive {
      makeIndefinitiveAndClobber ( tree, node_id ) ?;
@@ -141,6 +140,13 @@
     The Contents of its children can be edited to change Hides relationships.
     The rest of the SubscribeeCol branch are respawned on save,
       and have no effect if edited before saving.
+** read_skg_files_from_folder is stupid
+      let mut skgnode: SkgNode =
+        // Placeholder - caller always overwrites with actual source
+        // TODO : This is stupid!
+        read_skgnode (&path) ?;
+      skgnode.source = String::new();
+      nodes.push (skgnode); }}
 ** later
 *** midparent in text : options
 **** some examples
@@ -172,23 +178,7 @@
          Not sure this is needed.
 *** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
 *** 'content' count is wrong in Subsribees if any are hidden
-* for lossless smsn-encoding
-** title, body and contents translate directly
-** each alias is a child with text "(skg-as-smsn : alias) the-alias"
-** sharing relationships are midparented
-*** subscribes-to relationships are mediated by a '(skg-as-smsn : subscribes-to)' node
-*** hides relationships are mediated by a '(skg-as-smsn : hides)' node
-*** overrides relationships are mediated by a '(skg-as-smsn : overrides-to)' node
-** ? omit extra_ids
-   SmSn can't follow those links anyway.
-* add 'numSubscribees' near 'numLinksIn'
-* Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
-* [[id:7dd8d9fd-8e7f-4719-a547-554eb182beb1][rescue smsn into skg]]
-* aliases_to_org should rebuild the whole buffer
-  like request containerward view
-* most plans are online
-  e.g. here:
-  github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+*** add 'numSubscribees' near 'numLinksIn'
 * internalize
 ** ask AI to research and present options before implementing
 *** Clear its context before doing that.

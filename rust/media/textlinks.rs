@@ -25,10 +25,10 @@ pub fn textlinks_from_text (
   let mut textlinks = Vec::new ();
   for capture in textlink_pattern.captures_iter ( text ) {
     if capture.len () >= 3 { // capture group 0 is the entire match
-      let id    : String = capture [1] . to_string ();
-      let label : String = capture [2] . to_string ();
+      let skg_id : String = capture [1] . to_string ();
+      let label  : String = capture [2] . to_string ();
       textlinks.push (
-        TextLink::new ( id, label )); }}
+        TextLink::new ( skg_id, label )); }}
   textlinks }
 
 pub fn replace_each_link_with_its_label (

@@ -53,6 +53,9 @@ pub async fn add_missing_info_to_forest(
         tree_root_mut, &pid_map); } }
   Ok(()) }
 
+/// - assign alias Interp, if missing and appropriate
+/// - assign source if knowable
+/// - assign new ID,       if missing and appropriate
 fn add_missing_info_dfs (
   mut node_ref: NodeMut < OrgNode >,
   parent_reltoparent: Option < Interp >, // Thanks to AliasCol, if A(lias) descends from P(arent), which descends from G(randparent), then to process A, we need to know P's relationship to G.
@@ -67,32 +70,32 @@ fn add_missing_info_dfs (
     assign_new_id_if_needed (
       node_ref . value () ); }
 
-  let its_interp: Interp =
-    node_ref . value ()
-    . metadata . code . interp . clone ();
-  let its_source: Option < String > =
-    // Sourceless nodes don't propagate source to children.
-    if its_interp . should_be_sourceless () { None }
-    else { node_ref . value () . metadata . source . clone () };
   { // Recurse : Process children, DFS.
     // First collect child NodeIDs,
     // by reading from the immutable node reference.
     // PITFALL: don't confuse egoTree NodeIDs, which are all distinct,
     // from Skg IDs (which might not be).
-    let node_id: ego_tree::NodeId = node_ref . id ();
-    let child_ids: Vec < ego_tree::NodeId > = {
+    let its_interp: Interp =
+      node_ref . value ()
+      . metadata . code . interp . clone ();
+    let its_source: Option < String > = (
+      // Sourceless nodes don't propagate source to children.
+      if its_interp . should_be_sourceless () { None }
+      else { node_ref . value () . metadata . source . clone () } );
+    let tree_id: ego_tree::NodeId = node_ref . id ();
+    let child_tree_ids: Vec < ego_tree::NodeId > = {
       let tree = node_ref . tree ();
-      tree . get ( node_id ) . unwrap ()
+      tree . get ( tree_id ) . unwrap ()
         . children () . map ( | child |
                              child . id () )
         . collect () };
-    for child_id in child_ids {
-      if let Some ( child_mut ) =
-        node_ref . tree () . get_mut ( child_id )
-      { add_missing_info_dfs (
-        child_mut,
-        Some ( its_interp . clone () ),
-        its_source . clone () ); }} }}
+    for child_id in child_tree_ids {
+      if let Some ( child_mut )
+        = node_ref . tree () . get_mut ( child_id ) {
+          add_missing_info_dfs (
+            child_mut,
+            Some ( its_interp . clone () ),
+            its_source . clone () ); }} }}
 
 /// Assign treatment=Alias
 /// to nodes whose parent has treatment=AliasCol

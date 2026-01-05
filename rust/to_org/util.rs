@@ -68,13 +68,13 @@ pub fn is_forest_root (
 pub async fn skgnode_and_orgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  id     : &ID,
+  skg_id : &ID,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, id).await?
+      &config.db_name, driver, skg_id).await?
     . ok_or_else( || format!(
-      "ID '{}' not found in database", id ))?;
+      "ID '{}' not found in database", skg_id ))?;
   skgnode_and_orgnode_from_pid_and_source (
     config, &pid_resolved, &source ) }
 
@@ -205,17 +205,17 @@ pub fn detect_and_mark_cycle (
 /// containing just "tree root" nodes (no grandchildren yet),
 /// and complete each via complete_branch_minus_content.
 pub async fn stub_forest_from_root_ids (
-  root_ids : &[ID],
+  root_skg_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut VisitedMap,
 ) -> Result < PairTree, Box<dyn Error> > {
   let mut forest : PairTree = new_forest ();
-  let forest_root_id : NodeId = forest . root () . id ();
-  for root_id in root_ids {
+  let forest_root_tree_id : NodeId = forest . root () . id ();
+  for root_skg_id in root_skg_ids {
     build_node_branch_minus_content (
-      Some ( (&mut forest, forest_root_id) ),
-      root_id, config, driver, visited
+      Some ( (&mut forest, forest_root_tree_id) ),
+      root_skg_id, config, driver, visited
     ) . await ?; }
   Ok ( forest ) }
 
@@ -230,22 +230,22 @@ pub fn collect_ids_from_pair_tree (
         pids . push ( pid . clone () ); }} }
   pids }
 
-/// Check if `target_id` appears in the ancestor path of `node_id`.
+/// Check if `target_skg_id` appears in the ancestor path of `tree_id`.
 /// Used for cycle detection.
 pub fn is_ancestor_id (
-  tree      : &PairTree,
-  node_id   : NodeId,
-  target_id : &ID,
+  tree           : &PairTree,
+  origin_tree_id : NodeId, // start looking from here
+  target_skg_id  : &ID,    // look for this
 ) -> Result < bool, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
+    tree . get ( origin_tree_id )
     . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
   let mut current : Option < NodeRef < NodePair > > =
     node_ref . parent ();
   while let Some ( parent ) = current {
-    if let Some ( parent_id ) =
+    if let Some ( parent_skg_id ) =
       parent . value () . orgnode . metadata . id . as_ref () {
-        if parent_id == target_id {
+        if parent_skg_id == target_skg_id {
           return Ok ( true ); }}
     current = parent . parent (); }
   Ok ( false ) }
@@ -254,10 +254,10 @@ pub fn is_ancestor_id (
 /// Returns an error if the node is not found or has no ID.
 pub fn get_pid_in_pairtree (
   tree    : &PairTree,
-  node_id : NodeId,
+  tree_id : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
+    tree . get ( tree_id )
     . ok_or ( "get_pid_in_pairtree: NodeId not in tree" ) ?;
   node_ref . value () . orgnode . metadata . id . clone ()
     . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
@@ -272,32 +272,34 @@ pub fn get_pid_from_pair_using_noderef (
   node_ref . value () . orgnode . metadata . id . clone ()
     . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
 
-/// Build a node from disk and append it at 'parent_id' as a child.
+/// Build a node from disk and
+/// append it at 'parent_tree_id' as a child.
+/// Returns the new node's ego_tree::NodeId.
+///
 /// Does *not* take its ancestors into account,
 /// and does *not* build any of its descendents.
 /// Those can be done later via 'complete_branch_minus_content',
 /// or they can all be done at once via
 /// 'build_node_branch_minus_content.
-/// Returns the new node's NodeId.
 pub async fn make_and_append_child_pair (
-  tree      : &mut PairTree,
-  parent_id : NodeId, // will parent the new node
-  child_id  : &ID, // how to find the new node
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  tree           : &mut PairTree,
+  parent_tree_id : NodeId, // will parent the new node
+  child_skg_id   : &ID, // how to find the new node
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_id ) . await ?;
+      config, driver, child_skg_id ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
-    tree . get_mut ( parent_id )
+    tree . get_mut ( parent_tree_id )
     . ok_or ( "make_and_append_child_pair: parent not found" ) ?;
-  let child_node_id : NodeId =
+  let child_tree_id : NodeId =
     parent_mut . append ( NodePair { mskgnode: Some(child_skgnode),
                                      orgnode: child_orgnode } )
     . id ();
-  Ok ( child_node_id ) }
+  Ok ( child_tree_id ) }
 
 /// Builds a pair from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
@@ -308,43 +310,43 @@ pub async fn make_and_append_child_pair (
 ///   appends to tree, returns (None, branch_root_nodeid)
 pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut PairTree, NodeId)>, // if modifying an existing tree, attach as a child here
-  node_id         : &ID, // what to fetch
+  skg_id          : &ID, // what to fetch
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
   visited         : &mut VisitedMap,
 ) -> Result < (Option<PairTree>, NodeId), Box<dyn Error> > {
   let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
-      config, driver, node_id ) . await ?;
+      config, driver, skg_id ) . await ?;
   match tree_and_parent {
-    Some ( (tree, parent_id) ) => {
-      let child_node_id : NodeId = {
+    Some ( (tree, parent_tree_id) ) => {
+      let child_tree_id : NodeId = {
         let mut parent_mut : NodeMut < NodePair > =
-          tree . get_mut ( parent_id ) . ok_or (
+          tree . get_mut ( parent_tree_id ) . ok_or (
             "build_node_branch_minus_content: parent not found" ) ?;
         parent_mut . append ( NodePair { mskgnode: Some(skgnode),
                                          orgnode } ) . id () };
       complete_branch_minus_content (
-        tree, child_node_id, visited,
+        tree, child_tree_id, visited,
         config, driver ) . await ?;
-      Ok ( (None, child_node_id) ) },
+      Ok ( (None, child_tree_id) ) },
     None => {
       let mut tree : PairTree =
         Tree::new ( NodePair { mskgnode: Some(skgnode), orgnode } );
-      let root_node_id : NodeId = tree . root () . id ();
+      let root_tree_id : NodeId = tree . root () . id ();
       complete_branch_minus_content (
-        &mut tree, root_node_id, visited,
+        &mut tree, root_tree_id, visited,
         config, driver ) . await ?;
-      Ok ( (Some(tree), root_node_id) ) }, } }
+      Ok ( (Some(tree), root_tree_id) ) }, } }
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
 pub fn content_ids_if_definitive_else_empty (
   tree    : &PairTree,
-  node_id : NodeId,
+  tree_id : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
+    tree . get ( tree_id )
     . ok_or (
       "content_ids_if_definitive_else_empty: node not found" ) ?;
   if node_ref . value () . orgnode . metadata . code . indefinitive {
@@ -355,7 +357,8 @@ pub fn content_ids_if_definitive_else_empty (
     None => Ok ( Vec::new () ), // No SkgNode yet
   }}
 
-/// Collect NodeIds after a target node in a generation.
+/// Collect ego_tree::NodeIds after
+///   some member of some generation of a tree.
 /// 'effective_root' should be some ancestor.
 /// It affects both the meaning of generation numbers,
 /// and the scope of which nodes are collected
@@ -363,19 +366,19 @@ pub fn content_ids_if_definitive_else_empty (
 /// If effective root is None,
 /// the true root is used as the effective root.
 pub fn nodes_after_in_generation (
-  tree           : &PairTree,
-  generation     : usize,
-  after_node     : NodeId,
-  effective_root : Option < NodeId >,
+  tree                     : &PairTree,
+  generation               : usize,
+  generation_member_treeid : NodeId,
+  effective_root           : Option < NodeId >,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let nodes_in_gen : Vec < NodeId > =
+  let tree_ids_in_gen : Vec < NodeId > =
     collect_generation_ids ( tree, generation, effective_root ) ?;
   let mut result : Vec < NodeId > = Vec::new ();
   let mut found_target : bool = false;
-  for id in nodes_in_gen {
+  for tree_id in tree_ids_in_gen {
     if found_target {
-      result . push ( id );
-    } else if id == after_node {
+      result . push ( tree_id );
+    } else if tree_id == generation_member_treeid {
       found_target = true; } }
   Ok ( result ) }
 
@@ -388,23 +391,23 @@ pub fn nodes_after_in_generation (
 /// Returns an error if the node is not found.
 pub fn is_indefinitive (
   tree    : &PairTree,
-  node_id : NodeId,
+  tree_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
+    tree . get ( tree_id )
     . ok_or ( "is_indefinitive: NodeId not in tree" ) ?;
   Ok ( node_ref . value () . orgnode
        . metadata . code . indefinitive ) }
 
-/// Collect all child NodeIds from a node in a PairTree.
+/// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.
-pub fn collect_child_ids (
+pub fn collect_child_tree_ids (
   tree    : &PairTree,
-  node_id : NodeId,
+  tree_id : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
-    . ok_or ( "collect_child_ids: NodeId not in tree" ) ?;
+    tree . get ( tree_id )
+    . ok_or ( "collect_child_tree_ids: NodeId not in tree" ) ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
 
 

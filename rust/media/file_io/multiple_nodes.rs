@@ -103,11 +103,13 @@ fn read_skg_files_from_folder
     let path : PathBuf = entry.path () ;
     if ( path.is_file () &&
          path . extension () . map_or (
-           false,                // None => no extension found
-           |ext| ext == "skg") ) // Some
-    { let mut node: SkgNode = read_skgnode (&path) ?; // Placeholder - caller always overwrites with actual source
-      node.source = String::new();
-      nodes.push (node); }}
+           false,                  // None => no extension found
+           |ext| ext == "skg") ) { // Some
+      let mut skgnode: SkgNode =
+        // Placeholder - caller always overwrites with actual source
+        read_skgnode (&path) ?;
+      skgnode.source = String::new();
+      nodes.push (skgnode); }}
   Ok (nodes) }
 
 /// Reports duplicate IDs found across sources.

@@ -24,10 +24,10 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
     Vec::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      let node: &OrgNode = node_ref.value();
+      let orgnode: &OrgNode = node_ref.value();
       let node_triples : Vec<MergeInstructionTriple> =
         saveinstructions_from_the_merge_in_an_orgnode(
-          node, config, driver).await?;
+          orgnode, config, driver).await?;
       triples.extend(node_triples); } }
   Ok(triples) }
 

@@ -44,10 +44,10 @@ pub fn assign_pids_throughout_tree_from_map (
     { node_ref . value () . metadata . id =
       Some ( pid . clone () ); }}
   { // Process children recursively
-    let node_id : NodeId = node_ref . id ();
+    let tree_id : NodeId = node_ref . id ();
     let child_ids : Vec < NodeId > = {
       let tree = node_ref . tree ();
-      tree . get ( node_id ) . unwrap ()
+      tree . get ( tree_id ) . unwrap ()
         . children () . map ( | child | child . id () )
         . collect () };
     for child_id in child_ids {

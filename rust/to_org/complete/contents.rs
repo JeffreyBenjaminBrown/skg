@@ -2,7 +2,7 @@
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
-  get_pid_in_pairtree, is_indefinitive, collect_child_ids,
+  get_pid_in_pairtree, is_indefinitive, collect_child_tree_ids,
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::media::file_io::skgnode_and_source_from_id;
@@ -194,66 +194,67 @@ pub async fn completeDefinitiveOrgnode (
         . collect ();
       (content_from_disk, skgnode . contains . clone ()) };
 
-  let ( content_child_ids, mut non_content_child_ids )
+  let ( content_child_tree_ids, mut non_content_child_tree_ids )
     : ( Vec < NodeId >, Vec < NodeId > )
     = categorize_children_by_treatment (
       tree,
       node_id ) ?;
 
   // Validate content children have IDs
-  // and build map from ID to NodeId
-  let mut content_id_to_node_id : HashMap < ID, NodeId > =
+  // and build map from skg ID to tree NodeId
+  let mut content_skg_id_to_tree_id : HashMap < ID, NodeId > =
     HashMap::new ();
-  for child_id in & content_child_ids {
+  for child_tree_id in & content_child_tree_ids {
     let child_ref : NodeRef < NodePair > =
-      tree . get ( *child_id )
+      tree . get ( *child_tree_id )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
       child_ref . value () . orgnode . metadata . id . as_ref ()
       . ok_or ( "Content child has no ID" ) ?;
-    content_id_to_node_id . insert (
-      child_pid . clone (), *child_id ); }
+    content_skg_id_to_tree_id . insert (
+      child_pid . clone (), *child_tree_id ); }
 
   // Mark invalidated content as ParentIgnores
   // and move to non-content list
-  let mut invalid_content_ids : Vec < NodeId > =
+  let mut invalid_content_tree_ids : Vec < NodeId > =
     Vec::new ();
-  for ( child_pid, child_node_id ) in & content_id_to_node_id {
+  for ( child_pid, child_tree_id ) in & content_skg_id_to_tree_id {
     if ! content_from_disk . contains ( child_pid ) {
-      invalid_content_ids . push ( *child_node_id ); }}
-  for invalid_id in & invalid_content_ids {
+      invalid_content_tree_ids . push ( *child_tree_id ); }}
+  for invalid_tree_id in & invalid_content_tree_ids {
     let mut child_mut : NodeMut < NodePair > =
-      tree . get_mut ( *invalid_id )
+      tree . get_mut ( *invalid_tree_id )
       . ok_or ( "Invalid content child not found" ) ?;
     child_mut . value () . orgnode . metadata . code.interp =
       Interp::ParentIgnores;
-    content_id_to_node_id . remove (
+    content_skg_id_to_tree_id . remove (
       & child_mut . value () . orgnode
         . metadata . id . clone () . unwrap () );
-    non_content_child_ids . push ( *invalid_id ); }
+    non_content_child_tree_ids . push ( *invalid_tree_id ); }
 
   // Build completed-content list
   // preserving order from SkgNode
-  let mut completed_content_nodes : Vec < NodeId > =
+  let mut completed_content_tree_ids : Vec < NodeId > =
     Vec::new ();
   if let Some(contains) = & contains_list {
-    for disk_id in contains {
-      if let Some ( existing_node_id ) =
-        content_id_to_node_id . get ( disk_id ) {
+    for disk_skg_id in contains {
+      if let Some ( existing_tree_id ) =
+        content_skg_id_to_tree_id . get ( disk_skg_id ) {
         // Content already exists in tree
-        completed_content_nodes . push ( *existing_node_id );
+        completed_content_tree_ids . push ( *existing_tree_id );
       } else
       { // PITFALL: A preorder DFS traversal for completeOrgnodeTree
         // lets us add a child without considering grandchildren yet.
-        completed_content_nodes . push (
+        completed_content_tree_ids . push (
           extend_content (
-            tree, node_id, disk_id, config, driver ) . await ? ); }}}
+            tree, node_id, disk_skg_id, config, driver
+          ) . await ? ); }} }
 
   reorder_children (
     tree,
     node_id,
-    & non_content_child_ids,
-    & completed_content_nodes ) ?;
+    & non_content_child_tree_ids,
+    & completed_content_tree_ids ) ?;
   Ok (( )) }
 
 /// Categorize a node's children into Content and non-Content.
@@ -282,13 +283,13 @@ fn categorize_children_by_treatment (
 async fn extend_content (
   tree       : &mut PairTree,
   parent_nid : NodeId,
-  id         : &ID,
+  skg_id     : &ID,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, id ) . await ?;
+      config, driver, skg_id ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_nid )
     . ok_or ( "Parent node not found" ) ?;
@@ -336,11 +337,11 @@ fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
   view_requests_out    : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let child_ids : Vec < NodeId > =
-      collect_child_ids ( tree, node_id ) ?;
-    for child_id in child_ids {
+    let child_tree_ids : Vec < NodeId > =
+      collect_child_tree_ids ( tree, node_id ) ?;
+    for child_tree_id in child_tree_ids {
       completeAndRestoreNode_collectingViewRequests (
-        tree, child_id, config, typedb_driver,
+        tree, child_tree_id, config, typedb_driver,
         visited, view_requests_out ) . await ?; }
     Ok (( )) }) }
 

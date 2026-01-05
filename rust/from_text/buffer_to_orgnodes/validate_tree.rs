@@ -151,12 +151,12 @@ fn validate_node_and_children (
       if ! config.sources.contains_key(source_str) {
         let source_nickname: SourceNickname =
           SourceNickname::from ( source_str.as_str() );
-        let node_id: ID =
+        let skg_id: ID =
           orgnode.metadata.id.clone()
           .unwrap_or_else(|| ID::from("<no ID>"));
         errors.push(
           BufferValidationError::SourceNotInConfig(
-            node_id,
+            skg_id,
             source_nickname )); }} }
 
   if orgnode.metadata.code.indefinitive { // indef + edit = error
@@ -184,13 +184,13 @@ fn validate_definitive_view_requests (
     HashSet::new();
   for edge in forest.root().traverse() {
     if let Edge::Open(node_ref) = edge {
-        let node : &OrgNode =
+        let orgnode : &OrgNode =
           node_ref.value();
-        if node.metadata.code.viewRequests.contains(
+        if orgnode.metadata.code.viewRequests.contains(
           &ViewRequest::Definitive ) {
-          if let Some(ref id) = node.metadata.id {
+          if let Some(ref id) = orgnode.metadata.id {
             { // Error: must be indefinitive
-              if ! node.metadata.code.indefinitive {
+              if ! orgnode.metadata.code.indefinitive {
                 errors.push(
                   BufferValidationError::DefinitiveRequestOnDefinitiveNode(
                     id.clone() )); }}
