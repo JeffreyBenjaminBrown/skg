@@ -1,160 +1,177 @@
 * *Write an unRust module.*
 ** / definition & example /
-*** Write a function doToPairTreeNode
-**** Hides all the node id fetching ogic
-**** Can take a lambda
-** Maybe do it lazily, only where I want to be more readable.
-** Maybe do it to all boilerplate.
-* midparent in text : options
-** some examples
-*** music */ THE MIDPARENT */ "the edge where ideas deserve ..."
-**** its rendering into org-roam
-     #+title: music
-     * / & [[id:0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d][justice]] & [[id:1e0eb0bc-1d40-4a78-9c81-dbcef73d005e][distance]] /
-     ** the edge where ideas deserve not formal encoding yet in music
-        :PROPERTIES:
-        :ID:       eec10382-0ce9-4326-a1c7-f2ff477f19f0
-        :END:
-**** to read the midparent
-     justice and distance are both routes from music to "the edge ..."
-**** later
-     could consider letting a similar midparent encode the unordered set (music, justice, distance)
-*** a general one I like
-**** a messed-up attempt at explicit syntax
-***** [[..][/*predecessoor generation number]/name of relationship/
-**** "/", "..", and ("ni" where the "i" is a running variable)
-     It owuld look like a mix of slash-separated "ni"s and ".."s,
-     such that in any sequence n1/n2   , n1 > n2
-     and       in any sequence n1/../n2, n1 > n2
-     i is usually greater than 0, so signifies predecessors;
-     negative i signify descendents.
-     If it starts with a / the entire predecessor chain is specified.
-       "ni" is the alternative way to start.
-       There is no reason to start or end with "..".
-     If it ends with a / the entire descendent chain is specified.
-       Not sure this is needed.
-* Can I download my git repo and read it ony phone with goto definition, find uses, etc?
-* TODO BLOCKER : maybe_add_subscribee_col needs a lot of work
-  It's so complex I can't see past it.
-** Subdivide it.
-** maybe_add_subscribee_col should integrate existing SubscribeeCol
-   if it exists, rather than assuming it is correct
-** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribee_col?
-* Is this redundant?
-** as of this commit
-   dce37c085b5457953fa076dd2500a05e8635c87b
-** this passage
-   mark_if_visited_or_repeat_or_cycle (
-     tree, node_id, visited ) ?;
-   { if is_indefinitive ( tree, node_id ) ? {
-       clobberIndefinitiveOrgnode (
-** in this function
-   completeAndRestoreNode_collectingViewRequests
-** seems problematic
-   because we're rewriting the node as indefinitive twice.
-** solution
-   Don't call makeIndefinitiveAndClobber in
-     mark_if_visited_or_repeat_or_cycle.
-   Instead do it only in clobberIndefinitiveOrgnode.
-   And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
-   instead of essentially restating its definition.
-* completeAndRestoreNode_collectingViewRequests must handle Subscribees
-* After 'collect_view_requests', is there any reason to keep the view requests in the node?
-  The function pushes the node's requests onto 'view_requests_out'.
-  If they should be deleted from the node thereafter,
-  the function should be renamed something like 'transfer_requests'.
-* break up completeDefinitiveOrgnode
-  it's super-long
-* what if 'ensure_skgnode' is omitted?
-** omitted from completeAndRestoreNode_collectingViewRequests
-** elaboration
-   It seems like an absent skgnode where ensure_skgnode is called
-   might be an unreachable state.
-* On what Interps can 'completeDefinitiveOrgnode' be validly called?
-  The comment says only Content nodes.
-  If that's right (I think so) the name should reflect it.
-* simple refactors
-** make NodePair a type, not an alias
-   Currently, pub type NodePair = (Option<SkgNode>, OrgNode).
-   It would be better to use explicit field names
-     'mskgnode' ('m' for 'maybe') and 'orgnode'.
-** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
-  if is_indefinitive {
-    makeIndefinitiveAndClobber ( tree, node_id ) ?;
-  } else { // here, it might already be in visited, which would be bad
-    visited . insert ( pid, node_id ); }
-* What does the SkgNode in a PairTree represent?
-  If it's written by ensure_skgnode, it's from disk.
-  But sometimes it's generated from the org tree.
-* In saveinstructions_from_tree, recurse into subscribees
-** change this passage in saveinstructions_from_tree
-   if matches!(interp, Interp::AliasCol                     |
-                       Interp::Alias                        |
-                       Interp::SubscribeeCol                | // TODO: Recurse into these
-                       Interp::Subscribee                   | // TODO: Recurse into these
-                       Interp::HiddenOutsideOfSubscribeeCol |
-                       Interp::HiddenInSubscribeeCol        |
-                       Interp::HiddenFromSubscribees ) {
-     return Ok(()); } // Skip - these don't generate SaveInstructions
-** how to treat Subscribees
-If indefinitive, visit descendents but otherwise ignore.
-If definitive, treat its content list as a set,
-  and hide in the subscriber anything not included.
-** how to treat foreign content
-Compare content to what's on disk.
-If there's a discrepancy, override and subscribe.
-* maybe_add_hidden_in_subscribee_col should integrate
-  if it finds the subscribee col,
-  it can't assume that col is still accurate
-* 'content' count is wrong in Subsribees if any are hidden
-* add 'fn tree_nodepair_has_interp_subscribee'
-  and call it everywhere a passage like this appears
-```
-  let is_subscribee : bool = {
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( node_id ) . ok_or (
-        "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-    node_ref . value () . 1 . metadata . code . interp
-      == Interp::Subscribee };
-```
-* extend completeAndRestoreNode_collectingViewRequests
-  to complete a SubscribeeCol, and within one
-* subscription branches
-** PITFALL: Hiding is not ternary.
-   SubscribeR node R Hides node H from *all* its subscriptions.
-   When the nodes R hides are *displayed*,
-     they can be grouped by their parents,
-     and orphaned hidden nodes can be grouped separately,
-   but in the graph they are not represented that way.
-** Just like locally-owned nodes, make Content top-level children.
-** Collect each subscribee's hidden in a HiddenCol midparent.
-   The HiddenCol midparent is indefinitive.
-   Its contents can be modified, and it can be deleted entirely,
-   to no effect.
-   Its contents respawn from disk on each save.
-     (The user should perhaps be warned if that happens.)
-** to populate Content and Hidden in a subscription branch, filter each subscribee's Contents into
-**** Hidden = intersects with what the subscriber hides
-**** Content = intersects not
-** Collect hidden nodes that belong to no subscribee separately.
-   in a midparent titled 'hidden outside of subscribees'.
-   This one is also indefinite, respawning on each save.
-** Saving can change a subscription's contents in two ways.
-*** via deletion
-    Deleting a top-level node adds it to 'hidden'.
-*** via insertion
-**** Only something from 'hidden' can be inserted.
-     This un-hides it.
-**** Order does not matter.
-     When saving,
-     the subscribee branch'scontents are treated as a set,
-     and intersected with the set of contents of the
-       (foreign) subscribee.
-** When the user edits a subscribeeCol
-   Its children determine what is subscribed to.
-   The Contents of its children can be edited to change Hides relationships.
-   The rest of the SubscribeeCol branch are respawned on save,
-     and have no effect if edited before saving.
+* s, by urgency
+** What does the SkgNode in a PairTree represent?
+   If it's written by ensure_skgnode, it's from disk.
+   But sometimes it's generated from the org tree.
+   If this varies it should be encoded in the type --
+   maybe with a boolean 'complete' flag,
+   or a product of bools 'completionState'
+   with, maybe, fields like
+     id_present
+     can_be_saved_this_way
+     was_completed
+** Completion is complex.
+*** completeAndRestoreNode_collectingViewRequests must handle Subscribees
+*** break up completeDefinitiveOrgnode
+    it's super-long
+*** maybe_add_subscribee_col is impenetrable
+    so complex I can't see past it
+**** Subdivide it.
+**** maybe_add_subscribee_col should integrate existing SubscribeeCol
+     if it exists, rather than assuming it is correct
+*** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribee_col?
+*** After 'collect_view_requests', is there any reason to keep the view requests in the node?
+    The function pushes the node's requests onto 'view_requests_out'.
+    If they should be deleted from the node thereafter,
+    the function should be renamed something like 'transfer_requests'.
+*** On what Interps can 'completeDefinitiveOrgnode' be validly called?
+    The comment says only Content nodes.
+    If that's right (I think so) the name should reflect it.
+*** making something indefinitive twice
+**** as of this commit
+     dce37c085b5457953fa076dd2500a05e8635c87b
+**** this passage
+     mark_if_visited_or_repeat_or_cycle (
+       tree, node_id, visited ) ?;
+     { if is_indefinitive ( tree, node_id ) ? {
+         clobberIndefinitiveOrgnode (
+**** in this function
+     completeAndRestoreNode_collectingViewRequests
+**** seems problematic
+     because we're rewriting the node as indefinitive twice.
+**** solution
+     Don't call makeIndefinitiveAndClobber in
+       mark_if_visited_or_repeat_or_cycle.
+     Instead do it only in clobberIndefinitiveOrgnode.
+     And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
+     instead of essentially restating its definition.
+*** ? ignorable
+**** what if 'ensure_skgnode' is omitted?
+***** omitted from completeAndRestoreNode_collectingViewRequests
+***** elaboration
+      It seems like an absent skgnode where ensure_skgnode is called
+      might be an unreachable state.
+*** maybe_add_hidden_in_subscribee_col should integrate
+    if it finds the subscribee col,
+    it can't assume that col is still accurate
+*** extend completeAndRestoreNode_collectingViewRequests
+    to complete a SubscribeeCol, and within one
+** extend saving for sharing relations
+*** In saveinstructions_from_tree, recurse into subscribees
+**** change this passage in saveinstructions_from_tree
+     if matches!(interp, Interp::AliasCol                     |
+                         Interp::Alias                        |
+                         Interp::SubscribeeCol                | // TODO: Recurse into these
+                         Interp::Subscribee                   | // TODO: Recurse into these
+                         Interp::HiddenOutsideOfSubscribeeCol |
+                         Interp::HiddenInSubscribeeCol        |
+                         Interp::HiddenFromSubscribees ) {
+       return Ok(()); } // Skip - these don't generate SaveInstructions
+**** how to treat Subscribees
+  If indefinitive, visit descendents but otherwise ignore.
+  If definitive, treat its content list as a set,
+    and hide in the subscriber anything not included.
+**** how to treat foreign content
+  Compare content to what's on disk.
+  If there's a discrepancy, override and subscribe.
+** ONGOING simple refactors
+*** ONGOING make NodePair a type, not an alias
+**** 1
+ Wonderful.
+
+ Next, let's make NodePair a type, not an alias. Currently, pub type NodePair = (Option<SkgNode>, OrgNode). (And for all I know there might be the same type with the order swapped somewhere in the code, so please search for both cases, and replace them with this single case:
+
+ It would be better to use a true type, with explicit field names:
+      mskgnode : Option<SkgNode> // the 'm' is for 'maybe'
+      orgnode  : OrgNode
+**** TODO Rewrite clobberIndefinitiveOrgnoe to use them.
+*** rename each 'node' to skgnode, mskgnode or orgnode if that's what it is
+**** or else write a comment 'name collistion' if that renaming can't be done because something else is already using the name
+**** also rename each skgnode to mskgnode if that's what it is
+**** orgnode_data is a terrible name
+*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
+   if is_indefinitive {
+     makeIndefinitiveAndClobber ( tree, node_id ) ?;
+   } else { // here, it might already be in visited, which would be bad
+     visited . insert ( pid, node_id ); }
+*** add 'fn tree_nodepair_has_interp_subscribee'
+    and call it everywhere a passage like this appears
+  ```
+    let is_subscribee : bool = {
+      let node_ref : NodeRef < NodePair > =
+        tree . get ( node_id ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+      node_ref . value () . 1 . metadata . code . interp
+        == Interp::Subscribee };
+  ```
+** ONGOING subscription branches
+*** PITFALL: Hiding is not ternary.
+    SubscribeR node R Hides node H from *all* its subscriptions.
+    When the nodes R hides are *displayed*,
+      they can be grouped by their parents,
+      and orphaned hidden nodes can be grouped separately,
+    but in the graph they are not represented that way.
+*** DONE Just like locally-owned nodes, make a Subscribee's Content into (the last and probably most of) its top-level children.
+*** DONE Collect each subscribee's hidden in a HiddenCol midparent.
+    The HiddenCol midparent is indefinitive.
+    Its contents can be modified, and it can be deleted entirely,
+    to no effect.
+    Its contents respawn from disk on each save.
+      (The user should perhaps be warned if that happens.)
+*** DONE to populate Content and Hidden in a subscription branch, filter each subscribee's Contents into
+***** Hidden = intersects with what the subscriber hides
+***** Content = intersects not
+*** DONE Collect hidden nodes that belong to no subscribee separately.
+    in a midparent titled 'hidden outside of subscribees'.
+    This one is also indefinite, respawning on each save.
+*** Saving can change a subscription's contents in two ways.
+**** via deletion
+     Deleting a top-level node adds it to 'hidden'.
+**** via insertion
+***** Only something from 'hidden' can be inserted.
+      This un-hides it.
+***** Order does not matter.
+      When saving,
+      the subscribee branch'scontents are treated as a set,
+      and intersected with the set of contents of the
+        (foreign) subscribee.
+*** When the user edits a subscribeeCol
+    Its children determine what is subscribed to.
+    The Contents of its children can be edited to change Hides relationships.
+    The rest of the SubscribeeCol branch are respawned on save,
+      and have no effect if edited before saving.
+** later
+*** midparent in text : options
+**** some examples
+***** music */ THE MIDPARENT */ "the edge where ideas deserve ..."
+****** its rendering into org-roam
+       #+title: music
+       * / & [[id:0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d][justice]] & [[id:1e0eb0bc-1d40-4a78-9c81-dbcef73d005e][distance]] /
+       ** the edge where ideas deserve not formal encoding yet in music
+          :PROPERTIES:
+          :ID:       eec10382-0ce9-4326-a1c7-f2ff477f19f0
+          :END:
+****** to read the midparent
+       justice and distance are both routes from music to "the edge ..."
+****** later
+       could consider letting a similar midparent encode the unordered set (music, justice, distance)
+***** a general one I like
+****** a messed-up attempt at explicit syntax
+******* [[..][/*predecessoor generation number]/name of relationship/
+****** "/", "..", and ("ni" where the "i" is a running variable)
+       It owuld look like a mix of slash-separated "ni"s and ".."s,
+       such that in any sequence n1/n2   , n1 > n2
+       and       in any sequence n1/../n2, n1 > n2
+       i is usually greater than 0, so signifies predecessors;
+       negative i signify descendents.
+       If it starts with a / the entire predecessor chain is specified.
+         "ni" is the alternative way to start.
+         There is no reason to start or end with "..".
+       If it ends with a / the entire descendent chain is specified.
+         Not sure this is needed.
+*** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
+*** 'content' count is wrong in Subsribees if any are hidden
 * for lossless smsn-encoding
 ** title, body and contents translate directly
 ** each alias is a child with text "(skg-as-smsn : alias) the-alias"

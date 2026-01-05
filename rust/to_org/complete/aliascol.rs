@@ -82,9 +82,9 @@ pub async fn completeAliasCol (
       . ok_or ( "AliasCol node not found" ) ?;
     for alias in missing_aliases_from_disk {
       aliascol_mut . append (
-        ( None,
-          orgnode_from_title_and_rel (
-            Interp::Alias, alias ))); }}
+        NodePair { mskgnode: None,
+                   orgnode: orgnode_from_title_and_rel (
+                     Interp::Alias, alias ) }); }}
   Ok (( )) }
 
 /// Collect titles from Alias children of an AliasCol node.
@@ -100,7 +100,7 @@ fn collect_alias_titles (
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
     let child_node : &OrgNode =
-      & child . value () . 1;
+      & child . value () . orgnode;
     if child_node . metadata . code.interp != Interp::Alias {
       return Err (
         format! ( "AliasCol has non-Alias child with interp: {:?}",
@@ -137,7 +137,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
       HashSet::new ();
     for child in aliascol_ref . children () {
       let child_node : &OrgNode =
-        & child . value () . 1;
+        & child . value () . orgnode;
       let title : &String =
         & child_node . title;
       let is_duplicate : bool =
@@ -164,18 +164,18 @@ fn remove_duplicates_and_false_aliases_handling_focus (
       tree . get ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
     for child in aliascol_ref . children () {
-      if child . value () . 1 . title == title {
+      if child . value () . orgnode . title == title {
         let mut child_mut : NodeMut < NodePair > =
           tree . get_mut ( child . id () )
           . ok_or ( "Child node not found" ) ?;
-        child_mut . value () . 1 . metadata . viewData.focused = true;
+        child_mut . value () . orgnode . metadata . viewData.focused = true;
         break; }}}
 
   if removed_focused {
     let mut aliascol_mut : NodeMut < NodePair > =
       tree . get_mut ( aliascol_node_id )
       . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . value () . 1 . metadata . viewData.focused = true; }
+    aliascol_mut . value () . orgnode . metadata . viewData.focused = true; }
 
   Ok (( )) }
 
@@ -188,7 +188,7 @@ fn get_aliascol_parent_id (
   let aliascol_node : &OrgNode =
     & tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found in tree" ) ?
-    . value () . 1;
+    . value () . orgnode;
   if aliascol_node . metadata . code.interp
     != Interp::AliasCol {
       return Err (
@@ -204,7 +204,7 @@ fn get_aliascol_parent_id (
   let parent_id : &ID =
     tree . get ( parent_node_id )
     . ok_or ( "Parent node not found" ) ?
-    . value () . 1
+    . value () . orgnode
     . metadata . id . as_ref ()
     . ok_or ( "Parent node has no ID" ) ?;
   Ok ( parent_id . clone () ) }

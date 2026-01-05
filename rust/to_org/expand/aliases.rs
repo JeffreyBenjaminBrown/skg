@@ -2,7 +2,7 @@ use crate::media::file_io::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, orgnode_from_title_and_rel};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::trees::PairTree;
+use crate::types::trees::{PairTree, NodePair};
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -49,7 +49,7 @@ pub async fn build_and_integrate_aliases (
         . ok_or ( "Node not found in tree" ) ?;
       node_ref . children ()
         . any ( |child|
-                 child . value () . 1 . metadata . code.interp
+                 child . value () . orgnode . metadata . code.interp
                  == Interp::AliasCol ) };
     if has_aliascol {
       return Ok (( )); }}
@@ -66,7 +66,10 @@ pub async fn build_and_integrate_aliases (
     let mut node_mut =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found in tree" ) ?;
-    node_mut . prepend ( (None, aliascol) ) . id () };
+    node_mut
+      . prepend ( NodePair { mskgnode: None,
+                             orgnode: aliascol } )
+      . id () };
   for alias in aliases {
     // append each Alias to the AliasCol's children
     let alias_node : OrgNode =
@@ -74,5 +77,6 @@ pub async fn build_and_integrate_aliases (
     let mut aliascol_mut =
       tree . get_mut ( aliascol_id )
       . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . append ( (None, alias_node) ); }
+    aliascol_mut . append ( NodePair { mskgnode: None,
+                                       orgnode: alias_node } ); }
   Ok (( )) }

@@ -90,9 +90,9 @@ async fn execute_definitive_view_request (
     let mut node_mut : NodeMut < NodePair > =
       forest . get_mut ( node_id )
       . ok_or ( "execute_definitive_view_request: node not found" ) ?;
-    node_mut . value () . 1 . metadata . code . viewRequests
+    node_mut . value () . orgnode . metadata . code . viewRequests
       . remove ( & ViewRequest::Definitive );
-    node_mut.value () . 1 . metadata.code.indefinitive = false;
+    node_mut.value () . orgnode . metadata.code.indefinitive = false;
     rebuild_pair_from_disk_mostly_clobbering_the_org (
       // preserves relevant orgnode fields
       forest, node_id, config ) ?; }
@@ -107,7 +107,7 @@ async fn execute_definitive_view_request (
       let node_ref : NodeRef < NodePair > =
         forest . get ( node_id ) . ok_or (
           "execute_definitive_view_request: node not found" ) ?;
-      node_ref . value () . 1 . metadata . code . interp
+      node_ref . value () . orgnode . metadata . code . interp
         == Interp::Subscribee };
     if is_subscribee {
       maybe_add_hidden_in_subscribee_col (
@@ -125,7 +125,7 @@ fn get_hidden_ids_if_subscribee (
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
   let interp : &Interp =
-    & node_ref . value () . 1 . metadata . code . interp;
+    & node_ref . value () . orgnode . metadata . code . interp;
   if *interp != Interp::Subscribee {
     return Ok ( HashSet::new () ); }
   else {
@@ -136,7 +136,7 @@ fn get_hidden_ids_if_subscribee (
       subscribee_col . parent ()
       . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
     let hidden_ids : HashSet < ID > =
-      match & subscriber . value () . 0 {
+      match & subscriber . value () . mskgnode {
         Some ( skgnode ) =>
           skgnode . hides_from_its_subscriptions . clone ()
           . unwrap_or_default () . into_iter () . collect (),
@@ -157,13 +157,13 @@ fn indefinitize_content_subtree (
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-  let (skgnode_opt, orgnode) : &NodePair =
+  let pair : &NodePair =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
-    orgnode . metadata . id . clone ();
+    pair . orgnode . metadata . id . clone ();
   let content_child_ids : Vec < NodeId > =
     node_ref . children ()
-    . filter ( |c| c . value () . 1 . metadata . code . interp
+    . filter ( |c| c . value () . orgnode . metadata . code . interp
                    == Interp::Content )
     . map ( |c| c . id () )
     . collect ();
@@ -173,14 +173,14 @@ fn indefinitize_content_subtree (
     // TODO : This ought to call a function.
     // It, or something very like it anyway, happens elsewhere too.
     let canonical_title : Option<String> =
-      skgnode_opt . as_ref () . map ( |s| s . title . clone () );
+      pair . mskgnode . as_ref () . map ( |s| s . title . clone () );
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-    node_mut . value () . 1 . metadata . code . indefinitive = true;
+    node_mut . value () . orgnode . metadata . code . indefinitive = true;
     if let Some(title) = canonical_title {
-      node_mut . value () . 1 . title = title; }
-    node_mut . value () . 1 . body = None; }
+      node_mut . value () . orgnode . title = title; }
+    node_mut . value () . orgnode . body = None; }
   for child_id in content_child_ids { // recurse
     indefinitize_content_subtree (
       tree, child_id, visited ) ?; }
@@ -270,7 +270,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" ) ?;
-    let orgnode : &OrgNode = & node_ref . value () . 1;
+    let orgnode : &OrgNode = & node_ref . value () . orgnode;
     let pid : ID = orgnode . metadata . id . clone ()
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID" ) ?;
     let source : String = orgnode . metadata . source . clone ()
@@ -286,5 +286,6 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     // Replace node value in place
     tree . get_mut ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" )) ?;
-  * node_mut . value () = ( Some ( skgnode ), orgnode );
+  * node_mut . value () = NodePair { mskgnode: Some ( skgnode ),
+                                     orgnode };
   Ok (( )) }

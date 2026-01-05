@@ -15,8 +15,13 @@ use ego_tree::{Tree, NodeId};
 /// and eventually becomes one before being sent to Emacs,
 /// but carrying the SkgNode between those two phases
 /// lets us avoid redundant disk lookups.
-pub type PairTree = Tree < NodePair >;
-pub type NodePair = (Option<SkgNode>, OrgNode);
+pub type PairTree = Tree<NodePair>;
+
+#[derive(Clone, Debug)]
+pub struct NodePair {
+  pub mskgnode: Option<SkgNode>,
+  pub orgnode: OrgNode,
+}
 
 /// Read a node's value from a tree, applying a function to it.
 /// Returns an error if the node is not found.

@@ -17,7 +17,7 @@ pub fn orgnode_forest_to_string (
     node_ref : NodeRef < NodePair >,
     level    : usize,
   ) -> String {
-    let node : &OrgNode = & node_ref . value () . 1;
+    let node : &OrgNode = & node_ref . value () . orgnode;
     let mut out : String =
       orgnode_to_text ( level, node );
     for child in node_ref . children () {
@@ -27,7 +27,7 @@ pub fn orgnode_forest_to_string (
           level + 1 )); }
     out }
   let root_ref = forest . root ();
-  if root_ref . value () . 1 . metadata . code . interp
+  if root_ref . value () . orgnode . metadata . code . interp
      != Interp::ForestRoot {
     return Err (
       "orgnode_forest_to_string: root is not a ForestRoot".into() ); }

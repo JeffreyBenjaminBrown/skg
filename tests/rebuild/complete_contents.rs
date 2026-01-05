@@ -35,7 +35,7 @@ async fn check_and_complete (
     // 'mark_if_visited_or_repeat_or_cycle' may have changed this value.
     let node_ref = tree . get ( node_id )
       . ok_or ( "Node not found" ) ?;
-    node_ref . value () . 1 . metadata . code . indefinitive };
+    node_ref . value () . orgnode . metadata . code . indefinitive };
   if is_indefinitive {
     clobberIndefinitiveOrgnode (
       tree, node_id ) ?;

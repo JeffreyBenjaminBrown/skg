@@ -9,7 +9,7 @@ use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
 use crate::types::skgnode::SkgNode;
-use crate::types::trees::PairTree;
+use crate::types::trees::{PairTree, NodePair};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use futures::StreamExt;
@@ -337,10 +337,10 @@ pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
   if tree_roots1 . len () != tree_roots2 . len () {
     return false; }
   fn compare_nodes (
-    node1 : NodeRef < (Option<SkgNode>, OrgNode) >,
+    node1 : NodeRef < NodePair >,
     node2 : NodeRef < OrgNode >
   ) -> bool {
-    let n1 : & OrgNode = & node1 . value () . 1;
+    let n1 : & OrgNode = & node1 . value () . orgnode;
     let n2 : & OrgNode = node2 . value ();
     // Compare the OrgNode values
     if n1 != n2 { return false; }
@@ -474,7 +474,7 @@ pub fn orgnode_forest_to_paired (
       . unwrap () . value () . clone ();
     let new_node_id : NodeId = {
       let mut parent_mut = forest . get_mut ( parent_id ) . unwrap ();
-      parent_mut . append ( (None, orgnode_data) ) . id () };
+      parent_mut . append ( NodePair { mskgnode: None, orgnode: orgnode_data } ) . id () };
     let child_ids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_node_id ) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();

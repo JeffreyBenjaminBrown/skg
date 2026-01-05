@@ -74,7 +74,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let treatment: Interp =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.1.metadata.code.interp.clone()
+        node.orgnode.metadata.code.interp.clone()
       })?;
     if treatment == Interp::AliasCol {
       completeAliasCol (
@@ -116,7 +116,7 @@ fn collect_view_requests (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "collect_view_requests: node not found" ) ?;
-    node_ref . value () . 1 . metadata . code . viewRequests
+    node_ref . value () . orgnode . metadata . code . viewRequests
       . iter () . cloned () . collect () };
   for request in node_view_requests {
     view_requests_out . push ( (node_id, request) ); }
@@ -141,14 +141,15 @@ pub fn clobberIndefinitiveOrgnode (
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "Node not found" ) ?;
-    let (skgnode_opt, orgnode) = node_mut . value ();
+    let pair = node_mut . value ();
     let skgnode : &SkgNode =
-      skgnode_opt . as_ref ()
+      pair . mskgnode . as_ref ()
       . ok_or ( "SkgNode should exist after fetch" ) ?;
-    orgnode . title = skgnode . title . clone ();
-    orgnode . metadata . source =
+    pair . orgnode . title =
+      skgnode . title . clone ();
+    pair . orgnode . metadata . source =
       Some ( skgnode . source . clone () );
-    orgnode . body = None; }
+    pair . orgnode . body = None; }
   Ok (( )) }
 
 /// Completes a definitive Content node's children,
@@ -184,7 +185,7 @@ pub async fn completeDefinitiveOrgnode (
         tree . get ( node_id )
         . ok_or ( "Node not found in tree" ) ?;
       let skgnode : &SkgNode =
-        node_ref . value () . 0 . as_ref ()
+        node_ref . value () . mskgnode . as_ref ()
         . ok_or ( "SkgNode should exist" ) ?;
       let content_from_disk : HashSet<ID> =
         skgnode . contains . clone ()
@@ -208,7 +209,7 @@ pub async fn completeDefinitiveOrgnode (
       tree . get ( *child_id )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
-      child_ref . value () . 1 . metadata . id . as_ref ()
+      child_ref . value () . orgnode . metadata . id . as_ref ()
       . ok_or ( "Content child has no ID" ) ?;
     content_id_to_node_id . insert (
       child_pid . clone (), *child_id ); }
@@ -224,10 +225,10 @@ pub async fn completeDefinitiveOrgnode (
     let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_id )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . 1 . metadata . code.interp =
+    child_mut . value () . orgnode . metadata . code.interp =
       Interp::ParentIgnores;
     content_id_to_node_id . remove (
-      & child_mut . value () . 1
+      & child_mut . value () . orgnode
         . metadata . id . clone () . unwrap () );
     non_content_child_ids . push ( *invalid_id ); }
 
@@ -269,7 +270,7 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . 1 . metadata . code.interp
+    if child . value () . orgnode . metadata . code . interp
       == Interp::Content
     { content_child_ids . push ( child . id () );
     } else {
@@ -292,7 +293,8 @@ async fn extend_content (
     tree . get_mut ( parent_nid )
     . ok_or ( "Parent node not found" ) ?;
   let new_child : NodeMut < NodePair > =
-    parent_mut . append ( (Some(skgnode), new_orgnode) );
+    parent_mut . append ( NodePair { mskgnode: Some(skgnode),
+                                     orgnode: new_orgnode } );
   Ok ( new_child . id ( )) }
 
 /// Reorder a node's children by detaching all
@@ -356,7 +358,7 @@ pub async fn ensure_skgnode (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;
-    node_ref . value () . 0 . is_some () };
+    node_ref . value () . mskgnode . is_some () };
   if ! has_skgnode {
     let (skgnode, _source) =
       skgnode_and_source_from_id (
@@ -364,7 +366,7 @@ pub async fn ensure_skgnode (
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "ensure_skgnode: node not found" ) ?;
-    node_mut . value () . 0 = Some ( skgnode ); }
+    node_mut . value () . mskgnode = Some ( skgnode ); }
   Ok (( )) }
 
 /// Ensure a node in a PairTree has a source in its metadata.
@@ -380,7 +382,7 @@ pub async fn ensure_source (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "ensure_source: node not found" ) ?;
-    node_ref . value () . 1 . metadata . source . is_some () };
+    node_ref . value () . orgnode . metadata . source . is_some () };
   if ! has_source {
     let node_pid : ID =
       get_pid_in_pairtree ( tree, node_id ) ?;
@@ -393,7 +395,7 @@ pub async fn ensure_source (
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id )
       . ok_or ( "ensure_source: node not found" ) ?;
-    node_mut . value () . 1 . metadata . source =
+    node_mut . value () . orgnode . metadata . source =
       Some ( source ); }
   Ok (( )) }
 
@@ -415,14 +417,14 @@ pub async fn maybe_add_subscribee_col (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
-    node_ref . value () . 1 . metadata . code . indefinitive };
+    node_ref . value () . orgnode . metadata . code . indefinitive };
   if is_indefinitive { return Ok (( )); }
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) = {
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     let skgnode : &SkgNode =
-      node_ref . value () . 0 . as_ref ()
+      node_ref . value () . mskgnode . as_ref ()
       . ok_or ( "maybe_add_subscribee_col: SkgNode should exist" ) ?;
     ( skgnode . ids [ 0 ] . clone (),
       skgnode . subscribes_to . clone () . unwrap_or_default () ) };
@@ -432,7 +434,7 @@ pub async fn maybe_add_subscribee_col (
       tree . get ( node_id )
       . ok_or ( "maybe_add_subscribee_col: node not found" ) ?;
     node_ref . children () . any ( | child |
-      child . value () . 1 . metadata . code . interp
+      child . value () . orgnode . metadata . code . interp
         == Interp::SubscribeeCol ) };
   if has_subscribee_col { return Ok (( )); }
 
@@ -460,8 +462,10 @@ pub async fn maybe_add_subscribee_col (
       let mut node_mut : NodeMut < NodePair > = (
         tree . get_mut ( node_id )
           . ok_or ( "maybe_add_subscribee_col: node not found" )) ?;
-      node_mut . prepend (
-        (None, subscribee_col_orgnode) ) . id () }};
+      node_mut
+        . prepend ( NodePair { mskgnode: None,
+                               orgnode: subscribee_col_orgnode } )
+        . id () }};
 
   if ! hidden_outside_content . is_empty () {
     // the HiddenOutsideOfSubscribeeCol
@@ -477,7 +481,9 @@ pub async fn maybe_add_subscribee_col (
         let mut col_mut : NodeMut < NodePair > =
           tree . get_mut ( subscribee_col_nid ) . ok_or (
             "maybe_add_subscribee_col: SubscribeeCol not found" )?;
-        col_mut . append ((None, hidden_outside_col_orgnode))
+        col_mut
+          . append ( NodePair { mskgnode: None,
+                                orgnode: hidden_outside_col_orgnode })
           . id () }};
     { // its children, HiddenFromSubscribees (although since no subscribee contains them, they are not actually hidden anywhere)
       for hidden_id in hidden_outside_content {
@@ -491,7 +497,8 @@ pub async fn maybe_add_subscribee_col (
         let mut hidden_col_mut : NodeMut < NodePair > =
           tree . get_mut ( hidden_outside_col_nid )
           . ok_or ( "maybe_add_subscribee_col: HiddenOutsideOfSubscribeeCol not found" ) ?;
-        hidden_col_mut . append (( Some ( skgnode ), orgnode )); }} }
+        hidden_col_mut . append (
+          NodePair { mskgnode: Some(skgnode), orgnode } ); }} }
   { // The subscribees. These are indefinitive leaves (trivial 'branches'). They can be expanded by requesting definitive expansion, the same way one would do for ordinary content.
     let mut col_mut : NodeMut < NodePair > =
       tree . get_mut ( subscribee_col_nid )
@@ -507,7 +514,8 @@ pub async fn maybe_add_subscribee_col (
           metadata : md,
           title : subscribee_id . 0, // Use the ID as the title
           body : None, } };
-      col_mut . append ( (None, subscribee_orgnode) ); }}
+      col_mut . append ( NodePair { mskgnode: None,
+                                    orgnode: subscribee_orgnode } ); }}
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -524,7 +532,7 @@ pub async fn maybe_add_hidden_in_subscribee_col (
   { // error if not a Subscribee
     let is_subscribee: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.1.metadata.code.interp == Interp::Subscribee
+        node.orgnode.metadata.code.interp == Interp::Subscribee
       })?;
     if ! is_subscribee { return Err (
       "maybe_add_hidden_in_subscribee_col called on non-subscribee"
@@ -535,7 +543,7 @@ pub async fn maybe_add_hidden_in_subscribee_col (
         tree . get ( node_id ) . ok_or (
           "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
       node_ref . children () . any (
-        | child | child . value () . 1 . metadata . code . interp
+        | child | child . value () . orgnode . metadata . code . interp
           == Interp::HiddenInSubscribeeCol ) };
     if has_hidden_col { return Ok (( )); }}
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) = {
@@ -543,12 +551,12 @@ pub async fn maybe_add_hidden_in_subscribee_col (
       tree . get ( node_id ) . ok_or (
         "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
     let subscribee_pid : ID =
-      node_ref . value () . 1 . metadata . id . clone ()
+      node_ref . value () . orgnode . metadata . id . clone ()
       . ok_or ( "Subscribee has no ID" ) ?;
     let parent_ref : NodeRef < NodePair > =
       node_ref . parent ()
       . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-    if parent_ref . value () . 1 . metadata . code . interp
+    if parent_ref . value () . orgnode . metadata . code . interp
       != Interp::SubscribeeCol {
         return Err ( "Subscribee's parent is not a SubscribeeCol" .
                       into () ); }
@@ -556,7 +564,7 @@ pub async fn maybe_add_hidden_in_subscribee_col (
       parent_ref . parent ()
       . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
     let skgnode : &SkgNode =
-      grandparent_ref . value () . 0 . as_ref ()
+      grandparent_ref . value () . mskgnode . as_ref ()
       . ok_or ( "Subscriber has no SkgNode" ) ?;
     ( subscribee_pid,
       skgnode . ids [ 0 ] . clone () ) };
@@ -580,7 +588,10 @@ pub async fn maybe_add_hidden_in_subscribee_col (
     let mut node_mut : NodeMut < NodePair > =
       tree . get_mut ( node_id ) . ok_or (
         "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-    node_mut . prepend ( (None, hidden_col_orgnode) ) . id () };
+    node_mut
+      . prepend ( NodePair { mskgnode: None,
+                             orgnode: hidden_col_orgnode } )
+      . id () };
   { // Add HiddenFromSubscribees children
     for hidden_id in hidden_in_content {
       let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
@@ -592,5 +603,6 @@ pub async fn maybe_add_hidden_in_subscribee_col (
       let mut hidden_col_mut : NodeMut < NodePair > =
         tree . get_mut ( hidden_col_nid ) . ok_or (
           "maybe_add_hidden_in_subscribee_col: HiddenInSubscribeeCol not found" ) ?;
-      hidden_col_mut . append (( Some ( skgnode ), orgnode )); }}
+      hidden_col_mut . append ( NodePair { mskgnode: Some ( skgnode ),
+                                           orgnode } ); }}
   Ok (( )) }

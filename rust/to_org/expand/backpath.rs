@@ -15,7 +15,7 @@ use crate::media::typedb::search::{
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::trees::PairTree;
+use crate::types::trees::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -217,7 +217,8 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     true;
   let new_child_id : ego_tree::NodeId =
     tree . get_mut ( parent_id ) . unwrap ()
-    . prepend ( (None, child_orgnode) ) . id ();
+    . prepend ( NodePair { mskgnode: None,
+                           orgnode: child_orgnode } ) . id ();
   Ok ( new_child_id ) }
 
 /// Find a child node by its ID.
@@ -229,7 +230,7 @@ fn find_child_by_id (
 ) -> Option < ego_tree::NodeId > {
   for child in tree . get ( parent_id ) . unwrap () . children () {
     if let Some ( ref child_pid ) =
-      child . value () . 1 . metadata . id {
+      child . value () . orgnode . metadata . id {
         if child_pid == target_id {
           return Some ( child . id () ); }} }
   None }
@@ -245,7 +246,8 @@ fn find_children_by_ids (
   let mut result : HashMap < ID, ego_tree::NodeId > =
     HashMap::new ();
   for child in tree . get ( parent_id ) . unwrap () . children () {
-    if let Some ( ref child_pid ) = child . value () . 1 . metadata . id {
-      if target_ids . contains ( child_pid ) {
-        result . insert ( child_pid . clone (), child . id () ); }} }
+    if let Some ( ref child_pid )
+      = child . value () . orgnode . metadata . id
+    { if target_ids . contains ( child_pid )
+      { result . insert ( child_pid . clone (), child . id () ); }} }
   result }

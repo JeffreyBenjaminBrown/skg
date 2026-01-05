@@ -117,7 +117,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(ref id) = node_ref.value().1.metadata.id {
+      if let Some(ref id) = node_ref.value().orgnode.metadata.id {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -202,7 +202,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(ref id) = node_ref.value().1.metadata.id {
+      if let Some(ref id) = node_ref.value().orgnode.metadata.id {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;

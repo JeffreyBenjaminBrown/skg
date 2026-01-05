@@ -95,31 +95,31 @@ fn set_metadata_relationships_in_node_recursive (
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( node_id ) . unwrap ()
-    . value () . 1 . metadata . id . clone ();
+    . value () . orgnode . metadata . id . clone ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
     // Update all relationship fields
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . 1 . metadata . viewData . relationships . numContainers =
+      . orgnode . metadata . viewData . relationships . numContainers =
       rel_data . num_containers . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . 1 . metadata . viewData . relationships . numContents =
+      . orgnode . metadata . viewData . relationships . numContents =
       rel_data . num_contents . get ( node_pid ) . copied ();
     tree . get_mut ( node_id ) . unwrap () . value ()
-      . 1 . metadata . viewData . relationships . numLinksIn =
+      . orgnode . metadata . viewData . relationships . numLinksIn =
       rel_data . num_links_in . get ( node_pid ) . copied ();
     if let Some ( parent_id ) = parent_pid {
       // Set parent relationship flags if we have a parent.
       // TODO | PITFALL: If there is no parent,
       // these fields are meaningless.
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . 1 . metadata . viewData . relationships . parentIsContainer =
+        . orgnode . metadata . viewData . relationships . parentIsContainer =
         rel_data . content_to_containers
         . get ( node_pid )
         . map_or ( false, | containers |
                    containers . contains ( parent_id ));
       tree . get_mut ( node_id ) . unwrap () . value ()
-        . 1 . metadata . viewData . relationships . parentIsContent =
+        . orgnode . metadata . viewData . relationships . parentIsContent =
         rel_data . container_to_contents
         . get ( node_pid )
         . map_or ( false, | contents |

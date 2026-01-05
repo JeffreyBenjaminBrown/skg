@@ -5,7 +5,7 @@ use crate::types::misc::ID;
 use crate::types::orgnode::OrgNode;
 use crate::types::save::SaveInstruction;
 use crate::types::skgnode::SkgNode;
-use crate::types::trees::PairTree;
+use crate::types::trees::{PairTree, NodePair};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::HashMap;
@@ -49,7 +49,7 @@ fn add_paired_subtree_as_child (
   let orgnode : OrgNode =
     orgnode_tree . get ( orgnode_node_id ) . unwrap ()
     . value () . clone ();
-  let skgnode : Option<SkgNode> =
+  let mskgnode : Option<SkgNode> =
     orgnode . metadata . id . as_ref ()
     . and_then (
       |id| skgnode_map . get (id) . cloned () );
@@ -57,7 +57,7 @@ fn add_paired_subtree_as_child (
     let mut parent_mut : NodeMut < _ > =
       pair_tree . get_mut ( parent_id ) . unwrap ();
     parent_mut . append ( // add new node
-      (skgnode, orgnode) ) . id () };
+      NodePair { mskgnode, orgnode } ) . id () };
   { // recurse in new node
     let child_ids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_node_id ) . unwrap ()
