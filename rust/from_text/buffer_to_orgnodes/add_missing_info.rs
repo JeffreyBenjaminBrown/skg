@@ -37,22 +37,30 @@ pub async fn add_missing_info_to_forest(
           tree_root_mut,
           None,       // parent's Interp
           None ); } } // parent's source
+  assign_pids_throughout_forest (
+    forest, &tree_root_ids, db_name, driver ). await }
 
-  // collect IDs
+/// Collect IDs from forest, look up PIDs in TypeDB, assign them.
+async fn assign_pids_throughout_forest (
+  forest        : &mut Tree<OrgNode>,
+  tree_root_ids : &[NodeId],
+  db_name       : &str,
+  driver        : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
   let mut ids_to_lookup: Vec<ID> = Vec::new();
-  for tree_root_id in &tree_root_ids {
+  for tree_root_id in tree_root_ids {
     if let Some(tree_root_ref) = forest.get(*tree_root_id) {
       collect_ids_in_tree(tree_root_ref,
                           &mut ids_to_lookup); }}
-
-  // assign PIDs
   let pid_map: HashMap<ID, Option<ID>> =
-    pids_from_ids(db_name, driver, &ids_to_lookup).await?;
-  for tree_root_id in &tree_root_ids {
-    if let Some(tree_root_mut) = forest.get_mut(*tree_root_id) {
-      assign_pids_throughout_tree_from_map(
-        tree_root_mut, &pid_map); } }
-  Ok(()) }
+    pids_from_ids( db_name, driver, &ids_to_lookup
+    ). await?;
+  for tree_root_id in tree_root_ids {
+    if let Some(tree_root_mut) =
+      forest.get_mut(*tree_root_id) {
+        assign_pids_throughout_tree_from_map(
+          tree_root_mut, &pid_map); }}
+  Ok(( )) }
 
 /// - assign alias Interp, if missing and appropriate
 /// - assign source if knowable
@@ -65,12 +73,13 @@ fn add_missing_info_dfs (
   { // process this node
     assign_alias_relation_if_needed (
       node_ref . value (), parent_reltoparent );
-    if ! ( node_ref . value ()
-           . metadata . code . interp . should_be_sourceless () {
+    if ! node_ref . value ()
+         . metadata . code . interp . should_be_sourceless () {
       inherit_source_if_needed (
         node_ref . value (), parent_source ); }
     assign_new_id_if_needed (
       node_ref . value () ); }
+
   { // recurse into children DFS
     let its_interp: Interp =
       node_ref . value ()
@@ -82,8 +91,7 @@ fn add_missing_info_dfs (
     let child_treeids: Vec < ego_tree::NodeId > = {
       let tree = node_ref . tree ();
       tree . get ( treeid ) . unwrap ()
-        . children () . map ( | child |
-                             child . id () )
+        . children () . map ( | child | child . id () )
         . collect () };
     for child_treeid in child_treeids {
       if let Some ( child_mut )
