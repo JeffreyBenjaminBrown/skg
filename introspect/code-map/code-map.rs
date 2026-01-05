@@ -6,7 +6,7 @@
 use std::fs;
 use std::path::Path;
 use std::env;
-use syn::{Item, ImplItem, File};
+use syn::{Item, ImplItem, File, Visibility};
 use walkdir::WalkDir;
 
 fn main() {
@@ -80,39 +80,46 @@ fn process_rust_file(path: &Path, output: &mut String, level: usize, org_path: &
     for item in &syntax.items {
         match item {
             Item::Fn(f) => {
+                let vis = format_visibility(&f.vis);
                 let name = &f.sig.ident;
                 let line = line_of_span(&content, f.sig.fn_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][fn {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}fn {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Struct(s) => {
+                let vis = format_visibility(&s.vis);
                 let name = &s.ident;
                 let line = line_of_span(&content, s.struct_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][struct {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}struct {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Enum(e) => {
+                let vis = format_visibility(&e.vis);
                 let name = &e.ident;
                 let line = line_of_span(&content, e.enum_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][enum {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}enum {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Type(t) => {
+                let vis = format_visibility(&t.vis);
                 let name = &t.ident;
                 let line = line_of_span(&content, t.type_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][type {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}type {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Trait(t) => {
+                let vis = format_visibility(&t.vis);
                 let name = &t.ident;
                 let line = line_of_span(&content, t.trait_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][trait {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}trait {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Const(c) => {
+                let vis = format_visibility(&c.vis);
                 let name = &c.ident;
                 let line = line_of_span(&content, c.const_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][const {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}const {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Static(s) => {
+                let vis = format_visibility(&s.vis);
                 let name = &s.ident;
                 let line = line_of_span(&content, s.static_token.span);
-                output.push_str(&format!("{} [[file:{}::{}][static {}]]\n", stars, org_path, line, name));
+                output.push_str(&format!("{} [[file:{}::{}][{}static {}]]\n", stars, org_path, line, vis, name));
             }
             Item::Macro(m) => {
                 if let Some(ident) = &m.ident {
@@ -129,19 +136,22 @@ fn process_rust_file(path: &Path, output: &mut String, level: usize, org_path: &
                 for impl_item in &imp.items {
                     match impl_item {
                         ImplItem::Fn(f) => {
+                            let vis = format_visibility(&f.vis);
                             let name = &f.sig.ident;
                             let iline = line_of_span(&content, f.sig.fn_token.span);
-                            output.push_str(&format!("{} [[file:{}::{}][fn {}]]\n", child_stars, org_path, iline, name));
+                            output.push_str(&format!("{} [[file:{}::{}][{}fn {}]]\n", child_stars, org_path, iline, vis, name));
                         }
                         ImplItem::Type(t) => {
+                            let vis = format_visibility(&t.vis);
                             let name = &t.ident;
                             let iline = line_of_span(&content, t.type_token.span);
-                            output.push_str(&format!("{} [[file:{}::{}][type {}]]\n", child_stars, org_path, iline, name));
+                            output.push_str(&format!("{} [[file:{}::{}][{}type {}]]\n", child_stars, org_path, iline, vis, name));
                         }
                         ImplItem::Const(c) => {
+                            let vis = format_visibility(&c.vis);
                             let name = &c.ident;
                             let iline = line_of_span(&content, c.const_token.span);
-                            output.push_str(&format!("{} [[file:{}::{}][const {}]]\n", child_stars, org_path, iline, name));
+                            output.push_str(&format!("{} [[file:{}::{}][{}const {}]]\n", child_stars, org_path, iline, vis, name));
                         }
                         _ => {}
                     }
@@ -154,6 +164,20 @@ fn process_rust_file(path: &Path, output: &mut String, level: usize, org_path: &
 
 fn line_of_span(_content: &str, span: proc_macro2::Span) -> usize {
     span.start().line
+}
+
+fn format_visibility(vis: &Visibility) -> &'static str {
+    match vis {
+        Visibility::Public(_) => "pub ",
+        Visibility::Restricted(r) => {
+            // pub(crate), pub(super), pub(self), pub(in path)
+            if r.path.is_ident("crate") { "pub(crate) "
+            } else if r.path.is_ident("super") { "pub(super) "
+            } else if r.path.is_ident("self") { ""  // pub(self) is same as private
+            } else { "pub(...) " } // pub(in some::path)
+        }
+        Visibility::Inherited => "",  // private (no modifier)
+    }
 }
 
 fn format_impl_name(imp: &syn::ItemImpl) -> String {
