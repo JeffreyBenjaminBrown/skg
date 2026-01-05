@@ -81,7 +81,6 @@
    like request containerward view
 ** ONGOING simple refactors
 *** write helpers to simplify egotree boilerplate
-*** TODO Rewrite clobberIndefinitiveOrgnode to use them.
 *** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
    if is_indefinitive {
      makeIndefinitiveAndClobber ( tree, node_id ) ?;

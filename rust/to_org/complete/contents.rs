@@ -14,7 +14,7 @@ use crate::dbs::typedb::search::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest, default_metadata};
-use crate::types::tree::{NodePair, PairTree, read_at_node_in_tree};
+use crate::types::tree::{NodePair, PairTree, read_at_node_in_tree, write_at_node_in_tree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{HashSet, HashMap};
@@ -134,23 +134,19 @@ fn collect_view_requests (
 /// - Reset source.
 /// - Set body to None.
 pub fn clobberIndefinitiveOrgnode (
-  tree   : &mut PairTree,
-  node_id : NodeId,
+  tree    : &mut PairTree,
+  treeid : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  { // Update title, source. Clear body. Get data from the SkgNode.
-    let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "Node not found" ) ?;
-    let pair = node_mut . value ();
+  write_at_node_in_tree ( tree, treeid, |pair| {
     let skgnode : &SkgNode =
       pair . mskgnode . as_ref ()
-      . ok_or ( "SkgNode should exist after fetch" ) ?;
-    pair . orgnode . title =
-      skgnode . title . clone ();
-    pair . orgnode . metadata . source =
-      Some ( skgnode . source . clone () );
-    pair . orgnode . body = None; }
-  Ok (( )) }
+        . ok_or ("SkgNode should exist after fetch" . to_string() )?;
+    pair.orgnode.title = skgnode.title.clone();
+    pair.orgnode.metadata.source = Some(skgnode.source.clone());
+    pair.orgnode.body = None;
+    Ok::<(), String>(( ))
+  } )? // before the '?' it's a nested Result: R<R<(),String>,String>
+    . map_err( |e| -> Box<dyn Error> { e.into() } ) }
 
 /// Completes a definitive Content node's children,
 /// by reconciling them with the 'contains' relationships
