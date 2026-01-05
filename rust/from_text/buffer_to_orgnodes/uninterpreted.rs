@@ -3,8 +3,7 @@
 
 use crate::types::sexp::find_sexp_end;
 use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
-use crate::types::orgnode::{default_metadata, forest_root_orgnode};
-use crate::types::{OrgNode, OrgnodeMetadata};
+use crate::types::orgnode::{default_metadata, forest_root_orgnode, OrgNode, OrgnodeMetadata};
 
 use ego_tree::{Tree, NodeId};
 use regex::Regex;

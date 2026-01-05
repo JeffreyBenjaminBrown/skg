@@ -1,7 +1,9 @@
 // PURPOSE: Update Tantivy index from SaveInstructions.
 
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_from_index};
-use crate::types::{SkgNode, TantivyIndex, SaveInstruction, NonMerge_NodeAction};
+use crate::types::skgnode::SkgNode;
+use crate::types::misc::TantivyIndex;
+use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
 
 use tantivy::IndexWriter;
 use std::error::Error;

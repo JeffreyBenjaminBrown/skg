@@ -1,4 +1,4 @@
-use crate::from_text::{headline_to_triple, HeadlineInfo};
+use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::tantivy::search_index;

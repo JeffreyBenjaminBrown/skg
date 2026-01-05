@@ -1,5 +1,5 @@
 use crate::dbs::typedb::util::delete_database;
-use crate::types::SkgConfig;
+use crate::types::misc::SkgConfig;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 

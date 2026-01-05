@@ -1,17 +1,6 @@
 pub mod contains_from_pids;
-pub use contains_from_pids::contains_from_pids;
-
 pub mod count_relationships;
-pub use count_relationships::{
-  count_containers,
-  count_contents,
-  count_link_sources};
-
 pub mod hidden_in_subscribee_content;
-pub use hidden_in_subscribee_content::{
-  partition_subscribee_content_for_subscriber,
-  what_node_hides,
-  what_nodes_contain };
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -23,9 +12,9 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-use crate::dbs::typedb::util::build_id_disjunction;
+use crate::dbs::typedb::util::concept_document::build_id_disjunction;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::types::ID;
+use crate::types::misc::ID;
 
 /// Searches containerward recursively until reaching the first node
 /// which is either uncontained or multiply contained.

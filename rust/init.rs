@@ -4,7 +4,8 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::tantivy::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::types::{SkgNode, SkgConfig, TantivyIndex};
+use crate::types::skgnode::SkgNode;
+use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::error::Error;

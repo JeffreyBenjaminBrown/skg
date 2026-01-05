@@ -1,10 +1,11 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::types::tree::collect_generation_ids;
+use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::util::pid_and_source_from_id;
 use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
-use crate::types::orgnode::{default_metadata, Interp, ViewRequest};
+use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::{SkgNode, ID, SkgConfig, OrgNode};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::skgnode::SkgNode;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use ego_tree::iter::Edge;

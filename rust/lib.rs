@@ -11,8 +11,3 @@ pub mod test_utils;
 pub mod to_org;
 pub mod types;
 pub mod util;
-
-// Re-export dbs modules for backwards compatibility
-pub use dbs::filesystem;
-pub use dbs::tantivy;
-pub use dbs::typedb;

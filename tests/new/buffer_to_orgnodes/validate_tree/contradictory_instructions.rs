@@ -2,9 +2,12 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::{OrgNode, ID, BufferValidationError};
-use skg::types::orgnode::forest_root_orgnode;
-use skg::from_text::{org_to_uninterpreted_nodes, find_inconsistent_instructions, find_buffer_errors_for_saving};
+use skg::types::orgnode::{OrgNode, forest_root_orgnode};
+use skg::types::misc::ID;
+use skg::types::errors::BufferValidationError;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
 

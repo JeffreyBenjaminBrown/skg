@@ -4,10 +4,13 @@
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::from_text::{org_to_uninterpreted_nodes, saveinstructions_from_forest, find_inconsistent_instructions};
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::orgnodes_to_instructions::to_dirty_instructions::saveinstructions_from_forest;
+use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::run_with_test_db;
-use skg::types::{ID, NonMerge_NodeAction};
+use skg::types::misc::ID;
+use skg::types::save::NonMerge_NodeAction;
 use std::error::Error;
 
 #[test]

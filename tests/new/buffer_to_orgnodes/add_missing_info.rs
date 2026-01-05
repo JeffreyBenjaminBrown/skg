@@ -1,9 +1,11 @@
 // cargo test test_add_missing_info_comprehensive
 
 use indoc::indoc;
-use skg::from_text::{org_to_uninterpreted_nodes, add_missing_info_to_forest};
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
 use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id, compare_orgnode_forests};
-use skg::types::{OrgNode, SkgConfig, ID};
+use skg::types::orgnode::OrgNode;
+use skg::types::misc::{SkgConfig, ID};
 use ego_tree::Tree;
 
 use std::error::Error;

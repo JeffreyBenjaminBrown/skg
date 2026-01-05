@@ -1,7 +1,3 @@
-// DON'T IMPORT these re-exports. They are for documentation.
-// INSTEAD, imports in the codebase should use the original,
-// longer definition path. That makes it easier to find definitions.
-
 /// The 'buffer' referred to here
 /// is a Skg buffer from the Emacs client,
 /// read by the Rust server when the user saves it.
@@ -9,7 +5,7 @@
 /// is the function 'buffer_to_orgnode_forest_and_save_instructions'
 /// defined here.
 
-use crate::merge::instructiontriples_from_the_merges_in_an_orgnode_forest;
+use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::orgnode::OrgNode;
@@ -17,29 +13,15 @@ use crate::types::save::{MergeInstructionTriple, SaveInstruction};
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
-pub use buffer_to_orgnodes::{
-    org_to_uninterpreted_nodes,
-    headline_to_triple,
-    HeadlineInfo,
-    find_inconsistent_instructions,
-    find_buffer_errors_for_saving,
-    add_missing_info_to_forest,
-};
 pub mod buffer_to_orgnodes;
-
-pub use orgnodes_to_instructions::{
-    orgnodes_to_reconciled_save_instructions,
-    saveinstructions_from_forest,
-    reconcile_same_id_instructions,
-    clobber_none_fields_with_data_from_disk,
-};
 pub mod orgnodes_to_instructions;
-
 pub mod validate_foreign_nodes;
-pub use validate_foreign_nodes::{
-  validate_and_filter_foreign_instructions,
-  validate_merges_involve_only_owned_nodes,
-};
+
+use buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
+use buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
+use orgnodes_to_instructions::orgnodes_to_reconciled_save_instructions;
+use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
 
 pub async fn buffer_to_orgnode_forest_and_save_instructions (
   buffer_text : &str,

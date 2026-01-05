@@ -4,9 +4,9 @@ See the SkgConfig type at rust/types/misc.rs,
 or the example at data/skgconfig.toml.
 */
 
-use skg::filesystem::load_config;
+use skg::dbs::filesystem::misc::load_config;
 use skg::serve::serve;
-use skg::types::{ SkgConfig };
+use skg::types::misc::SkgConfig;
 
 use std::error::Error;
 use std::env;

@@ -1,5 +1,6 @@
-use crate::save::update_index_from_saveinstructions;
-use crate::types::{MergeInstructionTriple, SaveInstruction, TantivyIndex};
+use crate::save::tantivy::update_index_from_saveinstructions;
+use crate::types::save::{MergeInstructionTriple, SaveInstruction};
+use crate::types::misc::TantivyIndex;
 use std::error::Error;
 
 /// Apply each MergeInstructionTriple to the index.

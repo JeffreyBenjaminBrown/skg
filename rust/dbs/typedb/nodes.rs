@@ -1,4 +1,5 @@
-use crate::types::{ID, SkgNode};
+use crate::types::misc::ID;
+use crate::types::skgnode::SkgNode;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 
 use futures::StreamExt;

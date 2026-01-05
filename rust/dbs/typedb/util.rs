@@ -1,14 +1,5 @@
 pub mod pids_from_ids;
-pub use pids_from_ids::{
-  pids_from_ids,
-  collect_ids_in_tree,
-  assign_pids_throughout_tree_from_map};
-
 pub mod concept_document;
-pub use concept_document::{
-  extract_id_from_node,
-  extract_id_from_map,
-  build_id_disjunction};
 
 use std::error::Error;
 use typedb_driver::{
@@ -20,7 +11,8 @@ use typedb_driver::{
 };
 use futures::StreamExt;
 
-use crate::types::ID;
+use crate::types::misc::ID;
+use concept_document::extract_id_from_node;
 
 pub async fn delete_database (
   driver  : &TypeDBDriver,

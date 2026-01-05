@@ -4,8 +4,12 @@ use skg::test_utils::run_with_test_db;
 use skg::save::typedb::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
-use skg::from_text::{org_to_uninterpreted_nodes, orgnodes_to_reconciled_save_instructions, find_inconsistent_instructions};
-use skg::types::{ID, OrgNode, SaveInstruction};
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::orgnodes_to_instructions::orgnodes_to_reconciled_save_instructions;
+use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
+use skg::types::misc::ID;
+use skg::types::orgnode::OrgNode;
+use skg::types::save::SaveInstruction;
 use ego_tree::Tree;
 use indoc::indoc;
 

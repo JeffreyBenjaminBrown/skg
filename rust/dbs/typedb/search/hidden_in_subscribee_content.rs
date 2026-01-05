@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-use crate::types::ID;
+use crate::types::misc::ID;
 use crate::dbs::typedb::search::find_related_nodes;
 
 /// Partition E's direct content into visible and hidden portions,

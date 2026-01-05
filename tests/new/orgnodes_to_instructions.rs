@@ -4,9 +4,12 @@
 // so revising these tests feels low-priority.)
 
 use indoc::indoc;
-use skg::from_text::{org_to_uninterpreted_nodes, saveinstructions_from_forest};
-use skg::types::{OrgNode, ID, SkgNode, NonMerge_NodeAction};
-use skg::types::orgnode::forest_root_orgnode;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::orgnodes_to_instructions::to_dirty_instructions::saveinstructions_from_forest;
+use skg::types::orgnode::{OrgNode, forest_root_orgnode};
+use skg::types::misc::ID;
+use skg::types::skgnode::SkgNode;
+use skg::types::save::NonMerge_NodeAction;
 use ego_tree::Tree;
 
 #[test]

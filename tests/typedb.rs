@@ -11,14 +11,15 @@ mod util {
 }
 
 use skg::to_org::render::content_view::single_root_view;
-use skg::from_text::org_to_uninterpreted_nodes;
-use skg::types::OrgNode;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::orgnode::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::dbs::typedb::relationships::delete_out_links;
 use skg::dbs::typedb::util::{extract_payload_from_typedb_string_rep, pid_and_source_from_id};
-use skg::types::{ID, SkgNode, SkgConfig, empty_skgnode};
+use skg::types::misc::{ID, SkgConfig};
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 use futures::StreamExt;
 use std::collections::HashSet;

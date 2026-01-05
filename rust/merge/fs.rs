@@ -1,5 +1,7 @@
 use crate::dbs::filesystem::one_node::write_skgnode_to_source;
-use crate::types::{MergeInstructionTriple, SkgConfig, SkgNode};
+use crate::types::save::MergeInstructionTriple;
+use crate::types::misc::SkgConfig;
+use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 

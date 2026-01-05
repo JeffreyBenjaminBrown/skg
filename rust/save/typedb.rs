@@ -5,7 +5,9 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
-use crate::types::{SkgNode, ID, SaveInstruction, NonMerge_NodeAction};
+use crate::types::skgnode::SkgNode;
+use crate::types::misc::ID;
+use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
 
 /// Update the DB from a batch of `(SkgNode, NonMerge_NodeAction)` pairs:
 /// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids

@@ -4,13 +4,14 @@ use indoc::indoc;
 use std::error::Error;
 
 use ego_tree::{Tree, NodeId};
-use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
 use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
-use skg::to_org::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
+use skg::to_org::complete::contents::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
-use skg::types::{ID, OrgNode, SkgConfig};
+use skg::types::misc::{ID, SkgConfig};
+use skg::types::orgnode::OrgNode;
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
@@ -57,7 +58,7 @@ fn test_indefinitive_identity_at_multiple_levels
     } )) }
 
 async fn test_indefinitive_identity_at_multiple_levels_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
@@ -170,7 +171,7 @@ fn test_visited_and_indefinitive
     } )) }
 
 async fn test_visited_and_indefinitive_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   // Test 1: indefinitive with non-indefinitive child
@@ -326,7 +327,7 @@ fn test_visited_and_not_indefinitive
     } )) }
 
 async fn test_visited_and_not_indefinitive_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =
@@ -452,7 +453,7 @@ fn test_false_content
     } )) }
 
 async fn test_false_content_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let input_org_text : &str =

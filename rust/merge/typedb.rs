@@ -1,4 +1,6 @@
-use crate::types::{MergeInstructionTriple, SkgNode, ID};
+use crate::types::save::MergeInstructionTriple;
+use crate::types::skgnode::SkgNode;
+use crate::types::misc::ID;
 use crate::dbs::typedb::nodes::create_node;
 use crate::dbs::typedb::relationships::create_relationships_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;

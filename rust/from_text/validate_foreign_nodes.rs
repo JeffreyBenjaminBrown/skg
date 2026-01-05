@@ -1,4 +1,5 @@
-use crate::types::{ID, SkgConfig, BufferValidationError, SourceNickname};
+use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::errors::BufferValidationError;
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction, MergeInstructionTriple};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use typedb_driver::TypeDBDriver;

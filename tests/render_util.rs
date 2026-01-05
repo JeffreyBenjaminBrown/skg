@@ -1,8 +1,8 @@
 // cargo test --test render_util
 
 use skg::org_to_text::orgnode_to_text;
-use skg::types::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, ID};
-use skg::types::orgnode::default_metadata;
+use skg::types::orgnode::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, default_metadata};
+use skg::types::misc::ID;
 use std::collections::HashSet;
 
 #[test]

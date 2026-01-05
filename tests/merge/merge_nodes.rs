@@ -1,17 +1,16 @@
 // cargo test merge::merge_nodes
 
-use skg::merge::{
-  instructiontriples_from_the_merges_in_an_orgnode_forest,
-  merge_nodes};
+use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
+use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
-use skg::types::{ID, OrgNode, OrgnodeMetadata, EditRequest, SkgConfig, SkgNode, MergeInstructionTriple};
-use skg::types::orgnode::forest_root_orgnode;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::orgnode::{OrgNode, OrgnodeMetadata, EditRequest, forest_root_orgnode, OrgnodeCode, Interp};
+use skg::types::skgnode::SkgNode;
+use skg::types::save::MergeInstructionTriple;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
-use skg::dbs::typedb::search::{
-  contains_from_pids,
-  find_related_nodes};
-use skg::types::TantivyIndex;
+use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
+use skg::dbs::typedb::search::find_related_nodes;
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
@@ -66,8 +65,8 @@ async fn test_merge_2_into_1_impl(
       id: Some(ID::from("1")),
       source: None,
       viewData: Default::default(),
-      code: skg::types::OrgnodeCode {
-        interp: skg::types::Interp::Content,
+      code: OrgnodeCode {
+        interp: Interp::Content,
         indefinitive: false,
         editRequest: Some(EditRequest::Merge(ID::from("2"))),
         viewRequests: HashSet::new(), }, },
@@ -327,8 +326,8 @@ async fn test_merge_1_into_2_impl(
       id: Some(ID::from("2")),
       source: None,
       viewData: Default::default(),
-      code: skg::types::OrgnodeCode {
-        interp: skg::types::Interp::Content,
+      code: OrgnodeCode {
+        interp: Interp::Content,
         indefinitive: false,
         editRequest: Some(EditRequest::Merge(ID::from("1"))),
         viewRequests: HashSet::new(), }, },

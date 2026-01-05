@@ -1,4 +1,19 @@
-use super::ID;
+/// OrgNode, // metadata, title, opt body
+///   OrgnodeMetadata, // opt id, opt source, viewdata, code
+///     OrgnodeViewData, // cycle, focused, folded, relationships
+///       OrgnodeRelationships, // 2 bools, 3 opt ints
+///     OrgnodeCode, // interp, indef, opt editRequest, viewRequests
+///       Interp, // forestRoot | content | aliasCol | alias |
+///               // parentIgnores | subscribeeCol | subscribee |
+///               // hiddenOutsideOfSubscribeeCol |
+///               // hiddenInSubscribeeCol | hiddenFromSubscribees
+///       EditRequest, // merge | delete
+///                    //   Mutually excclusive.
+///       ViewRequest, // aliases | containerward
+///                    //   | sourceward | definitive
+///                    //   *Not* mutually exclusive.
+
+use super::misc::ID;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;

@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::skgnode_from_id;
+use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::orgnode_from_title_and_rel;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;

@@ -1,5 +1,8 @@
-use crate::dbs::filesystem::skgnode_from_id;
-use crate::types::{MergeInstructionTriple, SkgConfig, OrgNode, SkgNode, NonMerge_NodeAction, ID, EditRequest};
+use crate::dbs::filesystem::one_node::skgnode_from_id;
+use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
+use crate::types::misc::{SkgConfig, ID};
+use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;

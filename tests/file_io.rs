@@ -5,11 +5,12 @@ use indoc::indoc; // A macro, which acts like an unused import.
 use std::fs;
 use std::path::PathBuf;
 
-use skg::dbs::filesystem::{
+use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
-  misc::load_config_with_overrides,
-  one_node::{skgnode_from_pid_and_source, write_skgnode_to_source}};
-use skg::types::{SkgNode, ID, SkgConfig, skgnode_example, empty_skgnode};
+  skgnode_from_pid_and_source, write_skgnode_to_source};
+use skg::dbs::filesystem::misc::load_config_with_overrides;
+use skg::types::skgnode::{SkgNode, skgnode_example, empty_skgnode};
+use skg::types::misc::{ID, SkgConfig};
 use skg::test_utils::run_with_test_db;
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -144,7 +145,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
 #[test]
 fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   use std::collections::HashMap;
-  use skg::types::SkgfileSource;
+  use skg::types::misc::SkgfileSource;
   use tempfile::tempdir;
 
   // Create a temporary directory

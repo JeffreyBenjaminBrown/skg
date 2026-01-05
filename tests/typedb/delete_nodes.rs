@@ -6,7 +6,7 @@ use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::types::ID;
+use skg::types::misc::ID;
 
 use futures::StreamExt;
 use std::collections::{HashSet, BTreeSet};

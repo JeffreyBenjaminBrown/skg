@@ -5,16 +5,17 @@ use crate::to_org::util::{
   get_pid_in_pairtree, is_indefinitive, collect_child_treeids,
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::dbs::filesystem::skgnode_from_id;
+use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::util::pid_and_source_from_id;
-use crate::dbs::typedb::search::{
+use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest, default_metadata};
-use crate::types::tree::{NodePair, PairTree, read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::{NodePair, PairTree};
+use crate::types::tree::accessors::{read_at_node_in_tree, write_at_node_in_tree};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{HashSet, HashMap};

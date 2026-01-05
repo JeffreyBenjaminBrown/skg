@@ -1,10 +1,10 @@
-use crate::dbs::typedb::search::{
-  contains_from_pids,
+use crate::dbs::typedb::search::contains_from_pids::contains_from_pids;
+use crate::dbs::typedb::search::count_relationships::{
   count_containers,
   count_contents,
   count_link_sources};
 use crate::to_org::util::collect_ids_from_pair_tree;
-use crate::types::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::PairTree;
 
 use std::collections::{HashSet, HashMap};

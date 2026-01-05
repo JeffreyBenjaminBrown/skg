@@ -23,7 +23,7 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   build_node_branch_minus_content,
   VisitedMap };
-use crate::types::{SkgConfig, ID};
+use crate::types::misc::{SkgConfig, ID};
 use crate::types::tree::PairTree;
 
 use ego_tree::NodeId;

@@ -1,8 +1,8 @@
 // cargo test typedb::search::contains_from_pids
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::contains_from_pids;
-use skg::types::{ID, SkgConfig};
+use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
+use skg::types::misc::{ID, SkgConfig};
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;

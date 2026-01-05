@@ -3,11 +3,12 @@
 use std::path::Path;
 use std::collections::HashMap;
 use tantivy::schema as schema;
-use skg::dbs::filesystem::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::misc::load_config;
 use skg::init::in_fs_wipe_index_then_create_it;
 use skg::dbs::tantivy::{search_index, update_index_with_nodes};
-use skg::types::{TantivyIndex, SkgNode, ID, empty_skgnode};
+use skg::types::misc::{TantivyIndex, ID};
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 #[test]
 fn test_many_tantivy_things (

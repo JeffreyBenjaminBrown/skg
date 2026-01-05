@@ -5,7 +5,7 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::run_with_test_db;
-use skg::types::ID;
+use skg::types::misc::ID;
 
 #[test]
 fn test_bfs_limit_across_multiple_trees

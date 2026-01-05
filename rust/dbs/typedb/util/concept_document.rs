@@ -1,6 +1,6 @@
 use typedb_driver::answer::concept_document::{Node, Leaf};
 
-use crate::types::ID;
+use crate::types::misc::ID;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 
 

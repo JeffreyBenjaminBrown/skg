@@ -1,6 +1,7 @@
 use std::error::Error;
 
-use crate::types::{ID, SkgNode};
+use crate::types::misc::ID;
+use crate::types::skgnode::SkgNode;
 use crate::types::textlinks::textlinks_from_node;
 
 use typedb_driver::{

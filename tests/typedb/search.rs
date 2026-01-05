@@ -6,7 +6,7 @@ pub mod count_relationships;
 use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::find_containers_of;
 use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
-use skg::types::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig};
 
 use std::collections::HashSet;
 use std::error::Error;

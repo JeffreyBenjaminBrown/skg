@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::types::misc::ID;
 use crate::types::errors::TextLinkParseError;
-use crate::types::SkgNode;
+use crate::types::skgnode::SkgNode;
 
 //
 // Type Definitions

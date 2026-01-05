@@ -21,9 +21,11 @@
 /// .
 /// So this module only handles the simple case: supplement one instruction with disk.
 
-use crate::types::{
-  ID, SkgNode, SaveInstruction, NonMerge_NodeAction, SkgConfig, BufferValidationError, SourceNickname};
-use crate::dbs::filesystem::optskgnode_from_id;
+use crate::dbs::filesystem::one_node::optskgnode_from_id;
+use crate::types::errors::BufferValidationError;
+use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
+use crate::types::skgnode::SkgNode;
 use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;

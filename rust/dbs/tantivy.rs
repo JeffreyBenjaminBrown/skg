@@ -5,7 +5,8 @@
 // See the Tantivy section in glossary.md.
 
 use crate::types::textlinks::replace_each_link_with_its_label;
-use crate::types::{ID, SkgNode, TantivyIndex};
+use crate::types::misc::{ID, TantivyIndex};
+use crate::types::skgnode::SkgNode;
 
 use tantivy::{IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};

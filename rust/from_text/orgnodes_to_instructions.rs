@@ -2,12 +2,14 @@ pub mod to_dirty_instructions;
 pub mod reconcile_same_id_instructions;
 pub mod none_node_fields_are_noops;
 
-pub use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
-pub use reconcile_same_id_instructions::reconcile_same_id_instructions;
-pub use to_dirty_instructions::saveinstructions_from_forest;
-
-use crate::types::{SkgNode, SkgConfig, SaveInstruction};
+use crate::types::skgnode::SkgNode;
+use crate::types::misc::SkgConfig;
+use crate::types::save::SaveInstruction;
 use crate::types::orgnode::OrgNode;
+
+use to_dirty_instructions::saveinstructions_from_forest;
+use reconcile_same_id_instructions::reconcile_same_id_instructions;
+use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;

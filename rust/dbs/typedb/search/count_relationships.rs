@@ -9,11 +9,11 @@ use typedb_driver::{
 };
 use futures::StreamExt;
 
-use crate::types::ID;
-use crate::dbs::typedb::util::{
+use crate::types::misc::ID;
+use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
-  build_id_disjunction,
-  conjugate_binary_role};
+  build_id_disjunction};
+use crate::dbs::typedb::util::conjugate_binary_role;
 
 
 /// PURPOSE: Count how many times each node appears as 'contained'

@@ -4,9 +4,10 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::complete::aliascol::completeAliasCol;
-use skg::from_text::buffer_to_orgnodes::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
-use skg::types::OrgNode;
+use skg::types::orgnode::OrgNode;
+use skg::types::misc::SkgConfig;
 use skg::types::tree::PairTree;
 
 use ego_tree::{Tree, NodeId};
@@ -23,7 +24,7 @@ fn test_completeAliasCol
     } )) }
 
 async fn test_completeAliasCol_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
@@ -171,7 +172,7 @@ fn test_completeAliasCol_duplicate_aliases_different_orders
         config, driver ). await } )) }
 
 async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 

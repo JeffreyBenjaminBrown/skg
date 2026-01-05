@@ -5,10 +5,9 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::{
-  climb_containerward_and_fetch_rootish_context,
-  path_containerward_to_end_cycle_and_or_branches, };
-use skg::types::ID;
+use skg::dbs::typedb::search::climb_containerward_and_fetch_rootish_context;
+use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::types::misc::{ID, SkgConfig};
 
 #[test]
 fn test_a_mess_of_stuff
@@ -33,7 +32,7 @@ fn test_multi_root_view
     } )) }
 
 async fn run_path_and_root_tests (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver
 ) -> Result<(), Box<dyn std::error::Error>> {
 
@@ -103,7 +102,7 @@ async fn run_path_and_root_tests (
   Ok (( )) }
 
 async fn test_multi_root_view_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver
 ) -> Result<(), Box<dyn std::error::Error>> {
 

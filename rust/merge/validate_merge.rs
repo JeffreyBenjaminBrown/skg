@@ -9,7 +9,8 @@
        - No node can be involved in more than one merge.
 */
 
-use crate::types::{OrgNode, Interp, ID, EditRequest, SkgConfig};
+use crate::types::orgnode::{OrgNode, Interp, EditRequest};
+use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::util::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};

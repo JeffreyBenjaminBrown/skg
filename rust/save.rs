@@ -1,19 +1,15 @@
-// DON'T IMPORT these re-exports. They are for documentation.
-// INSTEAD, imports in the codebase should use the original,
-// longer definition path. That makes it easier to find definitions.
-
 pub mod fs;
 pub mod tantivy;
 pub mod typedb;
-
-pub use fs::update_fs_from_saveinstructions;
-pub use tantivy::update_index_from_saveinstructions;
-pub use typedb::update_typedb_from_saveinstructions;
 
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::save::SaveInstruction;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+use fs::update_fs_from_saveinstructions;
+use tantivy::update_index_from_saveinstructions;
+use typedb::update_typedb_from_saveinstructions;
 
 /// Updates **everything** from the given `SaveInstruction`s, in order:
 ///   1) TypeDB

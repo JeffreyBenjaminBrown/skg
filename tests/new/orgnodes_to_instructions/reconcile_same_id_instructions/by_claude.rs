@@ -2,7 +2,9 @@
 // Testing the logic for collecting and reducing duplicate instructions
 
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
-use skg::types::{ID, SkgNode, NonMerge_NodeAction};
+use skg::types::misc::ID;
+use skg::types::skgnode::SkgNode;
+use skg::types::save::NonMerge_NodeAction;
 
 // Helper function to create a basic SkgNode for testing
 fn create_test_node(

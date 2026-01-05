@@ -1,16 +1,6 @@
-// DON'T IMPORT these re-exports. They are for documentation.
-// INSTEAD, imports in the codebase should use the original,
-// longer definition path. That makes it easier to find definitions.
-
 pub mod handlers;
 pub mod parse_metadata_sexp;
 pub mod util;
-
-// Re-export handlers for backwards compatibility
-pub use handlers::save_buffer;
-pub use handlers::single_root_view;
-pub use handlers::title_matches;
-pub use title_matches::generate_title_matches_response;
 
 use crate::cleanup::cleanup_and_shutdown;
 use crate::init::initialize_dbs;

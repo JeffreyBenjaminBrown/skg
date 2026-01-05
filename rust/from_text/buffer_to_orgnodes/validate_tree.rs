@@ -1,14 +1,14 @@
 pub mod contradictory_instructions;
 
-use crate::types::{ID, OrgNode, Interp, BufferValidationError, SkgConfig, SourceNickname, ViewRequest};
-use crate::merge::validate_merge_requests;
+use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::errors::BufferValidationError;
+use crate::merge::validate_merge::validate_merge_requests;
+use contradictory_instructions::find_inconsistent_instructions;
 use ego_tree::Tree;
 use ego_tree::iter::Edge;
 use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
-
-// Re-export the main function
-pub use contradictory_instructions::find_inconsistent_instructions;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.

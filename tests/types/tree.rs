@@ -1,5 +1,5 @@
 use ego_tree::Tree;
-use skg::types::tree::{
+use skg::types::tree::generations::{
   first_in_generation,
   next_in_generation,
   collect_generation_ids,

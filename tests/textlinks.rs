@@ -5,7 +5,10 @@ use skg::types::textlinks::{
   textlinks_from_text,
   replace_each_link_with_its_label,
 };
-use skg::types::{TextLink, TextLinkParseError, ID, SkgNode, empty_skgnode};
+use skg::types::textlinks::TextLink;
+use skg::types::errors::TextLinkParseError;
+use skg::types::misc::ID;
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 #[test]
 fn test_textlink_to_string() {

@@ -2,10 +2,18 @@
 
 use indoc::indoc;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::from_text::{ buffer_to_orgnode_forest_and_save_instructions, org_to_uninterpreted_nodes, find_buffer_errors_for_saving, add_missing_info_to_forest};
-use skg::types::{OrgNode, BufferValidationError, SkgConfig, SkgNode, SaveError};
-use skg::dbs::filesystem::{read_all_skg_files_from_sources, load_config};
-use skg::dbs::typedb::{create_all_nodes, create_all_relationships};
+use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
+use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
+use skg::types::orgnode::OrgNode;
+use skg::types::errors::{BufferValidationError, SaveError};
+use skg::types::misc::SkgConfig;
+use skg::types::skgnode::SkgNode;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::misc::load_config;
+use skg::dbs::typedb::nodes::create_all_nodes;
+use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::init::{overwrite_new_empty_db, define_schema};
 use ego_tree::Tree;
 use std::error::Error;

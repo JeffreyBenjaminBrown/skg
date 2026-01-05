@@ -1,8 +1,9 @@
 // cargo test --test serve_title_matches_test
 
-use skg::types::{ID, empty_skgnode, SkgNode, TantivyIndex};
+use skg::types::misc::{ID, TantivyIndex};
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::init::in_fs_wipe_index_then_create_it;
-use skg::serve::title_matches::generate_title_matches_response;
+use skg::serve::handlers::title_matches::generate_title_matches_response;
 use std::path::Path;
 use std::fs;
 

@@ -5,7 +5,8 @@ use std::error::Error;
 use skg::from_text::orgnodes_to_instructions::none_node_fields_are_noops::
   clobber_none_fields_with_data_from_disk;
 use skg::test_utils::run_with_test_db;
-use skg::types::{ ID, SkgNode, empty_skgnode };
+use skg::types::misc::{ID, SkgConfig};
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 #[test]
 fn test_none_aliases_get_replaced_with_disk_aliases (
@@ -20,7 +21,7 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
     } )) }
 
 async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
@@ -76,7 +77,7 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
     } )) }
 
 async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
@@ -132,7 +133,7 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
     } )) }
 
 async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
@@ -187,7 +188,7 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
     } )) }
 
 async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
-  config : &skg::types::SkgConfig,
+  config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 

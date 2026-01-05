@@ -1,4 +1,5 @@
-use crate::types::{OrgNode, ID, EditRequest, SourceNickname};
+use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
 use std::collections::{HashMap, HashSet};

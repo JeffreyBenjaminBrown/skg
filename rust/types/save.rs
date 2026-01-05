@@ -1,4 +1,6 @@
-use super::{ID, SkgNode, SaveError, BufferValidationError};
+use super::misc::ID;
+use super::skgnode::SkgNode;
+use super::errors::{SaveError, BufferValidationError};
 
 
 /////////////////
