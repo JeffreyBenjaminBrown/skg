@@ -395,7 +395,7 @@ pub async fn all_pids_from_typedb(
 pub async fn extra_ids_from_pid(
   db_name: &str,
   driver: &TypeDBDriver,
-  skg_id: &ID,
+  skgid: &ID,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let tx: Transaction = driver.transaction(
     db_name, TransactionType::Read ). await?;
@@ -405,7 +405,7 @@ pub async fn extra_ids_from_pid(
        $rel isa has_extra_id (node: $node, extra_id: $e);
        $e has id $extra_id_value;
        select $extra_id_value;"#,
-    skg_id.0 );
+    skgid.0 );
   let answer: QueryAnswer = tx.query(query).await?;
   let mut extra_ids = Vec::new();
   let mut stream = answer.into_rows();

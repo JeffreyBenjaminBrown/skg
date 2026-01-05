@@ -12,15 +12,15 @@ use typedb_driver::TypeDBDriver;
 pub async fn skgnode_and_source_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skg_id : &ID
+  skgid : &ID
 ) -> Result<(SkgNode, SourceNickname), Box<dyn Error>> {
 
   let (pid, source) : (ID, String) =
     pid_and_source_from_id (
-      & config.db_name, driver, skg_id
+      & config.db_name, driver, skgid
   ). await ?
     . ok_or_else ( || format! (
-      "ID '{}' not found in database", skg_id ) ) ?;
+      "ID '{}' not found in database", skgid ) ) ?;
   let node_file_path : String =
     path_from_pid_and_source (
       config, &source, pid );
@@ -35,9 +35,9 @@ pub async fn skgnode_and_source_from_id (
 pub async fn skgnode_and_source_from_id_optional(
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skg_id : &ID
+  skgid : &ID
 ) -> Result<Option<(SkgNode, SourceNickname)>, Box<dyn Error>> {
-  match skgnode_and_source_from_id(config, driver, skg_id).await {
+  match skgnode_and_source_from_id(config, driver, skgid).await {
     Ok((skgnode, source)) => Ok(Some((skgnode, source))),
     Err(e)   => {
       let error_msg: String = e.to_string();
@@ -55,11 +55,11 @@ pub async fn skgnode_and_source_from_id_optional(
 pub async fn fetch_aliases_from_file (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skg_id : ID,
+  skgid : ID,
 ) -> Vec<String> {
   match pid_and_source_from_id (
     // Query TypeDB to get PID and source
-    &config.db_name, driver, &skg_id
+    &config.db_name, driver, &skgid
   ). await {
     Ok ( Some (( pid, source )) ) => {
       let file_path : String =

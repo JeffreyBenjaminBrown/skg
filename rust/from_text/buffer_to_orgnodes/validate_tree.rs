@@ -151,12 +151,12 @@ fn validate_node_and_children (
       if ! config.sources.contains_key(source_str) {
         let source_nickname: SourceNickname =
           SourceNickname::from ( source_str.as_str() );
-        let skg_id: ID =
+        let skgid: ID =
           orgnode.metadata.id.clone()
           .unwrap_or_else(|| ID::from("<no ID>"));
         errors.push(
           BufferValidationError::SourceNotInConfig(
-            skg_id,
+            skgid,
             source_nickname )); }} }
 
   if orgnode.metadata.code.indefinitive { // indef + edit = error

@@ -134,7 +134,7 @@ async fn merge_one_node_in_typedb(
 /// Deletes all extra_ids associated with a node.
 async fn delete_extra_ids_for_node(
   tx: &Transaction,
-  skg_id: &ID,
+  skgid: &ID,
 ) -> Result<(), Box<dyn Error>> {
   // Find all extra_ids (as strings) associated with the node.
   let extra_ids_query : String = format!(
@@ -144,7 +144,7 @@ async fn delete_extra_ids_for_node(
          $rel isa has_extra_id (node: $node, extra_id: $e);
          $e has id $extra_id_value;
        select $extra_id_value;"#,
-    skg_id.as_str() );
+    skgid.as_str() );
   let answer : QueryAnswer =
     tx.query ( extra_ids_query ). await ?;
   let mut extra_id_values : Vec<String> = Vec::new();

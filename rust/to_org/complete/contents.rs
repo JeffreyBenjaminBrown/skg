@@ -279,13 +279,13 @@ fn categorize_children_by_treatment (
 async fn extend_content (
   tree       : &mut PairTree,
   parent_nid : NodeId,
-  skg_id     : &ID,
+  skgid     : &ID,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, skg_id ) . await ?;
+      config, driver, skgid ) . await ?;
   let mut parent_mut : NodeMut < NodePair > =
     tree . get_mut ( parent_nid )
     . ok_or ( "Parent node not found" ) ?;

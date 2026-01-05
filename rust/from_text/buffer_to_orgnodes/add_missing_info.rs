@@ -82,10 +82,10 @@ fn add_missing_info_dfs (
       // Sourceless nodes don't propagate source to children.
       if its_interp . should_be_sourceless () { None }
       else { node_ref . value () . metadata . source . clone () } );
-    let tree_id: ego_tree::NodeId = node_ref . id ();
+    let treeid: ego_tree::NodeId = node_ref . id ();
     let child_tree_ids: Vec < ego_tree::NodeId > = {
       let tree = node_ref . tree ();
-      tree . get ( tree_id ) . unwrap ()
+      tree . get ( treeid ) . unwrap ()
         . children () . map ( | child |
                              child . id () )
         . collect () };

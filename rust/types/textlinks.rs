@@ -22,10 +22,10 @@ pub struct TextLink {
 //
 
 impl TextLink {
-  pub fn new ( skg_id : impl Into<String>,
+  pub fn new ( skgid : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
-    TextLink { id    : ID ( skg_id.into () ),
+    TextLink { id    : ID ( skgid.into () ),
                label : label.into (),
     }} }
 
@@ -49,10 +49,10 @@ impl FromStr for TextLink {
     let interior : &str = &text [5 .. text.len () - 2];
 
     if let Some ( idx ) = interior.find ( "][" ) {
-      let skg_id : &str = &interior [0..idx];
+      let skgid : &str = &interior [0..idx];
       let label  : &str = &interior [idx+2..];
       Ok ( TextLink {
-        id    : ID ( skg_id.to_string () ),
+        id    : ID ( skgid.to_string () ),
         label : label.to_string (),
       } )
     } else {
@@ -86,10 +86,10 @@ pub fn textlinks_from_text (
   let mut textlinks = Vec::new ();
   for capture in textlink_pattern.captures_iter ( text ) {
     if capture.len () >= 3 { // capture group 0 is the entire match
-      let skg_id : String = capture [1] . to_string ();
+      let skgid : String = capture [1] . to_string ();
       let label  : String = capture [2] . to_string ();
       textlinks.push (
-        TextLink::new ( skg_id, label )); }}
+        TextLink::new ( skgid, label )); }}
   textlinks }
 
 pub fn replace_each_link_with_its_label (
