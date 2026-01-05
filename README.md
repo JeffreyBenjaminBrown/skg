@@ -35,6 +35,6 @@ to get excited about this idea:
 - [What's done, and what's left to do](docs/progress.md)
 - Some reasonable jumping-off points for understanding the code
   - [The TypeDB schema](schema.tql)
-  - [The Rust types](rust/types.rs)
-  - [The Rust server](rust/serve.rs). (The `main` module is just a wrapper for this module.)
+  - [The Rust types](server/types.rs)
+  - [The Rust server](server/serve.rs). (The `main` module is just a wrapper for this module.)
   - [The Emacs client](elisp/skg-client.el)

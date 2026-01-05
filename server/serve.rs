@@ -3,7 +3,6 @@ pub mod parse_metadata_sexp;
 pub mod util;
 
 use crate::cleanup::cleanup_and_shutdown;
-use crate::init::initialize_dbs;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
@@ -18,16 +17,12 @@ use std::sync::Arc;
 use std::thread;
 use typedb_driver::TypeDBDriver;
 
-/// Populates the tantivy db ("the index") and the typedb db
-/// (sometimes called "the db", as if there were only one).
-/// Then pipes TCP input from Emacs into handle_emacs.
+/// Pipes TCP input from Emacs into handle_emacs.
 pub fn serve (
-  config : SkgConfig
+  config        : SkgConfig,
+  typedb_driver : Arc<TypeDBDriver>,
+  tantivy_index : TantivyIndex,
 ) -> std::io::Result<()> {
-
-  let (typedb_driver, tantivy_index)
-    : (Arc<TypeDBDriver>, TantivyIndex)
-    = initialize_dbs ( &config );
 
   { // Set up signal handler for Ctrl+C and SIGTERM,
     // for graceful shutdown with database cleanup.

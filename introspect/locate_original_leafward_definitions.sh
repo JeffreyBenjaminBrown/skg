@@ -25,7 +25,7 @@
 #    - If not, replace with the fully-qualified path from definitions.org
 #
 # ALGORITHM:
-# - Finds all .rs files in rust/
+# - Finds all .rs files in server/
 # - For each file that contains original definitions (not just re-exports):
 #   - Creates an org headline with the file path
 #   - Lists all public items (functions, structs, enums, traits, types, consts, statics)

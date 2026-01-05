@@ -4,7 +4,7 @@ Note that the above documents, this document, and any other documentation might 
 
 # What this program does.
 
-Skg is for manipulating a knowledge graph. The bulk of the logic is performed by the server, written in Rust, found in rust/. The client is written in Emacs, found in elisp/. The user's data is stored on disk, in a collection of '.skg' files, which are all valid YAML (but not vice-versa). When the program stops, those files are the only record of the user's data.
+Skg is for manipulating a knowledge graph. The bulk of the logic is performed by the server, written in Rust, found in server/. The client is written in Emacs, found in elisp/. The user's data is stored on disk, in a collection of '.skg' files, which are all valid YAML (but not vice-versa). When the program stops, those files are the only record of the user's data.
 
 While the server is running, it keeps a lot of information about the graph in TypeDB, and a little bit indexed in Tantivy. Some information about the graph might be in neither; if so, it is fetched from disk before being presented to the user.
 

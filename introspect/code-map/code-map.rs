@@ -1,7 +1,7 @@
 // Run from anywhere:
 //   cargo run -p code-map
 //
-// Generates introspect/code-map/code-map.org with a hierarchical view of the rust/ codebase.
+// Generates introspect/code-map/code-map.org with a hierarchical view of the server/ codebase.
 
 use std::fs;
 use std::path::Path;
@@ -14,11 +14,11 @@ fn main() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let project_root = Path::new(manifest_dir).parent().unwrap().parent().unwrap();
 
-    let rust_dir = project_root.join("rust");
+    let server_dir = project_root.join("server");
     let output_file = project_root.join("introspect/code-map/code-map.org");
 
     // Paths in org links are relative to where the org file lives
-    let output = generate_code_map(&rust_dir, "../../rust");
+    let output = generate_code_map(&server_dir, "../../server");
 
     fs::write(&output_file, &output).expect("Failed to write output");
     println!("Generated {} ({} lines)", output_file.display(), output.lines().count());
@@ -26,7 +26,7 @@ fn main() {
 
 fn generate_code_map(root: &Path, org_path_prefix: &str) -> String {
     let mut output = String::new();
-    output.push_str("* rust/\n");
+    output.push_str("* server/\n");
     process_directory(root, &mut output, 2, org_path_prefix);
     output
 }

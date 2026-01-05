@@ -24,7 +24,7 @@
 /// includes everything, even the header comment, except blank lines. Some especially
 /// boring implementations are ignored -- namely "new", "default", "from", and "from_str".
 ///
-/// The program only analyzes rust/. It ignores macros.
+/// The program only analyzes server/. It ignores macros.
 ///
 /// By default it starts from 'main'. But if the user supplies an alternative function
 /// name, it looks for a function of that name, and if there's only one, starts from
@@ -508,7 +508,7 @@ fn main() {
   let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   let project_root = manifest_dir.parent().unwrap().parent().unwrap();
 
-  let rust_dir = project_root.join("rust");
+  let server_dir = project_root.join("server");
   let output_dir = &manifest_dir;  // introspect/call-graph/
   let db_dir = output_dir.join("db");
 
@@ -522,9 +522,9 @@ fn main() {
   let mut all_functions: Vec<FunctionDef> = Vec::new();
   let mut file_sources: HashMap<String, String> = HashMap::new();
 
-  println!("Scanning Rust files in rust/ ...");
+  println!("Scanning Rust files in server/ ...");
 
-  for entry in WalkDir::new(&rust_dir)
+  for entry in WalkDir::new(&server_dir)
     .into_iter()
     .filter_map(|e| e.ok())
     .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))

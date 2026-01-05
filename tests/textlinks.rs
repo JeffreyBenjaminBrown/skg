@@ -1,4 +1,4 @@
-// Tests for rust/textlinks.rs
+// Tests for server/textlinks.rs
 
 use skg::types::textlinks::{
   textlinks_from_node,

@@ -7,11 +7,11 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-path = "rust/lib.rs"
+path = "server/lib.rs"
 
 [[bin]]
 name = "skg"
-path = "rust/main.rs"
+path = "server/main.rs"
 
 [[bin]]
 name = "skg_filenames_match_pids"
@@ -19,11 +19,11 @@ path = "introspect/skg_filenames_match_pids.rs"
 
 [[bin]]
 name = "cleanup-test-dbs"
-path = "rust/bin/cleanup-test-dbs.rs"
+path = "server/bin/cleanup-test-dbs.rs"
 
 [[bin]]
 name = "delete-one-db"
-path = "rust/bin/delete-one-db.rs"
+path = "server/bin/delete-one-db.rs"
 
 [[bin]]
 name = "smsn-keywords"

@@ -55,7 +55,7 @@ if and only if it adheres to the following:
 
 # The .skg file format
 
-It is a specialization of YAML -- that is, every .skg file is valid YAML, although not vice-versa. The fields might change; the definitive source of truth is in `rust/types.rs`. But for the moment they are:
+It is a specialization of YAML -- that is, every .skg file is valid YAML, although not vice-versa. The fields might change; the definitive source of truth is in `server/types.rs`. But for the moment they are:
 
 - title: A string, with no newlines. Must be present.
 - ids: A list of UUIDs. The first one is the primary id, which is equal to the filename minus the `.skg` extension. Must be non-empty. There can be more than one because nodes might be merged.
@@ -76,6 +76,6 @@ The whole collection is wrapped in (skg ...).
 This metadata appears right after the org bullet and a whitespace,
 and right before another whitespace and the node's title.
 
-The possible metadata is specified in `rust/types/orgnode.rs`.
+The possible metadata is specified in `server/types/orgnode.rs`.
 Metadata is not WYSIWYG; its appearance in the client
 is determined by `elisp/heralds-minor-mode`.

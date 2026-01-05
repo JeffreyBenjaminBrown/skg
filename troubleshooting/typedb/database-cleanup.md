@@ -29,7 +29,7 @@ cargo run --bin delete-one-db test-manual
 
 ### 1. cleanup-test-dbs
 
-**Location**: `rust/bin/cleanup-test-dbs.rs`
+**Location**: `server/bin/cleanup-test-dbs.rs`
 
 **Purpose**: Deletes ALL databases starting with "skg-test"
 
@@ -47,7 +47,7 @@ cargo run --bin cleanup-test-dbs
 
 ### 2. delete-one-db
 
-**Location**: `rust/bin/delete-one-db.rs`
+**Location**: `server/bin/delete-one-db.rs`
 
 **Purpose**: Deletes a single database by exact name
 

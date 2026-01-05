@@ -199,7 +199,7 @@
    For instance, an orgnode C might represent the collection of aliases
      for the node (in the graph) corresponding to C's parent P.
      If so, every child of C represents an alias of P.
-** [[https://github.com/JeffreyBenjaminBrown/skg/blob/main/rust/types.rs][the orgnode type definitions]] (link to Github)
+** [[https://github.com/JeffreyBenjaminBrown/skg/blob/main/server/types.rs][the orgnode type definitions]] (link to Github)
 * .skg files : the ultimate source of truth
 ** Each corresponds to a node in the graph.
 ** The only data persistent across server sessions.

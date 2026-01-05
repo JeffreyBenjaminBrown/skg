@@ -33,7 +33,7 @@ Upon starting each session, automatically:
 ## Key Project Context
 
 This is the **skg** project - a knowledge graph manipulation system with:
-- **Rust server** (`rust/`) handling core logic with TypeDB and Tantivy
+- **Rust server** (`server/`) handling core logic with TypeDB and Tantivy
   - TypeDB is now on version 3, which might be after your training data cutoff date, so bear in mind that your instincts might conflict with the latest syntax.
 - **Emacs client** (`elisp/`) providing org-mode interface
 - **YAML data storage** in `.skg` files
