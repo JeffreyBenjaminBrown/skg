@@ -2,47 +2,24 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
-** ONGOING simple refactors
-*** is_ancestor_id could be briefer
-    by using one of the accessors at types/tree/accessors.rs
-*** TODO wrap temp variables in the scope of what they are used for
-*** ONGOING reorg
-**** DONE request 1
-  Let's:
-  - move everything in server/bin/ to tools/.
-  - merge the three modules under save:: into save.rs
-     and delete them.
-  - rename compute_viewdata.rs to simply viewdata.rs
-  - move cleanup_and_shutdown to the end of server/serve.rs,
-     and delete the resulting empty module.
-  - move init.rs into dbs/.
-  - rename filesystem::misc to filesystem::not_nodes.
-  - move  [[file:../../rust/dbs/typedb/util.rs::37][fn pid_and_source_from_id]] to server/dbs/typedb/search.rs.
-  - rename to_dirty_instructions.rs to to_naive_instructions,
-    and similarly for the two saveinstructions_from_* functions --
-    call them naive_saveinstructions_from_*.
-**** TODO RESUME from introspect/code-map/code-map.org
-     reading downward
-*** ONGOING look for helpers to simplify egotree boilerplate
-*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
-   if is_indefinitive {
-     makeIndefinitiveAndClobber ( tree, node_id ) ?;
-   } else { // here, it might already be in visited, which would be bad
-     visited . insert ( pid, node_id ); }
-*** add 'fn tree_nodepair_has_interp_subscribee'
-    and call it everywhere a passage like this appears
-  ```
-    let is_subscribee : bool = {
-      let node_ref : NodeRef < NodePair > =
-        tree . get ( node_id ) . ok_or (
-          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-      node_ref . value () . 1 . metadata . code . interp
-        == Interp::Subscribee };
-  ```
-** Completion is complex.
+** ONGOING Completion is complex.
+*** ONGOING reading pub async fn completeAliasCol (
+  // Validate this is an AliasCol
+  let mut parent_skgnode : SkgNode = {
+  parent_skgnode.source = parent_source; // BUG ?
+  let aliases_from_disk : HashSet < String > = (
+  let aliases_from_tree : Vec < String > =
+  let good_aliases_in_tree : HashSet < String > = (
+    // aliases in tree that match aliases on disk
+  let missing_aliases_from_disk : HashSet < String > = (
+    // aliases on disk but not in tree
+  remove_duplicates_and_false_aliases_handling_focus (
+    tree, // PITFALL: Gets modified.
+    aliascol_node_id,
+    & good_aliases_in_tree ) ?;
+  { // Append new Alias nodes for missing aliases
 *** break up completeDefinitiveOrgnode
     it's super-long
-*** completeAndRestoreNode_collectingViewRequests must handle Subscribees
 *** maybe_add_subscribee_col is impenetrable
     so complex I can't see past it
 **** Subdivide it.
@@ -74,17 +51,73 @@
      Instead do it only in clobberIndefinitiveOrgnode.
      And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
      instead of essentially restating its definition.
+*** maybe_add_hidden_in_subscribee_col should integrate
+    if it finds the subscribee col,
+    it can't assume that col is still accurate
 *** ? ignorable
 **** what if 'ensure_skgnode' is omitted?
 ***** omitted from completeAndRestoreNode_collectingViewRequests
 ***** elaboration
       It seems like an absent skgnode where ensure_skgnode is called
       might be an unreachable state.
-*** maybe_add_hidden_in_subscribee_col should integrate
-    if it finds the subscribee col,
-    it can't assume that col is still accurate
+** AWAITS sharing
+*** AWAITS subscription branches
+**** PITFALL: Hiding is not ternary.
+     SubscribeR node R Hides node H from *all* its subscriptions.
+     When the nodes R hides are *displayed*,
+       they can be grouped by their parents,
+       and orphaned hidden nodes can be grouped separately,
+     but in the graph they are not represented that way.
+**** DONE Just like locally-owned nodes, make a Subscribee's Content into (the last and probably most of) its top-level children.
+**** DONE Collect each subscribee's hidden in a HiddenCol midparent.
+     The HiddenCol midparent is indefinitive.
+     Its contents can be modified, and it can be deleted entirely,
+     to no effect.
+     Its contents respawn from disk on each save.
+       (The user should perhaps be warned if that happens.)
+**** DONE to populate Content and Hidden in a subscription branch, filter each subscribee's Contents into
+****** Hidden = intersects with what the subscriber hides
+****** Content = intersects not
+**** DONE Collect hidden nodes that belong to no subscribee separately.
+     in a midparent titled 'hidden outside of subscribees'.
+     This one is also indefinite, respawning on each save.
+**** Saving can change a subscription's contents in two ways.
+***** via deletion
+      Deleting a top-level node adds it to 'hidden'.
+***** via insertion
+****** Only something from 'hidden' can be inserted.
+       This un-hides it.
+****** Order does not matter.
+       When saving,
+       the subscribee branch'scontents are treated as a set,
+       and intersected with the set of contents of the
+         (foreign) subscribee.
+**** When the user edits a subscribeeCol
+     Its children determine what is subscribed to.
+     The Contents of its children can be edited to change Hides relationships.
+     The rest of the SubscribeeCol branch are respawned on save,
+       and have no effect if edited before saving.
+*** extend saving for sharing relations
+**** In saveinstructions_from_tree, recurse into subscribees
+***** change this passage in saveinstructions_from_tree
+      if matches!(interp, Interp::AliasCol                     |
+                          Interp::Alias                        |
+                          Interp::SubscribeeCol                | // TODO: Recurse into these
+                          Interp::Subscribee                   | // TODO: Recurse into these
+                          Interp::HiddenOutsideOfSubscribeeCol |
+                          Interp::HiddenInSubscribeeCol        |
+                          Interp::HiddenFromSubscribees ) {
+        return Ok(()); } // Skip - these don't generate SaveInstructions
+***** how to treat Subscribees
+   If indefinitive, visit descendents but otherwise ignore.
+   If definitive, treat its content list as a set,
+     and hide in the subscriber anything not included.
+***** how to treat foreign content
+   Compare content to what's on disk.
+   If there's a discrepancy, override and subscribe.
 *** extend completeAndRestoreNode_collectingViewRequests
     to complete a SubscribeeCol, and within one
+    to handle Subscribees
 ** What does the SkgNode in a PairTree represent?
    If it's written by ensure_skgnode, it's from disk.
    But sometimes it's generated from the org tree.
@@ -95,47 +128,45 @@
      id_present
      can_be_saved_this_way
      was_completed
-** extend saving for sharing relations
-*** In saveinstructions_from_tree, recurse into subscribees
-**** change this passage in saveinstructions_from_tree
-     if matches!(interp, Interp::AliasCol                     |
-                         Interp::Alias                        |
-                         Interp::SubscribeeCol                | // TODO: Recurse into these
-                         Interp::Subscribee                   | // TODO: Recurse into these
-                         Interp::HiddenOutsideOfSubscribeeCol |
-                         Interp::HiddenInSubscribeeCol        |
-                         Interp::HiddenFromSubscribees ) {
-       return Ok(()); } // Skip - these don't generate SaveInstructions
-**** how to treat Subscribees
-  If indefinitive, visit descendents but otherwise ignore.
-  If definitive, treat its content list as a set,
-    and hide in the subscriber anything not included.
-**** how to treat foreign content
-  Compare content to what's on disk.
-  If there's a discrepancy, override and subscribe.
-** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
-** aliases_to_org should rebuild the whole buffer
-   like request containerward view
-** reading pub async fn completeAliasCol (
- // Validate this is an AliasCol
- let mut parent_skgnode : SkgNode = {
- parent_skgnode.source = parent_source; // BUG ?
- let aliases_from_disk : HashSet < String > = (
- let aliases_from_tree : Vec < String > =
- let good_aliases_in_tree : HashSet < String > = (
-   // aliases in tree that match aliases on disk
- let missing_aliases_from_disk : HashSet < String > = (
-   // aliases on disk but not in tree
- remove_duplicates_and_false_aliases_handling_focus (
-   tree, // PITFALL: Gets modified.
-   aliascol_node_id,
-   & good_aliases_in_tree ) ?;
- { // Append new Alias nodes for missing aliases
+** ONGOING simple refactors
+*** reorg
+**** DONE request 1
+  Let's:
+  - move everything in server/bin/ to tools/.
+  - merge the three modules under save:: into save.rs
+     and delete them.
+  - rename compute_viewdata.rs to simply viewdata.rs
+  - move cleanup_and_shutdown to the end of server/serve.rs,
+     and delete the resulting empty module.
+  - move init.rs into dbs/.
+  - rename filesystem::misc to filesystem::not_nodes.
+  - move  [[file:../../rust/dbs/typedb/util.rs::37][fn pid_and_source_from_id]] to server/dbs/typedb/search.rs.
+  - rename to_dirty_instructions.rs to to_naive_instructions,
+    and similarly for the two saveinstructions_from_* functions --
+    call them naive_saveinstructions_from_*.
+**** TODO RESUME around merge/ in introspect/code-map/code-map.org
+     reading downward
+*** look for helpers to simplify egotree boilerplate
+*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
+   if is_indefinitive {
+     makeIndefinitiveAndClobber ( tree, node_id ) ?;
+   } else { // here, it might already be in visited, which would be bad
+     visited . insert ( pid, node_id ); }
+*** add 'fn tree_nodepair_has_interp_subscribee'
+    and call it everywhere a passage like this appears
+  ```
+    let is_subscribee : bool = {
+      let node_ref : NodeRef < NodePair > =
+        tree . get ( node_id ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+      node_ref . value () . 1 . metadata . code . interp
+        == Interp::Subscribee };
+  ```
 ** likely helpful to generalize
 *** remove_duplicates_and_false_aliases_handling_focus
     could be generalized to something that takes lambdas
     indicating whether something deserves removal
-** build, use the tree library
+** ONGOING build, use the tree library
 *** refs
     That library is currently at types/trees.
     Which seems okay.
@@ -148,42 +179,8 @@
 *** these should be generic
     nodes_after_in_generation
     collect_child_treeids
-** AWAITS subscription branches
-*** PITFALL: Hiding is not ternary.
-    SubscribeR node R Hides node H from *all* its subscriptions.
-    When the nodes R hides are *displayed*,
-      they can be grouped by their parents,
-      and orphaned hidden nodes can be grouped separately,
-    but in the graph they are not represented that way.
-*** DONE Just like locally-owned nodes, make a Subscribee's Content into (the last and probably most of) its top-level children.
-*** DONE Collect each subscribee's hidden in a HiddenCol midparent.
-    The HiddenCol midparent is indefinitive.
-    Its contents can be modified, and it can be deleted entirely,
-    to no effect.
-    Its contents respawn from disk on each save.
-      (The user should perhaps be warned if that happens.)
-*** DONE to populate Content and Hidden in a subscription branch, filter each subscribee's Contents into
-***** Hidden = intersects with what the subscriber hides
-***** Content = intersects not
-*** DONE Collect hidden nodes that belong to no subscribee separately.
-    in a midparent titled 'hidden outside of subscribees'.
-    This one is also indefinite, respawning on each save.
-*** Saving can change a subscription's contents in two ways.
-**** via deletion
-     Deleting a top-level node adds it to 'hidden'.
-**** via insertion
-***** Only something from 'hidden' can be inserted.
-      This un-hides it.
-***** Order does not matter.
-      When saving,
-      the subscribee branch'scontents are treated as a set,
-      and intersected with the set of contents of the
-        (foreign) subscribee.
-*** When the user edits a subscribeeCol
-    Its children determine what is subscribed to.
-    The Contents of its children can be edited to change Hides relationships.
-    The rest of the SubscribeeCol branch are respawned on save,
-      and have no effect if edited before saving.
+** aliases_to_org should rebuild the whole buffer
+   like request containerward view
 ** real but minor
 *** replace nstruction -> nstruc
 ** later
@@ -218,6 +215,7 @@
 *** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
 *** 'content' count is wrong in Subsribees if any are hidden
 *** add 'numSubscribees' near 'numLinksIn'
+*** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * internalize
 ** ask AI to research and present options before implementing
 *** Clear its context before doing that.
