@@ -36,10 +36,9 @@ pub fn serve (
     } ) . expect ( "Error setting Ctrl+C handler" ); }
 
   // Bind to TCP port for Rust-Emacs API communication.
-  let bind_addr : String =
-    format!("0.0.0.0:{}", config.port);
   let emacs_listener : TcpListener =
-    TcpListener::bind ( &bind_addr )?;
+    TcpListener::bind (
+      & format!("0.0.0.0:{}", config.port) )?;
   println!("Listening on port {} for Emacs connections...",
            config.port);
 

@@ -52,9 +52,11 @@ pub fn handle_single_root_view_request (
 pub fn node_id_from_single_root_view_request (
   request : &str
 ) -> Result<ID, String> {
-  let sexp : Sexp =
-    sexp::parse ( request )
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) ) ?;
-  extract_v_from_kv_pair_in_sexp ( &sexp, "id" )
-    . map(ID) }
+  extract_v_from_kv_pair_in_sexp (
+    & { let sexp : Sexp =
+          sexp::parse ( request )
+          . map_err ( |e| format! (
+            "Failed to parse S-expression: {}", e ) ) ?;
+        sexp },
+    "id"
+  ). map(ID) }

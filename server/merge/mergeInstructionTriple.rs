@@ -26,11 +26,13 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
     Vec::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      let orgnode: &OrgNode = node_ref.value();
-      let node_triples : Vec<MergeInstructionTriple> =
-        saveinstructions_from_the_merge_in_an_orgnode(
-          orgnode, config, driver).await?;
-      triples.extend(node_triples); } }
+      triples.extend(
+        { let node_triples : Vec<MergeInstructionTriple> =
+            saveinstructions_from_the_merge_in_an_orgnode(
+              { let orgnode: &OrgNode = node_ref.value();
+                orgnode },
+              config, driver ). await?;
+          node_triples } ); } }
   Ok(triples) }
 
 /// PURPOSE: The name and type signature say it all.
@@ -50,12 +52,14 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
     Vec::new();
   if let Some(EditRequest::Merge(acquiree_id))
     = &node.metadata.code.editRequest {
-      let acquirer_id : &ID =
-        node.metadata.id.as_ref()
-        .ok_or("Node with merge request must have an ID")?;
       let acquirer_from_disk : SkgNode =
         skgnode_from_id(
-          config, driver, acquirer_id ) . await?;
+          config, driver,
+          { let acquirer_id : &ID =
+              node.metadata.id.as_ref()
+              .ok_or("Node with merge request must have an ID")?;
+            acquirer_id }
+        ). await?;
       let acquiree_from_disk : SkgNode =
         skgnode_from_id(
           config, driver, acquiree_id ) . await?;
@@ -93,8 +97,6 @@ fn three_merged_skgnodes(
 ) -> SkgNode {
   let mut updated_acquirer: SkgNode =
     acquirer_from_disk.clone();
-  let acquiree_text_preserver_id: &ID =
-    &acquiree_text_preserver.ids[0];
   { // Append acquiree's IDs to acquirer's.
     let mut combined_ids : Vec<ID> =
       acquirer_from_disk.ids.clone();
@@ -106,7 +108,10 @@ fn three_merged_skgnodes(
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
-      vec![acquiree_text_preserver_id.clone()];
+      vec![ { let acquiree_text_preserver_id: &ID =
+                &acquiree_text_preserver.ids[0];
+              acquiree_text_preserver_id }
+            . clone() ];
     combined.extend(
       acquirer_from_disk.contains.clone().unwrap_or_default() );
     combined.extend(
@@ -128,13 +133,13 @@ fn three_merged_skgnodes(
     combined.extend(
       acquiree_from_disk . hides_from_its_subscriptions
         . clone() . unwrap_or_default() );
-    let deduped_and_filtered : Vec<ID> =
-      // if it's in 'new_contains', then it's not here
-      setlike_vector_subtraction(
-        dedup_vector(combined),
-        &new_contains);
     updated_acquirer . hides_from_its_subscriptions =
-      Some(deduped_and_filtered); }
+      Some( { let deduped_and_filtered : Vec<ID> =
+                // if it's in 'new_contains', then it's not here
+                setlike_vector_subtraction(
+                    dedup_vector(combined),
+                    &new_contains);
+              deduped_and_filtered } ); }
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
       acquirer_from_disk . overrides_view_of

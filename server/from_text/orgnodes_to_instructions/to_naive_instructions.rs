@@ -38,11 +38,15 @@ fn naive_saveinstructions_from_tree(
         node.metadata.code.indefinitive )
     })?;
   if interp == Interp::ForestRoot {
-    let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
-      .children().map(|c| c.id()).collect();
-    for child_treeid in child_treeids {
-      naive_saveinstructions_from_tree(tree, child_treeid, result)?; }
-    return Ok(()); }
+    for child_treeid in {
+      let child_treeids: Vec<NodeId> =
+        tree . get(node_id) . unwrap() . children()
+        . map( |c| c.id() )
+        . collect();
+      child_treeids }
+    { naive_saveinstructions_from_tree (
+        tree, child_treeid, result)?; }
+    return Ok(( )); }
   if matches!(interp, Interp::AliasCol                     |
                       Interp::Alias                        |
                       Interp::SubscribeeCol                |
@@ -63,21 +67,23 @@ fn naive_saveinstructions_from_tree(
   } else { None };
   if let Some(skg_node) = skg_node_opt {
     // Push SaveInstruction if applicable
-    let save_action: NonMerge_NodeAction =
-      read_at_node_in_tree(tree, node_id, |node| {
-        if matches!(node.metadata.code.editRequest,
-                    Some(EditRequest::Delete)) {
-          NonMerge_NodeAction::Delete
-        } else {
-          NonMerge_NodeAction::Save }
-      })?;
-    result.push((skg_node, save_action)); }
+    result.push((skg_node, {
+      let save_action: NonMerge_NodeAction =
+        read_at_node_in_tree(tree, node_id, |node| {
+          if matches!( node.metadata.code.editRequest,
+                       Some(EditRequest::Delete) )
+          { NonMerge_NodeAction::Delete
+          } else { NonMerge_NodeAction::Save } })?;
+      save_action } )); }
   { // recurse
-    let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
-      .children().map(|c| c.id()).collect();
-    for child_treeid in child_treeids {
-      naive_saveinstructions_from_tree(tree, child_treeid, result)?; }}
-  Ok (()) }
+    for child_treeid in {
+      let child_treeids: Vec<NodeId> =
+        tree . get(node_id) . unwrap() . children()
+        . map(|c| c.id()) . collect();
+      child_treeids }
+    { naive_saveinstructions_from_tree(
+        tree, child_treeid, result )?; }}
+  Ok (( )) }
 
 fn skgnode_for_orgnode_in_tree<'a> (
   orgnode: &OrgNode,

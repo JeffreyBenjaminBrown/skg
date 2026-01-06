@@ -44,20 +44,22 @@ pub fn search_index (
   println! (
     "\nFinding files with titles or aliases matching \"{}\".",
     query_text);
-  let reader : IndexReader =
-    tantivy_index.index.reader () ?;
-  let searcher : Searcher =
-    reader.searcher();
-  let query_parser : QueryParser =
-    QueryParser::for_index (
-      &tantivy_index.index,
-      vec! [ tantivy_index.title_or_alias_field ] );
-  let query : Box < dyn Query > =
-    query_parser.parse_query ( query_text ) ?;
-  let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
-    searcher.search (
-      &query, &TopDocs::with_limit (10) )?;
-  Ok (( best_matches, searcher )) }
+  let searcher : Searcher = {
+    let reader : IndexReader =
+      tantivy_index.index.reader () ?;
+    reader } .searcher();
+  let query : Box < dyn Query > = {
+    let query_parser : QueryParser =
+      QueryParser::for_index (
+        &tantivy_index.index,
+        vec! [ tantivy_index.title_or_alias_field ] );
+    query_parser } .parse_query ( query_text ) ?;
+  Ok (( {
+    let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
+      searcher.search (
+        &query, &TopDocs::with_limit (10) )?;
+    best_matches },
+       searcher )) }
 
 /// Updates the index with the provided SkgNodes.
 ///   For existing IDs, updates the title.
@@ -86,15 +88,12 @@ pub fn delete_nodes_from_index<'a, I>(
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a SkgNode>, {
-
   for node in nodes_iter {
     if !node.ids.is_empty() {
-      let primary_id: &ID =
-        &node.ids[0];
-      let term: Term =
+      writer . delete_term ( {
+        let primary_id: &ID = &node.ids[0];
         Term::from_field_text( tantivy_index.id_field,
-                               primary_id.as_str() );
-      writer . delete_term (term); }}
+                               primary_id.as_str() ) } ); }}
   Ok (( )) }
 
 pub fn add_documents_to_tantivy_writer<'a, I> (
@@ -125,7 +124,6 @@ fn create_documents_from_node (
 
   if node.ids.is_empty() {
     return Err("SkgNode has no IDs" . into () ); }
-  let primary_id: &ID = &node.ids[0];
   let mut documents_acc: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> = // what to index
@@ -134,15 +132,17 @@ fn create_documents_from_node (
     titles_and_aliases . extend(
       aliases.clone () ); }
   for title_or_alias in titles_and_aliases { // index them
-    let doc : Document = doc!(
-      tantivy_index . id_field =>
-        primary_id.as_str (),
-      tantivy_index . title_or_alias_field =>
-        replace_each_link_with_its_label (
-          & title_or_alias ),
-      tantivy_index . source_field =>
-        node.source.as_str() );
-    documents_acc.push (doc); }
+    documents_acc.push ( {
+      let primary_id: &ID = &node.ids[0];
+      let doc : Document = doc!(
+        tantivy_index . id_field =>
+          primary_id.as_str (),
+        tantivy_index . title_or_alias_field =>
+          replace_each_link_with_its_label (
+            & title_or_alias ),
+        tantivy_index . source_field =>
+          node.source.as_str() );
+      doc } ); }
   Ok ( documents_acc ) }
 
 pub fn commit_with_status (

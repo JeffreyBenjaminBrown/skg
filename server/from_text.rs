@@ -52,13 +52,14 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
         validation_errors ) ); }}
 
   let instructions : Vec<SaveInstruction> =
-    orgnodes_to_reconciled_save_instructions (
-      & orgnode_forest, config, driver )
-    . await . map_err ( SaveError::DatabaseError ) ?;
-  let instructions : Vec<SaveInstruction> =
     validate_and_filter_foreign_instructions (
-      instructions, config, driver )
-    . await . map_err ( SaveError::BufferValidationErrors ) ?;
+      { let instructions : Vec<SaveInstruction> =
+          orgnodes_to_reconciled_save_instructions (
+            & orgnode_forest, config, driver )
+          . await . map_err ( SaveError::DatabaseError ) ?;
+        instructions },
+      config, driver
+    ). await . map_err ( SaveError::BufferValidationErrors ) ?;
   let mergeInstructions : Vec<MergeInstructionTriple> =
     instructiontriples_from_the_merges_in_an_orgnode_forest (
       & orgnode_forest, config, driver

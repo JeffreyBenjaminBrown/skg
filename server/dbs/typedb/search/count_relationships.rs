@@ -89,41 +89,42 @@ async fn count_relations (
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-  let disjunction_clauses : String =
-    build_id_disjunction ( ids, "node_id" );
   let other_role : &str =
     conjugate_binary_role ( relation, input_role ) ?;
-  let query : String =
-    format! ( r#"match
-        {{ $node isa node, has id $node_id; }} or
-        {{ $e isa extra_id, has id $node_id;
-           $rel isa has_extra_id ( extra_id: $e ); }};
-        {};
-        fetch {{
-          "node_id": $node_id,
-          "related": [
-            match
-              {{ $other isa node, has id $other_id;
-                 $input isa node, has id $node_id;
-                 $rel2 isa {} ( {}: $input,
-                                {}: $other ); }} or
-              {{ $other isa node, has id $other_id;
-                 $e2 isa extra_id, has id $node_id;
-                 $input isa node;
-                 $extra_rel isa has_extra_id ( node: $input,
-                                               extra_id: $e2 );
-                 $rel2 isa {} ( {}: $input,
-                                {}: $other ); }};
-            fetch {{ "other_id": $other_id }};
-          ]
-        }};"#,
-      disjunction_clauses,
-      relation, input_role, other_role,
-      relation, input_role, other_role );
-  let answer : QueryAnswer =
-    tx . query ( query ). await ?;
-
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = answer
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
+    let answer : QueryAnswer =
+      tx . query ( {
+        let disjunction_clauses : String =
+          build_id_disjunction ( ids, "node_id" );
+        let query : String =
+          format! ( r#"match
+              {{ $node isa node, has id $node_id; }} or
+              {{ $e isa extra_id, has id $node_id;
+                 $rel isa has_extra_id ( extra_id: $e ); }};
+              {};
+              fetch {{
+                "node_id": $node_id,
+                "related": [
+                  match
+                    {{ $other isa node, has id $other_id;
+                       $input isa node, has id $node_id;
+                       $rel2 isa {} ( {}: $input,
+                                      {}: $other ); }} or
+                    {{ $other isa node, has id $other_id;
+                       $e2 isa extra_id, has id $node_id;
+                       $input isa node;
+                       $extra_rel isa has_extra_id ( node: $input,
+                                                     extra_id: $e2 );
+                       $rel2 isa {} ( {}: $input,
+                                      {}: $other ); }};
+                  fetch {{ "other_id": $other_id }};
+                ]
+              }};"#,
+            disjunction_clauses,
+            relation, input_role, other_role,
+            relation, input_role, other_role );
+        query } ). await ?;
+    answer }
   { // Process the nested subquery results
     while let Some ( doc_result )
       = stream . next () . await
@@ -138,8 +139,9 @@ async fn count_relations (
         if let Some ( node_id ) = node_id_opt {
           if let Some ( Node::List ( related_list ) ) =
             map . get ( "related" )
-          { // count themem
-            let count : usize = related_list . len ();
-            result . insert ( node_id, count );
+          { // count them
+            result . insert ( node_id, {
+              let count : usize = related_list . len ();
+              count } );
           }} }} }
   Ok (result) }

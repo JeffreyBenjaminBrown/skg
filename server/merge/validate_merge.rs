@@ -45,20 +45,21 @@ pub async fn validate_merge_requests(
             acquirer_id.as_str() ));
         continue; }
     if let Some(EditRequest::Merge(acquiree_id))
-      = &node.metadata.code.editRequest {
-        let pair_errors : Vec<String> =
-          validate_merge_pair(
-            config,
-            driver,
-            acquirer_id,
-            acquiree_id,
-            &collections.to_delete_ids ). await?;
-        errors.extend(pair_errors); }}
-  let monogamy_errors : Vec<String> =
-    validate_monogamy_for_all_merges(
-      &collections.acquirer_to_acquirees,
-      &collections.acquiree_to_acquirers );
-  errors.extend(monogamy_errors);
+      = &node.metadata.code.editRequest
+    { errors.extend ( { let pair_errors : Vec<String> =
+                           validate_merge_pair(
+                             config,
+                             driver,
+                             acquirer_id,
+                             acquiree_id,
+                             &collections.to_delete_ids ). await?;
+                      pair_errors } ); }}
+  errors.extend( {
+    let monogamy_errors : Vec<String> =
+      validate_monogamy_for_all_merges(
+        &collections.acquirer_to_acquirees,
+        &collections.acquiree_to_acquirers );
+    monogamy_errors } );
   Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
@@ -169,12 +170,13 @@ fn validate_monogamy_for_all_merges(
         acquirers.iter().map(
           |id| id.as_str()
         ).collect::<Vec<_>>() )); }}
-  let acquirer_ids: HashSet<&ID> =
-    acquirer_to_acquirees.keys().collect();
-  let acquiree_ids: HashSet<&ID> =
-    acquiree_to_acquirers.keys().collect();
-  let overlap: Vec<&ID> =
-    acquirer_ids.intersection(&acquiree_ids).copied().collect();
+  let overlap: Vec<&ID> = {
+    let acquirer_ids: HashSet<&ID> =
+      acquirer_to_acquirees.keys().collect();
+    let acquiree_ids: HashSet<&ID> =
+      acquiree_to_acquirers.keys().collect();
+    acquirer_ids . intersection(&acquiree_ids)
+      . copied() . collect() };
   if !overlap.is_empty() {
     errors.push(format!(
       "Monogamy violation: nodes cannot be both acquirer and acquiree: {:?}",

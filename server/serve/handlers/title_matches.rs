@@ -110,18 +110,16 @@ fn format_matches_as_org_mode (
 
   let mut result : String =
     String::new();
-  let search_root_node : OrgNode =
-    OrgNode {
-      metadata : { let mut md = default_metadata ();
-                   md.code.interp = Interp::ParentIgnores;
-                   md },
-      title : search_terms.to_string (),
-      // The unique level-1 headline states the search terms.
-      body : None, };
   result.push_str (
     & orgnode_to_text (
       1,
-      &search_root_node ));
+      & OrgNode {
+        metadata : { let mut md = default_metadata ();
+                     md.code.interp = Interp::ParentIgnores;
+                     md },
+        title : search_terms.to_string (),
+        // The unique level-1 headline states the search terms.
+        body : None, } ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
@@ -136,45 +134,46 @@ fn format_matches_as_org_mode (
         . collect() );
   id_entries.sort_by ( |a, b| {
     // Sort IDs by each one's best (and now first) match score.
-    let score_a : f32 =
-      a.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
-    let score_b : f32 =
-      b.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
-    score_b . partial_cmp (&score_a) . unwrap () } );
+    { let score_b : f32 =
+        b.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
+      score_b
+    }. partial_cmp (
+      & { let score_a : f32 =
+            a.1.first() . map( |(s, _)| *s) . unwrap_or (0.0);
+          score_a }
+    ). unwrap () } );
   for (id, matches) in id_entries {
     // First (best) match becomes level-2 headline
     let (score, title) = &matches[0];
-    let match_node : OrgNode =
-      OrgNode {
-        metadata : default_metadata (),
-        title : format! (
-          "score: {:.2}, [[id:{}][{}]]",
-          score, id, title ),
-        body : None, };
     result.push_str (
       & orgnode_to_text (
         2,
-        &match_node ));
-    for (score, title) in matches.iter().skip(1) {
-      // The rest, if any, become level-3 headlines.
-      let alias_match_node : OrgNode =
-        OrgNode {
+        & OrgNode {
           metadata : default_metadata (),
           title : format! (
             "score: {:.2}, [[id:{}][{}]]",
             score, id, title ),
-          body : None, };
+          body : None, }  ));
+    for (score, title) in matches.iter().skip(1) {
+      // The rest, if any, become level-3 headlines.
       result.push_str (
         & orgnode_to_text (
           3,
-          &alias_match_node )); }}
+          & OrgNode {
+            metadata : default_metadata (),
+            title : format! (
+              "score: {:.2}, [[id:{}][{}]]",
+              score, id, title ),
+            body : None, } )); }}
   result }
 
 pub fn search_terms_from_request (
   request : &str
 ) -> Result<String, String> {
-  let sexp : Sexp =
-    sexp::parse ( request )
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) ) ?;
-  extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) }
+  extract_v_from_kv_pair_in_sexp (
+    & { let sexp : Sexp =
+          sexp::parse ( request )
+          . map_err ( |e| format! (
+            "Failed to parse S-expression: {}", e ) ) ?;
+        sexp },
+    "terms" ) }

@@ -29,10 +29,10 @@ pub fn skgnode_from_pid_and_source (
   pid    : ID,
   source : &str,
 ) -> io::Result<SkgNode> {
-  let path : String =
-    path_from_pid_and_source( config, source, pid );
-  let mut skgnode : SkgNode =
-    read_skgnode( path )?;
+  let mut skgnode : SkgNode = {
+    let path : String =
+      path_from_pid_and_source( config, source, pid );
+    read_skgnode( path )? };
   skgnode.source = // needed because it's not serialized
     source.to_string();
   Ok ( skgnode ) }
@@ -76,13 +76,14 @@ pub fn write_skgnode_to_source (
   skgnode : &SkgNode,
   config  : &SkgConfig,
 ) -> io::Result<()> {
-  let pid : &ID = skgnode.ids.get(0)
-    .ok_or_else(|| io::Error::new(
-      io::ErrorKind::InvalidInput,
-      "SkgNode has no IDs"))?;
-  let path : String =
-    path_from_pid_and_source( config, &skgnode.source, pid.clone() );
-  write_skgnode( skgnode, &path ) }
+  write_skgnode (
+    skgnode,
+    & { let pid : &ID = skgnode.ids.get(0)
+        .ok_or_else(|| io::Error::new(
+          io::ErrorKind::InvalidInput,
+          "SkgNode has no IDs"))?;
+        path_from_pid_and_source(
+          config, &skgnode.source, pid.clone() ) } ) }
 
 /// Effectively private.
 pub(super) fn read_skgnode
@@ -91,13 +92,13 @@ pub(super) fn read_skgnode
   ) -> io::Result <SkgNode> {
 
   let file_path : &Path = file_path.as_ref ();
-  let contents  : String = fs::read_to_string ( file_path )?;
-  let skgnode   : SkgNode =
+  let skgnode   : SkgNode = {
+    let contents  : String = fs::read_to_string ( file_path )?;
     serde_yaml::from_str ( &contents )
     . map_err (
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
-        e.to_string () )) ?;
+        e.to_string () )) ? };
   if skgnode.title.is_empty() {
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,
@@ -116,12 +117,13 @@ pub(super) fn write_skgnode
   ( skgnode   : &SkgNode,
     file_path : P
   ) -> io::Result<()> {
-
-  let yaml_string : String =
-    serde_yaml::to_string ( skgnode )
-    . map_err (
-      |e| io::Error::new(
-        io::ErrorKind::InvalidData,
-        e.to_string () )) ?;
-  fs::write ( file_path, yaml_string )?;
-  Ok (( )) }
+    fs::write ( file_path,
+                {
+                  let yaml_string : String =
+                    serde_yaml::to_string ( skgnode )
+                    . map_err (
+                      |e| io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        e.to_string () )) ?;
+                  yaml_string } )?;
+    Ok (( )) }

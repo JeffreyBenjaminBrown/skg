@@ -37,10 +37,10 @@ pub async fn update_graph_minus_merges (
     println!( "   TypeDB update complete." ); }
 
   { // filesystem
-    let total_input : usize = instructions.len ();
-    // TODO Phase 5: Print per-source write information
+    // TODO: Print per-source write information
     println!( "2) Writing {} instruction(s) to disk ...",
-               total_input );
+               { let total_input : usize = instructions.len ();
+                 total_input } );
     let (deleted_count, written_count) : (usize, usize) =
       update_fs_from_saveinstructions (
         instructions.clone (), config.clone ()) ?;
@@ -49,11 +49,11 @@ pub async fn update_graph_minus_merges (
 
   { // Tantivy
     println!( "3) Updating Tantivy index ..." );
-    let indexed_count : usize =
-      update_index_from_saveinstructions (
-        &instructions, tantivy_index )?;
     println!( "   Tantivy updated for {} document(s).",
-                  indexed_count ); }
+              { let indexed_count : usize =
+                  update_index_from_saveinstructions (
+                      &instructions, tantivy_index )?;
+              indexed_count } ); }
 
   println!( "All updates finished successfully." );
   Ok (( )) }
@@ -73,22 +73,22 @@ pub fn update_fs_from_saveinstructions (
     . partition (|(_, action)|
                  matches!(action, NonMerge_NodeAction::Delete) );
   let deleted : usize = {
-    let delete_nodes : Vec<SkgNode> =
+    let nodes_to_delete : Vec<SkgNode> =
       to_delete . into_iter ()
       . map ( |(node, _)| node )
       . collect ();
-    if ! delete_nodes . is_empty () {
+    if ! nodes_to_delete . is_empty () {
       delete_all_nodes_from_fs (
-        delete_nodes, config . clone () ) ?
+        nodes_to_delete, config . clone () ) ?
     } else { 0 } };
   let written : usize = {
-    let write_skgnodes : Vec<SkgNode> =
+    let nodes_to_write : Vec<SkgNode> =
       to_write . into_iter ()
       . map ( |(node, _)| node )
       . collect ();
-    if ! write_skgnodes . is_empty () {
+    if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
-        write_skgnodes, config ) ?
+        nodes_to_write, config ) ?
     } else { 0 } };
   Ok ( (deleted, written) ) }
 
@@ -114,22 +114,21 @@ pub(super) fn update_index_from_saveinstructions (
     instructions.iter().map(|(node, _)| node),
     &mut writer,
     tantivy_index)?;
-  { // Add documents only for non-deleted instructions.
-    let nodes_to_add: Vec<&SkgNode> =
-      instructions . iter()
-      . filter_map(
-        |(node, action)|
-        if !matches!( action,
-                      NonMerge_NodeAction::Delete) {
-          Some(node)
-        } else { None } )
-      . collect();
-    let processed_count: usize =
-      add_documents_to_tantivy_writer(
-        nodes_to_add, &mut writer, tantivy_index)?;
-    commit_with_status(
-      &mut writer, processed_count, "Updated")?;
-    Ok (processed_count) }}
+  let processed_count: usize =
+    add_documents_to_tantivy_writer(
+      { // Add documents only for non-deletion instructions.
+        let nodes_to_add: Vec<&SkgNode> =
+          instructions . iter()
+          . filter_map( |(node, action)|
+                         if !matches!( action,
+                                       NonMerge_NodeAction::Delete)
+                         { Some (node) } else { None } )
+          . collect();
+        nodes_to_add },
+      &mut writer, tantivy_index )? ;
+  commit_with_status(
+    &mut writer, processed_count, "Updated")?;
+  Ok (processed_count) }
 
 
 //

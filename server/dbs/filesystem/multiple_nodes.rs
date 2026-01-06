@@ -187,11 +187,12 @@ pub fn write_all_nodes_to_fs (
 
   // Collect unique source directories and ensure they exist
   use std::collections::HashSet;
-  let unique_sources : HashSet<&str> =
-    nodes . iter()
-    . map( |node| node.source.as_str() )
-    . collect();
-  for source_name in unique_sources {
+  for source_name in {
+    let unique_sources : HashSet<&str> =
+      nodes . iter()
+      . map( |node| node.source.as_str() )
+      . collect();
+    unique_sources } {
     let source_config: &SkgfileSource =
       config . sources . get ( source_name )
       . ok_or_else( || io::Error::new(
@@ -223,13 +224,13 @@ pub fn delete_all_nodes_from_fs (
 
   let mut deleted : usize = 0;
   for node in nodes {
-    let pid : ID = node . ids . get(0)
-      . unwrap () // Safe because we checked above
-      . clone ();
-    let file_path : String =
+    match fs::remove_file ( & {
+      let pid : ID = node . ids . get(0)
+        . unwrap () // Safe because we checked above
+        . clone ();
       path_from_pid_and_source (
-      & config, & node.source, pid );
-    match fs::remove_file ( & file_path ) {
+        & config, & node.source, pid ) } )
+    {
       Ok ( () ) => {
         deleted += 1; },
       Err ( e ) if e.kind () == io::ErrorKind::NotFound => {

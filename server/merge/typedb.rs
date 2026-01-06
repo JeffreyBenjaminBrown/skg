@@ -40,7 +40,6 @@ async fn merge_one_node_in_typedb(
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id  : &ID = &updated_acquirer        . ids[0];
   let acquiree_id  : &ID = &acquiree                . ids[0];
-  let preserver_id : &ID = &acquiree_text_preserver . ids[0];
 
   { // Reroute relationships.
     reroute_relationships_for_merge (
@@ -50,7 +49,9 @@ async fn merge_one_node_in_typedb(
       tx, acquiree_id, acquirer_id,
       "contains", "contained", "container" ). await ?;
     reroute_relationships_for_merge (
-      tx, acquiree_id, preserver_id,
+      tx, acquiree_id, { let preserver_id : &ID =
+                           &acquiree_text_preserver . ids[0];
+                         preserver_id },
       "textlinks_to", "source", "dest" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
@@ -102,35 +103,38 @@ async fn merge_one_node_in_typedb(
     acquiree_text_preserver, tx )
     . await
     . map_err ( |e| format!("Failed to create relationships for acquiree_text_preserver: {}", e ))?;
-  let acquiree_text_preserver_id : &ID =
-    &acquiree_text_preserver.ids[0];
-  let contains_query : String = format!(
-    r#"match
-         $acquirer isa node, has id "{}";
-         $preserver isa node, has id "{}";
-       insert
-         $contains_rel isa contains (container: $acquirer,
-                                     contained: $preserver);"#,
-    acquirer_id.as_str(),
-    acquiree_text_preserver_id.as_str() );
-  tx.query(contains_query).await?;
+  tx.query( {
+    let contains_query : String = format!(
+      r#"match
+           $acquirer isa node, has id "{}";
+           $preserver isa node, has id "{}";
+         insert
+           $contains_rel isa contains (container: $acquirer,
+                                       contained: $preserver);"#,
+      acquirer_id.as_str(),
+      ( { let acquiree_text_preserver_id : &ID =
+            &acquiree_text_preserver.ids[0];
+          acquiree_text_preserver_id }
+        . as_str() ));
+    contains_query } ).await?;
 
   for extra_id_value in &acquiree.ids {
     // Add extra_ids to acquirer.
     // PITFALL: Even the acquiree's PID becomomes an acquirer extra_id.
     // PITFALL: Should happen after deleting acquiree's extra_ids.
-    let query : String = format!(
-      r#"
-      match
-        $acquirer isa node, has id "{}";
-      insert
-        $e isa extra_id, has id "{}";
-        $r isa has_extra_id
-          ( node: $acquirer,
-            extra_id: $e );"#,
-      acquirer_id.as_str(),
-      extra_id_value.as_str() );
-    tx.query(query).await?; }
+    tx.query( { let query : String = format!(
+                  r#"
+                  match
+                    $acquirer isa node, has id "{}";
+                  insert
+                    $e isa extra_id, has id "{}";
+                    $r isa has_extra_id
+                      ( node: $acquirer,
+                        extra_id: $e );"#,
+                  acquirer_id.as_str(),
+                  extra_id_value.as_str() );
+              query }
+    ).await?; }
   Ok (( )) }
 
 /// Deletes all extra_ids associated with a node.
@@ -139,33 +143,36 @@ async fn delete_extra_ids_for_node(
   skgid: &ID,
 ) -> Result<(), Box<dyn Error>> {
   // Find all extra_ids (as strings) associated with the node.
-  let extra_ids_query : String = format!(
-    r#"match
-         $node isa node, has id "{}";
-         $e isa extra_id;
-         $rel isa has_extra_id (node: $node, extra_id: $e);
-         $e has id $extra_id_value;
-       select $extra_id_value;"#,
-    skgid.as_str() );
   let answer : QueryAnswer =
-    tx.query ( extra_ids_query ). await ?;
+    tx.query ( {
+      let extra_ids_query : String = format!(
+        r#"match
+             $node isa node, has id "{}";
+             $e isa extra_id;
+             $rel isa has_extra_id (node: $node, extra_id: $e);
+             $e has id $extra_id_value;
+           select $extra_id_value;"#,
+        skgid.as_str() );
+      extra_ids_query } ). await ?;
   let mut extra_id_values : Vec<String> = Vec::new();
   let mut rows = answer.into_rows();
   while let Some(row_res) = rows.next().await {
     let row = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_value : String =
-        extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      extra_id_values.push(extra_id_value); }}
+      extra_id_values.push( {
+        let extra_id_value : String =
+          extract_payload_from_typedb_string_rep(
+            &concept.to_string());
+        extra_id_value } ); }}
   for extra_id_value in extra_id_values {
     // Delete each extra_id
-    let delete_extra_id_query : String = format!(
-      r#"match
-           $e isa extra_id, has id "{}";
-         delete $e;"#,
-      extra_id_value );
-    tx . query(delete_extra_id_query) . await?; }
+    tx . query( {
+      let delete_extra_id_query : String = format!(
+        r#"match
+             $e isa extra_id, has id "{}";
+           delete $e;"#,
+        extra_id_value );
+      delete_extra_id_query } ) . await?; }
   Ok(( )) }
 
 /// Drops relationships where old_id plays old_role.
@@ -178,18 +185,19 @@ async fn drop_relationships_for_merge (
   old_role      : &str,
   other_role    : &str,
 ) -> Result < (), Box<dyn Error> > {
-  let query : String =
-    format! (
-      r#"match
-           $old_node isa node, has id "{}";
-           $other isa node;
-           $rel isa {} ({}: $old_node, {}: $other);
-         delete $rel;"#,
-      old_id.as_str (),
-      relation_name,
-      old_role,
-      other_role );
-  tx.query ( query ). await ?;
+  tx.query ( {
+    let query : String =
+      format! (
+        r#"match
+             $old_node isa node, has id "{}";
+             $other isa node;
+             $rel isa {} ({}: $old_node, {}: $other);
+           delete $rel;"#,
+        old_id.as_str (),
+        relation_name,
+        old_role,
+        other_role );
+    query } ). await ?;
   Ok (( )) }
 
 /// Given a 'relation_name' between 'old_id' playing 'old_role'
@@ -204,25 +212,26 @@ async fn reroute_relationships_for_merge (
   old_role      : &str,
   other_role    : &str,
 ) -> Result < (), Box<dyn Error> > {
-  let query : String =
-    format! (
-      r#"match
-           $old_node isa node, has id "{}";
-           $new_node isa node, has id "{}";
-           $other isa node;
-           $old_rel isa {} ({}: $old_node, {}: $other);
-         delete $old_rel;
-         insert
-           $new_rel isa {} ({}: $new_node, {}: $other);"#,
-      old_id.as_str (),
-      new_id.as_str (),
-      relation_name,
-      old_role,
-      other_role,
-      relation_name,
-      old_role,
-      other_role );
-  tx.query ( query ). await ?;
+  tx.query ( {
+    let query : String =
+      format! (
+        r#"match
+             $old_node isa node, has id "{}";
+             $new_node isa node, has id "{}";
+             $other isa node;
+             $old_rel isa {} ({}: $old_node, {}: $other);
+           delete $old_rel;
+           insert
+             $new_rel isa {} ({}: $new_node, {}: $other);"#,
+        old_id.as_str (),
+        new_id.as_str (),
+        relation_name,
+        old_role,
+        other_role,
+        relation_name,
+        old_role,
+        other_role );
+    query } ). await ?;
   Ok (( )) }
 
 /// Reroute what the acquiree hides.
@@ -237,47 +246,52 @@ async fn reroute_what_acquiree_hides (
   drop_relationships_for_merge (
     tx, acquiree_id,
     "hides_from_its_subscriptions", "hidden", "hider" ). await ?;
-  let what_acquiree_hides : String = format!(
-    r#"match
-         $acquiree isa node, has id "{}";
-         $r isa hides_from_its_subscriptions (hider: $acquiree,
-                                              hidden: $hidden);
-         $hidden has id $hidden_id;
-       select $hidden_id;"#,
-    acquiree_id.as_str() );
-  let answer : QueryAnswer = tx.query(what_acquiree_hides).await?;
+  let answer : QueryAnswer = tx.query( {
+    let what_acquiree_hides : String = format!(
+      r#"match
+           $acquiree isa node, has id "{}";
+           $r isa hides_from_its_subscriptions (hider: $acquiree,
+                                                hidden: $hidden);
+           $hidden has id $hidden_id;
+         select $hidden_id;"#,
+      acquiree_id.as_str() );
+    what_acquiree_hides } ).await?;
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
     let row = row_result?;
     if let Some(concept) = row.get("hidden_id")? {
-      let hidden_id_str : String =
-        extract_payload_from_typedb_string_rep(&concept.to_string());
-      let hidden_id : ID = ID(hidden_id_str);
+      let hidden_id : ID = ID( {
+        let hidden_id_str : String =
+          extract_payload_from_typedb_string_rep(
+            &concept.to_string());
+        hidden_id_str } );
       if !acquirer_final_contains.contains(&hidden_id) {
         // If this ID is not in acquirer's final contains,
         // then transfer the relationship.
-        let transfer_query : String = format!(
-          r#"match
-               $acquirer isa node, has id "{}";
-               $hidden isa node, has id "{}";
-               $acquiree isa node, has id "{}";
-               $old_r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
-             delete $old_r;
-             insert
-               $new_r isa hides_from_its_subscriptions (hider: $acquirer, hidden: $hidden);"#,
-          acquirer_id.as_str(),
-          hidden_id.as_str(),
-          acquiree_id.as_str() );
-        tx.query(transfer_query).await?;
+        tx.query( {
+          let transfer_query : String = format!(
+            r#"match
+                 $acquirer isa node, has id "{}";
+                 $hidden isa node, has id "{}";
+                 $acquiree isa node, has id "{}";
+                 $old_r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
+               delete $old_r;
+               insert
+                 $new_r isa hides_from_its_subscriptions (hider: $acquirer, hidden: $hidden);"#,
+            acquirer_id.as_str(),
+            hidden_id.as_str(),
+            acquiree_id.as_str() );
+          transfer_query } ).await?;
       } else {
         // Just delete, b/c acquirer shouldn't hite its own content.
-        let delete_query : String = format!(
-          r#"match
-               $acquiree isa node, has id "{}";
-               $hidden isa node, has id "{}";
-               $old_r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
-             delete $old_r;"#,
-          acquiree_id.as_str(),
-          hidden_id.as_str() );
-        tx.query ( delete_query ). await ?; }} }
+        tx.query ( {
+          let delete_query : String = format!(
+            r#"match
+                 $acquiree isa node, has id "{}";
+                 $hidden isa node, has id "{}";
+                 $old_r isa hides_from_its_subscriptions (hider: $acquiree, hidden: $hidden);
+               delete $old_r;"#,
+            acquiree_id.as_str(),
+            hidden_id.as_str() );
+          delete_query } ). await ?; }} }
   Ok (( )) }

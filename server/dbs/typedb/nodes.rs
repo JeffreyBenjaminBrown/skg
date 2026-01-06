@@ -47,8 +47,8 @@ pub async fn create_only_nodes_with_no_ids_present (
     = BTreeSet::new ();
   for node in nodes {
     // Don't check that the list is nonempty, because that should bork.
-    let pid: &ID = &node.ids[0];
-    all_pids.insert ( pid.to_string () ); }
+    all_pids.insert (
+      node . ids[0] . to_string () ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
       db_name,
@@ -58,9 +58,8 @@ pub async fn create_only_nodes_with_no_ids_present (
   let mut to_create : Vec < &SkgNode > =
     Vec::new ();
   for node in nodes {
-    let pid: &ID = &node.ids[0];
     if ! known_ids.contains (
-      pid.as_str () )
+      node.ids[0] . as_str () )
     { to_create.push ( node ); }}
   { // Create them.
     let tx : Transaction =
@@ -86,37 +85,39 @@ pub async fn which_ids_exist (
 
   if ids.is_empty () {
     return Ok ( HashSet::new () ); }
-  let or_block : String =
-    ids . iter ()
-    . map ( |v| {
-      format! (
-        r#"{{ $found isa id;
-                $found == "{}"; }}"#,
-        v ) } )
-    . collect::<Vec<String>> ()
-    . join ( " or\n" );
-  let query : String = format! (
-    "match\n{}\n;\nselect $found;",
-    or_block );
   let tx : Transaction =
     driver . transaction (
       db_name,
       TransactionType::Read
     ) . await ?;
-  let answer : QueryAnswer =
-    tx . query ( query ) . await ?;
+  let mut rows = { // TODO ? Is this hard to assign a type signature?
+    let answer : QueryAnswer =
+      tx . query ( {
+        let or_block : String =
+          ids . iter ()
+          . map ( |v| {
+            format! (
+              r#"{{ $found isa id;
+                      $found == "{}"; }}"#,
+              v ) } )
+          . collect::<Vec<String>> ()
+          . join ( " or\n" );
+        let query : String = format! (
+          "match\n{}\n;\nselect $found;",
+          or_block );
+        query } ) . await ?;
+    answer } . into_rows ();
   let mut found : HashSet < String > =
     HashSet::new ();
-  let mut rows = // TODO ? Is this hard to assign a type signature?
-    answer . into_rows ();
   while let Some ( row_res ) = rows . next () . await {
     let row = row_res ?;
     if let Some ( concept ) =
       row . get ( "found" ) ? {
-        let payload : String =
-          extract_payload_from_typedb_string_rep (
-            & concept . to_string () );
-        found.insert ( payload ); }}
+        found.insert ( {
+          let payload : String =
+            extract_payload_from_typedb_string_rep (
+              & concept . to_string () );
+          payload } ); }}
   Ok ( found ) }
 
 pub async fn create_node (
@@ -130,15 +131,16 @@ pub async fn create_node (
 
   if node . ids . is_empty () {
     return Err ( "SkgNode with no IDs.".into() ); }
-  let primary_id : &str =
-    node . ids [0] . as_str ();
-  let insert_node_query : String = format! (
-    r#"insert $n isa node,
-                 has id "{}",
-                 has source "{}";"#,
-    primary_id,
-    node . source );
-  tx . query ( insert_node_query ) . await ?;
+  tx . query ( {
+    let primary_id : &str =
+      node . ids [0] . as_str ();
+    let insert_node_query : String = format! (
+      r#"insert $n isa node,
+                   has id "{}",
+                   has source "{}";"#,
+      primary_id,
+      node . source );
+    insert_node_query } ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }
 
@@ -150,9 +152,9 @@ async fn insert_extra_ids (
   if node.ids.len () > 1 {
     let primary_id : &str =
       node . ids [0] . as_str ();
-    let extra_ids: Vec < &ID > =
-      node . ids . iter() . skip(1) . collect();
-    for extra_id in extra_ids {
+    for extra_id in { let extra_ids: Vec < &ID > =
+                        node . ids . iter() . skip(1) . collect();
+                      extra_ids } {
       tx.query (
         format! ( r#"
                     match
@@ -204,33 +206,34 @@ pub async fn delete_nodes_from_pids (
   while let Some(row_res) = rows.next().await {
     let row = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_value : String =
-        extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      extra_id_values.push (extra_id_value); }}
+      extra_id_values.push ( {
+        let extra_id_value : String =
+          extract_payload_from_typedb_string_rep(
+            &concept.to_string());
+        extra_id_value } ); }}
   { // delete nodes
-    let delete_nodes_from_pids_query : String = format! (
-      r#"match $node isa node;
-      {};
-      delete $node;"#,
-      pid_or_clause );
-    let _answer : QueryAnswer = tx.query (
-      delete_nodes_from_pids_query ). await ?; }
+    let _answer : QueryAnswer = tx.query ( {
+      let delete_nodes_from_pids_query : String = format! (
+        r#"match $node isa node;
+        {};
+        delete $node;"#,
+        pid_or_clause );
+      delete_nodes_from_pids_query } ). await ?; }
   { // Delete extra_ids
     if !extra_id_values.is_empty() {
-      let extra_id_or_clause : String =
-        extra_id_values . iter()
-        . map ( |id| format! (
-          r#"{{ $e has id "{}"; }}"#,
-          id ) )
-        . collect::< Vec<_> > ()
-        . join ( " or\n" );
-      let delete_extra_ids_query : String = format! (
-        r#"match $e isa extra_id;
-        {};
-        delete $e;"#,
-        extra_id_or_clause );
-      let _answer : QueryAnswer = tx.query (
-        delete_extra_ids_query ). await ?; }}
+      let _answer : QueryAnswer = tx.query ( {
+        let extra_id_or_clause : String =
+          extra_id_values . iter()
+          . map ( |id| format! (
+            r#"{{ $e has id "{}"; }}"#,
+            id ) )
+          . collect::< Vec<_> > ()
+          . join ( " or\n" );
+        let delete_extra_ids_query : String = format! (
+          r#"match $e isa extra_id;
+          {};
+          delete $e;"#,
+          extra_id_or_clause );
+        delete_extra_ids_query } ). await ?; }}
   tx . commit (). await ?;
   Ok ( () ) }

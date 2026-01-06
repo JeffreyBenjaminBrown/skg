@@ -57,31 +57,37 @@ pub fn handle_save_buffer_request (
           typedb_driver, config, tantivy_index ))
       { Ok (save_response) =>
         { // S-exp response format: ((content "...") (errors (...)))
-          let response_sexp : String =
-            save_response . to_sexp_string ();
-          let header : String =
-            format! ( "Content-Length: {}\r\n\r\n",
-                      response_sexp . len () );
           stream . write_all (
-            format! ( "{}{}", header, response_sexp )
-              . as_bytes () ). unwrap ();
+              { let response_sexp : String =
+                  save_response . to_sexp_string ();
+                let header : String =
+                  format! ( "Content-Length: {}\r\n\r\n",
+                               response_sexp . len () );
+                format! ( "{}{}", header, response_sexp ) }
+              . as_bytes() ). unwrap ();
           stream . flush() . unwrap (); }
         Err (err) => {
           // Check if this is a SaveError that should be formatted for the client
           if let Some(save_error) = err.downcast_ref::<SaveError>() {
-            let error_buffer_content : String =
-              format_save_error_as_org(save_error);
-            let response : Sexp =
-              empty_response_sexp ( &error_buffer_content );
-            let response_sexp : String =
-              response . to_string ();
-            let header : String =
-              format! ( "Content-Length: {}\r\n\r\n",
-                        response_sexp . len ( ));
-            let full_response : String =
-              format! ( "{}{}", header, response_sexp );
-            stream.write_all(full_response.as_bytes( ))
-              . unwrap();
+            stream.write_all(
+              { let response_sexp : String =
+                  { let response : Sexp =
+                      empty_response_sexp (
+                        & { let error_buffer_content : String =
+                              format_save_error_as_org(save_error);
+                            error_buffer_content } );
+                    response }
+                  . to_string ();
+                let full_response : String =
+                  format! (
+                    "{}{}",
+                    { let header : String =
+                        format! ( "Content-Length: {}\r\n\r\n",
+                                  response_sexp . len ( ));
+                      header },
+                    response_sexp );
+                full_response
+              } .as_bytes( )) . unwrap();
             stream.flush().unwrap();
           } else {
             let error_msg : String =

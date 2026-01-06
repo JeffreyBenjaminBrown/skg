@@ -92,16 +92,17 @@ fn add_missing_info_dfs (
     assign_new_id_if_needed (
       node_ref . value () ); }
   { // recurse into children DFS
-    let child_treeids: Vec < ego_tree::NodeId > = {
-      let treeid: ego_tree::NodeId = node_ref . id ();
-      let tree = node_ref . tree ();
-      tree . get ( treeid ) . unwrap ()
-        . children () . map ( | child | child . id () )
-        . collect () };
-    for child_treeid in child_treeids {
-      if let Some ( child_mut )
-        = node_ref . tree () . get_mut ( child_treeid ) {
-          add_missing_info_dfs ( child_mut ); }} }}
+    for child_treeid in {
+      let child_treeids: Vec < ego_tree::NodeId > = {
+        let treeid: ego_tree::NodeId = node_ref . id ();
+        let tree = node_ref . tree ();
+        tree . get ( treeid ) . unwrap ()
+          . children () . map ( | child | child . id () )
+          . collect () };
+      child_treeids }
+    { if let Some ( child_mut )
+        = node_ref . tree () . get_mut ( child_treeid )
+      { add_missing_info_dfs ( child_mut ); }} }}
 
 /// Assign treatment=Alias
 /// to nodes whose parent has treatment=AliasCol

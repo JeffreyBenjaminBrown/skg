@@ -16,17 +16,19 @@ pub(super) fn merge_nodes_in_fs (
   if merge_instructions.is_empty() {
     return Ok (( )); }
   for merge in merge_instructions {
-    let acquiree_text_preserver : &SkgNode =
-      &merge.acquiree_text_preserver.0;
-    let updated_acquirer : &SkgNode =
-      &merge.updated_acquirer.0;
     let acquiree : &SkgNode =
       &merge.acquiree_to_delete.0;
 
     write_skgnode_to_source(
-      acquiree_text_preserver, &config)?;
+      { let acquiree_text_preserver : &SkgNode =
+          &merge.acquiree_text_preserver.0;
+        acquiree_text_preserver },
+      &config)?;
     write_skgnode_to_source(
-      updated_acquirer, &config)?;
+      { let updated_acquirer : &SkgNode =
+          &merge.updated_acquirer.0;
+        updated_acquirer },
+      &config)?;
     { // Delete acquiree from disk
       let acquiree_path : String =
         path_from_pid_and_source (&config,

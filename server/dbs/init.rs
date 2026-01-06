@@ -100,14 +100,12 @@ pub fn initialize_tantivy_from_nodes (
   nodes  : & [SkgNode],
 ) -> TantivyIndex {
   println!("Initializing Tantivy index...");
-  let index_path : &Path =
-    Path::new ( & config . tantivy_folder );
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
     in_fs_wipe_index_then_create_it (
       nodes,
-      index_path )
-    . unwrap_or_else(|e| {
+      Path::new ( & config . tantivy_folder )
+    ). unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
       std::process::exit(1); } );
   println!(
@@ -133,10 +131,10 @@ pub fn create_empty_tantivy_index (
   let source_field: schema::Field =
     schema.get_field("source")
     .ok_or("Schema missing 'source' field")?;
-  let index : Index =
-    Index::create_in_dir ( index_path, schema )?;
   Ok ( TantivyIndex {
-    index: Arc::new(index),
+    index: Arc::new ( { let index : Index =
+                          Index::create_in_dir ( index_path, schema )?;
+                        index } ),
     id_field,
     title_or_alias_field,
     source_field, }) }
@@ -171,8 +169,8 @@ pub async fn overwrite_new_empty_db (
   if databases.contains (db_name) . await ? {
     println! ( "Deleting existing database '{}'...",
                 db_name );
-    let database = databases.get (db_name) . await ?;
-    database . delete () . await ?; }
+    { let database = databases.get (db_name) . await ?;
+      database } . delete () . await ?; }
   println! ( "Creating empty database '{}'...", db_name );
   databases.create (db_name) . await ?;
   Ok (()) }
@@ -186,10 +184,11 @@ pub async fn define_schema (
     driver.transaction ( db_name,
                          TransactionType::Schema )
     . await ?;
-  let schema : String = fs::read_to_string
-    ("schema.tql")
-    . expect ( "Failed to read TypeDB schema file" );
   println! ( "Defining schema ..." );
-  tx.query (schema) . await ?;
+  tx.query ( {
+    let schema : String = fs::read_to_string
+      ("schema.tql")
+      . expect ( "Failed to read TypeDB schema file" );
+    schema } ) . await ?;
   tx.commit () . await ?;
   Ok (()) }

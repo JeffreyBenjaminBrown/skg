@@ -45,13 +45,14 @@ pub fn assign_pids_throughout_tree_from_map (
     { node_ref . value () . metadata . id =
       Some ( pid . clone () ); }}
   { // Process children recursively
-    let treeid : NodeId = node_ref . id ();
-    let child_treeids : Vec < NodeId > = {
-      let tree = node_ref . tree ();
-      tree . get ( treeid ) . unwrap ()
-        . children () . map ( | child | child . id () )
-        . collect () };
-    for child_treeid in child_treeids {
+    for child_treeid in {
+      let treeid : NodeId = node_ref . id ();
+      let child_treeids : Vec < NodeId > = {
+        let tree = node_ref . tree ();
+        tree . get ( treeid ) . unwrap ()
+          . children () . map ( | child | child . id () )
+          . collect () };
+      child_treeids } {
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_treeid )
       { assign_pids_throughout_tree_from_map (
@@ -72,35 +73,36 @@ pub async fn pids_from_ids (
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-  let disjunction_clauses : String =
-    build_id_disjunction ( node_ids, "id" );
-  let query : String =
-    format! (
-      // Query for (id, primary_id) pairs.
-      // Outer match finds IDs, either as node IDs or extra IDs.
-      // Inner match finds PIDs.
-      r#"match
-        {{ $node isa node, has id $id; }} or
-        {{ $e isa extra_id, has id $id;
-           $rel isa has_extra_id ( extra_id: $e ); }};
-        {};
-        fetch {{
-          "id": $id,
-          "primary_ids": [
-            match
-              {{ $node2 isa node, has id $id2, has id $primary_id;
-                 $node2 has id $id; }} or
-              {{ $e2 isa extra_id, has id $id2;
-                 $node2 isa node, has id $primary_id;
-                 $rel2 isa has_extra_id ( node: $node2,
-                                          extra_id: $e2 );
-                 $e2 has id $id; }};
-            fetch {{ "primary_id": $primary_id }};
-          ]
-        }};"#,
-      disjunction_clauses );
   let answer : QueryAnswer =
-    tx . query ( query ) . await ?;
+    tx . query ( {
+      let disjunction_clauses : String =
+        build_id_disjunction ( node_ids, "id" );
+      let query : String =
+        format! (
+          // Query for (id, primary_id) pairs.
+          // Outer match finds IDs, either as node IDs or extra IDs.
+          // Inner match finds PIDs.
+          r#"match
+            {{ $node isa node, has id $id; }} or
+            {{ $e isa extra_id, has id $id;
+               $rel isa has_extra_id ( extra_id: $e ); }};
+            {};
+            fetch {{
+              "id": $id,
+              "primary_ids": [
+                match
+                  {{ $node2 isa node, has id $id2, has id $primary_id;
+                     $node2 has id $id; }} or
+                  {{ $e2 isa extra_id, has id $id2;
+                     $node2 isa node, has id $primary_id;
+                     $rel2 isa has_extra_id ( node: $node2,
+                                              extra_id: $e2 );
+                     $e2 has id $id; }};
+                fetch {{ "primary_id": $primary_id }};
+              ]
+            }};"#,
+          disjunction_clauses );
+      query } ) . await ?;
   let mut result : HashMap < ID, Option < ID > > =
     HashMap::new ();
   for node_id in node_ids {

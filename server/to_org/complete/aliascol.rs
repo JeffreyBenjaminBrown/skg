@@ -94,10 +94,10 @@ async fn ancestor_skgnode_from_disk (
     . ok_or_else(
       || -> Box<dyn Error> {
         "Ancestor node has no ID" . into () })?;
-  let skgnode : SkgNode =
-    skgnode_from_id(
-      config, driver, &ancestor_skgid ) . await?;
-  Ok ( skgnode ) }
+  Ok ( { let skgnode : SkgNode =
+           skgnode_from_id(
+             config, driver, &ancestor_skgid ) . await?;
+         skgnode } ) }
 
 /// Collect titles from Alias children of an AliasCol node.
 /// Errors if any non-Alias children are found.

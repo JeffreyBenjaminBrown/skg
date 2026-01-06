@@ -141,14 +141,14 @@ pub async fn delete_out_links (
       TransactionType::Write
     ) . await ?;
   for id in ids {
-    let q : String = format! (
+    tx . query ( format! (
       r#"match
            $n   isa node, has id "{}";
            $rel isa {} ( {}: $n );
          delete $rel; "#,
       id.as_str (),
       relation,
-      role );
-    tx . query ( q ) . await ?; }
+      role )
+    ). await ?; }
   tx . commit () . await ?;
   Ok ( ids.len () ) }

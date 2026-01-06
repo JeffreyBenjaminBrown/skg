@@ -19,10 +19,12 @@ pub async fn validate_and_filter_foreign_instructions(
   let mut errors: Vec<BufferValidationError> = Vec::new();
   let mut filtered: Vec<SaveInstruction> = Vec::new();
   for (node, action) in instructions {
-    let is_foreign: bool = config.sources.get(&node.source)
-      .map(|s| !s.user_owns_it)
-      .unwrap_or(false);
-    if !is_foreign { // nothing to worry about; move on
+    if ! { let is_foreign: bool =
+             config . sources . get(&node.source)
+             . map(|s| !s.user_owns_it)
+             . unwrap_or(false);
+           is_foreign }
+    { // nothing to worry about; move on
       filtered.push((node, action));
       continue; }
     match action { // maybe worry about it
@@ -91,23 +93,23 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
     { // Check if acquirer is from foreign source
       let acquirer_source: &String =
         &triple.updated_acquirer.0.source;
-      let acquirer_is_foreign: bool =
-        config.sources.get(acquirer_source)
-        .map(|s| !s.user_owns_it)
-        .unwrap_or(false);
-      if acquirer_is_foreign {
-        errors.push(BufferValidationError::ModifiedForeignNode(
+      if { let acquirer_is_foreign: bool =
+             config . sources . get(acquirer_source)
+             . map(|s| !s.user_owns_it)
+             . unwrap_or(false);
+           acquirer_is_foreign }
+      { errors.push(BufferValidationError::ModifiedForeignNode(
           triple.acquirer_id().clone(),
           SourceNickname::from(acquirer_source.clone() )) ); }}
     { // Check if acquiree is from foreign source
       let acquiree_source: &String =
         &triple.acquiree_to_delete.0.source;
-      let acquiree_is_foreign: bool =
-        config.sources.get(acquiree_source)
-        .map(|s| !s.user_owns_it)
-        .unwrap_or(false);
-      if acquiree_is_foreign {
-        errors.push(BufferValidationError::ModifiedForeignNode(
+      if { let acquiree_is_foreign: bool =
+             config.sources.get(acquiree_source)
+             . map(|s| !s.user_owns_it)
+             . unwrap_or (false);
+           acquiree_is_foreign }
+      { errors.push(BufferValidationError::ModifiedForeignNode(
           triple.acquiree_id().clone(),
           SourceNickname::from(acquiree_source.clone() )) ); }} }
   if errors.is_empty() { Ok(( ))

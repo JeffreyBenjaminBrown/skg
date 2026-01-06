@@ -23,17 +23,19 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
-  let instructions : Vec<SaveInstruction> =
-    naive_saveinstructions_from_forest ( forest . clone () ) ?;
-  let instructions_without_dups : Vec<SaveInstruction> =
-    reconcile_same_id_instructions (
-      config, driver, instructions ) . await ?;
   let mut clobbered_instructions : Vec<SaveInstruction> =
     Vec::new();
-  for (node, action) in instructions_without_dups {
-    let clobbered_node : SkgNode =
-      clobber_none_fields_with_data_from_disk (
-        config, driver, node ) . await ?;
-    clobbered_instructions.push(
-      (clobbered_node, action)); }
+  for (node, action) in {
+    let instructions_without_dups : Vec<SaveInstruction> =
+      reconcile_same_id_instructions (
+        config, driver, {
+          let instructions : Vec<SaveInstruction> =
+            naive_saveinstructions_from_forest ( forest . clone () ) ?;
+          instructions } ) . await ?;
+    instructions_without_dups }
+  { clobbered_instructions.push (
+      { let clobbered_node : SkgNode =
+          clobber_none_fields_with_data_from_disk (
+              config, driver, node ) . await ?;
+        (clobbered_node, action) } ); }
   Ok (clobbered_instructions) }

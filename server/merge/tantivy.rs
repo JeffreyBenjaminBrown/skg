@@ -8,11 +8,11 @@ pub(super) fn merge_nodes_in_tantivy (
   merge_instructions : &[MergeInstructionTriple],
   tantivy_index      : &TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-  let flat_instructions : Vec<SaveInstruction> =
-    merge_instructions . iter()
-    . flat_map( |m| m.to_vec() )
-    . collect();
   update_index_from_saveinstructions(
-    &flat_instructions,
+    & { let flat_instructions : Vec<SaveInstruction> =
+          merge_instructions . iter()
+          . flat_map( |m| m.to_vec() )
+          . collect();
+        flat_instructions },
     tantivy_index)?;
   Ok (( )) }

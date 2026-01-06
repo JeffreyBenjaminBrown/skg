@@ -17,12 +17,13 @@ use typedb_driver::TypeDBDriver;
 fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args().collect();
 
-  let config_path: String =
-    if args.len() > 1 { // config from command line, if given
-      args[1].clone()
-    } else { // default config
-      "data/skgconfig.toml".to_string() };
-  let config: SkgConfig = load_config (&config_path) ?;
+  let config: SkgConfig = load_config (
+    & { let config_path: String =
+          if args.len() > 1 { // config from command line, if given
+            args[1].clone()
+          } else { // default config
+            "data/skgconfig.toml".to_string() };
+        config_path } ) ?;
 
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)

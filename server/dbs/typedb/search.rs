@@ -206,33 +206,34 @@ pub async fn find_related_nodes (
     format!("{}_id", input_role);
   let output_id_var : String =
     format!("{}_id", output_role);
-  let input_disjunction : String =
-    build_id_disjunction ( nodes, &input_id_var );
-  let match_clause : String =
-    format!( r#" match
-                     ${} isa node, has id ${};
-                  {{ ${} isa node, has id ${}; }} or
-                  {{ ${} isa node;
-                     $e isa extra_id, has id ${};
-                     $extra_rel isa has_extra_id ( node:     ${},
-                                                   extra_id: $e ); }};
-                  {};"#,
-                   output_role, output_id_var,
-                   input_role, input_id_var,
-                   input_role, input_id_var, input_role,
-                   input_disjunction );
-  let relationship_and_select : String = format!( r#"
-                     $rel isa {} ( {}: ${},
-                                   {}: ${} );
-                     select ${};"#,
-                     relation, input_role, input_role,
-                     output_role, output_role,
-                     output_id_var );
-  let query : String = format!(
-    "{}{}", match_clause, relationship_and_select);
-
-  let answer : QueryAnswer = tx.query ( query ) . await?;
-  let mut stream = answer.into_rows ();
+  let mut stream = {
+    let answer : QueryAnswer = tx.query ( {
+      let input_disjunction : String =
+        build_id_disjunction ( nodes, &input_id_var );
+      let match_clause : String =
+        format!( r#" match
+                       ${} isa node, has id ${};
+                    {{ ${} isa node, has id ${}; }} or
+                    {{ ${} isa node;
+                       $e isa extra_id, has id ${};
+                       $extra_rel isa has_extra_id ( node:     ${},
+                                                     extra_id: $e ); }};
+                    {};"#,
+                     output_role, output_id_var,
+                     input_role, input_id_var,
+                     input_role, input_id_var, input_role,
+                     input_disjunction );
+      let relationship_and_select : String = format!( r#"
+                       $rel isa {} ( {}: ${},
+                                     {}: ${} );
+                       select ${};"#,
+                       relation, input_role, input_role,
+                       output_role, output_role,
+                       output_id_var );
+      let query : String = format!(
+        "{}{}", match_clause, relationship_and_select);
+      query } ) . await?;
+    answer } .into_rows ();
   let mut related_nodes : HashSet<ID> = HashSet::new ();
   while let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
@@ -255,24 +256,25 @@ pub async fn pid_and_source_from_id (
     driver.transaction (
       db_name, TransactionType::Read
     ). await ?;
-  let query : String = format! (
-    r#"match
-      $node isa node,
-            has id $primary_id,
-            has source $source;
-      {{ $node has id "{}"; }} or
-      {{ $e   isa     extra_id, has id "{}";
-         $rel isa has_extra_id ( node: $node,
-                                 extra_id: $e ); }} ;
-      fetch {{
-        "primary_id": $primary_id,
-        "source": $source
-      }};"#,
-    skgid,
-    skgid );
-  let answer : QueryAnswer = tx.query ( query ). await ?;
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
-    answer {
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
+    let answer : QueryAnswer = tx.query ( {
+      let query : String = format! (
+        r#"match
+          $node isa node,
+                has id $primary_id,
+                has source $source;
+          {{ $node has id "{}"; }} or
+          {{ $e   isa     extra_id, has id "{}";
+             $rel isa has_extra_id ( node: $node,
+                                     extra_id: $e ); }} ;
+          fetch {{
+            "primary_id": $primary_id,
+            "source": $source
+          }};"#,
+        skgid,
+        skgid );
+      query } ). await ?;
+    answer } {
       if let Some (doc_result) = stream . next () . await {
         let doc = doc_result ?;
         if let Some ( Node::Map ( ref map ) ) = doc . root {

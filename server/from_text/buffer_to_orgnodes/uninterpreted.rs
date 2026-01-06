@@ -27,13 +27,15 @@ struct OrgNodeLineCol {
 pub fn org_to_uninterpreted_nodes(
   input: &str
 ) -> Result<Tree<OrgNode>, String> {
-  let org_node_line_cols: Vec<OrgNodeLineCol> =
-    divide_into_orgNodeLineCols(input)?;
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
-  let forest_root_treeid: NodeId = forest.root().id();
   // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
-  let mut treeid_stack: Vec<NodeId> = vec![forest_root_treeid];
-  for org_node_line_col in &org_node_line_cols {
+  let mut treeid_stack: Vec<NodeId> = vec![ {
+    let forest_root_treeid: NodeId = forest.root().id();
+    forest_root_treeid } ];
+  for org_node_line_col in & {
+    let org_node_line_cols: Vec<OrgNodeLineCol> =
+      divide_into_orgNodeLineCols(input)?;
+    org_node_line_cols } {
     let (level, orgnode): (usize, OrgNode) =
       linecol_to_orgnode(org_node_line_col)?;
     // Adjust treeid_stack to proper level (ForestRoot is level 0, tree roots are level 1)
@@ -44,14 +46,13 @@ pub fn org_to_uninterpreted_nodes(
     if treeid_stack.len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-        orgnode.title, level, level - 1));
-    }
-    let parent_treeid: NodeId = *treeid_stack.last().unwrap();
-    let new_treeid: NodeId = {
-      let mut parent_mut = forest.get_mut(parent_treeid).unwrap();
-      parent_mut.append(orgnode).id() };
-    treeid_stack.push(new_treeid);
-  }
+        orgnode.title, level, level - 1)); }
+    treeid_stack.push( {
+      let parent_treeid: NodeId = *treeid_stack.last().unwrap();
+      let new_treeid: NodeId = {
+        let mut parent_mut = forest.get_mut(parent_treeid).unwrap();
+        parent_mut.append(orgnode).id() };
+      new_treeid } ); }
   Ok(forest) }
 
 /// Parse input text into org node line collections.

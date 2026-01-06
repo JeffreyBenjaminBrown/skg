@@ -31,15 +31,16 @@ pub async fn partition_subscribee_content_for_subscriber (
   let subscribee_content : HashSet < ID > =
     what_nodes_contain (
       db_name, driver, & [ subscribee_pid . clone () ] ) . await ?;
-  let visible : HashSet < ID > =
-    subscribee_content . iter ()
-    . filter ( | id | ! subscriber_hides . contains ( id ) )
-    . cloned () . collect ();
-  let hidden : HashSet < ID > =
-    subscribee_content . iter ()
-    . filter ( | id | subscriber_hides . contains ( id ) )
-    . cloned () . collect ();
-  Ok (( visible, hidden )) }
+  Ok (( { let visible : HashSet < ID > =
+            subscribee_content . iter () //  (rust-mode--indent-line)
+            . filter ( | id | ! subscriber_hides . contains ( id ) )
+            . cloned () . collect ();
+          visible },
+        { let hidden : HashSet < ID > =
+            subscribee_content . iter ()
+            . filter ( | id | subscriber_hides . contains ( id ) )
+            . cloned () . collect ();
+          hidden } )) }
 
 /// Returns all IDs that the subscriber hides_from_its_subscriptions.
 pub async fn what_node_hides (

@@ -44,58 +44,57 @@ pub async fn contains_from_pids (
       db_name, TransactionType::Read
     ) . await ?;
 
-  let disjunction_clauses : String =
-    build_id_disjunction ( pids, "node_id" );
-  let query : String = (
-    // - Outer match finds each node in our input set
-    // - First nested fetch finds what this node contains (if any)
-    // - Second nested fetch finds what contains this node (if any)
-    format! (
-      r#"match
-        {{ $node isa node, has id $node_id; }} or
-        {{ $e isa extra_id, has id $node_id;
-           $rel isa has_extra_id ( extra_id: $e ); }};
-        {};
-        fetch {{
-          "node_id": $node_id,
-          "contains": [
-            match
-              {{ $node2 isa node, has id $contained_id;
-                 $node3 isa node, has id $node_id;
-                 $rel2 isa contains ( container: $node3,
-                                      contained: $node2 ); }} or
-              {{ $node2 isa node, has id $contained_id;
-                 $e2 isa extra_id, has id $node_id;
-                 $node3 isa node;
-                 $extra_rel isa has_extra_id ( node: $node3,
-                                               extra_id: $e2 );
-                 $rel2 isa contains ( container: $node3,
-                                      contained: $node2 ); }};
-            fetch {{ "contained_id": $contained_id }};
-          ],
-          "contained_by": [
-            match
-              {{ $node4 isa node, has id $container_id;
-                 $node5 isa node, has id $node_id;
-                 $rel3 isa contains ( container: $node4,
-                                      contained: $node5 ); }} or
-              {{ $node4 isa node, has id $container_id;
-                 $e3 isa extra_id, has id $node_id;
-                 $node5 isa node;
-                 $extra_rel2 isa has_extra_id ( node: $node5,
-                                                extra_id: $e3 );
-                 $rel3 isa contains ( container: $node4,
-                                      contained: $node5 ); }};
-            fetch {{ "container_id": $container_id }};
-          ]
-        }};"#,
-      disjunction_clauses ) );
-
-  let answer : QueryAnswer =
-    tx . query ( query ) . await ?;
-
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream )
-    = answer
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
+    let answer : QueryAnswer =
+      tx . query ( {
+        let disjunction_clauses : String =
+          build_id_disjunction ( pids, "node_id" );
+        let query : String = (
+          // - Outer match finds each node in our input set
+          // - First nested fetch finds what this node contains (if any)
+          // - Second nested fetch finds what contains this node (if any)
+          format! (
+            r#"match
+              {{ $node isa node, has id $node_id; }} or
+              {{ $e isa extra_id, has id $node_id;
+                 $rel isa has_extra_id ( extra_id: $e ); }};
+              {};
+              fetch {{
+                "node_id": $node_id,
+                "contains": [
+                  match
+                    {{ $node2 isa node, has id $contained_id;
+                       $node3 isa node, has id $node_id;
+                       $rel2 isa contains ( container: $node3,
+                                            contained: $node2 ); }} or
+                    {{ $node2 isa node, has id $contained_id;
+                       $e2 isa extra_id, has id $node_id;
+                       $node3 isa node;
+                       $extra_rel isa has_extra_id ( node: $node3,
+                                                     extra_id: $e2 );
+                       $rel2 isa contains ( container: $node3,
+                                            contained: $node2 ); }};
+                  fetch {{ "contained_id": $contained_id }};
+                ],
+                "contained_by": [
+                  match
+                    {{ $node4 isa node, has id $container_id;
+                       $node5 isa node, has id $node_id;
+                       $rel3 isa contains ( container: $node4,
+                                            contained: $node5 ); }} or
+                    {{ $node4 isa node, has id $container_id;
+                       $e3 isa extra_id, has id $node_id;
+                       $node5 isa node;
+                       $extra_rel2 isa has_extra_id ( node: $node5,
+                                                      extra_id: $e3 );
+                       $rel3 isa contains ( container: $node4,
+                                            contained: $node5 ); }};
+                  fetch {{ "container_id": $container_id }};
+                ]
+              }};"#,
+            disjunction_clauses ) );
+        query } ) . await ?;
+    answer }
   { // Process the nested subquery results.
     // Each document has the structure:
     //   {"node_id": <id>, "contains": [...], "contained_by": [...]}

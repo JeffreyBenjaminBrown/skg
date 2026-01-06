@@ -39,10 +39,11 @@ pub async fn find_buffer_errors_for_saving (
           BufferValidationError::InconsistentSources(id, sources));
       }} }
   { // merge validation
-    let merge_errors: Vec<String> =
-      validate_merge_requests(forest, config, driver).await?;
-    for error_msg in merge_errors {
-      errors.push(
+    for error_msg in {
+      let merge_errors: Vec<String> =
+        validate_merge_requests(forest, config, driver).await?;
+      merge_errors }
+    { errors.push(
         BufferValidationError::Other(error_msg)); }}
   validate_definitive_view_requests(
     forest, &mut errors);
@@ -119,16 +120,17 @@ fn validate_node_and_children (
         _ => {} }}
 
   { // At most one child should have treatment=AliasCol
-    let aliasCol_children_count: usize =
-      node_ref . children()
-      . filter ( |child|
-                  child.value() . metadata.code.interp
-                  == Interp::AliasCol )
-      . count();
-    if aliasCol_children_count > 1 {
-      errors.push (
-        BufferValidationError::Multiple_AliasCols_in_Children (
-          orgnode.clone() )); }}
+    if { let aliasCol_children_count: usize =
+           node_ref . children()
+           . filter ( |child|
+                       child.value() . metadata.code.interp
+                       == Interp::AliasCol )
+           . count();
+         aliasCol_children_count
+       } > 1
+    { errors.push (
+      BufferValidationError::Multiple_AliasCols_in_Children (
+        orgnode.clone() )); }}
 
   { // If a node is definitive, it should have
     // no two treatment=Content children with the same ID.
@@ -167,11 +169,11 @@ fn validate_node_and_children (
           orgnode.clone() )); }}
 
   for child in node_ref.children() { // recurse
-    let cloned_rel: Interp =
-      orgnode.metadata.code.interp.clone();
     validate_node_and_children(
-      child, Some(cloned_rel), config, errors);
-  }}
+      child, Some( { let cloned_rel: Interp =
+                       orgnode.metadata.code.interp.clone();
+                     cloned_rel } ),
+      config, errors); }}
 
 /// Validate definitive view requests:
 /// - Must be on an indefinitive orgnode
