@@ -90,10 +90,10 @@ pub fn delete_nodes_from_index<'a, I>(
 where I: Iterator<Item = &'a SkgNode>, {
   for node in nodes_iter {
     if !node.ids.is_empty() {
-      writer . delete_term ( {
-        let primary_id: &ID = &node.ids[0];
+      let primary_id : &ID = node.primary_id()?;
+      writer . delete_term (
         Term::from_field_text( tantivy_index.id_field,
-                               primary_id.as_str() ) } ); }}
+                               primary_id.as_str() ) ); }}
   Ok (( )) }
 
 pub fn add_documents_to_tantivy_writer<'a, I> (
@@ -122,28 +122,25 @@ fn create_documents_from_node (
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {
 
-  if node.ids.is_empty() {
-    return Err("SkgNode has no IDs" . into () ); }
-  let mut documents_acc: Vec<Document> =
+  let primary_id : &ID = node.primary_id()?;
+  let mut documents: Vec<Document> =
     Vec::new();
-  let mut titles_and_aliases: Vec<String> = // what to index
+  let mut titles_and_aliases: Vec<String> =
     vec![node.title.clone()];
   if let Some(aliases) = &node.aliases {
     titles_and_aliases . extend(
       aliases.clone () ); }
-  for title_or_alias in titles_and_aliases { // index them
-    documents_acc.push ( {
-      let primary_id: &ID = &node.ids[0];
-      let doc : Document = doc!(
+  for title_or_alias in titles_and_aliases {
+    documents.push (
+      doc!(
         tantivy_index . id_field =>
           primary_id.as_str (),
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
             & title_or_alias ),
         tantivy_index . source_field =>
-          node.source.as_str() );
-      doc } ); }
-  Ok ( documents_acc ) }
+          node.source.as_str() ) ); }
+  Ok ( documents ) }
 
 pub fn commit_with_status (
   writer: &mut IndexWriter,

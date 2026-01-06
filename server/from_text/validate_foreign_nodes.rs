@@ -1,4 +1,4 @@
-use crate::types::misc::{SkgConfig, SourceNickname};
+use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::errors::BufferValidationError;
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction, MergeInstructionTriple};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
@@ -27,17 +27,23 @@ pub async fn validate_and_filter_foreign_instructions(
     { // nothing to worry about; move on
       filtered.push((node, action));
       continue; }
+    let primary_id : &ID = match node.primary_id() {
+      Ok(id) => id,
+      Err(e) => {
+        errors.push(BufferValidationError::Other(e));
+        continue; } };
     match action { // maybe worry about it
       NonMerge_NodeAction::Delete => {
         // Cannot delete foreign nodes
         errors.push(BufferValidationError::ModifiedForeignNode(
-          node.ids[0].clone(),
+          primary_id . clone(),
           SourceNickname::from ( node.source.clone() )) ); }
       NonMerge_NodeAction::Save => {
         // Check if node has been modified.
         // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
         match optskgnode_from_id(
-          config, driver, &node.ids[0]).await {
+          config, driver, primary_id
+        ).await {
           Ok(Some(disk_node)) => {
             /* Compare definitive fields (title, body, contains) and non-definitive fields (aliases).
 For *definitive* fields (title, body, contains):
@@ -64,19 +70,19 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
                  contains_matches &&
                  aliases_matches) {
               errors.push(BufferValidationError::ModifiedForeignNode(
-                node.ids[0].clone(),
+                primary_id . clone(),
                 SourceNickname::from(node.source.clone() )) ); }
             // If unchanged, filter out (no need to write)
           }
           Ok(None) => {
             // 'Foreign' node not found on disk.
             errors.push(BufferValidationError::ModifiedForeignNode(
-              node.ids[0].clone(),
+              primary_id . clone(),
               SourceNickname::from(node.source.clone() )) ); }
           Err(e) => { // Other error reading from disk
             return Err(vec![BufferValidationError::Other(
               format!("Error reading foreign node {}: {}",
-                      node.ids[0].0, e)) ] ); }} }} }
+                      primary_id . as_str(), e)) ] ); }} }} }
   if errors.is_empty() { Ok(filtered)
   } else { Err(errors) }}
 
@@ -98,9 +104,13 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
              . map(|s| !s.user_owns_it)
              . unwrap_or(false);
            acquirer_is_foreign }
-      { errors.push(BufferValidationError::ModifiedForeignNode(
-          triple.acquirer_id().clone(),
-          SourceNickname::from(acquirer_source.clone() )) ); }}
+      { match triple.acquirer_id()
+        { Ok(id) => errors.push(
+            BufferValidationError::ModifiedForeignNode(
+                id . clone(),
+                SourceNickname::from(acquirer_source.clone() )) ),
+          Err(e) => errors.push(
+            BufferValidationError::Other(e)), }; }}
     { // Check if acquiree is from foreign source
       let acquiree_source: &String =
         &triple.acquiree_to_delete.0.source;
@@ -109,9 +119,12 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
              . map(|s| !s.user_owns_it)
              . unwrap_or (false);
            acquiree_is_foreign }
-      { errors.push(BufferValidationError::ModifiedForeignNode(
-          triple.acquiree_id().clone(),
-          SourceNickname::from(acquiree_source.clone() )) ); }} }
+      { match triple.acquiree_id() {
+          Ok(id) => errors.push(BufferValidationError::ModifiedForeignNode(
+            id . clone(),
+            SourceNickname::from(acquiree_source.clone() )) ),
+          Err(e) => errors.push(BufferValidationError::Other(e)),
+        }; }} }
   if errors.is_empty() { Ok(( ))
   } else { Err(errors) }}
 

@@ -25,10 +25,13 @@ pub async fn create_all_relationships (
     . await ?;
   println! ( "Creating relationships ..." );
   for node in nodes {
+    let primary_id : &ID = node.primary_id()?;
     create_relationships_from_node (node, &tx)
-      . await
-      . map_err(|e| format!("Failed to create relationships for node '{}': {}",
-                           node.ids[0].as_str(), e))? ; }
+      . await . map_err(
+        |e| format!(
+          "Failed to create relationships for node '{}': {}",
+          primary_id . as_str (),
+          e ))? ; }
   tx . commit () . await
     . map_err(|e| format!("Failed to commit relationships transaction: {}", e))?;
   Ok (()) }
@@ -38,10 +41,9 @@ pub async fn create_relationships_from_node (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id : &str =
-    node . ids [0] . as_str ();
+  let primary_id : &ID = node.primary_id()?;
   insert_relationship_from_list (
-    primary_id,
+    primary_id . as_str (),
     node.contains.as_ref().unwrap_or(&vec![]),
     "contains",
     "container",
@@ -49,7 +51,7 @@ pub async fn create_relationships_from_node (
     tx ) . await
     . map_err(|e| format!("Failed to create 'contains' relationships: {}", e))?;
   insert_relationship_from_list (
-    primary_id,
+    primary_id . as_str (),
     & ( textlinks_from_node ( &node )
         . iter ()
         . map ( |textlink|
@@ -61,7 +63,7 @@ pub async fn create_relationships_from_node (
     tx ). await
     . map_err(|e| format!("Failed to create 'textlinks_to' relationships: {}", e))?;
   insert_relationship_from_list (
-    primary_id,
+    primary_id . as_str (),
     node.subscribes_to.as_ref().unwrap_or(&vec![]),
     "subscribes",
     "subscriber",
@@ -69,7 +71,7 @@ pub async fn create_relationships_from_node (
     tx ). await
     . map_err(|e| format!("Failed to create 'subscribes' relationships: {}", e))?;
   insert_relationship_from_list (
-    primary_id,
+    primary_id . as_str (),
     node.hides_from_its_subscriptions.as_ref().unwrap_or(&vec![]),
     "hides_from_its_subscriptions",
     "hider",
@@ -77,7 +79,7 @@ pub async fn create_relationships_from_node (
     tx ). await
     . map_err(|e| format!("Failed to create 'hides_from_its_subscriptions' relationships: {}", e))?;
   insert_relationship_from_list(
-    primary_id,
+    primary_id . as_str (),
     node.overrides_view_of.as_ref().unwrap_or(&vec![]),
     "overrides_view_of",
     "replacement",

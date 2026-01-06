@@ -68,7 +68,7 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
       let updated_acquirer: SkgNode =
         three_merged_skgnodes( &acquirer_from_disk,
                                &acquiree_from_disk,
-                               &acquiree_text_preserver);
+                               &acquiree_text_preserver)?;
       { merge_instructions.push(
           MergeInstructionTriple {
             acquiree_text_preserver : (
@@ -94,7 +94,7 @@ fn three_merged_skgnodes(
   acquirer_from_disk: &SkgNode,
   acquiree_from_disk: &SkgNode,
   acquiree_text_preserver: &SkgNode,
-) -> SkgNode {
+) -> Result<SkgNode, String> {
   let mut updated_acquirer: SkgNode =
     acquirer_from_disk.clone();
   { // Append acquiree's IDs to acquirer's.
@@ -108,10 +108,7 @@ fn three_merged_skgnodes(
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
-      vec![ { let acquiree_text_preserver_id: &ID =
-                &acquiree_text_preserver.ids[0];
-              acquiree_text_preserver_id }
-            . clone() ];
+      vec![ acquiree_text_preserver.primary_id()? . clone() ];
     combined.extend(
       acquirer_from_disk.contains.clone().unwrap_or_default() );
     combined.extend(
@@ -149,7 +146,7 @@ fn three_merged_skgnodes(
         . clone() . unwrap_or_default() );
     updated_acquirer . overrides_view_of =
       Some(dedup_vector(combined)); }
-  updated_acquirer }
+  Ok(updated_acquirer) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {

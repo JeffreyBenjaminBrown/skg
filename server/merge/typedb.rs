@@ -38,8 +38,8 @@ async fn merge_one_node_in_typedb(
   updated_acquirer        : &SkgNode,
   acquiree                : &SkgNode,
 ) -> Result<(), Box<dyn Error>> {
-  let acquirer_id  : &ID = &updated_acquirer        . ids[0];
-  let acquiree_id  : &ID = &acquiree                . ids[0];
+  let acquirer_id : &ID = updated_acquirer . primary_id()?;
+  let acquiree_id : &ID = acquiree         . primary_id()?;
 
   { // Reroute relationships.
     reroute_relationships_for_merge (
@@ -49,9 +49,8 @@ async fn merge_one_node_in_typedb(
       tx, acquiree_id, acquirer_id,
       "contains", "contained", "container" ). await ?;
     reroute_relationships_for_merge (
-      tx, acquiree_id, { let preserver_id : &ID =
-                           &acquiree_text_preserver . ids[0];
-                         preserver_id },
+      tx, acquiree_id,
+      acquiree_text_preserver . primary_id()?,
       "textlinks_to", "source", "dest" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
@@ -112,10 +111,7 @@ async fn merge_one_node_in_typedb(
            $contains_rel isa contains (container: $acquirer,
                                        contained: $preserver);"#,
       acquirer_id.as_str(),
-      ( { let acquiree_text_preserver_id : &ID =
-            &acquiree_text_preserver.ids[0];
-          acquiree_text_preserver_id }
-        . as_str() ));
+      acquiree_text_preserver.primary_id()? . as_str() );
     contains_query } ).await?;
 
   for extra_id_value in &acquiree.ids {

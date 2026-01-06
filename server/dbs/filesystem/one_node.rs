@@ -76,14 +76,14 @@ pub fn write_skgnode_to_source (
   skgnode : &SkgNode,
   config  : &SkgConfig,
 ) -> io::Result<()> {
+  let pid : &ID = skgnode.primary_id()
+    . map_err(
+      |e| io::Error::new(
+        io::ErrorKind::InvalidInput, e))?;
   write_skgnode (
     skgnode,
-    & { let pid : &ID = skgnode.ids.get(0)
-        .ok_or_else(|| io::Error::new(
-          io::ErrorKind::InvalidInput,
-          "SkgNode has no IDs"))?;
-        path_from_pid_and_source(
-          config, &skgnode.source, pid.clone() ) } ) }
+    & path_from_pid_and_source(
+        config, &skgnode.source, pid . clone() ) ) }
 
 /// Effectively private.
 pub(super) fn read_skgnode

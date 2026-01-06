@@ -42,13 +42,11 @@ pub async fn create_only_nodes_with_no_ids_present (
   nodes   : &Vec <SkgNode>
 ) -> Result < usize, Box<dyn Error> > {
 
-  let mut all_pids // All the primary IDs.
-    : BTreeSet < String >
-    = BTreeSet::new ();
+  let mut all_pids : BTreeSet < String > =
+    BTreeSet::new ();
   for node in nodes {
-    // Don't check that the list is nonempty, because that should bork.
     all_pids.insert (
-      node . ids[0] . to_string () ); }
+      node . primary_id()? . to_string() ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
       db_name,
@@ -59,7 +57,7 @@ pub async fn create_only_nodes_with_no_ids_present (
     Vec::new ();
   for node in nodes {
     if ! known_ids.contains (
-      node.ids[0] . as_str () )
+      node.primary_id()? . as_str () )
     { to_create.push ( node ); }}
   { // Create them.
     let tx : Transaction =
@@ -129,16 +127,13 @@ pub async fn create_node (
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  if node . ids . is_empty () {
-    return Err ( "SkgNode with no IDs.".into() ); }
+  let primary_id : &ID = node.primary_id()?;
   tx . query ( {
-    let primary_id : &str =
-      node . ids [0] . as_str ();
     let insert_node_query : String = format! (
       r#"insert $n isa node,
                    has id "{}",
                    has source "{}";"#,
-      primary_id,
+      primary_id . as_str (),
       node . source );
     insert_node_query } ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
@@ -150,8 +145,7 @@ async fn insert_extra_ids (
 ) -> Result < (), Box<dyn Error> > {
 
   if node.ids.len () > 1 {
-    let primary_id : &str =
-      node . ids [0] . as_str ();
+    let primary_id : &ID = node.primary_id()?;
     for extra_id in { let extra_ids: Vec < &ID > =
                         node . ids . iter() . skip(1) . collect();
                       extra_ids } {
@@ -164,7 +158,7 @@ async fn insert_extra_ids (
                         $r isa has_extra_id
                            ( node: $n,
                              extra_id: $e ); "#,
-                    primary_id,
+                    primary_id . as_str (),
                     extra_id.as_str () ))
         . await ?; }}
   Ok (()) }

@@ -38,6 +38,13 @@ pub struct SkgNode {
   pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
 }
 
+impl SkgNode {
+  /// Returns the primary ID, or an error if ids is empty.
+  pub fn primary_id(&self) -> Result<&ID, String> {
+    self.ids.get(0).ok_or_else(||
+      format!("SkgNode '{}' has no IDs", self.title)) }
+}
+
 //
 // Functions
 //

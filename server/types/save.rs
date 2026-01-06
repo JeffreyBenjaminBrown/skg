@@ -158,16 +158,16 @@ impl MergeInstructionTriple {
 
   pub fn acquirer_id (
     &self
-  ) -> &ID {
-    &self.updated_acquirer.0.ids[0] }
+  ) -> Result<&ID, String> {
+    self.updated_acquirer.0.primary_id() }
 
   pub fn acquiree_id (
     &self
-  ) -> &ID {
-    &self.acquiree_to_delete.0.ids[0] }
+  ) -> Result<&ID, String> {
+    self.acquiree_to_delete.0.primary_id() }
 
   pub fn preserver_id (
     &self
-  ) -> &ID {
-    &self.acquiree_text_preserver.0.ids[0] }
+  ) -> Result<&ID, String> {
+    self.acquiree_text_preserver.0.primary_id() }
 }
