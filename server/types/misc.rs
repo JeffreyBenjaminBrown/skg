@@ -109,6 +109,10 @@ impl Deref for ID {
   fn deref ( &self ) -> &Self::Target {
     &self.0 }}
 
+impl AsRef<str> for ID {
+  fn as_ref(&self) -> &str {
+    &self.0 }}
+
 impl Deref for SourceNickname {
   // lets SourceNickname be used like a String in (more?) cases
   type Target = String;

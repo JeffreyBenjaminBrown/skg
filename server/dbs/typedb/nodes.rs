@@ -1,6 +1,8 @@
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::dbs::typedb::util::concept_document::{
+  build_disjunction, build_has_id_disjunction};
 
 use futures::StreamExt;
 use std::collections::{ HashSet, BTreeSet };
@@ -92,16 +94,11 @@ pub async fn which_ids_exist (
     let answer : QueryAnswer =
       tx . query ( {
         let or_block : String =
-          ids . iter ()
-          . map ( |v| {
-            format! (
-              r#"{{ $found isa id;
-                      $found == "{}"; }}"#,
-              v ) } )
-          . collect::<Vec<String>> ()
-          . join ( " or\n" );
+          build_disjunction(
+            ids.iter(),
+            |v| format!("{{$found == \"{}\";}}", v) );
         let query : String = format! (
-          "match\n{}\n;\nselect $found;",
+          "match $found isa id;\n{};\nselect $found;",
           or_block );
         query } ) . await ?;
     answer } . into_rows ();
@@ -177,12 +174,7 @@ pub async fn delete_nodes_from_pids (
       db_name, TransactionType::Write
     ). await ?;
   let pid_or_clause : String =
-    ids . iter()
-    . map ( |id| format! (
-      r#"{{ $node has id "{}"; }}"#,
-      id.0 ) )
-    . collect::< Vec<_> > ()
-    . join ( " or\n" );
+    build_has_id_disjunction(ids, "node");
   let answer : QueryAnswer = {
     let extra_ids_query : String = format! (
       // To find every associated extra_id.
@@ -217,12 +209,7 @@ pub async fn delete_nodes_from_pids (
     if !extra_id_values.is_empty() {
       let _answer : QueryAnswer = tx.query ( {
         let extra_id_or_clause : String =
-          extra_id_values . iter()
-          . map ( |id| format! (
-            r#"{{ $e has id "{}"; }}"#,
-            id ) )
-          . collect::< Vec<_> > ()
-          . join ( " or\n" );
+          build_has_id_disjunction(&extra_id_values, "e");
         let delete_extra_ids_query : String = format! (
           r#"match $e isa extra_id;
           {};
