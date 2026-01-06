@@ -4,6 +4,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
+use crate::types::tree::accessors::{read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 
@@ -230,22 +231,21 @@ pub fn collect_ids_from_pair_tree (
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
 fn is_ancestor_id (
-  tree           : &PairTree,
-  origin_treeid : NodeId, // start looking from here
-  target_skgid  : &ID,    // look for this
-) -> Result < bool, Box<dyn Error> > {
-  let mut current : Option < NodeRef < NodePair > > = {
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( origin_treeid )
-      . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
-    node_ref . parent () };
-  while let Some ( parent ) = current {
-    if let Some ( parent_skgid ) =
-      parent . value () . orgnode . metadata . id . as_ref () {
-        if parent_skgid == target_skgid {
-          return Ok ( true ); }}
-    current = parent . parent (); }
-  Ok ( false ) }
+  tree          : &PairTree,
+  origin_treeid : NodeId,
+  target_skgid  : &ID,
+) -> Result<bool, Box<dyn Error>> {
+  read_at_node_in_tree(tree, origin_treeid, |_| ())
+    .map_err(|_| "is_ancestor_id: NodeId not in tree")?;
+  for generation in 1.. {
+    match read_at_ancestor_in_tree(
+      tree, origin_treeid, generation,
+      |np| np.orgnode.metadata.id.clone() )
+    { Ok(Some(id)) if &id == target_skgid
+        => return Ok(true),
+      Ok(_) => continue,
+      Err(_) => return Ok(false), }}
+  unreachable!() }
 
 /// Extract the PID from a node in a PairTree.
 /// Returns an error if the node is not found or has no ID.
