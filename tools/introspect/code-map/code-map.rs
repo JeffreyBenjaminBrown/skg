@@ -1,7 +1,7 @@
 // Run from anywhere:
 //   cargo run -p code-map
 //
-// Generates introspect/code-map/code-map.org with a hierarchical view of the server/ codebase.
+// Generates tools/introspect/code-map/code-map.org with a hierarchical view of the server/ codebase.
 
 use std::fs;
 use std::path::Path;
@@ -12,13 +12,13 @@ use walkdir::WalkDir;
 fn main() {
     // Find project root (where Cargo.toml with [workspace] lives)
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let project_root = Path::new(manifest_dir).parent().unwrap().parent().unwrap();
+    let project_root = Path::new(manifest_dir).parent().unwrap().parent().unwrap().parent().unwrap();
 
     let server_dir = project_root.join("server");
-    let output_file = project_root.join("introspect/code-map/code-map.org");
+    let output_file = project_root.join("tools/introspect/code-map/code-map.org");
 
     // Paths in org links are relative to where the org file lives
-    let output = generate_code_map(&server_dir, "../../server");
+    let output = generate_code_map(&server_dir, "../../../server");
 
     fs::write(&output_file, &output).expect("Failed to write output");
     println!("Generated {} ({} lines)", output_file.display(), output.lines().count());

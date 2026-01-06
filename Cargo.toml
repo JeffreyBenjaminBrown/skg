@@ -1,5 +1,5 @@
 [workspace]
-members = ["introspect/code-map", "introspect/call-graph", "tools/scope-reducer"]
+members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/scope-reducer"]
 
 [package]
 name = "skg"
@@ -15,7 +15,7 @@ path = "server/main.rs"
 
 [[bin]]
 name = "skg_filenames_match_pids"
-path = "introspect/skg_filenames_match_pids.rs"
+path = "tools/introspect/skg_filenames_match_pids.rs"
 
 [[bin]]
 name = "cleanup-test-dbs"

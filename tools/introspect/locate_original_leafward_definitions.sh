@@ -9,7 +9,7 @@
 #
 # USAGE:
 # 1. Generate definitions.org:
-#      bash introspect/locate_original_leafward_definitions.sh > definitions.org
+#      bash tools/introspect/locate_original_leafward_definitions.sh > definitions.org
 #
 # 2. Use definitions.org manually to fix imports:
 #    - When you see an import like: use crate::foo::bar;
@@ -31,7 +31,7 @@
 #   - Lists all public items (functions, structs, enums, traits, types, consts, statics)
 #   - Skips files that only contain module declarations and re-exports
 
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/../.." || exit 1
 
 echo "* Definitions by file"
 echo ""

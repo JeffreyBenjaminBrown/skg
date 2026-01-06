@@ -1,7 +1,7 @@
 /// USAGE: cargo run -p call-graph [-- function_name]
 ///
 /// PURPOSE: Generate a 'call tree' document. That's an .org file, saved to
-/// introspect/call-graph/function-name.org, for some function name. Each headline
+/// tools/introspect/call-graph/function-name.org, for some function name. Each headline
 /// is a function name. The root headline is the same as the file's basename. Each
 /// headline calls each of its child headlines. The first appearance of a function
 /// lists what it calls; subsequent appearances merely indicate that it was already
@@ -9,7 +9,7 @@
 /// part of the library are listed; functions from other libraries ('std::collections',
 /// etc.) are not listed.
 ///
-/// The program creates a simple .csv database, saved to introspect/call-graph/db/,
+/// The program creates a simple .csv database, saved to tools/introspect/call-graph/db/,
 /// with two files: 'functions.csv' and 'calls.csv'. 'functions' has one row per
 /// function, containing the name of the function, the full filepath (minus project
 /// root) it appears in, and how many LOC it has. The other has one row for each
@@ -506,10 +506,10 @@ fn main() {
 
   // Find project root via CARGO_MANIFEST_DIR
   let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  let project_root = manifest_dir.parent().unwrap().parent().unwrap();
+  let project_root = manifest_dir.parent().unwrap().parent().unwrap().parent().unwrap();
 
   let server_dir = project_root.join("server");
-  let output_dir = &manifest_dir;  // introspect/call-graph/
+  let output_dir = &manifest_dir;  // tools/introspect/call-graph/
   let db_dir = output_dir.join("db");
 
   // Create output directories
