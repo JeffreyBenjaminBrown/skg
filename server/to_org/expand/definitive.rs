@@ -18,8 +18,9 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::tree::{NodePair, PairTree};
+use crate::types::tree::accessors::write_at_node_in_tree;
 
-use ego_tree::{NodeId, NodeMut, NodeRef};
+use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -87,12 +88,12 @@ async fn execute_definitive_view_request (
   { // Mutate the root of the definitive view request:
     // Remove the ViewRequest, mark it definitive,
     // and rebuild from disk.
-    let mut node_mut : NodeMut < NodePair > =
-      forest . get_mut ( node_id )
-      . ok_or ( "execute_definitive_view_request: node not found" ) ?;
-    node_mut . value () . orgnode . metadata . code . viewRequests
-      . remove ( & ViewRequest::Definitive );
-    node_mut.value () . orgnode . metadata.code.indefinitive = false;
+    write_at_node_in_tree (
+      forest, node_id,
+      |np| { np . orgnode . metadata . code . viewRequests
+               . remove ( & ViewRequest::Definitive );
+             np . orgnode . metadata . code . indefinitive =
+               false; } ) ?;
     rebuild_pair_from_disk_mostly_clobbering_the_org (
       // preserves relevant orgnode fields
       forest, node_id, config ) ?; }
@@ -174,13 +175,12 @@ fn indefinitize_content_subtree (
     // It, or something very like it anyway, happens elsewhere too.
     let canonical_title : Option<String> =
       pair . mskgnode . as_ref () . map ( |s| s . title . clone () );
-    let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-    node_mut . value () . orgnode . metadata . code . indefinitive = true;
-    if let Some(title) = canonical_title {
-      node_mut . value () . orgnode . title = title; }
-    node_mut . value () . orgnode . body = None; }
+    write_at_node_in_tree (
+      tree, node_id,
+      |np| { np . orgnode . metadata . code . indefinitive = true;
+             if let Some(title) = canonical_title {
+               np . orgnode . title = title; }
+             np . orgnode . body = None; } ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, child_treeid, visited ) ?; }
@@ -282,10 +282,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
   orgnode . metadata . code = code;
-  let mut node_mut : NodeMut < NodePair > = (
-    // Replace node value in place
-    tree . get_mut ( node_id )
-      . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" )) ?;
-  * node_mut . value () = NodePair { mskgnode: Some ( skgnode ),
-                                     orgnode };
+  write_at_node_in_tree ( // replace it
+    tree, node_id,
+    |np| * np = NodePair { mskgnode: Some ( skgnode ), orgnode } ) ?;
   Ok (( )) }

@@ -1,6 +1,6 @@
 /// Node access utilities for ego_tree::Tree.
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 
 /// Read a value from an ancestor of a node in a tree, applying a function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -63,3 +63,82 @@ pub fn write_at_node_in_tree<T, F, R>(
 ) -> Result<R, String>
 where F: FnOnce(&mut T) -> R, {
   write_at_ancestor_in_tree(tree, treeid, 0, f) }
+
+/// Access a node mutably for structural operations (prepend, append, detach, etc.).
+/// Unlike write_at_node_in_tree which only provides &mut T (the value),
+/// this provides NodeMut<T> so you can modify tree structure.
+/// Returns an error if the node is not found.
+pub fn with_node_mut<T, F, R>(
+  tree    : &mut Tree<T>,
+  node_id : NodeId,
+  f       : F
+) -> Result<R, String>
+where F: FnOnce(NodeMut<T>) -> R {
+  let node_mut : NodeMut<T> = tree . get_mut ( node_id )
+    . ok_or ( "with_node_mut: node not found" ) ?;
+  Ok ( f ( node_mut ) ) }
+
+//
+// accessors specific to trees of OrgNodes and (maybe) SkgNodes
+//
+
+use crate::types::orgnode::{Interp, OrgNode};
+use super::PairTree;
+use std::error::Error;
+
+/// Find the unique child of a node with a given Interp (for PairTree).
+/// Returns None if no child has the interp,
+/// Some(child_id) if exactly one does,
+/// or an error if multiple children have it.
+pub fn unique_child_with_interp (
+  tree    : &PairTree,
+  node_id : NodeId,
+  interp  : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let node_ref : ego_tree::NodeRef<super::NodePair> =
+    tree.get(node_id)
+    .ok_or("unique_child_with_interp: node not found")?;
+  let matches : Vec<NodeId> = node_ref.children()
+    .filter(|c| c.value().orgnode.metadata.code.interp == interp)
+    .map(|c| c.id())
+    .collect();
+  match matches.len() {
+    0 => Ok(None),
+    1 => Ok(Some(matches[0])),
+    n => Err(format!(
+      "Expected at most one {:?} child, found {}", interp, n).into()),
+  }
+}
+
+/// Find the unique child of a node with a given Interp (for Tree<OrgNode>).
+/// Returns None if no child has the interp,
+/// Some(child_id) if exactly one does,
+/// or an error if multiple children have it.
+pub fn unique_orgnode_child_with_interp (
+  tree    : &Tree<OrgNode>,
+  node_id : NodeId,
+  interp  : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let node_ref : ego_tree::NodeRef<OrgNode> =
+    tree . get(node_id) . ok_or(
+      "unique_orgnode_child_with_interp: node not found")?;
+  unique_orgnode_child_with_interp_from_ref (
+    &node_ref, interp ) }
+
+/// Like unique_orgnode_child_with_interp, but takes a NodeRef directly.
+/// Useful when you already have the NodeRef and don't want to look it up again.
+pub fn unique_orgnode_child_with_interp_from_ref (
+  node_ref : &ego_tree::NodeRef<OrgNode>,
+  interp   : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let matches : Vec<NodeId> = node_ref.children()
+    .filter(|c| c.value().metadata.code.interp == interp)
+    .map(|c| c.id())
+    .collect();
+  match matches.len() {
+    0 => Ok(None),
+    1 => Ok(Some(matches[0])),
+    n => Err(format!(
+      "Expected at most one {:?} child, found {}", interp, n).into()),
+  }
+}

@@ -119,6 +119,8 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
 
 #[test]
 fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
+  // Multiple AliasCols under the same node is invalid
+  // (validate_tree rejects this). The function should error.
   let input: &str =
     indoc! {"
             * (skg (id main) (source main)) main node
@@ -132,14 +134,11 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
 
   let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+  let result : Result<Vec<(SkgNode, NonMerge_NodeAction)>, String> =
+    naive_saveinstructions_from_forest(forest);
 
-  assert_eq!(instructions.len(), 2); // main and content1
-
-  let (main_skg, _) = &instructions[0];
-  assert_eq!(main_skg.aliases, Some(vec!["alias one".to_string(), "alias two".to_string(), "alias three".to_string()]));
-  assert_eq!(main_skg.contains, Some(vec![ID::from("content1")]));
+  assert!(result.is_err());
+  assert!(result.unwrap_err().contains("Expected at most one"));
 }
 
 #[test]

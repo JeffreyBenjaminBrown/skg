@@ -3,6 +3,7 @@ use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, or
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::tree::{PairTree, NodePair};
+use crate::types::tree::accessors::unique_child_with_interp;
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -41,23 +42,14 @@ pub async fn build_and_integrate_aliases (
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_pid_in_pairtree ( tree, node_id ) ?;
-  { // If it already has an AliasCol child, then do nothing,
-    // because completeAliasCol already handled it.
-    let has_aliascol : bool = {
-      let node_ref =
-        tree . get ( node_id )
-        . ok_or ( "Node not found in tree" ) ?;
-      node_ref . children ()
-        . any ( |child|
-                 child . value () . orgnode . metadata . code.interp
-                 == Interp::AliasCol ) };
-    if has_aliascol {
-      return Ok (( )); }}
+  if unique_child_with_interp (
+    tree, node_id, Interp::AliasCol )? . is_some ()
+  { // If it already has an AliasCol child,
+    // then completeAliasCol already handled it.
+    return Ok (( )); }
   let aliases : Vec < String > =
     fetch_aliases_from_file (
-      config,
-      driver,
-      node_id_val ) . await;
+      config, driver, node_id_val ). await;
   let aliascol : OrgNode =
     orgnode_from_title_and_rel (
       Interp::AliasCol, String::new () );

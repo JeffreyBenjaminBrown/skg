@@ -1,4 +1,5 @@
 /// Functions for pairing OrgNode trees with SkgNode data.
+/// Note that PairTree-specific accessors are in './accessors.rs'.
 
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::ID;

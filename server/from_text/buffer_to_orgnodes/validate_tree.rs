@@ -3,6 +3,7 @@ pub mod contradictory_instructions;
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::errors::BufferValidationError;
+use crate::types::tree::accessors::unique_orgnode_child_with_interp_from_ref;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use ego_tree::Tree;
@@ -119,18 +120,11 @@ fn validate_node_and_children (
             orgnode.clone() )); },
         _ => {} }}
 
-  { // At most one child should have treatment=AliasCol
-    if { let aliasCol_children_count: usize =
-           node_ref . children()
-           . filter ( |child|
-                       child.value() . metadata.code.interp
-                       == Interp::AliasCol )
-           . count();
-         aliasCol_children_count
-       } > 1
-    { errors.push (
+  if unique_orgnode_child_with_interp_from_ref (
+    &node_ref, Interp::AliasCol ) . is_err ()
+  { errors.push (
       BufferValidationError::Multiple_AliasCols_in_Children (
-        orgnode.clone() )); }}
+        orgnode.clone() )); }
 
   { // If a node is definitive, it should have
     // no two treatment=Content children with the same ID.

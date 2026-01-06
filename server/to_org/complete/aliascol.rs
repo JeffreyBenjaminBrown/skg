@@ -4,8 +4,8 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::accessors::{read_at_ancestor_in_tree, read_at_node_in_tree};
-use ego_tree::{NodeId, NodeMut, NodeRef};
+use crate::types::tree::accessors::{read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
+use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -67,15 +67,14 @@ pub async fn completeAliasCol (
     tree, // PITFALL: Gets modified.
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
-  { // Append new Alias nodes for missing aliases
-    let mut aliascol_mut : NodeMut < NodePair > =
-      tree . get_mut ( aliascol_node_id )
-      . ok_or ( "AliasCol node not found" ) ?;
-    for alias in missing_aliases_from_disk {
-      aliascol_mut . append (
-        NodePair { mskgnode: None,
-                   orgnode: orgnode_from_title_and_rel (
-                     Interp::Alias, alias ) }); }}
+  with_node_mut ( // Append new Alias nodes for missing aliases
+    tree, aliascol_node_id,
+    ( |mut aliascol_mut| {
+      for alias in missing_aliases_from_disk {
+        aliascol_mut . append (
+          NodePair { mskgnode: None,
+                     orgnode: orgnode_from_title_and_rel (
+                       Interp::Alias, alias ) }); }} )) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode
@@ -166,10 +165,8 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     children_to_remove_acc };
 
   for child_treeid in children_to_remove {
-    let mut child_mut : NodeMut < NodePair > =
-      tree . get_mut ( child_treeid )
-      . ok_or ( "Child node not found" ) ?;
-    child_mut . detach (); }
+    with_node_mut ( tree, child_treeid,
+                    |mut child_mut| child_mut . detach () ) ?; }
 
   if let Some ( title ) = focused_title {
     let aliascol_ref : NodeRef < NodePair > =
@@ -177,16 +174,14 @@ fn remove_duplicates_and_false_aliases_handling_focus (
       . ok_or ( "AliasCol node not found" ) ?;
     for child in aliascol_ref . children () {
       if child . value () . orgnode . title == title {
-        let mut child_mut : NodeMut < NodePair > =
-          tree . get_mut ( child . id () )
-          . ok_or ( "Child node not found" ) ?;
-        child_mut . value () . orgnode . metadata . viewData.focused = true;
+        write_at_node_in_tree (
+          tree, child . id (),
+          |np| np . orgnode . metadata . viewData.focused = true ) ?;
         break; }}}
 
   if removed_focused {
-    let mut aliascol_mut : NodeMut < NodePair > =
-      tree . get_mut ( aliascol_node_id )
-      . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . value () . orgnode . metadata . viewData.focused = true; }
+    write_at_node_in_tree (
+      tree, aliascol_node_id,
+      |np| np . orgnode . metadata . viewData.focused = true ) ?; }
 
   Ok (( )) }

@@ -4,11 +4,11 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::{ clobberIndefinitiveOrgnode, maybe_add_subscribee_col };
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::accessors::{read_at_node_in_tree, read_at_ancestor_in_tree};
+use crate::types::tree::accessors::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 
-use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use ego_tree::{Tree, NodeId, NodeRef};
 use ego_tree::iter::Edge;
 use std::collections::HashMap;
 use std::error::Error;
@@ -120,11 +120,9 @@ pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  let mut node_mut : NodeMut < NodePair > =
-    tree . get_mut ( node_id )
-    . ok_or ( "makeIndefinitiveAndClobber: node not found" ) ?;
-  node_mut . value () . orgnode . metadata . code . indefinitive = true;
-  node_mut . value () . orgnode . body = None;
+  write_at_node_in_tree ( tree, node_id, |np| {
+    np . orgnode . metadata . code . indefinitive = true;
+    np . orgnode . body = None; } ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -163,15 +161,11 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   detect_and_mark_cycle ( tree, node_id ) ?;
   if visited . contains_key ( &pid ) {
     // Mark as indefinitive (it's a repeat).
-    let mut node_mut : NodeMut < NodePair > =
-      tree . get_mut ( node_id )
-      . ok_or ( "mark_if_visited_or_repeat_or_cycle: node not found" ) ?;
-    node_mut . value () . orgnode . metadata . code . indefinitive = true; }
-  let is_indefinitive : bool = {
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( node_id )
-      . ok_or ( "mark_if_visited_or_repeat_or_cycle: node not found" ) ?;
-    node_ref . value () . orgnode . metadata . code . indefinitive };
+    write_at_node_in_tree ( tree, node_id, |np|
+      np . orgnode . metadata . code . indefinitive = true ) ?; }
+  let is_indefinitive : bool =
+    read_at_node_in_tree ( tree, node_id, |np|
+      np . orgnode . metadata . code . indefinitive ) ?;
   if is_indefinitive {
     clobberIndefinitiveOrgnode ( tree, node_id ) ?;
   } else {
@@ -187,11 +181,8 @@ fn detect_and_mark_cycle (
   let is_cycle : bool = {
     let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  let mut node_mut : NodeMut < NodePair > =
-    tree . get_mut ( node_id ) . ok_or (
-      "detect_and_mark_cycle: node not found" ) ?;
-  node_mut . value () . orgnode . metadata . viewData . cycle =
-    is_cycle;
+  write_at_node_in_tree ( tree, node_id, |np|
+    np . orgnode . metadata . viewData . cycle = is_cycle ) ?;
   Ok (( )) }
 
 
@@ -253,10 +244,8 @@ pub(super) fn get_pid_in_pairtree (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( treeid )
-    . ok_or ( "get_pid_in_pairtree: NodeId not in tree" ) ?;
-  node_ref . value () . orgnode . metadata . id . clone ()
+  read_at_node_in_tree ( tree, treeid, |np|
+    np . orgnode . metadata . id . clone () ) ?
     . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
                        . into () ) }
 
@@ -289,13 +278,13 @@ pub async fn make_and_append_child_pair (
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid ) . await ?;
-  let mut parent_mut : NodeMut < NodePair > =
-    tree . get_mut ( parent_treeid )
-    . ok_or ( "make_and_append_child_pair: parent not found" ) ?;
   let child_treeid : NodeId =
-    parent_mut . append ( NodePair { mskgnode: Some(child_skgnode),
-                                     orgnode: child_orgnode } )
-    . id ();
+    with_node_mut (
+      tree, parent_treeid,
+      ( |mut parent_mut|
+        parent_mut . append ( NodePair { mskgnode: Some(child_skgnode),
+                                         orgnode: child_orgnode } )
+        . id () )) ?;
   Ok ( child_treeid ) }
 
 /// Builds a pair from disk, place it in a tree,
@@ -317,12 +306,12 @@ pub async fn build_node_branch_minus_content (
       config, driver, skgid ) . await ?;
   match tree_and_parent {
     Some ( (tree, parent_treeid) ) => {
-      let child_treeid : NodeId = {
-        let mut parent_mut : NodeMut < NodePair > =
-          tree . get_mut ( parent_treeid ) . ok_or (
-            "build_node_branch_minus_content: parent not found" ) ?;
-        parent_mut . append ( NodePair { mskgnode: Some(skgnode),
-                                         orgnode } ) . id () };
+      let child_treeid : NodeId =
+        with_node_mut (
+          tree, parent_treeid,
+          ( |mut parent_mut|
+            parent_mut . append ( NodePair { mskgnode: Some(skgnode),
+                                             orgnode } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
@@ -342,17 +331,16 @@ pub(super) fn content_ids_if_definitive_else_empty (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( treeid )
-    . ok_or (
-      "content_ids_if_definitive_else_empty: node not found" ) ?;
-  if node_ref . value () . orgnode . metadata . code . indefinitive {
-    return Ok ( Vec::new () ); }
-  match & node_ref . value () . mskgnode {
-    Some ( skgnode ) => Ok (
-      skgnode . contains . clone () . unwrap_or_default () ),
-    None => Ok ( Vec::new () ), // No SkgNode yet
-  }}
+  read_at_node_in_tree ( tree, treeid,
+    |nodepair| {
+      if nodepair . orgnode . metadata . code . indefinitive {
+        return Vec::new (); }
+      match & nodepair . mskgnode {
+        Some ( skgnode ) =>
+          skgnode . contains . clone () . unwrap_or_default (),
+        None => Vec::new (),  // No SkgNode yet
+      }}
+  ). map_err ( |e| e . into () ) }
 
 /// Collect ego_tree::NodeIds after
 ///   some member of some generation of a tree.
@@ -390,11 +378,9 @@ pub(super) fn is_indefinitive (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( treeid )
-    . ok_or ( "is_indefinitive: NodeId not in tree" ) ?;
-  Ok ( node_ref . value () . orgnode
-       . metadata . code . indefinitive ) }
+  read_at_node_in_tree ( tree, treeid, |np|
+    np . orgnode . metadata . code . indefinitive )
+    . map_err ( |e| e . into () ) }
 
 /// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.

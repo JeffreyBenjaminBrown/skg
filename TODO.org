@@ -2,6 +2,25 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
+** ONGOING rust-indent/
+*** 1
+Welcome! Please read rust-indent/ until you know what's going on. I'm not sure there's any overarching vision to that code, but if there is please try to understand it :)
+
+After that, I would like you to amend it to handle the following case. I want Emacs to be okay with this:
+```
+let alias_col_id : Option<NodeId> =
+  ( unique_orgnode_child_with_interp (
+      tree, node_id, Interp::AliasCol )
+    . map_err ( |e| e.to_string() ) ? );
+```
+
+Currently it instead rewrites that this way:
+```
+let alias_col_id : Option<NodeId> =
+  ( unique_orgnode_child_with_interp (
+    tree, node_id, Interp::AliasCol )
+    . map_err ( |e| e.to_string() ) ? );
+```
 ** ONGOING Completion is complex.
 *** ONGOING reading pub async fn completeAliasCol (
   // Validate this is an AliasCol
@@ -144,7 +163,7 @@
   - rename to_dirty_instructions.rs to to_naive_instructions,
     and similarly for the two saveinstructions_from_* functions --
     call them naive_saveinstructions_from_*.
-**** TODO RESUME around merge/ in introspect/code-map/code-map.org
+**** TODO RESUME around merge/ in tools/introspect/code-map/code-map.org
      reading downward
 *** look for helpers to simplify egotree boilerplate
 *** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'

@@ -2,7 +2,7 @@ use crate::types::orgnode::{OrgNode, Interp, EditRequest};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
-use crate::types::tree::accessors::read_at_node_in_tree;
+use crate::types::tree::accessors::{ read_at_node_in_tree, unique_orgnode_child_with_interp };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -117,15 +117,10 @@ fn skgnode_for_orgnode_in_tree<'a> (
     overrides_view_of: None,
   } ) }
 
-/// Collect aliases for a node, then delete its AliasCol branch(es):
-/// - for each child CA of N such that CA has treatment=AliasCol,
-///   - for each child A of CA such that A has treatment=Alias,
-///     - collect A into the list of aliases for N.
-///   - delete CA from the tree.
-/// This is programmed defensively:
-///   'validate_tree' will not currently permit multiple 'AliasCol'
-///   children under the same node,
-///   but this function will work even if there are.
+/// Collect aliases for a node, then delete its AliasCol branch:
+/// - find the unique AliasCol child (error if multiple)
+/// - for each Alias child of the AliasCol, collect its title
+/// - delete the AliasCol from the tree
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None ("no opinion") if no AliasCol found.
 /// Returns Some(vec) if AliasCol found, even if empty.
@@ -133,38 +128,33 @@ fn collect_aliases (
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
-  let (aliases, alias_col_ids): (Vec<String>, Vec<NodeId>) = {
-    let node_ref = tree.get(node_id).expect(
-      "collect_aliases: node not found");
-    let mut aliases: Vec<String> = Vec::new();
-    let mut alias_col_ids: Vec<NodeId> = Vec::new();
-    for alias_col_child in node_ref.children()
-    { if ( alias_col_child . value() . metadata . code.interp
-           == Interp::AliasCol ) // child of interest
-      { alias_col_ids.push(alias_col_child.id());
-        for alias_child in alias_col_child.children() {
-          let child_interp =
+  let alias_col_id : Option<NodeId> =
+    unique_orgnode_child_with_interp (
+      tree, node_id, Interp::AliasCol )
+    . map_err ( |e| e.to_string() ) ?;
+  match alias_col_id {
+    None => Ok(None),
+    Some(col_id) => {
+      let aliases : Vec<String> = {
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
+          "collect_aliases: AliasCol not found");
+        let mut aliases : Vec<String> = Vec::new();
+        for alias_child in col_ref.children() {
+          let child_interp : &Interp =
             &alias_child . value() . metadata . code.interp;
           if *child_interp != Interp::Alias {
             return Err ( format! (
               "AliasCol has non-Alias child with interp: {:?}",
               child_interp )); }
           aliases . push(
-            alias_child . value() . title . clone() ); } }}
-    (aliases, alias_col_ids) };
-  { // return
-    if alias_col_ids.is_empty() { Ok(None) }
-    else { Ok(Some(dedup_vector(aliases))) }} }
+            alias_child . value() . title . clone() ); }
+        aliases };
+      Ok(Some(dedup_vector(aliases))) }} }
 
-/// Collect a node's subscribees, then delete the colecting branch(es):
-/// - for each child SC of N such that SC has treatment=SubscribeeCol,
-///   - for each child S of SC such that S has treatment=Subscribee,
-///     - collect S's ID into the list of subscribees for N.
-///   - delete SC from the tree.
-/// This is programmed defensively:
-///   'validate_tree' will not currently permit multiple 'SubscribeeCol'
-///   children under the same node,
-///   but this function will work even if there are.
+/// Collect a node's subscribees, then delete the SubscribeeCol branch:
+/// - find the unique SubscribeeCol child (error if multiple)
+/// - for each Subscribee child, collect its ID
+/// - skip HiddenOutsideOfSubscribeeCol children (they're not subscribees)
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None if no SubscribeeCol found (no opinion).
 /// Returns Some(vec) if SubscribeeCol found - even if empty (user wants no subscribees).
@@ -172,20 +162,23 @@ fn collect_subscribees (
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
-  let (subscribees, subscribee_col_ids): (Vec<ID>, Vec<NodeId>) = {
-    let node_ref = tree.get(node_id).expect(
-      "collect_subscribees: node not found");
-    let mut subscribees: Vec<ID> = Vec::new();
-    let mut subscribee_col_ids: Vec<NodeId> = Vec::new();
-    for subscribee_col_child in node_ref.children()
-    { if ( subscribee_col_child . value() . metadata . code.interp
-           == Interp::SubscribeeCol ) // child of interest
-      { subscribee_col_ids.push(subscribee_col_child.id());
-        for subscribee_child in subscribee_col_child.children() {
-          let child_interp =
+  let subscribee_col_id : Option<NodeId> =
+    unique_orgnode_child_with_interp (
+      tree, node_id, Interp::SubscribeeCol )
+    . map_err ( |e| e.to_string() ) ?;
+  match subscribee_col_id {
+    None => Ok(None),
+    Some(col_id) => {
+      let subscribees : Vec<ID> = {
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
+          "collect_subscribees: SubscribeeCol not found");
+        let mut subscribees : Vec<ID> = Vec::new();
+        for subscribee_child in col_ref.children() {
+          let child_interp : &Interp =
             &subscribee_child . value() . metadata . code.interp;
-          // Skip HiddenOutsideOfSubscribeeCol - it's allowed as a child of a SubscribeeCol, but it's not a subscribee
           if *child_interp == Interp::HiddenOutsideOfSubscribeeCol {
+            // This Interp is allowed as a child of a SubscribeeCol,
+            // but it's not a subscribee, so skip it.
             continue; }
           if *child_interp != Interp::Subscribee {
             return Err ( format! (
@@ -195,12 +188,9 @@ fn collect_subscribees (
             Some(id) => subscribees . push( id . clone() ),
             None => return Err ( format! (
               "Subscribee '{}' has no ID",
-              subscribee_child.value().title )),
-          }} }}
-    (subscribees, subscribee_col_ids) };
-  { // return
-    if subscribee_col_ids.is_empty() { Ok(None) }
-    else { Ok(Some(dedup_vector(subscribees) )) }} }
+              subscribee_child.value().title )), }}
+        subscribees };
+      Ok(Some(dedup_vector(subscribees))) }} }
 
 /// Returns IDs of all children for which treatment = Content.
 /// Excludes children for which metadata.toDelete is true.
