@@ -38,7 +38,7 @@ pub fn request_type_from_request (
 /// Format buffer content and errors as an s-expression.
 /// Format: ((content "...") (errors ("error1" "error2" ...)))
 /// This is shared by save_buffer and single_root_view handlers.
-pub fn format_buffer_response_sexp (
+pub(super) fn format_buffer_response_sexp (
   buffer_content : &str,
   errors         : &[String]
 ) -> String {
@@ -59,7 +59,7 @@ pub fn format_buffer_response_sexp (
 /// Reads length-prefixed content from the stream.
 /// Expected format:
 ///   "Content-Length: N\r\n\r\n" followed by N bytes of content.
-pub fn read_length_prefixed_content (
+pub(super) fn read_length_prefixed_content (
   reader : &mut BufReader <TcpStream>
 ) -> Result<String, Box<dyn Error>> {
 

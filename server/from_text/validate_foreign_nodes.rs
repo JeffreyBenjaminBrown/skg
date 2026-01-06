@@ -81,7 +81,7 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
 /// Validates that merge instructions involve no foreign nodes.
 /// A merge modifies the acquirer and deletes the acquiree,
 /// so both must be from sources the user owns.
-pub fn validate_merges_involve_only_owned_nodes(
+pub(super) fn validate_merges_involve_only_owned_nodes(
   merge_instructions: &[MergeInstructionTriple],
   config: &SkgConfig,
 ) -> Result<(), Vec<BufferValidationError>> {

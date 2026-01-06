@@ -9,7 +9,6 @@
 /.lesshst
 /.npm
 /.ssh/
-/Cargo.lock
 /bash/kill-servers.sh
 /call-trees
 /data/skg
@@ -17,6 +16,7 @@
 /target
 /tests/**/generated/
 /tests/tantivy/generated_aliases/
+Cargo.lock
 TAGS
 introspect/call-graph/db/
 introspect/call-graph/main.org

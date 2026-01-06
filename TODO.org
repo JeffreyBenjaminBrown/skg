@@ -3,8 +3,6 @@
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
 ** ONGOING simple refactors
-*** TODO programmatically search for scope reductions
-I asked the AI to do it, but it is clearly fallible, as it had to correct what its subagents did. I could have it check programmatically instead: for each definition, try making it private, and if that fails pub(super), and if that fails leave it pub. And for every pub(super), try making it private. (Ignore pub(crate) -- that distinction doesn't matter to me right now.)
 *** TODO wrap temp variables in the scope of what they are used for
 *** ONGOING reorg
 **** DONE request 1

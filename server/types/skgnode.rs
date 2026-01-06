@@ -60,7 +60,7 @@ It better be okay with newlines."# . to_string() ),
     overrides_view_of: None, }}
 
 /// Useful for making tests more readable.
-pub fn empty_skgnode () -> SkgNode {
+fn empty_skgnode () -> SkgNode {
   SkgNode {
     title                        : String::new (),
     aliases                      : None,

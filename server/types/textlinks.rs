@@ -22,7 +22,7 @@ pub struct TextLink {
 //
 
 impl TextLink {
-  pub fn new ( skgid : impl Into<String>,
+  fn new ( skgid : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
     TextLink { id    : ID ( skgid.into () ),

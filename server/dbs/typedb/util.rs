@@ -33,7 +33,7 @@ pub fn extract_payload_from_typedb_string_rep (
 /// Conjugates a binary role within a specified relation.
 /// Given a relation name and one role, returns the other role.
 /// Returns an error if the role doesn't belong to the relation.
-pub fn conjugate_binary_role (
+pub(super) fn conjugate_binary_role (
   relation : &str,
   role     : &str
 ) -> Result < &'static str,

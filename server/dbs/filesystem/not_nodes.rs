@@ -8,7 +8,7 @@ use std::path::Path;
 /// If a source path does not exist:
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
-pub fn validate_source_paths_creating_owned_ones_if_needed (
+fn validate_source_paths_creating_owned_ones_if_needed (
   sources: &HashMap<String, SkgfileSource>
 ) -> io::Result<()> {
   for (nickname, source) in sources.iter() {
@@ -67,7 +67,7 @@ pub fn load_config (
 ///   &[("main", PathBuf::from("/tmp/fixtures-copy"))],
 /// ).unwrap();
 /// ```
-pub fn load_config_with_overrides (
+fn load_config_with_overrides (
   path             : &str,
   db_name          : Option<&str>, // None for no override
   source_overrides : &[(&str, std::path::PathBuf)],

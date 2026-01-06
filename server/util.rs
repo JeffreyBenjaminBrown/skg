@@ -29,7 +29,7 @@ pub fn path_from_pid_and_source (
 
 /// Removes duplicates from a vector.
 /// Preserves the order of first occurrence.
-pub fn dedup_vector<T> (
+pub(super) fn dedup_vector<T> (
   vec : Vec<T>
 ) -> Vec<T>
 where T: Clone + Eq + Hash {
@@ -43,7 +43,7 @@ where T: Clone + Eq + Hash {
 
 /// Removes from 'subtracting_from' anything in 'subtracting'.
 /// Preserves the order of elements in 'subtracting_from'.
-pub fn setlike_vector_subtraction<T> (
+pub(super) fn setlike_vector_subtraction<T> (
   subtracting_from : Vec<T>,
   subtracting      : &[T],
 ) -> Vec<T>

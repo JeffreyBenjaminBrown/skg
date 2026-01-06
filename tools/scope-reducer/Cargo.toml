@@ -1,0 +1,11 @@
+[package]
+name = "scope-reducer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "scope-reducer"
+path = "scope-reducer.rs"
+
+[dependencies]
+regex = "1"

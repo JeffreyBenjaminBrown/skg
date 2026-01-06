@@ -30,7 +30,7 @@ enum WhetherToDelete {
 /// for which the associated value (set) has size 2.
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
-pub fn find_inconsistent_instructions(
+pub(super) fn find_inconsistent_instructions(
   forest: &Tree<OrgNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes

@@ -20,7 +20,7 @@ use std::error::Error;
 /// - "id": STRING | STORED - the node's primary ID
 /// - "title_or_alias": TEXT | STORED - searchable titles and aliases
 /// - "source": STRING | STORED - the source nickname
-pub fn mk_tantivy_schema() -> schema::Schema {
+pub(super) fn mk_tantivy_schema() -> schema::Schema {
   let mut schema_builder = schema::Schema::builder();
   schema_builder.add_text_field(
     "id", schema::STRING | schema::STORED);
@@ -63,7 +63,7 @@ pub fn search_index (
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
-pub fn update_index_with_nodes (
+pub(super) fn update_index_with_nodes (
   nodes: &[SkgNode],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {

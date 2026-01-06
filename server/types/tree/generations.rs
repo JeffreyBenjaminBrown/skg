@@ -7,7 +7,7 @@ use std::error::Error;
 /// See 'first_in_nth_generation_of_descendents'.
 /// The difference is that that takes any node,
 /// whereas this takes a whole tree and starts from its root.
-pub fn first_in_generation<T>(
+fn first_in_generation<T>(
   tree: &Tree<T>,
   generation: usize,
 ) -> Result<Option<NodeRef<'_, T>>, Box<dyn Error>> {
@@ -24,7 +24,7 @@ pub fn first_in_generation<T>(
 /// # Returns
 /// * `Some(NodeRef)` if a node exists at that generation
 /// * `None` if no node exists at that generation
-pub fn first_in_nth_generation_of_descendents<T>(
+fn first_in_nth_generation_of_descendents<T>(
   node: NodeRef<'_, T>,
   generations: usize,
 ) -> Result<Option<NodeRef<'_, T>>, Box<dyn Error>> {
@@ -53,7 +53,7 @@ pub fn first_in_nth_generation_of_descendents<T>(
 /// - If that doesn't work, climb to N's grandparent and try each subsequent sibling,
 ///   using first_in_nth_generation_of_descendents with generations=2
 /// - Once we can't climb any higher, return None.
-pub fn next_in_generation<T>(
+fn next_in_generation<T>(
   node: NodeRef<'_, T>
 ) -> Option<NodeRef<'_, T>> {
   if let Some(next_sibling) = node.next_sibling() {

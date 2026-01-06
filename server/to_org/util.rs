@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 /// - prevent duplicate definitive expansions
 /// - locate the conflict when an earlier definitive view
 ///   conflicts with a new definitive view request
-pub type VisitedMap =
+pub(super) type VisitedMap =
   HashMap < ID, NodeId >;
 
 
@@ -43,11 +43,11 @@ pub fn forest_root_pair () -> NodePair {
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.
-pub fn new_forest () -> PairTree {
+fn new_forest () -> PairTree {
   Tree::new ( forest_root_pair () ) }
 
 /// Check if a node is a ForestRoot.
-pub fn is_forest_root (
+fn is_forest_root (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> bool {
@@ -81,7 +81,7 @@ pub async fn skgnode_and_orgnode_from_id (
 /// Fetch a SkgNode from disk given PID and source.
 /// Make an OrgNode from it, with validated title.
 /// Return both.
-pub fn skgnode_and_orgnode_from_pid_and_source (
+pub(super) fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &str,
@@ -104,7 +104,7 @@ pub fn skgnode_and_orgnode_from_pid_and_source (
 
 /// Create an OrgNode with a given Interp and title.
 /// Body is set to None, and all other metadata fields use defaults.
-pub fn orgnode_from_title_and_rel (
+pub(super) fn orgnode_from_title_and_rel (
   rel: Interp,
   title: String
 ) -> OrgNode {
@@ -115,7 +115,7 @@ pub fn orgnode_from_title_and_rel (
 /// Set 'indefinitive' to true,
 /// reset title and source,
 /// and set body to None.
-pub fn makeIndefinitiveAndClobber (
+pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
@@ -153,7 +153,7 @@ pub async fn complete_branch_minus_content (
 /// - If node is indefinitive, rewrite it (clear body, etc.).
 ///   (repeat should imply indefinitive. The reverse need not hold.)
 /// - If node is definitive, add it to visited.
-pub fn mark_if_visited_or_repeat_or_cycle (
+pub(super) fn mark_if_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
@@ -179,7 +179,7 @@ pub fn mark_if_visited_or_repeat_or_cycle (
 
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
-pub fn detect_and_mark_cycle (
+fn detect_and_mark_cycle (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
@@ -229,7 +229,7 @@ pub fn collect_ids_from_pair_tree (
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
-pub fn is_ancestor_id (
+fn is_ancestor_id (
   tree           : &PairTree,
   origin_treeid : NodeId, // start looking from here
   target_skgid  : &ID,    // look for this
@@ -249,7 +249,7 @@ pub fn is_ancestor_id (
 
 /// Extract the PID from a node in a PairTree.
 /// Returns an error if the node is not found or has no ID.
-pub fn get_pid_in_pairtree (
+pub(super) fn get_pid_in_pairtree (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
@@ -263,7 +263,7 @@ pub fn get_pid_in_pairtree (
 /// Extract the PID from a PairTree NodeRef.
 /// Returns an error if the node has no ID.
 /// Use this when you already have a NodeRef to avoid redundant tree lookup.
-pub fn get_pid_from_pair_using_noderef (
+fn get_pid_from_pair_using_noderef (
   node_ref : &NodeRef < NodePair >,
 ) -> Result < ID, Box<dyn Error> > {
   node_ref . value () . orgnode . metadata . id . clone ()
@@ -338,7 +338,7 @@ pub async fn build_node_branch_minus_content (
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
-pub fn content_ids_if_definitive_else_empty (
+pub(super) fn content_ids_if_definitive_else_empty (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
@@ -362,7 +362,7 @@ pub fn content_ids_if_definitive_else_empty (
 /// (only its descendents are collected).
 /// If effective root is None,
 /// the true root is used as the effective root.
-pub fn nodes_after_in_generation (
+pub(super) fn nodes_after_in_generation (
   tree                     : &PairTree,
   generation               : usize,
   generation_member_treeid : NodeId,
@@ -386,7 +386,7 @@ pub fn nodes_after_in_generation (
 
 /// Check if a node in a PairTree is marked indefinitive.
 /// Returns an error if the node is not found.
-pub fn is_indefinitive (
+pub(super) fn is_indefinitive (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
@@ -398,7 +398,7 @@ pub fn is_indefinitive (
 
 /// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.
-pub fn collect_child_treeids (
+pub(super) fn collect_child_treeids (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
@@ -415,7 +415,7 @@ pub fn collect_child_treeids (
 /// Log any error and remove the request from the node.
 /// Does *not* verify that the request was completed;
 /// that's just the only situation in which it would be used.
-pub fn remove_completed_view_request (
+pub(super) fn remove_completed_view_request (
   tree         : &mut PairTree,
   node_id      : NodeId,
   view_request : ViewRequest,
