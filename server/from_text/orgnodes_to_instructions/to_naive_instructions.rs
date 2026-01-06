@@ -12,7 +12,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 /// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
-pub(super) fn naive_saveinstructions_from_forest (
+pub fn naive_saveinstructions_from_forest (
   mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =

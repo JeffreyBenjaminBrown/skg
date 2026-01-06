@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 
 /// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
-struct SaveResponse {
+pub struct SaveResponse {
   pub buffer_content : String,
   pub errors         : Vec < String >,
 }

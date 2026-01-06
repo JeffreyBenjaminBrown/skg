@@ -52,7 +52,7 @@ pub async fn reconcile_same_id_instructions(
   Ok(result) }
 
 /// Group SaveInstructions with the same ID.
-fn collect_dup_instructions(
+pub fn collect_dup_instructions(
   instructions: Vec<SaveInstruction>
 ) -> HashMap<ID, Vec<SaveInstruction>> {
   let mut grouped: HashMap<ID, Vec<SaveInstruction>> =

@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 /// - prevent duplicate definitive expansions
 /// - locate the conflict when an earlier definitive view
 ///   conflicts with a new definitive view request
-pub(super) type VisitedMap =
+pub type VisitedMap =
   HashMap < ID, NodeId >;
 
 
@@ -153,7 +153,7 @@ pub async fn complete_branch_minus_content (
 /// - If node is indefinitive, rewrite it (clear body, etc.).
 ///   (repeat should imply indefinitive. The reverse need not hold.)
 /// - If node is definitive, add it to visited.
-pub(super) fn mark_if_visited_or_repeat_or_cycle (
+pub fn mark_if_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   node_id  : NodeId,
   visited  : &mut VisitedMap,
@@ -183,9 +183,9 @@ fn detect_and_mark_cycle (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  let is_cycle : bool =
-    is_ancestor_id ( tree, node_id, &pid ) ?;
+  let is_cycle : bool = {
+    let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
+    is_ancestor_id ( tree, node_id, &pid ) ? };
   let mut node_mut : NodeMut < NodePair > =
     tree . get_mut ( node_id ) . ok_or (
       "detect_and_mark_cycle: node not found" ) ?;
@@ -234,11 +234,11 @@ fn is_ancestor_id (
   origin_treeid : NodeId, // start looking from here
   target_skgid  : &ID,    // look for this
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( origin_treeid )
-    . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
-  let mut current : Option < NodeRef < NodePair > > =
-    node_ref . parent ();
+  let mut current : Option < NodeRef < NodePair > > = {
+    let node_ref : NodeRef < NodePair > =
+      tree . get ( origin_treeid )
+      . ok_or ( "is_ancestor_id: NodeId not in tree" ) ?;
+    node_ref . parent () };
   while let Some ( parent ) = current {
     if let Some ( parent_skgid ) =
       parent . value () . orgnode . metadata . id . as_ref () {

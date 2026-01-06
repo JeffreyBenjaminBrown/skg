@@ -187,17 +187,17 @@ pub async fn delete_nodes_from_pids (
       id.0 ) )
     . collect::< Vec<_> > ()
     . join ( " or\n" );
-  let extra_ids_query : String = format! (
-    // To find every associated extra_id.
-    r#"match $node isa node;
-      {};
-      $e isa extra_id;
-      $rel isa has_extra_id ( node: $node, extra_id: $e );
-      $e has id $extra_id_value;
-      select $extra_id_value;"#,
-    pid_or_clause );
-  let answer : QueryAnswer =
-    tx.query ( extra_ids_query ). await ?;
+  let answer : QueryAnswer = {
+    let extra_ids_query : String = format! (
+      // To find every associated extra_id.
+      r#"match $node isa node;
+        {};
+        $e isa extra_id;
+        $rel isa has_extra_id ( node: $node, extra_id: $e );
+        $e has id $extra_id_value;
+        select $extra_id_value;"#,
+      pid_or_clause );
+    tx.query ( extra_ids_query ). await ? };
   let mut extra_id_values : Vec<String> =
     Vec::new();
   let mut rows = answer.into_rows();

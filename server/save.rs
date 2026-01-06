@@ -72,27 +72,25 @@ pub fn update_fs_from_saveinstructions (
     instructions . into_iter ()
     . partition (|(_, action)|
                  matches!(action, NonMerge_NodeAction::Delete) );
-  let delete_nodes : Vec<SkgNode> = // functional; no IO
-    to_delete . into_iter ()
-    . map ( |(node, _)| node )
-    . collect ();
-  let write_skgnodes : Vec<SkgNode> = // functional; no IO
-    to_write . into_iter ()
-    . map ( |(node, _)| node )
-    . collect ();
-
-  { // Modify the FS.
-    let deleted : usize =
-      if ! delete_nodes . is_empty () {
-        delete_all_nodes_from_fs (
-          delete_nodes, config . clone () ) ?
-      } else { 0 };
-    let written : usize =
-      if ! write_skgnodes . is_empty () {
-        write_all_nodes_to_fs (
-          write_skgnodes, config ) ?
-      } else { 0 };
-    Ok ( (deleted, written) ) }}
+  let deleted : usize = {
+    let delete_nodes : Vec<SkgNode> =
+      to_delete . into_iter ()
+      . map ( |(node, _)| node )
+      . collect ();
+    if ! delete_nodes . is_empty () {
+      delete_all_nodes_from_fs (
+        delete_nodes, config . clone () ) ?
+    } else { 0 } };
+  let written : usize = {
+    let write_skgnodes : Vec<SkgNode> =
+      to_write . into_iter ()
+      . map ( |(node, _)| node )
+      . collect ();
+    if ! write_skgnodes . is_empty () {
+      write_all_nodes_to_fs (
+        write_skgnodes, config ) ?
+    } else { 0 } };
+  Ok ( (deleted, written) ) }
 
 
 //
@@ -166,32 +164,34 @@ pub async fn update_typedb_from_saveinstructions (
     . partition (
       |(_, action)| matches!(action,
                              NonMerge_NodeAction::Delete));
-  let to_write_skgnodes : Vec<SkgNode> =
-    to_write_instructions . iter ()
-    . map ( |(node, _)| node . clone () )
-    . collect ();
-  let to_write_pids : Vec<ID> =
-    to_write_skgnodes . iter ()
-    . filter_map ( |n|
-                    n . ids
-                    . get(0)
-                    . cloned() )
-    . collect ();
-  let to_delete_pids : Vec<ID> =
-    to_delete_instructions . iter ()
-    . filter_map ( |(node, _)|
-                    node . ids
-                    . get(0)
-                    . cloned() )
-    . collect ();
 
-  if ! to_delete_pids . is_empty () { // delete
-    println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
-    delete_nodes_from_pids (
-      // PITFALL: deletions cascade in TypeDB by default,
-      // so we are left with no incomplete relationships.
-      db_name, driver, & to_delete_pids ). await ?; }
+  { // delete
+    let to_delete_pids : Vec<ID> =
+      to_delete_instructions . iter ()
+      . filter_map ( |(node, _)|
+                      node . ids
+                      . get(0)
+                      . cloned() )
+      . collect ();
+    if ! to_delete_pids . is_empty () {
+      println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
+      delete_nodes_from_pids (
+        // PITFALL: deletions cascade in TypeDB by default,
+        // so we are left with no incomplete relationships.
+        db_name, driver, & to_delete_pids ). await ?; }}
+
   { // create | update
+    let to_write_skgnodes : Vec<SkgNode> =
+      to_write_instructions . iter ()
+      . map ( |(node, _)| node . clone () )
+      . collect ();
+    let to_write_pids : Vec<ID> =
+      to_write_skgnodes . iter ()
+      . filter_map ( |n|
+                      n . ids
+                      . get(0)
+                      . cloned() )
+      . collect ();
     create_only_nodes_with_no_ids_present (
       db_name, driver, & to_write_skgnodes ). await ?;
     delete_out_links (
@@ -201,4 +201,5 @@ pub async fn update_typedb_from_saveinstructions (
       "container" ). await ?;
     create_all_relationships (
       db_name, driver, & to_write_skgnodes ). await ?; }
+
   Ok (( )) }

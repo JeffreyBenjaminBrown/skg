@@ -11,6 +11,21 @@ If I specify an implementation and it looks
 inefficient, incorrect, or unnecessary,
 ditto.
 
+## Try refactoring sequential to nested definitions
+
+See 'coding-advice/good-refactors.md'.
+Do this to everything you write,
+and look for opportunities to do it in everything you use.
+
+## Look for prior art before and after coding.
+
+After determining what needs to happen,
+look for code that could be useful for it.
+Then, after writing that code,
+look for similar-looking ("quasi-duplicate") code,
+and try to deduplicate it.
+If you can't, report the quasi-duplication.
+
 ## Don't change anything in git.
 
 That includes my credentials (which, as the git history reveals,

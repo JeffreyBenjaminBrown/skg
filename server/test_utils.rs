@@ -49,7 +49,7 @@ use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, Trans
 ///       Ok(())
 ///     } )) }
 /// ```
-fn run_with_test_db<F>(
+pub fn run_with_test_db<F>(
   db_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
@@ -204,7 +204,7 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.
-fn compare_headlines_modulo_id(
+pub fn compare_headlines_modulo_id(
   headline1: &str,
   headline2: &str
 ) -> bool {
@@ -238,7 +238,7 @@ fn compare_headlines_modulo_id(
   }}
 
 /// See 'compare_orgnode_trees'.
-fn compare_orgnode_forests (
+pub fn compare_orgnode_forests (
   forest1 : & Tree < OrgNode >,
   forest2 : & Tree < OrgNode >
 ) -> bool {
@@ -273,7 +273,7 @@ fn compare_orgnode_trees (
 /// ignoring ID values (but not ID presence/absence).
 ///
 /// Input forests have ForestRoot at root; tree roots are their children.
-fn compare_two_forests_modulo_id(
+pub fn compare_two_forests_modulo_id(
   forest1: &Tree<OrgNode>,
   forest2: &Tree<OrgNode>
 ) -> bool {
@@ -321,7 +321,7 @@ fn compare_two_orgnodes_recursively_modulo_id (
 
 /// Compare a PairTree forest (with ForestRoot) against a Vec of OrgNode trees.
 /// This compares just the OrgNode portions, ignoring the SkgNode Option.
-fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
+pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
   forest : &PairTree,
   forest2 : & Tree<OrgNode>,
 ) -> bool {
@@ -415,7 +415,7 @@ pub async fn extra_ids_from_pid(
 
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.
-fn tantivy_contains_id(
+pub fn tantivy_contains_id(
   tantivy_index: &TantivyIndex,
   query: &str,
   expected_id: &str,
@@ -442,7 +442,7 @@ fn tantivy_contains_id(
 /// let result = strip_org_comments(input);
 /// assert_eq!(result, "  * (skg (id 1)) title 1\n  ** (skg (id 2)) title 2");
 /// ```
-fn strip_org_comments(s: &str) -> String {
+pub fn strip_org_comments(s: &str) -> String {
   s.lines()
     .map(|line| {
       if let Some(hash_pos) = line.find('#') {
@@ -455,7 +455,7 @@ fn strip_org_comments(s: &str) -> String {
 /// Convert an OrgNode "forest" (tree with ForestRoot)
 /// to a paired forest, *with None for all SkgNodes*.
 /// Used in tests where we don't have save instructions.
-fn orgnode_forest_to_paired (
+pub fn orgnode_forest_to_paired (
   forest : Tree < OrgNode >,
 ) -> PairTree {
   fn add_orgnode_tree_as_child_of_forest_root (

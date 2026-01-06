@@ -375,8 +375,10 @@ fn replace_pub_keyword(line: &str, replacement: &str) -> String {
 fn run_cargo_check() -> Result<(), String> {
     let target_dir = unsafe { TARGET_DIR.as_ref().unwrap() };
 
+    // Use --all-targets to also compile tests in tests/ directory.
+    // This ensures we don't reduce visibility of items needed by tests.
     let output = Command::new("cargo")
-        .args(["check", "--message-format=short"])
+        .args(["check", "--all-targets", "--message-format=short"])
         .current_dir(target_dir)
         .output()
         .expect("Failed to run cargo check");

@@ -3,6 +3,8 @@
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
 ** ONGOING simple refactors
+*** is_ancestor_id could be briefer
+    by using one of the accessors at types/tree/accessors.rs
 *** TODO wrap temp variables in the scope of what they are used for
 *** ONGOING reorg
 **** DONE request 1

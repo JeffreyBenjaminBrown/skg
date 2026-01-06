@@ -63,7 +63,7 @@ pub fn search_index (
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
-pub(super) fn update_index_with_nodes (
+pub fn update_index_with_nodes (
   nodes: &[SkgNode],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {

@@ -92,8 +92,8 @@ fn add_missing_info_dfs (
     assign_new_id_if_needed (
       node_ref . value () ); }
   { // recurse into children DFS
-    let treeid: ego_tree::NodeId = node_ref . id ();
     let child_treeids: Vec < ego_tree::NodeId > = {
+      let treeid: ego_tree::NodeId = node_ref . id ();
       let tree = node_ref . tree ();
       tree . get ( treeid ) . unwrap ()
         . children () . map ( | child | child . id () )

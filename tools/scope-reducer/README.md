@@ -32,3 +32,6 @@ Instead of compiling after each individual change (which would be very slow), th
 This minimizes per-file compile cycles
 from O(n) (where n = number of definitions in the file)
 to roughly O(1).
+
+Compilation does not cover the integration tests,
+but it covers the unit tests, via `cargo check --all-targets`.

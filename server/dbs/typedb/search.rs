@@ -188,7 +188,7 @@ pub(super) async fn path_to_end_cycle_and_or_branches (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
-pub(super) async fn find_related_nodes (
+pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
   nodes       : &[ID],

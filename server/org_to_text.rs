@@ -10,7 +10,7 @@ use std::error::Error;
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a ForestRoot.
-pub(super) fn orgnode_forest_to_string (
+pub fn orgnode_forest_to_string (
   forest : &PairTree,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
@@ -40,7 +40,7 @@ pub(super) fn orgnode_forest_to_string (
 
 /// Renders an OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
-pub(super) fn orgnode_to_text (
+pub fn orgnode_to_text (
   level   : usize,
   orgnode : &OrgNode
 ) -> String {

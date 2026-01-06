@@ -92,7 +92,7 @@ fn default_initial_node_limit() -> usize { 1000 }
 //
 
 impl ID {
-  pub(super) fn new <S : Into<String>> (s: S) -> Self {
+  pub fn new <S : Into<String>> (s: S) -> Self {
     ID ( s.into () ) }
   fn as_str ( &self ) -> &str {
     &self.0 }} // a reference to the first (and only) field

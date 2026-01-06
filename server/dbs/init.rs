@@ -147,7 +147,7 @@ pub fn create_empty_tantivy_index (
 ///
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
-fn in_fs_wipe_index_then_create_it (
+pub fn in_fs_wipe_index_then_create_it (
   nodes      : &[SkgNode],
   index_path : &Path,
 ) -> Result<(TantivyIndex,

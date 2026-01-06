@@ -50,7 +50,7 @@ pub fn handle_title_matches_request (
 /// each level-2 headline is a distinct matching node,
 /// and each level-3 headline is a distinct matching alias
 /// for its parent, if any exist.
-fn generate_title_matches_response (
+pub fn generate_title_matches_response (
   search_terms  : &str,
   tantivy_index : &TantivyIndex)
   -> String {
