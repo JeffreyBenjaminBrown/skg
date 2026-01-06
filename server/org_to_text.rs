@@ -76,5 +76,5 @@ pub fn orgnode_to_text (
         result . push ( '\n' ); }} }
   result }
 
-pub fn org_bullet ( level: usize ) -> String {
+fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }

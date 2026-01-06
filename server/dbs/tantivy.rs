@@ -117,7 +117,7 @@ where I: IntoIterator<Item = &'a SkgNode>, {
 
 /* -------------------- Private helpers -------------------- */
 
-pub fn create_documents_from_node (
+fn create_documents_from_node (
   node: &SkgNode,
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < Document >,

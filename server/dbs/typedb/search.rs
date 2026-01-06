@@ -102,7 +102,7 @@ pub async fn find_containers_of (
 
 /// Runs a single TypeDB query.
 /// Returns the IDs of nodes that link to the input node.
-pub async fn find_links_to (
+pub(super) async fn find_links_to (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
@@ -136,7 +136,7 @@ The process can end in three ways:
     and the function returns.
 Note that 2 and 3 can coincide. That is the only case
   in which are all three outputs non-null. */
-pub async fn path_to_end_cycle_and_or_branches (
+pub(super) async fn path_to_end_cycle_and_or_branches (
   db_name     : &str,
   driver      : &TypeDBDriver,
   node        : &ID,
@@ -188,7 +188,7 @@ pub async fn path_to_end_cycle_and_or_branches (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
-pub async fn find_related_nodes (
+pub(super) async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
   nodes       : &[ID],

@@ -142,7 +142,7 @@ pub async fn create_node (
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }
 
-pub async fn insert_extra_ids (
+async fn insert_extra_ids (
   node : &SkgNode,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {

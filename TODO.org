@@ -1,8 +1,44 @@
 * NOTE TO READER: Most plans are online.
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
-* reorg
 * s, by urgency
+** ONGOING simple refactors
+*** TODO programmatically search for scope reductions
+I asked the AI to do it, but it is clearly fallible, as it had to correct what its subagents did. I could have it check programmatically instead: for each definition, try making it private, and if that fails pub(super), and if that fails leave it pub. And for every pub(super), try making it private. (Ignore pub(crate) -- that distinction doesn't matter to me right now.)
+*** TODO wrap temp variables in the scope of what they are used for
+*** ONGOING reorg
+**** DONE request 1
+  Let's:
+  - move everything in server/bin/ to tools/.
+  - merge the three modules under save:: into save.rs
+     and delete them.
+  - rename compute_viewdata.rs to simply viewdata.rs
+  - move cleanup_and_shutdown to the end of server/serve.rs,
+     and delete the resulting empty module.
+  - move init.rs into dbs/.
+  - rename filesystem::misc to filesystem::not_nodes.
+  - move  [[file:../../rust/dbs/typedb/util.rs::37][fn pid_and_source_from_id]] to server/dbs/typedb/search.rs.
+  - rename to_dirty_instructions.rs to to_naive_instructions,
+    and similarly for the two saveinstructions_from_* functions --
+    call them naive_saveinstructions_from_*.
+**** TODO RESUME from introspect/code-map/code-map.org
+     reading downward
+*** ONGOING look for helpers to simplify egotree boilerplate
+*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
+   if is_indefinitive {
+     makeIndefinitiveAndClobber ( tree, node_id ) ?;
+   } else { // here, it might already be in visited, which would be bad
+     visited . insert ( pid, node_id ); }
+*** add 'fn tree_nodepair_has_interp_subscribee'
+    and call it everywhere a passage like this appears
+  ```
+    let is_subscribee : bool = {
+      let node_ref : NodeRef < NodePair > =
+        tree . get ( node_id ) . ok_or (
+          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+      node_ref . value () . 1 . metadata . code . interp
+        == Interp::Subscribee };
+  ```
 ** Completion is complex.
 *** break up completeDefinitiveOrgnode
     it's super-long
@@ -99,23 +135,6 @@
 *** remove_duplicates_and_false_aliases_handling_focus
     could be generalized to something that takes lambdas
     indicating whether something deserves removal
-** ONGOING simple refactors
-*** write helpers to simplify egotree boilerplate
-*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
-   if is_indefinitive {
-     makeIndefinitiveAndClobber ( tree, node_id ) ?;
-   } else { // here, it might already be in visited, which would be bad
-     visited . insert ( pid, node_id ); }
-*** add 'fn tree_nodepair_has_interp_subscribee'
-    and call it everywhere a passage like this appears
-  ```
-    let is_subscribee : bool = {
-      let node_ref : NodeRef < NodePair > =
-        tree . get ( node_id ) . ok_or (
-          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-      node_ref . value () . 1 . metadata . code . interp
-        == Interp::Subscribee };
-  ```
 ** build, use the tree library
 *** refs
     That library is currently at types/trees.
@@ -165,13 +184,8 @@
     The Contents of its children can be edited to change Hides relationships.
     The rest of the SubscribeeCol branch are respawned on save,
       and have no effect if edited before saving.
-** read_skg_files_from_folder is stupid
-      let mut skgnode: SkgNode =
-        // Placeholder - caller always overwrites with actual source
-        // TODO : This is stupid!
-        read_skgnode (&path) ?;
-      skgnode.source = String::new();
-      nodes.push (skgnode); }}
+** real but minor
+*** replace nstruction -> nstruc
 ** later
 *** midparent in text : options
 **** some examples
@@ -224,9 +238,9 @@
 *** collect_generation_ids
     test the new effective root logic
 ** This seems like it could have been more efficient.
-   rust/to_org/definitive_branch.rs
+   server/to_org/definitive_branch.rs
    sharing more code with
-   rust/to_org/initial_view_bfs.rs
+   server/to_org/initial_view_bfs.rs
 ** Appending from indef nodes moght be a misfeature.
 ** completeContents seems too long
 ** RelToParent could be generalized as RelToAncestor.
@@ -267,11 +281,11 @@ fold-preservation
 ** integration test for containerward view
 ** not pressing
 *** use s-exp parsing
-**** in rust/serve/containerward_view.rs
+**** in server/serve/containerward_view.rs
      fn extract_containerward_view_params
-**** in rust/serve/node_aliases.rs
+**** in server/serve/node_aliases.rs
      fn extract_node_aliases_params
-**** in rust/serve/util.rs
+**** in server/serve/util.rs
 ***** definitely
       fn request_type_from_request (
       fn node_id_from_single_root_view_request (
