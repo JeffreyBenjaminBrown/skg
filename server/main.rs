@@ -4,8 +4,8 @@ See the SkgConfig type at server/types/misc.rs,
 or the example at data/skgconfig.toml.
 */
 
-use skg::dbs::filesystem::misc::load_config;
-use skg::init::initialize_dbs;
+use skg::dbs::filesystem::not_nodes::load_config;
+use skg::dbs::init::initialize_dbs;
 use skg::serve::serve;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 

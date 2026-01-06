@@ -6,7 +6,7 @@
 /// - set_metadata_relationship_viewdata_in_forest
 /// - render to string
 
-use crate::compute_viewdata::set_metadata_relationship_viewdata_in_forest;
+use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig};

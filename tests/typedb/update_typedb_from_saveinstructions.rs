@@ -1,7 +1,7 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
 use skg::test_utils::run_with_test_db;
-use skg::save::typedb::update_typedb_from_saveinstructions;
+use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;

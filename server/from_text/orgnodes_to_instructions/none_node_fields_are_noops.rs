@@ -16,7 +16,7 @@ use std::io;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::dbs::typedb::util::pid_and_source_from_id;
+use crate::dbs::typedb::search::pid_and_source_from_id;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 

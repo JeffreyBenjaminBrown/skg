@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use tempfile::tempdir;
 
-use skg::dbs::filesystem::misc::validate_source_paths_creating_owned_ones_if_needed;
+use skg::dbs::filesystem::not_nodes::validate_source_paths_creating_owned_ones_if_needed;
 use skg::types::misc::SkgfileSource;
 
 #[test]

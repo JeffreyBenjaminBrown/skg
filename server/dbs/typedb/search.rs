@@ -6,13 +6,14 @@ use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer},
+  answer::{ConceptRow, QueryAnswer,
+           concept_document::{Node, Leaf}},
   Transaction,
   TransactionType,
   TypeDBDriver,
 };
 
-use crate::dbs::typedb::util::concept_document::build_id_disjunction;
+use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_id_from_node};
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::ID;
 
@@ -240,3 +241,54 @@ pub async fn find_related_nodes (
         extract_payload_from_typedb_string_rep (
           &concept . to_string () )) ); }}
   Ok (related_nodes) }
+
+/// Runs a single TypeDB query to get both PID and source.
+/// Returns None if not found.
+pub async fn pid_and_source_from_id (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  skgid  : &ID
+) -> Result < Option<(ID, String)>, Box<dyn Error> > {
+  use Node;
+
+  let tx : Transaction =
+    driver.transaction (
+      db_name, TransactionType::Read
+    ). await ?;
+  let query : String = format! (
+    r#"match
+      $node isa node,
+            has id $primary_id,
+            has source $source;
+      {{ $node has id "{}"; }} or
+      {{ $e   isa     extra_id, has id "{}";
+         $rel isa has_extra_id ( node: $node,
+                                 extra_id: $e ); }} ;
+      fetch {{
+        "primary_id": $primary_id,
+        "source": $source
+      }};"#,
+    skgid,
+    skgid );
+  let answer : QueryAnswer = tx.query ( query ). await ?;
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
+    answer {
+      if let Some (doc_result) = stream . next () . await {
+        let doc = doc_result ?;
+        if let Some ( Node::Map ( ref map ) ) = doc . root {
+          let primary_id_opt : Option < ID > =
+            map . get ( "primary_id" )
+            . and_then ( extract_id_from_node );
+          let source_opt : Option < String > =
+            map . get ( "source" )
+            . and_then ( | node : & Node | {
+              if let Node::Leaf ( Some ( leaf ) ) = node {
+                if let Leaf::Concept ( concept ) = leaf {
+                  return Some (
+                    extract_payload_from_typedb_string_rep (
+                      & concept . to_string () ) ); }}
+              None } );
+          if let ( Some ( pid ), Some ( source ) )
+            = ( primary_id_opt, source_opt )
+          { return Ok ( Some ( ( pid, source ) ) ); }} }}
+  Ok (None) }

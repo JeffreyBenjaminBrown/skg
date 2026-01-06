@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
   skgnode_from_pid_and_source, write_skgnode_to_source};
-use skg::dbs::filesystem::misc::load_config_with_overrides;
+use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::skgnode::{SkgNode, skgnode_example, empty_skgnode};
 use skg::types::misc::{ID, SkgConfig};
 use skg::test_utils::run_with_test_db;

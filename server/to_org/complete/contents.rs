@@ -6,7 +6,7 @@ use crate::to_org::util::{
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::dbs::typedb::util::pid_and_source_from_id;
+use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,

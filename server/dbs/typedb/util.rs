@@ -2,17 +2,7 @@ pub mod pids_from_ids;
 pub mod concept_document;
 
 use std::error::Error;
-use typedb_driver::{
-  answer::{QueryAnswer,
-           concept_document::{Node, Leaf}},
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
-use futures::StreamExt;
-
-use crate::types::misc::ID;
-use concept_document::extract_id_from_node;
+use typedb_driver::TypeDBDriver;
 
 pub async fn delete_database (
   driver  : &TypeDBDriver,
@@ -23,58 +13,6 @@ pub async fn delete_database (
     databases . get ( db_name ) . await ? . delete () . await ?;
     println! ( "Database '{}' deleted successfully", db_name ); }
   Ok (( )) }
-
-/// Runs a single TypeDB query to get both PID and source.
-/// Returns None if not found.
-pub async fn pid_and_source_from_id (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  skgid  : &ID
-) -> Result < Option<(ID, String)>, Box<dyn Error> > {
-  use Node;
-
-  let tx : Transaction =
-    driver.transaction (
-      db_name, TransactionType::Read
-    ). await ?;
-  let query : String = format! (
-    r#"match
-      $node isa node,
-            has id $primary_id,
-            has source $source;
-      {{ $node has id "{}"; }} or
-      {{ $e   isa     extra_id, has id "{}";
-         $rel isa has_extra_id ( node: $node,
-                                 extra_id: $e ); }} ;
-      fetch {{
-        "primary_id": $primary_id,
-        "source": $source
-      }};"#,
-    skgid,
-    skgid );
-  let answer : QueryAnswer = tx.query ( query ). await ?;
-
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
-    answer {
-      if let Some (doc_result) = stream . next () . await {
-        let doc = doc_result ?;
-        if let Some ( Node::Map ( ref map ) ) = doc . root {
-          let primary_id_opt : Option < ID > =
-            map . get ( "primary_id" )
-            . and_then ( extract_id_from_node );
-          let source_opt : Option < String > =
-            map . get ( "source" )
-            . and_then ( | node : & Node | {
-              if let Node::Leaf ( Some ( leaf ) ) = node {
-                if let Leaf::Concept ( concept ) = leaf {
-                  return Some (
-                    extract_payload_from_typedb_string_rep (
-                      & concept . to_string () ) ); }}
-              None } );
-          if let ( Some ( pid ), Some ( source ) )
-            = ( primary_id_opt, source_opt )
-          { return Ok ( Some ( ( pid, source ) ) ); }} }}
-  Ok (None) }
 
 /// Returns the string it finds
 /// between the first and the second quotation marks.

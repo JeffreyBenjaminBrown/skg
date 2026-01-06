@@ -12,14 +12,14 @@ use ego_tree::{NodeId, NodeRef, Tree};
 /// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
-pub fn saveinstructions_from_forest (
+pub fn naive_saveinstructions_from_forest (
   mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
   let root_id = forest.root().id();
-  saveinstructions_from_tree ( &mut forest, root_id,
-                               &mut result )?;
+  naive_saveinstructions_from_tree ( &mut forest, root_id,
+                                     &mut result )?;
   Ok(result) }
 
 /// Appends another pair to 'result' and recurses (in DFS order).
@@ -27,7 +27,7 @@ pub fn saveinstructions_from_forest (
 /// - indefinitive nodes don't generate instructions
 /// - aliases     are handled by 'collect_aliases'
 /// - subscribees are handled by 'collect_subscribees'
-fn saveinstructions_from_tree(
+fn naive_saveinstructions_from_tree(
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
@@ -41,7 +41,7 @@ fn saveinstructions_from_tree(
     let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
     for child_treeid in child_treeids {
-      saveinstructions_from_tree(tree, child_treeid, result)?; }
+      naive_saveinstructions_from_tree(tree, child_treeid, result)?; }
     return Ok(()); }
   if matches!(interp, Interp::AliasCol                     |
                       Interp::Alias                        |
@@ -76,7 +76,7 @@ fn saveinstructions_from_tree(
     let child_treeids: Vec<NodeId> = tree.get(node_id).unwrap()
       .children().map(|c| c.id()).collect();
     for child_treeid in child_treeids {
-      saveinstructions_from_tree(tree, child_treeid, result)?; }}
+      naive_saveinstructions_from_tree(tree, child_treeid, result)?; }}
   Ok (()) }
 
 fn skgnode_for_orgnode_in_tree<'a> (

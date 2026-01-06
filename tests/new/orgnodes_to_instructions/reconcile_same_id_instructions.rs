@@ -5,7 +5,7 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::orgnodes_to_instructions::to_dirty_instructions::saveinstructions_from_forest;
+use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
 use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::run_with_test_db;
@@ -26,7 +26,7 @@ fn test_inconsistent_delete() {
           "Should detect inconsistent toDelete");
 
   let instructions =
-    saveinstructions_from_forest(forest)
+    naive_saveinstructions_from_forest(forest)
     . unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(instructions[0].0.ids[0], ID::from("1"));
@@ -55,7 +55,7 @@ fn test_deletions_excluded (
         "};
 
       let forest = org_to_uninterpreted_nodes(input)?;
-      let instructions = saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
@@ -91,7 +91,7 @@ fn test_defining_node_defines (
         "};
 
       let forest = org_to_uninterpreted_nodes(input)?;
-      let instructions = saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -121,7 +121,7 @@ fn test_adding_without_definer (
             ** (skg (id 4) (source main) (code indefinitive)) 4 again
         "};
       let forest = org_to_uninterpreted_nodes(input)?;
-      let instructions = saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;
 

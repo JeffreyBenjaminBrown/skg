@@ -1,4 +1,4 @@
-pub mod to_dirty_instructions;
+pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 pub mod none_node_fields_are_noops;
 
@@ -7,7 +7,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::save::SaveInstruction;
 use crate::types::orgnode::OrgNode;
 
-use to_dirty_instructions::saveinstructions_from_forest;
+use to_naive_instructions::naive_saveinstructions_from_forest;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
 use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
 use ego_tree::Tree;
@@ -24,7 +24,7 @@ pub async fn orgnodes_to_reconciled_save_instructions (
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
   let instructions : Vec<SaveInstruction> =
-    saveinstructions_from_forest ( forest . clone () ) ?;
+    naive_saveinstructions_from_forest ( forest . clone () ) ?;
   let instructions_without_dups : Vec<SaveInstruction> =
     reconcile_same_id_instructions (
       config, driver, instructions ) . await ?;

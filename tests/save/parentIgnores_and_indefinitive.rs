@@ -2,8 +2,8 @@
 
 use skg::dbs::filesystem::one_node::skgnode_from_id;
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
-use skg::save::fs::update_fs_from_saveinstructions;
-use skg::save::typedb::update_typedb_from_saveinstructions;
+use skg::save::update_fs_from_saveinstructions;
+use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;

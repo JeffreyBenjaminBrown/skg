@@ -10,7 +10,7 @@
 
 use crate::types::orgnode::{OrgNode, Interp, EditRequest};
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::typedb::util::pid_and_source_from_id;
+use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;

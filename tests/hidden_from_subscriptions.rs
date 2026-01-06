@@ -7,8 +7,8 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use skg::dbs::filesystem::misc::load_config_with_overrides;
+use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;

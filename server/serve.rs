@@ -2,7 +2,7 @@ pub mod handlers;
 pub mod parse_metadata_sexp;
 pub mod util;
 
-use crate::cleanup::cleanup_and_shutdown;
+use crate::dbs::typedb::util::delete_database;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
@@ -148,3 +148,29 @@ fn handle_shutdown_request (
                   "Server shutting down..." );
   cleanup_and_shutdown (
     typedb_driver, config ); }
+
+/// Performs cleanup before server shutdown.
+/// Deletes the database if delete_on_quit is configured, then exits.
+fn cleanup_and_shutdown (
+  typedb_driver : &Arc<TypeDBDriver>,
+  config        : &SkgConfig,
+) {
+  if config . delete_on_quit {
+    println! (
+      "Deleting database '{}' before shutdown...",
+      config . db_name );
+
+    // Wait briefly to allow any pending operations to complete.
+    // This helps ensure the database isn't marked as "in use".
+    std::thread::sleep (
+      std::time::Duration::from_millis ( 100 ) );
+
+    futures::executor::block_on ( async {
+      if let Err ( e ) =
+        delete_database (
+          typedb_driver, & config . db_name )
+        . await {
+          eprintln! ( "Failed to delete database: {}", e );
+        }} ); }
+  println! ( "Shutdown complete." );
+  std::process::exit (0); }

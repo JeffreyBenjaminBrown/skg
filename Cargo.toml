@@ -19,11 +19,11 @@ path = "introspect/skg_filenames_match_pids.rs"
 
 [[bin]]
 name = "cleanup-test-dbs"
-path = "server/bin/cleanup-test-dbs.rs"
+path = "tools/cleanup-test-dbs.rs"
 
 [[bin]]
 name = "delete-one-db"
-path = "server/bin/delete-one-db.rs"
+path = "tools/delete-one-db.rs"
 
 [[bin]]
 name = "smsn-keywords"
