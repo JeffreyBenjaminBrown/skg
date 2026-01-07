@@ -5,9 +5,8 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request };
-use crate::to_org::complete::contents::{
-  maybe_add_hidden_in_subscribee_col,
-  ensure_source };
+use crate::to_org::complete::contents::ensure_source;
+use crate::to_org::complete::sharing::maybe_add_hidden_in_subscribee_col;
 use crate::to_org::util::{
   skgnode_and_orgnode_from_pid_and_source,
   build_node_branch_minus_content,

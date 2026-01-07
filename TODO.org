@@ -2,25 +2,6 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
-** ONGOING rust-indent/
-*** 1
-Welcome! Please read rust-indent/ until you know what's going on. I'm not sure there's any overarching vision to that code, but if there is please try to understand it :)
-
-After that, I would like you to amend it to handle the following case. I want Emacs to be okay with this:
-```
-let alias_col_id : Option<NodeId> =
-  ( unique_orgnode_child_with_interp (
-      tree, node_id, Interp::AliasCol )
-    . map_err ( |e| e.to_string() ) ? );
-```
-
-Currently it instead rewrites that this way:
-```
-let alias_col_id : Option<NodeId> =
-  ( unique_orgnode_child_with_interp (
-    tree, node_id, Interp::AliasCol )
-    . map_err ( |e| e.to_string() ) ? );
-```
 ** ONGOING Completion is complex.
 *** ONGOING reading pub async fn completeAliasCol (
   // Validate this is an AliasCol
@@ -37,24 +18,6 @@ let alias_col_id : Option<NodeId> =
     aliascol_node_id,
     & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
-*** extract function
-And let's extract this, too, into 'prepend_subscribee_col':
-
-  let subscribee_col_nid : NodeId = { // the subscribee collector
-    let subscribee_col_orgnode : OrgNode = { // build it
-      let mut md = default_metadata ();
-      md . code . interp = Interp::SubscribeeCol;
-      OrgNode {
-        metadata : md,
-        title : "it subscribes to these" . to_string (),
-        body : None, } };
-    with_node_mut (
-      tree, node_id,
-      ( |mut node_mut| node_mut . prepend (
-          NodePair { mskgnode: None,
-                     orgnode: subscribee_col_orgnode } )
-        . id () )) ? };
-
 *** break up completeDefinitiveOrgnode
     it's super-long
 *** maybe_add_subscribee_col is impenetrable
