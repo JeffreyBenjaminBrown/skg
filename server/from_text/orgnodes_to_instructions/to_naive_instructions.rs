@@ -3,7 +3,8 @@ use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::tree::orgnode_skgnode::unique_orgnode_child_with_interp;
+use crate::types::tree::orgnode_skgnode::{
+  collect_grandchild_aliases_for_orgnode, unique_orgnode_child_with_interp };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -57,7 +58,7 @@ fn naive_saveinstructions_from_tree(
                       Interp::HiddenFromSubscribees ) {
     return Ok(()); } // Skip - these don't generate SaveInstructions
   let aliases =
-    collect_aliases(tree, node_id)?;
+    collect_grandchild_aliases_for_orgnode(tree, node_id)?;
   let subscribees =
     collect_subscribees(tree, node_id)?;
   let skg_node_opt = if !is_indefinitive {
@@ -118,41 +119,7 @@ fn skgnode_for_orgnode_in_tree<'a> (
     overrides_view_of: None,
   } ) }
 
-/// Collect aliases for a node, then delete its AliasCol branch:
-/// - find the unique AliasCol child (error if multiple)
-/// - for each Alias child of the AliasCol, collect its title
-/// - delete the AliasCol from the tree
-/// Duplicates are removed (preserving order of first occurrence).
-/// Returns None ("no opinion") if no AliasCol found.
-/// Returns Some(vec) if AliasCol found, even if empty.
-fn collect_aliases (
-  tree: &mut Tree<OrgNode>,
-  node_id: NodeId,
-) -> Result<Option<Vec<String>>, String> {
-  let alias_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
-      tree, node_id, Interp::AliasCol )
-    . map_err ( |e| e.to_string() ) ?;
-  match alias_col_id {
-    None => Ok(None),
-    Some(col_id) => {
-      let aliases : Vec<String> = {
-        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
-          "collect_aliases: AliasCol not found");
-        let mut aliases : Vec<String> = Vec::new();
-        for alias_child in col_ref.children() {
-          let child_interp : &Interp =
-            &alias_child . value() . metadata . code.interp;
-          if *child_interp != Interp::Alias {
-            return Err ( format! (
-              "AliasCol has non-Alias child with interp: {:?}",
-              child_interp )); }
-          aliases . push(
-            alias_child . value() . title . clone() ); }
-        aliases };
-      Ok(Some(dedup_vector(aliases))) }} }
-
-/// Collect a node's subscribees, then delete the SubscribeeCol branch:
+/// Collect a node's subscribees:
 /// - find the unique SubscribeeCol child (error if multiple)
 /// - for each Subscribee child, collect its ID
 /// - skip HiddenOutsideOfSubscribeeCol children (they're not subscribees)
@@ -160,7 +127,7 @@ fn collect_aliases (
 /// Returns None if no SubscribeeCol found (no opinion).
 /// Returns Some(vec) if SubscribeeCol found - even if empty (user wants no subscribees).
 fn collect_subscribees (
-  tree: &mut Tree<OrgNode>,
+  tree: &Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =

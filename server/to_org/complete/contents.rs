@@ -101,7 +101,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver,
           visited, view_requests ) . await ?; }
-      collect_view_requests (
+      view_requests_at_node (
         tree, node_id, view_requests ) ?; }
     Ok (( )) } ) }
 
@@ -122,8 +122,8 @@ fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
         visited, view_requests_out ) . await ?; }
     Ok (( )) }) }
 
-/// Collect all view requests from a node and append them to the output vector.
-fn collect_view_requests (
+/// Append its view requests to the output vector.
+fn view_requests_at_node (
   tree              : &PairTree,
   node_id           : NodeId,
   view_requests_out : &mut Vec < (NodeId, ViewRequest) >,

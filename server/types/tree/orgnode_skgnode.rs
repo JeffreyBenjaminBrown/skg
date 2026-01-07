@@ -5,6 +5,7 @@ use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, OrgNode, default_metadata};
 use crate::types::skgnode::SkgNode;
+use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
 use super::generic::{read_at_ancestor_in_tree, read_at_node_in_tree, with_node_mut};
 
@@ -78,7 +79,8 @@ pub fn unique_orgnode_child_with_interp_from_ref (
 pub fn pids_for_subscriber_and_its_subscribees (
   tree    : &PairTree,
   node_id : NodeId,
-) -> Result < ( ID, Vec < ID > ), Box<dyn Error> > {
+) -> Result < ( ID, Vec < ID > ),
+              Box<dyn Error> > {
   read_at_node_in_tree (
     tree, node_id,
     |np| np . mskgnode . as_ref ()
@@ -184,3 +186,61 @@ pub async fn ancestor_skgnode_from_disk (
            skgnode_from_id(
              config, driver, &ancestor_skgid ) . await?;
          skgnode } ) }
+
+/// Collect titles from Alias children of an AliasCol node (for PairTree).
+/// Duplicates are removed (preserving order of first occurrence).
+/// Errors if any non-Alias children are found.
+pub fn collect_child_aliases_at_nodepair_aliascol (
+  tree             : &PairTree,
+  aliascol_node_id : NodeId,
+) -> Result < Vec < String >, Box<dyn Error> > {
+  let mut aliases : Vec < String > =
+    Vec::new ();
+  let aliascol_ref : NodeRef < NodePair > =
+    tree . get ( aliascol_node_id )
+    . ok_or ( "AliasCol node not found" ) ?;
+  for child in aliascol_ref . children () {
+    let child_orgnode : &OrgNode =
+      & child . value () . orgnode;
+    if child_orgnode . metadata . code.interp != Interp::Alias {
+      return Err (
+        format! ( "AliasCol has non-Alias child with interp: {:?}",
+                  child_orgnode . metadata . code.interp )
+        . into () ); }
+    aliases . push (
+      child_orgnode . title . clone () ); }
+  Ok ( dedup_vector ( aliases ) ) }
+
+/// Collect aliases for a node (for Tree<OrgNode>):
+/// - find the unique AliasCol child (error if multiple)
+/// - for each Alias child of the AliasCol, collect its title
+/// Duplicates are removed (preserving order of first occurrence).
+/// Returns None ("no opinion") if no AliasCol found.
+/// Returns Some(vec) if AliasCol found, even if empty.
+pub fn collect_grandchild_aliases_for_orgnode (
+  tree: &Tree<OrgNode>,
+  node_id: NodeId,
+) -> Result<Option<Vec<String>>, String> {
+  let alias_col_id : Option<NodeId> =
+    unique_orgnode_child_with_interp (
+      tree, node_id, Interp::AliasCol )
+    . map_err ( |e| e.to_string() ) ?;
+  match alias_col_id {
+    None => Ok(None),
+    Some(col_id) => {
+      let aliases : Vec<String> = {
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
+          "collect_aliases_at_orgnode: AliasCol not found");
+        let mut aliases : Vec<String> = Vec::new();
+        for alias_child in col_ref.children() {
+          { // check for invalid state
+            let child_interp : &Interp =
+              &alias_child . value() . metadata . code.interp;
+            if *child_interp != Interp::Alias {
+              return Err ( format! (
+                "AliasCol has non-Alias child with interp: {:?}",
+                child_interp )); }}
+          aliases . push(
+            alias_child . value() . title . clone() ); }
+        aliases };
+      Ok(Some(dedup_vector(aliases))) }} }

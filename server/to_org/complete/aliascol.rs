@@ -1,7 +1,8 @@
 use crate::types::orgnode::{Interp, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
-use crate::types::tree::orgnode_skgnode::{ancestor_skgnode_from_disk, insert_col_node};
+use crate::types::tree::orgnode_skgnode::{
+  ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol, insert_col_node };
 use crate::types::misc::SkgConfig;
 use crate::types::skgnode::SkgNode;
 use ego_tree::{NodeId, NodeRef};
@@ -49,7 +50,7 @@ pub async fn completeAliasCol (
     parent_skgnode . aliases // source of truth
       . unwrap_or_default () . into_iter () . collect ( ));
   let aliases_from_branch : Vec < String > =
-    collect_alias_titles ( tree, aliascol_node_id ) ?;
+    collect_child_aliases_at_nodepair_aliascol ( tree, aliascol_node_id ) ?;
   let good_aliases_in_branch : HashSet < String > = (
     // aliases in tree that match aliases on disk
     aliases_from_branch . iter ()
@@ -70,29 +71,6 @@ pub async fn completeAliasCol (
     insert_col_node ( tree, aliascol_node_id,
       Interp::Alias, & alias, false ) ?; }
   Ok (( )) }
-
-/// Collect titles from Alias children of an AliasCol node.
-/// Errors if any non-Alias children are found.
-fn collect_alias_titles (
-  tree             : &PairTree,
-  aliascol_node_id : NodeId,
-) -> Result < Vec < String >, Box<dyn Error> > {
-  let mut aliases_from_tree : Vec < String > =
-    Vec::new ();
-  let aliascol_ref : NodeRef < NodePair > =
-    tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found" ) ?;
-  for child in aliascol_ref . children () {
-    let child_orgnode : &OrgNode =
-      & child . value () . orgnode;
-    if child_orgnode . metadata . code.interp != Interp::Alias {
-      return Err (
-        format! ( "AliasCol has non-Alias child with interp: {:?}",
-                  child_orgnode . metadata . code.interp )
-        . into () ); }
-    aliases_from_tree . push (
-      child_orgnode . title . clone () ); }
-  Ok ( aliases_from_tree ) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,
 /// preserving focus information,

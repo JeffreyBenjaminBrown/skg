@@ -18,6 +18,9 @@
     aliascol_node_id,
     & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
+*** what do these do?
+**** collect_subscribees
+**** collect_contents
 *** break up completeDefinitiveOrgnode
     it's super-long
 *** maybe_add_subscribee_col is impenetrable
@@ -26,7 +29,7 @@
 **** maybe_add_subscribee_col should integrate existing SubscribeeCol
      if it exists, rather than assuming it is correct
 *** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribee_col?
-*** After 'collect_view_requests', is there any reason to keep the view requests in the node?
+*** After 'view_requests_at_node', is there any reason to keep the view requests in the node?
     The function pushes the node's requests onto 'view_requests_out'.
     If they should be deleted from the node thereafter,
     the function should be renamed something like 'transfer_requests'.
