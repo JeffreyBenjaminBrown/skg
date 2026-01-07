@@ -1,8 +1,9 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
-use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request, orgnode_from_title_and_rel};
+use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
+use crate::to_org::complete::sharing::insert_col_node;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::tree::{PairTree, NodePair};
+use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::tree::PairTree;
 use crate::types::tree::accessors::unique_child_with_interp;
 
 use std::error::Error;
@@ -50,25 +51,10 @@ pub async fn build_and_integrate_aliases (
   let aliases : Vec < String > =
     fetch_aliases_from_file (
       config, driver, node_id_val ). await;
-  let aliascol : OrgNode =
-    orgnode_from_title_and_rel (
-      Interp::AliasCol, String::new () );
-  let aliascol_id : ego_tree::NodeId = {
-    // prepend an AliasCol to the node's children
-    let mut node_mut =
-      tree . get_mut ( node_id )
-      . ok_or ( "Node not found in tree" ) ?;
-    node_mut
-      . prepend ( NodePair { mskgnode: None,
-                             orgnode: aliascol } )
-      . id () };
-  for alias in aliases {
-    // append each Alias to the AliasCol's children
-    let alias_node : OrgNode =
-      orgnode_from_title_and_rel ( Interp::Alias, alias );
-    let mut aliascol_mut =
-      tree . get_mut ( aliascol_id )
-      . ok_or ( "AliasCol node not found" ) ?;
-    aliascol_mut . append ( NodePair { mskgnode: None,
-                                       orgnode: alias_node } ); }
+  let aliascol_id : ego_tree::NodeId =
+    insert_col_node ( tree, node_id,
+      Interp::AliasCol, "", true ) ?;
+  for alias in & aliases {
+    insert_col_node ( tree, aliascol_id,
+      Interp::Alias, alias, false ) ?; }
   Ok (( )) }

@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::to_org::util::orgnode_from_title_and_rel;
+use crate::to_org::complete::sharing::insert_col_node;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp};
@@ -67,14 +67,9 @@ pub async fn completeAliasCol (
     tree, // PITFALL: Gets modified.
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
-  with_node_mut ( // Append new Alias nodes for missing aliases
-    tree, aliascol_node_id,
-    ( |mut aliascol_mut| {
-      for alias in missing_aliases_from_disk {
-        aliascol_mut . append (
-          NodePair { mskgnode: None,
-                     orgnode: orgnode_from_title_and_rel (
-                       Interp::Alias, alias ) }); }} )) ?;
+  for alias in missing_aliases_from_disk {
+    insert_col_node ( tree, aliascol_node_id,
+      Interp::Alias, & alias, false ) ?; }
   Ok (( )) }
 
 /// Reads from disk the SkgNode

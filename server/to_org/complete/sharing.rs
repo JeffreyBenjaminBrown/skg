@@ -54,44 +54,22 @@ pub async fn maybe_add_subscribee_col (
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId =
-    prepend_subscribee_col ( tree, node_id ) ?;
+    insert_col_node ( tree, node_id,
+      Interp::SubscribeeCol, "it subscribes to these", true ) ?;
 
   if ! hidden_outside_content . is_empty () {
     let hidden_outside_col_nid : NodeId =
-      append_hidden_outside_of_subscribee_col (
-        tree, subscribee_col_nid ) ?;
-    { // its children, HiddenFromSubscribees (although since no subscribee contains them, they are not actually hidden anywhere)
-      for hidden_id in hidden_outside_content {
-        let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
-          skgnode_and_orgnode_from_id (
-            config, driver, & hidden_id ) . await ?;
-        orgnode . metadata . code . interp =
-          Interp::HiddenFromSubscribees;
-        orgnode . metadata . code . indefinitive = true;
-        orgnode . body = None;
-        with_node_mut (
-          tree, hidden_outside_col_nid,
-          |mut hidden_col_mut| {
-            hidden_col_mut . append (
-              NodePair { mskgnode: Some(skgnode), orgnode } ); } )?;
-      }} }
-  with_node_mut (
-    tree, subscribee_col_nid,
-    |mut col_mut| {
-      for subscribee_id in subscribee_ids {
-        // These subscribees are indefinitive leaves (trivial 'branches'). They can be expanded by requesting definitive expansion, the same way one would do for ordinary content.
-        let subscribee_orgnode : OrgNode = {
-          let mut md = default_metadata ();
-          md . id = Some ( subscribee_id . clone () );
-          md . code . interp = Interp::Subscribee;
-          md . code . indefinitive = true;
-          OrgNode {
-            metadata : md,
-            title : subscribee_id . 0, // Use the ID as the title
-            body : None, } };
-        col_mut . append (
-          NodePair { mskgnode: None,
-                     orgnode: subscribee_orgnode } ); } } ) ?;
+      insert_col_node ( tree, subscribee_col_nid,
+        Interp::HiddenOutsideOfSubscribeeCol,
+        "hidden from all subscriptions", false ) ?;
+    for hidden_id in hidden_outside_content {
+      append_indefinitive_node (
+        tree, hidden_outside_col_nid, & hidden_id,
+        Interp::HiddenFromSubscribees, config, driver ) . await ?; } }
+  for subscribee_id in subscribee_ids {
+    append_indefinitive_node (
+      tree, subscribee_col_nid, & subscribee_id,
+      Interp::Subscribee, config, driver ) . await ?; }
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -146,35 +124,14 @@ pub async fn maybe_add_hidden_in_subscribee_col (
       & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
     return Ok (( )); }
-  let hidden_col_nid : NodeId = {
-    // Create HiddenInSubscribeeCol and prepend to this subscribee
-    let hidden_col_orgnode : OrgNode = {
-      let mut md = default_metadata ();
-      md . code . interp = Interp::HiddenInSubscribeeCol;
-      OrgNode {
-        metadata : md,
-        title : "hidden from this subscription" . to_string (),
-        body : None, } };
-    with_node_mut (
-      tree, node_id,
-      |mut node_mut| node_mut
-        . prepend ( NodePair { mskgnode: None,
-                               orgnode: hidden_col_orgnode } )
-        . id () ) ? };
+  let hidden_col_nid : NodeId =
+    insert_col_node ( tree, node_id,
+      Interp::HiddenInSubscribeeCol,
+      "hidden from this subscription", true ) ?;
   for hidden_id in hidden_in_content {
-    // Add HiddenFromSubscribees children
-    let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
-      skgnode_and_orgnode_from_id (
-        config, driver, & hidden_id ) . await ?;
-    orgnode . metadata . code . interp = Interp::HiddenFromSubscribees;
-    orgnode . metadata . code . indefinitive = true;
-    orgnode . body = None;
-    with_node_mut (
-      tree, hidden_col_nid,
-      |mut hidden_col_mut| {
-        hidden_col_mut . append (
-          NodePair { mskgnode: Some ( skgnode ),
-                     orgnode } ); } ) ?; }
+    append_indefinitive_node (
+      tree, hidden_col_nid, & hidden_id,
+      Interp::HiddenFromSubscribees, config, driver ) . await ?; }
   Ok (( )) }
 
 /// Extract PIDs for the subscriber and its subscribees.
@@ -194,46 +151,48 @@ fn subscriber_and_subscribee_pids (
     || "subscriber_and_subscribee_pids: SkgNode should exist"
     . into () ) }
 
-/// Prepend a SubscribeeCol child to a node.
-/// All SubscribeeCol nodes are identical
-///   -- no SkgNode, fixed title.
-fn prepend_subscribee_col (
-  tree    : &mut PairTree,
-  node_id : NodeId,
+/// Insert a collection node (no SkgNode, fixed title) as a child.
+/// If `prepend` is true, inserts at the beginning; otherwise appends.
+pub fn insert_col_node (
+  tree      : &mut PairTree,
+  parent_id : NodeId,
+  interp    : Interp,
+  title     : &str,
+  prepend   : bool,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let subscribee_col_orgnode : OrgNode = {
+  let col_orgnode : OrgNode = {
     let mut md = default_metadata ();
-    md . code . interp = Interp::SubscribeeCol;
+    md . code . interp = interp;
     OrgNode {
       metadata : md,
-      title : "it subscribes to these" . to_string (),
-      body : None, } };
-  let col_id : NodeId = with_node_mut ( tree, node_id, |mut node_mut|
-    node_mut . prepend (
-      NodePair { mskgnode: None,
-                 orgnode: subscribee_col_orgnode } )
-    . id () ) ?;
-  Ok ( col_id ) }
-
-/// Append a HiddenOutsideOfSubscribeeCol child to a SubscribeeCol.
-/// All HiddenOutsideOfSubscribeeCol nodes are identical
-///   -- no SkgNode, fixed title.
-fn append_hidden_outside_of_subscribee_col (
-  tree              : &mut PairTree,
-  subscribee_col_id : NodeId,
-) -> Result < NodeId, Box<dyn Error> > {
-  let hidden_outside_col_orgnode : OrgNode = {
-    let mut md = default_metadata ();
-    md . code . interp = Interp::HiddenOutsideOfSubscribeeCol;
-    OrgNode {
-      metadata : md,
-      title : "hidden from all subscriptions" . to_string (),
+      title : title . to_string (),
       body : None, } };
   let col_id : NodeId = with_node_mut (
-    tree, subscribee_col_id,
-    |mut col_mut|
-    col_mut . append (
-      NodePair { mskgnode: None,
-                 orgnode: hidden_outside_col_orgnode } )
-    . id () ) ?;
+    tree, parent_id,
+    |mut parent_mut| {
+      let pair = NodePair { mskgnode: None, orgnode: col_orgnode };
+      if prepend { parent_mut . prepend ( pair ) . id () }
+      else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
+
+/// Fetch a node from disk and append it as an indefinitive child with the given Interp.
+async fn append_indefinitive_node (
+  tree      : &mut PairTree,
+  parent_id : NodeId,
+  node_id   : &ID,
+  interp    : Interp,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+    skgnode_and_orgnode_from_id (
+      config, driver, node_id ) . await ?;
+  orgnode . metadata . code . interp = interp;
+  orgnode . metadata . code . indefinitive = true;
+  orgnode . body = None;
+  with_node_mut (
+    tree, parent_id,
+    |mut parent_mut| {
+      parent_mut . append (
+        NodePair { mskgnode: Some ( skgnode ), orgnode } ); } ) ?;
+  Ok (( )) }
