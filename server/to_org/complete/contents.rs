@@ -390,6 +390,23 @@ pub async fn ensure_source (
       |np| np . orgnode . metadata . source = Some (source) ) ?; }
   Ok (( )) }
 
+/// Extract PIDs for the subscriber and its subscribees.
+/// Returns an error if the node has no SkgNode.
+fn subscriber_and_subscribee_pids (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < ( ID, Vec < ID > ), Box<dyn Error> > {
+  read_at_node_in_tree (
+    tree, node_id,
+    |np| np . mskgnode . as_ref ()
+      . map ( |skgnode|
+              ( skgnode . ids [0] . clone (),
+                skgnode . subscribes_to . clone ()
+                . unwrap_or_default () ))
+  )? . ok_or_else (
+    || "subscriber_and_subscribee_pids: SkgNode should exist"
+    . into () ) }
+
 /// If the node:
 ///   - subscribes to something
 ///   - is definitive
@@ -404,25 +421,20 @@ pub async fn maybe_add_subscribee_col (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  { // skip indefinitive nodes
+  { // Skip indefinitive nodes.
     let is_indefinitive : bool =
       read_at_node_in_tree (
         tree, node_id,
         |np| np . orgnode . metadata . code . indefinitive ) ?;
     if is_indefinitive { return Ok (( )); }}
+  { // Skip if there already is one.
+    // TODO: We should not  assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
+    if unique_child_with_interp (
+      tree, node_id, Interp::SubscribeeCol )? . is_some ()
+    { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    read_at_node_in_tree (
-      tree, node_id,
-      |np| np . mskgnode . as_ref ()
-        . map ( |skgnode|
-                ( skgnode . ids [ 0 ] . clone (),
-                  ( skgnode . subscribes_to . clone ()
-                    . unwrap_or_default () )) )) ?
-    . ok_or ( "maybe_add_subscribee_col: SkgNode should exist" ) ?;
+    subscriber_and_subscribee_pids ( tree, node_id ) ?;
   if subscribee_ids . is_empty () { return Ok (( )); }
-  if unique_child_with_interp (
-    tree, node_id, Interp::SubscribeeCol )? . is_some ()
-  { return Ok (( )); }
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content

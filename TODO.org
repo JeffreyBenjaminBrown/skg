@@ -37,6 +37,24 @@ let alias_col_id : Option<NodeId> =
     aliascol_node_id,
     & good_aliases_in_tree ) ?;
   { // Append new Alias nodes for missing aliases
+*** extract function
+And let's extract this, too, into 'prepend_subscribee_col':
+
+  let subscribee_col_nid : NodeId = { // the subscribee collector
+    let subscribee_col_orgnode : OrgNode = { // build it
+      let mut md = default_metadata ();
+      md . code . interp = Interp::SubscribeeCol;
+      OrgNode {
+        metadata : md,
+        title : "it subscribes to these" . to_string (),
+        body : None, } };
+    with_node_mut (
+      tree, node_id,
+      ( |mut node_mut| node_mut . prepend (
+          NodePair { mskgnode: None,
+                     orgnode: subscribee_col_orgnode } )
+        . id () )) ? };
+
 *** break up completeDefinitiveOrgnode
     it's super-long
 *** maybe_add_subscribee_col is impenetrable
