@@ -5,7 +5,7 @@
 /// there is no SkgNode corresponding to the OrgNode.
 
 pub mod orgnode_skgnode;
-pub mod accessors;
+pub mod generic;
 pub mod generations;
 
 use crate::types::orgnode::OrgNode;

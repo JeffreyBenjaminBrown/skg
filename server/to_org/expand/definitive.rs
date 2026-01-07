@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::accessors::write_at_node_in_tree;
+use crate::types::tree::generic::write_at_node_in_tree;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;

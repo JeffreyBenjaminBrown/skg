@@ -1,70 +1,186 @@
-/// Functions for pairing OrgNode trees with SkgNode data.
-/// Note that PairTree-specific accessors are in './accessors.rs'.
+/// Node access utilities for ego_tree::Tree.
 
-use crate::to_org::util::forest_root_pair;
-use crate::types::misc::ID;
-use crate::types::orgnode::OrgNode;
-use crate::types::save::SaveInstruction;
+use crate::dbs::filesystem::one_node::skgnode_from_id;
+use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{Interp, OrgNode, default_metadata};
 use crate::types::skgnode::SkgNode;
-use super::{PairTree, NodePair};
+use super::{NodePair, PairTree};
+use super::generic::{read_at_ancestor_in_tree, read_at_node_in_tree, with_node_mut};
 
-use ego_tree::{Tree, NodeId, NodeMut};
-use std::collections::HashMap;
+use ego_tree::{Tree, NodeId, NodeRef};
+use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
-/// Converts an OrgNode forest to a PairTree forest
-/// (both represented as Trees, via ForestRoot).
 ///
-/// Definitive nodes that generated SaveInstructions get Some(skgnode).
-/// Indefinitive nodes (views) get None.
-pub fn pair_orgnode_forest_with_save_instructions (
-  orgnode_tree : &Tree<OrgNode>,
-  instructions : &[SaveInstruction],
-) -> PairTree {
-  let skgnode_map : HashMap<ID, SkgNode> =
-    instructions . iter ()
-    . filter_map ( |(skgnode, _action)| {
-      skgnode . ids . first ()
-        . map ( |pid| (pid.clone(), skgnode.clone()) ) } )
-    . collect ();
-  let mut pair_tree : PairTree = Tree::new (
-    // PITFALL: Discards the forest's root OrgNode.
-    forest_root_pair () );
-  let forest_root_treeid : NodeId = pair_tree . root () . id ();
-  for tree_root in orgnode_tree.root().children() {
-    add_paired_subtree_as_child (
-      &mut pair_tree,
-      forest_root_treeid,
-      orgnode_tree, tree_root . id (),
-      &skgnode_map ); }
-  pair_tree }
+/// accessors specific to trees of OrgNodes and (maybe) SkgNodes
+///
 
-/// Add an OrgNode subtree as a child of a parent in the PairTree,
-/// pairing each node with its SkgNode from the map.
-fn add_paired_subtree_as_child (
-  pair_tree       : &mut PairTree,
-  parent_treeid  : NodeId,
-  orgnode_tree    : &Tree<OrgNode>,
-  orgnode_treeid : NodeId,
-  skgnode_map     : &HashMap<ID, SkgNode>,
-) {
-  let orgnode : OrgNode =
-    orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-    . value () . clone ();
-  let mskgnode : Option<SkgNode> =
-    orgnode . metadata . id . as_ref ()
-    . and_then (
-      |id| skgnode_map . get (id) . cloned () );
-  let new_treeid : NodeId = {
-    let mut parent_mut : NodeMut < _ > =
-      pair_tree . get_mut ( parent_treeid ) . unwrap ();
-    parent_mut . append ( // add new node
-      NodePair { mskgnode, orgnode } ) . id () };
-  { // recurse in new node
-    let child_treeids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      add_paired_subtree_as_child (
-        pair_tree, new_treeid,
-        orgnode_tree, child_treeid,
-        skgnode_map ); }} }
+/// Find the unique child of a node with a given Interp (for PairTree).
+/// Returns None if no child has the interp,
+/// Some(child_id) if exactly one does,
+/// or an error if multiple children have it.
+pub fn unique_child_with_interp (
+  tree    : &PairTree,
+  node_id : NodeId,
+  interp  : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let node_ref : ego_tree::NodeRef<super::NodePair> =
+    tree.get(node_id)
+    .ok_or("unique_child_with_interp: node not found")?;
+  let matches : Vec<NodeId> = node_ref.children()
+    .filter(|c| c.value().orgnode.metadata.code.interp == interp)
+    .map(|c| c.id())
+    .collect();
+  match matches.len() {
+    0 => Ok(None),
+    1 => Ok(Some(matches[0])),
+    n => Err(format!(
+      "Expected at most one {:?} child, found {}", interp, n).into()),
+  }
+}
+
+/// Find the unique child of a node with a given Interp (for Tree<OrgNode>).
+/// Returns None if no child has the interp,
+/// Some(child_id) if exactly one does,
+/// or an error if multiple children have it.
+pub fn unique_orgnode_child_with_interp (
+  tree    : &Tree<OrgNode>,
+  node_id : NodeId,
+  interp  : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let node_ref : ego_tree::NodeRef<OrgNode> =
+    tree . get(node_id) . ok_or(
+      "unique_orgnode_child_with_interp: node not found")?;
+  unique_orgnode_child_with_interp_from_ref (
+    &node_ref, interp ) }
+
+/// Like unique_orgnode_child_with_interp, but takes a NodeRef directly.
+/// Useful when you already have the NodeRef and don't want to look it up again.
+pub fn unique_orgnode_child_with_interp_from_ref (
+  node_ref : &ego_tree::NodeRef<OrgNode>,
+  interp   : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let matches : Vec<NodeId> = node_ref.children()
+    .filter(|c| c.value().metadata.code.interp == interp)
+    .map(|c| c.id())
+    .collect();
+  match matches.len() {
+    0 => Ok(None),
+    1 => Ok(Some(matches[0])),
+    n => Err(format!(
+      "Expected at most one {:?} child, found {}", interp, n).into()),
+  }
+}
+
+/// Extract PIDs for the subscriber and its subscribees.
+/// Returns an error if the node has no SkgNode.
+pub fn pids_for_subscriber_and_its_subscribees (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < ( ID, Vec < ID > ), Box<dyn Error> > {
+  read_at_node_in_tree (
+    tree, node_id,
+    |np| np . mskgnode . as_ref ()
+      . map ( |skgnode|
+              ( skgnode . ids [0] . clone (),
+                skgnode . subscribes_to . clone ()
+                . unwrap_or_default () ))
+  )? . ok_or_else (
+    || "pids_for_subscriber_and_its_subscribees: SkgNode should exist"
+    . into () ) }
+
+/// Extract PIDs for a Subscribee and its grandparent (the subscriber).
+/// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
+pub fn pid_for_subscribee_and_its_subscriber_grandparent (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < ( ID, ID ), Box<dyn Error> > {
+  let node_ref : NodeRef < NodePair > =
+    tree . get ( node_id ) . ok_or (
+      "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
+  let subscribee_pid : ID =
+    node_ref . value () . orgnode . metadata . id . clone ()
+    . ok_or ( "Subscribee has no ID" ) ?;
+  let parent_ref : NodeRef < NodePair > =
+    node_ref . parent ()
+    . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
+  if parent_ref . value () . orgnode . metadata . code . interp
+    != Interp::SubscribeeCol {
+      return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                    into () ); }
+  let grandparent_ref : NodeRef < NodePair > =
+    parent_ref . parent ()
+    . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
+  let skgnode : &SkgNode =
+    grandparent_ref . value () . mskgnode . as_ref ()
+    . ok_or ( "Subscriber has no SkgNode" ) ?;
+  Ok ( ( subscribee_pid,
+         skgnode . ids [ 0 ] . clone () ) ) }
+
+/// Insert a collection node (no SkgNode, fixed title) as a child.
+/// If `prepend` is true, inserts at the beginning; otherwise appends.
+pub fn insert_col_node (
+  tree      : &mut PairTree,
+  parent_id : NodeId,
+  interp    : Interp,
+  title     : &str,
+  prepend   : bool,
+) -> Result < NodeId, Box<dyn Error> > {
+  let col_orgnode : OrgNode = {
+    let mut md = default_metadata ();
+    md . code . interp = interp;
+    OrgNode {
+      metadata : md,
+      title : title . to_string (),
+      body : None, } };
+  let col_id : NodeId = with_node_mut (
+    tree, parent_id,
+    |mut parent_mut| {
+      let pair = NodePair { mskgnode: None, orgnode: col_orgnode };
+      if prepend { parent_mut . prepend ( pair ) . id () }
+      else       { parent_mut . append  ( pair ) . id () } } ) ?;
+  Ok ( col_id ) }
+
+/// Fetch a node from disk and append it as an indefinitive child with the given Interp.
+pub async fn append_indefinitive_node (
+  tree      : &mut PairTree,
+  parent_id : NodeId,
+  node_id   : &ID,
+  interp    : Interp,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+    skgnode_and_orgnode_from_id (
+      config, driver, node_id ) . await ?;
+  orgnode . metadata . code . interp = interp;
+  orgnode . metadata . code . indefinitive = true;
+  orgnode . body = None;
+  with_node_mut (
+    tree, parent_id,
+    |mut parent_mut| {
+      parent_mut . append (
+        NodePair { mskgnode: Some ( skgnode ), orgnode } ); } ) ?;
+  Ok (( )) }
+
+/// Reads from disk the SkgNode
+/// for a node or for one of its tree-ancestors.
+pub async fn ancestor_skgnode_from_disk (
+  tree       : &PairTree,
+  treeid     : NodeId,
+  generation : usize, // 0 = self, 1 = parent, etc.
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < SkgNode, Box<dyn Error> > {
+  let ancestor_skgid : ID =
+    read_at_ancestor_in_tree( tree, treeid, generation,
+      |np| np . orgnode . metadata . id . clone () )
+    . map_err( |e| -> Box<dyn Error> { e . into () })?
+    . ok_or_else(
+      || -> Box<dyn Error> {
+        "Ancestor node has no ID" . into () })?;
+  Ok ( { let skgnode : SkgNode =
+           skgnode_from_id(
+             config, driver, &ancestor_skgid ) . await?;
+         skgnode } ) }

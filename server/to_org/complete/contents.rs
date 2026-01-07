@@ -13,7 +13,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::accessors::{
+use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
 
 use ego_tree::{NodeId, NodeMut, NodeRef};

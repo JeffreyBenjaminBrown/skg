@@ -2,7 +2,8 @@ use crate::types::orgnode::{OrgNode, Interp, EditRequest};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
-use crate::types::tree::accessors::{ read_at_node_in_tree, unique_orgnode_child_with_interp };
+use crate::types::tree::generic::read_at_node_in_tree;
+use crate::types::tree::orgnode_skgnode::unique_orgnode_child_with_interp;
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 

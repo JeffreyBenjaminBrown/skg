@@ -3,7 +3,7 @@ pub mod contradictory_instructions;
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
 use crate::types::errors::BufferValidationError;
-use crate::types::tree::accessors::unique_orgnode_child_with_interp_from_ref;
+use crate::types::tree::orgnode_skgnode::unique_orgnode_child_with_interp_from_ref;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use ego_tree::Tree;

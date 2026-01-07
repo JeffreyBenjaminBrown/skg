@@ -1,21 +1,23 @@
 use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
-use crate::types::tree::orgnode_skgnode::pair_orgnode_forest_with_save_instructions;
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
 use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
 use crate::to_org::expand::definitive::execute_view_requests;
+use crate::to_org::util::forest_root_pair;
 use crate::types::errors::SaveError;
-use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::orgnode::OrgNode;
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
-use crate::types::tree::PairTree;
+use crate::types::skgnode::SkgNode;
+use crate::types::tree::{NodePair, PairTree};
 
-use ego_tree::Tree;
+use ego_tree::{Tree, NodeId, NodeMut};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
+use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
@@ -185,3 +187,61 @@ pub async fn update_from_and_rerender_buffer (
     orgnode_forest_to_string ( & paired_forest ) ?;
 
   Ok ( SaveResponse { buffer_content, errors } ) }
+
+/// Converts an OrgNode forest to a PairTree forest
+/// (both represented as Trees, via ForestRoot).
+///
+/// Definitive nodes that generated SaveInstructions get Some(skgnode).
+/// Indefinitive nodes (views) get None.
+fn pair_orgnode_forest_with_save_instructions (
+  orgnode_tree : &Tree<OrgNode>,
+  instructions : &[SaveInstruction],
+) -> PairTree {
+  let skgnode_map : HashMap<ID, SkgNode> =
+    instructions . iter ()
+    . filter_map ( |(skgnode, _action)| {
+      skgnode . ids . first ()
+        . map ( |pid| (pid.clone(), skgnode.clone()) ) } )
+    . collect ();
+  let mut pair_tree : PairTree = Tree::new (
+    // PITFALL: Discards the forest's root OrgNode.
+    forest_root_pair () );
+  let forest_root_treeid : NodeId = pair_tree . root () . id ();
+  for tree_root in orgnode_tree.root().children() {
+    add_paired_subtree_as_child (
+      &mut pair_tree,
+      forest_root_treeid,
+      orgnode_tree, tree_root . id (),
+      &skgnode_map ); }
+  pair_tree }
+
+/// Add an OrgNode subtree as a child of a parent in the PairTree,
+/// pairing each node with its SkgNode from the map.
+fn add_paired_subtree_as_child (
+  pair_tree      : &mut PairTree,
+  parent_treeid  : NodeId,
+  orgnode_tree   : &Tree<OrgNode>,
+  orgnode_treeid : NodeId,
+  skgnode_map    : &HashMap<ID, SkgNode>,
+) {
+  let orgnode : OrgNode =
+    orgnode_tree . get ( orgnode_treeid ) . unwrap ()
+    . value () . clone ();
+  let mskgnode : Option<SkgNode> =
+    orgnode . metadata . id . as_ref ()
+    . and_then (
+      |id| skgnode_map . get (id) . cloned () );
+  let new_treeid : NodeId = {
+    let mut parent_mut : NodeMut < _ > =
+      pair_tree . get_mut ( parent_treeid ) . unwrap ();
+    parent_mut . append ( // add new node
+      NodePair { mskgnode, orgnode } ) . id () };
+  { // recurse in new node
+    let child_treeids : Vec < NodeId > =
+      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
+      . children () . map ( |c| c . id () ) . collect ();
+    for child_treeid in child_treeids {
+      add_paired_subtree_as_child (
+        pair_tree, new_treeid,
+        orgnode_tree, child_treeid,
+        skgnode_map ); }} }

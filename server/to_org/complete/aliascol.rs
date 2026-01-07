@@ -1,10 +1,9 @@
-use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::to_org::complete::sharing::insert_col_node;
-use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, Interp};
+use crate::types::orgnode::{Interp, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::accessors::{read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::tree::orgnode_skgnode::{ancestor_skgnode_from_disk, insert_col_node};
+use crate::types::misc::SkgConfig;
+use crate::types::skgnode::SkgNode;
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
@@ -71,27 +70,6 @@ pub async fn completeAliasCol (
     insert_col_node ( tree, aliascol_node_id,
       Interp::Alias, & alias, false ) ?; }
   Ok (( )) }
-
-/// Reads from disk the SkgNode
-/// for a node or for one of its tree-ancestors.
-async fn ancestor_skgnode_from_disk (
-  tree       : &PairTree,
-  treeid     : NodeId,
-  generation : usize, // 0 = self, 1 = parent, etc.
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
-) -> Result < SkgNode, Box<dyn Error> > {
-  let ancestor_skgid : ID =
-    read_at_ancestor_in_tree( tree, treeid, generation,
-      |np| np . orgnode . metadata . id . clone () )
-    . map_err( |e| -> Box<dyn Error> { e . into () })?
-    . ok_or_else(
-      || -> Box<dyn Error> {
-        "Ancestor node has no ID" . into () })?;
-  Ok ( { let skgnode : SkgNode =
-           skgnode_from_id(
-             config, driver, &ancestor_skgid ) . await?;
-         skgnode } ) }
 
 /// Collect titles from Alias children of an AliasCol node.
 /// Errors if any non-Alias children are found.

@@ -1,10 +1,9 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
-use crate::to_org::complete::sharing::insert_col_node;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, ViewRequest};
 use crate::types::tree::PairTree;
-use crate::types::tree::accessors::unique_child_with_interp;
+use crate::types::tree::orgnode_skgnode::{insert_col_node, unique_child_with_interp};
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;

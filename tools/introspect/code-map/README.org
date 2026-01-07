@@ -1,3 +1,6 @@
+* usage
+cargo run -p code-map
+* purpose
 Generates an .org document. The root headline is the folder name 'server/'. Thereafter, the subheadlines of every folder headline should be the files and folders it contains. The subheadlines of every file headline should be the functions and types it defines. (I mean types in the broadest sense -- enums, aliases, product types, the gamut.) It also includes each function and type defined under an Impl body.
 
-Let's call those types and functions 'leaves'. Each leaf includes a body with an Emacs-style link to the relevant definition.
+If we call those types and functions 'leaves', then each leaf includes a body with an Emacs-style link to the relevant definition.
