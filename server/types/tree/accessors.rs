@@ -1,6 +1,10 @@
 /// Node access utilities for ego_tree::Tree.
 
+use crate::types::orgnode::{Interp, OrgNode};
+use super::PairTree;
+
 use ego_tree::{Tree, NodeId, NodeMut};
+use std::error::Error;
 
 /// Read a value from an ancestor of a node in a tree, applying a function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -78,13 +82,9 @@ where F: FnOnce(NodeMut<T>) -> R {
     . ok_or ( "with_node_mut: node not found" ) ?;
   Ok ( f ( node_mut ) ) }
 
-//
-// accessors specific to trees of OrgNodes and (maybe) SkgNodes
-//
-
-use crate::types::orgnode::{Interp, OrgNode};
-use super::PairTree;
-use std::error::Error;
+///
+/// accessors specific to trees of OrgNodes and (maybe) SkgNodes
+///
 
 /// Find the unique child of a node with a given Interp (for PairTree).
 /// Returns None if no child has the interp,

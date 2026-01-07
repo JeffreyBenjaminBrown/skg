@@ -37,7 +37,7 @@ pub async fn maybe_add_subscribee_col (
       tree, node_id, Interp::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    subscriber_and_subscribee_pids ( tree, node_id ) ?;
+    pids_for_subscriber_and_its_subscribees ( tree, node_id ) ?;
   if subscribee_ids . is_empty () { // Skip because it would be empty.
     return Ok (( )); }
 
@@ -92,30 +92,11 @@ pub async fn maybe_add_hidden_in_subscribee_col (
       "maybe_add_hidden_in_subscribee_col called on non-subscribee"
         . into () ); }}
   if unique_child_with_interp (
+    // TODO: We should not  assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     tree, node_id, Interp::HiddenInSubscribeeCol )? . is_some ()
   { return Ok (( )); }
-  let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) = {
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( node_id ) . ok_or (
-        "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
-    let subscribee_pid : ID =
-      node_ref . value () . orgnode . metadata . id . clone ()
-      . ok_or ( "Subscribee has no ID" ) ?;
-    let parent_ref : NodeRef < NodePair > =
-      node_ref . parent ()
-      . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-    if parent_ref . value () . orgnode . metadata . code . interp
-      != Interp::SubscribeeCol {
-        return Err ( "Subscribee's parent is not a SubscribeeCol" .
-                      into () ); }
-    let grandparent_ref : NodeRef < NodePair > =
-      parent_ref . parent ()
-      . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
-    let skgnode : &SkgNode =
-      grandparent_ref . value () . mskgnode . as_ref ()
-      . ok_or ( "Subscriber has no SkgNode" ) ?;
-    ( subscribee_pid,
-      skgnode . ids [ 0 ] . clone () ) };
+  let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
+    pid_for_subscribee_and_its_subscriber_grandparent ( tree, node_id ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
@@ -136,7 +117,7 @@ pub async fn maybe_add_hidden_in_subscribee_col (
 
 /// Extract PIDs for the subscriber and its subscribees.
 /// Returns an error if the node has no SkgNode.
-fn subscriber_and_subscribee_pids (
+fn pids_for_subscriber_and_its_subscribees (
   tree    : &PairTree,
   node_id : NodeId,
 ) -> Result < ( ID, Vec < ID > ), Box<dyn Error> > {
@@ -148,8 +129,36 @@ fn subscriber_and_subscribee_pids (
                 skgnode . subscribes_to . clone ()
                 . unwrap_or_default () ))
   )? . ok_or_else (
-    || "subscriber_and_subscribee_pids: SkgNode should exist"
+    || "pids_for_subscriber_and_its_subscribees: SkgNode should exist"
     . into () ) }
+
+/// Extract PIDs for a Subscribee and its grandparent (the subscriber).
+/// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
+fn pid_for_subscribee_and_its_subscriber_grandparent (
+  tree    : &PairTree,
+  node_id : NodeId,
+) -> Result < ( ID, ID ), Box<dyn Error> > {
+  let node_ref : NodeRef < NodePair > =
+    tree . get ( node_id ) . ok_or (
+      "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
+  let subscribee_pid : ID =
+    node_ref . value () . orgnode . metadata . id . clone ()
+    . ok_or ( "Subscribee has no ID" ) ?;
+  let parent_ref : NodeRef < NodePair > =
+    node_ref . parent ()
+    . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
+  if parent_ref . value () . orgnode . metadata . code . interp
+    != Interp::SubscribeeCol {
+      return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                    into () ); }
+  let grandparent_ref : NodeRef < NodePair > =
+    parent_ref . parent ()
+    . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
+  let skgnode : &SkgNode =
+    grandparent_ref . value () . mskgnode . as_ref ()
+    . ok_or ( "Subscriber has no SkgNode" ) ?;
+  Ok ( ( subscribee_pid,
+         skgnode . ids [ 0 ] . clone () ) ) }
 
 /// Insert a collection node (no SkgNode, fixed title) as a child.
 /// If `prepend` is true, inserts at the beginning; otherwise appends.
