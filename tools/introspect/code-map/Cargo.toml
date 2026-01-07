@@ -2,10 +2,15 @@
 name = "code-map"
 version = "0.1.0"
 edition = "2021"
+default-run = "code-map"
 
 [[bin]]
 name = "code-map"
 path = "code-map.rs"
+
+[[bin]]
+name = "code-map-regen"
+path = "code-map-regen.rs"
 
 [dependencies]
 syn = { version = "2", features = ["full", "parsing"] }

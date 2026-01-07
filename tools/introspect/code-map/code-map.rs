@@ -1,7 +1,12 @@
-// Run from anywhere:
-//   cargo run -p code-map
+// Generate a code map for a path:
+//   cargo run -p code-map [path]
 //
-// Generates tools/introspect/code-map/code-map.org with a hierarchical view of the server/ codebase.
+// Default: analyzes server/, output to tools/introspect/code-map/output/server.org
+// With path: analyzes that path, output named by replacing / with _
+//   e.g., server/types/tree -> server_types_tree.org
+//
+// Regenerate all existing maps:
+//   cargo run -p code-map --bin code-map-regen
 
 use std::fs;
 use std::path::Path;
@@ -14,19 +19,45 @@ fn main() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let project_root = Path::new(manifest_dir).parent().unwrap().parent().unwrap().parent().unwrap();
 
-    let server_dir = project_root.join("server");
-    let output_file = project_root.join("tools/introspect/code-map/code-map.org");
+    let args: Vec<String> = std::env::args().collect();
+    let target_path = if args.len() > 1 { &args[1] } else { "server" };
 
-    // Paths in org links are relative to where the org file lives
-    let output = generate_code_map(&server_dir, "../../../server");
+    // Normalize: strip trailing slash and .rs extension
+    let normalized = target_path
+        .trim_end_matches('/')
+        .trim_end_matches(".rs");
+
+    // Compute output filename: / becomes _, and swap - with _
+    let output_name = format!("{}.org",
+        normalized.chars()
+            .map(|c| match c {
+                '/' => '_',
+                '-' => '_',
+                '_' => '-',
+                c => c,
+            })
+            .collect::<String>());
+    let output_dir = project_root.join("tools/introspect/code-map/output");
+    fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+    let output_file = output_dir.join(&output_name);
+
+    let target_dir = project_root.join(normalized);
+
+    // Calculate relative path from output file to target for org links
+    // Output is in tools/introspect/code-map/output/, so we need ../../../../{normalized}
+    let org_path_prefix = format!("../../../../{}", normalized);
+
+    let output = generate_code_map(&target_dir, normalized, &org_path_prefix);
 
     fs::write(&output_file, &output).expect("Failed to write output");
     println!("Generated {} ({} lines)", output_file.display(), output.lines().count());
 }
 
-fn generate_code_map(root: &Path, org_path_prefix: &str) -> String {
+fn generate_code_map(root: &Path, heading: &str, org_path_prefix: &str) -> String {
     let mut output = String::new();
-    output.push_str("* server/\n");
+    // Use trailing slash if it's a directory, not if it's a single file
+    let heading_suffix = if root.is_dir() { "/" } else { "" };
+    output.push_str(&format!("* {}{}\n", heading, heading_suffix));
     process_directory(root, &mut output, 2, org_path_prefix);
     output
 }

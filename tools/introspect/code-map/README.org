@@ -1,5 +1,9 @@
 * usage
-cargo run -p code-map
+** (re)build one map
+cargo run -p code-map [path]
+Defaults to the path server/.
+** rebuild them all
+cargo run -p code-map --bin code-map-regen
 * purpose
 Generates an .org document. The root headline is the folder name 'server/'. Thereafter, the subheadlines of every folder headline should be the files and folders it contains. The subheadlines of every file headline should be the functions and types it defines. (I mean types in the broadest sense -- enums, aliases, product types, the gamut.) It also includes each function and type defined under an Impl body.
 

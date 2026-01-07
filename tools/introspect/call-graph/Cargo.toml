@@ -2,10 +2,15 @@
 name = "call-graph"
 version = "0.1.0"
 edition = "2021"
+default-run = "call-graph"
 
 [[bin]]
 name = "call-graph"
 path = "call-graph.rs"
+
+[[bin]]
+name = "call-graph-regen"
+path = "call-graph-regen.rs"
 
 [dependencies]
 syn = { version = "2", features = ["full", "visit"] }

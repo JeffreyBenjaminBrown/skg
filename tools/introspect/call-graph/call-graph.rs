@@ -1,7 +1,11 @@
-/// USAGE: cargo run -p call-graph [-- function_name]
+/// Generate a call tree for a function:
+///   cargo run -p call-graph [-- function_name]
+///
+/// Regenerate all existing call trees:
+///   cargo run -p call-graph --bin call-graph-regen
 ///
 /// PURPOSE: Generate a 'call tree' document. That's an .org file, saved to
-/// tools/introspect/call-graph/function-name.org, for some function name. Each headline
+/// tools/introspect/call-graph/output/function-name.org, for some function name. Each headline
 /// is a function name. The root headline is the same as the file's basename. Each
 /// headline calls each of its child headlines. The first appearance of a function
 /// lists what it calls; subsequent appearances merely indicate that it was already
@@ -426,7 +430,6 @@ impl CallGraph {
     ancestors: &mut Vec<String>,
   ) {
     let stars = "*".repeat(depth);
-    let indent = " ".repeat(depth);
 
     // Check if this is a recursive call
     let is_recursive = ancestors[..ancestors.len().saturating_sub(1)]
@@ -445,11 +448,10 @@ impl CallGraph {
       return;
     }
 
-    // Get function info
-    let (_, loc) = match self.functions.get(func_name) {
-      Some(f) => f,
-      None => return,
-    };
+    // Check function exists
+    if !self.functions.contains_key(func_name) {
+      return;
+    }
 
     // Write headline
     if depth == 1 {
@@ -465,9 +467,6 @@ impl CallGraph {
     } else {
       output.push_str(&format!("{} {}\n", stars, func_name));
     }
-
-    // Write LOC
-    output.push_str(&format!("{} {} LOC\n", indent, loc));
 
     // Mark as described
     described.insert(func_name.to_string());
@@ -509,11 +508,12 @@ fn main() {
   let project_root = manifest_dir.parent().unwrap().parent().unwrap().parent().unwrap();
 
   let server_dir = project_root.join("server");
-  let output_dir = &manifest_dir;  // tools/introspect/call-graph/
-  let db_dir = output_dir.join("db");
+  let db_dir = manifest_dir.join("db");
+  let output_dir = manifest_dir.join("output");
 
   // Create output directories
   fs::create_dir_all(&db_dir).expect("Failed to create db/ directory");
+  fs::create_dir_all(&output_dir).expect("Failed to create output/ directory");
 
   //
   // PHASE 1: Parse codebase and write CSVs
@@ -644,6 +644,10 @@ fn main() {
   let org_content = graph.generate_org_tree(target_function);
 
   let output_file = output_dir.join(format!("{}.org", target_function));
-  fs::write(&output_file, org_content).expect("Failed to write org file");
-  println!("Wrote {}", output_file.display());
+  fs::write(&output_file, &org_content).expect("Failed to write org file");
+  println!(
+    "Wrote {} ({} lines)",
+    output_file.display(),
+    org_content.lines().count()
+  );
 }
