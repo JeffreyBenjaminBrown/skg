@@ -11,6 +11,7 @@ use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId};
 
 use crate::types::orgnode::OrgNode;
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
@@ -56,6 +57,46 @@ pub fn assign_pids_throughout_tree_from_map (
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_treeid )
       { assign_pids_throughout_tree_from_map (
+        child_mut, pid_map ); }} }}
+
+/// Collect IDs for bulk PID lookup (NewOrgNode version)
+pub fn collect_ids_in_neworgnode_tree (
+  node_ref : NodeRef < NewOrgNode >,
+  ids_to_lookup : & mut Vec < ID >
+) {
+  if let Some ( id )
+    = node_ref . value () . id ()
+  { // Collect ID if present
+    ids_to_lookup . push ( id . clone () ); }
+  for child in node_ref . children () { // Recurse
+    collect_ids_in_neworgnode_tree (
+      child,
+      ids_to_lookup ); } }
+
+/// Assign PIDs from the bulk lookup results (NewOrgNode version)
+pub fn assign_pids_throughout_neworgnode_tree_from_map (
+  mut node_ref : NodeMut < NewOrgNode >,
+  pid_map : & HashMap < ID, Option < ID > >
+) {
+  if let Some ( current_id )
+    = node_ref . value () . id () . cloned ()
+  { // Assign PID if we have one
+    if let Some ( Some ( pid )) =
+      pid_map . get ( &current_id )
+    { node_ref . value () . set_id (
+        Some ( pid . clone () ) ); }}
+  { // Process children recursively
+    for child_treeid in {
+      let treeid : NodeId = node_ref . id ();
+      let child_treeids : Vec < NodeId > = {
+        let tree = node_ref . tree ();
+        tree . get ( treeid ) . unwrap ()
+          . children () . map ( | child | child . id () )
+          . collect () };
+      child_treeids } {
+      if let Some ( child_mut )
+        = node_ref . tree () . get_mut ( child_treeid )
+      { assign_pids_throughout_neworgnode_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// PURPOSE: Run one TypeDB query, using nested subqueries,

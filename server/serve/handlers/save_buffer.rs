@@ -9,8 +9,7 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::forest_root_pair;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode::OrgNode;
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{NodePair, PairTree};
@@ -138,7 +137,7 @@ pub async fn update_from_and_rerender_buffer (
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (orgnode_forest, save_instructions, mergeInstructions)
-    : ( Tree<OrgNode>,
+    : ( Tree<NewOrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
     = buffer_to_orgnode_forest_and_save_instructions (
@@ -189,13 +188,13 @@ pub async fn update_from_and_rerender_buffer (
 
   Ok ( SaveResponse { buffer_content, errors } ) }
 
-/// Converts an OrgNode forest to a PairTree forest
+/// Converts a NewOrgNode forest to a PairTree forest
 /// (both represented as Trees, via ForestRoot).
 ///
 /// Definitive nodes that generated SaveInstructions get Some(skgnode).
 /// Indefinitive nodes (views) get None.
 fn pair_orgnode_forest_with_save_instructions (
-  orgnode_tree : &Tree<OrgNode>,
+  orgnode_tree : &Tree<NewOrgNode>,
   instructions : &[SaveInstruction],
 ) -> PairTree {
   let skgnode_map : HashMap<ID, SkgNode> =
@@ -216,28 +215,27 @@ fn pair_orgnode_forest_with_save_instructions (
       &skgnode_map ); }
   pair_tree }
 
-/// Add an OrgNode subtree as a child of a parent in the PairTree,
+/// Add a NewOrgNode subtree as a child of a parent in the PairTree,
 /// pairing each node with its SkgNode from the map.
 fn add_paired_subtree_as_child (
   pair_tree      : &mut PairTree,
   parent_treeid  : NodeId,
-  orgnode_tree   : &Tree<OrgNode>,
+  orgnode_tree   : &Tree<NewOrgNode>,
   orgnode_treeid : NodeId,
   skgnode_map    : &HashMap<ID, SkgNode>,
 ) {
-  let orgnode : OrgNode =
+  let orgnode : NewOrgNode =
     orgnode_tree . get ( orgnode_treeid ) . unwrap ()
     . value () . clone ();
   let mskgnode : Option<SkgNode> =
-    orgnode . metadata . id . as_ref ()
+    orgnode . id ()
     . and_then (
       |id| skgnode_map . get (id) . cloned () );
-  let new_orgnode = from_old_orgnode ( &orgnode );
   let new_treeid : NodeId = {
     let mut parent_mut : NodeMut < _ > =
       pair_tree . get_mut ( parent_treeid ) . unwrap ();
     parent_mut . append ( // add new node
-      NodePair { mskgnode, orgnode : new_orgnode } ) . id () };
+      NodePair { mskgnode, orgnode } ) . id () };
   { // recurse in new node
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()

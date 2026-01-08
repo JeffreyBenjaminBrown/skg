@@ -1,21 +1,22 @@
-use crate::types::orgnode::{OrgNode, Interp, EditRequest};
+use crate::types::orgnode::{Interp, EditRequest};
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  collect_grandchild_aliases_for_orgnode, unique_orgnode_child_with_interp };
+  collect_grandchild_aliases_for_neworgnode, unique_neworgnode_child_with_interp };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-/// Converts a forest of OrgNodes to SaveInstructions,
+/// Converts a forest of NewOrgNodes to SaveInstructions,
 /// taking them all at face value.
 ///
 /// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
 pub fn naive_saveinstructions_from_forest (
-  mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
+  mut forest: Tree<NewOrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
@@ -30,14 +31,14 @@ pub fn naive_saveinstructions_from_forest (
 /// - aliases     are handled by 'collect_aliases'
 /// - subscribees are handled by 'collect_subscribees'
 fn naive_saveinstructions_from_tree(
-  tree: &mut Tree<OrgNode>,
+  tree: &mut Tree<NewOrgNode>,
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
   let (interp, is_indefinitive): (Interp, bool) =
     read_at_node_in_tree(tree, node_id, |node| {
-      ( node.metadata.code.interp.clone(),
-        node.metadata.code.indefinitive )
+      ( node.interp().clone(),
+        node.is_indefinitive() )
     })?;
   if interp == Interp::ForestRoot {
     for child_treeid in {
@@ -58,7 +59,7 @@ fn naive_saveinstructions_from_tree(
                       Interp::HiddenFromSubscribees ) {
     return Ok(()); } // Skip - these don't generate SaveInstructions
   let aliases =
-    collect_grandchild_aliases_for_orgnode(tree, node_id)?;
+    collect_grandchild_aliases_for_neworgnode(tree, node_id)?;
   let subscribees =
     collect_subscribees(tree, node_id)?;
   let skg_node_opt = if !is_indefinitive {
@@ -72,7 +73,7 @@ fn naive_saveinstructions_from_tree(
     result.push((skg_node, {
       let save_action: NonMerge_NodeAction =
         read_at_node_in_tree(tree, node_id, |node| {
-          if matches!( node.metadata.code.editRequest,
+          if matches!( node.edit_request(),
                        Some(EditRequest::Delete) )
           { NonMerge_NodeAction::Delete
           } else { NonMerge_NodeAction::Save } })?;
@@ -88,22 +89,22 @@ fn naive_saveinstructions_from_tree(
   Ok (( )) }
 
 fn skgnode_for_orgnode_in_tree<'a> (
-  orgnode: &OrgNode,
-  noderef: &NodeRef<'a, OrgNode>, // the same node, but in the tree
+  orgnode: &NewOrgNode,
+  noderef: &NodeRef<'a, NewOrgNode>, // the same node, but in the tree
   aliases: Option<Vec<String>>,
   subscribees: Option<Vec<ID>>,
 ) -> Result<SkgNode, String> {
   let title: String =
-    orgnode . title . clone();
+    orgnode . title() . to_string();
   let body: Option<String> =
-    orgnode . body . clone();
+    orgnode . body() . cloned();
   let ids: Vec<ID> =
-    match &orgnode.metadata.id {
+    match orgnode.id() {
       Some(id) => vec![id.clone()],
       None => return Err(format!(
         "Node entitled '{}' has no ID", title)), };
   let source: String =
-    match &orgnode.metadata.source {
+    match orgnode.source() {
       Some(s) => s.clone(),
       None => return Err(format!(
         "Node entitled '{}' has no source", title)), };
@@ -126,37 +127,37 @@ fn skgnode_for_orgnode_in_tree<'a> (
 ///   Empty means the user wants no subscribees.
 ///   Deduplicates the output, preserving order of first occurrence.
 fn collect_subscribees (
-  tree: &Tree<OrgNode>,
+  tree: &Tree<NewOrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
+    unique_neworgnode_child_with_interp (
       tree, node_id, Interp::SubscribeeCol )
     . map_err ( |e| e.to_string() ) ?;
   match subscribee_col_id {
     None => Ok(None),
     Some(col_id) => {
       let subscribees : Vec<ID> = {
-        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
+        let col_ref : NodeRef<NewOrgNode> = tree.get(col_id).expect(
           "collect_subscribees: SubscribeeCol not found");
         let mut subscribees : Vec<ID> = Vec::new();
         for subscribee_child in col_ref.children() {
           { // maybe skip, maybe err
-            let child_interp : &Interp =
-              &subscribee_child . value() . metadata . code.interp;
-            if *child_interp == Interp::HiddenOutsideOfSubscribeeCol {
+            let child_interp : Interp =
+              subscribee_child . value() . interp() . clone();
+            if child_interp == Interp::HiddenOutsideOfSubscribeeCol {
               // This Interp is allowed as a child of a SubscribeeCol,
               // but it's not a subscribee, so skip it.
               continue; }
-            if *child_interp != Interp::Subscribee {
+            if child_interp != Interp::Subscribee {
               return Err ( format! (
                 "SubscribeeCol has non-Subscribee child with interp: {:?}",
                 child_interp )); }}
-          match &subscribee_child.value().metadata.id {
+          match subscribee_child.value().id() {
             Some(id) => subscribees . push( id . clone() ),
             None => return Err ( format! (
               "Subscribee '{}' has no ID",
-              subscribee_child.value().title )), }}
+              subscribee_child.value().title() )), }}
         subscribees };
       Ok(Some(dedup_vector(subscribees))) }} }
 
@@ -164,16 +165,16 @@ fn collect_subscribees (
 /// Not a recursive traversal;
 ///   it is only concerned with this node's contents.
 fn collect_contents_that_are_not_to_delete<'a> (
-  node_ref: &NodeRef<'a, OrgNode>
+  node_ref: &NodeRef<'a, NewOrgNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if (( child . value() . metadata . code.interp
+    if (( child . value() . interp()
           == Interp::Content )
         && ( ! matches!(
-          child . value() . metadata . code . editRequest,
+          child . value() . edit_request(),
           Some(EditRequest::Delete)) )) {
-      if let Some(id) = &child.value().metadata.id {
+      if let Some(id) = child.value().id() {
         contents.push(id.clone()); }} }
   contents }

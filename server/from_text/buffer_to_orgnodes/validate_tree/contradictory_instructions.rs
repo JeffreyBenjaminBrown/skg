@@ -1,4 +1,5 @@
-use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
@@ -31,7 +32,7 @@ enum WhetherToDelete {
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  forest: &Tree<OrgNode>
+  forest: &Tree<NewOrgNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, HashSet<SourceNickname>)>) { // IDs with inconsistent sources
@@ -63,7 +64,7 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn traverse_forest_and_collect(
-  forest: &Tree<OrgNode> // "forest" = tree with ForestRoot
+  forest: &Tree<NewOrgNode> // "forest" = tree with ForestRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // contradictory deletes
       HashMap<ID, usize>, // multiple defining containers
       HashMap<ID, HashSet<SourceNickname>>) { // inconsistent sources
@@ -85,7 +86,7 @@ fn traverse_forest_and_collect(
 
 /// Traverse a single node and its children to collect delete instructions, defining containers, and sources
 fn traverse_node_recursively_and_collect(
-  node_ref: NodeRef<OrgNode>,
+  node_ref: NodeRef<NewOrgNode>,
   id_toDelete_instructions: &mut
     HashMap<ID, HashSet<WhetherToDelete>>,
   id_defining_count: &mut
@@ -93,10 +94,10 @@ fn traverse_node_recursively_and_collect(
   id_to_sources: &mut
     HashMap<ID, HashSet<SourceNickname>>
 ) {
-  let orgnode: &OrgNode = node_ref.value();
-  if let Some(id) = &orgnode.metadata.id {
+  let orgnode: &NewOrgNode = node_ref.value();
+  if let Some(id) = orgnode.id() {
     let delete_instruction: WhetherToDelete =
-      if matches!(orgnode.metadata.code.editRequest,
+      if matches!(orgnode.edit_request(),
                   Some(EditRequest::Delete)) {
         WhetherToDelete::Delete
       } else { WhetherToDelete::DoNotDelete };
@@ -104,11 +105,11 @@ fn traverse_node_recursively_and_collect(
       . entry(id.clone())
       . or_insert_with(HashSet::new)
       . insert(delete_instruction);
-    if !orgnode.metadata.code.indefinitive {
+    if !orgnode.is_indefinitive() {
       // Increment the count for this defining container
       *id_defining_count . entry (id.clone())
         . or_insert(0) += 1; }
-    if let Some(ref source_str) = orgnode.metadata.source {
+    if let Some(source_str) = orgnode.source() {
       // Collect source for this ID
       let source : SourceNickname =
         SourceNickname::from(source_str.as_str());

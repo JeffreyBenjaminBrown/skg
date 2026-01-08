@@ -7,8 +7,8 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
-use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
-use crate::types::orgnode_new::{from_old_orgnode, to_old_orgnode};
+use crate::types::orgnode::OrgnodeMetadata;
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{PairTree, NodePair};
 
@@ -240,23 +240,23 @@ pub fn compare_headlines_modulo_id(
 
 /// See 'compare_orgnode_trees'.
 pub fn compare_orgnode_forests (
-  forest1 : & Tree < OrgNode >,
-  forest2 : & Tree < OrgNode >
+  forest1 : & Tree < NewOrgNode >,
+  forest2 : & Tree < NewOrgNode >
 ) -> bool {
   compare_orgnode_trees ( forest1.root(), forest2.root() ) }
 
-/// Compare two OrgNode trees (possibly forests, via ForestRoot)
+/// Compare two NewOrgNode trees (possibly forests, via ForestRoot)
 /// by traversing them DFS.
 /// Compares all structure and all content including IDs.
 /// Ignores internal NodeId values.
 /// (PITFALL: Naive comparison of trees just compares NodeIds,
 /// which are nearly meaningless.)
 fn compare_orgnode_trees (
-  node1 : NodeRef < OrgNode >,
-  node2 : NodeRef < OrgNode >
+  node1 : NodeRef < NewOrgNode >,
+  node2 : NodeRef < NewOrgNode >
 ) -> bool {
-  let n1 : & OrgNode = node1 . value ();
-  let n2 : & OrgNode = node2 . value ();
+  let n1 : & NewOrgNode = node1 . value ();
+  let n2 : & NewOrgNode = node2 . value ();
   // Compare the node values directly
   if n1 != n2 { return false; }
   // Compare children recursively
@@ -275,8 +275,8 @@ fn compare_orgnode_trees (
 ///
 /// Input forests have ForestRoot at root; tree roots are their children.
 pub fn compare_two_forests_modulo_id(
-  forest1: &Tree<OrgNode>,
-  forest2: &Tree<OrgNode>
+  forest1: &Tree<NewOrgNode>,
+  forest2: &Tree<NewOrgNode>
 ) -> bool {
   let root1 : Vec<_> = forest1.root().children().collect();
   let root2 : Vec<_> = forest2.root().children().collect();
@@ -289,24 +289,26 @@ pub fn compare_two_forests_modulo_id(
 
 /// Compare two nodes and their subtrees modulo ID differences.
 fn compare_two_orgnodes_recursively_modulo_id (
-  node1: NodeRef<OrgNode>,
-  node2: NodeRef<OrgNode>
+  node1: NodeRef<NewOrgNode>,
+  node2: NodeRef<NewOrgNode>
 ) -> bool {
-  let n1 : &OrgNode = node1.value();
-  let n2 : &OrgNode = node2.value();
+  let n1 : &NewOrgNode = node1.value();
+  let n2 : &NewOrgNode = node2.value();
 
   // Check if ID presence differs
-  if ( n1.metadata.id.is_some() !=
-       n2.metadata.id.is_some() )
+  if ( n1.id().is_some() !=
+       n2.id().is_some() )
   { return false; }
 
-  // Clone and strip IDs for comparison
-  let mut n1_copy : OrgNode = n1.clone();
-  let mut n2_copy : OrgNode = n2.clone();
-  n1_copy.metadata.id = None;
-  n2_copy.metadata.id = None;
-
-  if n1_copy != n2_copy { return false; }
+  // Compare all fields except ID
+  if n1.title() != n2.title() { return false; }
+  if n1.body() != n2.body() { return false; }
+  if n1.source() != n2.source() { return false; }
+  if n1.interp() != n2.interp() { return false; }
+  if n1.is_indefinitive() != n2.is_indefinitive() { return false; }
+  if n1.focused != n2.focused { return false; }
+  if n1.folded != n2.folded { return false; }
+  if n1.edit_request() != n2.edit_request() { return false; }
 
   // Compare children recursively
   let children1 : Vec<_> =
@@ -320,11 +322,11 @@ fn compare_two_orgnodes_recursively_modulo_id (
                 compare_two_orgnodes_recursively_modulo_id (
                   *c1, *c2 )) }
 
-/// Compare a PairTree forest (with ForestRoot) against a Vec of OrgNode trees.
+/// Compare a PairTree forest (with ForestRoot) against a Vec of NewOrgNode trees.
 /// This compares just the OrgNode portions, ignoring the SkgNode Option.
 pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
   forest : &PairTree,
-  forest2 : & Tree<OrgNode>,
+  forest2 : & Tree<NewOrgNode>,
 ) -> bool {
   let tree_roots1 : Vec < _ > =
     forest . root () . children () . collect ();
@@ -334,13 +336,13 @@ pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
     return false; }
   fn compare_nodes (
     node1 : NodeRef < NodePair >,
-    node2 : NodeRef < OrgNode >
+    node2 : NodeRef < NewOrgNode >
   ) -> bool {
-    // Convert new_orgnode back to OrgNode for comparison
-    let n1 : OrgNode = to_old_orgnode ( node1 . value () . orgnode () );
-    let n2 : & OrgNode = node2 . value ();
+    // Compare the NewOrgNode values directly
+    let n1 : & NewOrgNode = node1 . value () . orgnode ();
+    let n2 : & NewOrgNode = node2 . value ();
     // Compare the OrgNode values
-    if &n1 != n2 { return false; }
+    if n1 != n2 { return false; }
     // Compare children recursively
     let children1 : Vec < _ > = node1 . children () . collect ();
     let children2 : Vec < _ > = node2 . children () . collect ();
@@ -454,35 +456,34 @@ pub fn strip_org_comments(s: &str) -> String {
     .collect::<Vec<String>>()
     .join("\n") }
 
-/// Convert an OrgNode "forest" (tree with ForestRoot)
+/// Convert a NewOrgNode "forest" (tree with ForestRoot)
 /// to a paired forest, *with None for all SkgNodes*.
 /// Used in tests where we don't have save instructions.
 pub fn orgnode_forest_to_paired (
-  forest : Tree < OrgNode >,
+  forest : Tree < NewOrgNode >,
 ) -> PairTree {
   fn add_orgnode_tree_as_child_of_forest_root (
-    forest          : &mut PairTree,
-    parent_treeid  : NodeId,
-    orgnode_tree    : &Tree < OrgNode >,
-    orgnode_treeid : NodeId,
+    paired_forest   : &mut PairTree,
+    parent_treeid   : NodeId,
+    orgnode_tree    : &Tree < NewOrgNode >,
+    orgnode_treeid  : NodeId,
   ) {
-    let orgnode : OrgNode =
+    let orgnode : NewOrgNode =
       orgnode_tree . get ( orgnode_treeid )
       . unwrap () . value () . clone ();
-    let new_orgnode = from_old_orgnode ( &orgnode );
     let new_treeid : NodeId = {
       let mut parent_mut =
-        forest . get_mut ( parent_treeid ) . unwrap ();
+        paired_forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
         . append ( NodePair { mskgnode : None,
-                              orgnode  : new_orgnode } )
+                              orgnode } )
         . id () };
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
       add_orgnode_tree_as_child_of_forest_root (
-        forest, new_treeid, orgnode_tree, child_treeid ); } }
+        paired_forest, new_treeid, orgnode_tree, child_treeid ); } }
   let mut result : PairTree = Tree::new ( forest_root_pair () );
   let forest_root_treeid = result . root () . id ();
   // Iterate over tree roots (children of ForestRoot)

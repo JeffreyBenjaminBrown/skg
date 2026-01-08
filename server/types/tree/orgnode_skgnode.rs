@@ -4,7 +4,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, OrgNode, default_metadata};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode_new::{from_old_orgnode, NewOrgNode, ScaffoldKind};
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -248,5 +248,62 @@ pub fn collect_grandchild_aliases_for_orgnode (
                 child_interp )); }}
           aliases . push(
             alias_child . value() . title . clone() ); }
+        aliases };
+      Ok(Some(dedup_vector(aliases))) }} }
+
+/// Find the unique child of a node with a given ScaffoldKind (for Tree<NewOrgNode>).
+/// Returns None if no child has the kind,
+/// Some(child_id) if exactly one does,
+/// or an error if multiple children have it.
+pub fn unique_neworgnode_child_with_interp (
+  tree    : &Tree<NewOrgNode>,
+  node_id : NodeId,
+  interp  : Interp,
+) -> Result<Option<NodeId>, Box<dyn Error>> {
+  let node_ref : ego_tree::NodeRef<NewOrgNode> =
+    tree . get(node_id) . ok_or(
+      "unique_neworgnode_child_with_interp: node not found")?;
+  let matches : Vec<NodeId> = node_ref.children()
+    .filter(|c| c.value().matches_interp ( &interp ))
+    .map(|c| c.id())
+    .collect();
+  match matches.len() {
+    0 => Ok(None),
+    1 => Ok(Some(matches[0])),
+    n => Err(format!(
+      "Expected at most one {:?} child, found {}", interp, n).into()),
+  }
+}
+
+/// Collect aliases for a node (for Tree<NewOrgNode>):
+/// - find the unique AliasCol child (error if multiple)
+/// - for each Alias child of the AliasCol, collect its title
+/// Duplicates are removed (preserving order of first occurrence).
+/// Returns None ("no opinion") if no AliasCol found.
+/// Returns Some(vec) if AliasCol found, even if empty.
+pub fn collect_grandchild_aliases_for_neworgnode (
+  tree: &Tree<NewOrgNode>,
+  node_id: NodeId,
+) -> Result<Option<Vec<String>>, String> {
+  let alias_col_id : Option<NodeId> =
+    unique_neworgnode_child_with_interp (
+      tree, node_id, Interp::AliasCol )
+    . map_err ( |e| e.to_string() ) ?;
+  match alias_col_id {
+    None => Ok(None),
+    Some(col_id) => {
+      let aliases : Vec<String> = {
+        let col_ref : NodeRef<NewOrgNode> = tree.get(col_id).expect(
+          "collect_grandchild_aliases_for_neworgnode: AliasCol not found");
+        let mut aliases : Vec<String> = Vec::new();
+        for alias_child in col_ref.children() {
+          { // check for invalid state
+            if ! alias_child.value().is_scaffold(
+                   &ScaffoldKind::Alias(String::new())) {
+              return Err ( format! (
+                "AliasCol has non-Alias child with interp: {:?}",
+                alias_child.value().interp() )); }}
+          aliases . push(
+            alias_child . value() . title() . to_string() ); }
         aliases };
       Ok(Some(dedup_vector(aliases))) }} }

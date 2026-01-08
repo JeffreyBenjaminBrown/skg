@@ -3,7 +3,8 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::orgnode::{OrgNode, Interp};
+use skg::types::orgnode::Interp;
+use skg::types::orgnode_new::NewOrgNode;
 use ego_tree::Tree;
 
 #[test]
@@ -24,7 +25,7 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   let forest_roots: Vec<_> = forest.root().children().collect();
@@ -33,33 +34,33 @@ fn test_org_to_uninterpreted_nodes2() {
   // Test first tree (node 'a' and its children)
   let tree_a = &forest_roots[0];
   let node_a = tree_a.value();
-  assert_eq!(node_a.title, "a");
-  assert_eq!(node_a.body, None);
+  assert_eq!(node_a.title(), "a");
+  assert_eq!(node_a.body(), None);
 
   // Test node 'a' has children in the tree
   let node_a_children: Vec<_> = tree_a.children().collect();
   assert_eq!(node_a_children.len(), 2, "Node 'a' should have 2 children");
-  assert_eq!(node_a_children[0].value().title, "aa");
-  assert_eq!(node_a_children[0].value().body, Some("   body of aa".to_string()));
-  assert_eq!(node_a_children[1].value().title, "ab");
+  assert_eq!(node_a_children[0].value().title(), "aa");
+  assert_eq!(node_a_children[0].value().body(), Some(&"   body of aa".to_string()));
+  assert_eq!(node_a_children[1].value().title(), "ab");
 
   // Test second tree (node 'b' and its children)
   let tree_b = &forest_roots[1];
   let node_b = tree_b.value();
-  assert_eq!(node_b.title, "b");
-  assert_eq!(node_b.body, Some("  body of b".to_string()));
+  assert_eq!(node_b.title(), "b");
+  assert_eq!(node_b.body(), Some(&"  body of b".to_string()));
 
   // Test node 'b' has children in the tree
   let node_b_children: Vec<_> = tree_b.children().collect();
   assert_eq!(node_b_children.len(), 2, "Node 'b' should have 2 children");
-  assert_eq!(node_b_children[0].value().title, "ba");
-  assert_eq!(node_b_children[1].value().title, "bb");
+  assert_eq!(node_b_children[0].value().title(), "ba");
+  assert_eq!(node_b_children[1].value().title(), "bb");
 
   // Test deeper nesting - node 'ba' should have child 'baa'
   let node_ba_children: Vec<_> = node_b_children[0].children().collect();
   assert_eq!(node_ba_children.len(), 1, "Node 'ba' should have 1 child");
-  assert_eq!(node_ba_children[0].value().title, "baa");
-  assert_eq!(node_ba_children[0].value().body, Some("    body of baa".to_string()));
+  assert_eq!(node_ba_children[0].value().title(), "baa");
+  assert_eq!(node_ba_children[0].value().body(), Some(&"    body of baa".to_string()));
 }
 
 #[test]
@@ -76,7 +77,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   // Get tree roots (children of ForestRoot)
@@ -85,25 +86,25 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 
   // Test root node with metadata
   let root_node = tree_roots[0].value();
-  assert_eq!(root_node.title, "root");
-  assert_eq!(root_node.metadata.id, Some(ID::from("root")));
-  assert_eq!(root_node.metadata.viewData.focused, true);
-  assert_eq!(root_node.metadata.viewData.folded, false);
-  assert_eq!(root_node.body, Some("Root body content".to_string()));
+  assert_eq!(root_node.title(), "root");
+  assert_eq!(root_node.id(), Some(&ID::from("root")));
+  assert_eq!(root_node.focused(), true);
+  assert_eq!(root_node.folded(), false);
+  assert_eq!(root_node.body(), Some(&"Root body content".to_string()));
 
   // Test parentIgnores node
   let parentIgnores_node = tree_roots[1].value();
-  assert_eq!(parentIgnores_node.title, "parentIgnores node");
-  assert_eq!(parentIgnores_node.metadata.code.interp, Interp::ParentIgnores);
-  assert_eq!(parentIgnores_node.metadata.code.indefinitive, true);
-  assert_eq!(parentIgnores_node.body, Some("ParentIgnores body".to_string()));
+  assert_eq!(parentIgnores_node.title(), "parentIgnores node");
+  assert_eq!(parentIgnores_node.interp(), Interp::ParentIgnores);
+  assert_eq!(parentIgnores_node.is_indefinitive(), true);
+  assert_eq!(parentIgnores_node.body(), Some(&"ParentIgnores body".to_string()));
 
   // Test cycling node
   let cycle_node = tree_roots[2].value();
-  assert_eq!(cycle_node.title, "cycling node");
-  assert_eq!(cycle_node.metadata.viewData.cycle, true);
-  assert_eq!(cycle_node.body,
-             Some("This node has cycle flag".to_string()));
+  assert_eq!(cycle_node.title(), "cycling node");
+  assert_eq!(cycle_node.cycle(), true);
+  assert_eq!(cycle_node.body(),
+             Some(&"This node has cycle flag".to_string()));
 }
 
 #[test]
@@ -115,7 +116,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   let tree_roots: Vec<_> = forest.root().children().collect();
@@ -123,20 +124,20 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
 
   // Test first node - should have all default values except title and body
   let first_node = tree_roots[0].value();
-  assert_eq!(first_node.title, "simple node");
-  assert_eq!(first_node.body, Some("Simple body".to_string()));
-  assert_eq!(first_node.metadata.id, None);
-  assert_eq!(first_node.metadata.code.interp, Interp::Content);
-  assert_eq!(first_node.metadata.viewData.cycle, false);
-  assert_eq!(first_node.metadata.viewData.focused, false);
-  assert_eq!(first_node.metadata.viewData.folded, false);
-  assert_eq!(first_node.metadata.code.indefinitive, false);
-  assert_eq!(first_node.metadata.code.editRequest, None);
+  assert_eq!(first_node.title(), "simple node");
+  assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
+  assert_eq!(first_node.id(), None);
+  assert_eq!(first_node.interp(), Interp::Content);
+  assert_eq!(first_node.cycle(), false);
+  assert_eq!(first_node.focused(), false);
+  assert_eq!(first_node.folded(), false);
+  assert_eq!(first_node.is_indefinitive(), false);
+  assert_eq!(first_node.edit_request(), None);
 
   // Test second node - should have no body
   let second_node = tree_roots[1].value();
-  assert_eq!(second_node.title, "another node");
-  assert_eq!(second_node.body, None);
+  assert_eq!(second_node.title(), "another node");
+  assert_eq!(second_node.body(), None);
 }
 
 #[test]
@@ -153,7 +154,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let tree_roots: Vec<_> = forest.root().children().collect();
 
@@ -161,14 +162,14 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 
   // Test first node body spacing preservation
   let first_node = tree_roots[0].value();
-  assert_eq!(first_node.title, "node with spaced body");
-  assert_eq!(first_node.body, Some("  body with 2 spaces".to_string()));
+  assert_eq!(first_node.title(), "node with spaced body");
+  assert_eq!(first_node.body(), Some(&"  body with 2 spaces".to_string()));
 
   // Test second node complex body
   let second_node = tree_roots[1].value();
-  assert_eq!(second_node.title, "node with complex body");
+  assert_eq!(second_node.title(), "node with complex body");
   let expected_body = "line 1\n  line 2 with 2 spaces\n    line 3 with 4 spaces";
-  assert_eq!(second_node.body, Some(expected_body.to_string()));
+  assert_eq!(second_node.body(), Some(&expected_body.to_string()));
 }
 
 #[test]
@@ -181,7 +182,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   // Get tree roots (children of ForestRoot)
@@ -190,29 +191,29 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 
   // Test node with metadata
   let meta_node = tree_roots[0].value();
-  assert_eq!(meta_node.title, "simple node with metadata");
-  assert_eq!(meta_node.metadata.id, Some(ID::from("test")));
-  assert_eq!(meta_node.metadata.viewData.folded, true);
-  assert_eq!(meta_node.body, Some("Node body".to_string()));
+  assert_eq!(meta_node.title(), "simple node with metadata");
+  assert_eq!(meta_node.id(), Some(&ID::from("test")));
+  assert_eq!(meta_node.folded(), true);
+  assert_eq!(meta_node.body(), Some(&"Node body".to_string()));
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1].value();
-  assert_eq!(regular_node.title, "regular node without metadata");
-  assert_eq!(regular_node.metadata.id, None);
-  assert_eq!(regular_node.metadata.viewData.folded, false);
-  assert_eq!(regular_node.body, Some("Regular body".to_string()));
+  assert_eq!(regular_node.title(), "regular node without metadata");
+  assert_eq!(regular_node.id(), None);
+  assert_eq!(regular_node.folded(), false);
+  assert_eq!(regular_node.body(), Some(&"Regular body".to_string()));
 }
 
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   // ForestRoot should have no children
   assert_eq!(forest.root().children().count(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Tree<OrgNode> =
+  let trees2: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input2).unwrap();
   assert_eq!(trees2.root().children().count(), 0);
 }
@@ -226,7 +227,7 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let forest: Tree<OrgNode> =
+  let forest: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   assert_eq!(forest.root().children().count(), 0,
              "Should have no tree roots when there are no headlines");

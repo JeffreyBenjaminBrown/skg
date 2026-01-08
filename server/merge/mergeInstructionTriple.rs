@@ -1,14 +1,15 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
 use crate::types::misc::{SkgConfig, ID};
-use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode_new::NewOrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// PURPOSE: For each OrgNode with a merge instruction,
+/// PURPOSE: For each NewOrgNode with a merge instruction,
 /// this creates a MergeInstructionTriple:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
@@ -17,7 +18,7 @@ use typedb_driver::TypeDBDriver;
 /// TODO ? This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
 pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
-  forest: &Tree<OrgNode>,
+  forest: &Tree<NewOrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
@@ -29,7 +30,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
       triples.extend(
         { let node_triples : Vec<MergeInstructionTriple> =
             saveinstructions_from_the_merge_in_an_orgnode(
-              { let orgnode: &OrgNode = node_ref.value();
+              { let orgnode: &NewOrgNode = node_ref.value();
                 orgnode },
               config, driver ). await?;
           node_triples } ); } }
@@ -43,7 +44,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
 async fn saveinstructions_from_the_merge_in_an_orgnode(
-  node: &OrgNode,
+  node: &NewOrgNode,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
@@ -51,12 +52,12 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
   let mut merge_instructions: Vec<MergeInstructionTriple> =
     Vec::new();
   if let Some(EditRequest::Merge(acquiree_id))
-    = &node.metadata.code.editRequest {
+    = node.edit_request() {
       let acquirer_from_disk : SkgNode =
         skgnode_from_id(
           config, driver,
           { let acquirer_id : &ID =
-              node.metadata.id.as_ref()
+              node.id()
               .ok_or("Node with merge request must have an ID")?;
             acquirer_id }
         ). await?;

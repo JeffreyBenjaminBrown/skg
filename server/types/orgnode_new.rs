@@ -290,6 +290,21 @@ impl NewOrgNode {
             OrgNodeKind::Scaff ( _ ) => None,
         } }
 
+    /// Get the focused flag.
+    pub fn focused ( &self ) -> bool {
+        self . focused }
+
+    /// Get the folded flag.
+    pub fn folded ( &self ) -> bool {
+        self . folded }
+
+    /// Get the cycle flag from view_data. Returns false for Scaffolds.
+    pub fn cycle ( &self ) -> bool {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . view_data . cycle,
+            OrgNodeKind::Scaff ( _ ) => false,
+        } }
+
     /// Get the view_requests if this is a TrueNode. Returns None for Scaffolds.
     pub fn view_requests ( &self ) -> Option < &HashSet < ViewRequest > > {
         match &self . kind {
@@ -344,6 +359,37 @@ impl NewOrgNode {
     pub fn set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
         if let OrgNodeKind::True ( t ) = &mut self . kind {
             t . effect_on_parent = effect;
+        } }
+
+    /// Convert a TrueNode to an Alias scaffold.
+    /// Uses the TrueNode's title as the alias text.
+    /// No-op if already a Scaffold.
+    pub fn convert_to_alias ( &mut self ) {
+        if let OrgNodeKind::True ( true_node ) = &self . kind {
+            self . kind = OrgNodeKind::Scaff ( Scaffold {
+                kind : ScaffoldKind::Alias ( true_node . title . clone () ),
+            });
+        } }
+
+    /// Set the id. No-op for Scaffolds.
+    pub fn set_id ( &mut self, id : Option < ID > ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . id = id;
+        } }
+
+    /// Returns true if this node should have no source (is a Scaffold or Alias).
+    /// Mirrors Interp::should_be_sourceless().
+    pub fn should_be_sourceless ( &self ) -> bool {
+        match &self . kind {
+            OrgNodeKind::Scaff ( _ ) => true,
+            OrgNodeKind::True ( _ ) => false,
+        } }
+
+    /// Get the body if this is a TrueNode. Returns None for Scaffolds.
+    pub fn body ( &self ) -> Option < &String > {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . body . as_ref (),
+            OrgNodeKind::Scaff ( _ ) => None,
         } }
 }
 
@@ -452,6 +498,87 @@ pub fn from_old_orgnode ( old : &OrgNode ) -> NewOrgNode {
             view_data        : old . metadata . viewData . clone (),
             edit_request     : old . metadata . code . editRequest . clone (),
             view_requests    : old . metadata . code . viewRequests . clone (),
+        }),
+    };
+
+    NewOrgNode { focused, folded, kind } }
+
+/// Create a NewOrgNode directly from parsed components.
+/// This is the direct constructor for parsing, avoiding the intermediate OrgNode.
+/// Takes the same inputs as parsing produces: metadata, title, and optional body.
+pub fn from_parsed (
+    metadata : &OrgnodeMetadata,
+    title    : String,
+    body     : Option < String >,
+) -> NewOrgNode {
+    let focused = metadata . viewData . focused;
+    let folded  = metadata . viewData . folded;
+
+    let kind = match metadata . code . interp {
+        // Scaffold kinds
+        Interp::ForestRoot => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::ForestRoot,
+        }),
+        Interp::AliasCol => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::AliasCol,
+        }),
+        Interp::Alias => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::Alias ( title.clone () ),
+        }),
+        Interp::SubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::SubscribeeCol,
+        }),
+        Interp::HiddenOutsideOfSubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::HiddenOutsideOfSubscribeeCol,
+        }),
+        Interp::HiddenInSubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
+            kind : ScaffoldKind::HiddenInSubscribeeCol,
+        }),
+
+        // TrueNode kinds
+        Interp::Content => OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : metadata . id . clone (),
+            source           : metadata . source . clone (),
+            effect_on_parent : EffectOnParent::Content,
+            indefinitive     : metadata . code . indefinitive,
+            view_data        : metadata . viewData . clone (),
+            edit_request     : metadata . code . editRequest . clone (),
+            view_requests    : metadata . code . viewRequests . clone (),
+        }),
+        Interp::Subscribee => OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : metadata . id . clone (),
+            source           : metadata . source . clone (),
+            effect_on_parent : EffectOnParent::Subscribee,
+            indefinitive     : metadata . code . indefinitive,
+            view_data        : metadata . viewData . clone (),
+            edit_request     : metadata . code . editRequest . clone (),
+            view_requests    : metadata . code . viewRequests . clone (),
+        }),
+        Interp::ParentIgnores => OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : metadata . id . clone (),
+            source           : metadata . source . clone (),
+            effect_on_parent : EffectOnParent::ParentIgnores,
+            indefinitive     : metadata . code . indefinitive,
+            view_data        : metadata . viewData . clone (),
+            edit_request     : metadata . code . editRequest . clone (),
+            view_requests    : metadata . code . viewRequests . clone (),
+        }),
+        Interp::HiddenFromSubscribees => OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : metadata . id . clone (),
+            source           : metadata . source . clone (),
+            effect_on_parent : EffectOnParent::HiddenFromSubscribees,
+            indefinitive     : metadata . code . indefinitive,
+            view_data        : metadata . viewData . clone (),
+            edit_request     : metadata . code . editRequest . clone (),
+            view_requests    : metadata . code . viewRequests . clone (),
         }),
     };
 
