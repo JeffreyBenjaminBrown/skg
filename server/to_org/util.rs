@@ -3,8 +3,9 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode::ViewRequest;
+use crate::types::orgnode_new::{
+    neworgnode_content_from_disk, NewOrgNode, forest_root_new_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
@@ -37,14 +38,8 @@ pub type VisitedMap =
 /// Create a NodePair representing a ForestRoot.
 /// It is never rendered; it just makes forests easier to process.
 pub fn forest_root_pair () -> NodePair {
-  let mut md = default_metadata ();
-  md . code . interp = Interp::ForestRoot;
-  let orgnode = OrgNode { metadata : md,
-                          title    : String::new (),
-                          body     : None };
-  let new_orgnode = from_old_orgnode ( &orgnode );
   NodePair { mskgnode : None,
-             orgnode  : new_orgnode } }
+             orgnode  : forest_root_new_orgnode () } }
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.
@@ -56,13 +51,13 @@ fn new_forest () -> PairTree {
 // ======================================================
 
 /// Fetch a SkgNode from disk (queries TypeDB for source).
-/// Make an OrgNode from it, with validated title.
+/// Make a NewOrgNode from it, with validated title.
 /// Return both.
 pub async fn skgnode_and_orgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid : &ID,
-) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, NewOrgNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, skgid).await?
@@ -72,27 +67,26 @@ pub async fn skgnode_and_orgnode_from_id (
     config, &pid_resolved, &source ) }
 
 /// Fetch a SkgNode from disk given PID and source.
-/// Make an OrgNode from it, with validated title.
+/// Make a NewOrgNode from it, with validated title.
 /// Return both.
 pub(super) fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &str,
-) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, NewOrgNode ), Box<dyn Error> > {
   let skgnode : SkgNode =
     skgnode_from_pid_and_source( config, pid.clone(), source )?;
-  let orgnode : OrgNode = OrgNode {
-    metadata : { let mut md = default_metadata ();
-                 md . id = Some ( pid . clone () );
-                 md . source = Some ( source . to_string () );
-                 md },
-    title : ( & skgnode . title ) . replace ( '\n', " " ),
-    body  : skgnode . body . clone (), };
-  if orgnode . title . is_empty () { // Validate title
+  let title : String = skgnode . title . replace ( '\n', " " );
+  if title . is_empty () { // Validate title
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
       format! ( "SkgNode with ID {} has an empty title",
                  pid ), )) ); }
+  let orgnode : NewOrgNode = neworgnode_content_from_disk (
+    pid . clone (),
+    source . to_string (),
+    title,
+    skgnode . body . clone () );
   Ok (( skgnode, orgnode )) }
 
 /// Set 'indefinitive' to true,
@@ -249,16 +243,15 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+  let (child_skgnode, child_orgnode) : (SkgNode, NewOrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid ) . await ?;
-  let new_orgnode = from_old_orgnode ( &child_orgnode );
   let child_treeid : NodeId =
     with_node_mut (
       tree, parent_treeid,
       ( |mut parent_mut|
         parent_mut . append ( NodePair { mskgnode : Some(child_skgnode),
-                                         orgnode  : new_orgnode } )
+                                         orgnode  : child_orgnode } )
         . id () )) ?;
   Ok ( child_treeid ) }
 
@@ -276,10 +269,9 @@ pub async fn build_node_branch_minus_content (
   driver          : &TypeDBDriver,
   visited         : &mut VisitedMap,
 ) -> Result < (Option<PairTree>, NodeId), Box<dyn Error> > {
-  let (skgnode, orgnode) : (SkgNode, OrgNode) =
+  let (skgnode, orgnode) : (SkgNode, NewOrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
-  let new_orgnode = from_old_orgnode ( &orgnode );
   match tree_and_parent {
     Some ( (tree, parent_treeid) ) => {
       let child_treeid : NodeId =
@@ -287,7 +279,7 @@ pub async fn build_node_branch_minus_content (
           tree, parent_treeid,
           ( |mut parent_mut|
             parent_mut . append ( NodePair { mskgnode : Some(skgnode),
-                                             orgnode  : new_orgnode } ) . id () )) ?;
+                                             orgnode  : orgnode } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
@@ -295,7 +287,7 @@ pub async fn build_node_branch_minus_content (
     None => {
       let mut tree : PairTree =
         Tree::new ( NodePair { mskgnode : Some(skgnode),
-                               orgnode  : new_orgnode } );
+                               orgnode  : orgnode } );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, root_treeid, visited,

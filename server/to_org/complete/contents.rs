@@ -11,8 +11,8 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::orgnode_new::{from_old_orgnode, OrgNodeKind, EffectOnParent};
+use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode_new::{OrgNodeKind, EffectOnParent, NewOrgNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -310,15 +310,14 @@ async fn extend_content (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( skgnode, orgnode ) : ( SkgNode, OrgNode ) =
+  let ( skgnode, orgnode ) : ( SkgNode, NewOrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
-  let new_orgnode = from_old_orgnode ( &orgnode );
   let new_child_id : NodeId = with_node_mut (
     tree, parent_nid,
     ( |mut parent_mut|
       parent_mut . append ( NodePair { mskgnode : Some(skgnode),
-                                       orgnode  : new_orgnode } )
+                                       orgnode  : orgnode } )
       . id () )) ?;
   Ok ( new_child_id ) }
 

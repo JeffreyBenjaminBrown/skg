@@ -15,8 +15,9 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode_new::{
+    NewOrgNode, effect_on_parent_from_interp, neworgnode_with_metadata };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -282,16 +283,19 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
       org . is_indefinitive (),
       org . edit_request () . cloned (),
       org . view_requests () . cloned () . unwrap_or_default () ) };
-  let (skgnode, mut orgnode) : (SkgNode, OrgNode) =
+  let (skgnode, disk_orgnode) : (SkgNode, NewOrgNode) =
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
-  orgnode . metadata . code . interp = interp;
-  orgnode . metadata . code . indefinitive = indefinitive;
-  orgnode . metadata . code . editRequest = edit_request;
-  orgnode . metadata . code . viewRequests = view_requests;
-  let new_orgnode = from_old_orgnode ( &orgnode );
+  let effect = effect_on_parent_from_interp ( &interp )
+    . ok_or_else ( || format! (
+      "rebuild_pair_from_disk: Interp {:?} is not a TrueNode interp", interp ) ) ?;
+  let orgnode = neworgnode_with_metadata (
+    pid, source,
+    disk_orgnode . title () . to_string (),
+    disk_orgnode . body () . cloned (),
+    effect, indefinitive, edit_request, view_requests );
   write_at_node_in_tree ( // replace it
     tree, node_id,
     |np| * np = NodePair { mskgnode : Some ( skgnode ),
-                           orgnode  : new_orgnode } ) ?;
+                           orgnode  : orgnode } ) ?;
   Ok (( )) }

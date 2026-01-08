@@ -425,13 +425,54 @@
    - Updated test utilities to use to_old_orgnode() for comparison
    - Updated test files to use orgnode_new() accessors
 
-** 8.6 Rename types to final names
+** IN PROGRESS 8.6 Eliminate OrgNode construction outside parsing
+   Goal: Stop constructing old OrgNode except in parsing and conversion functions.
+
+   DONE: Changed skgnode_and_orgnode_from_* to return NewOrgNode directly:
+   - to_org/util.rs: skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source
+   - Added neworgnode_content_from_disk() constructor
+
+   DONE: Updated all callers to use NewOrgNode directly:
+   - to_org/complete/contents.rs: extend_content
+   - to_org/util.rs: make_and_append_child_pair, build_node_branch_minus_content
+   - types/tree/orgnode_skgnode.rs: append_indefinitive_node
+   - to_org/expand/backpath.rs: prepend_indefinitive_child_with_parent_ignores
+   - to_org/expand/definitive.rs: rebuild_pair_from_disk_mostly_clobbering_the_org
+
+   DONE: Added new constructors to orgnode_new.rs:
+   - neworgnode_content_from_disk(id, source, title, body)
+   - neworgnode_indefinitive_from_disk(id, source, title, effect)
+   - neworgnode_with_metadata(id, source, title, body, effect, indef, edit_req, view_reqs)
+   - neworgnode_scaffold_from_interp(interp, title)
+   - effect_on_parent_from_interp(interp)
+
+   DONE: Updated forest_root_pair() to use forest_root_new_orgnode() directly
+
+   DONE: Updated insert_sourceless_node() to use neworgnode_scaffold_from_interp()
+
+   DONE: Removed unused Tree<OrgNode> helper functions:
+   - unique_orgnode_child_with_interp
+   - unique_orgnode_child_with_interp_from_ref
+   - collect_grandchild_aliases_for_orgnode
+
+   All 35 unit tests + 10 integration tests pass.
+
+   REMAINING OrgNode construction:
+   - Parsing (parse_metadata_sexp.rs, uninterpreted.rs) still produces old types
+   - Conversion functions (from_old_orgnode, to_old_orgnode) still needed
+   - Tests in org_to_text.rs construct OrgNode for compatibility checks
+
+** 8.7 Rename types to final names (DEFERRED)
    - NewOrgNode → OrgNode
    - new_orgnode → orgnode
    - new_orgnode_to_text → orgnode_to_text
    - orgnode_new() → orgnode()
 
-** 8.7 Remove old types and conversion functions
+   NOTE: This requires first migrating parsing to produce NewOrgNode directly,
+   which would affect validate_tree.rs and the save instructions pipeline.
+   Interp enum is still heavily used (167 occurrences in 12 files).
+
+** 8.8 Remove old types and conversion functions (DEFERRED)
    Remove from orgnode.rs:
    - OrgNode struct
    - Interp enum
@@ -441,6 +482,8 @@
    - from_old_orgnode()
    - to_old_orgnode()
    - matches_interp() (no longer needed)
+
+   NOTE: Requires completing 8.7 first.
 
 * maybe later
 ** Make TrueNode.id required (separate refactor as discussed)

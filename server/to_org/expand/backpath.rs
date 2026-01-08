@@ -14,8 +14,9 @@ use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode_new::{
+    NewOrgNode, effect_on_parent_from_interp, neworgnode_indefinitive_from_disk };
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -208,19 +209,24 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
-  let ( _, mut child_orgnode ) : ( _, OrgNode ) =
+  let ( _, content_orgnode ) : ( _, NewOrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid
     ). await ?;
-  child_orgnode . metadata . code . interp =
-    Interp::ParentIgnores;
-  child_orgnode . metadata . code . indefinitive =
-    true;
-  let new_orgnode = from_old_orgnode ( &child_orgnode );
+  let effect = effect_on_parent_from_interp ( &Interp::ParentIgnores )
+    . ok_or ( "ParentIgnores is a TrueNode interp" ) ?;
+  let id = content_orgnode . id ()
+    . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no ID" ) ?
+    . clone ();
+  let source = content_orgnode . source ()
+    . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no source" ) ?
+    . clone ();
+  let orgnode = neworgnode_indefinitive_from_disk (
+    id, source, content_orgnode . title () . to_string (), effect );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode : None,
-                           orgnode  : new_orgnode } ) . id ();
+                           orgnode  : orgnode } ) . id ();
   Ok ( new_child_treeid ) }
 
 /// Find a child node by its ID.

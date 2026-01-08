@@ -584,6 +584,117 @@ pub fn from_parsed (
 
     NewOrgNode { focused, folded, kind } }
 
+/// Create a Content NewOrgNode directly from disk data.
+/// This is used when loading nodes from disk, bypassing the old OrgNode type.
+pub fn neworgnode_content_from_disk (
+    id     : ID,
+    source : String,
+    title  : String,
+    body   : Option < String >,
+) -> NewOrgNode {
+    NewOrgNode {
+        focused : false,
+        folded  : false,
+        kind    : OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : Some ( id ),
+            source           : Some ( source ),
+            effect_on_parent : EffectOnParent::Content,
+            indefinitive     : false,
+            view_data        : OrgnodeViewData::default (),
+            edit_request     : None,
+            view_requests    : HashSet::new (),
+        }),
+    } }
+
+/// Convert Interp to EffectOnParent for TrueNode cases.
+/// Returns None for Scaffold interps.
+pub fn effect_on_parent_from_interp ( interp : &Interp ) -> Option < EffectOnParent > {
+    match interp {
+        Interp::Content               => Some ( EffectOnParent::Content ),
+        Interp::Subscribee            => Some ( EffectOnParent::Subscribee ),
+        Interp::HiddenFromSubscribees => Some ( EffectOnParent::HiddenFromSubscribees ),
+        Interp::ParentIgnores         => Some ( EffectOnParent::ParentIgnores ),
+        _ => None, // Scaffold interps
+    } }
+
+/// Create a Scaffold NewOrgNode from an Interp and optional title.
+/// For Alias, the title is required and becomes the alias text.
+/// For other scaffolds, title is ignored.
+/// Returns Err if the interp is not a scaffold type.
+pub fn neworgnode_scaffold_from_interp (
+    interp : Interp,
+    title  : &str,
+) -> Result < NewOrgNode, String > {
+    let kind = match interp {
+        Interp::AliasCol                     => ScaffoldKind::AliasCol,
+        Interp::Alias                        => ScaffoldKind::Alias ( title . to_string () ),
+        Interp::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
+        Interp::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
+        Interp::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
+        Interp::ForestRoot                   => ScaffoldKind::ForestRoot,
+        _ => return Err ( format! ( "Interp {:?} is not a scaffold type", interp ) ),
+    };
+    Ok ( NewOrgNode {
+        focused : false,
+        folded  : false,
+        kind    : OrgNodeKind::Scaff ( Scaffold { kind } ),
+    }) }
+
+/// Create an indefinitive NewOrgNode from disk data with a specific effect.
+/// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).
+/// Body is always None since indefinitive nodes don't have editable content.
+pub fn neworgnode_indefinitive_from_disk (
+    id               : ID,
+    source           : String,
+    title            : String,
+    effect_on_parent : EffectOnParent,
+) -> NewOrgNode {
+    NewOrgNode {
+        focused : false,
+        folded  : false,
+        kind    : OrgNodeKind::True ( TrueNode {
+            title,
+            body             : None,
+            id               : Some ( id ),
+            source           : Some ( source ),
+            effect_on_parent,
+            indefinitive     : true,
+            view_data        : OrgnodeViewData::default (),
+            edit_request     : None,
+            view_requests    : HashSet::new (),
+        }),
+    } }
+
+/// Create a NewOrgNode from disk data with full metadata control.
+/// This is used when rebuilding a node from disk while preserving metadata.
+pub fn neworgnode_with_metadata (
+    id               : ID,
+    source           : String,
+    title            : String,
+    body             : Option < String >,
+    effect_on_parent : EffectOnParent,
+    indefinitive     : bool,
+    edit_request     : Option < EditRequest >,
+    view_requests    : HashSet < ViewRequest >,
+) -> NewOrgNode {
+    NewOrgNode {
+        focused : false,
+        folded  : false,
+        kind    : OrgNodeKind::True ( TrueNode {
+            title,
+            body,
+            id               : Some ( id ),
+            source           : Some ( source ),
+            effect_on_parent,
+            indefinitive,
+            view_data        : OrgnodeViewData::default (),
+            edit_request,
+            view_requests,
+        }),
+    } }
+
 /// Convert a NewOrgNode back to an old OrgNode.
 /// This should be lossless.
 pub fn to_old_orgnode ( new : &NewOrgNode ) -> OrgNode {

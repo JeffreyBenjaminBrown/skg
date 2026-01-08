@@ -3,8 +3,11 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{Interp, OrgNode, default_metadata};
-use crate::types::orgnode_new::{from_old_orgnode, NewOrgNode, ScaffoldKind};
+use crate::types::orgnode::Interp;
+use crate::types::orgnode_new::{
+    NewOrgNode, ScaffoldKind,
+    effect_on_parent_from_interp, neworgnode_indefinitive_from_disk,
+    neworgnode_scaffold_from_interp };
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -32,39 +35,6 @@ pub fn unique_child_with_interp (
     .ok_or("unique_child_with_interp: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
     .filter(|c| c.value().orgnode().matches_interp ( &interp ))
-    .map(|c| c.id())
-    .collect();
-  match matches.len() {
-    0 => Ok(None),
-    1 => Ok(Some(matches[0])),
-    n => Err(format!(
-      "Expected at most one {:?} child, found {}", interp, n).into()),
-  }
-}
-
-/// Find the unique child of a node with a given Interp (for Tree<OrgNode>).
-/// Returns None if no child has the interp,
-/// Some(child_id) if exactly one does,
-/// or an error if multiple children have it.
-pub fn unique_orgnode_child_with_interp (
-  tree    : &Tree<OrgNode>,
-  node_id : NodeId,
-  interp  : Interp,
-) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : ego_tree::NodeRef<OrgNode> =
-    tree . get(node_id) . ok_or(
-      "unique_orgnode_child_with_interp: node not found")?;
-  unique_orgnode_child_with_interp_from_ref (
-    &node_ref, interp ) }
-
-/// Like unique_orgnode_child_with_interp, but takes a NodeRef directly.
-/// Useful when you already have the NodeRef and don't want to look it up again.
-pub fn unique_orgnode_child_with_interp_from_ref (
-  node_ref : &ego_tree::NodeRef<OrgNode>,
-  interp   : Interp,
-) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().metadata.code.interp == interp)
     .map(|c| c.id())
     .collect();
   match matches.len() {
@@ -132,19 +102,13 @@ pub fn insert_sourceless_node (
   title     : &str,
   prepend   : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let col_orgnode : OrgNode = {
-    let mut md = default_metadata ();
-    md . code . interp = interp;
-    OrgNode {
-      metadata : md,
-      title : title . to_string (),
-      body : None, } };
-  let new_orgnode = from_old_orgnode ( &col_orgnode );
+  let orgnode = neworgnode_scaffold_from_interp ( interp, title )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       let pair = NodePair { mskgnode : None,
-                            orgnode  : new_orgnode };
+                            orgnode  : orgnode };
       if prepend { parent_mut . prepend ( pair ) . id () }
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
@@ -158,19 +122,26 @@ pub async fn append_indefinitive_node (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+  let ( skgnode, content_orgnode ) : ( SkgNode, NewOrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id ) . await ?;
-  orgnode . metadata . code . interp = interp;
-  orgnode . metadata . code . indefinitive = true;
-  orgnode . body = None;
-  let new_orgnode = from_old_orgnode ( &orgnode );
+  let effect = effect_on_parent_from_interp ( &interp )
+    . ok_or_else ( || format! (
+      "append_indefinitive_node: Interp {:?} is not a TrueNode interp", interp ) ) ?;
+  let id = content_orgnode . id ()
+    . ok_or ( "append_indefinitive_node: node has no ID" ) ?
+    . clone ();
+  let source = content_orgnode . source ()
+    . ok_or ( "append_indefinitive_node: node has no source" ) ?
+    . clone ();
+  let orgnode = neworgnode_indefinitive_from_disk (
+    id, source, content_orgnode . title () . to_string (), effect );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       parent_mut . append (
         NodePair { mskgnode : Some ( skgnode ),
-                   orgnode  : new_orgnode } ); } ) ?;
+                   orgnode  : orgnode } ); } ) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode
@@ -217,39 +188,6 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
       child_new . title () . to_string () ); }
   Ok ( dedup_vector ( aliases ) ) }
 
-/// Collect aliases for a node (for Tree<OrgNode>):
-/// - find the unique AliasCol child (error if multiple)
-/// - for each Alias child of the AliasCol, collect its title
-/// Duplicates are removed (preserving order of first occurrence).
-/// Returns None ("no opinion") if no AliasCol found.
-/// Returns Some(vec) if AliasCol found, even if empty.
-pub fn collect_grandchild_aliases_for_orgnode (
-  tree: &Tree<OrgNode>,
-  node_id: NodeId,
-) -> Result<Option<Vec<String>>, String> {
-  let alias_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
-      tree, node_id, Interp::AliasCol )
-    . map_err ( |e| e.to_string() ) ?;
-  match alias_col_id {
-    None => Ok(None),
-    Some(col_id) => {
-      let aliases : Vec<String> = {
-        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
-          "collect_aliases_at_orgnode: AliasCol not found");
-        let mut aliases : Vec<String> = Vec::new();
-        for alias_child in col_ref.children() {
-          { // check for invalid state
-            let child_interp : &Interp =
-              &alias_child . value() . metadata . code.interp;
-            if *child_interp != Interp::Alias {
-              return Err ( format! (
-                "AliasCol has non-Alias child with interp: {:?}",
-                child_interp )); }}
-          aliases . push(
-            alias_child . value() . title . clone() ); }
-        aliases };
-      Ok(Some(dedup_vector(aliases))) }} }
 
 /// Find the unique child of a node with a given ScaffoldKind (for Tree<NewOrgNode>).
 /// Returns None if no child has the kind,
