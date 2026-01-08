@@ -60,27 +60,42 @@
    DECISION: Use empty string for scaffold titles when rendering during transition.
    The descriptive titles will be enabled in Phase 7+ when we remove old types.
 
-* Phase 3: Migrate tree construction (output path continued)
+* DONE Phase 3: Migrate tree construction (output path continued)
   These functions build OrgNode trees from disk/TypeDB data.
-** 3.1 Update to_org/util.rs
-   - forest_root_pair() should create NewOrgNode with Scaffold::ForestRoot
-   - build_node_branch_minus_content() and helpers
-** 3.2 Update to_org/expand/aliases.rs
-   - Creates AliasCol and Alias scaffolds
-** 3.3 Update to_org/complete/sharing.rs
-   - Creates SubscribeeCol, HiddenInSubscribeeCol, HiddenOutsideOfSubscribeeCol
-   - Creates Subscribee and HiddenFromSubscribees TrueNodes
-** 3.4 Update to_org/complete/contents.rs
-   - Main content tree building
-** 3.5 Update to_org/complete/aliascol.rs
-   - AliasCol completion logic
-** 3.6 Update to_org/expand/backpath.rs
-   - Creates ParentIgnores TrueNodes
-** 3.7 Update to_org/expand/definitive.rs
-   - View request handling
-** 3.8 Update to_org/render/initial_bfs.rs
-   - BFS rendering, sets indefinitive on truncated nodes
-** 3.9 Run all tests after each sub-step
+** Decision: Use parallel NewNodePair type instead of changing NodePair
+   Changing NodePair.orgnode from OrgNode to NewOrgNode would cascade to 11 files.
+   DECISION: Add NewNodePair and NewPairTree as parallel types.
+   - Keep old NodePair/PairTree unchanged
+   - Add conversion functions between old and new types
+   - Old code keeps working, new code can convert at boundaries
+   - Merge types in Phase 7 when old types are removed
+** Implemented approach (simpler than originally planned)
+   The parallel types approach means we DON'T need to update all the tree
+   construction files (3.2-3.8 below). Instead:
+   - Added NewNodePair, NewPairTree types to server/types/tree.rs
+   - Added node_pair_to_new() and node_pair_from_new() conversion functions
+   - Added new_forest_root_pair() helper to server/to_org/util.rs
+   - Added comprehensive tests for NodePair <-> NewNodePair round-trips
+   The existing tree construction code continues to use PairTree.
+   When new types are needed (e.g., for rendering), convert at the boundary.
+** 3.1 Update server/types/tree.rs
+   - Added NewNodePair struct with new_orgnode: NewOrgNode
+   - Added NewPairTree type alias
+   - Added NewNodePair::from_orgnode() and from_pair() constructors
+   - Added node_pair_to_new() and node_pair_from_new() conversion functions
+   - Added 7 tests for round-trip conversions
+** 3.2 Update to_org/util.rs
+   - Added new_forest_root_pair() returning NewNodePair
+   - Added new_new_forest() (unused for now but available)
+   - Added is_new_forest_root() (unused for now but available)
+** 3.3-3.8 NOT NEEDED with parallel types approach
+   Original plan called for updating aliases.rs, sharing.rs, contents.rs,
+   aliascol.rs, backpath.rs, definitive.rs, initial_bfs.rs.
+   With parallel types + conversion at boundaries, these don't need changes yet.
+   They will be updated in Phase 7 when we merge old and new types.
+** 3.9 All tests pass
+   - cargo test: 57 tests pass
+   - integration tests: 10 tests pass
 
 * Phase 4: Migrate parsing (input path)
   Parsing is trickier because it builds OrgNodes from user text.

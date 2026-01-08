@@ -4,7 +4,8 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
-use crate::types::tree::{NodePair, PairTree};
+use crate::types::orgnode_new::{NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind};
+use crate::types::tree::{NodePair, PairTree, NewNodePair, NewPairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -57,6 +58,43 @@ fn is_forest_root (
     . map ( |node_ref|
              node_ref . value () . orgnode . metadata . code . interp
              == Interp::ForestRoot )
+    . unwrap_or ( false ) }
+
+
+// ======================================================
+// NewPairTree ForestRoot utilities (new types)
+// ======================================================
+
+/// Create a NewNodePair representing a ForestRoot.
+/// It is never rendered; it just makes forests easier to process.
+pub fn new_forest_root_pair () -> NewNodePair {
+  NewNodePair::from_orgnode ( NewOrgNode {
+    focused : false,
+    folded  : false,
+    kind    : OrgNodeKind::Scaff ( Scaffold {
+      kind : ScaffoldKind::ForestRoot,
+    }),
+  })}
+
+/// Create a new forest using NewPairTree (a tree with a ForestRoot root).
+/// The "tree roots" will be children of this root.
+#[allow(dead_code)]
+fn new_new_forest () -> NewPairTree {
+  Tree::new ( new_forest_root_pair () ) }
+
+/// Check if a node is a ForestRoot in a NewPairTree.
+#[allow(dead_code)]
+fn is_new_forest_root (
+  tree    : &NewPairTree,
+  node_id : NodeId,
+) -> bool {
+  tree . get ( node_id )
+    . map ( |node_ref| {
+      match &node_ref . value () . new_orgnode . kind {
+        OrgNodeKind::Scaff ( s ) =>
+          matches! ( s . kind, ScaffoldKind::ForestRoot ),
+        OrgNodeKind::True ( _ ) => false,
+      }})
     . unwrap_or ( false ) }
 
 
