@@ -232,8 +232,8 @@ fn find_child_by_id (
   target_skgid  : & ID,
 ) -> Option < ego_tree::NodeId > {
   for child in tree . get ( parent_treeid ) . unwrap () . children () {
-    if let Some ( ref child_skgpid ) =
-      child . value () . orgnode . metadata . id {
+    if let Some ( child_skgpid ) =
+      child . value () . orgnode_new () . id () {
         if child_skgpid == target_skgid {
           return Some ( child . id () ); }} }
   None }
@@ -249,8 +249,8 @@ fn find_children_by_ids (
   let mut result : HashMap < ID, ego_tree::NodeId > =
     HashMap::new ();
   for child in tree . get ( parent_treeid ) . unwrap () . children () {
-    if let Some ( ref child_skgpid )
-      = child . value () . orgnode . metadata . id
+    if let Some ( child_skgpid )
+      = child . value () . orgnode_new () . id ()
     { if target_skgids . contains ( child_skgpid )
       { result . insert ( child_skgpid . clone (), child . id () ); }} }
   result }

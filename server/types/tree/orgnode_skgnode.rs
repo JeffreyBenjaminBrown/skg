@@ -103,13 +103,13 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
-    node_ref . value () . orgnode . metadata . id . clone ()
+    node_ref . value () . orgnode_new () . id () . cloned ()
     . ok_or ( "Subscribee has no ID" ) ?;
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if parent_ref . value () . orgnode . metadata . code . interp
-    != Interp::SubscribeeCol {
+  if ! parent_ref . value () . orgnode_new ()
+      . matches_interp ( &Interp::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
   let grandparent_ref : NodeRef < NodePair > =
@@ -186,7 +186,7 @@ pub async fn ancestor_skgnode_from_disk (
 ) -> Result < SkgNode, Box<dyn Error> > {
   let ancestor_skgid : ID =
     read_at_ancestor_in_tree( tree, treeid, generation,
-      |np| np . orgnode . metadata . id . clone () )
+      |np| np . orgnode_new () . id () . cloned () )
     . map_err( |e| -> Box<dyn Error> { e . into () })?
     . ok_or_else(
       || -> Box<dyn Error> {
@@ -209,15 +209,14 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
-    let child_orgnode : &OrgNode =
-      & child . value () . orgnode;
-    if child_orgnode . metadata . code.interp != Interp::Alias {
+    let child_new = child . value () . orgnode_new ();
+    if ! child_new . matches_interp ( &Interp::Alias ) {
       return Err (
         format! ( "AliasCol has non-Alias child with interp: {:?}",
-                  child_orgnode . metadata . code.interp )
+                  child_new . interp () )
         . into () ); }
     aliases . push (
-      child_orgnode . title . clone () ); }
+      child_new . title () . to_string () ); }
   Ok ( dedup_vector ( aliases ) ) }
 
 /// Collect aliases for a node (for Tree<OrgNode>):

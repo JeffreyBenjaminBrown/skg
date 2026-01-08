@@ -95,35 +95,31 @@ fn set_metadata_relationships_in_node_recursive (
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( treeid ) . unwrap ()
-    . value () . orgnode . metadata . id . clone ();
+    . value () . orgnode_new () . id () . cloned ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
-    // Update all relationship fields
-    tree . get_mut ( treeid ) . unwrap () . value ()
-      . orgnode . metadata . viewData . relationships . numContainers =
-      rel_data . num_containers . get ( node_pid ) . copied ();
-    tree . get_mut ( treeid ) . unwrap () . value ()
-      . orgnode . metadata . viewData . relationships . numContents =
-      rel_data . num_contents . get ( node_pid ) . copied ();
-    tree . get_mut ( treeid ) . unwrap () . value ()
-      . orgnode . metadata . viewData . relationships . numLinksIn =
-      rel_data . num_links_in . get ( node_pid ) . copied ();
-    if let Some ( parent_skgid ) = parent_pid {
-      // Set parent relationship flags if we have a parent.
-      // TODO | PITFALL: If there is no parent,
-      // these fields are meaningless.
-      tree . get_mut ( treeid ) . unwrap () . value ()
-        . orgnode . metadata . viewData . relationships . parentIsContainer =
-        rel_data . content_to_containers
-        . get ( node_pid )
-        . map_or ( false, | containers |
-                   containers . contains ( parent_skgid ));
-      tree . get_mut ( treeid ) . unwrap () . value ()
-        . orgnode . metadata . viewData . relationships . parentIsContent =
-        rel_data . container_to_contents
-        . get ( node_pid )
-        . map_or ( false, | contents |
-                   contents . contains ( parent_skgid )); }}
+    // Update all relationship fields on new_orgnode
+    let num_containers = rel_data . num_containers . get ( node_pid ) . copied ();
+    let num_contents = rel_data . num_contents . get ( node_pid ) . copied ();
+    let num_links_in = rel_data . num_links_in . get ( node_pid ) . copied ();
+    let (parent_is_container, parent_is_content) : (bool, bool) =
+      if let Some ( parent_skgid ) = parent_pid {
+        ( rel_data . content_to_containers
+            . get ( node_pid )
+            . map_or ( false, | containers |
+                       containers . contains ( parent_skgid )),
+          rel_data . container_to_contents
+            . get ( node_pid )
+            . map_or ( false, | contents |
+                       contents . contains ( parent_skgid )) )
+      } else { (true, false) }; // default if no parent
+    let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
+    let org = node_mut . value () . orgnode_new_mut ();
+    org . set_num_containers ( num_containers );
+    org . set_num_contents ( num_contents );
+    org . set_num_links_in ( num_links_in );
+    org . set_parent_is_container ( parent_is_container );
+    org . set_parent_is_content ( parent_is_content ); }
   { // recurse
     let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()

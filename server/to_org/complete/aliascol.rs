@@ -1,5 +1,4 @@
-use crate::types::orgnode::{Interp, OrgNode};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode::Interp;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
@@ -27,14 +26,13 @@ pub async fn completeAliasCol (
   driver           : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { // Validate this is an AliasCol
-    let interp : Interp =
+    let is_aliascol : bool =
       read_at_node_in_tree(
         tree, aliascol_node_id,
-        |np| np . orgnode . metadata . code . interp . clone () )
+        |np| np . orgnode_new () . matches_interp ( &Interp::AliasCol ) )
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
-    if interp != Interp::AliasCol {
-      return Err( format!(
-        "Node is not an AliasCol: {:?}", interp ) . into () ); }}
+    if ! is_aliascol {
+      return Err( "Node is not an AliasCol" . into () ); }}
   let parent_skgnode : SkgNode =
     ancestor_skgnode_from_disk(
       tree, aliascol_node_id, 1, config, driver ) . await?;
@@ -86,22 +84,20 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
-      let child_orgnode : &OrgNode =
-        & child . value () . orgnode;
-      let title : &String =
-        & child_orgnode . title;
+      let child_new_orgnode = child . value () . orgnode_new ();
+      let title : &str = child_new_orgnode . title ();
       let is_duplicate : bool =
-        ! seen . insert ( title . clone () );
+        ! seen . insert ( title . to_string () );
       let is_invalid : bool =
         ! good_aliases . contains ( title );
       if is_duplicate || is_invalid {
         children_to_remove_acc . push ( child . id () );
-        if child_orgnode . metadata . viewData.focused {
+        if child_new_orgnode . focused {
           // We will delete the focused node.
           removed_focus = true;
           if is_duplicate {
             // Use this to move focus to the earlier duplicate title.
-            focused_title = Some ( title . clone () ); }; }} }
+            focused_title = Some ( title . to_string () ); }; }} }
     children_to_remove_acc };
 
   for child_treeid in children_to_remove {
@@ -115,18 +111,16 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         tree . get ( aliascol_node_id )
         . ok_or ( "AliasaCol node not found" ) ?;
       for child in aliascol_ref . children () {
-        if child . value () . orgnode . title == title {
+        if child . value () . orgnode_new () . title () == title {
           write_at_node_in_tree (
             tree, child . id (),
             |np| {
-              np . orgnode . metadata . viewData . focused = true;
-              np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
+              np . orgnode_new_mut () . focused = true; } ) ?;
           break; }} }
     else { // Move focus to aliasCol itself.
       write_at_node_in_tree (
         tree, aliascol_node_id,
         |np| {
-          np . orgnode . metadata . viewData.focused = true;
-          np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }}
+          np . orgnode_new_mut () . focused = true; } ) ?; }}
 
   Ok (( )) }

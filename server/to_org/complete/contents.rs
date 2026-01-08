@@ -12,7 +12,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode_new::{from_old_orgnode, OrgNodeKind, EffectOnParent};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -135,8 +135,12 @@ fn view_requests_at_node (
   let node_view_requests : Vec < ViewRequest > =
     read_at_node_in_tree (
       tree, node_id,
-      ( |np| np . orgnode . metadata . code . viewRequests
-        . iter () . cloned () . collect () )) ?;
+      |np| {
+        match &np . orgnode_new () . kind {
+          OrgNodeKind::True ( t ) =>
+            t . view_requests . iter () . cloned () . collect (),
+          OrgNodeKind::Scaff ( _ ) => Vec::new (),
+        } }) ?;
   for request in node_view_requests {
     view_requests_out . push ( (node_id, request) ); }
   Ok (( )) }
@@ -157,14 +161,16 @@ pub fn clobberIndefinitiveOrgnode (
   treeid : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree ( tree, treeid, |pair| {
-    let skgnode : &SkgNode =
-      pair . mskgnode . as_ref ()
-        . ok_or ("SkgNode should exist after fetch" . to_string() )?;
-    pair.orgnode.title = skgnode.title.clone();
-    pair.orgnode.metadata.source = Some(skgnode.source.clone());
-    pair.orgnode.body = None;
-    // Keep new_orgnode in sync with orgnode mutations
-    pair.new_orgnode = Some ( from_old_orgnode ( &pair.orgnode ));
+    let (title, source) : (String, String) = {
+      let skgnode : &SkgNode =
+        pair . mskgnode . as_ref ()
+          . ok_or ("SkgNode should exist after fetch" . to_string() )?;
+      ( skgnode . title . clone (),
+        skgnode . source . clone () ) };
+    let org = pair . orgnode_new_mut ();
+    org . set_title ( title );
+    org . set_source ( source );
+    org . clear_body ();
     Ok::<(), String>(( ))
   } )? // before the '?' it's a nested Result: R<R<(),String>,String>
     . map_err( |e| -> Box<dyn Error> { e.into() } ) }
@@ -226,7 +232,7 @@ pub async fn completeDefinitiveOrgnode (
       tree . get ( *child_treeid )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
-      child_ref . value () . orgnode . metadata . id . as_ref ()
+      child_ref . value () . orgnode_new () . id ()
       . ok_or ( "Content child has no ID" ) ?;
     content_skgid_to_treeid . insert (
       child_pid . clone (), *child_treeid ); }
@@ -242,11 +248,11 @@ pub async fn completeDefinitiveOrgnode (
     let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_treeid )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . orgnode . metadata . code.interp =
-      Interp::ParentIgnores;
-    content_skgid_to_treeid . remove (
-      & child_mut . value () . orgnode
-        . metadata . id . clone () . unwrap () );
+    let pair = child_mut . value ();
+    pair . orgnode_new_mut ()
+      . set_effect_on_parent ( EffectOnParent::ParentIgnores );
+    let child_pid = pair . orgnode_new () . id () . cloned () . unwrap ();
+    content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
 
   // Build completed-content list
@@ -288,8 +294,8 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . orgnode . metadata . code . interp
-      == Interp::Content
+    if child . value () . orgnode_new ()
+        . matches_interp ( &Interp::Content )
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}
@@ -380,7 +386,7 @@ pub async fn ensure_source (
   let has_source : bool =
     read_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode . metadata . source . is_some () ) ?;
+      |np| np . orgnode_new () . has_source () ) ?;
   if ! has_source {
     let node_pid : ID =
       get_pid_in_pairtree ( tree, node_id ) ?;
@@ -393,6 +399,5 @@ pub async fn ensure_source (
     write_at_node_in_tree (
       tree, node_id,
       |np| {
-        np . orgnode . metadata . source = Some (source);
-        np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }
+        np . orgnode_new_mut () . set_source ( source ); } ) ?; }
   Ok (( )) }

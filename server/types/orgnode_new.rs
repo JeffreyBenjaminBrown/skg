@@ -185,6 +185,26 @@ impl NewOrgNode {
             OrgNodeKind::Scaff ( _ ) => false,
         } }
 
+    /// Returns the Interp that this NewOrgNode corresponds to.
+    /// Used during transition to bridge old and new type systems.
+    pub fn interp ( &self ) -> Interp {
+        match &self . kind {
+            OrgNodeKind::Scaff ( s ) => match &s . kind {
+                ScaffoldKind::ForestRoot => Interp::ForestRoot,
+                ScaffoldKind::AliasCol => Interp::AliasCol,
+                ScaffoldKind::Alias ( _ ) => Interp::Alias,
+                ScaffoldKind::SubscribeeCol => Interp::SubscribeeCol,
+                ScaffoldKind::HiddenInSubscribeeCol => Interp::HiddenInSubscribeeCol,
+                ScaffoldKind::HiddenOutsideOfSubscribeeCol => Interp::HiddenOutsideOfSubscribeeCol,
+            },
+            OrgNodeKind::True ( t ) => match t . effect_on_parent {
+                EffectOnParent::Content => Interp::Content,
+                EffectOnParent::Subscribee => Interp::Subscribee,
+                EffectOnParent::ParentIgnores => Interp::ParentIgnores,
+                EffectOnParent::HiddenFromSubscribees => Interp::HiddenFromSubscribees,
+            },
+        } }
+
     /// Returns true if this NewOrgNode corresponds to the given old Interp.
     /// Used during transition to bridge old and new type systems.
     pub fn matches_interp ( &self, interp : &Interp ) -> bool {
@@ -261,6 +281,69 @@ impl NewOrgNode {
         match &self . kind {
             OrgNodeKind::True ( t ) => t . source . is_some (),
             OrgNodeKind::Scaff ( _ ) => false,
+        } }
+
+    /// Get the source if this is a TrueNode. Returns None for Scaffolds.
+    pub fn source ( &self ) -> Option < &String > {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . source . as_ref (),
+            OrgNodeKind::Scaff ( _ ) => None,
+        } }
+
+    /// Get the view_requests if this is a TrueNode. Returns None for Scaffolds.
+    pub fn view_requests ( &self ) -> Option < &HashSet < ViewRequest > > {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => Some ( &t . view_requests ),
+            OrgNodeKind::Scaff ( _ ) => None,
+        } }
+
+    /// Get the edit_request if this is a TrueNode. Returns None for Scaffolds.
+    pub fn edit_request ( &self ) -> Option < &EditRequest > {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . edit_request . as_ref (),
+            OrgNodeKind::Scaff ( _ ) => None,
+        } }
+
+    /// Set the edit_request. No-op for Scaffolds.
+    pub fn set_edit_request ( &mut self, edit_request : Option < EditRequest > ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . edit_request = edit_request;
+        } }
+
+    /// Set numContainers in view_data.relationships. No-op for Scaffolds.
+    pub fn set_num_containers ( &mut self, value : Option < usize > ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . relationships . numContainers = value;
+        } }
+
+    /// Set numContents in view_data.relationships. No-op for Scaffolds.
+    pub fn set_num_contents ( &mut self, value : Option < usize > ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . relationships . numContents = value;
+        } }
+
+    /// Set numLinksIn in view_data.relationships. No-op for Scaffolds.
+    pub fn set_num_links_in ( &mut self, value : Option < usize > ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . relationships . numLinksIn = value;
+        } }
+
+    /// Set parentIsContainer in view_data.relationships. No-op for Scaffolds.
+    pub fn set_parent_is_container ( &mut self, value : bool ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . relationships . parentIsContainer = value;
+        } }
+
+    /// Set parentIsContent in view_data.relationships. No-op for Scaffolds.
+    pub fn set_parent_is_content ( &mut self, value : bool ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . relationships . parentIsContent = value;
+        } }
+
+    /// Set effect_on_parent. No-op for Scaffolds.
+    pub fn set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . effect_on_parent = effect;
         } }
 }
 

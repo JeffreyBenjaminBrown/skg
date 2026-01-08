@@ -355,20 +355,92 @@
    testable change. If something breaks, it's easy to identify which
    caller caused the issue.
 
-* Phase 8: Optional improvements (separate PRs)
-** 8.0 Complete type migration (if desired)
-   The dual-field approach is stable but maintains two type systems.
-   To fully migrate to new types only:
-   - Migrate parsing to produce NewOrgNode directly (or Tree<NewOrgNode>)
-   - Remove orgnode field from NodePair
-   - Rename NewOrgNode → OrgNode, new_orgnode → orgnode
-   - Remove conversion functions (from_old_orgnode, to_old_orgnode)
-   - Remove old types (OrgNode, Interp, OrgnodeCode, OrgnodeMetadata)
-   This is substantial work with limited benefit beyond cleaner types.
-** 8.1 Make TrueNode.id required (separate refactor as discussed)
-** 8.2 Make TrueNode.source required (separate refactor)
-** 8.3 Consider splitting TrueNode further by effect_on_parent
+* IN PROGRESS Phase 8: Complete type migration
+  Goal: Remove orgnode field from NodePair, use only new_orgnode.
 
+** DONE 8.1 Add helper methods to NewOrgNode
+   Query methods:
+   - id() -> Option<&ID>
+   - title() -> &str
+   - matches_interp(&Interp) -> bool (bridge for transition)
+   - has_effect(EffectOnParent) -> bool
+   - is_scaffold(&ScaffoldKind) -> bool
+   - is_true_node() -> bool
+   - is_scaffold_any() -> bool
+   - scaffold_kind() -> Option<&ScaffoldKind>
+   - is_indefinitive() -> bool
+   - has_source() -> bool
+
+   Mutation methods:
+   - set_indefinitive(bool)
+   - clear_body()
+   - set_title(String)
+   - set_source(String)
+   - set_cycle(bool)
+   - view_requests_mut() -> Option<&mut HashSet<ViewRequest>>
+
+** DONE 8.2 Add helper methods to NodePair
+   - orgnode_new() -> &NewOrgNode (panics if None)
+   - orgnode_new_mut() -> &mut NewOrgNode
+
+** DONE 8.3 Migrate reads from .orgnode to .orgnode_new()
+   Migrated sites:
+   - types/tree/orgnode_skgnode.rs:34 - unique_child_with_interp
+   - to_org/util.rs:220 - is_ancestor_id
+   - to_org/util.rs:234 - get_pid_in_pairtree
+   - to_org/complete/sharing.rs:92 - Subscribee check
+   - to_org/complete/contents.rs:78 - interp checks
+
+** DONE 8.4 Migrate mutations to use new_orgnode directly
+   Previously: code mutated .orgnode then synced to .new_orgnode
+   Now: code reads/mutates .new_orgnode directly using helper methods
+
+   Migrated all runtime reads from .orgnode to .orgnode_new():
+   - types/tree/orgnode_skgnode.rs: pid_for_subscribee_and_its_subscriber_grandparent,
+     ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol
+   - to_org/expand/backpath.rs: find_child_by_id, find_children_by_ids
+   - to_org/util.rs: collect_ids_from_pair_tree
+   - to_org/complete/contents.rs: content child ID lookup, categorize_children_by_treatment
+   - to_org/complete/aliascol.rs: validation
+   - to_org/expand/definitive.rs: rebuild_pair_from_disk_mostly_clobbering_the_org
+
+   Added new helper method to NewOrgNode:
+   - interp() -> Interp (returns equivalent Interp for this node)
+
+   Remaining .orgnode uses are:
+   - Type definitions (NodePair struct)
+   - NodePair construction (both fields set in sync)
+   - Conversion functions
+   - Test utility comparing against Tree<OrgNode>
+   - Input parsing in from_text/ (operates on Tree<OrgNode>)
+
+** 8.5 Remove orgnode field from NodePair
+   Once all code uses new_orgnode:
+   - Change NodePair to only have: { mskgnode, new_orgnode }
+   - Update all NodePair constructions
+   - Remove from_old_orgnode syncing
+
+** 8.6 Rename types to final names
+   - NewOrgNode → OrgNode
+   - new_orgnode → orgnode
+   - new_orgnode_to_text → orgnode_to_text
+   - orgnode_new() → orgnode()
+
+** 8.7 Remove old types and conversion functions
+   Remove from orgnode.rs:
+   - OrgNode struct
+   - Interp enum
+   - OrgnodeCode struct
+   - OrgnodeMetadata struct
+   Remove from orgnode_new.rs:
+   - from_old_orgnode()
+   - to_old_orgnode()
+   - matches_interp() (no longer needed)
+
+* maybe later
+** Make TrueNode.id required (separate refactor as discussed)
+** Make TrueNode.source required (separate refactor)
+** Consider splitting TrueNode further by effect_on_parent
 * Testing strategy
   - Run `cargo nextest run` after each numbered step
   - Run `bash/integration-tests.sh` after each phase

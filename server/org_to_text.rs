@@ -26,11 +26,11 @@ pub fn orgnode_forest_to_string (
     node_ref : NodeRef < NodePair >,
     level    : usize,
   ) -> String {
-    // Convert at render time to capture any post-construction mutations
-    let new_orgnode : NewOrgNode =
-      from_old_orgnode ( & node_ref . value () . orgnode );
+    // Use new_orgnode directly - it's the authoritative source
+    let new_orgnode : &NewOrgNode =
+      node_ref . value () . orgnode_new ();
     let mut out : String =
-      new_orgnode_to_text ( level, &new_orgnode );
+      new_orgnode_to_text ( level, new_orgnode );
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -39,8 +39,8 @@ pub fn orgnode_forest_to_string (
     out }
   let root_ref = forest . root ();
   let is_forest_root : bool = {
-    let root_new_orgnode : NewOrgNode =
-      from_old_orgnode ( & root_ref . value () . orgnode );
+    let root_new_orgnode : &NewOrgNode =
+      root_ref . value () . orgnode_new ();
     matches! (
       & root_new_orgnode . kind,
       OrgNodeKind::Scaff ( Scaffold { kind : ScaffoldKind::ForestRoot } )) };

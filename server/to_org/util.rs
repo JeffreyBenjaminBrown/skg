@@ -104,9 +104,9 @@ pub(super) fn makeIndefinitiveAndClobber (
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree ( tree, node_id, |np| {
-    np . orgnode . metadata . code . indefinitive = true;
-    np . orgnode . body = None;
-    np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
+    let org = np . orgnode_new_mut ();
+    org . set_indefinitive ( true );
+    org . clear_body (); } ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -146,11 +146,10 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   if visited . contains_key ( &pid ) {
     // Mark as indefinitive (it's a repeat).
     write_at_node_in_tree ( tree, node_id, |np| {
-      np . orgnode . metadata . code . indefinitive = true;
-      np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }
+      np . orgnode_new_mut () . set_indefinitive ( true ); } ) ?; }
   let is_indefinitive : bool =
     read_at_node_in_tree ( tree, node_id, |np|
-      np . orgnode . metadata . code . indefinitive ) ?;
+      np . orgnode_new () . is_indefinitive () ) ?;
   if is_indefinitive {
     clobberIndefinitiveOrgnode ( tree, node_id ) ?;
   } else {
@@ -167,8 +166,7 @@ fn detect_and_mark_cycle (
     let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
   write_at_node_in_tree ( tree, node_id, |np| {
-    np . orgnode . metadata . viewData . cycle = is_cycle;
-    np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
+    np . orgnode_new_mut () . set_cycle ( is_cycle ); } ) ?;
   Ok (( )) }
 
 
@@ -200,8 +198,8 @@ pub fn collect_ids_from_pair_tree (
   let mut pids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open ( node_ref ) = edge {
-      if let Some ( ref pid ) =
-        node_ref . value () . orgnode . metadata . id {
+      if let Some ( pid ) =
+        node_ref . value () . orgnode_new () . id () {
         pids . push ( pid . clone () ); }} }
   pids }
 
@@ -316,7 +314,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid,
     |nodepair| {
-      if nodepair . orgnode . metadata . code . indefinitive {
+      if nodepair . orgnode_new () . is_indefinitive () {
         return Vec::new (); }
       match & nodepair . mskgnode {
         Some ( skgnode ) =>
@@ -362,7 +360,7 @@ pub(super) fn is_indefinitive (
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid, |np|
-    np . orgnode . metadata . code . indefinitive )
+    np . orgnode_new () . is_indefinitive () )
     . map_err ( |e| e . into () ) }
 
 /// Collect all child tree NodeIds from a node in a PairTree.
@@ -394,8 +392,9 @@ pub(super) fn remove_completed_view_request (
 ) -> Result < (), Box<dyn Error> > {
   if let Err ( e ) = result {
     errors . push ( format! ( "{}: {}", error_msg, e )); }
-  tree . get_mut ( node_id )
-    . ok_or ( "remove_completed_view_request: node not found" ) ?
-    . value () . orgnode . metadata . code . viewRequests
-    . remove ( &view_request );
+  let mut node_mut = tree . get_mut ( node_id )
+    . ok_or ( "remove_completed_view_request: node not found" ) ?;
+  if let Some ( vr ) = node_mut . value ()
+    . orgnode_new_mut () . view_requests_mut ()
+  { vr . remove ( &view_request ); }
   Ok (()) }
