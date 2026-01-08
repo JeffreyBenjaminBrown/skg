@@ -127,6 +127,143 @@ pub struct NewOrgNode {
     pub kind    : OrgNodeKind,
 }
 
+impl NewOrgNode {
+    /// Returns the ID if this is a TrueNode with an ID, None otherwise.
+    pub fn id ( &self ) -> Option < &ID > {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . id . as_ref (),
+            OrgNodeKind::Scaff ( _ ) => None,
+        } }
+
+    /// Returns the title. For TrueNode, returns the title field.
+    /// For Scaffold, returns the scaffold kind's title.
+    pub fn title ( &self ) -> &str {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => &t . title,
+            OrgNodeKind::Scaff ( s ) => s . kind . title (),
+        } }
+
+    /// Returns true if this is a TrueNode with the given effect_on_parent.
+    pub fn has_effect ( &self, effect : EffectOnParent ) -> bool {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . effect_on_parent == effect,
+            OrgNodeKind::Scaff ( _ ) => false,
+        } }
+
+    /// Returns true if this is a Scaffold with the given kind.
+    pub fn is_scaffold ( &self, kind : &ScaffoldKind ) -> bool {
+        match &self . kind {
+            OrgNodeKind::Scaff ( s ) => {
+                // For Alias, we compare the variant, not the string content
+                match ( &s . kind, kind ) {
+                    ( ScaffoldKind::Alias ( _ ), ScaffoldKind::Alias ( _ ) ) => true,
+                    _ => std::mem::discriminant ( &s . kind )
+                         == std::mem::discriminant ( kind ),
+                } }
+            OrgNodeKind::True ( _ ) => false,
+        } }
+
+    /// Returns true if this is a TrueNode (not a Scaffold).
+    pub fn is_true_node ( &self ) -> bool {
+        matches! ( &self . kind, OrgNodeKind::True ( _ ) ) }
+
+    /// Returns true if this is a Scaffold (not a TrueNode).
+    pub fn is_scaffold_any ( &self ) -> bool {
+        matches! ( &self . kind, OrgNodeKind::Scaff ( _ ) ) }
+
+    /// Returns the ScaffoldKind if this is a Scaffold, None otherwise.
+    pub fn scaffold_kind ( &self ) -> Option < &ScaffoldKind > {
+        match &self . kind {
+            OrgNodeKind::Scaff ( s ) => Some ( &s . kind ),
+            OrgNodeKind::True ( _ ) => None,
+        } }
+
+    /// Returns true if this is a TrueNode and is indefinitive.
+    pub fn is_indefinitive ( &self ) -> bool {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . indefinitive,
+            OrgNodeKind::Scaff ( _ ) => false,
+        } }
+
+    /// Returns true if this NewOrgNode corresponds to the given old Interp.
+    /// Used during transition to bridge old and new type systems.
+    pub fn matches_interp ( &self, interp : &Interp ) -> bool {
+        match ( &self . kind, interp ) {
+            // Scaffolds
+            ( OrgNodeKind::Scaff ( s ), Interp::ForestRoot ) =>
+                matches! ( s . kind, ScaffoldKind::ForestRoot ),
+            ( OrgNodeKind::Scaff ( s ), Interp::AliasCol ) =>
+                matches! ( s . kind, ScaffoldKind::AliasCol ),
+            ( OrgNodeKind::Scaff ( s ), Interp::Alias ) =>
+                matches! ( s . kind, ScaffoldKind::Alias ( _ ) ),
+            ( OrgNodeKind::Scaff ( s ), Interp::SubscribeeCol ) =>
+                matches! ( s . kind, ScaffoldKind::SubscribeeCol ),
+            ( OrgNodeKind::Scaff ( s ), Interp::HiddenInSubscribeeCol ) =>
+                matches! ( s . kind, ScaffoldKind::HiddenInSubscribeeCol ),
+            ( OrgNodeKind::Scaff ( s ), Interp::HiddenOutsideOfSubscribeeCol ) =>
+                matches! ( s . kind, ScaffoldKind::HiddenOutsideOfSubscribeeCol ),
+            // TrueNodes
+            ( OrgNodeKind::True ( t ), Interp::Content ) =>
+                t . effect_on_parent == EffectOnParent::Content,
+            ( OrgNodeKind::True ( t ), Interp::Subscribee ) =>
+                t . effect_on_parent == EffectOnParent::Subscribee,
+            ( OrgNodeKind::True ( t ), Interp::ParentIgnores ) =>
+                t . effect_on_parent == EffectOnParent::ParentIgnores,
+            ( OrgNodeKind::True ( t ), Interp::HiddenFromSubscribees ) =>
+                t . effect_on_parent == EffectOnParent::HiddenFromSubscribees,
+            // Mismatched kinds
+            _ => false,
+        } }
+
+    //
+    // Mutation helpers (for TrueNodes only; no-op for Scaffolds)
+    //
+
+    /// Set the indefinitive flag. No-op for Scaffolds.
+    pub fn set_indefinitive ( &mut self, value : bool ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . indefinitive = value;
+        } }
+
+    /// Clear the body (set to None). No-op for Scaffolds.
+    pub fn clear_body ( &mut self ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . body = None;
+        } }
+
+    /// Set the title. No-op for Scaffolds.
+    pub fn set_title ( &mut self, title : String ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . title = title;
+        } }
+
+    /// Set the source. No-op for Scaffolds.
+    pub fn set_source ( &mut self, source : String ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . source = Some ( source );
+        } }
+
+    /// Set the cycle flag in view_data. No-op for Scaffolds.
+    pub fn set_cycle ( &mut self, value : bool ) {
+        if let OrgNodeKind::True ( t ) = &mut self . kind {
+            t . view_data . cycle = value;
+        } }
+
+    /// Get mutable access to view_requests. Returns None for Scaffolds.
+    pub fn view_requests_mut ( &mut self ) -> Option < &mut HashSet < ViewRequest > > {
+        match &mut self . kind {
+            OrgNodeKind::True ( t ) => Some ( &mut t . view_requests ),
+            OrgNodeKind::Scaff ( _ ) => None,
+        } }
+
+    /// Check if source is set. Returns false for Scaffolds.
+    pub fn has_source ( &self ) -> bool {
+        match &self . kind {
+            OrgNodeKind::True ( t ) => t . source . is_some (),
+            OrgNodeKind::Scaff ( _ ) => false,
+        } }
+}
+
 //
 // Defaults
 //

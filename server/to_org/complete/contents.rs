@@ -73,16 +73,19 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let treatment: Interp =
+    let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode.metadata.code.interp.clone() })?;
-    if treatment == Interp::AliasCol {
+        node.orgnode_new().matches_interp ( &Interp::AliasCol ) })?;
+    let is_col_scaffold: bool =
+      read_at_node_in_tree(tree, node_id, |node| {
+        node.orgnode_new().matches_interp ( &Interp::SubscribeeCol )
+        || node.orgnode_new().matches_interp ( &Interp::HiddenOutsideOfSubscribeeCol )
+        || node.orgnode_new().matches_interp ( &Interp::HiddenInSubscribeeCol ) })?;
+    if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if treatment == Interp::SubscribeeCol
-           || treatment == Interp::HiddenOutsideOfSubscribeeCol
-           || treatment == Interp::HiddenInSubscribeeCol {
+    } else if is_col_scaffold {
       // Recurse into children to collect view requests (e.g. from Subscribee nodes) but don't try to complete the SubscribeeCol node itself.
       map_completeAndRestoreNodeCollectingViewRequests_over_children (
         tree, node_id, config, typedb_driver,

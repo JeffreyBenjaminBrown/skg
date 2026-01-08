@@ -89,7 +89,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { // error if not a Subscribee
     let is_subscribee: bool =
       read_at_node_in_tree(tree, subscribee_treeid, |node| {
-        node.orgnode.metadata.code.interp == Interp::Subscribee
+        node.orgnode_new().matches_interp ( &Interp::Subscribee )
       })?;
     if ! is_subscribee { return Err (
       "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee"

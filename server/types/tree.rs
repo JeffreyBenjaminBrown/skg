@@ -34,6 +34,18 @@ pub struct NodePair {
   pub new_orgnode: Option<NewOrgNode>,
 }
 
+impl NodePair {
+  /// Get the NewOrgNode. Panics if not present (should always be present after Phase 7).
+  pub fn orgnode_new ( &self ) -> &NewOrgNode {
+    self . new_orgnode . as_ref ()
+      . expect ( "NodePair.new_orgnode should always be present" ) }
+
+  /// Get a mutable reference to the NewOrgNode.
+  pub fn orgnode_new_mut ( &mut self ) -> &mut NewOrgNode {
+    self . new_orgnode . as_mut ()
+      . expect ( "NodePair.new_orgnode should always be present" ) }
+}
+
 //
 // New types using NewOrgNode (transition period)
 //

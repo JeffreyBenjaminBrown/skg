@@ -217,7 +217,7 @@ fn is_ancestor_id (
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
-      |np| np.orgnode.metadata.id.clone() )
+      |np| np.orgnode_new().id().cloned() )
     { Ok(Some(id)) if &id == target_skgid
         => return Ok(true),
       Ok(_) => continue,
@@ -231,7 +231,7 @@ pub(super) fn get_pid_in_pairtree (
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid, |np|
-    np . orgnode . metadata . id . clone () ) ?
+    np . orgnode_new () . id () . cloned () ) ?
     . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
                        . into () ) }
 

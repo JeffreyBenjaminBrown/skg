@@ -31,7 +31,7 @@ pub fn unique_child_with_interp (
     tree.get(node_id)
     .ok_or("unique_child_with_interp: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode.metadata.code.interp == interp)
+    .filter(|c| c.value().orgnode_new().matches_interp ( &interp ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
