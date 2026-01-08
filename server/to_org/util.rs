@@ -39,10 +39,11 @@ pub type VisitedMap =
 pub fn forest_root_pair () -> NodePair {
   let mut md = default_metadata ();
   md . code . interp = Interp::ForestRoot;
-  NodePair { mskgnode: None,
-             orgnode: OrgNode { metadata: md,
-                                title: String::new (),
-                                body: None }} }
+  NodePair { mskgnode    : None,
+             orgnode     : OrgNode { metadata: md,
+                                     title: String::new (),
+                                     body: None },
+             new_orgnode : None, } }
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.
@@ -321,8 +322,9 @@ pub async fn make_and_append_child_pair (
     with_node_mut (
       tree, parent_treeid,
       ( |mut parent_mut|
-        parent_mut . append ( NodePair { mskgnode: Some(child_skgnode),
-                                         orgnode: child_orgnode } )
+        parent_mut . append ( NodePair { mskgnode    : Some(child_skgnode),
+                                         orgnode     : child_orgnode,
+                                         new_orgnode : None } )
         . id () )) ?;
   Ok ( child_treeid ) }
 
@@ -349,15 +351,18 @@ pub async fn build_node_branch_minus_content (
         with_node_mut (
           tree, parent_treeid,
           ( |mut parent_mut|
-            parent_mut . append ( NodePair { mskgnode: Some(skgnode),
-                                             orgnode } ) . id () )) ?;
+            parent_mut . append ( NodePair { mskgnode    : Some(skgnode),
+                                             orgnode,
+                                             new_orgnode : None } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
       Ok ( (None, child_treeid) ) },
     None => {
       let mut tree : PairTree =
-        Tree::new ( NodePair { mskgnode: Some(skgnode), orgnode } );
+        Tree::new ( NodePair { mskgnode    : Some(skgnode),
+                               orgnode,
+                               new_orgnode : None } );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, root_treeid, visited,

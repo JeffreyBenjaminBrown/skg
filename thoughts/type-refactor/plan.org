@@ -158,32 +158,41 @@
   Files using OrgNode (28 files)
   Files accessing .code.interp (9 files, 14 occurrences)
 
-** 7.1 Migrate rendering subsystem
-   Files: server/org_to_text.rs
+** DONE 7.1 Migrate rendering subsystem
+   Files: server/org_to_text.rs, server/serve/handlers/title_matches.rs
 
    - org_to_text.rs already has new_orgnode_to_text() functions
-   - Update callers to use new functions (convert OrgNode -> NewOrgNode)
-   - Eventually remove old orgnode_to_text() when unused
-   - Test: cargo test, integration tests
+   - Updated title_matches.rs to use NewOrgNode and new_orgnode_to_text()
+   - This was the only external caller of orgnode_to_text()
+   - Internal use in orgnode_forest_to_string() tied to PairTree (step 7.3)
+   - All tests pass
 
 ** 7.2 Migrate tree construction subsystem
    Files: server/to_org/util.rs, server/to_org/complete/*.rs,
           server/to_org/expand/*.rs (7 files)
 
+   NOTE: Do this AFTER 7.3, since tree construction needs to populate
+   the new_orgnode field that 7.3 adds.
+
    - These files build OrgNode trees from disk/TypeDB
-   - Update to build NewOrgNode internally
-   - Convert to OrgNode at boundary (for PairTree compatibility)
+   - Update to populate both orgnode AND new_orgnode in NodePair
    - Test after each file
 
-** 7.3 Switch PairTree to use NewOrgNode
-   Files: server/types/tree.rs, server/types/tree/orgnode_skgnode.rs
+** DONE 7.3 Add dual field to NodePair (do this BEFORE 7.2)
+   Files: server/types/tree.rs, server/types/tree/orgnode_skgnode.rs,
+          and all files that construct NodePair
 
-   This is the central change:
-   - Change NodePair.orgnode from OrgNode to NewOrgNode
-   - Or: Replace NodePair with NewNodePair entirely
-   - Update orgnode_skgnode.rs helper functions
-   - Update all callers (should be ready from 7.2)
-   - Test thoroughly
+   ORDERING NOTE: This step is done before 7.2 because tree construction
+   needs the new_orgnode field to exist before it can populate it.
+
+   Using the safer incremental approach:
+   - Added new field: NodePair { orgnode, new_orgnode: Option<NewOrgNode> }
+   - Initially new_orgnode is None everywhere
+   - Updated all NodePair constructions (12 locations in 8 files)
+   - Tree construction (7.2) will populate it
+   - Callers (7.4-7.7) will migrate to read from it
+   - Finally (7.8) remove orgnode field
+   - All tests pass
 
 ** 7.4 Migrate parsing subsystem
    Files: server/serve/parse_metadata_sexp.rs,
@@ -254,17 +263,18 @@
    - Final test pass: cargo test, integration tests
    - Consider squashing commits or keeping history
 
-** Notes on 7.3 (the tricky step)
-   Changing NodePair.orgnode to NewOrgNode is the "big bang" moment.
-   All code that accesses orgnode field must change simultaneously.
+** Decision on 7.3: Use the safer incremental approach
+   DECISION: Use the safer approach with dual fields.
 
-   Alternative approach (if 7.3 is too risky):
-   - Add a new field: NodePair { orgnode: OrgNode, new_orgnode: Option<NewOrgNode> }
-   - Migrate callers one by one to use new_orgnode
-   - When all use new_orgnode, remove orgnode field
-   - This is slower but safer
+   Instead of changing NodePair.orgnode all at once:
+   1. Add new field: NodePair { orgnode: OrgNode, new_orgnode: Option<NewOrgNode> }
+   2. Migrate callers one by one to use new_orgnode
+   3. When all callers use new_orgnode, remove orgnode field
+   4. Rename new_orgnode -> orgnode (now it's NewOrgNode type)
 
-   Decision: Choose based on confidence after completing 7.1-7.2
+   This is slower but much safer - each caller migration is a small,
+   testable change. If something breaks, it's easy to identify which
+   caller caused the issue.
 
 * Phase 8: Optional improvements (separate PRs)
 ** 8.1 Make TrueNode.id required (separate refactor as discussed)

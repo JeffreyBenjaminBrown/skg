@@ -471,8 +471,9 @@ pub fn orgnode_forest_to_paired (
       let mut parent_mut =
         forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
-        . append ( NodePair { mskgnode: None,
-                              orgnode: orgnode } )
+        . append ( NodePair { mskgnode    : None,
+                              orgnode     : orgnode,
+                              new_orgnode : None } )
         . id () };
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()

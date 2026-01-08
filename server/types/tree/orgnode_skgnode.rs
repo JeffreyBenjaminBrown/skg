@@ -141,7 +141,9 @@ pub fn insert_sourceless_node (
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
-      let pair = NodePair { mskgnode: None, orgnode: col_orgnode };
+      let pair = NodePair { mskgnode    : None,
+                            orgnode     : col_orgnode,
+                            new_orgnode : None };
       if prepend { parent_mut . prepend ( pair ) . id () }
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
@@ -165,7 +167,9 @@ pub async fn append_indefinitive_node (
     tree, parent_id,
     |mut parent_mut| {
       parent_mut . append (
-        NodePair { mskgnode: Some ( skgnode ), orgnode } ); } ) ?;
+        NodePair { mskgnode    : Some ( skgnode ),
+                   orgnode,
+                   new_orgnode : None } ); } ) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode

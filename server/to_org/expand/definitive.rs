@@ -283,5 +283,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   orgnode . metadata . code = code;
   write_at_node_in_tree ( // replace it
     tree, node_id,
-    |np| * np = NodePair { mskgnode: Some ( skgnode ), orgnode } ) ?;
+    |np| * np = NodePair { mskgnode    : Some ( skgnode ),
+                           orgnode,
+                           new_orgnode : None } ) ?;
   Ok (( )) }

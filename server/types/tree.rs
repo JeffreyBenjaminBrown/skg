@@ -27,6 +27,11 @@ pub type PairTree = Tree<NodePair>;
 pub struct NodePair {
   pub mskgnode: Option<SkgNode>,
   pub orgnode: OrgNode,
+  /// During transition: the new representation of the same node.
+  /// Initially None; tree construction (7.2) will populate it.
+  /// Callers will migrate to use this instead of orgnode.
+  /// Finally orgnode will be removed and this renamed.
+  pub new_orgnode: Option<NewOrgNode>,
 }
 
 //
@@ -71,8 +76,9 @@ pub fn node_pair_to_new ( old : &NodePair ) -> NewNodePair {
 pub fn node_pair_from_new ( new : &NewNodePair ) -> NodePair {
   use crate::types::orgnode_new::to_old_orgnode;
   NodePair {
-    mskgnode : new . mskgnode . clone (),
-    orgnode  : to_old_orgnode ( &new . new_orgnode ),
+    mskgnode    : new . mskgnode . clone (),
+    orgnode     : to_old_orgnode ( &new . new_orgnode ),
+    new_orgnode : Some ( new . new_orgnode . clone () ),
   } }
 
 //
@@ -113,8 +119,9 @@ mod tests {
       overrides_view_of            : None,
     };
     let old = NodePair {
-      mskgnode : Some ( skgnode ),
+      mskgnode    : Some ( skgnode ),
       orgnode,
+      new_orgnode : None,
     };
     let new = node_pair_to_new ( &old );
     let back = node_pair_from_new ( &new );
@@ -132,8 +139,9 @@ mod tests {
       body     : None,
     };
     let old = NodePair {
-      mskgnode : None,
+      mskgnode    : None,
       orgnode,
+      new_orgnode : None,
     };
     let new = node_pair_to_new ( &old );
     let back = node_pair_from_new ( &new );
@@ -151,8 +159,9 @@ mod tests {
       body     : None,
     };
     let old = NodePair {
-      mskgnode : None,
+      mskgnode    : None,
       orgnode,
+      new_orgnode : None,
     };
     let new = node_pair_to_new ( &old );
     let back = node_pair_from_new ( &new );

@@ -217,8 +217,9 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     true;
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
-    . prepend ( NodePair { mskgnode: None,
-                           orgnode: child_orgnode } ) . id ();
+    . prepend ( NodePair { mskgnode    : None,
+                           orgnode     : child_orgnode,
+                           new_orgnode : None } ) . id ();
   Ok ( new_child_treeid ) }
 
 /// Find a child node by its ID.

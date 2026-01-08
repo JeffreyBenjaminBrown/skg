@@ -235,7 +235,7 @@ fn add_paired_subtree_as_child (
     let mut parent_mut : NodeMut < _ > =
       pair_tree . get_mut ( parent_treeid ) . unwrap ();
     parent_mut . append ( // add new node
-      NodePair { mskgnode, orgnode } ) . id () };
+      NodePair { mskgnode, orgnode, new_orgnode : None } ) . id () };
   { // recurse in new node
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()
