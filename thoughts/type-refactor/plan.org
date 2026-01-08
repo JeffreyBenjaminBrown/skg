@@ -1,0 +1,268 @@
+#+title: Incremental Plan for OrgNode Type Refactor
+
+* Goal
+  Split OrgNode into TrueNode | Scaffold to make invalid states unrepresentable.
+  See spec-questions.org for the target type hierarchy.
+
+* Guiding principles
+  - Tests pass after every step
+  - Introduce new types alongside old, then migrate, then remove old
+  - Small commits with clear descriptions
+  - When in doubt, add a conversion function rather than change everything at once
+
+* DONE Phase 1: Define new types (no behavioral changes)
+  Commit: 506a083
+** 1.1 Create server/types/orgnode_new.rs with new type definitions
+   - EffectOnParent enum: Content, Subscribee, ParentIgnores
+   - ScaffoldKind enum: Alias(String), AliasCol, ForestRoot,
+     HiddenInSubscribeeCol, HiddenOutsideOfSubscribeeCol, SubscribeeCol
+   - Scaffold struct: kind: ScaffoldKind (no other fields needed)
+   - TrueNode struct: title, body, id (Option), source (Option),
+     effect_on_parent, indefinitive, view_data, edit_request, view_requests
+   - OrgNodeKind enum: True(TrueNode), Scaff(Scaffold)
+   - NewOrgNode struct: focused, folded, kind: OrgNodeKind
+   - Add title_from_scaffold_kind() function with the fixed strings
+   - Add derives: Clone, Debug, PartialEq, Serialize, Deserialize as needed
+** 1.2 Add conversion functions in orgnode_new.rs
+   - from_old_orgnode(OrgNode) -> NewOrgNode
+   - to_old_orgnode(NewOrgNode) -> OrgNode
+   - These should be lossless round-trips for valid OrgNodes
+** 1.3 Add unit tests for the conversion functions
+   - Test each Interp variant maps correctly
+   - Test round-trip: old -> new -> old == old
+   - Test round-trip: new -> old -> new == new
+** 1.4 Export new types from server/types/orgnode.rs
+   - pub mod orgnode_new; pub use orgnode_new::*;
+   - Or inline the new types in orgnode.rs if cleaner
+** Decision: Keep HiddenFromSubscribees separate from ParentIgnores
+   During implementation, discovered that merging these in EffectOnParent
+   would break lossless round-trips (they serialize to different sexp strings).
+   DECISION: Keep both as separate EffectOnParent variants during transition.
+   Can merge in Phase 7 if desired.
+
+* DONE Phase 2: Migrate rendering (output path)
+  Rendering is easier because it only reads OrgNodes, doesn't create them.
+** 2.1 Update org_to_text.rs to work with NewOrgNode
+   - Added new_orgnode_to_text() that takes &NewOrgNode
+   - Added new_orgnodemd_to_string() for metadata rendering
+   - Added scaffold_metadata_to_string() and true_node_metadata_to_string()
+** 2.2 Update orgnodemd_to_string for new structure
+   - New rendering handles TrueNode vs Scaffold differently
+   - Scaffolds have minimal metadata (just interp, focused/folded)
+   - TrueNodes have full metadata (id, source, view_data, code)
+** 2.3 Run tests, fix any rendering issues
+   - Added 15 rendering tests comparing old vs new output
+   - All tests pass: old→new conversion produces identical rendering
+** Decision: Scaffold titles use empty string during transition
+   ScaffoldKind::title() returns descriptive strings ("its aliases", etc.)
+   but the OLD OrgNode format uses empty strings for scaffold titles.
+   For lossless round-trips, new rendering must match old behavior.
+   DECISION: Use empty string for scaffold titles when rendering during transition.
+   The descriptive titles will be enabled in Phase 7+ when we remove old types.
+
+* Phase 3: Migrate tree construction (output path continued)
+  These functions build OrgNode trees from disk/TypeDB data.
+** 3.1 Update to_org/util.rs
+   - forest_root_pair() should create NewOrgNode with Scaffold::ForestRoot
+   - build_node_branch_minus_content() and helpers
+** 3.2 Update to_org/expand/aliases.rs
+   - Creates AliasCol and Alias scaffolds
+** 3.3 Update to_org/complete/sharing.rs
+   - Creates SubscribeeCol, HiddenInSubscribeeCol, HiddenOutsideOfSubscribeeCol
+   - Creates Subscribee and HiddenFromSubscribees TrueNodes
+** 3.4 Update to_org/complete/contents.rs
+   - Main content tree building
+** 3.5 Update to_org/complete/aliascol.rs
+   - AliasCol completion logic
+** 3.6 Update to_org/expand/backpath.rs
+   - Creates ParentIgnores TrueNodes
+** 3.7 Update to_org/expand/definitive.rs
+   - View request handling
+** 3.8 Update to_org/render/initial_bfs.rs
+   - BFS rendering, sets indefinitive on truncated nodes
+** 3.9 Run all tests after each sub-step
+
+* Phase 4: Migrate parsing (input path)
+  Parsing is trickier because it builds OrgNodes from user text.
+** 4.1 Update serve/parse_metadata_sexp.rs
+   - Parse sexp metadata into new structures
+   - Determine TrueNode vs Scaffold from interp field
+** 4.2 Update from_text/buffer_to_orgnodes/uninterpreted.rs
+   - Initial parsing creates OrgNodes
+   - Needs to decide TrueNode vs Scaffold based on metadata
+** 4.3 Update from_text/buffer_to_orgnodes/add_missing_info.rs
+   - Adds source inheritance, etc.
+** 4.4 Update from_text/buffer_to_orgnodes/validate_tree.rs
+   - Validation logic
+   - Many checks become unnecessary (type system enforces them)
+   - Some checks get simpler (e.g., "Scaffold should not have ID")
+** 4.5 Run tests after each sub-step
+
+* Phase 5: Migrate save instructions (input path continued)
+** 5.1 Update from_text/orgnodes_to_instructions/to_naive_instructions.rs
+   - Converting OrgNode tree to save instructions
+   - Only TrueNodes generate save instructions
+** 5.2 Update from_text/orgnodes_to_instructions/reconcile_same_id_instructions.rs
+** 5.3 Update from_text/validate_foreign_nodes.rs
+** 5.4 Run tests
+
+* Phase 6: Migrate remaining code
+** 6.1 Update merge/validate_merge.rs
+** 6.2 Update merge/mergeInstructionTriple.rs
+** 6.3 Update types/tree/orgnode_skgnode.rs
+   - Helper functions for trees
+** 6.4 Update serve/handlers/*.rs
+** 6.5 Update test_utils.rs
+** 6.6 Run all tests
+
+* Phase 7: Cleanup
+** 7.1 Remove old Interp variants that are now in EffectOnParent
+   - Content, Subscribee, ParentIgnores, HiddenFromSubscribees
+** 7.2 Remove OrgnodeCode struct (replaced by OrgNodeKind)
+** 7.3 Remove conversion functions (no longer needed)
+** 7.4 Rename NewOrgNode -> OrgNode, remove old OrgNode
+** 7.5 Update all imports
+** 7.6 Final test pass
+** 7.7 Review for dead code, unused imports
+
+* Phase 8: Optional improvements (separate PRs)
+** 8.1 Make TrueNode.id required (separate refactor as discussed)
+** 8.2 Make TrueNode.source required (separate refactor)
+** 8.3 Consider splitting TrueNode further by effect_on_parent
+
+* Testing strategy
+  - Run `cargo nextest run` after each numbered step
+  - Run `bash/integration-tests.sh` after each phase
+  - If tests fail, fix before proceeding
+  - Commit after each passing step for easy bisection
+
+* Estimated file changes by phase
+  | Phase | Files touched |
+  |-------+---------------|
+  |     1 | 1-2           |
+  |     2 | 2-3           |
+  |     3 | 8-10          |
+  |     4 | 4-5           |
+  |     5 | 3-4           |
+  |     6 | 5-7           |
+  |     7 | 10-15         |
+  Total: ~27 server files + tests
+
+* tricky|dangerous parts
+
+** Interp is used in match statements everywhere
+   The current code has many `match interp { ... }` blocks.
+   After the refactor, these become `match kind { True(t) => ..., Scaff(s) => ... }`.
+
+   DANGER: It's easy to miss a match arm or handle a case incorrectly.
+
+   MITIGATION: The compiler will catch missing arms if we remove Interp variants.
+   But during the transition, both old and new types exist, so we lose this safety.
+
+   SUGGESTION: Add #[deny(unreachable_patterns)] where possible.
+   Consider adding a "bridge" function that maps old Interp to new kind,
+   so there's one authoritative place for the mapping.
+
+** OrgnodeMetadata is deeply nested
+   Current: OrgNode.metadata.code.interp
+   New: OrgNode.kind (TrueNode | Scaffold)
+
+   DANGER: Many field accesses like `node.metadata.code.interp` need updating.
+   Easy to miss some, especially in less-tested code paths.
+
+   MITIGATION: Use grep/IDE to find all `.metadata.code.interp` accesses.
+   The compiler will catch type errors, but semantic errors are possible.
+
+*** TODO a
+    Bear in mind that there might be lots of whitespace in that string, and it might even be spread across multiple lines. (Sorry, that's how I find the code easy to read.)
+
+** focused/folded move from OrgnodeViewData to OrgNode
+   Current: OrgNode.metadata.view_data.focused
+   New: OrgNode.focused
+
+   DANGER: These fields are accessed in many places.
+   Some code might assume all OrgNodes have view_data (they do now).
+   After refactor, Scaffolds don't have view_data, but DO have focused/folded.
+
+   MITIGATION: Search for all `.view_data.focused` and `.view_data.folded`.
+   Update to use the top-level fields.
+
+** Scaffold validation becomes type-enforced but happens later
+   Current: Validation checks "AliasCol should not have body".
+   New: Scaffold type has no body field, so this is impossible.
+
+   DANGER: The error must now occur during parsing, not validation.
+   If parsing creates a Scaffold when there's body text, that text is silently lost.
+
+   MITIGATION: Parser must error when scaffold-interp headline has body.
+   Add explicit test: "parsing AliasCol with body produces error".
+
+** PairTree (Tree<NodePair>) contains OrgNode
+   NodePair has: orgnode: OrgNode, skgnode: Option<SkgNode>
+
+   DANGER: Updating OrgNode affects NodePair, which affects PairTree.
+   PairTree is used throughout the rendering pipeline.
+
+   MITIGATION: NodePair is just a container; updating OrgNode type
+   should propagate automatically. But watch for places that construct
+   NodePair manually.
+
+** title_from_scaffold_kind() must match current behavior
+   The strings are scattered across the codebase.
+
+   DANGER: If titleFromInterp returns different strings than current code,
+   round-trip tests will fail, or worse, behavior changes silently.
+
+   MITIGATION: I found the strings (see spec-questions.org).
+   Add a test that the function returns exactly these strings.
+   Compare against the actual code locations:
+   - AliasCol: "" (but should become "It has these aliases.")
+   - SubscribeeCol: "it subscribes to these"
+   - HiddenOutsideOfSubscribeeCol: "hidden from all subscriptions"
+   - HiddenInSubscribeeCol: "hidden from this subscription"
+   - ForestRoot: ""
+*** TODO a
+    Now that I see what the others are, let's change the AliasCol title to match that style: just use "its aliases'.
+** Conversion functions must be truly lossless
+   from_old_orgnode() and to_old_orgnode() are used during transition.
+
+   DANGER: If conversion loses information, bugs appear only when
+   old and new code interact (hard to reproduce).
+
+   MITIGATION: Exhaustive round-trip tests.
+   Property test: for any valid OrgNode o, to_old(from_old(o)) == o.
+   Property test: for any valid NewOrgNode n, from_old(to_old(n)) == n.
+
+** Test coverage may not catch all edge cases
+   Some code paths are only exercised by integration tests or manual testing.
+
+   DANGER: A type change might break a rarely-used feature.
+
+   MITIGATION: Run full integration test suite after each phase.
+   Consider adding more unit tests for under-tested code before refactoring.
+
+** TODO The "indefinitive" field has subtle semantics
+   It means different things in different contexts:
+   - Repeated node in view (don't recurse)
+   - BFS limit reached (truncated)
+   - User manually set indefinitive
+   - Foreign node (can't edit)
+
+   DANGER: Moving indef from OrgnodeCode to TrueNode might lose context.
+
+   MITIGATION: The boolean just means "don't save changes to this node's children".
+   The context is determined by tree position, not the flag itself.
+   But review all places that SET indefinitive to ensure they still make sense.
+
+*** a
+    Actually, 'indefinitive' means 'changes to this node's children will not affect it'. Things you've listed as what it 'means' are not that, but rather ways it can arise. In all cases it has the same effect when saving.
+** sexp serialization format must not change
+   The metadata sexp (skg ...) is parsed by both Rust and Emacs.
+
+   DANGER: If the new types serialize differently, Emacs breaks.
+
+   MITIGATION: orgnodemd_to_string() must produce identical output.
+   Add test: "new type serializes to same sexp as old type".
+   The sexp format is the contract; internal types can change freely.
+* TODO Before deviating from the plan, stop and report.
+  This plan looks great. But when the rubber hits the road it's very likely you'll encounter something unanticipated. Before making any important unforeseen decisions, report the fork in the road to me.

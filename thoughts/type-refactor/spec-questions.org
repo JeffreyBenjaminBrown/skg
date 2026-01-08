@@ -1,0 +1,277 @@
+#+title: Questions and Concerns about the OrgNode Refactoring Spec
+
+* The goal is good
+  Separating TrueNode (graph nodes) from Scaffold (display structure)
+  eliminates a class of invalid states. The current design permits, e.g.,
+  a node with Interp::AliasCol that has an ID, which is meaningless.
+
+* Holes, contradictions, and concerns
+
+** Scaffold is missing essential display data
+*** Where does the title come from for non-Alias Scaffolds?
+**** q
+     Current code: AliasCol gets title "aliases" (or user-facing equivalent).
+     SubscribeeCol gets "it subscribes to these". ForestRoot gets "".
+     HiddenOutsideOfSubscribeeCol gets "hidden from all subscriptions".
+     HiddenInSubscribeeCol gets "hidden from this subscription".
+
+     The spec's Scaffold has only 'indef' and 'Interp', no title field.
+     The 'titleFromInterp' function you mention could return these strings,
+     but the Alias variant is different -- its title IS the alias string,
+     which comes from the user, not from a fixed mapping.
+
+     SUGGESTION: Either add 'title: String' to Scaffold, or clarify that
+     Alias carries its own title while others use titleFromInterp.
+**** a
+     Each such collection has a string that's used in the code. There's supposed to be only one, but maybe that's violated because nothing enforced it. (After this refactor, something will.) So for instance, for the AliasCol it might have been the string "its aliases", or maybe "it has these aliases", or "it has the following aliases", or even (I doubt it but it would be accurate) "the parent of this node has aliases equal to the titles of the children of this node".
+     I don't know what strings were used; I'm hoping you can find them.
+**** found strings
+     - AliasCol: "" (empty string) -- server/to_org/expand/aliases.rs:55
+     - SubscribeeCol: "it subscribes to these" -- server/to_org/complete/sharing.rs:60
+     - HiddenOutsideOfSubscribeeCol: "hidden from all subscriptions" -- server/to_org/complete/sharing.rs:67
+     - HiddenInSubscribeeCol: "hidden from this subscription" -- server/to_org/complete/sharing.rs:115
+     - ForestRoot: "" (empty string) -- server/types/orgnode.rs:265
+**** DONE AliasCol has empty title -- is that intentional?
+     Other *Col scaffolds have descriptive titles. Should AliasCol be "aliases" or "its aliases"?
+     ForestRoot having "" makes sense (it's never rendered), but AliasCol IS rendered.
+***** a
+      Better to give it a ttitle, yes! Let's use 'It has these aliases.'.
+*** Scaffold is missing focused/folded/cycle
+**** q
+     The current code uses focus and folded on Scaffolds.
+     See to_org/complete/aliascol.rs:98-127 -- it handles focus on Alias nodes.
+     If a user folds an AliasCol, that fold state must be preserved.
+
+     QUESTION: Should Scaffold have a reduced OrgnodeViewData, or a subset of it?
+     At minimum it needs 'focused' and 'folded'. Probably not 'cycle' (scaffolds
+     don't form cycles in the graph sense), and probably not 'relationships'.
+**** a
+     You're right. I've amended the type spec. See the end of this document, but in brief OrgNode would have three fields:
+     focused : bool,
+     folded : bool,
+     needsABetterName : OrgNode | Scaffold
+*** Scaffold body field
+**** q
+     Current validation rejects bodies on AliasCol and Alias.
+     But validation must produce an error, not crash. If Scaffold has no body field,
+     how do we validate that users haven't added one? We'd need to detect it
+     during parsing, before we construct the Scaffold.
+
+     This is probably fine -- the parser can error if it sees a body on a scaffold.
+     Just noting it as a change in error-handling location.
+**** a
+     Yes I think it's fine. There's a big buffer validation pass
+     before we do anything with a user's data.
+** TrueNode required fields conflict with "new node" state
+*** ID is required, but new nodes don't have IDs
+**** q
+     When a user creates a new headline and saves, it has no ID yet.
+     The save process generates the ID. Current code: Option<ID>.
+
+     QUESTION: How do we represent a new, unsaved TrueNode?
+     Options:
+     1. TrueNode.id is still Option<ID>
+     2. A third variant: OrgNode = TrueNode | NewNode | Scaffold
+     3. Use a sentinel ID like ID("") to mean "not yet assigned"
+     4. ID is required, parsing creates it eagerly (pre-save)
+
+     Option 4 is cleanest if feasible. Option 1 defeats part of the refactor's purpose.
+**** a
+     I think we should stick to 1, and make that a separate refactor.
+     It's a hard thing for me to think about, because I believe the TrueNodes go through various stages of increasingly complete data. They might for instance not have their aliases yet because the user didn't include those, but then later they'll get fetched on disk. So there's no clean place to separate 'TrueNodeInProgress' from 'TrueNode'.
+*** source is required, but new nodes might lack it
+**** q
+     Same issue. New root-level nodes won't have a source until inherited/assigned.
+     Current code handles this with Option<String> and inheritance during parsing.
+
+     If TrueNode requires source, does the parser populate it before construction?
+     That would push source-inheritance logic into the parser, which seems reasonable.
+**** a
+     Again let's deal with that later and just make this optional.
+** 'indefinitive' is missing from TrueNode -- but TrueNodes can be indefinitive
+   This is a significant gap. The spec puts 'indef' only on Scaffold.
+   But the codebase uses 'indefinitive' extensively on Content nodes:
+*** a
+    Yes! Amended.
+** effectOnParent conflates semantically different things
+*** ParentIgnores vs HiddenFromSubscribees
+    The spec maps both to 'noEffect'. But they have different origins:
+    - ParentIgnores: Used in containerward views. The node IS content of
+      something, but in this particular view, it shouldn't update its parent.
+    - HiddenFromSubscribees: Represents a node hidden from subscriptions.
+      It has an ID pointing to the hidden node.
+
+    Both have "no effect on parent" semantically, so maybe this is fine.
+    But it loses information about WHY there's no effect.
+
+    QUESTION: Do we ever need to distinguish these in processing?
+    If yes, we need separate effectOnParent values or a separate field.
+**** a
+     It's fine. The distinction will be clear from their tree-predecessors.
+*** Subscribee is listed but has special properties
+    Subscribees always start as indefinitive. They're created synthetically
+    to show subscription content. They have IDs (the subscribee's ID).
+
+    The spec puts 'subscribee' under TrueNode.effectOnParent, which makes sense
+    since they DO have IDs. But they're also somewhat "scaffoldy" in that
+    they're created to structure a view, not to represent user-authored content.
+
+    This is probably fine. Just noting the dual nature.
+**** a
+     Yes, it's fine.
+** HiddenFromSubscribees is ambiguous
+   Looking at the current Interp enum and usage:
+   - HiddenFromSubscribees nodes HAVE IDs (pointing to the hidden node).
+   - They're created as indefinitive children of HiddenInSubscribeeCol
+     or HiddenOutsideOfSubscribeeCol.
+   - They represent real graph nodes, just hidden from this subscription.
+
+   In your spec:
+   - TrueNode.effectOnParent has 'noEffect' for both ParentIgnores
+     and HiddenFromSubscribees.
+   - Scaffold.Interp has hiddenInSubscribeeCol and hiddenOutsideOfSubscribeeCol,
+     but NOT hiddenFromSubscribees.
+
+   So HiddenFromSubscribees maps to TrueNode with effectOnParent=noEffect.
+   This seems correct -- they are true nodes, just with no effect on parent.
+
+   CLARIFICATION NEEDED: Is this interpretation correct?
+*** a
+    yes
+** What about relationships on TrueNode?
+   The spec says TrueNode has OrgnodeViewData, which currently includes
+   OrgnodeRelationships (parentIsContainer, parentIsContent, numContainers, etc.).
+
+   This data tells the user about the node's place in the graph.
+   It makes sense on TrueNodes.
+
+   Does it make sense on Scaffolds? Probably not -- scaffolds don't have
+   containers or contents in the graph sense.
+
+   The current code doesn't seem to populate relationships for scaffolds,
+   so this is probably fine. Just confirming.
+*** a
+    yes
+** Missing: how does parsing work?
+   Currently: parse headline -> OrgNode with Interp
+   Now: parse headline -> TrueNode | Scaffold based on Interp
+
+   The parser needs to branch based on Interp:
+   - If Interp in {ForestRoot, AliasCol, Alias, SubscribeeCol,
+     HiddenOutsideOfSubscribeeCol, HiddenInSubscribeeCol}: produce Scaffold
+   - If Interp in {Content, Subscribee, ParentIgnores, HiddenFromSubscribees}:
+     produce TrueNode
+
+   This seems clean. The should_be_sourceless() function already encodes
+   a similar distinction.
+*** a
+    I don't really understand your question, but yes, that needs to happen.
+** Should Subscribee and HiddenFromSubscribees be in effectOnParent?
+   Both are Interp values that have IDs and are "true nodes" in some sense.
+   But they're also created synthetically for subscription views.
+
+   Alternative: They could be a separate field, e.g.:
+   TrueNode {
+     ...
+     effectOnParent: enum { content, noEffect },
+     subscriptionRole: Option<enum { subscribee, hiddenFromSubscribee }>,
+     ...
+   }
+
+   This separates "how it affects parent's contains list" from
+   "what role it plays in subscription structure".
+
+   But this might be overengineering. The current proposal is simpler.
+*** a
+    Yeah let's keep it simple for now.
+** editRequest and viewRequests on Scaffolds?
+   The spec puts these only on TrueNode. That seems right:
+   - You can't delete or merge a scaffold.
+   - You can't request containerward or aliases view on a scaffold.
+
+   Current code doesn't seem to use these on scaffolds. Good.
+*** a
+    yes
+** Is the refactor worth the effort?
+   The main benefit: making invalid states unrepresentable.
+   The main cost: significant code changes across parsing, rendering, saving.
+
+   Secondary benefits:
+   - Clearer type signatures (function takes TrueNode vs Scaffold)
+   - Some match statements become exhaustive
+   - Documentation via types
+
+   Risks:
+   - Large refactor introduces bugs
+   - Might discover edge cases where the clean separation doesn't hold
+
+   I think it's worth it, but it's a substantial undertaking.
+
+* Summary of needed spec clarifications
+  1. Does Scaffold need a title field? (For Alias at minimum, maybe all)
+  2. Does Scaffold need focused/folded?
+  3. Does TrueNode need indefinitive?
+  4. How are new (unsaved) TrueNodes represented if ID is required?
+  5. Confirm: HiddenFromSubscribees maps to TrueNode with effectOnParent=noEffect?
+  6. Any need to distinguish ParentIgnores from HiddenFromSubscribees?
+
+* Minor concerns
+** Naming
+   'noEffect' might not be the clearest name. Consider:
+   - 'parentIgnores' (current name, specific)
+   - 'detached' (suggests no attachment)
+   - 'viewOnly' (suggests no save-time effect)
+*** a
+    You're right, parentIgnores is better.
+** Alias title field
+   You said: alias { title : String }
+   This is the only Interp variant with data. Consider whether it should be
+   structured as a tuple variant or a struct variant:
+   - Alias(String) -- tuple, more concise
+   - Alias { title: String } -- struct, clearer field name
+
+   Either works. Just noting the choice.
+*** a
+    I hadn't noticed the difference, but yes, let's use the tuple.
+    There's no other data in an alias,
+    and the thing we're accessing *is* the alias,
+    so it's clear.
+
+* revised target type hierarchy
+** OrgNode
+   focused : bool,
+   folded : bool,
+   needsAGoodName : TrueNode | Scaffold
+*** DONE name for the inner union
+    Options: 'kind', 'variant', 'data', 'payload', 'node', 'inner', 'content'
+    I lean toward 'kind' or 'variant' -- short and suggests a tagged union.
+**** a
+     'kind' sounds good.
+** TrueNode
+*** title
+*** body
+*** opt ID
+*** opt source
+*** effectOnParent : enum
+    content
+    subscribee
+    parentIgnores // the prior Interp values ParentIgnores and HiddenFromSubscribees should both map to this.
+*** indef : bool
+*** OrgnodeViewData
+*** editRequest
+*** viewrequests
+** Scaffold
+   // One of these, 'Alias', should carry a string. The others are pure labels.
+   // There should be a function 'titleFromInterp' which:
+   //   - given Alias(s), returns s
+   //   - given aliasCol, returns ""
+   //   - given forestRoot, returns ""
+   //   - given subscribeeCol, returns "it subscribes to these"
+   //   - given hiddenOutsideOfSubscribeeCol, returns "hidden from all subscriptions"
+   //   - given hiddenInSubscribeeCol, returns "hidden from this subscription"
+   Alias(String)
+   AliasCol
+   ForestRoot
+   HiddenInSubscribeeCol
+   HiddenOutsideOfSubscribeeCol
+   SubscribeeCol

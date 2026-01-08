@@ -2,21 +2,22 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
+** ? restructure types, divide Interp
+*** [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
+*** ? two kinds of TrueNode
+    one that might not have an ID, one that must
+*** AWAITS refactor : Is the term 'Interp' gone?
+    If so, rename kind -> interp.
 ** ONGOING Completion is complex.
 *** break up completeDefinitiveOrgnode
     it's super-long
-*** maybe_add_subscribeeCol_branch is impenetrable
-    so complex I can't see past it
-**** Subdivide it.
-**** maybe_add_subscribeeCol_branch should integrate existing SubscribeeCol
-     if it exists, rather than assuming it is correct
 *** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribeeCol_branch?
 *** After 'view_requests_at_node', is there any reason to keep the view requests in the node?
     The function pushes the node's requests onto 'view_requests_out'.
     If they should be deleted from the node thereafter,
     the function should be renamed something like 'transfer_requests'.
 *** On what Interps can 'completeDefinitiveOrgnode' be validly called?
-    The comment says only Content nodes.
+    The comment says only nodes with Interp = Content.
     If that's right (I think so) the name should reflect it.
 *** making something indefinitive twice
 **** as of this commit
