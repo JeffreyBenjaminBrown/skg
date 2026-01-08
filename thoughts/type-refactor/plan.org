@@ -150,15 +150,121 @@
    - Phase 7: Remove old types, rename NewOrgNode -> OrgNode
    - Phase 8: Optional improvements
 
-* Phase 7: Cleanup
-** 7.1 Remove old Interp variants that are now in EffectOnParent
-   - Content, Subscribee, ParentIgnores, HiddenFromSubscribees
-** 7.2 Remove OrgnodeCode struct (replaced by OrgNodeKind)
-** 7.3 Remove conversion functions (no longer needed)
-** 7.4 Rename NewOrgNode -> OrgNode, remove old OrgNode
-** 7.5 Update all imports
-** 7.6 Final test pass
-** 7.7 Review for dead code, unused imports
+* Phase 7: Cleanup (subdivided for incremental migration)
+  Goal: Remove old types, rename NewOrgNode -> OrgNode.
+  Strategy: Migrate subsystem by subsystem, keeping tests passing at each step.
+
+  Files using Interp:: (18 files)
+  Files using OrgNode (28 files)
+  Files accessing .code.interp (9 files, 14 occurrences)
+
+** 7.1 Migrate rendering subsystem
+   Files: server/org_to_text.rs
+
+   - org_to_text.rs already has new_orgnode_to_text() functions
+   - Update callers to use new functions (convert OrgNode -> NewOrgNode)
+   - Eventually remove old orgnode_to_text() when unused
+   - Test: cargo test, integration tests
+
+** 7.2 Migrate tree construction subsystem
+   Files: server/to_org/util.rs, server/to_org/complete/*.rs,
+          server/to_org/expand/*.rs (7 files)
+
+   - These files build OrgNode trees from disk/TypeDB
+   - Update to build NewOrgNode internally
+   - Convert to OrgNode at boundary (for PairTree compatibility)
+   - Test after each file
+
+** 7.3 Switch PairTree to use NewOrgNode
+   Files: server/types/tree.rs, server/types/tree/orgnode_skgnode.rs
+
+   This is the central change:
+   - Change NodePair.orgnode from OrgNode to NewOrgNode
+   - Or: Replace NodePair with NewNodePair entirely
+   - Update orgnode_skgnode.rs helper functions
+   - Update all callers (should be ready from 7.2)
+   - Test thoroughly
+
+** 7.4 Migrate parsing subsystem
+   Files: server/serve/parse_metadata_sexp.rs,
+          server/from_text/buffer_to_orgnodes/*.rs (4 files)
+
+   - parse_metadata_sexp.rs: Parse sexp to new structures
+     (parse into OrgnodeMetadata, then convert, OR parse directly to new)
+   - uninterpreted.rs: Build Tree<NewOrgNode> instead of Tree<OrgNode>
+   - add_missing_info.rs: Work with NewOrgNode
+   - validate_tree.rs: Update Interp:: matches to OrgNodeKind matches
+   - Test after each file
+
+** 7.5 Migrate save instructions subsystem
+   Files: server/from_text/orgnodes_to_instructions/*.rs,
+          server/from_text/validate_foreign_nodes.rs (3 files)
+
+   - to_naive_instructions.rs: Accept Tree<NewOrgNode>
+   - reconcile_same_id_instructions.rs: Work with NewOrgNode
+   - Test after each file
+
+** 7.6 Migrate handlers and merge
+   Files: server/serve/handlers/*.rs, server/merge/*.rs (4 files)
+
+   - title_matches.rs: Update Interp checks
+   - save_buffer.rs: Should work with new tree types
+   - validate_merge.rs: Update to NewOrgNode
+   - mergeInstructionTriple.rs: Update if needed
+   - Test after each file
+
+** 7.7 Migrate test utilities and error types
+   Files: server/test_utils.rs, server/types/errors.rs
+
+   - test_utils.rs: Update test helpers to use new types
+   - errors.rs: BufferValidationError contains OrgNode, update to NewOrgNode
+   - Test all tests still pass
+
+** 7.8 Remove old types
+   Files: server/types/orgnode.rs, server/types/orgnode_new.rs
+
+   Once nothing uses the old types:
+   - Remove from orgnode.rs:
+     - OrgNode struct
+     - Interp enum (scaffold variants: ForestRoot, AliasCol, Alias, etc.)
+     - OrgnodeCode struct
+     - OrgnodeMetadata struct (or keep if still useful)
+   - Keep in orgnode.rs (still needed):
+     - OrgnodeViewData, OrgnodeRelationships
+     - EditRequest, ViewRequest
+   - Test that everything still compiles
+
+** 7.9 Rename new types to final names
+   Files: All files using New* types
+
+   - NewOrgNode -> OrgNode
+   - NewNodePair -> NodePair
+   - NewPairTree -> PairTree
+   - new_orgnode_to_text -> orgnode_to_text
+   - new_forest_root_pair -> forest_root_pair
+   - from_old_orgnode, to_old_orgnode -> DELETE (no longer needed)
+   - Use IDE/sed for bulk rename, verify no breakage
+   - Test thoroughly
+
+** 7.10 Final cleanup
+   - Remove conversion functions (from_old_orgnode, to_old_orgnode, etc.)
+   - Remove #[allow(dead_code)] annotations added during transition
+   - Review for dead code, unused imports
+   - Run clippy
+   - Final test pass: cargo test, integration tests
+   - Consider squashing commits or keeping history
+
+** Notes on 7.3 (the tricky step)
+   Changing NodePair.orgnode to NewOrgNode is the "big bang" moment.
+   All code that accesses orgnode field must change simultaneously.
+
+   Alternative approach (if 7.3 is too risky):
+   - Add a new field: NodePair { orgnode: OrgNode, new_orgnode: Option<NewOrgNode> }
+   - Migrate callers one by one to use new_orgnode
+   - When all use new_orgnode, remove orgnode field
+   - This is slower but safer
+
+   Decision: Choose based on confidence after completing 7.1-7.2
 
 * Phase 8: Optional improvements (separate PRs)
 ** 8.1 Make TrueNode.id required (separate refactor as discussed)
