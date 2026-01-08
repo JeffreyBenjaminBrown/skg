@@ -1,6 +1,5 @@
 use crate::types::orgnode::{OrgNode, orgnodemd_to_string};
 use crate::types::orgnode_new::{
-    from_old_orgnode,
     EffectOnParent, NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};

@@ -318,8 +318,7 @@ async fn extend_content (
     tree, parent_nid,
     ( |mut parent_mut|
       parent_mut . append ( NodePair { mskgnode    : Some(skgnode),
-                                       orgnode,
-                                       new_orgnode : Some ( new_orgnode ) } )
+                                       new_orgnode } )
       . id () )) ?;
   Ok ( new_child_id ) }
 

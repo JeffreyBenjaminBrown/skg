@@ -8,7 +8,6 @@ pub mod orgnode_skgnode;
 pub mod generic;
 pub mod generations;
 
-use crate::types::orgnode::OrgNode;
 use crate::types::orgnode_new::NewOrgNode;
 use crate::types::skgnode::SkgNode;
 use ego_tree::Tree;
@@ -26,210 +25,58 @@ pub type PairTree = Tree<NodePair>;
 #[derive(Clone, Debug)]
 pub struct NodePair {
   pub mskgnode: Option<SkgNode>,
-  pub orgnode: OrgNode,
-  /// During transition: the new representation of the same node.
-  /// Initially None; tree construction (7.2) will populate it.
-  /// Callers will migrate to use this instead of orgnode.
-  /// Finally orgnode will be removed and this renamed.
-  pub new_orgnode: Option<NewOrgNode>,
+  pub new_orgnode: NewOrgNode,
 }
 
 impl NodePair {
-  /// Get the NewOrgNode. Panics if not present (should always be present after Phase 7).
+  /// Get the NewOrgNode.
   pub fn orgnode_new ( &self ) -> &NewOrgNode {
-    self . new_orgnode . as_ref ()
-      . expect ( "NodePair.new_orgnode should always be present" ) }
+    &self . new_orgnode }
 
   /// Get a mutable reference to the NewOrgNode.
   pub fn orgnode_new_mut ( &mut self ) -> &mut NewOrgNode {
-    self . new_orgnode . as_mut ()
-      . expect ( "NodePair.new_orgnode should always be present" ) }
+    &mut self . new_orgnode }
 }
 
 //
-// New types using NewOrgNode (transition period)
+// NodePair constructors
 //
 
-/// NewPairTree uses NewOrgNode instead of OrgNode.
-/// During transition, both PairTree and NewPairTree coexist.
-/// After Phase 7, NewPairTree becomes the only PairTree.
-pub type NewPairTree = Tree<NewNodePair>;
-
-#[derive(Clone, Debug)]
-pub struct NewNodePair {
-  pub mskgnode   : Option<SkgNode>,
-  pub new_orgnode : NewOrgNode,
-}
-
-impl NewNodePair {
-  /// Create a new NewNodePair with no SkgNode.
+impl NodePair {
+  /// Create a new NodePair with no SkgNode.
   pub fn from_orgnode ( orgnode : NewOrgNode ) -> Self {
-    NewNodePair {
+    NodePair {
       mskgnode    : None,
       new_orgnode : orgnode,
     } }
 
-  /// Create a new NewNodePair with an SkgNode.
+  /// Create a new NodePair with an SkgNode.
   pub fn from_pair ( orgnode : NewOrgNode, skgnode : SkgNode ) -> Self {
-    NewNodePair {
+    NodePair {
       mskgnode    : Some ( skgnode ),
       new_orgnode : orgnode,
     } } }
 
-/// Convert a NodePair to a NewNodePair.
-pub fn node_pair_to_new ( old : &NodePair ) -> NewNodePair {
-  use crate::types::orgnode_new::from_old_orgnode;
-  NewNodePair {
-    mskgnode    : old . mskgnode . clone (),
-    new_orgnode : from_old_orgnode ( &old . orgnode ),
-  } }
-
-/// Convert a NewNodePair back to a NodePair.
-pub fn node_pair_from_new ( new : &NewNodePair ) -> NodePair {
-  use crate::types::orgnode_new::to_old_orgnode;
-  NodePair {
-    mskgnode    : new . mskgnode . clone (),
-    orgnode     : to_old_orgnode ( &new . new_orgnode ),
-    new_orgnode : Some ( new . new_orgnode . clone () ),
-  } }
+// Type aliases for backwards compatibility during transition
+pub type NewPairTree = PairTree;
+pub type NewNodePair = NodePair;
 
 //
-// Tests for NodePair <-> NewNodePair conversions
+// Tests for NodePair constructors
 //
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::types::misc::ID;
-  use crate::types::orgnode::{default_metadata, Interp, OrgNode};
   use crate::types::orgnode_new::{
-    EffectOnParent, NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
+    NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
   };
   use crate::types::skgnode::SkgNode;
 
-  // Test round-trip: NodePair -> NewNodePair -> NodePair
+  // Test that NodePair::from_pair works
   #[test]
-  fn test_node_pair_roundtrip_content () {
-    let mut md = default_metadata ();
-    md . id = Some ( ID::from ( "test123" ) );
-    md . source = Some ( "test.skg" . to_string () );
-    md . code . interp = Interp::Content;
-    let orgnode = OrgNode {
-      metadata : md,
-      title    : "Test Node" . to_string (),
-      body     : Some ( "Body text" . to_string () ),
-    };
-    let skgnode = SkgNode {
-      ids      : vec![ ID::from ( "test123" ) ],
-      title    : "Test Node" . to_string (),
-      source   : "test" . to_string (),
-      body     : Some ( "Body text" . to_string () ),
-      contains : Some ( vec![] ),
-      aliases  : Some ( vec![] ),
-      subscribes_to                : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of            : None,
-    };
-    let old = NodePair {
-      mskgnode    : Some ( skgnode ),
-      orgnode,
-      new_orgnode : None,
-    };
-    let new = node_pair_to_new ( &old );
-    let back = node_pair_from_new ( &new );
-    assert_eq! ( old . orgnode, back . orgnode );
-    assert_eq! ( old . mskgnode, back . mskgnode );
-  }
-
-  #[test]
-  fn test_node_pair_roundtrip_forest_root () {
-    let mut md = default_metadata ();
-    md . code . interp = Interp::ForestRoot;
-    let orgnode = OrgNode {
-      metadata : md,
-      title    : String::new (),
-      body     : None,
-    };
-    let old = NodePair {
-      mskgnode    : None,
-      orgnode,
-      new_orgnode : None,
-    };
-    let new = node_pair_to_new ( &old );
-    let back = node_pair_from_new ( &new );
-    assert_eq! ( old . orgnode, back . orgnode );
-    assert_eq! ( old . mskgnode, back . mskgnode );
-  }
-
-  #[test]
-  fn test_node_pair_roundtrip_no_skgnode () {
-    let mut md = default_metadata ();
-    md . code . interp = Interp::AliasCol;
-    let orgnode = OrgNode {
-      metadata : md,
-      title    : String::new (),
-      body     : None,
-    };
-    let old = NodePair {
-      mskgnode    : None,
-      orgnode,
-      new_orgnode : None,
-    };
-    let new = node_pair_to_new ( &old );
-    let back = node_pair_from_new ( &new );
-    assert_eq! ( old . orgnode, back . orgnode );
-    assert! ( back . mskgnode . is_none () );
-  }
-
-  // Test round-trip: NewNodePair -> NodePair -> NewNodePair
-  #[test]
-  fn test_new_node_pair_roundtrip_true_node () {
-    use crate::types::orgnode::OrgnodeViewData;
-    // Note: NewOrgNode.focused must match TrueNode.view_data.focused
-    // because during conversion they get synchronized.
-    let mut view_data = OrgnodeViewData::default ();
-    view_data . focused = true; // Match NewOrgNode.focused
-    let true_node = TrueNode {
-      title            : "Test" . to_string (),
-      body             : Some ( "Body" . to_string () ),
-      id               : Some ( ID::from ( "xyz" ) ),
-      source           : Some ( "src.skg" . to_string () ),
-      effect_on_parent : EffectOnParent::Content,
-      indefinitive     : false,
-      view_data,
-      edit_request     : None,
-      view_requests    : std::collections::HashSet::new (),
-    };
-    let new_orgnode = NewOrgNode {
-      focused : true,
-      folded  : false,
-      kind    : OrgNodeKind::True ( true_node ),
-    };
-    let new = NewNodePair::from_orgnode ( new_orgnode . clone () );
-    let old = node_pair_from_new ( &new );
-    let back = node_pair_to_new ( &old );
-    assert_eq! ( new . new_orgnode, back . new_orgnode );
-  }
-
-  #[test]
-  fn test_new_node_pair_roundtrip_scaffold () {
-    let scaffold = Scaffold {
-      kind : ScaffoldKind::SubscribeeCol,
-    };
-    let new_orgnode = NewOrgNode {
-      focused : false,
-      folded  : true,
-      kind    : OrgNodeKind::Scaff ( scaffold ),
-    };
-    let new = NewNodePair::from_orgnode ( new_orgnode . clone () );
-    let old = node_pair_from_new ( &new );
-    let back = node_pair_to_new ( &old );
-    assert_eq! ( new . new_orgnode, back . new_orgnode );
-  }
-
-  // Test that NewNodePair::from_pair works
-  #[test]
-  fn test_new_node_pair_from_pair () {
+  fn test_node_pair_from_pair () {
     let true_node = TrueNode {
       title  : "Node" . to_string (),
       id     : Some ( ID::from ( "abc" ) ),
@@ -251,14 +98,14 @@ mod tests {
       hides_from_its_subscriptions : None,
       overrides_view_of            : None,
     };
-    let pair = NewNodePair::from_pair ( new_orgnode . clone (), skgnode . clone () );
+    let pair = NodePair::from_pair ( new_orgnode . clone (), skgnode . clone () );
     assert_eq! ( pair . new_orgnode, new_orgnode );
     assert_eq! ( pair . mskgnode, Some ( skgnode ) );
   }
 
-  // Test that NewNodePair::from_orgnode works
+  // Test that NodePair::from_orgnode works
   #[test]
-  fn test_new_node_pair_from_orgnode () {
+  fn test_node_pair_from_orgnode () {
     let scaffold = Scaffold {
       kind : ScaffoldKind::ForestRoot,
     };
@@ -267,8 +114,42 @@ mod tests {
       folded  : false,
       kind    : OrgNodeKind::Scaff ( scaffold ),
     };
-    let pair = NewNodePair::from_orgnode ( new_orgnode . clone () );
+    let pair = NodePair::from_orgnode ( new_orgnode . clone () );
     assert_eq! ( pair . new_orgnode, new_orgnode );
     assert! ( pair . mskgnode . is_none () );
+  }
+
+  // Test orgnode_new accessor
+  #[test]
+  fn test_orgnode_new_accessor () {
+    let true_node = TrueNode {
+      title  : "Test" . to_string (),
+      id     : Some ( ID::from ( "xyz" ) ),
+      ..TrueNode::default ()
+    };
+    let new_orgnode = NewOrgNode {
+      focused : true,
+      folded  : false,
+      kind    : OrgNodeKind::True ( true_node ),
+    };
+    let pair = NodePair::from_orgnode ( new_orgnode );
+    assert_eq! ( pair . orgnode_new () . title (), "Test" );
+    assert! ( pair . orgnode_new () . focused );
+  }
+
+  // Test orgnode_new_mut accessor
+  #[test]
+  fn test_orgnode_new_mut_accessor () {
+    let scaffold = Scaffold {
+      kind : ScaffoldKind::SubscribeeCol,
+    };
+    let new_orgnode = NewOrgNode {
+      focused : false,
+      folded  : false,
+      kind    : OrgNodeKind::Scaff ( scaffold ),
+    };
+    let mut pair = NodePair::from_orgnode ( new_orgnode );
+    pair . orgnode_new_mut () . focused = true;
+    assert! ( pair . orgnode_new () . focused );
   }
 }

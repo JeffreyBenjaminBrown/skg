@@ -77,9 +77,9 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_1_ref =
       forest . get ( aliascol_1_id ) . unwrap ();
-    let children : Vec < & OrgNode > =
+    let children : Vec < &str > =
       aliascol_1_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode_new () . title () )
       . collect ();
 
     assert_eq! (
@@ -88,12 +88,12 @@ async fn test_completeAliasCol_logic (
       "AliasCol 1 should have exactly 2 children"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children [ 0 ],
       "c",
       "First child should be 'c'"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children [ 1 ],
       "b",
       "Second child should be 'b'"
     );
@@ -259,9 +259,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   {
     let aliascol_ref =
       forest . get ( second_aliascol_id ) . unwrap ();
-    let children : Vec < & OrgNode > =
+    let children : Vec < _ > =
       aliascol_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode_new () )
       . collect ();
 
     assert_eq! (
@@ -270,21 +270,21 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "Second AliasCol should have exactly 2 children (b focused, c)"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children [ 0 ] . title (),
       "b",
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . metadata . viewData.focused,
+      children [ 0 ] . focused,
       "First child should be focused"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children [ 1 ] . title (),
       "c",
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . metadata . viewData.focused,
+      ! children [ 1 ] . focused,
       "Second child should not be focused"
     );
   }

@@ -292,7 +292,6 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   let new_orgnode = from_old_orgnode ( &orgnode );
   write_at_node_in_tree ( // replace it
     tree, node_id,
-    |np| * np = NodePair { mskgnode    : Some ( skgnode ),
-                           orgnode,
-                           new_orgnode : Some ( new_orgnode ) } ) ?;
+    |np| * np = NodePair { mskgnode : Some ( skgnode ),
+                           new_orgnode } ) ?;
   Ok (( )) }

@@ -8,7 +8,7 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
-use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::orgnode_new::{from_old_orgnode, to_old_orgnode};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{PairTree, NodePair};
 
@@ -336,10 +336,11 @@ pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
     node1 : NodeRef < NodePair >,
     node2 : NodeRef < OrgNode >
   ) -> bool {
-    let n1 : & OrgNode = & node1 . value () . orgnode;
+    // Convert new_orgnode back to OrgNode for comparison
+    let n1 : OrgNode = to_old_orgnode ( node1 . value () . orgnode_new () );
     let n2 : & OrgNode = node2 . value ();
     // Compare the OrgNode values
-    if n1 != n2 { return false; }
+    if &n1 != n2 { return false; }
     // Compare children recursively
     let children1 : Vec < _ > = node1 . children () . collect ();
     let children2 : Vec < _ > = node2 . children () . collect ();
@@ -474,8 +475,7 @@ pub fn orgnode_forest_to_paired (
         forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
         . append ( NodePair { mskgnode    : None,
-                              orgnode,
-                              new_orgnode : Some ( new_orgnode ) } )
+                              new_orgnode } )
         . id () };
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()

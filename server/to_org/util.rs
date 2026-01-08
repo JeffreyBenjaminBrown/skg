@@ -44,8 +44,7 @@ pub fn forest_root_pair () -> NodePair {
                           body     : None };
   let new_orgnode = from_old_orgnode ( &orgnode );
   NodePair { mskgnode    : None,
-             orgnode,
-             new_orgnode : Some ( new_orgnode ), } }
+             new_orgnode } }
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.
@@ -259,8 +258,7 @@ pub async fn make_and_append_child_pair (
       tree, parent_treeid,
       ( |mut parent_mut|
         parent_mut . append ( NodePair { mskgnode    : Some(child_skgnode),
-                                         orgnode     : child_orgnode,
-                                         new_orgnode : Some ( new_orgnode ) } )
+                                         new_orgnode } )
         . id () )) ?;
   Ok ( child_treeid ) }
 
@@ -288,18 +286,16 @@ pub async fn build_node_branch_minus_content (
         with_node_mut (
           tree, parent_treeid,
           ( |mut parent_mut|
-            parent_mut . append ( NodePair { mskgnode    : Some(skgnode),
-                                             orgnode,
-                                             new_orgnode : Some ( new_orgnode ) } ) . id () )) ?;
+            parent_mut . append ( NodePair { mskgnode : Some(skgnode),
+                                             new_orgnode } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
       Ok ( (None, child_treeid) ) },
     None => {
       let mut tree : PairTree =
-        Tree::new ( NodePair { mskgnode    : Some(skgnode),
-                               orgnode,
-                               new_orgnode : Some ( new_orgnode ) } );
+        Tree::new ( NodePair { mskgnode : Some(skgnode),
+                               new_orgnode } );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, root_treeid, visited,

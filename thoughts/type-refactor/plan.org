@@ -414,11 +414,16 @@
    - Test utility comparing against Tree<OrgNode>
    - Input parsing in from_text/ (operates on Tree<OrgNode>)
 
-** 8.5 Remove orgnode field from NodePair
-   Once all code uses new_orgnode:
-   - Change NodePair to only have: { mskgnode, new_orgnode }
-   - Update all NodePair constructions
-   - Remove from_old_orgnode syncing
+** DONE 8.5 Remove orgnode field from NodePair
+   Changed NodePair to only have: { mskgnode, new_orgnode }
+   - Removed orgnode field from NodePair struct
+   - Made new_orgnode non-optional
+   - Updated orgnode_new() and orgnode_new_mut() to access directly
+   - Removed NewNodePair (now just a type alias)
+   - Removed node_pair_to_new() and node_pair_from_new()
+   - Updated all NodePair constructions (~12 locations)
+   - Updated test utilities to use to_old_orgnode() for comparison
+   - Updated test files to use orgnode_new() accessors
 
 ** 8.6 Rename types to final names
    - NewOrgNode → OrgNode
