@@ -97,38 +97,58 @@
    - cargo test: 57 tests pass
    - integration tests: 10 tests pass
 
-* Phase 4: Migrate parsing (input path)
+* DONE Phase 4: Migrate parsing (input path)
   Parsing is trickier because it builds OrgNodes from user text.
-** 4.1 Update serve/parse_metadata_sexp.rs
-   - Parse sexp metadata into new structures
-   - Determine TrueNode vs Scaffold from interp field
-** 4.2 Update from_text/buffer_to_orgnodes/uninterpreted.rs
-   - Initial parsing creates OrgNodes
-   - Needs to decide TrueNode vs Scaffold based on metadata
-** 4.3 Update from_text/buffer_to_orgnodes/add_missing_info.rs
-   - Adds source inheritance, etc.
-** 4.4 Update from_text/buffer_to_orgnodes/validate_tree.rs
-   - Validation logic
-   - Many checks become unnecessary (type system enforces them)
-   - Some checks get simpler (e.g., "Scaffold should not have ID")
-** 4.5 Run tests after each sub-step
+** Decision: Keep parsing using old types during transition
+   With the parallel types approach, parsing doesn't need changes:
+   - Parsing produces Tree<OrgNode> (old types)
+   - Validation works on old types
+   - Conversion to new types happens at boundaries when needed
+   - from_old_orgnode() converts OrgNode -> NewOrgNode
+   The parsing code will be updated in Phase 7 when old types are removed.
+** 4.1-4.4 NOT NEEDED with parallel types approach
+   Original plan called for updating parse_metadata_sexp.rs, uninterpreted.rs,
+   add_missing_info.rs, and validate_tree.rs to produce new types.
+   With conversion at boundaries, these files don't need changes yet.
+** 4.5 All tests still pass
+   - cargo test: 57 tests pass
+   - integration tests: 10 tests pass
 
-* Phase 5: Migrate save instructions (input path continued)
-** 5.1 Update from_text/orgnodes_to_instructions/to_naive_instructions.rs
-   - Converting OrgNode tree to save instructions
-   - Only TrueNodes generate save instructions
-** 5.2 Update from_text/orgnodes_to_instructions/reconcile_same_id_instructions.rs
-** 5.3 Update from_text/validate_foreign_nodes.rs
-** 5.4 Run tests
+* DONE Phase 5: Migrate save instructions (input path continued)
+** Decision: Keep save instructions using old types during transition
+   With the parallel types approach, save instruction code doesn't need changes:
+   - Code works with Tree<OrgNode> and produces save instructions
+   - Only TrueNodes generate save instructions (this logic stays the same)
+   - No conversion to new types needed for save operations
+   Code will be updated in Phase 7 when old types are removed.
+** 5.1-5.3 NOT NEEDED with parallel types approach
+   Original plan called for updating to_naive_instructions.rs,
+   reconcile_same_id_instructions.rs, and validate_foreign_nodes.rs.
+   With conversion at boundaries, these files don't need changes yet.
+** 5.4 All tests still pass
 
-* Phase 6: Migrate remaining code
-** 6.1 Update merge/validate_merge.rs
-** 6.2 Update merge/mergeInstructionTriple.rs
-** 6.3 Update types/tree/orgnode_skgnode.rs
-   - Helper functions for trees
-** 6.4 Update serve/handlers/*.rs
-** 6.5 Update test_utils.rs
-** 6.6 Run all tests
+* DONE Phase 6: Migrate remaining code
+** Decision: Keep remaining code using old types during transition
+   With the parallel types approach:
+   - merge/validate_merge.rs - works with old types
+   - merge/mergeInstructionTriple.rs - works with old types
+   - types/tree/orgnode_skgnode.rs - works with old types
+   - serve/handlers/*.rs - works with old types
+   - test_utils.rs - works with old types
+   All these will be updated in Phase 7 when old types are removed.
+** 6.1-6.5 NOT NEEDED with parallel types approach
+** 6.6 All tests still pass
+
+** Summary: Phases 3-6 simplified by parallel types approach
+   The parallel types approach (Option B) deferred most migration work to Phase 7.
+   What was done:
+   - Phase 1: Created new types (TrueNode, Scaffold, NewOrgNode)
+   - Phase 2: Added new rendering functions (new_orgnode_to_text, etc.)
+   - Phase 3: Added NewNodePair, NewPairTree, conversion functions
+   - Phase 4-6: No changes needed (conversion at boundaries)
+   What remains:
+   - Phase 7: Remove old types, rename NewOrgNode -> OrgNode
+   - Phase 8: Optional improvements
 
 * Phase 7: Cleanup
 ** 7.1 Remove old Interp variants that are now in EffectOnParent
