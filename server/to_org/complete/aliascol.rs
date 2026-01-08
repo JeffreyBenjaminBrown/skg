@@ -1,4 +1,5 @@
 use crate::types::orgnode::{Interp, OrgNode};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
@@ -117,13 +118,15 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         if child . value () . orgnode . title == title {
           write_at_node_in_tree (
             tree, child . id (),
-            |np| np . orgnode . metadata . viewData . focused
-              = true ) ?;
+            |np| {
+              np . orgnode . metadata . viewData . focused = true;
+              np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
           break; }} }
     else { // Move focus to aliasCol itself.
       write_at_node_in_tree (
         tree, aliascol_node_id,
-        |np| np . orgnode . metadata . viewData.focused
-          = true ) ?; }}
+        |np| {
+          np . orgnode . metadata . viewData.focused = true;
+          np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }}
 
   Ok (( )) }

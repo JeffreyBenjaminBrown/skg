@@ -4,6 +4,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, OrgNode, default_metadata};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -138,12 +139,13 @@ pub fn insert_sourceless_node (
       metadata : md,
       title : title . to_string (),
       body : None, } };
+  let new_orgnode = from_old_orgnode ( &col_orgnode );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       let pair = NodePair { mskgnode    : None,
                             orgnode     : col_orgnode,
-                            new_orgnode : None };
+                            new_orgnode : Some ( new_orgnode ) };
       if prepend { parent_mut . prepend ( pair ) . id () }
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
@@ -163,13 +165,14 @@ pub async fn append_indefinitive_node (
   orgnode . metadata . code . interp = interp;
   orgnode . metadata . code . indefinitive = true;
   orgnode . body = None;
+  let new_orgnode = from_old_orgnode ( &orgnode );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       parent_mut . append (
         NodePair { mskgnode    : Some ( skgnode ),
                    orgnode,
-                   new_orgnode : None } ); } ) ?;
+                   new_orgnode : Some ( new_orgnode ) } ); } ) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode

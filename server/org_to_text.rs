@@ -1,6 +1,7 @@
-use crate::types::orgnode::{OrgNode, orgnodemd_to_string, Interp};
+use crate::types::orgnode::{OrgNode, orgnodemd_to_string};
 use crate::types::orgnode_new::{
-    EffectOnParent, NewOrgNode, OrgNodeKind, Scaffold, TrueNode,
+    from_old_orgnode,
+    EffectOnParent, NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};
 
@@ -13,6 +14,11 @@ use std::error::Error;
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a ForestRoot.
+///
+/// TRANSITION NOTE: Converts orgnode to NewOrgNode at render time.
+/// This ensures we use new types for rendering while orgnode remains
+/// the authoritative source (since it gets modified post-construction).
+/// Once all mutations use NewOrgNode, we can switch to reading new_orgnode directly.
 pub fn orgnode_forest_to_string (
   forest : &PairTree,
 ) -> Result < String, Box<dyn Error> > {
@@ -20,9 +26,11 @@ pub fn orgnode_forest_to_string (
     node_ref : NodeRef < NodePair >,
     level    : usize,
   ) -> String {
-    let orgnode : &OrgNode = & node_ref . value () . orgnode;
+    // Convert at render time to capture any post-construction mutations
+    let new_orgnode : NewOrgNode =
+      from_old_orgnode ( & node_ref . value () . orgnode );
     let mut out : String =
-      orgnode_to_text ( level, orgnode );
+      new_orgnode_to_text ( level, &new_orgnode );
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -30,8 +38,13 @@ pub fn orgnode_forest_to_string (
           level + 1 )); }
     out }
   let root_ref = forest . root ();
-  if root_ref . value () . orgnode . metadata . code . interp
-     != Interp::ForestRoot {
+  let is_forest_root : bool = {
+    let root_new_orgnode : NewOrgNode =
+      from_old_orgnode ( & root_ref . value () . orgnode );
+    matches! (
+      & root_new_orgnode . kind,
+      OrgNodeKind::Scaff ( Scaffold { kind : ScaffoldKind::ForestRoot } )) };
+  if ! is_forest_root {
     return Err (
       "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
   let mut result : String =
@@ -88,22 +101,15 @@ fn org_bullet ( level: usize ) -> String {
 
 /// Renders a NewOrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
-/// PITFALL: During transition, scaffold titles use empty string to match old behavior.
-/// Once old types are removed (Phase 7+), use ScaffoldKind::title() instead.
 pub fn new_orgnode_to_text (
   level   : usize,
   orgnode : &NewOrgNode
 ) -> String {
   let metadata_str : String =
     new_orgnodemd_to_string ( orgnode );
-  // TRANSITION: Use empty string for scaffolds (except Alias) to match old OrgNode behavior.
-  // After Phase 7, change to: s . kind . title ()
   let title : &str = match &orgnode . kind {
     OrgNodeKind::True  ( t ) => &t . title,
-    OrgNodeKind::Scaff ( s ) => match &s . kind {
-      crate::types::orgnode_new::ScaffoldKind::Alias ( alias ) => alias,
-      _ => "", // Non-Alias scaffolds have empty title in old format
-    },
+    OrgNodeKind::Scaff ( s ) => s . kind . title (),
   };
   let body : Option < &String > = match &orgnode . kind {
     OrgNodeKind::True  ( t ) => t . body . as_ref (),
@@ -256,7 +262,7 @@ mod tests {
     use super::*;
     use crate::types::misc::ID;
     use crate::types::orgnode::{
-        default_metadata, forest_root_orgnode, EditRequest, ViewRequest,
+        default_metadata, forest_root_orgnode, EditRequest, ViewRequest, Interp,
     };
     use crate::types::orgnode_new::from_old_orgnode;
 
@@ -408,7 +414,7 @@ mod tests {
         md . code . interp = Interp::AliasCol;
         let old = OrgNode {
             metadata : md,
-            title    : String::new (),
+            title    : "its aliases" . to_string (), // canonical scaffold title
             body     : None,
         };
         assert_render_identical ( &old, 2 );
@@ -432,7 +438,7 @@ mod tests {
         md . code . interp = Interp::SubscribeeCol;
         let old = OrgNode {
             metadata : md,
-            title    : String::new (),
+            title    : "it subscribes to these" . to_string (), // canonical scaffold title
             body     : None,
         };
         assert_render_identical ( &old, 2 );
@@ -444,7 +450,7 @@ mod tests {
         md . code . interp = Interp::HiddenOutsideOfSubscribeeCol;
         let old = OrgNode {
             metadata : md,
-            title    : String::new (),
+            title    : "hidden from all subscriptions" . to_string (), // canonical scaffold title
             body     : None,
         };
         assert_render_identical ( &old, 3 );
@@ -456,7 +462,7 @@ mod tests {
         md . code . interp = Interp::HiddenInSubscribeeCol;
         let old = OrgNode {
             metadata : md,
-            title    : String::new (),
+            title    : "hidden from this subscription" . to_string (), // canonical scaffold title
             body     : None,
         };
         assert_render_identical ( &old, 3 );

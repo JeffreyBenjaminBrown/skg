@@ -8,6 +8,7 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgnodeMetadata};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{PairTree, NodePair};
 
@@ -467,13 +468,14 @@ pub fn orgnode_forest_to_paired (
     let orgnode : OrgNode =
       orgnode_tree . get ( orgnode_treeid )
       . unwrap () . value () . clone ();
+    let new_orgnode = from_old_orgnode ( &orgnode );
     let new_treeid : NodeId = {
       let mut parent_mut =
         forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
         . append ( NodePair { mskgnode    : None,
-                              orgnode     : orgnode,
-                              new_orgnode : None } )
+                              orgnode,
+                              new_orgnode : Some ( new_orgnode ) } )
         . id () };
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()

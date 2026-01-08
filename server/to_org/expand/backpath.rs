@@ -15,6 +15,7 @@ use crate::dbs::typedb::search::{
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -215,11 +216,12 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     Interp::ParentIgnores;
   child_orgnode . metadata . code . indefinitive =
     true;
+  let new_orgnode = from_old_orgnode ( &child_orgnode );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode    : None,
                            orgnode     : child_orgnode,
-                           new_orgnode : None } ) . id ();
+                           new_orgnode : Some ( new_orgnode ) } ) . id ();
   Ok ( new_child_treeid ) }
 
 /// Find a child node by its ID.

@@ -94,12 +94,15 @@ fn default_initial_node_limit() -> usize { 1000 }
 impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {
     ID ( s.into () ) }
+  #[allow(dead_code)]
   fn as_str ( &self ) -> &str {
     &self.0 }} // a reference to the first (and only) field
 
 impl SourceNickname {
+  #[allow(dead_code)]
   fn new <S : Into<String>> (s: S) -> Self {
     SourceNickname ( s.into () ) }
+  #[allow(dead_code)]
   fn as_str ( &self ) -> &str {
     &self.0 }}
 

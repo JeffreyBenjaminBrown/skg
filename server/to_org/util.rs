@@ -4,8 +4,8 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
-use crate::types::orgnode_new::{NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind};
-use crate::types::tree::{NodePair, PairTree, NewNodePair, NewPairTree};
+use crate::types::orgnode_new::from_old_orgnode;
+use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -39,65 +39,18 @@ pub type VisitedMap =
 pub fn forest_root_pair () -> NodePair {
   let mut md = default_metadata ();
   md . code . interp = Interp::ForestRoot;
+  let orgnode = OrgNode { metadata : md,
+                          title    : String::new (),
+                          body     : None };
+  let new_orgnode = from_old_orgnode ( &orgnode );
   NodePair { mskgnode    : None,
-             orgnode     : OrgNode { metadata: md,
-                                     title: String::new (),
-                                     body: None },
-             new_orgnode : None, } }
+             orgnode,
+             new_orgnode : Some ( new_orgnode ), } }
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.
 fn new_forest () -> PairTree {
   Tree::new ( forest_root_pair () ) }
-
-/// Check if a node is a ForestRoot.
-fn is_forest_root (
-  tree    : &PairTree,
-  node_id : NodeId,
-) -> bool {
-  tree . get ( node_id )
-    . map ( |node_ref|
-             node_ref . value () . orgnode . metadata . code . interp
-             == Interp::ForestRoot )
-    . unwrap_or ( false ) }
-
-
-// ======================================================
-// NewPairTree ForestRoot utilities (new types)
-// ======================================================
-
-/// Create a NewNodePair representing a ForestRoot.
-/// It is never rendered; it just makes forests easier to process.
-pub fn new_forest_root_pair () -> NewNodePair {
-  NewNodePair::from_orgnode ( NewOrgNode {
-    focused : false,
-    folded  : false,
-    kind    : OrgNodeKind::Scaff ( Scaffold {
-      kind : ScaffoldKind::ForestRoot,
-    }),
-  })}
-
-/// Create a new forest using NewPairTree (a tree with a ForestRoot root).
-/// The "tree roots" will be children of this root.
-#[allow(dead_code)]
-fn new_new_forest () -> NewPairTree {
-  Tree::new ( new_forest_root_pair () ) }
-
-/// Check if a node is a ForestRoot in a NewPairTree.
-#[allow(dead_code)]
-fn is_new_forest_root (
-  tree    : &NewPairTree,
-  node_id : NodeId,
-) -> bool {
-  tree . get ( node_id )
-    . map ( |node_ref| {
-      match &node_ref . value () . new_orgnode . kind {
-        OrgNodeKind::Scaff ( s ) =>
-          matches! ( s . kind, ScaffoldKind::ForestRoot ),
-        OrgNodeKind::True ( _ ) => false,
-      }})
-    . unwrap_or ( false ) }
-
 
 // ======================================================
 // Fetching, building and modifying SkgNodes and OrgNodes
@@ -143,16 +96,6 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
                  pid ), )) ); }
   Ok (( skgnode, orgnode )) }
 
-/// Create an OrgNode with a given Interp and title.
-/// Body is set to None, and all other metadata fields use defaults.
-pub(super) fn orgnode_from_title_and_rel (
-  rel: Interp,
-  title: String
-) -> OrgNode {
-  let mut md = default_metadata ();
-  md . code . interp = rel;
-  OrgNode { metadata: md, title, body: None }}
-
 /// Set 'indefinitive' to true,
 /// reset title and source,
 /// and set body to None.
@@ -162,7 +105,8 @@ pub(super) fn makeIndefinitiveAndClobber (
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree ( tree, node_id, |np| {
     np . orgnode . metadata . code . indefinitive = true;
-    np . orgnode . body = None; } ) ?;
+    np . orgnode . body = None;
+    np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -201,8 +145,9 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   detect_and_mark_cycle ( tree, node_id ) ?;
   if visited . contains_key ( &pid ) {
     // Mark as indefinitive (it's a repeat).
-    write_at_node_in_tree ( tree, node_id, |np|
-      np . orgnode . metadata . code . indefinitive = true ) ?; }
+    write_at_node_in_tree ( tree, node_id, |np| {
+      np . orgnode . metadata . code . indefinitive = true;
+      np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }
   let is_indefinitive : bool =
     read_at_node_in_tree ( tree, node_id, |np|
       np . orgnode . metadata . code . indefinitive ) ?;
@@ -221,8 +166,9 @@ fn detect_and_mark_cycle (
   let is_cycle : bool = {
     let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_node_in_tree ( tree, node_id, |np|
-    np . orgnode . metadata . viewData . cycle = is_cycle ) ?;
+  write_at_node_in_tree ( tree, node_id, |np| {
+    np . orgnode . metadata . viewData . cycle = is_cycle;
+    np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
   Ok (( )) }
 
 
@@ -289,15 +235,6 @@ pub(super) fn get_pid_in_pairtree (
     . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
                        . into () ) }
 
-/// Extract the PID from a PairTree NodeRef.
-/// Returns an error if the node has no ID.
-/// Use this when you already have a NodeRef to avoid redundant tree lookup.
-fn get_pid_from_pair_using_noderef (
-  node_ref : &NodeRef < NodePair >,
-) -> Result < ID, Box<dyn Error> > {
-  node_ref . value () . orgnode . metadata . id . clone ()
-    . ok_or_else ( || "get_pid_from_pair_using_noderef: node has no ID" . into () ) }
-
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
 /// Returns the new node's ego_tree::NodeId.
@@ -318,13 +255,14 @@ pub async fn make_and_append_child_pair (
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid ) . await ?;
+  let new_orgnode = from_old_orgnode ( &child_orgnode );
   let child_treeid : NodeId =
     with_node_mut (
       tree, parent_treeid,
       ( |mut parent_mut|
         parent_mut . append ( NodePair { mskgnode    : Some(child_skgnode),
                                          orgnode     : child_orgnode,
-                                         new_orgnode : None } )
+                                         new_orgnode : Some ( new_orgnode ) } )
         . id () )) ?;
   Ok ( child_treeid ) }
 
@@ -345,6 +283,7 @@ pub async fn build_node_branch_minus_content (
   let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
+  let new_orgnode = from_old_orgnode ( &orgnode );
   match tree_and_parent {
     Some ( (tree, parent_treeid) ) => {
       let child_treeid : NodeId =
@@ -353,7 +292,7 @@ pub async fn build_node_branch_minus_content (
           ( |mut parent_mut|
             parent_mut . append ( NodePair { mskgnode    : Some(skgnode),
                                              orgnode,
-                                             new_orgnode : None } ) . id () )) ?;
+                                             new_orgnode : Some ( new_orgnode ) } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
@@ -362,7 +301,7 @@ pub async fn build_node_branch_minus_content (
       let mut tree : PairTree =
         Tree::new ( NodePair { mskgnode    : Some(skgnode),
                                orgnode,
-                               new_orgnode : None } );
+                               new_orgnode : Some ( new_orgnode ) } );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, root_treeid, visited,

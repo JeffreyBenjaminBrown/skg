@@ -12,6 +12,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -159,6 +160,8 @@ pub fn clobberIndefinitiveOrgnode (
     pair.orgnode.title = skgnode.title.clone();
     pair.orgnode.metadata.source = Some(skgnode.source.clone());
     pair.orgnode.body = None;
+    // Keep new_orgnode in sync with orgnode mutations
+    pair.new_orgnode = Some ( from_old_orgnode ( &pair.orgnode ));
     Ok::<(), String>(( ))
   } )? // before the '?' it's a nested Result: R<R<(),String>,String>
     . map_err( |e| -> Box<dyn Error> { e.into() } ) }
@@ -298,15 +301,16 @@ async fn extend_content (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
+  let ( skgnode, orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
+  let new_orgnode = from_old_orgnode ( &orgnode );
   let new_child_id : NodeId = with_node_mut (
     tree, parent_nid,
     ( |mut parent_mut|
       parent_mut . append ( NodePair { mskgnode    : Some(skgnode),
-                                       orgnode     : new_orgnode,
-                                       new_orgnode : None } )
+                                       orgnode,
+                                       new_orgnode : Some ( new_orgnode ) } )
       . id () )) ?;
   Ok ( new_child_id ) }
 
@@ -385,5 +389,7 @@ pub async fn ensure_source (
         node_pid ) ) ?;
     write_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode . metadata . source = Some (source) ) ?; }
+      |np| {
+        np . orgnode . metadata . source = Some (source);
+        np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }
   Ok (( )) }

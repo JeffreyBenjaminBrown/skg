@@ -102,6 +102,7 @@ pub async fn find_containers_of (
 
 /// Runs a single TypeDB query.
 /// Returns the IDs of nodes that link to the input node.
+#[allow(dead_code)]
 pub(super) async fn find_links_to (
   db_name : &str,
   driver  : &TypeDBDriver,

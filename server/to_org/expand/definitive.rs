@@ -16,6 +16,7 @@ use crate::to_org::util::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::orgnode_new::from_old_orgnode;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -91,8 +92,8 @@ async fn execute_definitive_view_request (
       forest, node_id,
       |np| { np . orgnode . metadata . code . viewRequests
                . remove ( & ViewRequest::Definitive );
-             np . orgnode . metadata . code . indefinitive =
-               false; } ) ?;
+             np . orgnode . metadata . code . indefinitive = false;
+             np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?;
     rebuild_pair_from_disk_mostly_clobbering_the_org (
       // preserves relevant orgnode fields
       forest, node_id, config ) ?; }
@@ -177,9 +178,10 @@ fn indefinitize_content_subtree (
     write_at_node_in_tree (
       tree, node_id,
       |np| { np . orgnode . metadata . code . indefinitive = true;
-             if let Some(title) = canonical_title {
+             if let Some(title) = canonical_title.clone() {
                np . orgnode . title = title; }
-             np . orgnode . body = None; } ) ?; }
+             np . orgnode . body = None;
+             np . new_orgnode = Some ( from_old_orgnode ( &np.orgnode )); } ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, child_treeid, visited ) ?; }
@@ -281,9 +283,10 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
   orgnode . metadata . code = code;
+  let new_orgnode = from_old_orgnode ( &orgnode );
   write_at_node_in_tree ( // replace it
     tree, node_id,
     |np| * np = NodePair { mskgnode    : Some ( skgnode ),
                            orgnode,
-                           new_orgnode : None } ) ?;
+                           new_orgnode : Some ( new_orgnode ) } ) ?;
   Ok (( )) }
