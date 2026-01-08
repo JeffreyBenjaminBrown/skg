@@ -113,19 +113,18 @@ fn skgnode_for_orgnode_in_tree<'a> (
     source: source,
     ids: ids,
     body: body,
-    contains: Some(collect_contents(noderef)),
+    contains: Some(collect_contents_that_are_not_to_delete(noderef)),
     subscribes_to: subscribees,
     hides_from_its_subscriptions: None,
     overrides_view_of: None,
   } ) }
 
-/// Collect a node's subscribees:
-/// - find the unique SubscribeeCol child (error if multiple)
-/// - for each Subscribee child, collect its ID
-/// - skip HiddenOutsideOfSubscribeeCol children (they're not subscribees)
-/// Duplicates are removed (preserving order of first occurrence).
-/// Returns None if no SubscribeeCol found (no opinion).
-/// Returns Some(vec) if SubscribeeCol found - even if empty (user wants no subscribees).
+/// Treats the input tree as the source of truth; does not read dbs.
+/// Returns None if no SubscribeeCol found,
+///   because in this case the user has expressed no opinion.
+/// Returns Some(vec) if SubscribeeCol found.
+///   Empty means the user wants no subscribees.
+///   Deduplicates the output, preserving order of first occurrence.
 fn collect_subscribees (
   tree: &Tree<OrgNode>,
   node_id: NodeId,
@@ -142,16 +141,17 @@ fn collect_subscribees (
           "collect_subscribees: SubscribeeCol not found");
         let mut subscribees : Vec<ID> = Vec::new();
         for subscribee_child in col_ref.children() {
-          let child_interp : &Interp =
-            &subscribee_child . value() . metadata . code.interp;
-          if *child_interp == Interp::HiddenOutsideOfSubscribeeCol {
-            // This Interp is allowed as a child of a SubscribeeCol,
-            // but it's not a subscribee, so skip it.
-            continue; }
-          if *child_interp != Interp::Subscribee {
-            return Err ( format! (
-              "SubscribeeCol has non-Subscribee child with interp: {:?}",
-              child_interp )); }
+          { // maybe skip, maybe err
+            let child_interp : &Interp =
+              &subscribee_child . value() . metadata . code.interp;
+            if *child_interp == Interp::HiddenOutsideOfSubscribeeCol {
+              // This Interp is allowed as a child of a SubscribeeCol,
+              // but it's not a subscribee, so skip it.
+              continue; }
+            if *child_interp != Interp::Subscribee {
+              return Err ( format! (
+                "SubscribeeCol has non-Subscribee child with interp: {:?}",
+                child_interp )); }}
           match &subscribee_child.value().metadata.id {
             Some(id) => subscribees . push( id . clone() ),
             None => return Err ( format! (
@@ -161,10 +161,9 @@ fn collect_subscribees (
       Ok(Some(dedup_vector(subscribees))) }} }
 
 /// Returns IDs of all children for which treatment = Content.
-/// Excludes children for which metadata.toDelete is true.
-/// This is not a recursive traversal;
-/// it is only concerned with this node's contents.
-fn collect_contents<'a> (
+/// Not a recursive traversal;
+///   it is only concerned with this node's contents.
+fn collect_contents_that_are_not_to_delete<'a> (
   node_ref: &NodeRef<'a, OrgNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =

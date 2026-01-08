@@ -2,7 +2,7 @@ use crate::types::orgnode::{Interp, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
-  ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol, insert_col_node };
+  ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol, insert_sourceless_node };
 use crate::types::misc::SkgConfig;
 use crate::types::skgnode::SkgNode;
 use ego_tree::{NodeId, NodeRef};
@@ -10,24 +10,15 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Complete an AliasCol node by reconciling its Alias children
-/// with the aliases found on disk for its parent node.
+/// Reconciles its Alias children
+///   with the aliases found on disk for its parent node.
+/// Might add and remove aliases.
+/// Might transfer focus.
 ///
-/// PITFALL: This function should be called AFTER saving,
+/// ASSUMES the buffer that generated this tree was already saved,
 /// so the disk state is the source of truth.
-///
-/// This function assumes the parent node P has been normalized
+/// ASSUMES the parent node P has been normalized
 /// so that its 'id' field is the PID.
-///
-/// Given an AliasCol node C:
-/// - Fetches the parent P's SkgNode S from disk
-///   TODO ? This is inefficient.
-///   Climbing the tree, to where it already is, would be smarter.
-/// - Deduplicates C's Alias children (preserving order)
-/// - Removes invalid Alias children (those not in S.aliases)
-/// - Adds missing Alias children (those in S.aliases but not in C's children)
-/// - Transfers focus to C if any focused Alias is removed
-/// - Errors if C's parent has no ID or if non-Alias children are found
 pub async fn completeAliasCol (
   tree             : &mut PairTree,
   aliascol_node_id : NodeId,
@@ -50,7 +41,8 @@ pub async fn completeAliasCol (
     parent_skgnode . aliases // source of truth
       . unwrap_or_default () . into_iter () . collect ( ));
   let aliases_from_branch : Vec < String > =
-    collect_child_aliases_at_nodepair_aliascol ( tree, aliascol_node_id ) ?;
+    collect_child_aliases_at_nodepair_aliascol (
+      tree, aliascol_node_id )?;
   let good_aliases_in_branch : HashSet < String > = (
     // aliases in tree that match aliases on disk
     aliases_from_branch . iter ()
@@ -68,25 +60,20 @@ pub async fn completeAliasCol (
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
   for alias in missing_aliases_from_disk {
-    insert_col_node ( tree, aliascol_node_id,
+    insert_sourceless_node (
+      tree, aliascol_node_id,
       Interp::Alias, & alias, false ) ?; }
   Ok (( )) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,
 /// preserving focus information,
 /// where 'invalid' means not found on disk.
-///
-/// If a duplicate node has focus, after it is removed,
-/// the remaining node with the same title gets focus.
-///
-/// If an invalid (non-existent on disk) alias has focus,
-/// focus is transferred to the AliasCol itself.
 fn remove_duplicates_and_false_aliases_handling_focus (
   tree             : &mut PairTree,
   aliascol_node_id : NodeId,
   good_aliases     : &HashSet < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let mut removed_focused : bool = false;
+  let mut removed_focus : bool = false;
   let mut focused_title : Option < String > = None;
 
   let children_to_remove : Vec < NodeId > = {
@@ -109,30 +96,34 @@ fn remove_duplicates_and_false_aliases_handling_focus (
       if is_duplicate || is_invalid {
         children_to_remove_acc . push ( child . id () );
         if child_orgnode . metadata . viewData.focused {
+          // We will delete the focused node.
+          removed_focus = true;
           if is_duplicate {
-            focused_title = Some ( title . clone () ); }
-          else {
-            removed_focused = true; }}} }
+            // Use this to move focus to the earlier duplicate title.
+            focused_title = Some ( title . clone () ); }; }} }
     children_to_remove_acc };
 
   for child_treeid in children_to_remove {
     with_node_mut ( tree, child_treeid,
                     |mut child_mut| child_mut . detach () ) ?; }
 
-  if let Some ( title ) = focused_title {
-    let aliascol_ref : NodeRef < NodePair > =
-      tree . get ( aliascol_node_id )
-      . ok_or ( "AliasCol node not found" ) ?;
-    for child in aliascol_ref . children () {
-      if child . value () . orgnode . title == title {
-        write_at_node_in_tree (
-          tree, child . id (),
-          |np| np . orgnode . metadata . viewData.focused = true ) ?;
-        break; }}}
-
-  if removed_focused {
-    write_at_node_in_tree (
-      tree, aliascol_node_id,
-      |np| np . orgnode . metadata . viewData.focused = true ) ?; }
+  if removed_focus {
+    if let Some ( title ) = focused_title {
+      // Move focus to the earlier duplicate title.
+      let aliascol_ref : NodeRef < NodePair > =
+        tree . get ( aliascol_node_id )
+        . ok_or ( "AliasaCol node not found" ) ?;
+      for child in aliascol_ref . children () {
+        if child . value () . orgnode . title == title {
+          write_at_node_in_tree (
+            tree, child . id (),
+            |np| np . orgnode . metadata . viewData . focused
+              = true ) ?;
+          break; }} }
+    else { // Move focus to aliasCol itself.
+      write_at_node_in_tree (
+        tree, aliascol_node_id,
+        |np| np . orgnode . metadata . viewData.focused
+          = true ) ?; }}
 
   Ok (( )) }

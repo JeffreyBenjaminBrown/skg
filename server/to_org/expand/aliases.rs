@@ -3,7 +3,7 @@ use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, ViewRequest};
 use crate::types::tree::PairTree;
-use crate::types::tree::orgnode_skgnode::{insert_col_node, unique_child_with_interp};
+use crate::types::tree::orgnode_skgnode::{insert_sourceless_node, unique_child_with_interp};
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -51,9 +51,9 @@ pub async fn build_and_integrate_aliases (
     fetch_aliases_from_file (
       config, driver, node_id_val ). await;
   let aliascol_id : ego_tree::NodeId =
-    insert_col_node ( tree, node_id,
+    insert_sourceless_node ( tree, node_id,
       Interp::AliasCol, "", true ) ?;
   for alias in & aliases {
-    insert_col_node ( tree, aliascol_id,
+    insert_sourceless_node ( tree, aliascol_id,
       Interp::Alias, alias, false ) ?; }
   Ok (( )) }

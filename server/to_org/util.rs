@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
-use crate::to_org::complete::sharing::maybe_add_subscribee_col;
+use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::{default_metadata, Interp, ViewRequest, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
@@ -142,7 +142,7 @@ pub async fn complete_branch_minus_content (
 ) -> Result<(), Box<dyn Error>> {
   mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
-  maybe_add_subscribee_col (
+  maybe_add_subscribeeCol_branch (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 

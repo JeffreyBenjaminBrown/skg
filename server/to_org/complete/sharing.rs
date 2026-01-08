@@ -7,7 +7,7 @@ use crate::types::orgnode::Interp;
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  append_indefinitive_node, insert_col_node,
+  append_indefinitive_node, insert_sourceless_node,
   pid_for_subscribee_and_its_subscriber_grandparent,
   pids_for_subscriber_and_its_subscribees,
   unique_child_with_interp };
@@ -18,10 +18,10 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 /// If appropriate, prepend a SubscribeeCol child containing:
-///   - for each subscribee, an indefinitive Subscribee child
-///   - if any hidden nodes are outside subscribee content,
-///     a HiddenOutsideOfSubscribeeCol
-pub async fn maybe_add_subscribee_col (
+/// - for each subscribee, an indefinitive Subscribee child
+/// - if any hidden nodes are outside subscribee content,
+///   a HiddenOutsideOfSubscribeeCol
+pub async fn maybe_add_subscribeeCol_branch (
   tree    : &mut PairTree,
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
@@ -34,7 +34,7 @@ pub async fn maybe_add_subscribee_col (
         |np| np . orgnode . metadata . code . indefinitive ) ?;
     if is_indefinitive { return Ok (( )); }}
   { // Skip if there already is one.
-    // TODO: We should not  assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
+    // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     if unique_child_with_interp (
       tree, node_id, Interp::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
@@ -56,22 +56,23 @@ pub async fn maybe_add_subscribee_col (
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId =
-    insert_col_node ( tree, node_id,
+    insert_sourceless_node ( tree, node_id,
       Interp::SubscribeeCol, "it subscribes to these", true ) ?;
 
-  if ! hidden_outside_content . is_empty () {
-    let hidden_outside_col_nid : NodeId =
-      insert_col_node ( tree, subscribee_col_nid,
-        Interp::HiddenOutsideOfSubscribeeCol,
-        "hidden from all subscriptions", false ) ?;
-    for hidden_id in hidden_outside_content {
+  { // mutate the tree
+    if ! hidden_outside_content . is_empty () {
+      let hidden_outside_col_nid : NodeId =
+        insert_sourceless_node ( tree, subscribee_col_nid,
+                          Interp::HiddenOutsideOfSubscribeeCol,
+                          "hidden from all subscriptions", false ) ?;
+      for hidden_id in hidden_outside_content {
+        append_indefinitive_node (
+          tree, hidden_outside_col_nid, & hidden_id,
+          Interp::HiddenFromSubscribees, config, driver ). await ?; }}
+    for subscribee_id in subscribee_ids {
       append_indefinitive_node (
-        tree, hidden_outside_col_nid, & hidden_id,
-        Interp::HiddenFromSubscribees, config, driver ) . await ?; } }
-  for subscribee_id in subscribee_ids {
-    append_indefinitive_node (
-      tree, subscribee_col_nid, & subscribee_id,
-      Interp::Subscribee, config, driver ) . await ?; }
+        tree, subscribee_col_nid, & subscribee_id,
+        Interp::Subscribee, config, driver ) . await ?; }}
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -79,40 +80,42 @@ pub async fn maybe_add_subscribee_col (
 /// then prepend a HiddenInSubscribeeCol to hold those hidden nodes.
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubsribeeCol -> Subscribee
-pub async fn maybe_add_hidden_in_subscribee_col (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+pub async fn maybe_add_hiddenInSubscribeeCol_branch (
+  tree              : &mut PairTree,
+  subscribee_treeid : NodeId,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { // error if not a Subscribee
     let is_subscribee: bool =
-      read_at_node_in_tree(tree, node_id, |node| {
+      read_at_node_in_tree(tree, subscribee_treeid, |node| {
         node.orgnode.metadata.code.interp == Interp::Subscribee
       })?;
     if ! is_subscribee { return Err (
-      "maybe_add_hidden_in_subscribee_col called on non-subscribee"
+      "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee"
         . into () ); }}
   if unique_child_with_interp (
-    // TODO: We should not  assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
-    tree, node_id, Interp::HiddenInSubscribeeCol )? . is_some ()
+       // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
+       tree, subscribee_treeid, Interp::HiddenInSubscribeeCol
+     )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
-    pid_for_subscribee_and_its_subscriber_grandparent ( tree, node_id ) ?;
+    pid_for_subscribee_and_its_subscriber_grandparent (
+      tree, subscribee_treeid ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
-      &config.db_name, driver,
-      & subscriber_pid,
-      & subscribee_pid ) . await ?;
+        & config.db_name, driver,
+        & subscriber_pid, & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
     return Ok (( )); }
   let hidden_col_nid : NodeId =
-    insert_col_node ( tree, node_id,
+    insert_sourceless_node ( tree, subscribee_treeid,
       Interp::HiddenInSubscribeeCol,
       "hidden from this subscription", true ) ?;
   for hidden_id in hidden_in_content {
+    // populate the collection
     append_indefinitive_node (
       tree, hidden_col_nid, & hidden_id,
-      Interp::HiddenFromSubscribees, config, driver ) . await ?; }
+      Interp::HiddenFromSubscribees, config, driver ). await ?; }
   Ok (( )) }

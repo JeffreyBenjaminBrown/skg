@@ -120,14 +120,16 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   Ok ( ( subscribee_pid,
          skgnode . ids [ 0 ] . clone () ) ) }
 
-/// Insert a collection node (no SkgNode, fixed title) as a child.
-/// If `prepend` is true, inserts at the beginning; otherwise appends.
-pub fn insert_col_node (
+/// Insert into parent_id's children
+///   a node with no associated SkgNode.
+/// Most Interps are like this (Alias and all the *Cols.)
+///   but the most common ones are not (Content, Subscribee).
+pub fn insert_sourceless_node (
   tree      : &mut PairTree,
   parent_id : NodeId,
   interp    : Interp,
   title     : &str,
-  prepend   : bool,
+  prepend   : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
   let col_orgnode : OrgNode = {
     let mut md = default_metadata ();

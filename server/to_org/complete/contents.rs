@@ -6,7 +6,7 @@ use crate::to_org::util::{
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::{
-  maybe_add_subscribee_col };
+  maybe_add_subscribeeCol_branch };
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
@@ -188,7 +188,7 @@ pub async fn completeDefinitiveOrgnode (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  maybe_add_subscribee_col (
+  maybe_add_subscribeeCol_branch (
     tree, node_id, config, driver ) . await ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {

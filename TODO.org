@@ -3,32 +3,14 @@
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
 ** ONGOING Completion is complex.
-*** ONGOING reading pub async fn completeAliasCol (
-  // Validate this is an AliasCol
-  let mut parent_skgnode : SkgNode = {
-  parent_skgnode.source = parent_source; // BUG ?
-  let aliases_from_disk : HashSet < String > = (
-  let aliases_from_tree : Vec < String > =
-  let good_aliases_in_tree : HashSet < String > = (
-    // aliases in tree that match aliases on disk
-  let missing_aliases_from_disk : HashSet < String > = (
-    // aliases on disk but not in tree
-  remove_duplicates_and_false_aliases_handling_focus (
-    tree, // PITFALL: Gets modified.
-    aliascol_node_id,
-    & good_aliases_in_tree ) ?;
-  { // Append new Alias nodes for missing aliases
-*** what do these do?
-**** collect_subscribees
-**** collect_contents
 *** break up completeDefinitiveOrgnode
     it's super-long
-*** maybe_add_subscribee_col is impenetrable
+*** maybe_add_subscribeeCol_branch is impenetrable
     so complex I can't see past it
 **** Subdivide it.
-**** maybe_add_subscribee_col should integrate existing SubscribeeCol
+**** maybe_add_subscribeeCol_branch should integrate existing SubscribeeCol
      if it exists, rather than assuming it is correct
-*** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribee_col?
+*** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribeeCol_branch?
 *** After 'view_requests_at_node', is there any reason to keep the view requests in the node?
     The function pushes the node's requests onto 'view_requests_out'.
     If they should be deleted from the node thereafter,
@@ -54,7 +36,7 @@
      Instead do it only in clobberIndefinitiveOrgnode.
      And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
      instead of essentially restating its definition.
-*** maybe_add_hidden_in_subscribee_col should integrate
+*** maybe_add_hiddenInSubscribeeCol_branch should integrate
     if it finds the subscribee col,
     it can't assume that col is still accurate
 *** ? ignorable
@@ -161,7 +143,7 @@
     let is_subscribee : bool = {
       let node_ref : NodeRef < NodePair > =
         tree . get ( node_id ) . ok_or (
-          "maybe_add_hidden_in_subscribee_col: node not found" ) ?;
+          "maybe_add_hiddenInSubscribeeCol_branch: node not found" ) ?;
       node_ref . value () . 1 . metadata . code . interp
         == Interp::Subscribee };
   ```

@@ -18,6 +18,9 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
+/// Corresponds to an Emacs headline-body pair.
+/// The metadata precedes the title in the headline.
+/// (Both follow the "bullet", which is a string of asterisks.)
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgNode {
   pub metadata: OrgnodeMetadata,
@@ -35,7 +38,7 @@ pub struct OrgnodeMetadata {
   pub code: OrgnodeCode,
 }
 
-/* View-related metadata: fields that dictate only how the node is shown. */
+/// View-related metadata. It dictates only how the node is shown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeViewData {
   // PITFALL: One could reasonably describe 'focused' and 'folded' as code rather than data. They tell Emacs what to do. Once Emacs has done that, it deletes them from the metadata. The other fields in this type are only acted on to the extent that Emacs displays them.
@@ -46,10 +49,10 @@ pub struct OrgnodeViewData {
   pub relationships: OrgnodeRelationships,
 }
 
-/* These data only influence how the node is shown.
-Editing them and then saving the buffer leaves the graph unchanged,
-and the edits would be immediately lost,
-as this data is regenerated each time the view is rebuilt. */
+/// These data only influence how the node is shown.
+/// Editing them and then saving the buffer leaves the graph unchanged,
+/// and the edits would be immediately lost,
+/// as this data is regenerated each time the view is rebuilt.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeRelationships {
   pub parentIsContainer: bool,
@@ -73,6 +76,8 @@ pub struct OrgnodeCode {
 /// how it relates to its ancestors and its descendents in the tree.
 /// It influences both how the user should read it,
 /// and how Rust should treat the data when it is saved.
+/// PITFALL: Nodes with certain Interp values need a source and an id.
+///   Others should not have them. See should_be_sourceless.
 /// PITFALL: It does not describe every potential relationship
 /// between the node and its parent.
 #[derive(Debug, Clone, PartialEq)]
@@ -113,15 +118,16 @@ pub enum ViewRequest {
 //
 
 impl Interp {
-  /// Returns true if nodes with this Interp should not have a source.
-  /// These are synthetic containers that don't correspond to .skg files.
+  /// Nodes with certain Interps should have no source or id. They are synthetic containers, and don't correspond to .skg files.
   pub fn should_be_sourceless ( &self ) -> bool {
-    matches! ( self,
-      Interp::AliasCol                     |
-      Interp::Alias                        |
-      Interp::SubscribeeCol                |
-      Interp::HiddenOutsideOfSubscribeeCol |
-      Interp::HiddenInSubscribeeCol ) } }
+    matches! (
+      self,
+      ( Interp::ForestRoot                   |
+        Interp::AliasCol                     |
+        Interp::Alias                        |
+        Interp::SubscribeeCol                |
+        Interp::HiddenOutsideOfSubscribeeCol |
+        Interp::HiddenInSubscribeeCol )) }}
 
 impl fmt::Display for Interp {
   fn fmt (
