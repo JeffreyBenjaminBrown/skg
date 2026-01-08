@@ -6,7 +6,7 @@ use std::error::Error;
 use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode_new::NewOrgNode;
 use skg::types::misc::SkgConfig;
 use skg::types::tree::PairTree;
 
@@ -44,7 +44,7 @@ async fn test_completeAliasCol_logic (
       ** (skg (code (interp alias))) the above should break
     " };
 
-  let orgnode_forest : Tree < OrgNode > =
+  let orgnode_forest : Tree < NewOrgNode > =
     org_to_uninterpreted_nodes ( org_text ) ?;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );
@@ -186,7 +186,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       *** (skg (code (interp alias))) b
     " };
 
-  let orgnode_forest : Tree < OrgNode > =
+  let orgnode_forest : Tree < NewOrgNode > =
     org_to_uninterpreted_nodes ( org_text ) ?;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );

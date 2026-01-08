@@ -12,7 +12,7 @@ mod util {
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode_new::NewOrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -357,7 +357,7 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Tree<OrgNode> =
+  let result_forest : Tree<NewOrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
 
@@ -367,51 +367,51 @@ async fn test_recursive_document (
     "Expected exactly 1 root node" );
 
   let root_node_ref = &tree_roots[0];
-  let root_node : &OrgNode = root_node_ref . value ();
+  let root_node : &NewOrgNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert_eq! ( root_node.metadata.id, Some ( ID::from ("a") ),
+  assert_eq! ( root_node.id(), Some ( &ID::from ("a") ),
     "Root node should have id 'a'" );
-  assert_eq! ( root_node.title, "a",
+  assert_eq! ( root_node.title(), "a",
     "Root node should have title 'a'" );
 
   // Root should have 1 child: "b"
   let mut root_children = root_node_ref . children ();
   let b_node_ref = root_children . next ()
     . expect ( "Root should have child 'b'" );
-  let b_node : &OrgNode = b_node_ref . value ();
+  let b_node : &NewOrgNode = b_node_ref . value ();
 
-  assert_eq! ( b_node.metadata.id, Some ( ID::from ("b") ),
+  assert_eq! ( b_node.id(), Some ( &ID::from ("b") ),
     "First child should have id 'b'" );
-  assert_eq! ( b_node.title, "b",
+  assert_eq! ( b_node.title(), "b",
     "First child should have title 'b'" );
-  assert_eq! ( b_node.body, Some ( "b has a body" . to_string () ),
+  assert_eq! ( b_node.body(), Some ( "b has a body" . to_string () ).as_ref(),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_node.metadata.code.indefinitive,
+  assert! ( ! b_node.is_indefinitive(),
     "First occurrence of 'b' should not be marked as indefinitive" );
 
   // "b" should have 1 child: "c"
   let mut b_children = b_node_ref . children ();
   let c_node_ref = b_children . next ()
     . expect ( "Node 'b' should have child 'c'" );
-  let c_node : &OrgNode = c_node_ref . value ();
+  let c_node : &NewOrgNode = c_node_ref . value ();
 
-  assert_eq! ( c_node.metadata.id, Some ( ID::from ("c") ),
+  assert_eq! ( c_node.id(), Some ( &ID::from ("c") ),
     "Child of 'b' should have id 'c'" );
-  assert_eq! ( c_node.title, "c",
+  assert_eq! ( c_node.title(), "c",
     "Child of 'b' should have title 'c'" );
 
   // "c" should have 1 child: "b" (repeated)
   let mut c_children = c_node_ref . children ();
   let b_repeat_ref = c_children . next ()
     . expect ( "Node 'c' should have child 'b' (repeated)" );
-  let b_repeat : &OrgNode = b_repeat_ref . value ();
+  let b_repeat : &NewOrgNode = b_repeat_ref . value ();
 
-  assert_eq! ( b_repeat.metadata.id, Some ( ID::from ("b") ),
+  assert_eq! ( b_repeat.id(), Some ( &ID::from ("b") ),
     "Child of 'c' should have id 'b'" );
-  assert_eq! ( b_repeat.title, "b",
+  assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat.metadata.code.indefinitive,
+  assert! ( b_repeat.is_indefinitive(),
     "Second occurrence of 'b' should be marked as indefinitive" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)

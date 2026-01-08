@@ -6,7 +6,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::{NewOrgNode, forest_root_new_orgnode};
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
 use skg::types::save::NonMerge_NodeAction;
@@ -224,7 +224,7 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
 
 #[test]
 fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
-  let forest: Tree<NewOrgNode> = Tree::new(forest_root_orgnode());
+  let forest: Tree<NewOrgNode> = Tree::new(forest_root_new_orgnode());
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 

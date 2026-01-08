@@ -2,7 +2,7 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::orgnode::{OrgNode, forest_root_orgnode};
+use skg::types::orgnode_new::{NewOrgNode, forest_root_new_orgnode};
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -21,7 +21,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id node1) (code toDelete)) duplicate of first node (same delete instruction)
         "};
 
-  let forest_consistent: Tree<OrgNode> =
+  let forest_consistent: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input_consistent).unwrap();
   let (inconsistent_ids_consistent, _, _) =
     find_inconsistent_instructions(&forest_consistent);
@@ -37,7 +37,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id conflict2)) another conflict end
         "};
 
-  let forest_inconsistent: Tree<OrgNode> =
+  let forest_inconsistent: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input_inconsistent).unwrap();
   let (inconsistent_ids, _, _) = find_inconsistent_instructions(&forest_inconsistent);
 
@@ -53,13 +53,13 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (id valid_node)) only node with id
         "};
 
-  let forest_no_ids: Tree<OrgNode> =
+  let forest_no_ids: Tree<NewOrgNode> =
     org_to_uninterpreted_nodes(input_no_ids).unwrap();
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty forest (just ForestRoot, no tree roots)
-  let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  let empty_forest: Tree<NewOrgNode> = Tree::new(forest_root_new_orgnode());
   let (inconsistent_empty, _, _) = find_inconsistent_instructions(&empty_forest);
   assert_eq!(inconsistent_empty.len(), 0, "Should have no conflicts in empty forest");
 }
@@ -86,7 +86,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let forest: Tree<OrgNode> =
+      let forest: Tree<NewOrgNode> =
         org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
