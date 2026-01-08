@@ -219,8 +219,8 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   let new_orgnode = from_old_orgnode ( &child_orgnode );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
-    . prepend ( NodePair { mskgnode    : None,
-                           new_orgnode } ) . id ();
+    . prepend ( NodePair { mskgnode : None,
+                           orgnode  : new_orgnode } ) . id ();
   Ok ( new_child_treeid ) }
 
 /// Find a child node by its ID.
@@ -232,7 +232,7 @@ fn find_child_by_id (
 ) -> Option < ego_tree::NodeId > {
   for child in tree . get ( parent_treeid ) . unwrap () . children () {
     if let Some ( child_skgpid ) =
-      child . value () . orgnode_new () . id () {
+      child . value () . orgnode () . id () {
         if child_skgpid == target_skgid {
           return Some ( child . id () ); }} }
   None }
@@ -249,7 +249,7 @@ fn find_children_by_ids (
     HashMap::new ();
   for child in tree . get ( parent_treeid ) . unwrap () . children () {
     if let Some ( child_skgpid )
-      = child . value () . orgnode_new () . id ()
+      = child . value () . orgnode () . id ()
     { if target_skgids . contains ( child_skgpid )
       { result . insert ( child_skgpid . clone (), child . id () ); }} }
   result }

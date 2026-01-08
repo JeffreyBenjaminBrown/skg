@@ -95,7 +95,7 @@ fn set_metadata_relationships_in_node_recursive (
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( treeid ) . unwrap ()
-    . value () . orgnode_new () . id () . cloned ();
+    . value () . orgnode () . id () . cloned ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
     // Update all relationship fields on new_orgnode
@@ -114,7 +114,7 @@ fn set_metadata_relationships_in_node_recursive (
                        contents . contains ( parent_skgid )) )
       } else { (true, false) }; // default if no parent
     let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
-    let org = node_mut . value () . orgnode_new_mut ();
+    let org = node_mut . value () . orgnode_mut ();
     org . set_num_containers ( num_containers );
     org . set_num_contents ( num_contents );
     org . set_num_links_in ( num_links_in );

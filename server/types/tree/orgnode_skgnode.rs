@@ -31,7 +31,7 @@ pub fn unique_child_with_interp (
     tree.get(node_id)
     .ok_or("unique_child_with_interp: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode_new().matches_interp ( &interp ))
+    .filter(|c| c.value().orgnode().matches_interp ( &interp ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
@@ -103,12 +103,12 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
-    node_ref . value () . orgnode_new () . id () . cloned ()
+    node_ref . value () . orgnode () . id () . cloned ()
     . ok_or ( "Subscribee has no ID" ) ?;
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if ! parent_ref . value () . orgnode_new ()
+  if ! parent_ref . value () . orgnode ()
       . matches_interp ( &Interp::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
@@ -143,8 +143,8 @@ pub fn insert_sourceless_node (
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
-      let pair = NodePair { mskgnode    : None,
-                            new_orgnode };
+      let pair = NodePair { mskgnode : None,
+                            orgnode  : new_orgnode };
       if prepend { parent_mut . prepend ( pair ) . id () }
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
@@ -170,7 +170,7 @@ pub async fn append_indefinitive_node (
     |mut parent_mut| {
       parent_mut . append (
         NodePair { mskgnode : Some ( skgnode ),
-                   new_orgnode } ); } ) ?;
+                   orgnode  : new_orgnode } ); } ) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode
@@ -184,7 +184,7 @@ pub async fn ancestor_skgnode_from_disk (
 ) -> Result < SkgNode, Box<dyn Error> > {
   let ancestor_skgid : ID =
     read_at_ancestor_in_tree( tree, treeid, generation,
-      |np| np . orgnode_new () . id () . cloned () )
+      |np| np . orgnode () . id () . cloned () )
     . map_err( |e| -> Box<dyn Error> { e . into () })?
     . ok_or_else(
       || -> Box<dyn Error> {
@@ -207,7 +207,7 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
-    let child_new = child . value () . orgnode_new ();
+    let child_new = child . value () . orgnode ();
     if ! child_new . matches_interp ( &Interp::Alias ) {
       return Err (
         format! ( "AliasCol has non-Alias child with interp: {:?}",

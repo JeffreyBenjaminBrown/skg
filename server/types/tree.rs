@@ -25,17 +25,26 @@ pub type PairTree = Tree<NodePair>;
 #[derive(Clone, Debug)]
 pub struct NodePair {
   pub mskgnode: Option<SkgNode>,
-  pub new_orgnode: NewOrgNode,
+  pub orgnode: NewOrgNode,
 }
 
 impl NodePair {
-  /// Get the NewOrgNode.
-  pub fn orgnode_new ( &self ) -> &NewOrgNode {
-    &self . new_orgnode }
+  /// Get the OrgNode.
+  pub fn orgnode ( &self ) -> &NewOrgNode {
+    &self . orgnode }
 
-  /// Get a mutable reference to the NewOrgNode.
+  /// Get a mutable reference to the OrgNode.
+  pub fn orgnode_mut ( &mut self ) -> &mut NewOrgNode {
+    &mut self . orgnode }
+
+  // Backwards compatibility aliases during transition
+  #[deprecated(note = "Use orgnode() instead")]
+  pub fn orgnode_new ( &self ) -> &NewOrgNode {
+    self . orgnode () }
+
+  #[deprecated(note = "Use orgnode_mut() instead")]
   pub fn orgnode_new_mut ( &mut self ) -> &mut NewOrgNode {
-    &mut self . new_orgnode }
+    self . orgnode_mut () }
 }
 
 //
@@ -46,15 +55,15 @@ impl NodePair {
   /// Create a new NodePair with no SkgNode.
   pub fn from_orgnode ( orgnode : NewOrgNode ) -> Self {
     NodePair {
-      mskgnode    : None,
-      new_orgnode : orgnode,
+      mskgnode : None,
+      orgnode,
     } }
 
   /// Create a new NodePair with an SkgNode.
   pub fn from_pair ( orgnode : NewOrgNode, skgnode : SkgNode ) -> Self {
     NodePair {
-      mskgnode    : Some ( skgnode ),
-      new_orgnode : orgnode,
+      mskgnode : Some ( skgnode ),
+      orgnode,
     } } }
 
 // Type aliases for backwards compatibility during transition
@@ -99,7 +108,7 @@ mod tests {
       overrides_view_of            : None,
     };
     let pair = NodePair::from_pair ( new_orgnode . clone (), skgnode . clone () );
-    assert_eq! ( pair . new_orgnode, new_orgnode );
+    assert_eq! ( pair . orgnode, new_orgnode );
     assert_eq! ( pair . mskgnode, Some ( skgnode ) );
   }
 
@@ -115,13 +124,13 @@ mod tests {
       kind    : OrgNodeKind::Scaff ( scaffold ),
     };
     let pair = NodePair::from_orgnode ( new_orgnode . clone () );
-    assert_eq! ( pair . new_orgnode, new_orgnode );
+    assert_eq! ( pair . orgnode, new_orgnode );
     assert! ( pair . mskgnode . is_none () );
   }
 
-  // Test orgnode_new accessor
+  // Test orgnode accessor
   #[test]
-  fn test_orgnode_new_accessor () {
+  fn test_orgnode_accessor () {
     let true_node = TrueNode {
       title  : "Test" . to_string (),
       id     : Some ( ID::from ( "xyz" ) ),
@@ -133,13 +142,13 @@ mod tests {
       kind    : OrgNodeKind::True ( true_node ),
     };
     let pair = NodePair::from_orgnode ( new_orgnode );
-    assert_eq! ( pair . orgnode_new () . title (), "Test" );
-    assert! ( pair . orgnode_new () . focused );
+    assert_eq! ( pair . orgnode () . title (), "Test" );
+    assert! ( pair . orgnode () . focused );
   }
 
-  // Test orgnode_new_mut accessor
+  // Test orgnode_mut accessor
   #[test]
-  fn test_orgnode_new_mut_accessor () {
+  fn test_orgnode_mut_accessor () {
     let scaffold = Scaffold {
       kind : ScaffoldKind::SubscribeeCol,
     };
@@ -149,7 +158,7 @@ mod tests {
       kind    : OrgNodeKind::Scaff ( scaffold ),
     };
     let mut pair = NodePair::from_orgnode ( new_orgnode );
-    pair . orgnode_new_mut () . focused = true;
-    assert! ( pair . orgnode_new () . focused );
+    pair . orgnode_mut () . focused = true;
+    assert! ( pair . orgnode () . focused );
   }
 }

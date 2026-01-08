@@ -29,7 +29,7 @@ pub async fn completeAliasCol (
     let is_aliascol : bool =
       read_at_node_in_tree(
         tree, aliascol_node_id,
-        |np| np . orgnode_new () . matches_interp ( &Interp::AliasCol ) )
+        |np| np . orgnode () . matches_interp ( &Interp::AliasCol ) )
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
     if ! is_aliascol {
       return Err( "Node is not an AliasCol" . into () ); }}
@@ -84,7 +84,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
-      let child_new_orgnode = child . value () . orgnode_new ();
+      let child_new_orgnode = child . value () . orgnode ();
       let title : &str = child_new_orgnode . title ();
       let is_duplicate : bool =
         ! seen . insert ( title . to_string () );
@@ -111,16 +111,16 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         tree . get ( aliascol_node_id )
         . ok_or ( "AliasaCol node not found" ) ?;
       for child in aliascol_ref . children () {
-        if child . value () . orgnode_new () . title () == title {
+        if child . value () . orgnode () . title () == title {
           write_at_node_in_tree (
             tree, child . id (),
             |np| {
-              np . orgnode_new_mut () . focused = true; } ) ?;
+              np . orgnode_mut () . focused = true; } ) ?;
           break; }} }
     else { // Move focus to aliasCol itself.
       write_at_node_in_tree (
         tree, aliascol_node_id,
         |np| {
-          np . orgnode_new_mut () . focused = true; } ) ?; }}
+          np . orgnode_mut () . focused = true; } ) ?; }}
 
   Ok (( )) }

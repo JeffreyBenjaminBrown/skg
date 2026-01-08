@@ -337,7 +337,7 @@ pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
     node2 : NodeRef < OrgNode >
   ) -> bool {
     // Convert new_orgnode back to OrgNode for comparison
-    let n1 : OrgNode = to_old_orgnode ( node1 . value () . orgnode_new () );
+    let n1 : OrgNode = to_old_orgnode ( node1 . value () . orgnode () );
     let n2 : & OrgNode = node2 . value ();
     // Compare the OrgNode values
     if &n1 != n2 { return false; }
@@ -474,8 +474,8 @@ pub fn orgnode_forest_to_paired (
       let mut parent_mut =
         forest . get_mut ( parent_treeid ) . unwrap ();
       parent_mut
-        . append ( NodePair { mskgnode    : None,
-                              new_orgnode } )
+        . append ( NodePair { mskgnode : None,
+                              orgnode  : new_orgnode } )
         . id () };
     let child_treeids : Vec < NodeId > =
       orgnode_tree . get ( orgnode_treeid ) . unwrap ()
