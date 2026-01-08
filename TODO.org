@@ -2,12 +2,19 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
-** ? restructure types, divide Interp
-*** [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
+** DONE restructure types, divide Interp
+*** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
+    NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)
+    from Scaffold (ForestRoot, AliasCol, Alias, SubscribeeCol, etc.).
+    Parsing pipeline produces Tree<NewOrgNode> directly.
 *** ? two kinds of TrueNode
     one that might not have an ID, one that must
 *** AWAITS refactor : Is the term 'Interp' gone?
     If so, rename kind -> interp.
+*** NOTE: Body validation on Scaffolds
+    Body_of_AliasCol and Body_of_Alias errors are no longer detectable
+    post-parsing because Scaffold nodes don't store body data.
+    These validations should happen during parsing if needed.
 ** ONGOING Completion is complex.
 *** break up completeDefinitiveOrgnode
     it's super-long
