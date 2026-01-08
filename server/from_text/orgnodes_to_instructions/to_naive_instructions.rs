@@ -1,22 +1,22 @@
 use crate::types::orgnode::{Interp, EditRequest};
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  collect_grandchild_aliases_for_neworgnode, unique_neworgnode_child_with_interp };
+  collect_grandchild_aliases_for_orgnode, unique_orgnode_child_with_interp };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-/// Converts a forest of NewOrgNodes to SaveInstructions,
+/// Converts a forest of OrgNodes to SaveInstructions,
 /// taking them all at face value.
 ///
 /// PITFALL: Leaves important work undone,
 /// which its caller 'orgnodes_to_reconciled_save_instructions'
 /// does after calling it.
 pub fn naive_saveinstructions_from_forest (
-  mut forest: Tree<NewOrgNode> // "forest" = tree with ForestRoot
+  mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
@@ -31,7 +31,7 @@ pub fn naive_saveinstructions_from_forest (
 /// - aliases     are handled by 'collect_aliases'
 /// - subscribees are handled by 'collect_subscribees'
 fn naive_saveinstructions_from_tree(
-  tree: &mut Tree<NewOrgNode>,
+  tree: &mut Tree<OrgNode>,
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
@@ -59,7 +59,7 @@ fn naive_saveinstructions_from_tree(
                       Interp::HiddenFromSubscribees ) {
     return Ok(()); } // Skip - these don't generate SaveInstructions
   let aliases =
-    collect_grandchild_aliases_for_neworgnode(tree, node_id)?;
+    collect_grandchild_aliases_for_orgnode(tree, node_id)?;
   let subscribees =
     collect_subscribees(tree, node_id)?;
   let skg_node_opt = if !is_indefinitive {
@@ -89,8 +89,8 @@ fn naive_saveinstructions_from_tree(
   Ok (( )) }
 
 fn skgnode_for_orgnode_in_tree<'a> (
-  orgnode: &NewOrgNode,
-  noderef: &NodeRef<'a, NewOrgNode>, // the same node, but in the tree
+  orgnode: &OrgNode,
+  noderef: &NodeRef<'a, OrgNode>, // the same node, but in the tree
   aliases: Option<Vec<String>>,
   subscribees: Option<Vec<ID>>,
 ) -> Result<SkgNode, String> {
@@ -127,18 +127,18 @@ fn skgnode_for_orgnode_in_tree<'a> (
 ///   Empty means the user wants no subscribees.
 ///   Deduplicates the output, preserving order of first occurrence.
 fn collect_subscribees (
-  tree: &Tree<NewOrgNode>,
+  tree: &Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =
-    unique_neworgnode_child_with_interp (
+    unique_orgnode_child_with_interp (
       tree, node_id, Interp::SubscribeeCol )
     . map_err ( |e| e.to_string() ) ?;
   match subscribee_col_id {
     None => Ok(None),
     Some(col_id) => {
       let subscribees : Vec<ID> = {
-        let col_ref : NodeRef<NewOrgNode> = tree.get(col_id).expect(
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
           "collect_subscribees: SubscribeeCol not found");
         let mut subscribees : Vec<ID> = Vec::new();
         for subscribee_child in col_ref.children() {
@@ -165,7 +165,7 @@ fn collect_subscribees (
 /// Not a recursive traversal;
 ///   it is only concerned with this node's contents.
 fn collect_contents_that_are_not_to_delete<'a> (
-  node_ref: &NodeRef<'a, NewOrgNode>
+  node_ref: &NodeRef<'a, OrgNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();

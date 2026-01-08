@@ -5,9 +5,9 @@ use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::Interp;
 use crate::types::orgnode_new::{
-    NewOrgNode, ScaffoldKind,
-    effect_on_parent_from_interp, neworgnode_indefinitive_from_disk,
-    neworgnode_scaffold_from_interp };
+    OrgNode, ScaffoldKind,
+    effect_on_parent_from_interp, orgnode_indefinitive_from_disk,
+    orgnode_scaffold_from_interp };
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -102,7 +102,7 @@ pub fn insert_sourceless_node (
   title     : &str,
   prepend   : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode = neworgnode_scaffold_from_interp ( interp, title )
+  let orgnode = orgnode_scaffold_from_interp ( interp, title )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
@@ -122,7 +122,7 @@ pub async fn append_indefinitive_node (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( skgnode, content_orgnode ) : ( SkgNode, NewOrgNode ) =
+  let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id ) . await ?;
   let effect = effect_on_parent_from_interp ( &interp )
@@ -134,7 +134,7 @@ pub async fn append_indefinitive_node (
   let source = content_orgnode . source ()
     . ok_or ( "append_indefinitive_node: node has no source" ) ?
     . clone ();
-  let orgnode = neworgnode_indefinitive_from_disk (
+  let orgnode = orgnode_indefinitive_from_disk (
     id, source, content_orgnode . title () . to_string (), effect );
   with_node_mut (
     tree, parent_id,
@@ -189,18 +189,18 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
   Ok ( dedup_vector ( aliases ) ) }
 
 
-/// Find the unique child of a node with a given ScaffoldKind (for Tree<NewOrgNode>).
+/// Find the unique child of a node with a given ScaffoldKind (for Tree<OrgNode>).
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_neworgnode_child_with_interp (
-  tree    : &Tree<NewOrgNode>,
+pub fn unique_orgnode_child_with_interp (
+  tree    : &Tree<OrgNode>,
   node_id : NodeId,
   interp  : Interp,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : ego_tree::NodeRef<NewOrgNode> =
+  let node_ref : ego_tree::NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
-      "unique_neworgnode_child_with_interp: node not found")?;
+      "unique_orgnode_child_with_interp: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
     .filter(|c| c.value().matches_interp ( &interp ))
     .map(|c| c.id())
@@ -213,26 +213,26 @@ pub fn unique_neworgnode_child_with_interp (
   }
 }
 
-/// Collect aliases for a node (for Tree<NewOrgNode>):
+/// Collect aliases for a node (for Tree<OrgNode>):
 /// - find the unique AliasCol child (error if multiple)
 /// - for each Alias child of the AliasCol, collect its title
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None ("no opinion") if no AliasCol found.
 /// Returns Some(vec) if AliasCol found, even if empty.
-pub fn collect_grandchild_aliases_for_neworgnode (
-  tree: &Tree<NewOrgNode>,
+pub fn collect_grandchild_aliases_for_orgnode (
+  tree: &Tree<OrgNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
-    unique_neworgnode_child_with_interp (
+    unique_orgnode_child_with_interp (
       tree, node_id, Interp::AliasCol )
     . map_err ( |e| e.to_string() ) ?;
   match alias_col_id {
     None => Ok(None),
     Some(col_id) => {
       let aliases : Vec<String> = {
-        let col_ref : NodeRef<NewOrgNode> = tree.get(col_id).expect(
-          "collect_grandchild_aliases_for_neworgnode: AliasCol not found");
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
+          "collect_grandchild_aliases_for_orgnode: AliasCol not found");
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in col_ref.children() {
           { // check for invalid state

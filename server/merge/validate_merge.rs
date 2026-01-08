@@ -9,7 +9,7 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::{NewOrgNode, ScaffoldKind};
+use crate::types::orgnode_new::{OrgNode, ScaffoldKind};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -18,7 +18,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 struct MergeValidationData<'a> {
-  acquirer_orgnodes     : Vec<&'a NewOrgNode>,
+  acquirer_orgnodes     : Vec<&'a OrgNode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
   to_delete_ids         : HashSet<ID>, }
@@ -27,7 +27,7 @@ struct MergeValidationData<'a> {
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_merge_requests(
-  forest: &Tree<NewOrgNode>,
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
@@ -64,9 +64,9 @@ pub async fn validate_merge_requests(
   Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
-  forest: &'a Tree<NewOrgNode>,
+  forest: &'a Tree<OrgNode>,
 ) -> MergeValidationData<'a> {
-  let mut acquirer_orgnodes: Vec<&NewOrgNode> =
+  let mut acquirer_orgnodes: Vec<&OrgNode> =
     Vec::new();
   let mut acquirer_to_acquirees: HashMap<ID, HashSet<ID>> =
     HashMap::new();
@@ -76,7 +76,7 @@ fn collect_merge_validation_data<'a>(
     HashSet::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-        let orgnode: &NewOrgNode = node_ref.value();
+        let orgnode: &OrgNode = node_ref.value();
         if matches!(orgnode.edit_request(),
                     Some(EditRequest::Delete)) {
           if let Some(id) = orgnode.id() {

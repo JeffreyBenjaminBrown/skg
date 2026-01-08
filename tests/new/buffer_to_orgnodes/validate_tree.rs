@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use ego_tree::Tree;
-use skg::types::orgnode_new::{NewOrgNode, forest_root_new_orgnode};
+use skg::types::orgnode_new::{OrgNode, forest_root_new_orgnode};
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
@@ -33,13 +33,13 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(
           input_with_errors).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
-  // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with NewOrgNode
+  // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
   // because Scaffold nodes don't store body data. These validations should happen during parsing.
   // Remaining errors: Child_of_AliasCol_with_ID(1), Child_of_Alias(1), Alias_with_no_AliasCol_Parent(3),
   //                   AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1), RootWithoutSource(1) = 8
@@ -123,7 +123,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(valid_input).unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver).await?;
 
@@ -141,7 +141,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (forest with just ForestRoot, no tree roots)
-      let empty_forest: Tree<NewOrgNode> = Tree::new(forest_root_new_orgnode());
+      let empty_forest: Tree<OrgNode> = Tree::new(forest_root_new_orgnode());
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no errors in empty input");
@@ -168,7 +168,7 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
                 ** Normal child
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -204,7 +204,7 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
                 ** (skg (id 1)) 1
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -240,7 +240,7 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
                 ** (skg (id 2)) 2
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -271,7 +271,7 @@ fn test_root_without_source_validation(
                 * (skg (id root2)) Root without source (invalid)
             "};
 
-      let forest: Tree<NewOrgNode> =
+      let forest: Tree<OrgNode> =
         org_to_uninterpreted_nodes(input).unwrap();
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -308,7 +308,7 @@ fn test_nonexistent_source_validation(
                   ** (skg (id child1) (source nonexistent)) Child with invalid source
                   * (skg (id root2) (source invalid_source)) Root with nonexistent source
               "};
-        let forest: Tree<NewOrgNode> =
+        let forest: Tree<OrgNode> =
           org_to_uninterpreted_nodes(input).unwrap();
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&forest, config, driver).await?;

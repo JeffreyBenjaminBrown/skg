@@ -5,7 +5,7 @@ pub mod none_node_fields_are_noops;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::SkgConfig;
 use crate::types::save::SaveInstruction;
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 
 use to_naive_instructions::naive_saveinstructions_from_forest;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
@@ -14,12 +14,12 @@ use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
-/// Converts a forest of NewOrgNodes to SaveInstructions,
+/// Converts a forest of OrgNodes to SaveInstructions,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// (which filters out indefinitive instructions),
 /// and clobbering None fields with data from disk.
 pub async fn orgnodes_to_reconciled_save_instructions (
-  forest  : &Tree<NewOrgNode>, // "forest" = tree with ForestRoot
+  forest  : &Tree<OrgNode>, // "forest" = tree with ForestRoot
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {

@@ -5,7 +5,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode_new::{
-    neworgnode_content_from_disk, NewOrgNode, forest_root_new_orgnode };
+    orgnode_content_from_disk, OrgNode, forest_root_new_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
@@ -51,13 +51,13 @@ fn new_forest () -> PairTree {
 // ======================================================
 
 /// Fetch a SkgNode from disk (queries TypeDB for source).
-/// Make a NewOrgNode from it, with validated title.
+/// Make a OrgNode from it, with validated title.
 /// Return both.
 pub async fn skgnode_and_orgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid : &ID,
-) -> Result < ( SkgNode, NewOrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, skgid).await?
@@ -67,13 +67,13 @@ pub async fn skgnode_and_orgnode_from_id (
     config, &pid_resolved, &source ) }
 
 /// Fetch a SkgNode from disk given PID and source.
-/// Make a NewOrgNode from it, with validated title.
+/// Make a OrgNode from it, with validated title.
 /// Return both.
 pub(super) fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &str,
-) -> Result < ( SkgNode, NewOrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let skgnode : SkgNode =
     skgnode_from_pid_and_source( config, pid.clone(), source )?;
   let title : String = skgnode . title . replace ( '\n', " " );
@@ -82,7 +82,7 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
       io::ErrorKind::InvalidData,
       format! ( "SkgNode with ID {} has an empty title",
                  pid ), )) ); }
-  let orgnode : NewOrgNode = neworgnode_content_from_disk (
+  let orgnode : OrgNode = orgnode_content_from_disk (
     pid . clone (),
     source . to_string (),
     title,
@@ -243,7 +243,7 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (child_skgnode, child_orgnode) : (SkgNode, NewOrgNode) =
+  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid ) . await ?;
   let child_treeid : NodeId =
@@ -269,7 +269,7 @@ pub async fn build_node_branch_minus_content (
   driver          : &TypeDBDriver,
   visited         : &mut VisitedMap,
 ) -> Result < (Option<PairTree>, NodeId), Box<dyn Error> > {
-  let (skgnode, orgnode) : (SkgNode, NewOrgNode) =
+  let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
   match tree_and_parent {

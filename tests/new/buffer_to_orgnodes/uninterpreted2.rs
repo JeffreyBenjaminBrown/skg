@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
 use skg::types::orgnode::Interp;
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::OrgNode;
 use ego_tree::Tree;
 
 #[test]
@@ -25,7 +25,7 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   let forest_roots: Vec<_> = forest.root().children().collect();
@@ -77,7 +77,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   // Get tree roots (children of ForestRoot)
@@ -116,7 +116,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   let tree_roots: Vec<_> = forest.root().children().collect();
@@ -154,7 +154,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   let tree_roots: Vec<_> = forest.root().children().collect();
 
@@ -182,7 +182,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
 
   // Get tree roots (children of ForestRoot)
@@ -207,13 +207,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   // ForestRoot should have no children
   assert_eq!(forest.root().children().count(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Tree<NewOrgNode> =
+  let trees2: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input2).unwrap();
   assert_eq!(trees2.root().children().count(), 0);
 }
@@ -227,7 +227,7 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let forest: Tree<NewOrgNode> =
+  let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap();
   assert_eq!(forest.root().children().count(), 0,
              "Should have no tree roots when there are no headlines");

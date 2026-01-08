@@ -1,5 +1,5 @@
 use super::misc::{ID, SourceNickname};
-use super::orgnode_new::NewOrgNode;
+use super::orgnode_new::OrgNode;
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
@@ -22,23 +22,23 @@ pub enum SaveError {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum BufferValidationError {
-  Body_of_AliasCol               (NewOrgNode),
-  Child_of_AliasCol_with_ID      (NewOrgNode),
-  Body_of_Alias                  (NewOrgNode),
-  Child_of_Alias                 (NewOrgNode),
-  Alias_with_no_AliasCol_Parent  (NewOrgNode),
-  Multiple_AliasCols_in_Children (NewOrgNode),
+  Body_of_AliasCol               (OrgNode),
+  Child_of_AliasCol_with_ID      (OrgNode),
+  Body_of_Alias                  (OrgNode),
+  Child_of_Alias                 (OrgNode),
+  Alias_with_no_AliasCol_Parent  (OrgNode),
+  Multiple_AliasCols_in_Children (OrgNode),
   Multiple_Defining_Orgnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceNickname>), // Multiple orgnodes with same ID have different sources
-  RootWithoutSource              (NewOrgNode), // Root node (top-level in forest) has no source
+  RootWithoutSource              (OrgNode), // Root node (top-level in forest) has no source
   ModifiedForeignNode            (ID, SourceNickname), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
   DiskSourceBufferSourceConflict (ID,
                                   SourceNickname, // disk source
                                   SourceNickname), // buffer source
   SourceNotInConfig              (ID, SourceNickname),
-  IndefinitiveWithEditRequest    (NewOrgNode), // Indefinitive node has an edit request (not allowed)
+  IndefinitiveWithEditRequest    (OrgNode), // Indefinitive node has an edit request (not allowed)
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID

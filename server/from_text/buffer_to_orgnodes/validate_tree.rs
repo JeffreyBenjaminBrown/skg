@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{NewOrgNode, EffectOnParent, ScaffoldKind};
+use crate::types::orgnode_new::{OrgNode, EffectOnParent, ScaffoldKind};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
@@ -19,7 +19,7 @@ use typedb_driver::TypeDBDriver;
 ///   might refer to the same skg node, yet appear not to.
 /// - Where missing, source has been inherited from an ancestor.
 pub async fn find_buffer_errors_for_saving (
-  forest: &Tree<NewOrgNode>,
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -63,11 +63,11 @@ pub async fn find_buffer_errors_for_saving (
 /// have sources. After source inheritance,
 /// only tree roots can be without sources.
 fn validate_roots_have_sources(
-  forest: &Tree<NewOrgNode>,
+  forest: &Tree<OrgNode>,
   errors: &mut Vec<BufferValidationError>
 ) {
   for tree_root in forest.root().children() {
-    let root: &NewOrgNode = tree_root.value();
+    let root: &OrgNode = tree_root.value();
     if root.source().is_none() {
       errors.push(
         BufferValidationError::RootWithoutSource(
@@ -75,14 +75,14 @@ fn validate_roots_have_sources(
 
 /// Recursively validate a node and its children for saving errors
 fn validate_node_and_children (
-  node_ref: ego_tree::NodeRef<NewOrgNode>,
+  node_ref: ego_tree::NodeRef<OrgNode>,
   parent_is_aliascol : bool,
   parent_is_alias    : bool,
   config: &SkgConfig,
   errors: &mut Vec<BufferValidationError>
 ) {
 
-  let orgnode: &NewOrgNode = node_ref.value();
+  let orgnode: &OrgNode = node_ref.value();
   let is_aliascol = orgnode . is_scaffold ( &ScaffoldKind::AliasCol );
   let is_alias = orgnode . is_scaffold ( &ScaffoldKind::Alias ( String::new() ) );
 
@@ -130,7 +130,7 @@ fn validate_node_and_children (
       let mut seen_content_ids : HashSet < ID > =
         HashSet::new ();
       for child in node_ref . children () {
-        let child_orgnode : &NewOrgNode =
+        let child_orgnode : &OrgNode =
           child . value ();
         if child_orgnode . has_effect ( EffectOnParent::Content ) {
           if let Some ( child_skgid )
@@ -170,14 +170,14 @@ fn validate_node_and_children (
 /// - Must be on a childless orgnode
 /// - At most one request of this kind per ID
 fn validate_definitive_view_requests (
-  forest : &Tree<NewOrgNode>, // "forest" = tree with ForestRoot
+  forest : &Tree<OrgNode>, // "forest" = tree with ForestRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
   for edge in forest.root().traverse() {
     if let Edge::Open(node_ref) = edge {
-        let orgnode : &NewOrgNode =
+        let orgnode : &OrgNode =
           node_ref.value();
         if let Some(view_reqs) = orgnode.view_requests() {
           if view_reqs.contains( &ViewRequest::Definitive ) {

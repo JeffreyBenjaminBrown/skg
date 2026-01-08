@@ -16,7 +16,7 @@ use crate::dbs::typedb::search::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{Interp, ViewRequest};
 use crate::types::orgnode_new::{
-    NewOrgNode, effect_on_parent_from_interp, neworgnode_indefinitive_from_disk };
+    OrgNode, effect_on_parent_from_interp, orgnode_indefinitive_from_disk };
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -209,7 +209,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
-  let ( _, content_orgnode ) : ( _, NewOrgNode ) =
+  let ( _, content_orgnode ) : ( _, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid
     ). await ?;
@@ -221,7 +221,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   let source = content_orgnode . source ()
     . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no source" ) ?
     . clone ();
-  let orgnode = neworgnode_indefinitive_from_disk (
+  let orgnode = orgnode_indefinitive_from_disk (
     id, source, content_orgnode . title () . to_string (), effect );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()

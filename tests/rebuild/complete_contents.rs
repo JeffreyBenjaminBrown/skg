@@ -11,7 +11,7 @@ use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
 use skg::to_org::complete::contents::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::OrgNode;
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
@@ -69,7 +69,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     " };
 
   { // Test running on root with empty visited
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -96,7 +96,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       "Visited should be empty, because we only ran it on the indefinitive root" ); }
 
   { // Test running on root with 'a' in visited
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -129,7 +129,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
   }
 
   { // Test running on second node (c)
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -185,7 +185,7 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with empty visited
     {
-      let orgnode_forest : Tree < NewOrgNode > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
@@ -212,7 +212,7 @@ async fn test_visited_and_indefinitive_logic (
 
     // Test with 'a' in visited - should mark as repeated
     {
-      let orgnode_forest : Tree < NewOrgNode > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text ) ?;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
@@ -251,7 +251,7 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from root
     {
-      let orgnode_forest : Tree < NewOrgNode > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
@@ -279,7 +279,7 @@ async fn test_visited_and_indefinitive_logic (
 
     // Running from second node
     {
-      let orgnode_forest : Tree < NewOrgNode > =
+      let orgnode_forest : Tree < OrgNode > =
         org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
@@ -339,7 +339,7 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with 'a' in visited
   {
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -374,7 +374,7 @@ async fn test_visited_and_not_indefinitive_logic (
 
   // Test with empty visited
   {
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_org_text ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -412,7 +412,7 @@ async fn test_visited_and_not_indefinitive_logic (
         ** (skg (id d) (code (interp parentIgnores))) d
       " };
 
-    let orgnode_forest : Tree < NewOrgNode > =
+    let orgnode_forest : Tree < OrgNode > =
       org_to_uninterpreted_nodes ( input_with_existing_content ) ?;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
@@ -463,7 +463,7 @@ async fn test_false_content_logic (
       ** (skg (id d)) d
     " };
 
-  let orgnode_forest : Tree < NewOrgNode > =
+  let orgnode_forest : Tree < OrgNode > =
     org_to_uninterpreted_nodes ( input_org_text ) ?;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );

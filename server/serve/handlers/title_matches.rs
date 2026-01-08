@@ -2,7 +2,7 @@ use crate::serve::util::send_response;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::dbs::tantivy::search_index;
 use crate::types::orgnode_new::{
-  NewOrgNode, OrgNodeKind, TrueNode, EffectOnParent,
+  OrgNode, OrgNodeKind, TrueNode, EffectOnParent,
 };
 use crate::types::misc::TantivyIndex;
 use crate::org_to_text::new_orgnode_to_text;
@@ -115,7 +115,7 @@ fn format_matches_as_org_mode (
   result.push_str (
     & new_orgnode_to_text (
       1,
-      & NewOrgNode {
+      & OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::True ( TrueNode {
@@ -153,7 +153,7 @@ fn format_matches_as_org_mode (
     result.push_str (
       & new_orgnode_to_text (
         2,
-        & NewOrgNode {
+        & OrgNode {
           focused : false,
           folded  : false,
           kind    : OrgNodeKind::True ( TrueNode {
@@ -168,7 +168,7 @@ fn format_matches_as_org_mode (
       result.push_str (
         & new_orgnode_to_text (
           3,
-          & NewOrgNode {
+          & OrgNode {
             focused : false,
             folded  : false,
             kind    : OrgNodeKind::True ( TrueNode {

@@ -2,14 +2,14 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// PURPOSE: For each NewOrgNode with a merge instruction,
+/// PURPOSE: For each OrgNode with a merge instruction,
 /// this creates a MergeInstructionTriple:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
@@ -18,7 +18,7 @@ use typedb_driver::TypeDBDriver;
 /// TODO ? This is slightly inefficient. It would be faster to collect a list
 /// of orgnodes with merge instructions during one of the other walks of the forest.
 pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
-  forest: &Tree<NewOrgNode>,
+  forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,
@@ -30,7 +30,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
       triples.extend(
         { let node_triples : Vec<MergeInstructionTriple> =
             saveinstructions_from_the_merge_in_an_orgnode(
-              { let orgnode: &NewOrgNode = node_ref.value();
+              { let orgnode: &OrgNode = node_ref.value();
                 orgnode },
               config, driver ). await?;
           node_triples } ); } }
@@ -44,7 +44,7 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
 async fn saveinstructions_from_the_merge_in_an_orgnode(
-  node: &NewOrgNode,
+  node: &OrgNode,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<MergeInstructionTriple>,

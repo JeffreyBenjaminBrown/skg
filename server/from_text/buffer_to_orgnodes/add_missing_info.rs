@@ -3,10 +3,10 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::orgnode_new::{NewOrgNode, EffectOnParent, ScaffoldKind};
+use crate::types::orgnode_new::{OrgNode, EffectOnParent, ScaffoldKind};
 use crate::types::misc::ID;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
-use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_neworgnode_tree, assign_pids_throughout_neworgnode_tree_from_map};
+use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_orgnode_tree, assign_pids_throughout_orgnode_tree_from_map};
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::boxed::Box;
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ use uuid::Uuid;
 ///
 /// Input forest has ForestRoot at root; tree roots are its children.
 pub async fn add_missing_info_to_forest(
-  forest: &mut Tree<NewOrgNode>,
+  forest: &mut Tree<OrgNode>,
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
@@ -41,7 +41,7 @@ pub async fn add_missing_info_to_forest(
 
 /// Collect IDs from forest, look up PIDs in TypeDB, assign them.
 async fn assign_pids_throughout_forest (
-  forest        : &mut Tree<NewOrgNode>,
+  forest        : &mut Tree<OrgNode>,
   tree_root_ids : &[NodeId],
   db_name       : &str,
   driver        : &TypeDBDriver,
@@ -49,7 +49,7 @@ async fn assign_pids_throughout_forest (
   let mut ids_to_lookup: Vec<ID> = Vec::new();
   for tree_root_id in tree_root_ids {
     if let Some(tree_root_ref) = forest.get(*tree_root_id) {
-      collect_ids_in_neworgnode_tree(tree_root_ref,
+      collect_ids_in_orgnode_tree(tree_root_ref,
                                       &mut ids_to_lookup); }}
   let pid_map: HashMap<ID, Option<ID>> =
     pids_from_ids( db_name, driver, &ids_to_lookup
@@ -57,7 +57,7 @@ async fn assign_pids_throughout_forest (
   for tree_root_id in tree_root_ids {
     if let Some(tree_root_mut) =
       forest.get_mut(*tree_root_id) {
-        assign_pids_throughout_neworgnode_tree_from_map(
+        assign_pids_throughout_orgnode_tree_from_map(
           tree_root_mut, &pid_map); }}
   Ok(( )) }
 
@@ -65,7 +65,7 @@ async fn assign_pids_throughout_forest (
 /// - assign source if knowable
 /// - assign new ID,       if missing and appropriate
 fn add_missing_info_dfs (
-  mut node_ref: NodeMut < NewOrgNode >,
+  mut node_ref: NodeMut < OrgNode >,
 ) {
   let (parent_is_aliascol, parent_source)
     : (bool, Option<String>) = {
@@ -106,7 +106,7 @@ fn add_missing_info_dfs (
 /// Assign treatment=Alias (convert to Alias scaffold)
 /// to nodes whose parent has treatment=AliasCol
 fn assign_alias_relation_if_needed(
-  node: &mut NewOrgNode,
+  node: &mut OrgNode,
   parent_is_aliascol: bool
 ) {
   if parent_is_aliascol {
@@ -114,7 +114,7 @@ fn assign_alias_relation_if_needed(
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_new_id_if_needed(
-  node: &mut NewOrgNode
+  node: &mut OrgNode
 ) {
   if node . has_effect ( EffectOnParent::Content )
      && node . id () . is_none () {
@@ -125,7 +125,7 @@ fn assign_new_id_if_needed(
 /// (The caller is responsible for recognizing, if it's true,
 /// that the parent should have no associated source.)
 fn inherit_source_if_needed(
-  node: &mut NewOrgNode,
+  node: &mut OrgNode,
   parent_source: Option<String>
 ) {
   if ! node . has_source () {

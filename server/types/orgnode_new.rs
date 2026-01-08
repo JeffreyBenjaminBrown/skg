@@ -1,7 +1,7 @@
-/// New OrgNode type hierarchy that separates TrueNode from Scaffold.
+/// OrgNode type hierarchy that separates TrueNode from Scaffold.
 /// See thoughts/type-refactor/spec-questions.org for the design.
 ///
-/// NewOrgNode
+/// OrgNode
 ///   focused : bool
 ///   folded : bool
 ///   kind : OrgNodeKind
@@ -116,18 +116,18 @@ pub enum OrgNodeKind {
 }
 
 //
-// NewOrgNode - the top-level wrapper
+// OrgNode - the top-level wrapper
 //
 
-/// The new OrgNode type. Wraps focused/folded state and the kind.
+/// The OrgNode type. Wraps focused/folded state and the kind.
 #[derive( Debug, Clone, PartialEq )]
-pub struct NewOrgNode {
+pub struct OrgNode {
     pub focused : bool,
     pub folded  : bool,
     pub kind    : OrgNodeKind,
 }
 
-impl NewOrgNode {
+impl OrgNode {
     /// Returns the ID if this is a TrueNode with an ID, None otherwise.
     pub fn id ( &self ) -> Option < &ID > {
         match &self . kind {
@@ -185,7 +185,7 @@ impl NewOrgNode {
             OrgNodeKind::Scaff ( _ ) => false,
         } }
 
-    /// Returns the Interp that this NewOrgNode corresponds to.
+    /// Returns the Interp that this OrgNode corresponds to.
     /// Used during transition to bridge old and new type systems.
     pub fn interp ( &self ) -> Interp {
         match &self . kind {
@@ -205,7 +205,7 @@ impl NewOrgNode {
             },
         } }
 
-    /// Returns true if this NewOrgNode corresponds to the given old Interp.
+    /// Returns true if this OrgNode corresponds to the given old Interp.
     /// Used during transition to bridge old and new type systems.
     pub fn matches_interp ( &self, interp : &Interp ) -> bool {
         match ( &self . kind, interp ) {
@@ -411,9 +411,9 @@ impl Default for TrueNode {
             view_requests    : HashSet::new (),
         } } }
 
-impl Default for NewOrgNode {
+impl Default for OrgNode {
     fn default () -> Self {
-        NewOrgNode {
+        OrgNode {
             focused : false,
             folded  : false,
             kind    : OrgNodeKind::True ( TrueNode::default () ),
@@ -424,12 +424,12 @@ impl Default for NewOrgNode {
 //
 
 use crate::types::orgnode::{
-    default_metadata, Interp, OrgNode, OrgnodeCode, OrgnodeMetadata,
+    default_metadata, Interp, LegacyOrgNode, OrgnodeCode, OrgnodeMetadata,
 };
 
-/// Convert an old OrgNode to a NewOrgNode.
-/// This should be lossless for valid OrgNodes.
-pub fn from_old_orgnode ( old : &OrgNode ) -> NewOrgNode {
+/// Convert an old LegacyOrgNode to a OrgNode.
+/// This should be lossless for valid LegacyOrgNodes.
+pub fn from_old_orgnode ( old : &LegacyOrgNode ) -> OrgNode {
     let focused = old . metadata . viewData . focused;
     let folded  = old . metadata . viewData . folded;
 
@@ -501,16 +501,16 @@ pub fn from_old_orgnode ( old : &OrgNode ) -> NewOrgNode {
         }),
     };
 
-    NewOrgNode { focused, folded, kind } }
+    OrgNode { focused, folded, kind } }
 
-/// Create a NewOrgNode directly from parsed components.
+/// Create a OrgNode directly from parsed components.
 /// This is the direct constructor for parsing, avoiding the intermediate OrgNode.
 /// Takes the same inputs as parsing produces: metadata, title, and optional body.
 pub fn from_parsed (
     metadata : &OrgnodeMetadata,
     title    : String,
     body     : Option < String >,
-) -> NewOrgNode {
+) -> OrgNode {
     let focused = metadata . viewData . focused;
     let folded  = metadata . viewData . folded;
 
@@ -582,17 +582,17 @@ pub fn from_parsed (
         }),
     };
 
-    NewOrgNode { focused, folded, kind } }
+    OrgNode { focused, folded, kind } }
 
-/// Create a Content NewOrgNode directly from disk data.
+/// Create a Content OrgNode directly from disk data.
 /// This is used when loading nodes from disk, bypassing the old OrgNode type.
-pub fn neworgnode_content_from_disk (
+pub fn orgnode_content_from_disk (
     id     : ID,
     source : String,
     title  : String,
     body   : Option < String >,
-) -> NewOrgNode {
-    NewOrgNode {
+) -> OrgNode {
+    OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::True ( TrueNode {
@@ -619,14 +619,14 @@ pub fn effect_on_parent_from_interp ( interp : &Interp ) -> Option < EffectOnPar
         _ => None, // Scaffold interps
     } }
 
-/// Create a Scaffold NewOrgNode from an Interp and optional title.
+/// Create a Scaffold OrgNode from an Interp and optional title.
 /// For Alias, the title is required and becomes the alias text.
 /// For other scaffolds, title is ignored.
 /// Returns Err if the interp is not a scaffold type.
-pub fn neworgnode_scaffold_from_interp (
+pub fn orgnode_scaffold_from_interp (
     interp : Interp,
     title  : &str,
-) -> Result < NewOrgNode, String > {
+) -> Result < OrgNode, String > {
     let kind = match interp {
         Interp::AliasCol                     => ScaffoldKind::AliasCol,
         Interp::Alias                        => ScaffoldKind::Alias ( title . to_string () ),
@@ -636,22 +636,22 @@ pub fn neworgnode_scaffold_from_interp (
         Interp::ForestRoot                   => ScaffoldKind::ForestRoot,
         _ => return Err ( format! ( "Interp {:?} is not a scaffold type", interp ) ),
     };
-    Ok ( NewOrgNode {
+    Ok ( OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::Scaff ( Scaffold { kind } ),
     }) }
 
-/// Create an indefinitive NewOrgNode from disk data with a specific effect.
+/// Create an indefinitive OrgNode from disk data with a specific effect.
 /// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).
 /// Body is always None since indefinitive nodes don't have editable content.
-pub fn neworgnode_indefinitive_from_disk (
+pub fn orgnode_indefinitive_from_disk (
     id               : ID,
     source           : String,
     title            : String,
     effect_on_parent : EffectOnParent,
-) -> NewOrgNode {
-    NewOrgNode {
+) -> OrgNode {
+    OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::True ( TrueNode {
@@ -667,9 +667,9 @@ pub fn neworgnode_indefinitive_from_disk (
         }),
     } }
 
-/// Create a NewOrgNode from disk data with full metadata control.
+/// Create a OrgNode from disk data with full metadata control.
 /// This is used when rebuilding a node from disk while preserving metadata.
-pub fn neworgnode_with_metadata (
+pub fn orgnode_with_metadata (
     id               : ID,
     source           : String,
     title            : String,
@@ -678,8 +678,8 @@ pub fn neworgnode_with_metadata (
     indefinitive     : bool,
     edit_request     : Option < EditRequest >,
     view_requests    : HashSet < ViewRequest >,
-) -> NewOrgNode {
-    NewOrgNode {
+) -> OrgNode {
+    OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::True ( TrueNode {
@@ -695,9 +695,9 @@ pub fn neworgnode_with_metadata (
         }),
     } }
 
-/// Convert a NewOrgNode back to an old OrgNode.
+/// Convert a OrgNode back to an old LegacyOrgNode.
 /// This should be lossless.
-pub fn to_old_orgnode ( new : &NewOrgNode ) -> OrgNode {
+pub fn to_old_orgnode ( new : &OrgNode ) -> LegacyOrgNode {
     match &new . kind {
         OrgNodeKind::Scaff ( scaffold ) => {
             let mut md = default_metadata ();
@@ -716,7 +716,7 @@ pub fn to_old_orgnode ( new : &NewOrgNode ) -> OrgNode {
                 ScaffoldKind::Alias ( s ) => s . clone (),
                 _ => String::new (), // Scaffolds other than Alias have empty title in old format
             };
-            OrgNode {
+            LegacyOrgNode {
                 metadata : md,
                 title,
                 body : None,
@@ -743,18 +743,18 @@ pub fn to_old_orgnode ( new : &NewOrgNode ) -> OrgNode {
                     viewRequests : true_node . view_requests . clone (),
                 },
             };
-            OrgNode {
+            LegacyOrgNode {
                 metadata : md,
                 title    : true_node . title . clone (),
                 body     : true_node . body . clone (),
             } } } }
 
 //
-// Helper to create a ForestRoot NewOrgNode
+// Helper to create a ForestRoot OrgNode
 //
 
-pub fn forest_root_new_orgnode () -> NewOrgNode {
-    NewOrgNode {
+pub fn forest_root_new_orgnode () -> OrgNode {
+    OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::Scaff ( Scaffold {
@@ -772,7 +772,7 @@ mod tests {
     use crate::types::misc::ID;
     use crate::types::orgnode::{
         default_metadata, forest_root_orgnode, EditRequest, Interp,
-        OrgNode, ViewRequest,
+        LegacyOrgNode, ViewRequest,
     };
 
     // Test ScaffoldKind::title() returns correct strings
@@ -803,7 +803,7 @@ mod tests {
     fn test_roundtrip_scaffold_alias_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::AliasCol;
-        let old = OrgNode { metadata: md, title: String::new (), body: None };
+        let old = LegacyOrgNode { metadata: md, title: String::new (), body: None };
         let new = from_old_orgnode ( &old );
         let back = to_old_orgnode ( &new );
         assert_eq! ( old, back );
@@ -813,7 +813,7 @@ mod tests {
     fn test_roundtrip_scaffold_alias () {
         let mut md = default_metadata ();
         md . code . interp = Interp::Alias;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "my alias" . to_string (),
             body     : None,
@@ -827,7 +827,7 @@ mod tests {
     fn test_roundtrip_scaffold_subscribee_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::SubscribeeCol;
-        let old = OrgNode { metadata: md, title: String::new (), body: None };
+        let old = LegacyOrgNode { metadata: md, title: String::new (), body: None };
         let new = from_old_orgnode ( &old );
         let back = to_old_orgnode ( &new );
         assert_eq! ( old, back );
@@ -837,7 +837,7 @@ mod tests {
     fn test_roundtrip_scaffold_hidden_outside () {
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenOutsideOfSubscribeeCol;
-        let old = OrgNode { metadata: md, title: String::new (), body: None };
+        let old = LegacyOrgNode { metadata: md, title: String::new (), body: None };
         let new = from_old_orgnode ( &old );
         let back = to_old_orgnode ( &new );
         assert_eq! ( old, back );
@@ -847,7 +847,7 @@ mod tests {
     fn test_roundtrip_scaffold_hidden_in () {
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenInSubscribeeCol;
-        let old = OrgNode { metadata: md, title: String::new (), body: None };
+        let old = LegacyOrgNode { metadata: md, title: String::new (), body: None };
         let new = from_old_orgnode ( &old );
         let back = to_old_orgnode ( &new );
         assert_eq! ( old, back );
@@ -863,7 +863,7 @@ mod tests {
         md . code . indefinitive = true;
         md . viewData . focused = true;
         md . viewData . folded = true;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Test Node" . to_string (),
             body     : Some ( "Body text" . to_string () ),
@@ -878,7 +878,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "sub123" ) );
         md . code . interp = Interp::Subscribee;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Subscribee" . to_string (),
             body     : None,
@@ -893,7 +893,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "pi123" ) );
         md . code . interp = Interp::ParentIgnores;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Parent Ignores" . to_string (),
             body     : None,
@@ -908,7 +908,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "hfs123" ) );
         md . code . interp = Interp::HiddenFromSubscribees;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Hidden From Subscribees" . to_string (),
             body     : None,
@@ -925,7 +925,7 @@ mod tests {
         md . id = Some ( ID::from ( "del123" ) );
         md . code . interp = Interp::Content;
         md . code . editRequest = Some ( EditRequest::Delete );
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "To Delete" . to_string (),
             body     : None,
@@ -943,7 +943,7 @@ mod tests {
         md . code . interp = Interp::Content;
         md . code . viewRequests . insert ( ViewRequest::Aliases );
         md . code . viewRequests . insert ( ViewRequest::Containerward );
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "With Views" . to_string (),
             body     : None,
@@ -959,7 +959,7 @@ mod tests {
         // Content
         let mut md = default_metadata ();
         md . code . interp = Interp::Content;
-        let new = from_old_orgnode ( &OrgNode {
+        let new = from_old_orgnode ( &LegacyOrgNode {
             metadata: md, title: String::new (), body: None });
         match new . kind {
             OrgNodeKind::True ( t ) =>
@@ -970,7 +970,7 @@ mod tests {
         // Subscribee
         let mut md = default_metadata ();
         md . code . interp = Interp::Subscribee;
-        let new = from_old_orgnode ( &OrgNode {
+        let new = from_old_orgnode ( &LegacyOrgNode {
             metadata: md, title: String::new (), body: None });
         match new . kind {
             OrgNodeKind::True ( t ) =>
@@ -981,7 +981,7 @@ mod tests {
         // ParentIgnores
         let mut md = default_metadata ();
         md . code . interp = Interp::ParentIgnores;
-        let new = from_old_orgnode ( &OrgNode {
+        let new = from_old_orgnode ( &LegacyOrgNode {
             metadata: md, title: String::new (), body: None });
         match new . kind {
             OrgNodeKind::True ( t ) =>
@@ -992,7 +992,7 @@ mod tests {
         // HiddenFromSubscribees
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenFromSubscribees;
-        let new = from_old_orgnode ( &OrgNode {
+        let new = from_old_orgnode ( &LegacyOrgNode {
             metadata: md, title: String::new (), body: None });
         match new . kind {
             OrgNodeKind::True ( t ) =>
@@ -1017,7 +1017,7 @@ mod tests {
         for ( interp, expected_kind ) in scaffolds {
             let mut md = default_metadata ();
             md . code . interp = interp;
-            let new = from_old_orgnode ( &OrgNode {
+            let new = from_old_orgnode ( &LegacyOrgNode {
                 metadata: md, title: String::new (), body: None });
             match new . kind {
                 OrgNodeKind::Scaff ( s ) => {
@@ -1036,7 +1036,7 @@ mod tests {
     fn test_alias_preserves_title () {
         let mut md = default_metadata ();
         md . code . interp = Interp::Alias;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "My Alias Title" . to_string (),
             body     : None,

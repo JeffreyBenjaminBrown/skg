@@ -1,14 +1,14 @@
 // cargo test --test render_util
 
 use skg::org_to_text::orgnode_to_text;
-use skg::types::orgnode::{OrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, default_metadata};
+use skg::types::orgnode::{LegacyOrgNode, OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, default_metadata};
 use skg::types::misc::ID;
 use std::collections::HashSet;
 
 #[test]
 fn test_orgnode_to_text_no_metadata () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata : default_metadata (),
       title : "Test Title".to_string (),
       body : None,
@@ -19,8 +19,8 @@ fn test_orgnode_to_text_no_metadata () {
 
 #[test]
 fn test_orgnode_to_text_with_body () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata : default_metadata (),
       title : "Test Title".to_string (),
       body : Some ( "Test body content".to_string () ),
@@ -31,8 +31,8 @@ fn test_orgnode_to_text_with_body () {
 
 #[test]
 fn test_orgnode_to_text_with_metadata () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata : { let mut md = default_metadata ();
                    md.code.interp = Interp::AliasCol;
                    md.viewData.folded = true;
@@ -45,8 +45,8 @@ fn test_orgnode_to_text_with_metadata () {
 
 #[test]
 fn test_orgnode_to_text_with_id_metadata () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata : { let mut md = default_metadata ();
                    md.id = Some ( ID::from ( "test123" ));
                    md.code.indefinitive = true;
@@ -59,8 +59,8 @@ fn test_orgnode_to_text_with_id_metadata () {
 
 #[test]
 fn test_metadata_ordering () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata :
         OrgnodeMetadata {
           id : Some ( ID::from ( "xyz" )),
@@ -86,8 +86,8 @@ fn test_metadata_ordering () {
 #[test]
 #[should_panic ( expected = "orgnode_to_text called with both empty metadata and empty title" )]
 fn test_orgnode_to_text_empty_metadata_and_title () {
-  let node : OrgNode =
-    OrgNode {
+  let node : LegacyOrgNode =
+    LegacyOrgNode {
       metadata : default_metadata (),
       title : "".to_string (),
       body : None,

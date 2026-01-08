@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
@@ -32,7 +32,7 @@ enum WhetherToDelete {
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  forest: &Tree<NewOrgNode>
+  forest: &Tree<OrgNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, HashSet<SourceNickname>)>) { // IDs with inconsistent sources
@@ -64,7 +64,7 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn traverse_forest_and_collect(
-  forest: &Tree<NewOrgNode> // "forest" = tree with ForestRoot
+  forest: &Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // contradictory deletes
       HashMap<ID, usize>, // multiple defining containers
       HashMap<ID, HashSet<SourceNickname>>) { // inconsistent sources
@@ -86,7 +86,7 @@ fn traverse_forest_and_collect(
 
 /// Traverse a single node and its children to collect delete instructions, defining containers, and sources
 fn traverse_node_recursively_and_collect(
-  node_ref: NodeRef<NewOrgNode>,
+  node_ref: NodeRef<OrgNode>,
   id_toDelete_instructions: &mut
     HashMap<ID, HashSet<WhetherToDelete>>,
   id_defining_count: &mut
@@ -94,7 +94,7 @@ fn traverse_node_recursively_and_collect(
   id_to_sources: &mut
     HashMap<ID, HashSet<SourceNickname>>
 ) {
-  let orgnode: &NewOrgNode = node_ref.value();
+  let orgnode: &OrgNode = node_ref.value();
   if let Some(id) = orgnode.id() {
     let delete_instruction: WhetherToDelete =
       if matches!(orgnode.edit_request(),

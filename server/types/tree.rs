@@ -8,7 +8,7 @@ pub mod orgnode_skgnode;
 pub mod generic;
 pub mod generations;
 
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::skgnode::SkgNode;
 use ego_tree::Tree;
 
@@ -25,25 +25,25 @@ pub type PairTree = Tree<NodePair>;
 #[derive(Clone, Debug)]
 pub struct NodePair {
   pub mskgnode: Option<SkgNode>,
-  pub orgnode: NewOrgNode,
+  pub orgnode: OrgNode,
 }
 
 impl NodePair {
   /// Get the OrgNode.
-  pub fn orgnode ( &self ) -> &NewOrgNode {
+  pub fn orgnode ( &self ) -> &OrgNode {
     &self . orgnode }
 
   /// Get a mutable reference to the OrgNode.
-  pub fn orgnode_mut ( &mut self ) -> &mut NewOrgNode {
+  pub fn orgnode_mut ( &mut self ) -> &mut OrgNode {
     &mut self . orgnode }
 
   // Backwards compatibility aliases during transition
   #[deprecated(note = "Use orgnode() instead")]
-  pub fn orgnode_new ( &self ) -> &NewOrgNode {
+  pub fn orgnode_new ( &self ) -> &OrgNode {
     self . orgnode () }
 
   #[deprecated(note = "Use orgnode_mut() instead")]
-  pub fn orgnode_new_mut ( &mut self ) -> &mut NewOrgNode {
+  pub fn orgnode_new_mut ( &mut self ) -> &mut OrgNode {
     self . orgnode_mut () }
 }
 
@@ -53,14 +53,14 @@ impl NodePair {
 
 impl NodePair {
   /// Create a new NodePair with no SkgNode.
-  pub fn from_orgnode ( orgnode : NewOrgNode ) -> Self {
+  pub fn from_orgnode ( orgnode : OrgNode ) -> Self {
     NodePair {
       mskgnode : None,
       orgnode,
     } }
 
   /// Create a new NodePair with an SkgNode.
-  pub fn from_pair ( orgnode : NewOrgNode, skgnode : SkgNode ) -> Self {
+  pub fn from_pair ( orgnode : OrgNode, skgnode : SkgNode ) -> Self {
     NodePair {
       mskgnode : Some ( skgnode ),
       orgnode,
@@ -79,7 +79,7 @@ mod tests {
   use super::*;
   use crate::types::misc::ID;
   use crate::types::orgnode_new::{
-    NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
+    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
   };
   use crate::types::skgnode::SkgNode;
 
@@ -91,7 +91,7 @@ mod tests {
       id     : Some ( ID::from ( "abc" ) ),
       ..TrueNode::default ()
     };
-    let new_orgnode = NewOrgNode {
+    let new_orgnode = OrgNode {
       focused : false,
       folded  : false,
       kind    : OrgNodeKind::True ( true_node ),
@@ -118,7 +118,7 @@ mod tests {
     let scaffold = Scaffold {
       kind : ScaffoldKind::ForestRoot,
     };
-    let new_orgnode = NewOrgNode {
+    let new_orgnode = OrgNode {
       focused : false,
       folded  : false,
       kind    : OrgNodeKind::Scaff ( scaffold ),
@@ -136,7 +136,7 @@ mod tests {
       id     : Some ( ID::from ( "xyz" ) ),
       ..TrueNode::default ()
     };
-    let new_orgnode = NewOrgNode {
+    let new_orgnode = OrgNode {
       focused : true,
       folded  : false,
       kind    : OrgNodeKind::True ( true_node ),
@@ -152,7 +152,7 @@ mod tests {
     let scaffold = Scaffold {
       kind : ScaffoldKind::SubscribeeCol,
     };
-    let new_orgnode = NewOrgNode {
+    let new_orgnode = OrgNode {
       focused : false,
       folded  : false,
       kind    : OrgNodeKind::Scaff ( scaffold ),

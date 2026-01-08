@@ -12,7 +12,7 @@ mod util {
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -357,7 +357,7 @@ async fn test_recursive_document (
       config,
       &ID ( "a".to_string () )
     ) . await ?;
-  let result_forest : Tree<NewOrgNode> =
+  let result_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
 
@@ -367,7 +367,7 @@ async fn test_recursive_document (
     "Expected exactly 1 root node" );
 
   let root_node_ref = &tree_roots[0];
-  let root_node : &NewOrgNode = root_node_ref . value ();
+  let root_node : &OrgNode = root_node_ref . value ();
 
   // Root node should be "a"
   assert_eq! ( root_node.id(), Some ( &ID::from ("a") ),
@@ -379,7 +379,7 @@ async fn test_recursive_document (
   let mut root_children = root_node_ref . children ();
   let b_node_ref = root_children . next ()
     . expect ( "Root should have child 'b'" );
-  let b_node : &NewOrgNode = b_node_ref . value ();
+  let b_node : &OrgNode = b_node_ref . value ();
 
   assert_eq! ( b_node.id(), Some ( &ID::from ("b") ),
     "First child should have id 'b'" );
@@ -394,7 +394,7 @@ async fn test_recursive_document (
   let mut b_children = b_node_ref . children ();
   let c_node_ref = b_children . next ()
     . expect ( "Node 'b' should have child 'c'" );
-  let c_node : &NewOrgNode = c_node_ref . value ();
+  let c_node : &OrgNode = c_node_ref . value ();
 
   assert_eq! ( c_node.id(), Some ( &ID::from ("c") ),
     "Child of 'b' should have id 'c'" );
@@ -405,7 +405,7 @@ async fn test_recursive_document (
   let mut c_children = c_node_ref . children ();
   let b_repeat_ref = c_children . next ()
     . expect ( "Node 'c' should have child 'b' (repeated)" );
-  let b_repeat : &NewOrgNode = b_repeat_ref . value ();
+  let b_repeat : &OrgNode = b_repeat_ref . value ();
 
   assert_eq! ( b_repeat.id(), Some ( &ID::from ("b") ),
     "Child of 'c' should have id 'b'" );

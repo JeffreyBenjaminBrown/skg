@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::from_text::orgnodes_to_instructions::orgnodes_to_reconciled_save_instructions;
 use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::OrgNode;
 use skg::types::save::SaveInstruction;
 use ego_tree::Tree;
 use indoc::indoc;
@@ -32,7 +32,7 @@ fn test_update_nodes_and_relationships2 (
       ** (skg (id 1) (source main) (code indefinitive)) 1
     "};
 
-    let forest : Tree<NewOrgNode> =
+    let forest : Tree<OrgNode> =
       org_to_uninterpreted_nodes ( org_text )?;
 
     // Check for inconsistent instructions

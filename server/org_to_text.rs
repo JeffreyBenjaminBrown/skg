@@ -1,6 +1,6 @@
-use crate::types::orgnode::{OrgNode, orgnodemd_to_string};
+use crate::types::orgnode::{LegacyOrgNode, orgnodemd_to_string};
 use crate::types::orgnode_new::{
-    EffectOnParent, NewOrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
+    EffectOnParent, OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};
 
@@ -14,10 +14,10 @@ use std::error::Error;
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a ForestRoot.
 ///
-/// TRANSITION NOTE: Converts orgnode to NewOrgNode at render time.
+/// TRANSITION NOTE: Converts orgnode to OrgNode at render time.
 /// This ensures we use new types for rendering while orgnode remains
 /// the authoritative source (since it gets modified post-construction).
-/// Once all mutations use NewOrgNode, we can switch to reading new_orgnode directly.
+/// Once all mutations use OrgNode, we can switch to reading new_orgnode directly.
 pub fn orgnode_forest_to_string (
   forest : &PairTree,
 ) -> Result < String, Box<dyn Error> > {
@@ -26,7 +26,7 @@ pub fn orgnode_forest_to_string (
     level    : usize,
   ) -> String {
     // Use new_orgnode directly - it's the authoritative source
-    let new_orgnode : &NewOrgNode =
+    let new_orgnode : &OrgNode =
       node_ref . value () . orgnode ();
     let mut out : String =
       new_orgnode_to_text ( level, new_orgnode );
@@ -38,7 +38,7 @@ pub fn orgnode_forest_to_string (
     out }
   let root_ref = forest . root ();
   let is_forest_root : bool = {
-    let root_new_orgnode : &NewOrgNode =
+    let root_new_orgnode : &OrgNode =
       root_ref . value () . orgnode ();
     matches! (
       & root_new_orgnode . kind,
@@ -53,11 +53,11 @@ pub fn orgnode_forest_to_string (
       & render_node_subtree_to_org ( child, 1 )); }
   Ok ( result ) }
 
-/// Renders an OrgNode as org-mode formatted text.
+/// Renders a LegacyOrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
 pub fn orgnode_to_text (
   level   : usize,
-  orgnode : &OrgNode
+  orgnode : &LegacyOrgNode
 ) -> String {
   let metadata_str : String =
     orgnodemd_to_string ( &orgnode.metadata );
@@ -95,14 +95,14 @@ fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level.max ( 1 )) }
 
 //
-// New rendering functions for NewOrgNode
+// New rendering functions for OrgNode
 //
 
-/// Renders a NewOrgNode as org-mode formatted text.
+/// Renders a OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
 pub fn new_orgnode_to_text (
   level   : usize,
-  orgnode : &NewOrgNode
+  orgnode : &OrgNode
 ) -> String {
   let metadata_str : String =
     new_orgnodemd_to_string ( orgnode );
@@ -138,11 +138,11 @@ pub fn new_orgnode_to_text (
         result . push ( '\n' ); }} }
   result }
 
-/// Renders NewOrgNode metadata as a string suitable for org-mode display.
+/// Renders OrgNode metadata as a string suitable for org-mode display.
 /// Returns string like "(id abc123) (view ...) (code ...)" etc.
 /// Must produce identical output to orgnodemd_to_string for equivalent data.
 pub fn new_orgnodemd_to_string (
-  orgnode : &NewOrgNode
+  orgnode : &OrgNode
 ) -> String {
   match &orgnode . kind {
     OrgNodeKind::Scaff ( scaffold ) =>
@@ -262,11 +262,12 @@ mod tests {
     use crate::types::misc::ID;
     use crate::types::orgnode::{
         default_metadata, forest_root_orgnode, EditRequest, ViewRequest, Interp,
+        LegacyOrgNode,
     };
     use crate::types::orgnode_new::from_old_orgnode;
 
-    /// Test that rendering a converted OrgNode produces identical output.
-    fn assert_render_identical ( old : &OrgNode, level : usize ) {
+    /// Test that rendering a converted LegacyOrgNode produces identical output.
+    fn assert_render_identical ( old : &LegacyOrgNode, level : usize ) {
         let old_text = orgnode_to_text ( level, old );
         let new = from_old_orgnode ( old );
         let new_text = new_orgnode_to_text ( level, &new );
@@ -288,7 +289,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "abc123" ));
         md . source = Some ( "test.skg" . to_string ());
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Test Title" . to_string (),
             body     : Some ( "Body text\n" . to_string ()),
@@ -303,7 +304,7 @@ mod tests {
         md . viewData . focused = true;
         md . viewData . folded = true;
         md . viewData . cycle = true;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "With View Data" . to_string (),
             body     : None,
@@ -320,7 +321,7 @@ mod tests {
         md . viewData . relationships . numContainers = Some ( 3 );
         md . viewData . relationships . numContents = Some ( 5 );
         md . viewData . relationships . numLinksIn = Some ( 2 );
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "With Relationships" . to_string (),
             body     : None,
@@ -333,7 +334,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "indef123" ));
         md . code . indefinitive = true;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Indefinitive" . to_string (),
             body     : None,
@@ -346,7 +347,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "del123" ));
         md . code . editRequest = Some ( EditRequest::Delete );
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "To Delete" . to_string (),
             body     : None,
@@ -360,7 +361,7 @@ mod tests {
         md . id = Some ( ID::from ( "vr123" ));
         md . code . viewRequests . insert ( ViewRequest::Aliases );
         md . code . viewRequests . insert ( ViewRequest::Containerward );
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "With View Requests" . to_string (),
             body     : None,
@@ -373,7 +374,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "sub123" ));
         md . code . interp = Interp::Subscribee;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Subscribee Node" . to_string (),
             body     : None,
@@ -386,7 +387,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "pi123" ));
         md . code . interp = Interp::ParentIgnores;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Parent Ignores" . to_string (),
             body     : None,
@@ -399,7 +400,7 @@ mod tests {
         let mut md = default_metadata ();
         md . id = Some ( ID::from ( "hfs123" ));
         md . code . interp = Interp::HiddenFromSubscribees;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "Hidden From Subscribees" . to_string (),
             body     : None,
@@ -411,7 +412,7 @@ mod tests {
     fn test_render_alias_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::AliasCol;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "its aliases" . to_string (), // canonical scaffold title
             body     : None,
@@ -423,7 +424,7 @@ mod tests {
     fn test_render_alias () {
         let mut md = default_metadata ();
         md . code . interp = Interp::Alias;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "My Alias" . to_string (),
             body     : None,
@@ -435,7 +436,7 @@ mod tests {
     fn test_render_subscribee_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::SubscribeeCol;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "it subscribes to these" . to_string (), // canonical scaffold title
             body     : None,
@@ -447,7 +448,7 @@ mod tests {
     fn test_render_hidden_outside_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenOutsideOfSubscribeeCol;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "hidden from all subscriptions" . to_string (), // canonical scaffold title
             body     : None,
@@ -459,7 +460,7 @@ mod tests {
     fn test_render_hidden_in_col () {
         let mut md = default_metadata ();
         md . code . interp = Interp::HiddenInSubscribeeCol;
-        let old = OrgNode {
+        let old = LegacyOrgNode {
             metadata : md,
             title    : "hidden from this subscription" . to_string (), // canonical scaffold title
             body     : None,

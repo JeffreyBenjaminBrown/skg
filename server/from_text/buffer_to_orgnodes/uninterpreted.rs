@@ -4,7 +4,7 @@
 use crate::types::sexp::find_sexp_end;
 use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
 use crate::types::orgnode::{default_metadata, OrgnodeMetadata};
-use crate::types::orgnode_new::{from_parsed, forest_root_new_orgnode, NewOrgNode};
+use crate::types::orgnode_new::{from_parsed, forest_root_new_orgnode, OrgNode};
 
 use ego_tree::{Tree, NodeId};
 use regex::Regex;
@@ -27,8 +27,8 @@ struct OrgNodeLineCol {
 /// Each level-1 headline becomes a child of the ForestRoot.
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result<Tree<NewOrgNode>, String> {
-  let mut forest: Tree<NewOrgNode> = Tree::new(forest_root_new_orgnode());
+) -> Result<Tree<OrgNode>, String> {
+  let mut forest: Tree<OrgNode> = Tree::new(forest_root_new_orgnode());
   // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let forest_root_treeid: NodeId = forest.root().id();
@@ -37,7 +37,7 @@ pub fn org_to_uninterpreted_nodes(
     let org_node_line_cols: Vec<OrgNodeLineCol> =
       divide_into_orgNodeLineCols(input)?;
     org_node_line_cols } {
-    let (level, orgnode): (usize, NewOrgNode) =
+    let (level, orgnode): (usize, OrgNode) =
       linecol_to_neworgnode(org_node_line_col)?;
     // Adjust treeid_stack to proper level (ForestRoot is level 0, tree roots are level 1)
     while treeid_stack.len() > level {
@@ -95,12 +95,12 @@ fn divide_into_orgNodeLineCols (
   }
   Ok (result) }
 
-/// Create a NewOrgNode from an OrgNodeLineCol.
+/// Create a OrgNode from an OrgNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
 /// Returns an error if the metadata cannot be parsed.
 fn linecol_to_neworgnode(
   org_node_line_col: &OrgNodeLineCol
-) -> Result<(usize, NewOrgNode), String> {
+) -> Result<(usize, OrgNode), String> {
   let (level, metadata_option, title): HeadlineInfo =
     org_node_line_col.headline.clone();
   let body_lines: &[String] = &org_node_line_col.body;

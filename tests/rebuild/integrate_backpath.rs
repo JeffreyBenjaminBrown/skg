@@ -5,7 +5,7 @@ use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_portions_of_pairforest_and_orgnodeforest, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode_new::NewOrgNode;
+use skg::types::orgnode_new::OrgNode;
 use skg::types::tree::PairTree;
 
 use ego_tree::Tree;
@@ -36,7 +36,7 @@ async fn test_path_with_cycle_impl(
     *** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Tree<NewOrgNode> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
@@ -71,7 +71,7 @@ async fn test_path_with_cycle_impl(
     *** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Tree<NewOrgNode> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(
@@ -106,7 +106,7 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Tree<NewOrgNode> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
@@ -156,7 +156,7 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Tree<NewOrgNode> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(
@@ -191,7 +191,7 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let orgnode_trees: Tree<NewOrgNode> =
+  let orgnode_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
@@ -241,7 +241,7 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (id off-path)) off-path
   "};
 
-  let expected_trees: Tree<NewOrgNode> =
+  let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?;
 
   assert!(

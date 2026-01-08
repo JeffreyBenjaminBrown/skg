@@ -9,7 +9,7 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::forest_root_pair;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{NodePair, PairTree};
@@ -137,7 +137,7 @@ pub async fn update_from_and_rerender_buffer (
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (orgnode_forest, save_instructions, mergeInstructions)
-    : ( Tree<NewOrgNode>,
+    : ( Tree<OrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
     = buffer_to_orgnode_forest_and_save_instructions (
@@ -188,13 +188,13 @@ pub async fn update_from_and_rerender_buffer (
 
   Ok ( SaveResponse { buffer_content, errors } ) }
 
-/// Converts a NewOrgNode forest to a PairTree forest
+/// Converts a OrgNode forest to a PairTree forest
 /// (both represented as Trees, via ForestRoot).
 ///
 /// Definitive nodes that generated SaveInstructions get Some(skgnode).
 /// Indefinitive nodes (views) get None.
 fn pair_orgnode_forest_with_save_instructions (
-  orgnode_tree : &Tree<NewOrgNode>,
+  orgnode_tree : &Tree<OrgNode>,
   instructions : &[SaveInstruction],
 ) -> PairTree {
   let skgnode_map : HashMap<ID, SkgNode> =
@@ -215,16 +215,16 @@ fn pair_orgnode_forest_with_save_instructions (
       &skgnode_map ); }
   pair_tree }
 
-/// Add a NewOrgNode subtree as a child of a parent in the PairTree,
+/// Add a OrgNode subtree as a child of a parent in the PairTree,
 /// pairing each node with its SkgNode from the map.
 fn add_paired_subtree_as_child (
   pair_tree      : &mut PairTree,
   parent_treeid  : NodeId,
-  orgnode_tree   : &Tree<NewOrgNode>,
+  orgnode_tree   : &Tree<OrgNode>,
   orgnode_treeid : NodeId,
   skgnode_map    : &HashMap<ID, SkgNode>,
 ) {
-  let orgnode : NewOrgNode =
+  let orgnode : OrgNode =
     orgnode_tree . get ( orgnode_treeid ) . unwrap ()
     . value () . clone ();
   let mskgnode : Option<SkgNode> =

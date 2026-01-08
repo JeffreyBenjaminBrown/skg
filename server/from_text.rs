@@ -8,7 +8,7 @@
 use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
-use crate::types::orgnode_new::NewOrgNode;
+use crate::types::orgnode_new::OrgNode;
 use crate::types::save::{MergeInstructionTriple, SaveInstruction};
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -28,11 +28,11 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
   config      : &SkgConfig,
   driver      : &TypeDBDriver
 ) -> Result<
-    ( Tree<NewOrgNode>,
+    ( Tree<OrgNode>,
       Vec<SaveInstruction>,
       Vec<MergeInstructionTriple>
     ), SaveError> {
-  let mut orgnode_forest : Tree<NewOrgNode> =
+  let mut orgnode_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( buffer_text )
     . map_err ( SaveError::ParseError ) ?;
   add_missing_info_to_forest (
