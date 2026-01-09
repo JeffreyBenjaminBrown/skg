@@ -33,7 +33,7 @@ pub fn unique_scaffold_child (
     tree.get(node_id)
     .ok_or("unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode().is_scaffold ( scaffold_kind ))
+    .filter(|c| c.value().orgnode.is_scaffold ( scaffold_kind ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
@@ -96,12 +96,12 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
-    node_ref . value () . orgnode () . id () . cloned ()
+    node_ref . value () .orgnode . id () . cloned ()
     . ok_or ( "Subscribee has no ID" ) ?;
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if ! parent_ref . value () . orgnode ()
+  if ! parent_ref . value () .orgnode
       . is_scaffold ( &Scaffold::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
@@ -170,7 +170,7 @@ pub async fn ancestor_skgnode_from_disk (
   let ancestor_skgid : ID =
     read_at_ancestor_in_tree(
       tree, treeid, generation,
-      |np| np . orgnode() . id() . cloned() )
+      |np| np.orgnode.id().cloned() )
     . map_err( |e| -> Box<dyn Error> { e . into () })?
     . ok_or_else(
       || -> Box<dyn Error> {
@@ -193,7 +193,7 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
-    let child_new = child . value () . orgnode ();
+    let child_new = &child . value () .orgnode;
     if ! child_new . is_scaffold ( &Scaffold::Alias ( String::new () ) ) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",

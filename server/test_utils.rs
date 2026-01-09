@@ -353,7 +353,7 @@ pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
     node2 : NodeRef < OrgNode >
   ) -> bool {
     // Compare the OrgNode values directly
-    let n1 : & OrgNode = node1 . value () . orgnode ();
+    let n1 : & OrgNode = &node1 . value () .orgnode;
     let n2 : & OrgNode = node2 . value ();
     // Compare the OrgNode values
     if n1 != n2 { return false; }

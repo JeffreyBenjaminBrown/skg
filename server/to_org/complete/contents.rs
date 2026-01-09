@@ -75,12 +75,12 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().is_scaffold ( &Scaffold::AliasCol ) })?;
+        node.orgnode.is_scaffold ( &Scaffold::AliasCol ) })?;
     let is_col_scaffold: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().is_scaffold ( &Scaffold::SubscribeeCol )
-        || node.orgnode().is_scaffold ( &Scaffold::HiddenOutsideOfSubscribeeCol )
-        || node.orgnode().is_scaffold ( &Scaffold::HiddenInSubscribeeCol ) })?;
+        node.orgnode.is_scaffold ( &Scaffold::SubscribeeCol )
+        || node.orgnode.is_scaffold ( &Scaffold::HiddenOutsideOfSubscribeeCol )
+        || node.orgnode.is_scaffold ( &Scaffold::HiddenInSubscribeeCol ) })?;
     if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
@@ -135,7 +135,7 @@ fn view_requests_at_node (
   let node_view_requests : Vec < ViewRequest > =
     read_at_node_in_tree (
       tree, node_id,
-      |np| match &np . orgnode () . kind {
+      |np| match &np . orgnode . kind {
              OrgNodeKind::True ( t ) =>
                t . view_requests . iter () . cloned () . collect (),
              OrgNodeKind::Scaff ( _ ) => Vec::new (),
@@ -166,7 +166,7 @@ pub fn clobberIndefinitiveOrgnode (
           . ok_or ("SkgNode should exist after fetch" . to_string() )?;
       ( skgnode . title . clone (),
         skgnode . source . clone () ) };
-    let org = pair . orgnode_mut ();
+    let org = &mut pair.orgnode;
     org . set_title ( title );
     org . set_source ( source );
     org . clear_body ();
@@ -231,7 +231,7 @@ pub async fn completeDefinitiveOrgnode (
       tree . get ( *child_treeid )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
-      child_ref . value () . orgnode () . id ()
+      child_ref . value () . orgnode . id ()
       . ok_or ( "Content child has no ID" ) ?;
     content_skgid_to_treeid . insert (
       child_pid . clone (), *child_treeid ); }
@@ -248,9 +248,9 @@ pub async fn completeDefinitiveOrgnode (
       tree . get_mut ( *invalid_treeid )
       . ok_or ( "Invalid content child not found" ) ?;
     let pair = child_mut . value ();
-    pair . orgnode_mut ()
-      . set_effect_on_parent ( EffectOnParent::ParentIgnores );
-    let child_pid = pair . orgnode () . id () . cloned () . unwrap ();
+    pair . orgnode . set_effect_on_parent (
+      EffectOnParent::ParentIgnores );
+    let child_pid = pair.orgnode . id () . cloned () . unwrap ();
     content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
 
@@ -293,7 +293,7 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . orgnode ()
+    if child . value () . orgnode
         . has_effect ( EffectOnParent::Content )
     { content_child_ids . push ( child . id () );
     } else {
@@ -383,7 +383,7 @@ pub async fn ensure_source (
   let has_source : bool =
     read_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode () . has_source () ) ?;
+      |np| np . orgnode . has_source () ) ?;
   if ! has_source {
     let node_pid : ID =
       get_pid_in_pairtree ( tree, node_id ) ?;
@@ -396,5 +396,5 @@ pub async fn ensure_source (
     write_at_node_in_tree (
       tree, node_id,
       |np| {
-        np . orgnode_mut () . set_source ( source ); } ) ?; }
+        np . orgnode . set_source ( source ); } ) ?; }
   Ok (( )) }

@@ -79,7 +79,7 @@ async fn test_completeAliasCol_logic (
       forest . get ( aliascol_1_id ) . unwrap ();
     let children : Vec < &str > =
       aliascol_1_ref . children ()
-      . map ( |n| n . value () . orgnode () . title () )
+      . map ( |n| n . value () .orgnode . title () )
       . collect ();
 
     assert_eq! (
@@ -110,10 +110,10 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_2_ref =
       forest . get ( aliascol_2_id ) . unwrap ();
-    let aliascol_2_new = aliascol_2_ref . value () . orgnode ();
+    let aliascol_2_new = &aliascol_2_ref . value () .orgnode;
     let children : Vec < &str > =
       aliascol_2_ref . children ()
-      . map ( |n| n . value () . orgnode () . title () )
+      . map ( |n| n . value () .orgnode . title () )
       . collect ();
 
     assert_eq! (
@@ -220,7 +220,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       forest . get ( first_aliascol_id ) . unwrap ();
     let children_new : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| n . value () . orgnode () )
+      . map ( |n| &n . value () .orgnode )
       . collect ();
 
     assert_eq! (
@@ -261,7 +261,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       forest . get ( second_aliascol_id ) . unwrap ();
     let children : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| n . value () . orgnode () )
+      . map ( |n| &n . value () .orgnode )
       . collect ();
 
     assert_eq! (

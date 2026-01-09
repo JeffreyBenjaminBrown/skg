@@ -20,7 +20,7 @@ pub fn orgnode_forest_to_string (
     level    : usize,
   ) -> String {
     let orgnode : &OrgNode =
-      node_ref . value () . orgnode ();
+      &node_ref . value () .orgnode;
     let mut out : String =
       orgnode_to_text ( level, orgnode );
     for child in node_ref . children () {
@@ -32,7 +32,7 @@ pub fn orgnode_forest_to_string (
   let root_ref = forest . root ();
   let is_forest_root : bool = {
     let root_orgnode : &OrgNode =
-      root_ref . value () . orgnode ();
+      &root_ref . value () .orgnode;
     matches! (
       & root_orgnode . kind,
       OrgNodeKind::Scaff ( Scaffold::ForestRoot )) };

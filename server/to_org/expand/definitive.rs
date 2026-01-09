@@ -93,7 +93,7 @@ async fn execute_definitive_view_request (
     write_at_node_in_tree (
       forest, node_id,
       |np| { // remove ViewRequest and mark definitive
-        let org = np . orgnode_mut ();
+        let org = &mut np.orgnode;
         if let Some ( vr ) = org . view_requests_mut () {
           vr . remove ( & ViewRequest::Definitive ); }
         org . set_indefinitive ( false ); } ) ?; }
@@ -108,7 +108,7 @@ async fn execute_definitive_view_request (
       let node_ref : NodeRef < NodePair > =
         forest . get ( node_id ) . ok_or (
           "execute_definitive_view_request: node not found" ) ?;
-      node_ref . value () . orgnode ()
+      node_ref . value () .orgnode
         . has_effect ( EffectOnParent::Subscribee ) };
     if is_subscribee {
       maybe_add_hiddenInSubscribeeCol_branch (
@@ -125,7 +125,7 @@ fn get_hidden_ids_if_subscribee (
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
-  if ! node_ref . value () . orgnode ()
+  if ! node_ref . value () .orgnode
        . has_effect ( EffectOnParent::Subscribee ) {
     return Ok ( HashSet::new () ); }
   else {
@@ -160,10 +160,10 @@ fn indefinitize_content_subtree (
   let pair : &NodePair =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
-    pair . orgnode () . id () . cloned ();
+    pair .orgnode . id () . cloned ();
   let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
-    . filter ( |c| c . value () . orgnode ()
+    . filter ( |c| c . value () .orgnode
                    . has_effect ( EffectOnParent::Content ) )
     . map ( |c| c . id () )
     . collect ();
@@ -177,7 +177,7 @@ fn indefinitize_content_subtree (
     write_at_node_in_tree (
       tree, node_id,
       |np| {
-        let org = np . orgnode_mut ();
+        let org = &mut np.orgnode;
         org . set_indefinitive ( true );
         if let Some ( title ) = canonical_title.clone () {
           org . set_title ( title ); }
@@ -271,7 +271,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" ) ?;
-    let org = node_ref . value () . orgnode ();
+    let org = &node_ref . value () .orgnode;
     let pid : ID = org . id () . cloned ()
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID" ) ?;
     let source : String = org . source () . cloned ()

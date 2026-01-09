@@ -31,7 +31,7 @@ pub async fn maybe_add_subscribeeCol_branch (
     let is_indefinitive : bool =
       read_at_node_in_tree (
         tree, node_id,
-        |np| np . orgnode () . is_indefinitive () ) ?;
+        |np| np . orgnode . is_indefinitive () ) ?;
     if is_indefinitive { return Ok (( )); }}
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
@@ -89,7 +89,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { // error if not a Subscribee
     let is_subscribee: bool =
       read_at_node_in_tree(tree, subscribee_treeid, |node| {
-        node.orgnode().has_effect ( EffectOnParent::Subscribee )
+        node.orgnode.has_effect ( EffectOnParent::Subscribee )
       })?;
     if ! is_subscribee { return Err (
       "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee"

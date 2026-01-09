@@ -28,13 +28,6 @@ pub struct NodePair {
   pub orgnode: OrgNode,
 }
 
-impl NodePair {
-  pub fn orgnode ( &self ) -> &OrgNode {
-    &self . orgnode }
-  pub fn orgnode_mut ( &mut self ) -> &mut OrgNode {
-    &mut self . orgnode }
-}
-
 //
 // NodePair constructors
 //
