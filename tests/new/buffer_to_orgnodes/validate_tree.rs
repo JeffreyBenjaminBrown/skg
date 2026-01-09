@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use ego_tree::Tree;
-use skg::types::orgnode_new::{OrgNode, forest_root_new_orgnode};
+use skg::types::orgnode_new::{OrgNode, forest_root_orgnode};
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
@@ -141,7 +141,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (forest with just ForestRoot, no tree roots)
-      let empty_forest: Tree<OrgNode> = Tree::new(forest_root_new_orgnode());
+      let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no errors in empty input");

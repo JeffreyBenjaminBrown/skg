@@ -4,7 +4,7 @@
 use crate::types::sexp::find_sexp_end;
 use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
 use crate::types::orgnode::{default_metadata, OrgnodeMetadata};
-use crate::types::orgnode_new::{from_parsed, forest_root_new_orgnode, OrgNode};
+use crate::types::orgnode_new::{from_parsed, forest_root_orgnode, OrgNode};
 
 use ego_tree::{Tree, NodeId};
 use regex::Regex;
@@ -28,7 +28,7 @@ struct OrgNodeLineCol {
 pub fn org_to_uninterpreted_nodes(
   input: &str
 ) -> Result<Tree<OrgNode>, String> {
-  let mut forest: Tree<OrgNode> = Tree::new(forest_root_new_orgnode());
+  let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let forest_root_treeid: NodeId = forest.root().id();

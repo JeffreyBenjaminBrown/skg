@@ -2,7 +2,7 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::orgnode_new::{OrgNode, forest_root_new_orgnode};
+use skg::types::orgnode_new::{OrgNode, forest_root_orgnode};
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -59,7 +59,7 @@ fn test_find_inconsistent_toDelete_instructions() {
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty forest (just ForestRoot, no tree roots)
-  let empty_forest: Tree<OrgNode> = Tree::new(forest_root_new_orgnode());
+  let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   let (inconsistent_empty, _, _) = find_inconsistent_instructions(&empty_forest);
   assert_eq!(inconsistent_empty.len(), 0, "Should have no conflicts in empty forest");
 }

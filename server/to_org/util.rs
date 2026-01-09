@@ -5,7 +5,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode_new::{
-    orgnode_content_from_disk, OrgNode, forest_root_new_orgnode };
+    orgnode_content_from_disk, OrgNode, forest_root_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
@@ -39,7 +39,7 @@ pub type VisitedMap =
 /// It is never rendered; it just makes forests easier to process.
 pub fn forest_root_pair () -> NodePair {
   NodePair { mskgnode : None,
-             orgnode  : forest_root_new_orgnode () } }
+             orgnode  : forest_root_orgnode () } }
 
 /// Create a new forest (a tree with a ForestRoot root).
 /// The "tree roots" will be children of this root.

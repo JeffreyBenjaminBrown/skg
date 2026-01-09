@@ -5,7 +5,7 @@ use crate::types::orgnode_new::{
   OrgNode, OrgNodeKind, TrueNode, EffectOnParent,
 };
 use crate::types::misc::TantivyIndex;
-use crate::org_to_text::new_orgnode_to_text;
+use crate::org_to_text::orgnode_to_text;
 
 use sexp::Sexp;
 use std::collections::HashMap;
@@ -113,7 +113,7 @@ fn format_matches_as_org_mode (
   let mut result : String =
     String::new();
   result.push_str (
-    & new_orgnode_to_text (
+    & orgnode_to_text (
       1,
       & OrgNode {
         focused : false,
@@ -151,7 +151,7 @@ fn format_matches_as_org_mode (
     // First (best) match becomes level-2 headline
     let (score, title) = &matches[0];
     result.push_str (
-      & new_orgnode_to_text (
+      & orgnode_to_text (
         2,
         & OrgNode {
           focused : false,
@@ -166,7 +166,7 @@ fn format_matches_as_org_mode (
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
       result.push_str (
-        & new_orgnode_to_text (
+        & orgnode_to_text (
           3,
           & OrgNode {
             focused : false,

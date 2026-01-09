@@ -18,17 +18,6 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-/// Corresponds to an Emacs headline-body pair.
-/// The metadata precedes the title in the headline.
-/// (Both follow the "bullet", which is a string of asterisks.)
-/// DEPRECATED: Use OrgNode from orgnode_new.rs instead.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LegacyOrgNode {
-  pub metadata: OrgnodeMetadata,
-  pub title: String, // does not re-state the metadata
-  pub body: Option<String>,
-}
-
 /// Each org headline corresponds to a node.
 /// This is the metadata necessary to interpret the headline.
 #[derive(Debug, Clone, PartialEq)]
@@ -257,15 +246,6 @@ pub fn default_metadata () -> OrgnodeMetadata {
     viewData : OrgnodeViewData::default (),
     code : OrgnodeCode::default (),
   }}
-
-/// Create a LegacyOrgNode representing a ForestRoot.
-/// DEPRECATED: Use forest_root_orgnode from orgnode_new.rs instead.
-pub fn forest_root_orgnode () -> LegacyOrgNode {
-  let mut md = default_metadata ();
-  md . code . interp = Interp::ForestRoot;
-  LegacyOrgNode { metadata: md,
-                  title: String::new (),
-                  body: None } }
 
 /// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
 /// This is the inverse of parse_metadata_to_orgnodemd.
