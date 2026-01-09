@@ -1,0 +1,160 @@
+#+title: Claude's notes on remaining type refactor work
+
+* State Assessment (January 2026)
+
+** Git commits say 8.6, 8.7, 8.8 are done
+   But plan.org is stale - it says 8.6 is "IN PROGRESS" and 8.7, 8.8 are "DEFERRED".
+
+** What ACTUALLY happened per git history:
+   - Phase 8.6: Eliminate OrgNode construction outside parsing
+   - Phase 8.7: Rename types to final names (NewOrgNode -> OrgNode)
+   - Phase 8.8: Remove LegacyOrgNode and conversion functions
+
+** What's STILL in the code (contrary to 8.8 description):
+
+*** Old types still exist in orgnode.rs (13+ files still use Interp::)
+    - Interp enum
+    - OrgnodeMetadata, OrgnodeCode, OrgnodeViewData, OrgnodeRelationships
+    - orgnodemd_to_string() function
+
+*** Bridge functions still exist in orgnode_new.rs
+    - from_parsed() - converts OrgnodeMetadata to OrgNode
+    - matches_interp() - compares OrgNode to Interp
+    - interp() - returns equivalent Interp for an OrgNode
+    - effect_on_parent_from_interp()
+    - orgnode_scaffold_from_interp()
+
+*** Parsing still uses old types
+    - parse_metadata_sexp.rs -> produces OrgnodeMetadata
+    - uninterpreted.rs -> calls from_parsed()
+
+*** Functions still take Interp as parameter
+    - insert_sourceless_node(tree, parent_id, Interp, ...)
+    - append_indefinitive_node(tree, parent_id, node_id, Interp, ...)
+    - unique_child_with_interp(tree, node_id, Interp)
+    - unique_orgnode_child_with_interp(tree, node_id, Interp)
+
+*** Save instructions use Interp heavily
+    - to_naive_instructions.rs - matches on Interp::ForestRoot, Interp::Content, etc.
+
+* Problems / Remaining Work
+
+** The key issue: Interp is still used throughout
+   Files using Interp::: (13 files)
+   - server/types/orgnode.rs (definition)
+   - server/types/orgnode_new.rs (bridge functions)
+   - server/serve/parse_metadata_sexp.rs (parsing)
+   - server/types/tree/orgnode_skgnode.rs (tree utils)
+   - server/to_org/complete/contents.rs
+   - server/to_org/complete/sharing.rs
+   - server/to_org/complete/aliascol.rs
+   - server/to_org/expand/definitive.rs
+   - server/to_org/expand/backpath.rs
+   - server/to_org/expand/aliases.rs
+   - server/from_text/orgnodes_to_instructions/to_naive_instructions.rs
+   - tests/new/buffer_to_orgnodes/uninterpreted2.rs
+   - TODO.org (documentation only)
+
+** Goal: minimize diff against main
+   Eventually:
+   - One OrgNode type (the new one), defined in orgnode.rs
+   - No orgnode_new.rs file
+   - No Interp enum (use OrgNodeKind/ScaffoldKind/EffectOnParent directly)
+
+* Proposed remaining phases
+
+** Phase 9: Eliminate Interp from runtime code
+   Replace all uses of Interp:: in runtime code with new type system.
+
+*** 9.1 Replace matches_interp() calls with direct type checks
+    Currently: node.matches_interp(&Interp::AliasCol)
+    After:     node.is_scaffold(&ScaffoldKind::AliasCol)
+
+    Or for TrueNode effects:
+    Currently: node.matches_interp(&Interp::Content)
+    After:     node.has_effect(EffectOnParent::Content)
+
+*** 9.2 Change insert_sourceless_node() to take ScaffoldKind
+    Currently: insert_sourceless_node(tree, parent_id, Interp::AliasCol, ...)
+    After:     insert_sourceless_node(tree, parent_id, ScaffoldKind::AliasCol, ...)
+
+*** 9.3 Change append_indefinitive_node() to take EffectOnParent
+    Currently: append_indefinitive_node(..., Interp::Subscribee, ...)
+    After:     append_indefinitive_node(..., EffectOnParent::Subscribee, ...)
+
+*** 9.4 Change unique_child_with_interp() to take ScaffoldKind
+    Or possibly split into two functions:
+    - unique_child_with_scaffold_kind()
+    - unique_child_with_effect()
+
+** Phase 10: Eliminate Interp from save instructions
+   The to_naive_instructions.rs code needs refactoring.
+
+*** Current pattern
+    match interp {
+      Interp::ForestRoot => ...,
+      Interp::AliasCol | Interp::Alias | ... => skip,
+      _ => process
+    }
+
+*** New pattern
+    match node.kind {
+      OrgNodeKind::Scaff(s) => match s.kind {
+        ScaffoldKind::ForestRoot => ...,
+        _ => skip // all scaffolds except ForestRoot
+      },
+      OrgNodeKind::True(t) => process
+    }
+
+** Phase 11: Eliminate Interp from parsing
+   Options:
+   A) Change parser to produce OrgNode directly (no OrgnodeMetadata)
+   B) Keep OrgnodeMetadata as internal parsing representation, just don't export Interp
+
+   Option A is cleaner but bigger change.
+   Option B is smaller change but leaves cruft.
+
+   Recommend: Option A - change parser to produce OrgNode directly.
+   The parser already calls from_parsed() at the end anyway.
+
+** Phase 12: Remove old types and cleanup
+*** Remove from orgnode.rs
+    - Interp enum
+    - OrgnodeMetadata struct
+    - OrgnodeCode struct
+    - OrgnodeViewData struct (WAIT - TrueNode uses this!)
+    - OrgnodeRelationships struct (WAIT - used by OrgnodeViewData)
+    - orgnodemd_to_string() (old rendering, replaced by new_orgnodemd_to_string)
+    - default_metadata()
+
+*** Remove from orgnode_new.rs
+    - from_parsed() (no longer needed if parser produces OrgNode)
+    - matches_interp() (replaced by is_scaffold/has_effect)
+    - interp() (bridge function)
+    - effect_on_parent_from_interp() (used by from_parsed)
+    - orgnode_scaffold_from_interp() (replaced by direct construction)
+
+*** Note: OrgnodeViewData and OrgnodeRelationships are used by TrueNode!
+    These should NOT be removed. They are still needed.
+    Only Interp, OrgnodeMetadata, OrgnodeCode need removal.
+
+** Phase 13: File reorganization
+*** Move OrgNode types from orgnode_new.rs to orgnode.rs
+*** Delete orgnode_new.rs
+*** Update all imports
+
+* Concerns / Notes
+
+** OrgnodeViewData is shared
+   TrueNode uses OrgnodeViewData for its view_data field.
+   This is fine - OrgnodeViewData is a good type.
+   It should stay, just remove the parsing-specific types.
+
+** EditRequest and ViewRequest are shared
+   These are used by both old and new systems.
+   They should stay in orgnode.rs.
+
+** Test coverage
+   There are comprehensive tests. Run after each step:
+   - cargo nextest run (207 tests)
+   - bash/integration-tests.sh (10 tests)

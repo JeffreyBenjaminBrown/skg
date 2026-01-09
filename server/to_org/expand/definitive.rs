@@ -15,9 +15,9 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode_new::{
-    OrgNode, effect_on_parent_from_interp, orgnode_with_metadata };
+    OrgNode, EffectOnParent, effect_on_parent_from_interp, orgnode_with_metadata };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -110,7 +110,7 @@ async fn execute_definitive_view_request (
         forest . get ( node_id ) . ok_or (
           "execute_definitive_view_request: node not found" ) ?;
       node_ref . value () . orgnode ()
-        . matches_interp ( &Interp::Subscribee ) };
+        . has_effect ( EffectOnParent::Subscribee ) };
     if is_subscribee {
       maybe_add_hiddenInSubscribeeCol_branch (
         forest, node_id, config, typedb_driver ) . await ?; }}
@@ -127,7 +127,7 @@ fn get_hidden_ids_if_subscribee (
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
   if ! node_ref . value () . orgnode ()
-       . matches_interp ( &Interp::Subscribee ) {
+       . has_effect ( EffectOnParent::Subscribee ) {
     return Ok ( HashSet::new () ); }
   else {
     let subscribee_col : NodeRef < NodePair > =
@@ -165,7 +165,7 @@ fn indefinitize_content_subtree (
   let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
     . filter ( |c| c . value () . orgnode ()
-                   . matches_interp ( &Interp::Content ) )
+                   . has_effect ( EffectOnParent::Content ) )
     . map ( |c| c . id () )
     . collect ();
   if let Some(ref pid) = node_pid_opt { // remove from visited

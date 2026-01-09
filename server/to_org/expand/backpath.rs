@@ -14,9 +14,9 @@ use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode_new::{
-    OrgNode, effect_on_parent_from_interp, orgnode_indefinitive_from_disk };
+    OrgNode, EffectOnParent, orgnode_indefinitive_from_disk };
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -213,8 +213,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid
     ). await ?;
-  let effect = effect_on_parent_from_interp ( &Interp::ParentIgnores )
-    . ok_or ( "ParentIgnores is a TrueNode interp" ) ?;
+  let effect = EffectOnParent::ParentIgnores;
   let id = content_orgnode . id ()
     . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no ID" ) ?
     . clone ();

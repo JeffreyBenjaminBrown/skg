@@ -5,485 +5,146 @@
   See spec-questions.org for the target type hierarchy.
 
 * Guiding principles
-  - Tests pass after every step
-  - Introduce new types alongside old, then migrate, then remove old
-  - Small commits with clear descriptions
-  - When in doubt, add a conversion function rather than change everything at once
-
-* DONE Phase 1: Define new types (no behavioral changes)
-  Commit: 506a083
-** 1.1 Create server/types/orgnode_new.rs with new type definitions
-   - EffectOnParent enum: Content, Subscribee, ParentIgnores
-   - ScaffoldKind enum: Alias(String), AliasCol, ForestRoot,
-     HiddenInSubscribeeCol, HiddenOutsideOfSubscribeeCol, SubscribeeCol
-   - Scaffold struct: kind: ScaffoldKind (no other fields needed)
-   - TrueNode struct: title, body, id (Option), source (Option),
-     effect_on_parent, indefinitive, view_data, edit_request, view_requests
-   - OrgNodeKind enum: True(TrueNode), Scaff(Scaffold)
-   - NewOrgNode struct: focused, folded, kind: OrgNodeKind
-   - Add title_from_scaffold_kind() function with the fixed strings
-   - Add derives: Clone, Debug, PartialEq, Serialize, Deserialize as needed
-** 1.2 Add conversion functions in orgnode_new.rs
-   - from_old_orgnode(OrgNode) -> NewOrgNode
-   - to_old_orgnode(NewOrgNode) -> OrgNode
-   - These should be lossless round-trips for valid OrgNodes
-** 1.3 Add unit tests for the conversion functions
-   - Test each Interp variant maps correctly
-   - Test round-trip: old -> new -> old == old
-   - Test round-trip: new -> old -> new == new
-** 1.4 Export new types from server/types/orgnode.rs
-   - pub mod orgnode_new; pub use orgnode_new::*;
-   - Or inline the new types in orgnode.rs if cleaner
-** Decision: Keep HiddenFromSubscribees separate from ParentIgnores
-   During implementation, discovered that merging these in EffectOnParent
-   would break lossless round-trips (they serialize to different sexp strings).
-   DECISION: Keep both as separate EffectOnParent variants during transition.
-   Can merge in Phase 7 if desired.
-
-* DONE Phase 2: Migrate rendering (output path)
-  Rendering is easier because it only reads OrgNodes, doesn't create them.
-** 2.1 Update org_to_text.rs to work with NewOrgNode
-   - Added new_orgnode_to_text() that takes &NewOrgNode
-   - Added new_orgnodemd_to_string() for metadata rendering
-   - Added scaffold_metadata_to_string() and true_node_metadata_to_string()
-** 2.2 Update orgnodemd_to_string for new structure
-   - New rendering handles TrueNode vs Scaffold differently
-   - Scaffolds have minimal metadata (just interp, focused/folded)
-   - TrueNodes have full metadata (id, source, view_data, code)
-** 2.3 Run tests, fix any rendering issues
-   - Added 15 rendering tests comparing old vs new output
-   - All tests pass: old→new conversion produces identical rendering
-** Decision: Scaffold titles use empty string during transition
-   ScaffoldKind::title() returns descriptive strings ("its aliases", etc.)
-   but the OLD OrgNode format uses empty strings for scaffold titles.
-   For lossless round-trips, new rendering must match old behavior.
-   DECISION: Use empty string for scaffold titles when rendering during transition.
-   The descriptive titles will be enabled in Phase 7+ when we remove old types.
-
-* DONE Phase 3: Migrate tree construction (output path continued)
-  These functions build OrgNode trees from disk/TypeDB data.
-** Decision: Use parallel NewNodePair type instead of changing NodePair
-   Changing NodePair.orgnode from OrgNode to NewOrgNode would cascade to 11 files.
-   DECISION: Add NewNodePair and NewPairTree as parallel types.
-   - Keep old NodePair/PairTree unchanged
-   - Add conversion functions between old and new types
-   - Old code keeps working, new code can convert at boundaries
-   - Merge types in Phase 7 when old types are removed
-** Implemented approach (simpler than originally planned)
-   The parallel types approach means we DON'T need to update all the tree
-   construction files (3.2-3.8 below). Instead:
-   - Added NewNodePair, NewPairTree types to server/types/tree.rs
-   - Added node_pair_to_new() and node_pair_from_new() conversion functions
-   - Added new_forest_root_pair() helper to server/to_org/util.rs
-   - Added comprehensive tests for NodePair <-> NewNodePair round-trips
-   The existing tree construction code continues to use PairTree.
-   When new types are needed (e.g., for rendering), convert at the boundary.
-** 3.1 Update server/types/tree.rs
-   - Added NewNodePair struct with new_orgnode: NewOrgNode
-   - Added NewPairTree type alias
-   - Added NewNodePair::from_orgnode() and from_pair() constructors
-   - Added node_pair_to_new() and node_pair_from_new() conversion functions
-   - Added 7 tests for round-trip conversions
-** 3.2 Update to_org/util.rs
-   - Added new_forest_root_pair() returning NewNodePair
-   - Added new_new_forest() (unused for now but available)
-   - Added is_new_forest_root() (unused for now but available)
-** 3.3-3.8 NOT NEEDED with parallel types approach
-   Original plan called for updating aliases.rs, sharing.rs, contents.rs,
-   aliascol.rs, backpath.rs, definitive.rs, initial_bfs.rs.
-   With parallel types + conversion at boundaries, these don't need changes yet.
-   They will be updated in Phase 7 when we merge old and new types.
-** 3.9 All tests pass
-   - cargo test: 57 tests pass
-   - integration tests: 10 tests pass
-
-* DONE Phase 4: Migrate parsing (input path)
-  Parsing is trickier because it builds OrgNodes from user text.
-** Decision: Keep parsing using old types during transition
-   With the parallel types approach, parsing doesn't need changes:
-   - Parsing produces Tree<OrgNode> (old types)
-   - Validation works on old types
-   - Conversion to new types happens at boundaries when needed
-   - from_old_orgnode() converts OrgNode -> NewOrgNode
-   The parsing code will be updated in Phase 7 when old types are removed.
-** 4.1-4.4 NOT NEEDED with parallel types approach
-   Original plan called for updating parse_metadata_sexp.rs, uninterpreted.rs,
-   add_missing_info.rs, and validate_tree.rs to produce new types.
-   With conversion at boundaries, these files don't need changes yet.
-** 4.5 All tests still pass
-   - cargo test: 57 tests pass
-   - integration tests: 10 tests pass
-
-* DONE Phase 5: Migrate save instructions (input path continued)
-** Decision: Keep save instructions using old types during transition
-   With the parallel types approach, save instruction code doesn't need changes:
-   - Code works with Tree<OrgNode> and produces save instructions
-   - Only TrueNodes generate save instructions (this logic stays the same)
-   - No conversion to new types needed for save operations
-   Code will be updated in Phase 7 when old types are removed.
-** 5.1-5.3 NOT NEEDED with parallel types approach
-   Original plan called for updating to_naive_instructions.rs,
-   reconcile_same_id_instructions.rs, and validate_foreign_nodes.rs.
-   With conversion at boundaries, these files don't need changes yet.
-** 5.4 All tests still pass
-
-* DONE Phase 6: Migrate remaining code
-** Decision: Keep remaining code using old types during transition
-   With the parallel types approach:
-   - merge/validate_merge.rs - works with old types
-   - merge/mergeInstructionTriple.rs - works with old types
-   - types/tree/orgnode_skgnode.rs - works with old types
-   - serve/handlers/*.rs - works with old types
-   - test_utils.rs - works with old types
-   All these will be updated in Phase 7 when old types are removed.
-** 6.1-6.5 NOT NEEDED with parallel types approach
-** 6.6 All tests still pass
-
-** Summary: Phases 3-6 simplified by parallel types approach
-   The parallel types approach (Option B) deferred most migration work to Phase 7.
-   What was done:
-   - Phase 1: Created new types (TrueNode, Scaffold, NewOrgNode)
-   - Phase 2: Added new rendering functions (new_orgnode_to_text, etc.)
-   - Phase 3: Added NewNodePair, NewPairTree, conversion functions
-   - Phase 4-6: No changes needed (conversion at boundaries)
-   What remains:
-   - Phase 8: Optional improvements
-
-* DONE Phase 7: Cleanup (subdivided for incremental migration)
-  Goal: Remove old types, rename NewOrgNode -> OrgNode.
-  Strategy: Migrate subsystem by subsystem, keeping tests passing at each step.
-
-  OUTCOME: Phase 7 complete with dual-field approach. Old types still exist
-  but new types are used for rendering. Full type removal deferred to Phase 8+.
-
-  Files using Interp:: (18 files)
-  Files using OrgNode (28 files)
-  Files accessing .code.interp (9 files, 14 occurrences)
-
-** DONE 7.1 Migrate rendering subsystem
-   Files: server/org_to_text.rs, server/serve/handlers/title_matches.rs
-
-   - org_to_text.rs already has new_orgnode_to_text() functions
-   - Updated title_matches.rs to use NewOrgNode and new_orgnode_to_text()
-   - This was the only external caller of orgnode_to_text()
-   - Internal use in orgnode_forest_to_string() tied to PairTree (step 7.3)
-   - All tests pass
-
-** DONE 7.2 Migrate tree construction subsystem
-   Files: server/to_org/util.rs, server/to_org/complete/*.rs,
-          server/to_org/expand/*.rs (7 files)
-
-   NOTE: Done AFTER 7.3, since tree construction needs the new_orgnode
-   field to exist before it can populate it.
-
-   Updated all NodePair constructions to compute and store new_orgnode:
-   - server/to_org/util.rs: forest_root_pair(), make_and_append_child_pair(),
-     build_node_branch_minus_content()
-   - server/types/tree/orgnode_skgnode.rs: insert_sourceless_node(),
-     append_indefinitive_node()
-   - server/to_org/expand/backpath.rs: prepend_indefinitive_child_with_parent_ignores()
-   - server/to_org/complete/contents.rs: extend_content()
-   - server/to_org/expand/definitive.rs: rebuild_pair_from_disk_mostly_clobbering_the_org()
-   - server/serve/handlers/save_buffer.rs: add_paired_subtree_as_child()
-   - server/test_utils.rs: orgnode_forest_to_paired()
-
-   Each construction now:
-   1. Creates the orgnode (as before)
-   2. Computes new_orgnode = from_old_orgnode(&orgnode)
-   3. Stores new_orgnode: Some(new_orgnode) in NodePair
-
-   All tests pass (207 tests)
-
-** DONE 7.3 Add dual field to NodePair (do this BEFORE 7.2)
-   Files: server/types/tree.rs, server/types/tree/orgnode_skgnode.rs,
-          and all files that construct NodePair
-
-   ORDERING NOTE: This step is done before 7.2 because tree construction
-   needs the new_orgnode field to exist before it can populate it.
-
-   Using the safer incremental approach:
-   - Added new field: NodePair { orgnode, new_orgnode: Option<NewOrgNode> }
-   - Initially new_orgnode is None everywhere
-   - Updated all NodePair constructions (12 locations in 8 files)
-   - Tree construction (7.2) will populate it
-   - Callers (7.4-7.7) will migrate to read from it
-   - Finally (7.8) remove orgnode field
-   - All tests pass
-
-** DONE 7.4 Migrate parsing subsystem
-   Files: server/serve/parse_metadata_sexp.rs,
-          server/from_text/buffer_to_orgnodes/*.rs (4 files)
-
-   NOT NEEDED with dual-field approach.
-
-   Parsing continues to use old types:
-   - parse_metadata_sexp.rs: Parses to OrgnodeMetadata (unchanged)
-   - uninterpreted.rs: Produces Tree<OrgNode> (unchanged)
-   - add_missing_info.rs: Works with Tree<OrgNode> (unchanged)
-   - validate_tree.rs: Validates Tree<OrgNode> using Interp:: matches (unchanged)
-
-   Conversion happens at PairTree boundary:
-   - buffer_to_orgnode_forest_and_save_instructions returns Tree<OrgNode>
-   - pair_orgnode_forest_with_save_instructions creates PairTree
-   - Each NodePair gets new_orgnode = Some(from_old_orgnode(&orgnode))
-   - This was implemented in Phase 7.2
-
-   The actual migration of parsing to use new types directly will happen
-   in Phase 7.8 when we remove old types. At that point, either:
-   - Change parsing to produce Tree<NewOrgNode> directly, OR
-   - Keep parsing intermediate types and convert at a single boundary
-
-   All tests pass (207 tests)
-
-** DONE 7.5 Migrate save instructions subsystem
-   Files: server/from_text/orgnodes_to_instructions/*.rs,
-          server/from_text/validate_foreign_nodes.rs (3 files)
-
-   NOT NEEDED with dual-field approach.
-
-   Save instructions are generated from Tree<OrgNode> (old types):
-   - to_naive_instructions.rs: Takes Tree<OrgNode>, produces Vec<SaveInstruction>
-   - reconcile_same_id_instructions.rs: Works with SaveInstruction (contains SkgNode)
-   - validate_foreign_nodes.rs: Works with SaveInstruction
-
-   Save instructions are independent of NewOrgNode/PairTree:
-   - They extract data from OrgNode to build SkgNode for disk storage
-   - No need to convert to new types
-   - Will be updated in Phase 7.8 when old types are removed
-
-   All tests pass (207 tests)
-
-** DONE 7.6 Migrate handlers and merge
-   Files: server/serve/handlers/*.rs, server/merge/*.rs
-
-   Already done or not needed with dual-field approach:
-
-   Handlers:
-   - title_matches.rs: Already migrated in Phase 7.1 (uses NewOrgNode)
-   - save_buffer.rs: Already migrated in Phase 7.2/7.3 (populates new_orgnode)
-   - single_root_view.rs: No changes needed (doesn't use OrgNode directly)
-
-   Merge:
-   - validate_merge.rs: No changes needed (works with Tree<OrgNode> for validation)
-   - mergeInstructionTriple.rs: No changes needed (works with Tree<OrgNode>)
-
-   The merge code validates and generates instructions from the original
-   Tree<OrgNode> forest, which is independent of PairTree. Will be updated
-   in Phase 7.8 when old types are removed.
-
-   All tests pass (207 tests)
-
-** DONE 7.7 Migrate test utilities and error types
-   Files: server/test_utils.rs, server/types/errors.rs
-
-   Partially done or not needed with dual-field approach:
-
-   test_utils.rs:
-   - orgnode_forest_to_paired: Already updated in Phase 7.2 (populates new_orgnode)
-   - compare_orgnode_forests, compare_two_forests_modulo_id: Work with Tree<OrgNode>
-     for testing parsing - no changes needed
-   - compare_orgnode_portions_of_pairforest_and_orgnodeforest: Compares .orgnode field
-     for compatibility testing - no changes needed
-
-   errors.rs:
-   - BufferValidationError contains OrgNode for error context
-   - Validation uses Tree<OrgNode> (old types)
-   - Will change to NewOrgNode in Phase 7.8 when old types are removed
-
-   All tests pass (207 tests)
-
-** DONE 7.8 Sync new_orgnode after all orgnode mutations
-   Files: Multiple files with write_at_node_in_tree calls
-
-   7.8.1 DONE Migrate rendering to use NewOrgNode
-   - orgnode_forest_to_string now uses new_orgnode_to_text()
-   - Converts orgnode → NewOrgNode at render time (to capture mutations)
-   - Checks ForestRoot using OrgNodeKind::Scaff(ScaffoldKind::ForestRoot)
-   - Updated unit tests to use canonical scaffold titles
-   - All 207 tests pass
-
-   7.8.2 DONE Sync new_orgnode after all orgnode mutations
-   - to_org/util.rs: makeIndefinitiveAndClobber, mark_if_visited_or_repeat_or_cycle,
-     detect_and_mark_cycle (3 sites)
-   - to_org/complete/contents.rs: clobberIndefinitiveOrgnode, ensure_source (2 sites)
-   - to_org/complete/aliascol.rs: focus mutations (2 sites)
-   - to_org/expand/definitive.rs: execute_definitive_view_request,
-     indefinitize_content_subtree (2 sites already had sync in rebuild_pair_from_disk)
-   - All 207 unit tests + 10 integration tests pass
-
-   NOTE: Old types (OrgNode, Interp) are still used internally.
-   The dual-field approach (NodePair with both orgnode and new_orgnode)
-   is working. Full migration of parsing to produce NewOrgNode directly
-   would be a future enhancement if desired.
-
-** DONE 7.9-7.10 Cleanup
-   7.9 Dead code removal:
-   - Removed unused functions from to_org/util.rs:
-     - is_forest_root, orgnode_from_title_and_rel, get_pid_from_pair_using_noderef
-   - Removed NewPairTree utilities (new_forest_root_pair, new_new_forest, is_new_forest_root)
-   - Added #[allow(dead_code)] for intentionally kept methods:
-     - find_links_to in dbs/typedb/search.rs
-     - ID::as_str, SourceNickname::new/as_str in types/misc.rs
-   - Updated integration test (aliases-view-request) for canonical scaffold titles
-   - No compiler warnings
-
-   7.10 Type renames NOT done (deferred):
-   - NewOrgNode, NewNodePair, NewPairTree, new_orgnode_to_text, etc.
-     remain with their current names
-   - from_old_orgnode and to_old_orgnode are still needed for conversion
-   - The dual-field approach is stable and working
-   - Full rename would require migrating parsing to produce NewOrgNode directly
-
-   CURRENT STATE:
-   - NodePair has: { orgnode: OrgNode, new_orgnode: Option<NewOrgNode> }
-   - Tree construction populates both fields
-   - Mutations sync new_orgnode after modifying orgnode
-   - Rendering converts orgnode → NewOrgNode at render time
-   - All 207 unit tests + 10 integration tests pass
-   - No compiler warnings
-
-** Decision on 7.3: Use the safer incremental approach
-   DECISION: Use the safer approach with dual fields.
-
-   Instead of changing NodePair.orgnode all at once:
-   1. Add new field: NodePair { orgnode: OrgNode, new_orgnode: Option<NewOrgNode> }
-   2. Migrate callers one by one to use new_orgnode
-   3. When all callers use new_orgnode, remove orgnode field
-   4. Rename new_orgnode -> orgnode (now it's NewOrgNode type)
-
-   This is slower but much safer - each caller migration is a small,
-   testable change. If something breaks, it's easy to identify which
-   caller caused the issue.
-
-* IN PROGRESS Phase 8: Complete type migration
-  Goal: Remove orgnode field from NodePair, use only new_orgnode.
-
-** DONE 8.1 Add helper methods to NewOrgNode
-   Query methods:
-   - id() -> Option<&ID>
-   - title() -> &str
-   - matches_interp(&Interp) -> bool (bridge for transition)
-   - has_effect(EffectOnParent) -> bool
-   - is_scaffold(&ScaffoldKind) -> bool
-   - is_true_node() -> bool
-   - is_scaffold_any() -> bool
-   - scaffold_kind() -> Option<&ScaffoldKind>
-   - is_indefinitive() -> bool
-   - has_source() -> bool
-
-   Mutation methods:
-   - set_indefinitive(bool)
-   - clear_body()
-   - set_title(String)
-   - set_source(String)
-   - set_cycle(bool)
-   - view_requests_mut() -> Option<&mut HashSet<ViewRequest>>
-
-** DONE 8.2 Add helper methods to NodePair
-   - orgnode_new() -> &NewOrgNode (panics if None)
-   - orgnode_new_mut() -> &mut NewOrgNode
-
-** DONE 8.3 Migrate reads from .orgnode to .orgnode_new()
-   Migrated sites:
-   - types/tree/orgnode_skgnode.rs:34 - unique_child_with_interp
-   - to_org/util.rs:220 - is_ancestor_id
-   - to_org/util.rs:234 - get_pid_in_pairtree
-   - to_org/complete/sharing.rs:92 - Subscribee check
-   - to_org/complete/contents.rs:78 - interp checks
-
-** DONE 8.4 Migrate mutations to use new_orgnode directly
-   Previously: code mutated .orgnode then synced to .new_orgnode
-   Now: code reads/mutates .new_orgnode directly using helper methods
-
-   Migrated all runtime reads from .orgnode to .orgnode_new():
-   - types/tree/orgnode_skgnode.rs: pid_for_subscribee_and_its_subscriber_grandparent,
-     ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol
-   - to_org/expand/backpath.rs: find_child_by_id, find_children_by_ids
-   - to_org/util.rs: collect_ids_from_pair_tree
-   - to_org/complete/contents.rs: content child ID lookup, categorize_children_by_treatment
-   - to_org/complete/aliascol.rs: validation
-   - to_org/expand/definitive.rs: rebuild_pair_from_disk_mostly_clobbering_the_org
-
-   Added new helper method to NewOrgNode:
-   - interp() -> Interp (returns equivalent Interp for this node)
-
-   Remaining .orgnode uses are:
-   - Type definitions (NodePair struct)
-   - NodePair construction (both fields set in sync)
-   - Conversion functions
-   - Test utility comparing against Tree<OrgNode>
-   - Input parsing in from_text/ (operates on Tree<OrgNode>)
-
-** DONE 8.5 Remove orgnode field from NodePair
-   Changed NodePair to only have: { mskgnode, new_orgnode }
-   - Removed orgnode field from NodePair struct
-   - Made new_orgnode non-optional
-   - Updated orgnode_new() and orgnode_new_mut() to access directly
-   - Removed NewNodePair (now just a type alias)
-   - Removed node_pair_to_new() and node_pair_from_new()
-   - Updated all NodePair constructions (~12 locations)
-   - Updated test utilities to use to_old_orgnode() for comparison
-   - Updated test files to use orgnode_new() accessors
-
-** IN PROGRESS 8.6 Eliminate OrgNode construction outside parsing
-   Goal: Stop constructing old OrgNode except in parsing and conversion functions.
-
-   DONE: Changed skgnode_and_orgnode_from_* to return NewOrgNode directly:
-   - to_org/util.rs: skgnode_and_orgnode_from_id, skgnode_and_orgnode_from_pid_and_source
-   - Added neworgnode_content_from_disk() constructor
-
-   DONE: Updated all callers to use NewOrgNode directly:
-   - to_org/complete/contents.rs: extend_content
-   - to_org/util.rs: make_and_append_child_pair, build_node_branch_minus_content
-   - types/tree/orgnode_skgnode.rs: append_indefinitive_node
-   - to_org/expand/backpath.rs: prepend_indefinitive_child_with_parent_ignores
-   - to_org/expand/definitive.rs: rebuild_pair_from_disk_mostly_clobbering_the_org
-
-   DONE: Added new constructors to orgnode_new.rs:
-   - neworgnode_content_from_disk(id, source, title, body)
-   - neworgnode_indefinitive_from_disk(id, source, title, effect)
-   - neworgnode_with_metadata(id, source, title, body, effect, indef, edit_req, view_reqs)
-   - neworgnode_scaffold_from_interp(interp, title)
-   - effect_on_parent_from_interp(interp)
-
-   DONE: Updated forest_root_pair() to use forest_root_new_orgnode() directly
-
-   DONE: Updated insert_sourceless_node() to use neworgnode_scaffold_from_interp()
-
-   DONE: Removed unused Tree<OrgNode> helper functions:
-   - unique_orgnode_child_with_interp
-   - unique_orgnode_child_with_interp_from_ref
-   - collect_grandchild_aliases_for_orgnode
-
-   All 35 unit tests + 10 integration tests pass.
-
-   REMAINING OrgNode construction:
-   - Parsing (parse_metadata_sexp.rs, uninterpreted.rs) still produces old types
-   - Conversion functions (from_old_orgnode, to_old_orgnode) still needed
-   - Tests in org_to_text.rs construct OrgNode for compatibility checks
-
-** 8.7 Rename types to final names (DEFERRED)
-   - NewOrgNode → OrgNode
-   - new_orgnode → orgnode
-   - new_orgnode_to_text → orgnode_to_text
-   - orgnode_new() → orgnode()
-
-   NOTE: This requires first migrating parsing to produce NewOrgNode directly,
-   which would affect validate_tree.rs and the save instructions pipeline.
-   Interp enum is still heavily used (167 occurrences in 12 files).
-
-** 8.8 Remove old types and conversion functions (DEFERRED)
-   Remove from orgnode.rs:
-   - OrgNode struct
+** Tests pass after every step
+** Introduce new types alongside old, then migrate, then remove old
+** Small commits with clear descriptions
+** When in doubt, add a conversion function rather than change everything at once
+** Before deviating from the plan, stop and report.
+   This plan looks great. But when the rubber hits the road it's very likely you'll encounter something unanticipated. Before making any important unforeseen decisions, report the fork in the road to me.
+** Short atomic functions, with names long enough to sufficiently describe their responsibilities.
+** Minimizate the diff against branch 'main'
+   Write the new code in a way that minimizes the diff between this "type-refactor" branch and "main". (Don't change any branch but "type-refactor".) That means, for instance, that eventually there should only be one orgnode type, like there used to be, and it should be defined in a file of the same name.
+* DONE Phases 1-8
+  These plans have been moved to the neighboring file 'done.org'.
+* DONE Phase 9: Eliminate Interp from runtime code
+  Goal: Replace all uses of Interp:: with direct OrgNode type checks.
+  Completed: Reduced Interp usage from 13 files to 6 files.
+  Remaining: to_naive_instructions.rs (Phase 10), parsing (Phase 11), old types (Phase 12).
+
+** 9.1 Replace matches_interp() calls with direct type checks
+   Currently: node.matches_interp(&Interp::AliasCol)
+   Change to: node.is_scaffold(&ScaffoldKind::AliasCol)
+
+   For TrueNode effects:
+   Currently: node.matches_interp(&Interp::Content)
+   Change to: node.has_effect(EffectOnParent::Content)
+
+   Files to update:
+   - server/to_org/complete/contents.rs (4 sites)
+   - server/to_org/complete/sharing.rs (3 sites)
+   - server/to_org/complete/aliascol.rs (2 sites)
+   - server/to_org/expand/definitive.rs (3 sites)
+   - server/types/tree/orgnode_skgnode.rs (3 sites)
+
+** 9.2 Change insert_sourceless_node() to take ScaffoldKind
+   Currently: insert_sourceless_node(tree, parent_id, Interp::AliasCol, ...)
+   Change to: insert_sourceless_node(tree, parent_id, ScaffoldKind::AliasCol, ...)
+
+   Files calling it:
+   - server/to_org/expand/aliases.rs
+   - server/to_org/complete/sharing.rs
+   - server/to_org/complete/aliascol.rs
+
+** 9.3 Change append_indefinitive_node() to take EffectOnParent
+   Currently: append_indefinitive_node(..., Interp::Subscribee, ...)
+   Change to: append_indefinitive_node(..., EffectOnParent::Subscribee, ...)
+
+   Files calling it:
+   - server/to_org/complete/sharing.rs
+   - server/to_org/expand/backpath.rs
+
+** 9.4 Change unique_child_with_interp() to unique_scaffold_child()
+   DECISION: Use single function taking ScaffoldKind.
+   Looking at usage, it's only ever called with scaffold kinds (AliasCol,
+   SubscribeeCol, HiddenInSubscribeeCol), never with Content/Subscribee.
+
+   Rename: unique_child_with_interp() -> unique_scaffold_child()
+   Change param: Interp -> ScaffoldKind
+
+   Files calling it:
+   - server/to_org/expand/aliases.rs
+   - server/to_org/complete/sharing.rs
+
+* Phase 10: Eliminate Interp from save instructions
+  Goal: Refactor to_naive_instructions.rs to not use Interp.
+
+** 10.1 Refactor naive_saveinstructions_from_tree()
+   Current pattern:
+     match interp {
+       Interp::ForestRoot => ...,
+       Interp::AliasCol | Interp::Alias | ... => skip,
+       _ => process
+     }
+
+   New pattern:
+     match &node.kind {
+       OrgNodeKind::Scaff(s) => match s.kind {
+         ScaffoldKind::ForestRoot => ...,
+         _ => skip // all other scaffolds
+       },
+       OrgNodeKind::True(_) => process
+     }
+
+** 10.2 Refactor collect_subscribees()
+   Change to use is_scaffold() checks.
+
+** 10.3 Refactor collect_contents_that_are_not_to_delete()
+   Change Interp::Content check to has_effect(EffectOnParent::Content).
+
+* Phase 11: Eliminate Interp from parsing
+  Goal: Change parser to produce OrgNode directly, so Interp becomes dead code.
+
+  The from_parsed() function already does this conversion, so we're
+  essentially inlining that logic into the parser. This lets us delete
+  Interp entirely in Phase 12.
+
+** 11.1 Change parse_metadata_sexp.rs
+   Instead of returning OrgnodeMetadata, return a simpler intermediate
+   struct that from_parsed() (or its logic inlined) can use to build OrgNode.
+   Or parse directly to OrgNode components.
+
+** 11.2 Update uninterpreted.rs
+   Call the new parser and construct OrgNode directly,
+   removing the from_parsed() call.
+
+* Phase 12: Remove old types
+  Goal: Delete unused types after migration complete.
+
+** 12.1 Remove from orgnode.rs (after Interp no longer used externally)
    - Interp enum
+   - OrgnodeMetadata struct (if not needed for parsing)
    - OrgnodeCode struct
-   - OrgnodeMetadata struct
-   Remove from orgnode_new.rs:
-   - from_old_orgnode()
-   - to_old_orgnode()
-   - matches_interp() (no longer needed)
+   - orgnodemd_to_string() function
+   - default_metadata() function
 
-   NOTE: Requires completing 8.7 first.
+   KEEP:
+   - OrgnodeViewData (used by TrueNode)
+   - OrgnodeRelationships (used by OrgnodeViewData)
+   - EditRequest, ViewRequest (used by both old and new)
+
+** 12.2 Remove bridge functions from orgnode_new.rs
+   - from_parsed() (if parser changed)
+   - matches_interp() (after 9.1)
+   - interp() (bridge function)
+   - effect_on_parent_from_interp() (after 9.3)
+   - orgnode_scaffold_from_interp() (after 9.2)
+
+* Phase 13: File reorganization (minimize diff with main)
+  Goal: Single OrgNode type in orgnode.rs, matching main branch structure.
+
+** 13.1 Move OrgNode types from orgnode_new.rs to orgnode.rs
+   - OrgNode, OrgNodeKind, TrueNode, Scaffold, ScaffoldKind, EffectOnParent
+   - Helper functions like forest_root_orgnode()
+
+** 13.2 Delete orgnode_new.rs
+
+** 13.3 Update all imports
+   Change: use crate::types::orgnode_new::OrgNode
+   To:     use crate::types::orgnode::OrgNode
+
+** 13.4 Final cleanup
+   - Ensure orgnode.rs exports match main branch structure
+   - Remove any remaining type aliases for backwards compatibility
 
 * maybe later
 ** Make TrueNode.id required (separate refactor as discussed)
@@ -494,20 +155,7 @@
   - Run `bash/integration-tests.sh` after each phase
   - If tests fail, fix before proceeding
   - Commit after each passing step for easy bisection
-
-* Estimated file changes by phase
-  | Phase | Files touched |
-  |-------+---------------|
-  |     1 | 1-2           |
-  |     2 | 2-3           |
-  |     3 | 8-10          |
-  |     4 | 4-5           |
-  |     5 | 3-4           |
-  |     6 | 5-7           |
-  |     7 | 10-15         |
-  Total: ~27 server files + tests
-
-* tricky|dangerous parts
+* PROBABLY DONE : tricky|dangerous parts
 
 ** Interp is used in match statements everywhere
    The current code has many `match interp { ... }` blocks.
@@ -532,7 +180,7 @@
    MITIGATION: Use grep/IDE to find all `.metadata.code.interp` accesses.
    The compiler will catch type errors, but semantic errors are possible.
 
-*** TODO a
+*** DONE a
     Bear in mind that there might be lots of whitespace in that string, and it might even be spread across multiple lines. (Sorry, that's how I find the code easy to read.)
 
 ** focused/folded move from OrgnodeViewData to OrgNode
@@ -580,7 +228,7 @@
    - HiddenOutsideOfSubscribeeCol: "hidden from all subscriptions"
    - HiddenInSubscribeeCol: "hidden from this subscription"
    - ForestRoot: ""
-*** TODO a
+*** DONE a
     Now that I see what the others are, let's change the AliasCol title to match that style: just use "its aliases'.
 ** Conversion functions must be truly lossless
    from_old_orgnode() and to_old_orgnode() are used during transition.
@@ -600,21 +248,6 @@
    MITIGATION: Run full integration test suite after each phase.
    Consider adding more unit tests for under-tested code before refactoring.
 
-** TODO The "indefinitive" field has subtle semantics
-   It means different things in different contexts:
-   - Repeated node in view (don't recurse)
-   - BFS limit reached (truncated)
-   - User manually set indefinitive
-   - Foreign node (can't edit)
-
-   DANGER: Moving indef from OrgnodeCode to TrueNode might lose context.
-
-   MITIGATION: The boolean just means "don't save changes to this node's children".
-   The context is determined by tree position, not the flag itself.
-   But review all places that SET indefinitive to ensure they still make sense.
-
-*** a
-    Actually, 'indefinitive' means 'changes to this node's children will not affect it'. Things you've listed as what it 'means' are not that, but rather ways it can arise. In all cases it has the same effect when saving.
 ** sexp serialization format must not change
    The metadata sexp (skg ...) is parsed by both Rust and Emacs.
 
@@ -623,5 +256,3 @@
    MITIGATION: orgnodemd_to_string() must produce identical output.
    Add test: "new type serializes to same sexp as old type".
    The sexp format is the contract; internal types can change freely.
-* TODO Before deviating from the plan, stop and report.
-  This plan looks great. But when the rubber hits the road it's very likely you'll encounter something unanticipated. Before making any important unforeseen decisions, report the fork in the road to me.

@@ -11,8 +11,8 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{Interp, ViewRequest};
-use crate::types::orgnode_new::{OrgNodeKind, EffectOnParent, OrgNode};
+use crate::types::orgnode::ViewRequest;
+use crate::types::orgnode_new::{OrgNodeKind, EffectOnParent, OrgNode, ScaffoldKind};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -75,12 +75,12 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().matches_interp ( &Interp::AliasCol ) })?;
+        node.orgnode().is_scaffold ( &ScaffoldKind::AliasCol ) })?;
     let is_col_scaffold: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().matches_interp ( &Interp::SubscribeeCol )
-        || node.orgnode().matches_interp ( &Interp::HiddenOutsideOfSubscribeeCol )
-        || node.orgnode().matches_interp ( &Interp::HiddenInSubscribeeCol ) })?;
+        node.orgnode().is_scaffold ( &ScaffoldKind::SubscribeeCol )
+        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenOutsideOfSubscribeeCol )
+        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenInSubscribeeCol ) })?;
     if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
@@ -295,7 +295,7 @@ fn categorize_children_by_treatment (
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
     if child . value () . orgnode ()
-        . matches_interp ( &Interp::Content )
+        . has_effect ( EffectOnParent::Content )
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}

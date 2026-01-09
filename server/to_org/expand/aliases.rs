@@ -1,9 +1,10 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{Interp, ViewRequest};
+use crate::types::orgnode::ViewRequest;
+use crate::types::orgnode_new::ScaffoldKind;
 use crate::types::tree::PairTree;
-use crate::types::tree::orgnode_skgnode::{insert_sourceless_node, unique_child_with_interp};
+use crate::types::tree::orgnode_skgnode::{insert_sourceless_node, unique_scaffold_child};
 
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -42,8 +43,8 @@ pub async fn build_and_integrate_aliases (
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_pid_in_pairtree ( tree, node_id ) ?;
-  if unique_child_with_interp (
-    tree, node_id, Interp::AliasCol )? . is_some ()
+  if unique_scaffold_child (
+    tree, node_id, &ScaffoldKind::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,
     // then completeAliasCol already handled it.
     return Ok (( )); }
@@ -52,8 +53,8 @@ pub async fn build_and_integrate_aliases (
       config, driver, node_id_val ). await;
   let aliascol_id : ego_tree::NodeId =
     insert_sourceless_node ( tree, node_id,
-      Interp::AliasCol, "", true ) ?;
+      ScaffoldKind::AliasCol, true ) ?;
   for alias in & aliases {
     insert_sourceless_node ( tree, aliascol_id,
-      Interp::Alias, alias, false ) ?; }
+      ScaffoldKind::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }

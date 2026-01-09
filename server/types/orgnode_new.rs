@@ -547,6 +547,7 @@ pub fn effect_on_parent_from_interp ( interp : &Interp ) -> Option < EffectOnPar
 /// For Alias, the title is required and becomes the alias text.
 /// For other scaffolds, title is ignored.
 /// Returns Err if the interp is not a scaffold type.
+/// DEPRECATED: Use orgnode_from_scaffold_kind instead.
 pub fn orgnode_scaffold_from_interp (
     interp : Interp,
     title  : &str,
@@ -560,11 +561,15 @@ pub fn orgnode_scaffold_from_interp (
         Interp::ForestRoot                   => ScaffoldKind::ForestRoot,
         _ => return Err ( format! ( "Interp {:?} is not a scaffold type", interp ) ),
     };
-    Ok ( OrgNode {
+    Ok ( orgnode_from_scaffold_kind ( kind ) ) }
+
+/// Create a Scaffold OrgNode from a ScaffoldKind.
+pub fn orgnode_from_scaffold_kind ( kind : ScaffoldKind ) -> OrgNode {
+    OrgNode {
         focused : false,
         folded  : false,
         kind    : OrgNodeKind::Scaff ( Scaffold { kind } ),
-    }) }
+    } }
 
 /// Create an indefinitive OrgNode from disk data with a specific effect.
 /// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).

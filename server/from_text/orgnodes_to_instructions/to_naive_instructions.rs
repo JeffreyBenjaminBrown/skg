@@ -1,11 +1,11 @@
 use crate::types::orgnode::{Interp, EditRequest};
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode_new::{OrgNode, ScaffoldKind};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  collect_grandchild_aliases_for_orgnode, unique_orgnode_child_with_interp };
+  collect_grandchild_aliases_for_orgnode, unique_orgnode_scaffold_child };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -131,8 +131,8 @@ fn collect_subscribees (
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
-      tree, node_id, Interp::SubscribeeCol )
+    unique_orgnode_scaffold_child (
+      tree, node_id, &ScaffoldKind::SubscribeeCol )
     . map_err ( |e| e.to_string() ) ?;
   match subscribee_col_id {
     None => Ok(None),

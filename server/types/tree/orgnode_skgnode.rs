@@ -3,11 +3,10 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::Interp;
 use crate::types::orgnode_new::{
-    OrgNode, ScaffoldKind,
-    effect_on_parent_from_interp, orgnode_indefinitive_from_disk,
-    orgnode_scaffold_from_interp };
+    OrgNode, ScaffoldKind, EffectOnParent,
+    orgnode_indefinitive_from_disk,
+    orgnode_from_scaffold_kind };
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -21,27 +20,27 @@ use typedb_driver::TypeDBDriver;
 /// accessors specific to trees of OrgNodes and (maybe) SkgNodes
 ///
 
-/// Find the unique child of a node with a given Interp (for PairTree).
-/// Returns None if no child has the interp,
+/// Find the unique child of a node with a given ScaffoldKind (for PairTree).
+/// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_child_with_interp (
-  tree    : &PairTree,
-  node_id : NodeId,
-  interp  : Interp,
+pub fn unique_scaffold_child (
+  tree          : &PairTree,
+  node_id       : NodeId,
+  scaffold_kind : &ScaffoldKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<super::NodePair> =
     tree.get(node_id)
-    .ok_or("unique_child_with_interp: node not found")?;
+    .ok_or("unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode().matches_interp ( &interp ))
+    .filter(|c| c.value().orgnode().is_scaffold ( scaffold_kind ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
     0 => Ok(None),
     1 => Ok(Some(matches[0])),
     n => Err(format!(
-      "Expected at most one {:?} child, found {}", interp, n).into()),
+      "Expected at most one {:?} child, found {}", scaffold_kind, n).into()),
   }
 }
 
@@ -79,7 +78,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
   if ! parent_ref . value () . orgnode ()
-      . matches_interp ( &Interp::SubscribeeCol ) {
+      . is_scaffold ( &ScaffoldKind::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
   let grandparent_ref : NodeRef < NodePair > =
@@ -93,17 +92,15 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
 
 /// Insert into parent_id's children
 ///   a node with no associated SkgNode.
-/// Most Interps are like this (Alias and all the *Cols.)
-///   but the most common ones are not (Content, Subscribee).
+/// Most ScaffoldKinds are like this (Alias and all the *Cols.)
+///   but TrueNodes are not (Content, Subscribee).
 pub fn insert_sourceless_node (
-  tree      : &mut PairTree,
-  parent_id : NodeId,
-  interp    : Interp,
-  title     : &str,
-  prepend   : bool, // otherwise, append
+  tree          : &mut PairTree,
+  parent_id     : NodeId,
+  scaffold_kind : ScaffoldKind,
+  prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode = orgnode_scaffold_from_interp ( interp, title )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  let orgnode = orgnode_from_scaffold_kind ( scaffold_kind );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -113,21 +110,18 @@ pub fn insert_sourceless_node (
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
 
-/// Fetch a node from disk and append it as an indefinitive child with the given Interp.
+/// Fetch a node from disk and append it as an indefinitive child with the given effect.
 pub async fn append_indefinitive_node (
   tree      : &mut PairTree,
   parent_id : NodeId,
   node_id   : &ID,
-  interp    : Interp,
+  effect    : EffectOnParent,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id ) . await ?;
-  let effect = effect_on_parent_from_interp ( &interp )
-    . ok_or_else ( || format! (
-      "append_indefinitive_node: Interp {:?} is not a TrueNode interp", interp ) ) ?;
   let id = content_orgnode . id ()
     . ok_or ( "append_indefinitive_node: node has no ID" ) ?
     . clone ();
@@ -179,7 +173,7 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
     let child_new = child . value () . orgnode ();
-    if ! child_new . matches_interp ( &Interp::Alias ) {
+    if ! child_new . is_scaffold ( &ScaffoldKind::Alias ( String::new () ) ) {
       return Err (
         format! ( "AliasCol has non-Alias child with interp: {:?}",
                   child_new . interp () )
@@ -193,23 +187,23 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_orgnode_child_with_interp (
-  tree    : &Tree<OrgNode>,
-  node_id : NodeId,
-  interp  : Interp,
+pub fn unique_orgnode_scaffold_child (
+  tree          : &Tree<OrgNode>,
+  node_id       : NodeId,
+  scaffold_kind : &ScaffoldKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
-      "unique_orgnode_child_with_interp: node not found")?;
+      "unique_orgnode_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().matches_interp ( &interp ))
+    .filter(|c| c.value().is_scaffold ( scaffold_kind ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
     0 => Ok(None),
     1 => Ok(Some(matches[0])),
     n => Err(format!(
-      "Expected at most one {:?} child, found {}", interp, n).into()),
+      "Expected at most one {:?} child, found {}", scaffold_kind, n).into()),
   }
 }
 
@@ -224,8 +218,8 @@ pub fn collect_grandchild_aliases_for_orgnode (
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
-      tree, node_id, Interp::AliasCol )
+    unique_orgnode_scaffold_child (
+      tree, node_id, &ScaffoldKind::AliasCol )
     . map_err ( |e| e.to_string() ) ?;
   match alias_col_id {
     None => Ok(None),
