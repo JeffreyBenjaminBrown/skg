@@ -3,8 +3,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::orgnode::Interp;
-use skg::types::orgnode_new::OrgNode;
+use skg::types::orgnode_new::{OrgNode, EffectOnParent};
 use ego_tree::Tree;
 
 #[test]
@@ -95,7 +94,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test parentIgnores node
   let parentIgnores_node = tree_roots[1].value();
   assert_eq!(parentIgnores_node.title(), "parentIgnores node");
-  assert_eq!(parentIgnores_node.interp(), Interp::ParentIgnores);
+  assert!(parentIgnores_node.has_effect(EffectOnParent::ParentIgnores));
   assert_eq!(parentIgnores_node.is_indefinitive(), true);
   assert_eq!(parentIgnores_node.body(), Some(&"ParentIgnores body".to_string()));
 
@@ -127,7 +126,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title(), "simple node");
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_node.id(), None);
-  assert_eq!(first_node.interp(), Interp::Content);
+  assert!(first_node.has_effect(EffectOnParent::Content));
   assert_eq!(first_node.cycle(), false);
   assert_eq!(first_node.focused(), false);
   assert_eq!(first_node.folded(), false);

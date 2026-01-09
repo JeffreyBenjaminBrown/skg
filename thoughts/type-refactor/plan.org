@@ -93,21 +93,18 @@
 ** 10.3 Refactor collect_contents_that_are_not_to_delete()
    Change Interp::Content check to has_effect(EffectOnParent::Content).
 
-* Phase 11: Eliminate Interp from parsing
-  Goal: Change parser to produce OrgNode directly, so Interp becomes dead code.
+* DONE Phase 11: Eliminate Interp from external code
+  Goal: Make Interp internal to the parsing pipeline.
 
-  The from_parsed() function already does this conversion, so we're
-  essentially inlining that logic into the parser. This lets us delete
-  Interp entirely in Phase 12.
+  Approach: Keep parse_metadata_sexp.rs producing OrgnodeMetadata internally,
+  but ensure no code outside the parsing pipeline uses Interp directly.
+  The from_parsed() function converts OrgnodeMetadata to OrgNode at the boundary.
 
-** 11.1 Change parse_metadata_sexp.rs
-   Instead of returning OrgnodeMetadata, return a simpler intermediate
-   struct that from_parsed() (or its logic inlined) can use to build OrgNode.
-   Or parse directly to OrgNode components.
-
-** 11.2 Update uninterpreted.rs
-   Call the new parser and construct OrgNode directly,
-   removing the from_parsed() call.
+  Completed:
+  - Removed all Interp usage from test files (uninterpreted2.rs)
+  - Verified no server code outside types/ and parsing uses Interp
+  - Interp is now internal: defined in orgnode.rs, used by parse_metadata_sexp.rs,
+    converted to OrgNode by from_parsed() in orgnode_new.rs
 
 * Phase 12: Remove old types
   Goal: Delete unused types after migration complete.
