@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::org_to_text::orgnode_to_text;
-use skg::types::orgnode::{OrgnodeViewData, OrgnodeRelationships};
+use skg::types::orgnode::OrgnodeRelationships;
 use skg::types::orgnode::{
     OrgNode, OrgNodeKind, TrueNode, Scaffold,
     orgnode_from_scaffold };
@@ -57,12 +57,10 @@ fn test_metadata_ordering () {
     kind: OrgNodeKind::True ( TrueNode {
       title: "Test".to_string(),
       id: Some ( ID::from ( "xyz" )),
-      view_data: OrgnodeViewData {
-        cycle: true,
-        relationships: OrgnodeRelationships {
-          parentIsContainer: false,
-          .. OrgnodeRelationships::default() },
-        .. OrgnodeViewData::default() },
+      cycle: true,
+      relationships: OrgnodeRelationships {
+        parentIsContainer: false,
+        .. OrgnodeRelationships::default() },
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =

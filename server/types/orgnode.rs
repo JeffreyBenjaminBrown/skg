@@ -4,25 +4,6 @@
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
 /// Some 'OrgNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
-///
-/// OrgNode
-///   focused : bool
-///   folded : bool
-///   kind : OrgNodeKind
-///     True(TrueNode)
-///       title, body, id, source, effect_on_parent, indefinitive,
-///       view_data, edit_request, view_requests
-///     Scaff(Scaffold)
-///       kind : ScaffoldKind
-///         Alias(String) | AliasCol | ForestRoot | ...
-///
-/// Supporting types:
-///   OrgnodeViewData, // cycle, relationships
-///   OrgnodeRelationships, // 2 bools, 3 opt ints
-///   EditRequest, // merge | delete (mutually exclusive)
-///   ViewRequest, // aliases | containerward | sourceward | definitive
-///   EffectOnParent, // content | subscribee | parentIgnores | hiddenFromSubscribees
-///   ScaffoldKind, // alias | aliasCol | forestRoot | ...
 
 use super::misc::ID;
 use std::collections::HashSet;
@@ -56,7 +37,8 @@ pub struct TrueNode {
   pub source           : Option < String >,
   pub effect_on_parent : EffectOnParent,
   pub indefinitive     : bool,
-  pub view_data        : OrgnodeViewData,
+  pub cycle            : bool,
+  pub relationships    : OrgnodeRelationships,
   pub edit_request     : Option < EditRequest >,
   pub view_requests    : HashSet < ViewRequest >,
 }
@@ -68,13 +50,6 @@ pub enum EffectOnParent {
   Subscribee,            // Subscription relationship
   ParentIgnores,         // No effect on parent (containerward views)
   HiddenFromSubscribees, // No effect on parent (hidden from subscriptions)
-}
-
-/// View-related metadata. It dictates only how the node is shown.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeViewData {
-  pub cycle: bool, // True if a node is in its own org-predecessors.
-  pub relationships: OrgnodeRelationships,
 }
 
 /// These data only influence how the node is shown.
@@ -233,10 +208,10 @@ impl OrgNode {
       t . source = Some ( source );
     }}
 
-  /// Set the cycle flag in view_data. No-op for Scaffolds.
+  /// Set the cycle flag. No-op for Scaffolds.
   pub fn set_cycle ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . cycle = value;
+      t . cycle = value;
     }}
 
   /// Get mutable access to view_requests. Returns None for Scaffolds.
@@ -268,10 +243,10 @@ impl OrgNode {
   pub fn folded ( &self ) -> bool {
     self . folded }
 
-  /// Get the cycle flag from view_data. Returns false for Scaffolds.
+  /// Get the cycle flag. Returns false for Scaffolds.
   pub fn cycle ( &self ) -> bool {
     match &self . kind {
-      OrgNodeKind::True ( t ) => t . view_data . cycle,
+      OrgNodeKind::True ( t ) => t . cycle,
       OrgNodeKind::Scaff ( _ ) => false,
     }}
 
@@ -295,34 +270,34 @@ impl OrgNode {
       t . edit_request = edit_request;
     }}
 
-  /// Set numContainers in view_data.relationships. No-op for Scaffolds.
+  /// Set numContainers in relationships. No-op for Scaffolds.
   pub fn set_num_containers ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . relationships . numContainers = value;
+      t . relationships . numContainers = value;
     }}
 
-  /// Set numContents in view_data.relationships. No-op for Scaffolds.
+  /// Set numContents in relationships. No-op for Scaffolds.
   pub fn set_num_contents ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . relationships . numContents = value;
+      t . relationships . numContents = value;
     }}
 
-  /// Set numLinksIn in view_data.relationships. No-op for Scaffolds.
+  /// Set numLinksIn in relationships. No-op for Scaffolds.
   pub fn set_num_links_in ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . relationships . numLinksIn = value;
+      t . relationships . numLinksIn = value;
     }}
 
-  /// Set parentIsContainer in view_data.relationships. No-op for Scaffolds.
+  /// Set parentIsContainer in relationships. No-op for Scaffolds.
   pub fn set_parent_is_container ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . relationships . parentIsContainer = value;
+      t . relationships . parentIsContainer = value;
     }}
 
-  /// Set parentIsContent in view_data.relationships. No-op for Scaffolds.
+  /// Set parentIsContent in relationships. No-op for Scaffolds.
   pub fn set_parent_is_content ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . view_data . relationships . parentIsContent = value;
+      t . relationships . parentIsContent = value;
     }}
 
   /// Set effect_on_parent. No-op for Scaffolds.
@@ -427,13 +402,6 @@ impl Default for OrgnodeRelationships {
       numLinksIn    : Some ( 0 ),
     }} }
 
-impl Default for OrgnodeViewData {
-  fn default () -> Self {
-    OrgnodeViewData {
-      cycle : false,
-      relationships : OrgnodeRelationships::default (),
-    }} }
-
 impl Default for TrueNode {
   fn default () -> Self {
     TrueNode {
@@ -443,7 +411,8 @@ impl Default for TrueNode {
       source           : None,
       effect_on_parent : EffectOnParent::Content,
       indefinitive     : false,
-      view_data        : OrgnodeViewData::default (),
+      cycle            : false,
+      relationships    : OrgnodeRelationships::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }} }
@@ -476,7 +445,8 @@ pub fn mk_definitive_orgnode (
       source           : Some ( source ),
       effect_on_parent : EffectOnParent::Content,
       indefinitive     : false,
-      view_data        : OrgnodeViewData::default (),
+      cycle            : false,
+      relationships    : OrgnodeRelationships::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }),
@@ -501,7 +471,8 @@ pub fn mk_indefinitive_orgnode (
       source           : Some ( source ),
       effect_on_parent,
       indefinitive     : true,
-      view_data        : OrgnodeViewData::default (),
+      cycle            : false,
+      relationships    : OrgnodeRelationships::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }),
@@ -531,7 +502,8 @@ pub fn mk_orgnode (
       source           : Some ( source ),
       effect_on_parent,
       indefinitive,
-      view_data        : OrgnodeViewData::default (),
+      cycle            : false,
+      relationships    : OrgnodeRelationships::default (),
       edit_request,
       view_requests,
     }),

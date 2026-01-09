@@ -136,7 +136,7 @@ fn true_node_metadata_to_string (
 
   // Build view s-expr
   let mut view_parts : Vec < String > = Vec::new ();
-  if true_node . view_data . cycle {
+  if true_node . cycle {
     view_parts . push ( "cycle" . to_string () ); }
   if focused {
     view_parts . push ( "focused" . to_string () ); }
@@ -145,18 +145,18 @@ fn true_node_metadata_to_string (
 
   // Build rels s-expr
   let mut rel_parts : Vec < String > = Vec::new ();
-  if ! true_node . view_data . relationships . parentIsContainer {
+  if ! true_node . relationships . parentIsContainer {
     rel_parts . push ( "notInParent" . to_string () ); }
-  if true_node . view_data . relationships . parentIsContent {
+  if true_node . relationships . parentIsContent {
     rel_parts . push ( "containsParent" . to_string () ); }
-  if true_node . view_data . relationships . numContainers != Some ( 1 ) {
-    if let Some ( count ) = true_node . view_data . relationships . numContainers {
+  if true_node . relationships . numContainers != Some ( 1 ) {
+    if let Some ( count ) = true_node . relationships . numContainers {
       rel_parts . push ( format! ( "(containers {})", count )); }}
-  if true_node . view_data . relationships . numContents != Some ( 0 ) {
-    if let Some ( count ) = true_node . view_data . relationships . numContents {
+  if true_node . relationships . numContents != Some ( 0 ) {
+    if let Some ( count ) = true_node . relationships . numContents {
       rel_parts . push ( format! ( "(contents {})", count )); }}
-  if true_node . view_data . relationships . numLinksIn != Some ( 0 ) {
-    if let Some ( count ) = true_node . view_data . relationships . numLinksIn {
+  if true_node . relationships . numLinksIn != Some ( 0 ) {
+    if let Some ( count ) = true_node . relationships . numLinksIn {
       rel_parts . push ( format! ( "(linksIn {})", count )); }}
 
   if ! rel_parts . is_empty () {

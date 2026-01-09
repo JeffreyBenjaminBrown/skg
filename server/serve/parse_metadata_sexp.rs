@@ -9,7 +9,7 @@
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
-use crate::types::orgnode::{OrgnodeViewData, OrgnodeRelationships, EditRequest, ViewRequest};
+use crate::types::orgnode::{OrgnodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode, EffectOnParent,
 };
@@ -30,7 +30,8 @@ pub struct OrgnodeMetadata {
   pub source: Option<String>,
   pub focused: bool,
   pub folded: bool,
-  pub viewData: OrgnodeViewData,
+  pub cycle: bool,
+  pub relationships: OrgnodeRelationships,
   pub code: OrgnodeCode,
 }
 
@@ -110,7 +111,8 @@ pub fn default_metadata() -> OrgnodeMetadata {
     source: None,
     focused: false,
     folded: false,
-    viewData: OrgnodeViewData::default(),
+    cycle: false,
+    relationships: OrgnodeRelationships::default(),
     code: OrgnodeCode::default(),
   }
 }
@@ -134,7 +136,8 @@ pub fn from_parsed (
         source           : metadata . source . clone (),
         effect_on_parent : effect,
         indefinitive     : metadata . code . indefinitive,
-        view_data        : metadata . viewData . clone (),
+        cycle            : metadata . cycle,
+        relationships    : metadata . relationships . clone (),
         edit_request     : metadata . code . editRequest . clone (),
         view_requests    : metadata . code . viewRequests . clone (), } )
     } else { panic! ( "Invalid Interp: {:?}", interp ) };
@@ -211,7 +214,7 @@ fn parse_view_sexp (
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         if key == "rels" {
-          parse_rels_sexp ( &subitems[1..], &mut metadata . viewData . relationships ) ?;
+          parse_rels_sexp ( &subitems[1..], &mut metadata . relationships ) ?;
         } else {
           return Err ( format! ( "Unknown view key: {}", key )); }
       },
@@ -219,7 +222,7 @@ fn parse_view_sexp (
         let bare_value : String =
           atom_to_string ( view_element ) ?;
         match bare_value . as_str () {
-          "cycle"    => metadata . viewData . cycle = true,
+          "cycle"    => metadata . cycle = true,
           "focused"  => metadata . focused = true,
           "folded"   => metadata . folded = true,
           _ => {
