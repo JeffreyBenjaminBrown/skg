@@ -28,6 +28,8 @@ use std::str::FromStr;
 pub struct OrgnodeMetadata {
   pub id: Option<ID>,
   pub source: Option<String>,
+  pub focused: bool,
+  pub folded: bool,
   pub viewData: OrgnodeViewData,
   pub code: OrgnodeCode,
 }
@@ -106,6 +108,8 @@ pub fn default_metadata() -> OrgnodeMetadata {
   OrgnodeMetadata {
     id: None,
     source: None,
+    focused: false,
+    folded: false,
     viewData: OrgnodeViewData::default(),
     code: OrgnodeCode::default(),
   }
@@ -134,8 +138,8 @@ pub fn from_parsed (
         edit_request     : metadata . code . editRequest . clone (),
         view_requests    : metadata . code . viewRequests . clone (), } )
     } else { panic! ( "Invalid Interp: {:?}", interp ) };
-  OrgNode { focused : metadata.viewData.focused,
-            folded  : metadata.viewData.folded,
+  OrgNode { focused : metadata.focused,
+            folded  : metadata.folded,
             kind } }
 
 
@@ -185,7 +189,7 @@ pub fn parse_metadata_to_orgnodemd (
               atom_to_string ( &items[1] ) ?;
             result.source = Some ( value ); },
           "view" => {
-            parse_view_sexp ( &items[1..], &mut result . viewData ) ?; },
+            parse_view_sexp ( &items[1..], &mut result ) ?; },
           "code" => {
             parse_code_sexp ( &items[1..], &mut result . code ) ?; },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
@@ -196,10 +200,10 @@ pub fn parse_metadata_to_orgnodemd (
   Ok ( result ) }
 
 
-/// Parse the (view ...) s-expression and update viewData.
+/// Parse the (view ...) s-expression and update metadata.
 fn parse_view_sexp (
   items : &[Sexp],
-  view_data : &mut OrgnodeViewData
+  metadata : &mut OrgnodeMetadata
 ) -> Result<(), String> {
   for view_element in items {
     match view_element {
@@ -207,7 +211,7 @@ fn parse_view_sexp (
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         if key == "rels" {
-          parse_rels_sexp ( &subitems[1..], &mut view_data . relationships ) ?;
+          parse_rels_sexp ( &subitems[1..], &mut metadata . viewData . relationships ) ?;
         } else {
           return Err ( format! ( "Unknown view key: {}", key )); }
       },
@@ -215,9 +219,9 @@ fn parse_view_sexp (
         let bare_value : String =
           atom_to_string ( view_element ) ?;
         match bare_value . as_str () {
-          "cycle"    => view_data . cycle = true,
-          "focused"  => view_data . focused = true,
-          "folded"   => view_data . folded = true,
+          "cycle"    => metadata . viewData . cycle = true,
+          "focused"  => metadata . focused = true,
+          "folded"   => metadata . folded = true,
           _ => {
             return Err ( format! ( "Unknown view value: {}",
                                     bare_value )); }} },

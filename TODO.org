@@ -3,9 +3,6 @@
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
 ** ONGOING futzing the refactor
-*** Can from_parsed be simplified?
-    Looks like a dangerous lot of boilerplate.
-*** delete folded and focused from OrgnodeViewData
 *** functions to delete in server/types/orgnode.rs
 **** impl OrgNode {
 ***** should_be_sourceless
