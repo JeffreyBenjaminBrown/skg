@@ -12,7 +12,7 @@ mod util {
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode_new::OrgNode;
+use skg::types::orgnode::OrgNode;
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;

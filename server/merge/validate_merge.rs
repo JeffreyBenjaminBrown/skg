@@ -9,7 +9,7 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::{OrgNode, ScaffoldKind};
+use crate::types::orgnode::{OrgNode, ScaffoldKind};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;

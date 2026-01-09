@@ -16,7 +16,7 @@ use crate::to_org::util::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     OrgNode, OrgNodeKind, EffectOnParent, orgnode_with_metadata };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;

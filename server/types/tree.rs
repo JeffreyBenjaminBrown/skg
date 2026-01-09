@@ -8,7 +8,7 @@ pub mod orgnode_skgnode;
 pub mod generic;
 pub mod generations;
 
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
 use ego_tree::Tree;
 
@@ -37,14 +37,6 @@ impl NodePair {
   pub fn orgnode_mut ( &mut self ) -> &mut OrgNode {
     &mut self . orgnode }
 
-  // Backwards compatibility aliases during transition
-  #[deprecated(note = "Use orgnode() instead")]
-  pub fn orgnode_new ( &self ) -> &OrgNode {
-    self . orgnode () }
-
-  #[deprecated(note = "Use orgnode_mut() instead")]
-  pub fn orgnode_new_mut ( &mut self ) -> &mut OrgNode {
-    self . orgnode_mut () }
 }
 
 //
@@ -66,10 +58,6 @@ impl NodePair {
       orgnode,
     } } }
 
-// Type aliases for backwards compatibility during transition
-pub type NewPairTree = PairTree;
-pub type NewNodePair = NodePair;
-
 //
 // Tests for NodePair constructors
 //
@@ -78,7 +66,7 @@ pub type NewNodePair = NodePair;
 mod tests {
   use super::*;
   use crate::types::misc::ID;
-  use crate::types::orgnode_new::{
+  use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
   };
   use crate::types::skgnode::SkgNode;

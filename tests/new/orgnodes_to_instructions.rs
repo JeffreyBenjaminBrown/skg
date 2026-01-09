@@ -6,7 +6,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
-use skg::types::orgnode_new::{OrgNode, forest_root_orgnode};
+use skg::types::orgnode::{OrgNode, forest_root_orgnode};
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
 use skg::types::save::NonMerge_NodeAction;

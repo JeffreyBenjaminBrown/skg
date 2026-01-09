@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId};
 
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,

@@ -2,7 +2,7 @@
 
 use skg::org_to_text::orgnode_to_text;
 use skg::types::orgnode::{OrgnodeViewData, OrgnodeRelationships};
-use skg::types::orgnode_new::{OrgNode, OrgNodeKind, TrueNode, Scaffold, ScaffoldKind, EffectOnParent};
+use skg::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold, ScaffoldKind, EffectOnParent};
 use skg::types::misc::ID;
 use std::collections::HashSet;
 

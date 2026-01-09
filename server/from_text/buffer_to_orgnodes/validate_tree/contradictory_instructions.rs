@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};

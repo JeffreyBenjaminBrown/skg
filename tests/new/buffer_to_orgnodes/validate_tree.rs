@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use ego_tree::Tree;
-use skg::types::orgnode_new::{OrgNode, forest_root_orgnode};
+use skg::types::orgnode::{OrgNode, forest_root_orgnode};
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;

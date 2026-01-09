@@ -8,7 +8,7 @@
 use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::save::{MergeInstructionTriple, SaveInstruction};
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;

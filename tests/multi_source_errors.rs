@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::types::orgnode_new::OrgNode;
+use skg::types::orgnode::OrgNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;

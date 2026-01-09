@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;

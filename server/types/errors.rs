@@ -1,5 +1,5 @@
 use super::misc::{ID, SourceNickname};
-use super::orgnode_new::OrgNode;
+use super::orgnode::OrgNode;
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;

@@ -15,7 +15,7 @@ use crate::dbs::typedb::search::{
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     OrgNode, EffectOnParent, orgnode_indefinitive_from_disk };
 use crate::types::tree::{PairTree, NodePair};
 

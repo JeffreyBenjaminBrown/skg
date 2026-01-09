@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::orgnode_new::{OrgNode, EffectOnParent};
+use skg::types::orgnode::{OrgNode, EffectOnParent};
 use ego_tree::Tree;
 
 #[test]

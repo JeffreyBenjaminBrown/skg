@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode_new::{EffectOnParent, ScaffoldKind};
+use crate::types::orgnode::{EffectOnParent, ScaffoldKind};
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{

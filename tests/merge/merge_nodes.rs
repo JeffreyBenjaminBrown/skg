@@ -5,7 +5,7 @@ use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::orgnode::{EditRequest, OrgnodeViewData};
-use skg::types::orgnode_new::{
+use skg::types::orgnode::{
     OrgNode, OrgNodeKind, TrueNode, EffectOnParent, forest_root_orgnode
 };
 use skg::types::skgnode::SkgNode;

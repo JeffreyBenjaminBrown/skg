@@ -4,7 +4,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     orgnode_content_from_disk, OrgNode, forest_root_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};

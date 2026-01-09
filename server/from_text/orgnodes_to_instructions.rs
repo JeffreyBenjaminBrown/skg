@@ -5,7 +5,7 @@ pub mod none_node_fields_are_noops;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::SkgConfig;
 use crate::types::save::SaveInstruction;
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 
 use to_naive_instructions::naive_saveinstructions_from_forest;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;

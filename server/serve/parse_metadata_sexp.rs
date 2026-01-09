@@ -2,12 +2,12 @@
 ///
 /// This module contains the parsing types (OrgnodeMetadata, Interp, etc.)
 /// which are internal to the parsing pipeline. External code should use
-/// OrgNode from types::orgnode_new.
+/// OrgNode from types::orgnode.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::orgnode::{OrgnodeViewData, OrgnodeRelationships, EditRequest, ViewRequest};
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode, EffectOnParent,
 };
 

@@ -106,44 +106,30 @@
   - Interp is now internal: defined in orgnode.rs, used by parse_metadata_sexp.rs,
     converted to OrgNode by from_parsed() in orgnode_new.rs
 
-* Phase 12: Remove old types
+* DONE Phase 12: Remove old types
   Goal: Delete unused types after migration complete.
 
-** 12.1 Remove from orgnode.rs (after Interp no longer used externally)
-   - Interp enum
-   - OrgnodeMetadata struct (if not needed for parsing)
-   - OrgnodeCode struct
-   - orgnodemd_to_string() function
-   - default_metadata() function
+  Completed:
+  - Moved OrgnodeMetadata, OrgnodeCode, Interp, default_metadata() to parse_metadata_sexp.rs
+  - Moved from_parsed() to parse_metadata_sexp.rs
+  - Removed Interp, OrgnodeMetadata, OrgnodeCode, orgnodemd_to_string() from orgnode.rs
+  - Removed interp(), matches_interp(), effect_on_parent_from_interp(),
+    orgnode_scaffold_from_interp() from orgnode_new.rs
+  - Updated all imports to use new locations
+  - Fixed test comparison function to compare kinds modulo ID
 
-   KEEP:
-   - OrgnodeViewData (used by TrueNode)
-   - OrgnodeRelationships (used by OrgnodeViewData)
-   - EditRequest, ViewRequest (used by both old and new)
+  orgnode.rs now only contains:
+  - OrgnodeViewData, OrgnodeRelationships (used by TrueNode)
+  - EditRequest, ViewRequest (used by TrueNode)
 
-** 12.2 Remove bridge functions from orgnode_new.rs
-   - from_parsed() (if parser changed)
-   - matches_interp() (after 9.1)
-   - interp() (bridge function)
-   - effect_on_parent_from_interp() (after 9.3)
-   - orgnode_scaffold_from_interp() (after 9.2)
-
-* Phase 13: File reorganization (minimize diff with main)
+* DONE Phase 13: File reorganization (minimize diff with main)
   Goal: Single OrgNode type in orgnode.rs, matching main branch structure.
 
-** 13.1 Move OrgNode types from orgnode_new.rs to orgnode.rs
-   - OrgNode, OrgNodeKind, TrueNode, Scaffold, ScaffoldKind, EffectOnParent
-   - Helper functions like forest_root_orgnode()
-
-** 13.2 Delete orgnode_new.rs
-
-** 13.3 Update all imports
-   Change: use crate::types::orgnode_new::OrgNode
-   To:     use crate::types::orgnode::OrgNode
-
-** 13.4 Final cleanup
-   - Ensure orgnode.rs exports match main branch structure
-   - Remove any remaining type aliases for backwards compatibility
+  Completed:
+  - Moved all OrgNode types from orgnode_new.rs to orgnode.rs
+  - Deleted orgnode_new.rs
+  - Updated all imports from types::orgnode_new to types::orgnode
+  - Removed backwards compatibility aliases (orgnode_new(), NewPairTree, etc.)
 
 * maybe later
 ** Make TrueNode.id required (separate refactor as discussed)

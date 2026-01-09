@@ -9,7 +9,7 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::forest_root_pair;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode_new::OrgNode;
+use crate::types::orgnode::OrgNode;
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{NodePair, PairTree};

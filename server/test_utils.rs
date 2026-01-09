@@ -8,7 +8,7 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
-use crate::types::orgnode_new::{OrgNode, OrgNodeKind};
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{PairTree, NodePair};
 

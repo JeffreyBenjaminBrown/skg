@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode_new::{OrgNode, OrgNodeKind, ScaffoldKind, EffectOnParent};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, ScaffoldKind, EffectOnParent};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};

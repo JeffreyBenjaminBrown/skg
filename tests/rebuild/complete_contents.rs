@@ -11,7 +11,7 @@ use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
 use skg::to_org::complete::contents::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode_new::OrgNode;
+use skg::types::orgnode::OrgNode;
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {

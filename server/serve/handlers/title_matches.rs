@@ -1,7 +1,7 @@
 use crate::serve::util::send_response;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::dbs::tantivy::search_index;
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
   OrgNode, OrgNodeKind, TrueNode, EffectOnParent,
 };
 use crate::types::misc::TantivyIndex;

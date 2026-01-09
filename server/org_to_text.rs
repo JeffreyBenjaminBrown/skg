@@ -1,4 +1,4 @@
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     EffectOnParent, OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};

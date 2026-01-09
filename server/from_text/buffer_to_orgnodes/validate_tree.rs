@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{OrgNode, EffectOnParent, ScaffoldKind};
+use crate::types::orgnode::{OrgNode, EffectOnParent, ScaffoldKind};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;

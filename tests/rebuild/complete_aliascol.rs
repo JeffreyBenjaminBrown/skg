@@ -6,7 +6,7 @@ use std::error::Error;
 use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
-use skg::types::orgnode_new::OrgNode;
+use skg::types::orgnode::OrgNode;
 use skg::types::misc::SkgConfig;
 use skg::types::tree::PairTree;
 

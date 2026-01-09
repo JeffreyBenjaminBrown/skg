@@ -3,7 +3,7 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode_new::{
+use crate::types::orgnode::{
     OrgNode, ScaffoldKind, EffectOnParent,
     orgnode_indefinitive_from_disk,
     orgnode_from_scaffold_kind };

@@ -3,7 +3,6 @@ pub mod textlinks;
 pub mod misc;
 pub mod errors;
 pub mod orgnode;
-pub mod orgnode_new;
 pub mod skgnode;
 pub mod save;
 pub mod tree;

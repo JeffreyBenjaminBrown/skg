@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::ScaffoldKind;
+use crate::types::orgnode::ScaffoldKind;
 use crate::types::tree::PairTree;
 use crate::types::tree::orgnode_skgnode::{insert_sourceless_node, unique_scaffold_child};
 

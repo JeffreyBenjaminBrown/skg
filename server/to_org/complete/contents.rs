@@ -12,7 +12,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode_new::{OrgNodeKind, EffectOnParent, OrgNode, ScaffoldKind};
+use crate::types::orgnode::{OrgNodeKind, EffectOnParent, OrgNode, ScaffoldKind};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };

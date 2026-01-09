@@ -27,9 +27,3 @@ tools/introspect/call-graph/output/
 tools/introspect/code-map/code-map.org
 tools/introspect/code-map/output/
 tools/md-to-org/.org-id-db.json
-
-# temporary
-temp.*
-usaid
-thoughts
-tools/introspect/call-graph/completeAndRestoreForest_collectingViewRequests.org
