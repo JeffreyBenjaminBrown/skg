@@ -3,8 +3,8 @@
 use skg::org_to_text::orgnode_to_text;
 use skg::types::orgnode::{OrgnodeViewData, OrgnodeRelationships};
 use skg::types::orgnode::{
-    OrgNode, OrgNodeKind, TrueNode, ScaffoldKind,
-    orgnode_from_scaffold_kind };
+    OrgNode, OrgNodeKind, TrueNode, Scaffold,
+    orgnode_from_scaffold };
 use skg::types::misc::ID;
 
 #[test]
@@ -32,7 +32,7 @@ fn test_orgnode_to_text_with_body () {
 
 #[test]
 fn test_orgnode_to_text_with_metadata () {
-  let mut node = orgnode_from_scaffold_kind ( ScaffoldKind::AliasCol );
+  let mut node = orgnode_from_scaffold ( Scaffold::AliasCol );
   node.folded = true;
   let result : String =
     orgnode_to_text ( 1, &node );

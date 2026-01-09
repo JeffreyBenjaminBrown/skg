@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind, ScaffoldKind, EffectOnParent};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, EffectOnParent};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
@@ -40,7 +40,7 @@ fn naive_saveinstructions_from_tree(
       ( node.kind.clone(),
         node.is_indefinitive() ) } )?;
   if matches!(&node_kind, OrgNodeKind::Scaff(s)
-              if s.kind == ScaffoldKind::ForestRoot)
+              if *s == Scaffold::ForestRoot)
   { // for ForestRoot, just recurse to children
     for child_treeid in {
       let child_treeids: Vec<NodeId> =
@@ -129,7 +129,7 @@ fn collect_subscribees (
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =
     unique_orgnode_scaffold_child (
-      tree, node_id, &ScaffoldKind::SubscribeeCol )
+      tree, node_id, &Scaffold::SubscribeeCol )
     . map_err ( |e| e.to_string() ) ?;
   match subscribee_col_id {
     None => Ok(None),
@@ -141,7 +141,7 @@ fn collect_subscribees (
         for subscribee_child in col_ref.children() {
           let child_node = subscribee_child . value();
           if child_node . is_scaffold ( // This can be a child of a SubscribeeCol, but it's not a subscribee, so skip it.
-            &ScaffoldKind::HiddenOutsideOfSubscribeeCol )
+            &Scaffold::HiddenOutsideOfSubscribeeCol )
           { continue; }
           if ! child_node . has_effect ( EffectOnParent::Subscribee ) {
             return Err ( format! (

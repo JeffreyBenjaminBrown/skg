@@ -11,7 +11,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::orgnode::{OrgnodeViewData, OrgnodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode, EffectOnParent,
+    OrgNode, OrgNodeKind, Scaffold, TrueNode, EffectOnParent,
 };
 
 use sexp::Sexp;
@@ -80,82 +80,76 @@ pub fn default_metadata() -> OrgnodeMetadata {
 /// Create an OrgNode from parsed metadata components.
 /// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
 pub fn from_parsed(
-    metadata: &OrgnodeMetadata,
-    title: String,
-    body: Option<String>,
+  metadata: &OrgnodeMetadata,
+  title: String,
+  body: Option<String>,
 ) -> OrgNode {
-    let focused = metadata.viewData.focused;
-    let folded = metadata.viewData.folded;
+  let focused = metadata.viewData.focused;
+  let folded = metadata.viewData.folded;
 
-    let kind = match metadata.code.interp {
-        // Scaffold kinds
-        Interp::ForestRoot => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::ForestRoot,
-        }),
-        Interp::AliasCol => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::AliasCol,
-        }),
-        Interp::Alias => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::Alias(title.clone()),
-        }),
-        Interp::SubscribeeCol => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::SubscribeeCol,
-        }),
-        Interp::HiddenOutsideOfSubscribeeCol => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::HiddenOutsideOfSubscribeeCol,
-        }),
-        Interp::HiddenInSubscribeeCol => OrgNodeKind::Scaff(Scaffold {
-            kind: ScaffoldKind::HiddenInSubscribeeCol,
-        }),
+  let kind = match metadata.code.interp {
+    // Scaffold kinds
+    Interp::ForestRoot =>
+      OrgNodeKind::Scaff ( Scaffold::ForestRoot ),
+    Interp::AliasCol =>
+      OrgNodeKind::Scaff ( Scaffold::AliasCol ),
+    Interp::Alias =>
+      OrgNodeKind::Scaff ( Scaffold::Alias ( title.clone() )),
+    Interp::SubscribeeCol =>
+      OrgNodeKind::Scaff ( Scaffold::SubscribeeCol ),
+    Interp::HiddenOutsideOfSubscribeeCol =>
+      OrgNodeKind::Scaff ( Scaffold::HiddenOutsideOfSubscribeeCol ),
+    Interp::HiddenInSubscribeeCol =>
+      OrgNodeKind::Scaff ( Scaffold::HiddenInSubscribeeCol ),
 
-        // TrueNode kinds
-        Interp::Content => OrgNodeKind::True(TrueNode {
-            title,
-            body,
-            id: metadata.id.clone(),
-            source: metadata.source.clone(),
-            effect_on_parent: EffectOnParent::Content,
-            indefinitive: metadata.code.indefinitive,
-            view_data: metadata.viewData.clone(),
-            edit_request: metadata.code.editRequest.clone(),
-            view_requests: metadata.code.viewRequests.clone(),
-        }),
-        Interp::Subscribee => OrgNodeKind::True(TrueNode {
-            title,
-            body,
-            id: metadata.id.clone(),
-            source: metadata.source.clone(),
-            effect_on_parent: EffectOnParent::Subscribee,
-            indefinitive: metadata.code.indefinitive,
-            view_data: metadata.viewData.clone(),
-            edit_request: metadata.code.editRequest.clone(),
-            view_requests: metadata.code.viewRequests.clone(),
-        }),
-        Interp::ParentIgnores => OrgNodeKind::True(TrueNode {
-            title,
-            body,
-            id: metadata.id.clone(),
-            source: metadata.source.clone(),
-            effect_on_parent: EffectOnParent::ParentIgnores,
-            indefinitive: metadata.code.indefinitive,
-            view_data: metadata.viewData.clone(),
-            edit_request: metadata.code.editRequest.clone(),
-            view_requests: metadata.code.viewRequests.clone(),
-        }),
-        Interp::HiddenFromSubscribees => OrgNodeKind::True(TrueNode {
-            title,
-            body,
-            id: metadata.id.clone(),
-            source: metadata.source.clone(),
-            effect_on_parent: EffectOnParent::HiddenFromSubscribees,
-            indefinitive: metadata.code.indefinitive,
-            view_data: metadata.viewData.clone(),
-            edit_request: metadata.code.editRequest.clone(),
-            view_requests: metadata.code.viewRequests.clone(),
-        }),
-    };
+    // TrueNode kinds
+    Interp::Content => OrgNodeKind::True(TrueNode {
+      title,
+      body,
+      id: metadata.id.clone(),
+      source: metadata.source.clone(),
+      effect_on_parent: EffectOnParent::Content,
+      indefinitive: metadata.code.indefinitive,
+      view_data: metadata.viewData.clone(),
+      edit_request: metadata.code.editRequest.clone(),
+      view_requests: metadata.code.viewRequests.clone(),
+    }),
+    Interp::Subscribee => OrgNodeKind::True(TrueNode {
+      title,
+      body,
+      id: metadata.id.clone(),
+      source: metadata.source.clone(),
+      effect_on_parent: EffectOnParent::Subscribee,
+      indefinitive: metadata.code.indefinitive,
+      view_data: metadata.viewData.clone(),
+      edit_request: metadata.code.editRequest.clone(),
+      view_requests: metadata.code.viewRequests.clone(),
+    }),
+    Interp::ParentIgnores => OrgNodeKind::True(TrueNode {
+      title,
+      body,
+      id: metadata.id.clone(),
+      source: metadata.source.clone(),
+      effect_on_parent: EffectOnParent::ParentIgnores,
+      indefinitive: metadata.code.indefinitive,
+      view_data: metadata.viewData.clone(),
+      edit_request: metadata.code.editRequest.clone(),
+      view_requests: metadata.code.viewRequests.clone(),
+    }),
+    Interp::HiddenFromSubscribees => OrgNodeKind::True(TrueNode {
+      title,
+      body,
+      id: metadata.id.clone(),
+      source: metadata.source.clone(),
+      effect_on_parent: EffectOnParent::HiddenFromSubscribees,
+      indefinitive: metadata.code.indefinitive,
+      view_data: metadata.viewData.clone(),
+      edit_request: metadata.code.editRequest.clone(),
+      view_requests: metadata.code.viewRequests.clone(),
+    }),
+  };
 
-    OrgNode { focused, folded, kind }
+  OrgNode { focused, folded, kind }
 }
 
 

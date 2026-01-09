@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::ScaffoldKind;
+use crate::types::orgnode::Scaffold;
 use crate::types::tree::PairTree;
 use crate::types::tree::orgnode_skgnode::{insert_scaffold_as_child, unique_scaffold_child};
 
@@ -44,7 +44,7 @@ pub async fn build_and_integrate_aliases (
   let node_id_val : ID =
     get_pid_in_pairtree ( tree, node_id ) ?;
   if unique_scaffold_child (
-    tree, node_id, &ScaffoldKind::AliasCol )? . is_some ()
+    tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,
     // then completeAliasCol already handled it.
     return Ok (( )); }
@@ -53,8 +53,8 @@ pub async fn build_and_integrate_aliases (
       config, driver, node_id_val ). await;
   let aliascol_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
-      ScaffoldKind::AliasCol, true ) ?;
+      Scaffold::AliasCol, true ) ?;
   for alias in & aliases {
     insert_scaffold_as_child ( tree, aliascol_id,
-      ScaffoldKind::Alias ( alias . clone () ), false ) ?; }
+      Scaffold::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }

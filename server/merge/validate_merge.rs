@@ -9,7 +9,7 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, ScaffoldKind};
+use crate::types::orgnode::{OrgNode, Scaffold};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -38,8 +38,8 @@ pub async fn validate_merge_requests(
     let acquirer_id : &ID =
       node.id()
       .ok_or("Acquirer node must have an ID")?;
-    if ( node.is_scaffold( &ScaffoldKind::Alias(String::new()) ) ||
-         node.is_scaffold( &ScaffoldKind::AliasCol ))
+    if ( node.is_scaffold( &Scaffold::Alias(String::new()) ) ||
+         node.is_scaffold( &Scaffold::AliasCol ))
     { errors.push(
         format!(
           "Acquirer node '{}' cannot be an Alias or AliasCol",

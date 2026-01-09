@@ -5,7 +5,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    mk_definitive_orgnode, OrgNode, ScaffoldKind, forest_root_orgnode };
+    mk_definitive_orgnode, OrgNode, Scaffold, forest_root_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
@@ -54,7 +54,7 @@ fn is_forest_root (
   tree . get ( node_id )
     . map ( |node_ref|
              node_ref . value () . orgnode ()
-             . is_scaffold ( &ScaffoldKind::ForestRoot ) )
+             . is_scaffold ( &Scaffold::ForestRoot ) )
     . unwrap_or ( false ) }
 
 

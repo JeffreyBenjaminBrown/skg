@@ -98,20 +98,13 @@ pub struct OrgnodeRelationships {
 /// that don't correspond per se to nodes in the graph,
 /// but encode information about the OrgNodes around them.
 #[derive( Debug, Clone, PartialEq, Eq )]
-pub enum ScaffoldKind {
+pub enum Scaffold {
   Alias (String), // The node is an alias for its grandparent.
   AliasCol, // The node collects (as children) aliases for its parent.
   ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   SubscribeeCol, // Collects subscribees for its parent.
-}
-
-/// A scaffold node. These are synthetic nodes for display purposes only.
-/// They don't correspond to real nodes in the graph.
-#[derive( Debug, Clone, PartialEq )]
-pub struct Scaffold {
-  pub kind : ScaffoldKind,
 }
 
 /// Requests for editing operations on a node.
@@ -136,26 +129,26 @@ pub enum ViewRequest {
 // Implementations
 //
 
-impl ScaffoldKind {
+impl Scaffold {
   pub fn title ( &self ) -> &str {
     match self {
-      ScaffoldKind::Alias ( s ) => s,
-      ScaffoldKind::AliasCol => "its aliases",
-      ScaffoldKind::ForestRoot => "",
-      ScaffoldKind::HiddenInSubscribeeCol => "hidden from this subscription",
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
-      ScaffoldKind::SubscribeeCol => "it subscribes to these",
+      Scaffold::Alias ( s ) => s,
+      Scaffold::AliasCol => "its aliases",
+      Scaffold::ForestRoot => "",
+      Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
+      Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      Scaffold::SubscribeeCol => "it subscribes to these",
     }}
 
   /// For serialization.
   pub fn interp_str ( &self ) -> &str {
     match self {
-      ScaffoldKind::Alias ( _ ) => "alias",
-      ScaffoldKind::AliasCol => "aliasCol",
-      ScaffoldKind::ForestRoot => "forestRoot",
-      ScaffoldKind::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
-      ScaffoldKind::SubscribeeCol => "subscribeeCol",
+      Scaffold::Alias ( _ ) => "alias",
+      Scaffold::AliasCol => "aliasCol",
+      Scaffold::ForestRoot => "forestRoot",
+      Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
+      Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
+      Scaffold::SubscribeeCol => "subscribeeCol",
     }} }
 
 impl OrgNode {
@@ -167,11 +160,11 @@ impl OrgNode {
     }}
 
   /// Returns the title. For TrueNode, returns the title field.
-  /// For Scaffold, returns the scaffold kind's title.
+  /// For Scaffold, returns the scaffold's title.
   pub fn title ( &self ) -> &str {
     match &self . kind {
       OrgNodeKind::True ( t ) => &t . title,
-      OrgNodeKind::Scaff ( s ) => s . kind . title (),
+      OrgNodeKind::Scaff ( s ) => s . title (),
     }}
 
   /// Returns true if this is a TrueNode with the given effect_on_parent.
@@ -182,14 +175,14 @@ impl OrgNode {
     }}
 
   /// Returns true if this is a Scaffold with the given kind.
-  pub fn is_scaffold ( &self, kind : &ScaffoldKind ) -> bool {
+  pub fn is_scaffold ( &self, scaffold : &Scaffold ) -> bool {
     match &self . kind {
       OrgNodeKind::Scaff ( s ) => {
         // For Alias, we compare the variant, not the string content
-        match ( &s . kind, kind ) {
-          ( ScaffoldKind::Alias ( _ ), ScaffoldKind::Alias ( _ ) ) => true,
-          _ => std::mem::discriminant ( &s . kind )
-          == std::mem::discriminant ( kind ),
+        match ( s, scaffold ) {
+          ( Scaffold::Alias ( _ ), Scaffold::Alias ( _ ) ) => true,
+          _ => std::mem::discriminant ( s )
+          == std::mem::discriminant ( scaffold ),
         }}
       OrgNodeKind::True ( _ ) => false,
     }}
@@ -202,10 +195,10 @@ impl OrgNode {
   pub fn is_scaffold_any ( &self ) -> bool {
     matches! ( &self . kind, OrgNodeKind::Scaff ( _ ) ) }
 
-  /// Returns the ScaffoldKind if this is a Scaffold, None otherwise.
-  pub fn scaffold_kind ( &self ) -> Option < &ScaffoldKind > {
+  /// Returns the Scaffold if this is a Scaffold, None otherwise.
+  pub fn scaffold ( &self ) -> Option < &Scaffold > {
     match &self . kind {
-      OrgNodeKind::Scaff ( s ) => Some ( &s . kind ),
+      OrgNodeKind::Scaff ( s ) => Some ( s ),
       OrgNodeKind::True ( _ ) => None,
     }}
 
@@ -347,9 +340,8 @@ impl OrgNode {
   /// No-op if already a Scaffold.
   pub fn convert_to_alias ( &mut self ) {
     if let OrgNodeKind::True ( true_node ) = &self . kind {
-      self . kind = OrgNodeKind::Scaff ( Scaffold {
-        kind : ScaffoldKind::Alias ( true_node . title . clone () ),
-      });
+      self . kind = OrgNodeKind::Scaff (
+        Scaffold::Alias ( true_node . title . clone () ) );
     }}
 
   /// Set the id. No-op for Scaffolds.
@@ -551,18 +543,18 @@ pub fn mk_orgnode (
     }),
   }}
 
-/// Create a Scaffold OrgNode from a ScaffoldKind.
-pub fn orgnode_from_scaffold_kind ( kind : ScaffoldKind ) -> OrgNode {
+/// Create a Scaffold OrgNode from a Scaffold.
+pub fn orgnode_from_scaffold ( scaffold : Scaffold ) -> OrgNode {
   OrgNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::Scaff ( Scaffold { kind } ),
+    kind    : OrgNodeKind::Scaff ( scaffold ),
   }}
 
 /// Helper to create a ForestRoot OrgNode.
 pub fn forest_root_orgnode () -> OrgNode {
   OrgNode {
     focused : false,
-    folded : false,
-    kind : OrgNodeKind::Scaff ( Scaffold {
-      kind : ScaffoldKind::ForestRoot, } ), }}
+    folded  : false,
+    kind    : OrgNodeKind::Scaff ( Scaffold::ForestRoot ),
+  }}

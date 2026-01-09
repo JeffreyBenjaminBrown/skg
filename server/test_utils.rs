@@ -293,8 +293,8 @@ fn compare_orgnode_interpretations(
 ) -> bool {
   match (k1, k2) {
     (OrgNodeKind::Scaff(s1), OrgNodeKind::Scaff(s2)) =>
-      // two Scaffolds of the same kind
-      s1.kind == s2.kind,
+      // two Scaffolds of the same variant
+      s1 == s2,
     (OrgNodeKind::True(t1), OrgNodeKind::True(t2)) =>
       // two TrueNodes of the same Effect_On_Parent
       t1.effect_on_parent == t2.effect_on_parent,

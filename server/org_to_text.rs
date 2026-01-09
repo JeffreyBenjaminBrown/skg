@@ -1,5 +1,5 @@
 use crate::types::orgnode::{
-    EffectOnParent, OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
+    EffectOnParent, OrgNode, OrgNodeKind, Scaffold, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};
 
@@ -35,7 +35,7 @@ pub fn orgnode_forest_to_string (
       root_ref . value () . orgnode ();
     matches! (
       & root_orgnode . kind,
-      OrgNodeKind::Scaff ( Scaffold { kind : ScaffoldKind::ForestRoot } )) };
+      OrgNodeKind::Scaff ( Scaffold::ForestRoot )) };
   if ! is_forest_root {
     return Err (
       "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
@@ -56,7 +56,7 @@ pub fn orgnode_to_text (
     orgnode_to_string ( orgnode );
   let title : &str = match &orgnode . kind {
     OrgNodeKind::True  ( t ) => &t . title,
-    OrgNodeKind::Scaff ( s ) => s . kind . title (),
+    OrgNodeKind::Scaff ( s ) => s . title (),
   };
   let body : Option < &String > = match &orgnode . kind {
     OrgNodeKind::True  ( t ) => t . body . as_ref (),
@@ -115,7 +115,7 @@ fn scaffold_metadata_to_string (
   // Build code s-expr
   let mut code_parts : Vec < String > = Vec::new ();
   // Scaffolds always have non-Content interp
-  code_parts . push ( format! ( "(interp {})", scaffold . kind . interp_str () ));
+  code_parts . push ( format! ( "(interp {})", scaffold . interp_str () ));
   if ! code_parts . is_empty () {
     parts . push ( format! ( "(code {})", code_parts . join ( " " ))); }
 

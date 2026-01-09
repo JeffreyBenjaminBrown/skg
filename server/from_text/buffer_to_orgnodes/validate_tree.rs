@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNode, EffectOnParent, ScaffoldKind};
+use crate::types::orgnode::{OrgNode, EffectOnParent, Scaffold};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
@@ -83,8 +83,8 @@ fn validate_node_and_children (
 ) {
 
   let orgnode: &OrgNode = node_ref.value();
-  let is_aliascol = orgnode . is_scaffold ( &ScaffoldKind::AliasCol );
-  let is_alias = orgnode . is_scaffold ( &ScaffoldKind::Alias ( String::new() ) );
+  let is_aliascol = orgnode . is_scaffold ( &Scaffold::AliasCol );
+  let is_alias = orgnode . is_scaffold ( &Scaffold::Alias ( String::new() ) );
 
   if is_aliascol {
     if orgnode.body().is_some() {
@@ -117,7 +117,7 @@ fn validate_node_and_children (
 
   { // Check for multiple AliasCol children
     let aliascol_count = node_ref.children()
-      .filter(|c| c.value().is_scaffold(&ScaffoldKind::AliasCol))
+      .filter(|c| c.value().is_scaffold(&Scaffold::AliasCol))
       .count();
     if aliascol_count > 1 {
       errors.push (

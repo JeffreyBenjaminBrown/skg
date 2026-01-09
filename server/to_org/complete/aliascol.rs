@@ -1,4 +1,4 @@
-use crate::types::orgnode::ScaffoldKind;
+use crate::types::orgnode::Scaffold;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
@@ -29,7 +29,7 @@ pub async fn completeAliasCol (
     let is_aliascol : bool =
       read_at_node_in_tree(
         tree, aliascol_node_id,
-        |np| np . orgnode () . is_scaffold ( &ScaffoldKind::AliasCol ) )
+        |np| np . orgnode () . is_scaffold ( &Scaffold::AliasCol ) )
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
     if ! is_aliascol {
       return Err( "Node is not an AliasCol" . into () ); }}
@@ -61,7 +61,7 @@ pub async fn completeAliasCol (
   for alias in missing_aliases_from_disk {
     insert_scaffold_as_child (
       tree, aliascol_node_id,
-      ScaffoldKind::Alias ( alias . clone () ), false ) ?; }
+      Scaffold::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,

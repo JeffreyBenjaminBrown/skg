@@ -12,7 +12,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNodeKind, EffectOnParent, OrgNode, ScaffoldKind};
+use crate::types::orgnode::{OrgNodeKind, EffectOnParent, OrgNode, Scaffold};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -75,12 +75,12 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().is_scaffold ( &ScaffoldKind::AliasCol ) })?;
+        node.orgnode().is_scaffold ( &Scaffold::AliasCol ) })?;
     let is_col_scaffold: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode().is_scaffold ( &ScaffoldKind::SubscribeeCol )
-        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenOutsideOfSubscribeeCol )
-        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenInSubscribeeCol ) })?;
+        node.orgnode().is_scaffold ( &Scaffold::SubscribeeCol )
+        || node.orgnode().is_scaffold ( &Scaffold::HiddenOutsideOfSubscribeeCol )
+        || node.orgnode().is_scaffold ( &Scaffold::HiddenInSubscribeeCol ) })?;
     if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;

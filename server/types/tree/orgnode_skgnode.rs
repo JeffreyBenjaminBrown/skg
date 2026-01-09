@@ -4,9 +4,9 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{
-    OrgNode, ScaffoldKind, EffectOnParent,
+    OrgNode, Scaffold, EffectOnParent,
     mk_indefinitive_orgnode,
-    orgnode_from_scaffold_kind };
+    orgnode_from_scaffold };
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -20,14 +20,14 @@ use typedb_driver::TypeDBDriver;
 /// accessors specific to trees of OrgNodes and (maybe) SkgNodes
 ///
 
-/// Find the unique child of a node with a given ScaffoldKind (for PairTree).
+/// Find the unique child of a node with a given Scaffold (for PairTree).
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
 pub fn unique_scaffold_child (
   tree          : &PairTree,
   node_id       : NodeId,
-  scaffold_kind : &ScaffoldKind,
+  scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<super::NodePair> =
     tree.get(node_id)
@@ -44,14 +44,14 @@ pub fn unique_scaffold_child (
   }
 }
 
-/// Find the unique child of a node with a given ScaffoldKind (for Tree<OrgNode>).
+/// Find the unique child of a node with a given Scaffold (for Tree<OrgNode>).
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
 pub fn unique_orgnode_scaffold_child (
   tree          : &Tree<OrgNode>,
   node_id       : NodeId,
-  scaffold_kind : &ScaffoldKind,
+  scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
@@ -102,7 +102,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
   if ! parent_ref . value () . orgnode ()
-      . is_scaffold ( &ScaffoldKind::SubscribeeCol ) {
+      . is_scaffold ( &Scaffold::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
   let grandparent_ref : NodeRef < NodePair > =
@@ -117,10 +117,10 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
 pub fn insert_scaffold_as_child (
   tree          : &mut PairTree,
   parent_id     : NodeId,
-  scaffold_kind : ScaffoldKind,
+  scaffold_kind : Scaffold,
   prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode = orgnode_from_scaffold_kind ( scaffold_kind );
+  let orgnode = orgnode_from_scaffold ( scaffold_kind );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -194,7 +194,7 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
     let child_new = child . value () . orgnode ();
-    if ! child_new . is_scaffold ( &ScaffoldKind::Alias ( String::new () ) ) {
+    if ! child_new . is_scaffold ( &Scaffold::Alias ( String::new () ) ) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",
                   child_new . kind )
@@ -215,7 +215,7 @@ pub fn collect_grandchild_aliases_for_orgnode (
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
     unique_orgnode_scaffold_child (
-      tree, node_id, &ScaffoldKind::AliasCol )
+      tree, node_id, &Scaffold::AliasCol )
     . map_err ( |e| e.to_string() ) ?;
   match alias_col_id {
     None => Ok(None),
@@ -227,7 +227,7 @@ pub fn collect_grandchild_aliases_for_orgnode (
         for alias_child in col_ref.children() {
           { // check for invalid state
             if ! alias_child.value().is_scaffold(
-                   &ScaffoldKind::Alias(String::new())) {
+                   &Scaffold::Alias(String::new())) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child.value().kind )); }}

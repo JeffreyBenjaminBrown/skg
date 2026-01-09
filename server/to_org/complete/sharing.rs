@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{EffectOnParent, ScaffoldKind};
+use crate::types::orgnode::{EffectOnParent, Scaffold};
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
@@ -36,7 +36,7 @@ pub async fn maybe_add_subscribeeCol_branch (
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     if unique_scaffold_child (
-      tree, node_id, &ScaffoldKind::SubscribeeCol )? . is_some ()
+      tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees ( tree, node_id ) ?;
@@ -57,13 +57,14 @@ pub async fn maybe_add_subscribeeCol_branch (
 
   let subscribee_col_nid : NodeId =
     insert_scaffold_as_child ( tree, node_id,
-      ScaffoldKind::SubscribeeCol, true ) ?;
+      Scaffold::SubscribeeCol, true ) ?;
 
   { // mutate the tree
     if ! hidden_outside_content . is_empty () {
       let hidden_outside_col_nid : NodeId =
-        insert_scaffold_as_child ( tree, subscribee_col_nid,
-                          ScaffoldKind::HiddenOutsideOfSubscribeeCol, false ) ?;
+        insert_scaffold_as_child (
+          tree, subscribee_col_nid,
+          Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
           tree, hidden_outside_col_nid, & hidden_id,
@@ -95,7 +96,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
         . into () ); }}
   if unique_scaffold_child (
        // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
-       tree, subscribee_treeid, &ScaffoldKind::HiddenInSubscribeeCol
+       tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
@@ -110,7 +111,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     return Ok (( )); }
   let hidden_col_nid : NodeId =
     insert_scaffold_as_child ( tree, subscribee_treeid,
-      ScaffoldKind::HiddenInSubscribeeCol, true ) ?;
+      Scaffold::HiddenInSubscribeeCol, true ) ?;
   for hidden_id in hidden_in_content {
     // populate the collection
     append_indefinitive_from_disk_as_child (
