@@ -29,6 +29,10 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
+//
+// Type declarations
+//
+
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
 pub struct OrgNode {
@@ -103,32 +107,6 @@ pub enum ScaffoldKind {
   SubscribeeCol, // Collects subscribees for its parent.
 }
 
-impl ScaffoldKind {
-  pub fn title ( &self ) -> &str {
-    match self {
-      ScaffoldKind::Alias ( s ) => s,
-      ScaffoldKind::AliasCol => "its aliases",
-      ScaffoldKind::ForestRoot => "",
-      ScaffoldKind::HiddenInSubscribeeCol => "hidden from this subscription",
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
-      ScaffoldKind::SubscribeeCol => "it subscribes to these",
-    } }
-
-  /// For serialization.
-  pub fn interp_str ( &self ) -> &str {
-    match self {
-      ScaffoldKind::Alias ( _ ) => "alias",
-      ScaffoldKind::AliasCol => "aliasCol",
-      ScaffoldKind::ForestRoot => "forestRoot",
-      ScaffoldKind::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
-      ScaffoldKind::SubscribeeCol => "subscribeeCol",
-    } } }
-
-//
-// Scaffold - a display-only node
-//
-
 /// A scaffold node. These are synthetic nodes for display purposes only.
 /// They don't correspond to real nodes in the graph.
 #[derive( Debug, Clone, PartialEq )]
@@ -154,13 +132,39 @@ pub enum ViewRequest {
   Definitive,
 }
 
+//
+// Implementations
+//
+
+impl ScaffoldKind {
+  pub fn title ( &self ) -> &str {
+    match self {
+      ScaffoldKind::Alias ( s ) => s,
+      ScaffoldKind::AliasCol => "its aliases",
+      ScaffoldKind::ForestRoot => "",
+      ScaffoldKind::HiddenInSubscribeeCol => "hidden from this subscription",
+      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      ScaffoldKind::SubscribeeCol => "it subscribes to these",
+    }}
+
+  /// For serialization.
+  pub fn interp_str ( &self ) -> &str {
+    match self {
+      ScaffoldKind::Alias ( _ ) => "alias",
+      ScaffoldKind::AliasCol => "aliasCol",
+      ScaffoldKind::ForestRoot => "forestRoot",
+      ScaffoldKind::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
+      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
+      ScaffoldKind::SubscribeeCol => "subscribeeCol",
+    }} }
+
 impl OrgNode {
   /// Returns the ID if this is a TrueNode with an ID, None otherwise.
   pub fn id ( &self ) -> Option < &ID > {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . id . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 
   /// Returns the title. For TrueNode, returns the title field.
   /// For Scaffold, returns the scaffold kind's title.
@@ -168,14 +172,14 @@ impl OrgNode {
     match &self . kind {
       OrgNodeKind::True ( t ) => &t . title,
       OrgNodeKind::Scaff ( s ) => s . kind . title (),
-    } }
+    }}
 
   /// Returns true if this is a TrueNode with the given effect_on_parent.
   pub fn has_effect ( &self, effect : EffectOnParent ) -> bool {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . effect_on_parent == effect,
       OrgNodeKind::Scaff ( _ ) => false,
-    } }
+    }}
 
   /// Returns true if this is a Scaffold with the given kind.
   pub fn is_scaffold ( &self, kind : &ScaffoldKind ) -> bool {
@@ -186,9 +190,9 @@ impl OrgNode {
           ( ScaffoldKind::Alias ( _ ), ScaffoldKind::Alias ( _ ) ) => true,
           _ => std::mem::discriminant ( &s . kind )
           == std::mem::discriminant ( kind ),
-        } }
+        }}
       OrgNodeKind::True ( _ ) => false,
-    } }
+    }}
 
   /// Returns true if this is a TrueNode (not a Scaffold).
   pub fn is_true_node ( &self ) -> bool {
@@ -203,14 +207,14 @@ impl OrgNode {
     match &self . kind {
       OrgNodeKind::Scaff ( s ) => Some ( &s . kind ),
       OrgNodeKind::True ( _ ) => None,
-    } }
+    }}
 
   /// Returns true if this is a TrueNode and is indefinitive.
   pub fn is_indefinitive ( &self ) -> bool {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . indefinitive,
       OrgNodeKind::Scaff ( _ ) => false,
-    } }
+    }}
 
   //
   // Mutation helpers (for TrueNodes only; no-op for Scaffolds)
@@ -220,52 +224,52 @@ impl OrgNode {
   pub fn set_indefinitive ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . indefinitive = value;
-    } }
+    }}
 
   /// Clear the body (set to None). No-op for Scaffolds.
   pub fn clear_body ( &mut self ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . body = None;
-    } }
+    }}
 
   /// Set the title. No-op for Scaffolds.
   pub fn set_title ( &mut self, title : String ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . title = title;
-    } }
+    }}
 
   /// Set the source. No-op for Scaffolds.
   pub fn set_source ( &mut self, source : String ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . source = Some ( source );
-    } }
+    }}
 
   /// Set the cycle flag in view_data. No-op for Scaffolds.
   pub fn set_cycle ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . cycle = value;
-    } }
+    }}
 
   /// Get mutable access to view_requests. Returns None for Scaffolds.
   pub fn view_requests_mut ( &mut self ) -> Option < &mut HashSet < ViewRequest > > {
     match &mut self . kind {
       OrgNodeKind::True ( t ) => Some ( &mut t . view_requests ),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 
   /// Check if source is set. Returns false for Scaffolds.
   pub fn has_source ( &self ) -> bool {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . source . is_some (),
       OrgNodeKind::Scaff ( _ ) => false,
-    } }
+    }}
 
   /// Get the source if this is a TrueNode. Returns None for Scaffolds.
   pub fn source ( &self ) -> Option < &String > {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . source . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 
   /// Get the focused flag.
   pub fn focused ( &self ) -> bool {
@@ -280,63 +284,63 @@ impl OrgNode {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . view_data . cycle,
       OrgNodeKind::Scaff ( _ ) => false,
-    } }
+    }}
 
   /// Get the view_requests if this is a TrueNode. Returns None for Scaffolds.
   pub fn view_requests ( &self ) -> Option < &HashSet < ViewRequest > > {
     match &self . kind {
       OrgNodeKind::True ( t ) => Some ( &t . view_requests ),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 
   /// Get the edit_request if this is a TrueNode. Returns None for Scaffolds.
   pub fn edit_request ( &self ) -> Option < &EditRequest > {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . edit_request . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 
   /// Set the edit_request. No-op for Scaffolds.
   pub fn set_edit_request ( &mut self, edit_request : Option < EditRequest > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . edit_request = edit_request;
-    } }
+    }}
 
   /// Set numContainers in view_data.relationships. No-op for Scaffolds.
   pub fn set_num_containers ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . relationships . numContainers = value;
-    } }
+    }}
 
   /// Set numContents in view_data.relationships. No-op for Scaffolds.
   pub fn set_num_contents ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . relationships . numContents = value;
-    } }
+    }}
 
   /// Set numLinksIn in view_data.relationships. No-op for Scaffolds.
   pub fn set_num_links_in ( &mut self, value : Option < usize > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . relationships . numLinksIn = value;
-    } }
+    }}
 
   /// Set parentIsContainer in view_data.relationships. No-op for Scaffolds.
   pub fn set_parent_is_container ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . relationships . parentIsContainer = value;
-    } }
+    }}
 
   /// Set parentIsContent in view_data.relationships. No-op for Scaffolds.
   pub fn set_parent_is_content ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . view_data . relationships . parentIsContent = value;
-    } }
+    }}
 
   /// Set effect_on_parent. No-op for Scaffolds.
   pub fn set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . effect_on_parent = effect;
-    } }
+    }}
 
   /// Convert a TrueNode to an Alias scaffold.
   /// Uses the TrueNode's title as the alias text.
@@ -346,32 +350,28 @@ impl OrgNode {
       self . kind = OrgNodeKind::Scaff ( Scaffold {
         kind : ScaffoldKind::Alias ( true_node . title . clone () ),
       });
-    } }
+    }}
 
   /// Set the id. No-op for Scaffolds.
   pub fn set_id ( &mut self, id : Option < ID > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . id = id;
-    } }
+    }}
 
   /// Returns true if this node should have no source (is a Scaffold).
   pub fn should_be_sourceless ( &self ) -> bool {
     match &self . kind {
       OrgNodeKind::Scaff ( _ ) => true,
       OrgNodeKind::True ( _ ) => false,
-    } }
+    }}
 
   /// Get the body if this is a TrueNode. Returns None for Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . body . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
-    } }
+    }}
 }
-
-//
-// Implementations for request types
-//
 
 impl fmt::Display for EditRequest {
   fn fmt (
@@ -381,7 +381,7 @@ impl fmt::Display for EditRequest {
     match self {
       EditRequest::Merge(id) => write!(f, "(merge {})", id.0),
       EditRequest::Delete    => write!(f, "toDelete"),
-    } } }
+    }} }
 
 impl FromStr for EditRequest {
   type Err = String;
@@ -409,7 +409,7 @@ impl fmt::Display for ViewRequest {
       ViewRequest::Containerward => write!(f, "containerwardView"),
       ViewRequest::Sourceward    => write!(f, "sourcewardView"),
       ViewRequest::Definitive    => write!(f, "definitiveView"),
-    } } }
+    }} }
 
 impl FromStr for ViewRequest {
   type Err = String;
@@ -460,7 +460,7 @@ impl Default for TrueNode {
       view_data        : OrgnodeViewData::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
-    } } }
+    }} }
 
 impl Default for OrgNode {
   fn default () -> Self {
@@ -468,7 +468,7 @@ impl Default for OrgNode {
       focused : false,
       folded  : false,
       kind    : OrgNodeKind::True ( TrueNode::default () ),
-    } } }
+    }} }
 
 //
 // Constructor functions
@@ -494,7 +494,7 @@ pub fn mk_definitive_orgnode (
       edit_request     : None,
       view_requests    : HashSet::new (),
     }),
-  } }
+  }}
 
 /// Create an indefinitive OrgNode from disk data with a specific effect.
 /// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).
@@ -519,7 +519,7 @@ pub fn mk_indefinitive_orgnode (
       edit_request     : None,
       view_requests    : HashSet::new (),
     }),
-  } }
+  }}
 
 /// Create a OrgNode with *nearly* full metadata control.
 /// The exception is that the 'OrgnodeRelationships' is intentionally omitted,
@@ -549,7 +549,7 @@ pub fn mk_orgnode (
       edit_request,
       view_requests,
     }),
-  } }
+  }}
 
 /// Create a Scaffold OrgNode from a ScaffoldKind.
 pub fn orgnode_from_scaffold_kind ( kind : ScaffoldKind ) -> OrgNode {
@@ -557,14 +557,12 @@ pub fn orgnode_from_scaffold_kind ( kind : ScaffoldKind ) -> OrgNode {
     focused : false,
     folded  : false,
     kind    : OrgNodeKind::Scaff ( Scaffold { kind } ),
-  } }
+  }}
 
 /// Helper to create a ForestRoot OrgNode.
 pub fn forest_root_orgnode () -> OrgNode {
   OrgNode {
     focused : false,
-    folded  : false,
-    kind    : OrgNodeKind::Scaff ( Scaffold {
-      kind : ScaffoldKind::ForestRoot,
-    }),
-  } }
+    folded : false,
+    kind : OrgNodeKind::Scaff ( Scaffold {
+      kind : ScaffoldKind::ForestRoot, } ), }}

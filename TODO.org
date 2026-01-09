@@ -3,21 +3,46 @@
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
 ** ONGOING futzing the refactor
-*** missing comments in types/orgnode.rs
-/// The metadata precedes the title in the headline.
-/// (Both follow the "bullet", which is a string of asterisks.)
-*** rewrite parts of test_orgnode_to_text_no_metadata
-    to use OrgNode constructors, for brevity
+*** functions to delete in server/types/orgnode.rs
+**** impl OrgNode {
+***** should_be_sourceless
+***** id
+***** title
+***** is_true_node
+***** is_scaffold_any
+***** scaffold_kind
+***** is_indefinitive
+***** set_indefinitive
+***** clear_body
+***** set_title
+***** set_source
+***** set_cycle
+***** view_requests_mut
+***** has_source
+***** source
+***** focused
+***** folded
+***** cycle
+***** view_requests
+***** edit_request
+***** set_edit_request
+***** set_num_containers
+***** set_num_contents
+***** set_num_links_in
+***** set_parent_is_container
+***** set_parent_is_content ( &mut self, value : bool ) {
+***** set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
+*****   pub fn set_id ( &mut self, id : Option < ID > ) {
+*****   pub fn should_be_sourceless ( &self ) -> bool {
+*****   pub fn body ( &self ) -> Option < &String > {
 *** compare_two_orgnode_branches_recursively_modulo_id
     is baroque
-*** delete should_be_sourceless
 *** merge assign_alias_relation_if_needed into its caller
 *** assign_new_id_if_needed should verify it's owned
 *** validate_node_and_children
-    Rather than two bool arguments,
-    take a single ScaffoldKind argument.
-*** validate_node_and_children
-    Case directly, rather than defining is_alias etc.
+**** Rather than two bool arguments,
+     take a single ScaffoldKind argument.
+**** Case directly, rather than defining is_alias etc.
 *** validate_merge_requests and friends
 **** 1
 It does this:
@@ -30,28 +55,11 @@ That's *terrible* -- it's imagining every Alias will contain an empty String. Fi
 Don't worry about alias, aliascol, etc.
 Just test whether it's a Scaffold, period.
 Actually that whole test seems unneeded -- it can't happen.
-*** put all implementations in orgnode.rs after all type dec's
-*** merge the Scaffold and ScaffoldKind types
-    keeping the first and deleting the second name
-*** delete folded and focused from OrgnodeViewData
+*** ONGOING put all implementations in orgnode.rs after all type dec's
 *** rename
 **** OrgnodeViewData -> TrueNodeViewData
 *** rewrite mk_*_orgnode
    in terms of mk_orgnode
-*** impl OrgNode
-**** rename
-     Most of those noops should be renamed to append "_if_truenode'.
-     has_source should be renamed is_truenode_and_has_source.
-     Similarly for cycle.
-**** delete
-+  /// Get the focused flag.
-+  pub fn focused ( &self ) -> bool {
-+    self . focused }
-+
-+  /// Get the folded flag.
-+  pub fn folded ( &self ) -> bool {
-+    self . folded }
-**** I'm not convinced most of these should exist.
 *** what's up with this?
 **** the comment
   // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
@@ -73,9 +81,11 @@ Actually that whole test seems unneeded -- it can't happen.
 *** put type signatures here
 fn set_metadata_relationships_in_node_recursive (
 *** rename is_scaffold
-    to has_scaffold_kind
+    to has_scaffoldkind
 *** seems baroque
 fn rebuild_pair_from_disk_mostly_clobbering_the_org (
+** change metadata rendering
+   'code' is now an obsolete s-exp title, etc.
 ** type changes
 *** delete EffectOnParent
     should only be a bool, parentIgnores, defaulting to false.
