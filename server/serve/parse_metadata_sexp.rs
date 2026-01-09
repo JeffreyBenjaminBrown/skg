@@ -57,6 +57,40 @@ pub enum Interp {
   HiddenFromSubscribees,
 }
 
+impl Interp {
+  /// Convert scaffold Interps to Scaffold. Returns None for TrueNode interps.
+  fn to_scaffold ( &self, title : &str ) -> Option < Scaffold > {
+    match self {
+      Interp::ForestRoot =>
+        Some ( Scaffold::ForestRoot ),
+      Interp::AliasCol =>
+        Some ( Scaffold::AliasCol ),
+      Interp::Alias =>
+        Some ( Scaffold::Alias ( title.to_string() )),
+      Interp::SubscribeeCol =>
+        Some ( Scaffold::SubscribeeCol ),
+      Interp::HiddenOutsideOfSubscribeeCol =>
+        Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
+      Interp::HiddenInSubscribeeCol =>
+        Some ( Scaffold::HiddenInSubscribeeCol ),
+      _ => None,
+    }}
+
+  /// Convert TrueNode Interps to EffectOnParent. Returns None for scaffold interps.
+  fn to_effect_on_parent ( &self ) -> Option < EffectOnParent > {
+    match self {
+      Interp::Content =>
+        Some ( EffectOnParent::Content ),
+      Interp::Subscribee =>
+        Some ( EffectOnParent::Subscribee ),
+      Interp::ParentIgnores =>
+        Some ( EffectOnParent::ParentIgnores ),
+      Interp::HiddenFromSubscribees =>
+        Some ( EffectOnParent::HiddenFromSubscribees ),
+      _ => None,
+    }}
+}
+
 impl Default for OrgnodeCode {
   fn default() -> Self {
     OrgnodeCode {
@@ -79,78 +113,30 @@ pub fn default_metadata() -> OrgnodeMetadata {
 
 /// Create an OrgNode from parsed metadata components.
 /// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
-pub fn from_parsed(
-  metadata: &OrgnodeMetadata,
-  title: String,
-  body: Option<String>,
+pub fn from_parsed (
+  metadata : &OrgnodeMetadata,
+  title    : String,
+  body     : Option < String >,
 ) -> OrgNode {
-  let focused = metadata.viewData.focused;
-  let folded = metadata.viewData.folded;
-
-  let kind = match metadata.code.interp {
-    // Scaffold kinds
-    Interp::ForestRoot =>
-      OrgNodeKind::Scaff ( Scaffold::ForestRoot ),
-    Interp::AliasCol =>
-      OrgNodeKind::Scaff ( Scaffold::AliasCol ),
-    Interp::Alias =>
-      OrgNodeKind::Scaff ( Scaffold::Alias ( title.clone() )),
-    Interp::SubscribeeCol =>
-      OrgNodeKind::Scaff ( Scaffold::SubscribeeCol ),
-    Interp::HiddenOutsideOfSubscribeeCol =>
-      OrgNodeKind::Scaff ( Scaffold::HiddenOutsideOfSubscribeeCol ),
-    Interp::HiddenInSubscribeeCol =>
-      OrgNodeKind::Scaff ( Scaffold::HiddenInSubscribeeCol ),
-
-    // TrueNode kinds
-    Interp::Content => OrgNodeKind::True(TrueNode {
-      title,
-      body,
-      id: metadata.id.clone(),
-      source: metadata.source.clone(),
-      effect_on_parent: EffectOnParent::Content,
-      indefinitive: metadata.code.indefinitive,
-      view_data: metadata.viewData.clone(),
-      edit_request: metadata.code.editRequest.clone(),
-      view_requests: metadata.code.viewRequests.clone(),
-    }),
-    Interp::Subscribee => OrgNodeKind::True(TrueNode {
-      title,
-      body,
-      id: metadata.id.clone(),
-      source: metadata.source.clone(),
-      effect_on_parent: EffectOnParent::Subscribee,
-      indefinitive: metadata.code.indefinitive,
-      view_data: metadata.viewData.clone(),
-      edit_request: metadata.code.editRequest.clone(),
-      view_requests: metadata.code.viewRequests.clone(),
-    }),
-    Interp::ParentIgnores => OrgNodeKind::True(TrueNode {
-      title,
-      body,
-      id: metadata.id.clone(),
-      source: metadata.source.clone(),
-      effect_on_parent: EffectOnParent::ParentIgnores,
-      indefinitive: metadata.code.indefinitive,
-      view_data: metadata.viewData.clone(),
-      edit_request: metadata.code.editRequest.clone(),
-      view_requests: metadata.code.viewRequests.clone(),
-    }),
-    Interp::HiddenFromSubscribees => OrgNodeKind::True(TrueNode {
-      title,
-      body,
-      id: metadata.id.clone(),
-      source: metadata.source.clone(),
-      effect_on_parent: EffectOnParent::HiddenFromSubscribees,
-      indefinitive: metadata.code.indefinitive,
-      view_data: metadata.viewData.clone(),
-      edit_request: metadata.code.editRequest.clone(),
-      view_requests: metadata.code.viewRequests.clone(),
-    }),
-  };
-
-  OrgNode { focused, folded, kind }
-}
+  let interp  = &metadata . code . interp;
+  let kind =
+    if let Some ( scaffold ) = interp . to_scaffold ( &title ) {
+      OrgNodeKind::Scaff ( scaffold )
+    } else if let Some ( effect ) = interp . to_effect_on_parent () {
+      OrgNodeKind::True ( TrueNode {
+        title,
+        body,
+        id               : metadata . id . clone (),
+        source           : metadata . source . clone (),
+        effect_on_parent : effect,
+        indefinitive     : metadata . code . indefinitive,
+        view_data        : metadata . viewData . clone (),
+        edit_request     : metadata . code . editRequest . clone (),
+        view_requests    : metadata . code . viewRequests . clone (), } )
+    } else { panic! ( "Invalid Interp: {:?}", interp ) };
+  OrgNode { focused : metadata.viewData.focused,
+            folded  : metadata.viewData.folded,
+            kind } }
 
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
