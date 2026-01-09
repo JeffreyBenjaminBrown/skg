@@ -1,5 +1,5 @@
-use crate::types::orgnode::{Interp, EditRequest};
-use crate::types::orgnode_new::{OrgNode, ScaffoldKind};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode_new::{OrgNode, OrgNodeKind, ScaffoldKind, EffectOnParent};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
@@ -35,12 +35,13 @@ fn naive_saveinstructions_from_tree(
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
-  let (interp, is_indefinitive): (Interp, bool) =
+  let (node_kind, is_indefinitive): (OrgNodeKind, bool) =
     read_at_node_in_tree(tree, node_id, |node| {
-      ( node.interp().clone(),
+      ( node.kind.clone(),
         node.is_indefinitive() )
     })?;
-  if interp == Interp::ForestRoot {
+  // Handle ForestRoot: just recurse to children
+  if matches!(&node_kind, OrgNodeKind::Scaff(s) if s.kind == ScaffoldKind::ForestRoot) {
     for child_treeid in {
       let child_treeids: Vec<NodeId> =
         tree . get(node_id) . unwrap() . children()
@@ -50,14 +51,9 @@ fn naive_saveinstructions_from_tree(
     { naive_saveinstructions_from_tree (
         tree, child_treeid, result)?; }
     return Ok(( )); }
-  if matches!(interp, Interp::AliasCol                     |
-                      Interp::Alias                        |
-                      Interp::SubscribeeCol                |
-                      Interp::Subscribee                   |
-                      Interp::HiddenOutsideOfSubscribeeCol |
-                      Interp::HiddenInSubscribeeCol        |
-                      Interp::HiddenFromSubscribees ) {
-    return Ok(()); } // Skip - these don't generate SaveInstructions
+  // Skip all other scaffolds - they don't generate SaveInstructions
+  if matches!(&node_kind, OrgNodeKind::Scaff(_)) {
+    return Ok(()); }
   let aliases =
     collect_grandchild_aliases_for_orgnode(tree, node_id)?;
   let subscribees =
@@ -142,22 +138,22 @@ fn collect_subscribees (
           "collect_subscribees: SubscribeeCol not found");
         let mut subscribees : Vec<ID> = Vec::new();
         for subscribee_child in col_ref.children() {
-          { // maybe skip, maybe err
-            let child_interp : Interp =
-              subscribee_child . value() . interp() . clone();
-            if child_interp == Interp::HiddenOutsideOfSubscribeeCol {
-              // This Interp is allowed as a child of a SubscribeeCol,
-              // but it's not a subscribee, so skip it.
-              continue; }
-            if child_interp != Interp::Subscribee {
-              return Err ( format! (
-                "SubscribeeCol has non-Subscribee child with interp: {:?}",
-                child_interp )); }}
-          match subscribee_child.value().id() {
+          let child_node = subscribee_child . value();
+          // HiddenOutsideOfSubscribeeCol is allowed as a child of SubscribeeCol,
+          // but it's not a subscribee, so skip it.
+          if child_node . is_scaffold ( &ScaffoldKind::HiddenOutsideOfSubscribeeCol ) {
+            continue; }
+          // Must be a Subscribee (TrueNode with Subscribee effect)
+          if ! child_node . has_effect ( EffectOnParent::Subscribee ) {
+            return Err ( format! (
+              "SubscribeeCol has non-Subscribee child: {:?}",
+              child_node . kind )); }
+          match child_node.id() {
             Some(id) => subscribees . push( id . clone() ),
             None => return Err ( format! (
               "Subscribee '{}' has no ID",
-              subscribee_child.value().title() )), }}
+              child_node.title() )), }
+        }
         subscribees };
       Ok(Some(dedup_vector(subscribees))) }} }
 
@@ -170,11 +166,10 @@ fn collect_contents_that_are_not_to_delete<'a> (
   let mut contents: Vec<ID> =
     Vec::new();
   for child in node_ref.children() {
-    if (( child . value() . interp()
-          == Interp::Content )
-        && ( ! matches!(
-          child . value() . edit_request(),
-          Some(EditRequest::Delete)) )) {
-      if let Some(id) = child.value().id() {
+    let child_node = child . value();
+    if child_node . has_effect ( EffectOnParent::Content )
+       && ! matches!( child_node . edit_request(), Some(EditRequest::Delete) )
+    {
+      if let Some(id) = child_node.id() {
         contents.push(id.clone()); }} }
   contents }

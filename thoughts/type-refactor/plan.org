@@ -65,8 +65,10 @@
    - server/to_org/expand/aliases.rs
    - server/to_org/complete/sharing.rs
 
-* Phase 10: Eliminate Interp from save instructions
+* DONE Phase 10: Eliminate Interp from save instructions
   Goal: Refactor to_naive_instructions.rs to not use Interp.
+  Completed: Replaced Interp checks with OrgNodeKind matching and has_effect()/is_scaffold() calls.
+  Interp usage reduced from 6 files to 5 files.
 
 ** 10.1 Refactor naive_saveinstructions_from_tree()
    Current pattern:
