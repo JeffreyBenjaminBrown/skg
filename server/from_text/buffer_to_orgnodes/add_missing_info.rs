@@ -3,7 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::orgnode::{OrgNode, EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, EffectOnParent, Scaffold};
 use crate::types::misc::ID;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_orgnode_tree, assign_pids_throughout_orgnode_tree_from_map};
@@ -77,7 +77,7 @@ fn add_missing_info_dfs (
           let is_aliascol =
             orgnode . is_scaffold ( &Scaffold::AliasCol );
           let parent_source = (
-            if orgnode . should_be_sourceless () { None }
+            if matches!(&orgnode.kind, OrgNodeKind::Scaff(_)) { None }
             else { orgnode . source () . cloned () } );
           ( is_aliascol, parent_source ) })
       { Ok (( is_aliascol, source )) => ( is_aliascol, source ),
@@ -85,7 +85,7 @@ fn add_missing_info_dfs (
   { // process this node
     assign_alias_relation_if_needed (
       node_ref . value (), parent_is_aliascol );
-    if ! node_ref . value () . should_be_sourceless () {
+    if let OrgNodeKind::True(_) = &node_ref.value().kind {
       inherit_source_if_needed (
         node_ref . value (), parent_source ); }
     assign_new_id_if_needed (

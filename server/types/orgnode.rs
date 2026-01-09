@@ -321,13 +321,6 @@ impl OrgNode {
       t . id = id;
     }}
 
-  /// Returns true if this node should have no source (is a Scaffold).
-  pub fn should_be_sourceless ( &self ) -> bool {
-    match &self . kind {
-      OrgNodeKind::Scaff ( _ ) => true,
-      OrgNodeKind::True ( _ ) => false,
-    }}
-
   /// Get the body if this is a TrueNode. Returns None for Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {
