@@ -75,7 +75,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
                  "Expected exactly 1 RootWithoutSource error for pub-1");
       if let BufferValidationError::RootWithoutSource(node)
       = root_without_source_errors[0]
-      { assert_eq!(node.metadata.id.as_ref().map(|id| id.0.as_str()),
+      { assert_eq!(node.id().map(|id| id.0.as_str()),
                    Some("pub-1"),
                    "RootWithoutSource should be for pub-1"); }}
 

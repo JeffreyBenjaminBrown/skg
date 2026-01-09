@@ -1,4 +1,5 @@
-use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode::OrgNode;
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
@@ -94,9 +95,9 @@ fn traverse_node_recursively_and_collect(
     HashMap<ID, HashSet<SourceNickname>>
 ) {
   let orgnode: &OrgNode = node_ref.value();
-  if let Some(id) = &orgnode.metadata.id {
+  if let Some(id) = orgnode.id() {
     let delete_instruction: WhetherToDelete =
-      if matches!(orgnode.metadata.code.editRequest,
+      if matches!(orgnode.edit_request(),
                   Some(EditRequest::Delete)) {
         WhetherToDelete::Delete
       } else { WhetherToDelete::DoNotDelete };
@@ -104,11 +105,11 @@ fn traverse_node_recursively_and_collect(
       . entry(id.clone())
       . or_insert_with(HashSet::new)
       . insert(delete_instruction);
-    if !orgnode.metadata.code.indefinitive {
+    if !orgnode.is_indefinitive() {
       // Increment the count for this defining container
       *id_defining_count . entry (id.clone())
         . or_insert(0) += 1; }
-    if let Some(ref source_str) = orgnode.metadata.source {
+    if let Some(source_str) = orgnode.source() {
       // Collect source for this ID
       let source : SourceNickname =
         SourceNickname::from(source_str.as_str());

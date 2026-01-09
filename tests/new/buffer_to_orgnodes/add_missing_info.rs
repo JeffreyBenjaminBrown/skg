@@ -72,7 +72,7 @@ async fn test_add_missing_info_logic (
   { let actual_root : &OrgNode =
       after_adding_missing_info.root().first_child().unwrap().value();
     let actual_root_id : &ID =
-      actual_root . metadata . id.as_ref() . unwrap();
+      actual_root . id() . unwrap();
     assert_eq!(
       actual_root_id . 0,
       "root-pid",

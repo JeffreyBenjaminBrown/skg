@@ -27,3 +27,27 @@ pub struct NodePair {
   pub mskgnode: Option<SkgNode>,
   pub orgnode: OrgNode,
 }
+
+impl NodePair {
+  pub fn orgnode ( &self ) -> &OrgNode {
+    &self . orgnode }
+  pub fn orgnode_mut ( &mut self ) -> &mut OrgNode {
+    &mut self . orgnode }
+}
+
+//
+// NodePair constructors
+//
+
+impl NodePair {
+  pub fn from_orgnode ( orgnode : OrgNode ) -> Self {
+    NodePair {
+      mskgnode : None,
+      orgnode,
+    } }
+  pub fn from_pair ( orgnode : OrgNode,
+                     skgnode : SkgNode ) -> Self {
+    NodePair {
+      mskgnode : Some ( skgnode ),
+      orgnode,
+    } } }

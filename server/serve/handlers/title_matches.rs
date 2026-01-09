@@ -1,7 +1,9 @@
 use crate::serve::util::send_response;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::dbs::tantivy::search_index;
-use crate::types::orgnode::{OrgNode, Interp, default_metadata};
+use crate::types::orgnode::{
+  OrgNode, OrgNodeKind, TrueNode, EffectOnParent,
+};
 use crate::types::misc::TantivyIndex;
 use crate::org_to_text::orgnode_to_text;
 
@@ -105,8 +107,8 @@ fn group_matches_by_id (
 /// Sorts IDs by best score, and matches within each ID by score.
 fn format_matches_as_org_mode (
   search_terms  : &str,
-  matches_by_id : MatchGroups )
-  -> String {
+  matches_by_id : MatchGroups
+) -> String {
 
   let mut result : String =
     String::new();
@@ -114,12 +116,15 @@ fn format_matches_as_org_mode (
     & orgnode_to_text (
       1,
       & OrgNode {
-        metadata : { let mut md = default_metadata ();
-                     md.code.interp = Interp::ParentIgnores;
-                     md },
-        title : search_terms.to_string (),
-        // The unique level-1 headline states the search terms.
-        body : None, } ));
+        focused : false,
+        folded  : false,
+        kind    : OrgNodeKind::True ( TrueNode {
+          title :
+          ( // The unique level-1 headline states the search terms.
+            search_terms.to_string ()),
+          effect_on_parent : EffectOnParent::ParentIgnores,
+          ..TrueNode::default ()
+        } ), } ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
@@ -149,22 +154,26 @@ fn format_matches_as_org_mode (
       & orgnode_to_text (
         2,
         & OrgNode {
-          metadata : default_metadata (),
-          title : format! (
-            "score: {:.2}, [[id:{}][{}]]",
-            score, id, title ),
-          body : None, }  ));
+          focused : false,
+          folded  : false,
+          kind    : OrgNodeKind::True ( TrueNode {
+            title : format! (
+              "score: {:.2}, [[id:{}][{}]]",
+              score, id, title ),
+            ..TrueNode::default () } ), } ));
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
       result.push_str (
         & orgnode_to_text (
           3,
           & OrgNode {
-            metadata : default_metadata (),
-            title : format! (
-              "score: {:.2}, [[id:{}][{}]]",
-              score, id, title ),
-            body : None, } )); }}
+            focused : false,
+            folded  : false,
+            kind    : OrgNodeKind::True ( TrueNode {
+              title : format! (
+                "score: {:.2}, [[id:{}][{}]]",
+                score, id, title ),
+              ..TrueNode::default () } ), } )); }}
   result }
 
 pub fn search_terms_from_request (

@@ -11,7 +11,8 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::orgnode::ViewRequest;
+use crate::types::orgnode::{OrgNodeKind, EffectOnParent, OrgNode, ScaffoldKind};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -72,16 +73,19 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
-    let treatment: Interp =
+    let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode.metadata.code.interp.clone() })?;
-    if treatment == Interp::AliasCol {
+        node.orgnode().is_scaffold ( &ScaffoldKind::AliasCol ) })?;
+    let is_col_scaffold: bool =
+      read_at_node_in_tree(tree, node_id, |node| {
+        node.orgnode().is_scaffold ( &ScaffoldKind::SubscribeeCol )
+        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenOutsideOfSubscribeeCol )
+        || node.orgnode().is_scaffold ( &ScaffoldKind::HiddenInSubscribeeCol ) })?;
+    if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if treatment == Interp::SubscribeeCol
-           || treatment == Interp::HiddenOutsideOfSubscribeeCol
-           || treatment == Interp::HiddenInSubscribeeCol {
+    } else if is_col_scaffold {
       // Recurse into children to collect view requests (e.g. from Subscribee nodes) but don't try to complete the SubscribeeCol node itself.
       map_completeAndRestoreNodeCollectingViewRequests_over_children (
         tree, node_id, config, typedb_driver,
@@ -131,8 +135,11 @@ fn view_requests_at_node (
   let node_view_requests : Vec < ViewRequest > =
     read_at_node_in_tree (
       tree, node_id,
-      ( |np| np . orgnode . metadata . code . viewRequests
-        . iter () . cloned () . collect () )) ?;
+      |np| match &np . orgnode () . kind {
+             OrgNodeKind::True ( t ) =>
+               t . view_requests . iter () . cloned () . collect (),
+             OrgNodeKind::Scaff ( _ ) => Vec::new (),
+      } ) ?;
   for request in node_view_requests {
     view_requests_out . push ( (node_id, request) ); }
   Ok (( )) }
@@ -153,12 +160,16 @@ pub fn clobberIndefinitiveOrgnode (
   treeid : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree ( tree, treeid, |pair| {
-    let skgnode : &SkgNode =
-      pair . mskgnode . as_ref ()
-        . ok_or ("SkgNode should exist after fetch" . to_string() )?;
-    pair.orgnode.title = skgnode.title.clone();
-    pair.orgnode.metadata.source = Some(skgnode.source.clone());
-    pair.orgnode.body = None;
+    let (title, source) : (String, String) = {
+      let skgnode : &SkgNode =
+        pair . mskgnode . as_ref ()
+          . ok_or ("SkgNode should exist after fetch" . to_string() )?;
+      ( skgnode . title . clone (),
+        skgnode . source . clone () ) };
+    let org = pair . orgnode_mut ();
+    org . set_title ( title );
+    org . set_source ( source );
+    org . clear_body ();
     Ok::<(), String>(( ))
   } )? // before the '?' it's a nested Result: R<R<(),String>,String>
     . map_err( |e| -> Box<dyn Error> { e.into() } ) }
@@ -220,7 +231,7 @@ pub async fn completeDefinitiveOrgnode (
       tree . get ( *child_treeid )
       . ok_or ( "Child node not found" ) ?;
     let child_pid : &ID =
-      child_ref . value () . orgnode . metadata . id . as_ref ()
+      child_ref . value () . orgnode () . id ()
       . ok_or ( "Content child has no ID" ) ?;
     content_skgid_to_treeid . insert (
       child_pid . clone (), *child_treeid ); }
@@ -236,11 +247,11 @@ pub async fn completeDefinitiveOrgnode (
     let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_treeid )
       . ok_or ( "Invalid content child not found" ) ?;
-    child_mut . value () . orgnode . metadata . code.interp =
-      Interp::ParentIgnores;
-    content_skgid_to_treeid . remove (
-      & child_mut . value () . orgnode
-        . metadata . id . clone () . unwrap () );
+    let pair = child_mut . value ();
+    pair . orgnode_mut ()
+      . set_effect_on_parent ( EffectOnParent::ParentIgnores );
+    let child_pid = pair . orgnode () . id () . cloned () . unwrap ();
+    content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
 
   // Build completed-content list
@@ -282,8 +293,8 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . orgnode . metadata . code . interp
-      == Interp::Content
+    if child . value () . orgnode ()
+        . has_effect ( EffectOnParent::Content )
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}
@@ -298,14 +309,14 @@ async fn extend_content (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( skgnode, new_orgnode ) : ( SkgNode, OrgNode ) =
+  let ( skgnode, orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
   let new_child_id : NodeId = with_node_mut (
     tree, parent_nid,
     ( |mut parent_mut|
-      parent_mut . append ( NodePair { mskgnode: Some(skgnode),
-                                       orgnode: new_orgnode } )
+      parent_mut . append ( NodePair { mskgnode : Some(skgnode),
+                                       orgnode  : orgnode } )
       . id () )) ?;
   Ok ( new_child_id ) }
 
@@ -372,7 +383,7 @@ pub async fn ensure_source (
   let has_source : bool =
     read_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode . metadata . source . is_some () ) ?;
+      |np| np . orgnode () . has_source () ) ?;
   if ! has_source {
     let node_pid : ID =
       get_pid_in_pairtree ( tree, node_id ) ?;
@@ -384,5 +395,6 @@ pub async fn ensure_source (
         node_pid ) ) ?;
     write_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode . metadata . source = Some (source) ) ?; }
+      |np| {
+        np . orgnode_mut () . set_source ( source ); } ) ?; }
   Ok (( )) }

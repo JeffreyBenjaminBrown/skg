@@ -19,31 +19,30 @@ use crate::dbs::typedb::util::concept_document::{
 
 
 /// Collect IDs for bulk PID lookup
-pub fn collect_ids_in_tree (
+pub fn collect_ids_in_orgnode_tree (
   node_ref : NodeRef < OrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let Some ( ref id )
-    = node_ref . value () . metadata . id
+  if let Some ( id )
+    = node_ref . value () . id ()
   { // Collect ID if present
     ids_to_lookup . push ( id . clone () ); }
   for child in node_ref . children () { // Recurse
-    collect_ids_in_tree (
+    collect_ids_in_orgnode_tree (
       child,
       ids_to_lookup ); } }
 
-/// Assign PIDs from the bulk lookup results
-pub fn assign_pids_throughout_tree_from_map (
+pub fn assign_pids_throughout_orgnode_tree_from_map (
   mut node_ref : NodeMut < OrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let Some ( ref current_id )
-    = node_ref . value () . metadata . id . clone ()
+  if let Some ( current_id )
+    = node_ref . value () . id () . cloned ()
   { // Assign PID if we have one
     if let Some ( Some ( pid )) =
-      pid_map . get ( current_id )
-    { node_ref . value () . metadata . id =
-      Some ( pid . clone () ); }}
+      pid_map . get ( &current_id )
+    { node_ref . value () . set_id (
+        Some ( pid . clone () ) ); }}
   { // Process children recursively
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
@@ -55,7 +54,7 @@ pub fn assign_pids_throughout_tree_from_map (
       child_treeids } {
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_treeid )
-      { assign_pids_throughout_tree_from_map (
+      { assign_pids_throughout_orgnode_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// PURPOSE: Run one TypeDB query, using nested subqueries,

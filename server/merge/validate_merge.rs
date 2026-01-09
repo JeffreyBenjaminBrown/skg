@@ -8,7 +8,8 @@
 ///     - No node can be an acquirer and an acquiree.
 ///     - No node can be involved in more than one merge.
 
-use crate::types::orgnode::{OrgNode, Interp, EditRequest};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode::{OrgNode, ScaffoldKind};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -35,17 +36,17 @@ pub async fn validate_merge_requests(
     collect_merge_validation_data ( forest );
   for node in collections.acquirer_orgnodes {
     let acquirer_id : &ID =
-      node.metadata.id.as_ref()
+      node.id()
       .ok_or("Acquirer node must have an ID")?;
-    if node.metadata.code.interp == Interp::Alias
-      || node.metadata.code.interp == Interp::AliasCol {
-        errors.push(
-          format!(
-            "Acquirer node '{}' cannot be an Alias or AliasCol",
-            acquirer_id.as_str() ));
-        continue; }
+    if ( node.is_scaffold( &ScaffoldKind::Alias(String::new()) ) ||
+         node.is_scaffold( &ScaffoldKind::AliasCol ))
+    { errors.push(
+        format!(
+          "Acquirer node '{}' cannot be an Alias or AliasCol",
+          acquirer_id.as_str() ));
+      continue; }
     if let Some(EditRequest::Merge(acquiree_id))
-      = &node.metadata.code.editRequest
+      = node.edit_request()
     { errors.extend ( { let pair_errors : Vec<String> =
                            validate_merge_pair(
                              config,
@@ -76,14 +77,14 @@ fn collect_merge_validation_data<'a>(
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
         let orgnode: &OrgNode = node_ref.value();
-        if matches!(orgnode.metadata.code.editRequest,
+        if matches!(orgnode.edit_request(),
                     Some(EditRequest::Delete)) {
-          if let Some(ref id) = orgnode.metadata.id {
+          if let Some(id) = orgnode.id() {
             to_delete_ids.insert( // Mutate!
               id.clone()); }}
         if let Some(EditRequest::Merge(acquiree_id))
-          = &orgnode.metadata.code.editRequest {
-            if let Some(ref acquirer_id) = orgnode.metadata.id {
+          = orgnode.edit_request() {
+            if let Some(acquirer_id) = orgnode.id() {
               acquirer_orgnodes.push( // Mutate!
                 orgnode);
               acquirer_to_acquirees // Mutate!

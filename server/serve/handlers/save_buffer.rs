@@ -228,7 +228,7 @@ fn add_paired_subtree_as_child (
     orgnode_tree . get ( orgnode_treeid ) . unwrap ()
     . value () . clone ();
   let mskgnode : Option<SkgNode> =
-    orgnode . metadata . id . as_ref ()
+    orgnode . id ()
     . and_then (
       |id| skgnode_map . get (id) . cloned () );
   let new_treeid : NodeId = {

@@ -15,7 +15,9 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNode, Interp, ViewRequest};
+use crate::types::orgnode::ViewRequest;
+use crate::types::orgnode::{
+    OrgNode, OrgNodeKind, EffectOnParent, mk_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -85,17 +87,16 @@ async fn execute_definitive_view_request (
   ensure_source (
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
-    // Remove the ViewRequest, mark it definitive,
-    // and rebuild from disk.
-    write_at_node_in_tree (
-      forest, node_id,
-      |np| { np . orgnode . metadata . code . viewRequests
-               . remove ( & ViewRequest::Definitive );
-             np . orgnode . metadata . code . indefinitive =
-               false; } ) ?;
     rebuild_pair_from_disk_mostly_clobbering_the_org (
       // preserves relevant orgnode fields
-      forest, node_id, config ) ?; }
+      forest, node_id, config ) ?;
+    write_at_node_in_tree (
+      forest, node_id,
+      |np| { // remove ViewRequest and mark definitive
+        let org = np . orgnode_mut ();
+        if let Some ( vr ) = org . view_requests_mut () {
+          vr . remove ( & ViewRequest::Definitive ); }
+        org . set_indefinitive ( false ); } ) ?; }
   visited . insert ( node_pid.clone(), node_id );
   extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
     forest, node_id,
@@ -107,8 +108,8 @@ async fn execute_definitive_view_request (
       let node_ref : NodeRef < NodePair > =
         forest . get ( node_id ) . ok_or (
           "execute_definitive_view_request: node not found" ) ?;
-      node_ref . value () . orgnode . metadata . code . interp
-        == Interp::Subscribee };
+      node_ref . value () . orgnode ()
+        . has_effect ( EffectOnParent::Subscribee ) };
     if is_subscribee {
       maybe_add_hiddenInSubscribeeCol_branch (
         forest, node_id, config, typedb_driver ) . await ?; }}
@@ -124,9 +125,8 @@ fn get_hidden_ids_if_subscribee (
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
-  let interp : &Interp =
-    & node_ref . value () . orgnode . metadata . code . interp;
-  if *interp != Interp::Subscribee {
+  if ! node_ref . value () . orgnode ()
+       . has_effect ( EffectOnParent::Subscribee ) {
     return Ok ( HashSet::new () ); }
   else {
     let subscribee_col : NodeRef < NodePair > =
@@ -160,11 +160,11 @@ fn indefinitize_content_subtree (
   let pair : &NodePair =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
-    pair . orgnode . metadata . id . clone ();
+    pair . orgnode () . id () . cloned ();
   let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
-    . filter ( |c| c . value () . orgnode . metadata . code . interp
-                   == Interp::Content )
+    . filter ( |c| c . value () . orgnode ()
+                   . has_effect ( EffectOnParent::Content ) )
     . map ( |c| c . id () )
     . collect ();
   if let Some(ref pid) = node_pid_opt { // remove from visited
@@ -173,13 +173,15 @@ fn indefinitize_content_subtree (
     // TODO : This ought to call a function.
     // It, or something very like it anyway, happens elsewhere too.
     let canonical_title : Option<String> =
-      pair . mskgnode . as_ref () . map ( |s| s . title . clone () );
+      pair . mskgnode . as_ref() . map ( |s| s . title . clone () );
     write_at_node_in_tree (
       tree, node_id,
-      |np| { np . orgnode . metadata . code . indefinitive = true;
-             if let Some(title) = canonical_title {
-               np . orgnode . title = title; }
-             np . orgnode . body = None; } ) ?; }
+      |np| {
+        let org = np . orgnode_mut ();
+        org . set_indefinitive ( true );
+        if let Some ( title ) = canonical_title.clone () {
+          org . set_title ( title ); }
+        org . clear_body (); } ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, child_treeid, visited ) ?; }
@@ -256,7 +258,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   Ok (( )) }
 
 /// Fetches fresh (SkgNode, OrgNode) from disk
-/// and replaces both in the tree.
+///   and replaces both in the tree.
 /// Preserves OrgnodeCode fields.
 /// Replaces all other OrgNode data.
 fn rebuild_pair_from_disk_mostly_clobbering_the_org (
@@ -264,24 +266,37 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, source, code) = {
+  let (pid, source, effect, indefinitive, edit_request, view_requests) = {
     // Extract values to preserve from existing orgnode
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" ) ?;
-    let orgnode : &OrgNode = & node_ref . value () . orgnode;
-    let pid : ID = orgnode . metadata . id . clone ()
+    let org = node_ref . value () . orgnode ();
+    let pid : ID = org . id () . cloned ()
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID" ) ?;
-    let source : String = orgnode . metadata . source . clone ()
+    let source : String = org . source () . cloned ()
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no source" ) ?;
+    let effect : EffectOnParent = match &org . kind {
+      OrgNodeKind::True ( t ) => t . effect_on_parent . clone (),
+      OrgNodeKind::Scaff ( _ ) => return Err (
+        "rebuild_pair_from_disk_mostly_clobbering_the_org: node is Scaffold, not TrueNode" . into () ),
+    };
     ( pid,
       source,
-      orgnode . metadata . code . clone () ) };
-  let (skgnode, mut orgnode) : (SkgNode, OrgNode) =
+      effect,
+      org . is_indefinitive (),
+      org . edit_request () . cloned (),
+      org . view_requests () . cloned () . unwrap_or_default () ) };
+  let (skgnode, disk_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
-  orgnode . metadata . code = code;
+  let orgnode = mk_orgnode (
+    pid, source . to_string (),
+    disk_orgnode . title () . to_string (),
+    disk_orgnode . body () . cloned (),
+    effect, indefinitive, edit_request, view_requests );
   write_at_node_in_tree ( // replace it
     tree, node_id,
-    |np| * np = NodePair { mskgnode: Some ( skgnode ), orgnode } ) ?;
+    |np| * np = NodePair { mskgnode : Some ( skgnode ),
+                           orgnode  : orgnode } ) ?;
   Ok (( )) }

@@ -3,14 +3,14 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::Interp;
+use crate::types::orgnode::{EffectOnParent, ScaffoldKind};
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  append_indefinitive_node, insert_sourceless_node,
+  append_indefinitive_from_disk_as_child, insert_scaffold_as_child,
   pid_for_subscribee_and_its_subscriber_grandparent,
   pids_for_subscriber_and_its_subscribees,
-  unique_child_with_interp };
+  unique_scaffold_child };
 
 use ego_tree::NodeId;
 use std::collections::HashSet;
@@ -31,12 +31,12 @@ pub async fn maybe_add_subscribeeCol_branch (
     let is_indefinitive : bool =
       read_at_node_in_tree (
         tree, node_id,
-        |np| np . orgnode . metadata . code . indefinitive ) ?;
+        |np| np . orgnode () . is_indefinitive () ) ?;
     if is_indefinitive { return Ok (( )); }}
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
-    if unique_child_with_interp (
-      tree, node_id, Interp::SubscribeeCol )? . is_some ()
+    if unique_scaffold_child (
+      tree, node_id, &ScaffoldKind::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees ( tree, node_id ) ?;
@@ -56,23 +56,22 @@ pub async fn maybe_add_subscribeeCol_branch (
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId =
-    insert_sourceless_node ( tree, node_id,
-      Interp::SubscribeeCol, "it subscribes to these", true ) ?;
+    insert_scaffold_as_child ( tree, node_id,
+      ScaffoldKind::SubscribeeCol, true ) ?;
 
   { // mutate the tree
     if ! hidden_outside_content . is_empty () {
       let hidden_outside_col_nid : NodeId =
-        insert_sourceless_node ( tree, subscribee_col_nid,
-                          Interp::HiddenOutsideOfSubscribeeCol,
-                          "hidden from all subscriptions", false ) ?;
+        insert_scaffold_as_child ( tree, subscribee_col_nid,
+                          ScaffoldKind::HiddenOutsideOfSubscribeeCol, false ) ?;
       for hidden_id in hidden_outside_content {
-        append_indefinitive_node (
+        append_indefinitive_from_disk_as_child (
           tree, hidden_outside_col_nid, & hidden_id,
-          Interp::HiddenFromSubscribees, config, driver ). await ?; }}
+          EffectOnParent::HiddenFromSubscribees, config, driver ). await ?; }}
     for subscribee_id in subscribee_ids {
-      append_indefinitive_node (
+      append_indefinitive_from_disk_as_child (
         tree, subscribee_col_nid, & subscribee_id,
-        Interp::Subscribee, config, driver ) . await ?; }}
+        EffectOnParent::Subscribee, config, driver ) . await ?; }}
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -89,14 +88,14 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { // error if not a Subscribee
     let is_subscribee: bool =
       read_at_node_in_tree(tree, subscribee_treeid, |node| {
-        node.orgnode.metadata.code.interp == Interp::Subscribee
+        node.orgnode().has_effect ( EffectOnParent::Subscribee )
       })?;
     if ! is_subscribee { return Err (
       "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee"
         . into () ); }}
-  if unique_child_with_interp (
+  if unique_scaffold_child (
        // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
-       tree, subscribee_treeid, Interp::HiddenInSubscribeeCol
+       tree, subscribee_treeid, &ScaffoldKind::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
@@ -110,12 +109,11 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   if hidden_in_content . is_empty () {
     return Ok (( )); }
   let hidden_col_nid : NodeId =
-    insert_sourceless_node ( tree, subscribee_treeid,
-      Interp::HiddenInSubscribeeCol,
-      "hidden from this subscription", true ) ?;
+    insert_scaffold_as_child ( tree, subscribee_treeid,
+      ScaffoldKind::HiddenInSubscribeeCol, true ) ?;
   for hidden_id in hidden_in_content {
     // populate the collection
-    append_indefinitive_node (
+    append_indefinitive_from_disk_as_child (
       tree, hidden_col_nid, & hidden_id,
-      Interp::HiddenFromSubscribees, config, driver ). await ?; }
+      EffectOnParent::HiddenFromSubscribees, config, driver ). await ?; }
   Ok (( )) }

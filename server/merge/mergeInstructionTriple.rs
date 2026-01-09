@@ -1,7 +1,8 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
 use crate::types::misc::{SkgConfig, ID};
-use crate::types::orgnode::{OrgNode, EditRequest};
+use crate::types::orgnode::EditRequest;
+use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
@@ -51,12 +52,12 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
   let mut merge_instructions: Vec<MergeInstructionTriple> =
     Vec::new();
   if let Some(EditRequest::Merge(acquiree_id))
-    = &node.metadata.code.editRequest {
+    = node.edit_request() {
       let acquirer_from_disk : SkgNode =
         skgnode_from_id(
           config, driver,
           { let acquirer_id : &ID =
-              node.metadata.id.as_ref()
+              node.id()
               .ok_or("Node with merge request must have an ID")?;
             acquirer_id }
         ). await?;

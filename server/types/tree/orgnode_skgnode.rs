@@ -3,7 +3,10 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{Interp, OrgNode, default_metadata};
+use crate::types::orgnode::{
+    OrgNode, ScaffoldKind, EffectOnParent,
+    mk_indefinitive_orgnode,
+    orgnode_from_scaffold_kind };
 use crate::types::skgnode::SkgNode;
 use crate::util::dedup_vector;
 use super::{NodePair, PairTree};
@@ -17,60 +20,51 @@ use typedb_driver::TypeDBDriver;
 /// accessors specific to trees of OrgNodes and (maybe) SkgNodes
 ///
 
-/// Find the unique child of a node with a given Interp (for PairTree).
-/// Returns None if no child has the interp,
+/// Find the unique child of a node with a given ScaffoldKind (for PairTree).
+/// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_child_with_interp (
-  tree    : &PairTree,
-  node_id : NodeId,
-  interp  : Interp,
+pub fn unique_scaffold_child (
+  tree          : &PairTree,
+  node_id       : NodeId,
+  scaffold_kind : &ScaffoldKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<super::NodePair> =
     tree.get(node_id)
-    .ok_or("unique_child_with_interp: node not found")?;
+    .ok_or("unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode.metadata.code.interp == interp)
+    .filter(|c| c.value().orgnode().is_scaffold ( scaffold_kind ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
     0 => Ok(None),
     1 => Ok(Some(matches[0])),
     n => Err(format!(
-      "Expected at most one {:?} child, found {}", interp, n).into()),
+      "Expected at most one {:?} child, found {}", scaffold_kind, n).into()),
   }
 }
 
-/// Find the unique child of a node with a given Interp (for Tree<OrgNode>).
-/// Returns None if no child has the interp,
+/// Find the unique child of a node with a given ScaffoldKind (for Tree<OrgNode>).
+/// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_orgnode_child_with_interp (
-  tree    : &Tree<OrgNode>,
-  node_id : NodeId,
-  interp  : Interp,
+pub fn unique_orgnode_scaffold_child (
+  tree          : &Tree<OrgNode>,
+  node_id       : NodeId,
+  scaffold_kind : &ScaffoldKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : ego_tree::NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
-      "unique_orgnode_child_with_interp: node not found")?;
-  unique_orgnode_child_with_interp_from_ref (
-    &node_ref, interp ) }
-
-/// Like unique_orgnode_child_with_interp, but takes a NodeRef directly.
-/// Useful when you already have the NodeRef and don't want to look it up again.
-pub fn unique_orgnode_child_with_interp_from_ref (
-  node_ref : &ego_tree::NodeRef<OrgNode>,
-  interp   : Interp,
-) -> Result<Option<NodeId>, Box<dyn Error>> {
+      "unique_orgnode_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().metadata.code.interp == interp)
+    .filter(|c| c.value().is_scaffold ( scaffold_kind ))
     .map(|c| c.id())
     .collect();
   match matches.len() {
     0 => Ok(None),
     1 => Ok(Some(matches[0])),
     n => Err(format!(
-      "Expected at most one {:?} child, found {}", interp, n).into()),
+      "Expected at most one {:?} child, found {}", scaffold_kind, n).into()),
   }
 }
 
@@ -102,13 +96,13 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
-    node_ref . value () . orgnode . metadata . id . clone ()
+    node_ref . value () . orgnode () . id () . cloned ()
     . ok_or ( "Subscribee has no ID" ) ?;
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if parent_ref . value () . orgnode . metadata . code . interp
-    != Interp::SubscribeeCol {
+  if ! parent_ref . value () . orgnode ()
+      . is_scaffold ( &ScaffoldKind::SubscribeeCol ) {
       return Err ( "Subscribee's parent is not a SubscribeeCol" .
                     into () ); }
   let grandparent_ref : NodeRef < NodePair > =
@@ -120,52 +114,48 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   Ok ( ( subscribee_pid,
          skgnode . ids [ 0 ] . clone () ) ) }
 
-/// Insert into parent_id's children
-///   a node with no associated SkgNode.
-/// Most Interps are like this (Alias and all the *Cols.)
-///   but the most common ones are not (Content, Subscribee).
-pub fn insert_sourceless_node (
-  tree      : &mut PairTree,
-  parent_id : NodeId,
-  interp    : Interp,
-  title     : &str,
-  prepend   : bool, // otherwise, append
+pub fn insert_scaffold_as_child (
+  tree          : &mut PairTree,
+  parent_id     : NodeId,
+  scaffold_kind : ScaffoldKind,
+  prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let col_orgnode : OrgNode = {
-    let mut md = default_metadata ();
-    md . code . interp = interp;
-    OrgNode {
-      metadata : md,
-      title : title . to_string (),
-      body : None, } };
+  let orgnode = orgnode_from_scaffold_kind ( scaffold_kind );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
-      let pair = NodePair { mskgnode: None, orgnode: col_orgnode };
+      let pair = NodePair { mskgnode : None,
+                            orgnode  : orgnode };
       if prepend { parent_mut . prepend ( pair ) . id () }
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
 
-/// Fetch a node from disk and append it as an indefinitive child with the given Interp.
-pub async fn append_indefinitive_node (
+/// Fetch a node from disk and append it as an indefinitive child with the given effect.
+pub async fn append_indefinitive_from_disk_as_child (
   tree      : &mut PairTree,
   parent_id : NodeId,
   node_id   : &ID,
-  interp    : Interp,
+  effect    : EffectOnParent,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( skgnode, mut orgnode ) : ( SkgNode, OrgNode ) =
+  let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id ) . await ?;
-  orgnode . metadata . code . interp = interp;
-  orgnode . metadata . code . indefinitive = true;
-  orgnode . body = None;
+  let id = content_orgnode . id ()
+    . ok_or ( "append_indefinitive_from_disk_as_child: node has no ID" ) ?
+    . clone ();
+  let source = content_orgnode . source ()
+    . ok_or ( "append_indefinitive_from_disk_as_child: node has no source" ) ?
+    . clone ();
+  let orgnode = mk_indefinitive_orgnode (
+    id, source, content_orgnode . title () . to_string (), effect );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       parent_mut . append (
-        NodePair { mskgnode: Some ( skgnode ), orgnode } ); } ) ?;
+        NodePair { mskgnode : Some ( skgnode ),
+                   orgnode  : orgnode } ); } ) ?;
   Ok (( )) }
 
 /// Reads from disk the SkgNode
@@ -178,8 +168,9 @@ pub async fn ancestor_skgnode_from_disk (
   driver     : &TypeDBDriver,
 ) -> Result < SkgNode, Box<dyn Error> > {
   let ancestor_skgid : ID =
-    read_at_ancestor_in_tree( tree, treeid, generation,
-      |np| np . orgnode . metadata . id . clone () )
+    read_at_ancestor_in_tree(
+      tree, treeid, generation,
+      |np| np . orgnode() . id() . cloned() )
     . map_err( |e| -> Box<dyn Error> { e . into () })?
     . ok_or_else(
       || -> Box<dyn Error> {
@@ -202,15 +193,14 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child in aliascol_ref . children () {
-    let child_orgnode : &OrgNode =
-      & child . value () . orgnode;
-    if child_orgnode . metadata . code.interp != Interp::Alias {
+    let child_new = child . value () . orgnode ();
+    if ! child_new . is_scaffold ( &ScaffoldKind::Alias ( String::new () ) ) {
       return Err (
-        format! ( "AliasCol has non-Alias child with interp: {:?}",
-                  child_orgnode . metadata . code.interp )
+        format! ( "AliasCol has non-Alias child with kind: {:?}",
+                  child_new . kind )
         . into () ); }
     aliases . push (
-      child_orgnode . title . clone () ); }
+      child_new . title () . to_string () ); }
   Ok ( dedup_vector ( aliases ) ) }
 
 /// Collect aliases for a node (for Tree<OrgNode>):
@@ -224,25 +214,24 @@ pub fn collect_grandchild_aliases_for_orgnode (
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
-    unique_orgnode_child_with_interp (
-      tree, node_id, Interp::AliasCol )
+    unique_orgnode_scaffold_child (
+      tree, node_id, &ScaffoldKind::AliasCol )
     . map_err ( |e| e.to_string() ) ?;
   match alias_col_id {
     None => Ok(None),
     Some(col_id) => {
       let aliases : Vec<String> = {
         let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
-          "collect_aliases_at_orgnode: AliasCol not found");
+          "collect_grandchild_aliases_for_orgnode: AliasCol not found");
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in col_ref.children() {
           { // check for invalid state
-            let child_interp : &Interp =
-              &alias_child . value() . metadata . code.interp;
-            if *child_interp != Interp::Alias {
+            if ! alias_child.value().is_scaffold(
+                   &ScaffoldKind::Alias(String::new())) {
               return Err ( format! (
-                "AliasCol has non-Alias child with interp: {:?}",
-                child_interp )); }}
+                "AliasCol has non-Alias child with kind: {:?}",
+                alias_child.value().kind )); }}
           aliases . push(
-            alias_child . value() . title . clone() ); }
+            alias_child . value() . title() . to_string() ); }
         aliases };
       Ok(Some(dedup_vector(aliases))) }} }

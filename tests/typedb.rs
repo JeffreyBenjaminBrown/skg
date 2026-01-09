@@ -370,9 +370,9 @@ async fn test_recursive_document (
   let root_node : &OrgNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert_eq! ( root_node.metadata.id, Some ( ID::from ("a") ),
+  assert_eq! ( root_node.id(), Some ( &ID::from ("a") ),
     "Root node should have id 'a'" );
-  assert_eq! ( root_node.title, "a",
+  assert_eq! ( root_node.title(), "a",
     "Root node should have title 'a'" );
 
   // Root should have 1 child: "b"
@@ -381,13 +381,13 @@ async fn test_recursive_document (
     . expect ( "Root should have child 'b'" );
   let b_node : &OrgNode = b_node_ref . value ();
 
-  assert_eq! ( b_node.metadata.id, Some ( ID::from ("b") ),
+  assert_eq! ( b_node.id(), Some ( &ID::from ("b") ),
     "First child should have id 'b'" );
-  assert_eq! ( b_node.title, "b",
+  assert_eq! ( b_node.title(), "b",
     "First child should have title 'b'" );
-  assert_eq! ( b_node.body, Some ( "b has a body" . to_string () ),
+  assert_eq! ( b_node.body(), Some ( "b has a body" . to_string () ).as_ref(),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_node.metadata.code.indefinitive,
+  assert! ( ! b_node.is_indefinitive(),
     "First occurrence of 'b' should not be marked as indefinitive" );
 
   // "b" should have 1 child: "c"
@@ -396,9 +396,9 @@ async fn test_recursive_document (
     . expect ( "Node 'b' should have child 'c'" );
   let c_node : &OrgNode = c_node_ref . value ();
 
-  assert_eq! ( c_node.metadata.id, Some ( ID::from ("c") ),
+  assert_eq! ( c_node.id(), Some ( &ID::from ("c") ),
     "Child of 'b' should have id 'c'" );
-  assert_eq! ( c_node.title, "c",
+  assert_eq! ( c_node.title(), "c",
     "Child of 'b' should have title 'c'" );
 
   // "c" should have 1 child: "b" (repeated)
@@ -407,11 +407,11 @@ async fn test_recursive_document (
     . expect ( "Node 'c' should have child 'b' (repeated)" );
   let b_repeat : &OrgNode = b_repeat_ref . value ();
 
-  assert_eq! ( b_repeat.metadata.id, Some ( ID::from ("b") ),
+  assert_eq! ( b_repeat.id(), Some ( &ID::from ("b") ),
     "Child of 'c' should have id 'b'" );
-  assert_eq! ( b_repeat.title, "b",
+  assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat.metadata.code.indefinitive,
+  assert! ( b_repeat.is_indefinitive(),
     "Second occurrence of 'b' should be marked as indefinitive" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)

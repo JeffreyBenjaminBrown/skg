@@ -77,9 +77,9 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_1_ref =
       forest . get ( aliascol_1_id ) . unwrap ();
-    let children : Vec < & OrgNode > =
+    let children : Vec < &str > =
       aliascol_1_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode () . title () )
       . collect ();
 
     assert_eq! (
@@ -88,12 +88,12 @@ async fn test_completeAliasCol_logic (
       "AliasCol 1 should have exactly 2 children"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children [ 0 ],
       "c",
       "First child should be 'c'"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children [ 1 ],
       "b",
       "Second child should be 'b'"
     );
@@ -110,11 +110,10 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_2_ref =
       forest . get ( aliascol_2_id ) . unwrap ();
-    let aliascol_2_node : & OrgNode =
-      & aliascol_2_ref . value () . orgnode;
-    let children : Vec < & OrgNode > =
+    let aliascol_2_new = aliascol_2_ref . value () . orgnode ();
+    let children : Vec < &str > =
       aliascol_2_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode () . title () )
       . collect ();
 
     assert_eq! (
@@ -123,17 +122,17 @@ async fn test_completeAliasCol_logic (
       "AliasCol 2 should have exactly 2 children"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children [ 0 ],
       "b",
       "First child should be 'b'"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children [ 1 ],
       "c",
       "Second child should be 'c'"
     );
     assert! (
-      aliascol_2_node . metadata . viewData.focused,
+      aliascol_2_new . focused,
       "AliasCol 2 should have gained focus"
     );
   }
@@ -219,32 +218,32 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   {
     let aliascol_ref =
       forest . get ( first_aliascol_id ) . unwrap ();
-    let children : Vec < & OrgNode > =
+    let children_new : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode () )
       . collect ();
 
     assert_eq! (
-      children . len (),
+      children_new . len (),
       2,
       "First AliasCol should have exactly 2 children (b focused, c)"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children_new [ 0 ] . title (),
       "b",
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . metadata . viewData.focused,
+      children_new [ 0 ] . focused,
       "First child should be focused"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children_new [ 1 ] . title (),
       "c",
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . metadata . viewData.focused,
+      ! children_new [ 1 ] . focused,
       "Second child should not be focused"
     );
   }
@@ -260,9 +259,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   {
     let aliascol_ref =
       forest . get ( second_aliascol_id ) . unwrap ();
-    let children : Vec < & OrgNode > =
+    let children : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| & n . value () . orgnode )
+      . map ( |n| n . value () . orgnode () )
       . collect ();
 
     assert_eq! (
@@ -271,21 +270,21 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "Second AliasCol should have exactly 2 children (b focused, c)"
     );
     assert_eq! (
-      children [ 0 ] . title,
+      children [ 0 ] . title (),
       "b",
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . metadata . viewData.focused,
+      children [ 0 ] . focused,
       "First child should be focused"
     );
     assert_eq! (
-      children [ 1 ] . title,
+      children [ 1 ] . title (),
       "c",
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . metadata . viewData.focused,
+      ! children [ 1 ] . focused,
       "Second child should not be focused"
     );
   }

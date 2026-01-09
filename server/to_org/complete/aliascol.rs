@@ -1,8 +1,8 @@
-use crate::types::orgnode::{Interp, OrgNode};
+use crate::types::orgnode::ScaffoldKind;
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
-  ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol, insert_sourceless_node };
+  ancestor_skgnode_from_disk, collect_child_aliases_at_nodepair_aliascol, insert_scaffold_as_child };
 use crate::types::misc::SkgConfig;
 use crate::types::skgnode::SkgNode;
 use ego_tree::{NodeId, NodeRef};
@@ -26,14 +26,13 @@ pub async fn completeAliasCol (
   driver           : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { // Validate this is an AliasCol
-    let interp : Interp =
+    let is_aliascol : bool =
       read_at_node_in_tree(
         tree, aliascol_node_id,
-        |np| np . orgnode . metadata . code . interp . clone () )
+        |np| np . orgnode () . is_scaffold ( &ScaffoldKind::AliasCol ) )
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
-    if interp != Interp::AliasCol {
-      return Err( format!(
-        "Node is not an AliasCol: {:?}", interp ) . into () ); }}
+    if ! is_aliascol {
+      return Err( "Node is not an AliasCol" . into () ); }}
   let parent_skgnode : SkgNode =
     ancestor_skgnode_from_disk(
       tree, aliascol_node_id, 1, config, driver ) . await?;
@@ -60,9 +59,9 @@ pub async fn completeAliasCol (
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
   for alias in missing_aliases_from_disk {
-    insert_sourceless_node (
+    insert_scaffold_as_child (
       tree, aliascol_node_id,
-      Interp::Alias, & alias, false ) ?; }
+      ScaffoldKind::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,
@@ -85,22 +84,20 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
-      let child_orgnode : &OrgNode =
-        & child . value () . orgnode;
-      let title : &String =
-        & child_orgnode . title;
+      let child_orgnode = child . value () . orgnode ();
+      let title : &str = child_orgnode . title ();
       let is_duplicate : bool =
-        ! seen . insert ( title . clone () );
+        ! seen . insert ( title . to_string () );
       let is_invalid : bool =
         ! good_aliases . contains ( title );
       if is_duplicate || is_invalid {
         children_to_remove_acc . push ( child . id () );
-        if child_orgnode . metadata . viewData.focused {
+        if child_orgnode . focused {
           // We will delete the focused node.
           removed_focus = true;
           if is_duplicate {
             // Use this to move focus to the earlier duplicate title.
-            focused_title = Some ( title . clone () ); }; }} }
+            focused_title = Some ( title . to_string () ); }; }} }
     children_to_remove_acc };
 
   for child_treeid in children_to_remove {
@@ -114,16 +111,16 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         tree . get ( aliascol_node_id )
         . ok_or ( "AliasaCol node not found" ) ?;
       for child in aliascol_ref . children () {
-        if child . value () . orgnode . title == title {
+        if child . value () . orgnode () . title () == title {
           write_at_node_in_tree (
             tree, child . id (),
-            |np| np . orgnode . metadata . viewData . focused
-              = true ) ?;
+            |np| {
+              np . orgnode_mut () . focused = true; } ) ?;
           break; }} }
     else { // Move focus to aliasCol itself.
       write_at_node_in_tree (
         tree, aliascol_node_id,
-        |np| np . orgnode . metadata . viewData.focused
-          = true ) ?; }}
+        |np| {
+          np . orgnode_mut () . focused = true; } ) ?; }}
 
   Ok (( )) }

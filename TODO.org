@@ -2,21 +2,111 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
-** ONGOING Completion is complex.
+** ONGOING futzing the refactor
+*** missing comments in types/orgnode.rs
+/// The metadata precedes the title in the headline.
+/// (Both follow the "bullet", which is a string of asterisks.)
+*** rewrite parts of test_orgnode_to_text_no_metadata
+    to use OrgNode constructors, for brevity
+*** compare_two_orgnode_branches_recursively_modulo_id
+    is baroque
+*** delete should_be_sourceless
+*** merge assign_alias_relation_if_needed into its caller
+*** assign_new_id_if_needed should verify it's owned
+*** validate_node_and_children
+    Rather than two bool arguments,
+    take a single ScaffoldKind argument.
+*** validate_node_and_children
+    Case directly, rather than defining is_alias etc.
+*** validate_merge_requests and friends
+**** 1
+It does this:
+```
+    if ( node.is_scaffold( &ScaffoldKind::Alias(String::new()) ) ||
+         node.is_scaffold( &ScaffoldKind::AliasCol ))
+```
+That's *terrible* -- it's imagining every Alias will contain an empty String. Find any such test anywhere, and replace it with something that just tests the constructor, not its contents. If a parallel enum ScaffoldKindConstructorName is needed, so be it.
+**** 2
+Don't worry about alias, aliascol, etc.
+Just test whether it's a Scaffold, period.
+Actually that whole test seems unneeded -- it can't happen.
+*** put all implementations in orgnode.rs after all type dec's
+*** merge the Scaffold and ScaffoldKind types
+    keeping the first and deleting the second name
+*** delete folded and focused from OrgnodeViewData
+*** rename
+**** OrgnodeViewData -> TrueNodeViewData
+*** rewrite mk_*_orgnode
+   in terms of mk_orgnode
+*** impl OrgNode
+**** rename
+     Most of those noops should be renamed to append "_if_truenode'.
+     has_source should be renamed is_truenode_and_has_source.
+     Similarly for cycle.
+**** delete
++  /// Get the focused flag.
++  pub fn focused ( &self ) -> bool {
++    self . focused }
++
++  /// Get the folded flag.
++  pub fn folded ( &self ) -> bool {
++    self . folded }
+**** I'm not convinced most of these should exist.
+*** what's up with this?
+**** the comment
+  // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
+  // because Scaffold nodes don't store body data. These validations should happen during parsing.
+  // Remaining errors: Child_of_AliasCol_with_ID(1), Child_of_Alias(1), Alias_with_no_AliasCol_Parent(3),
+  //                   AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1), RootWithoutSource(1) = 8
+**** my concern
+     That passage seems to test parsing.
+     If the error wouldn't happen there, where would it happen?
+*** why did this new RootWithoutSource test need to be added?
++  { let root_without_source_errors: Vec<&BufferValidationError> = errors.iter()
++    .filter(|e| matches!(e, BufferValidationError::RootWithoutSource(_)))
++    .collect();
++  assert_eq!(root_without_source_errors.len(), 1, "Should find 1 RootWithoutSource error");
++    if let BufferValidationError::RootWithoutSource(node)
++    = root_without_source_errors[0] {
++      assert_eq!(node.title(), "Root level Alias (bad)",
++                 "RootWithoutSource error should come from root-level Alias"); }}
+*** put type signatures here
+fn set_metadata_relationships_in_node_recursive (
+*** rename is_scaffold
+    to has_scaffold_kind
+*** seems baroque
+fn rebuild_pair_from_disk_mostly_clobbering_the_org (
+** type changes
+*** delete EffectOnParent
+    should only be a bool, parentIgnores, defaulting to false.
+*** definitive OrgNode != definitive skgnode
+**** One is that the orgnode stuff is intended as definitive.
+**** SkgNode might need definitive modifiers for each field.
+*** merge OrgnodeRelationships and OrgnodeViewData
+    deleting the second name
+** DONE restructure types, divide Interp
+*** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
+    NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)
+    from Scaffold (ForestRoot, AliasCol, Alias, SubscribeeCol, etc.).
+    Parsing pipeline produces Tree<NewOrgNode> directly.
+*** ? two kinds of TrueNode
+    one that might not have an ID, one that must
+*** AWAITS refactor : Is the term 'Interp' gone?
+    If so, rename kind -> interp.
+*** NOTE: Body validation on Scaffolds
+    Body_of_AliasCol and Body_of_Alias errors are no longer detectable
+    post-parsing because Scaffold nodes don't store body data.
+    These validations should happen during parsing if needed.
+** AWAITS Completion is complex.
 *** break up completeDefinitiveOrgnode
     it's super-long
-*** maybe_add_subscribeeCol_branch is impenetrable
-    so complex I can't see past it
-**** Subdivide it.
-**** maybe_add_subscribeeCol_branch should integrate existing SubscribeeCol
-     if it exists, rather than assuming it is correct
 *** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribeeCol_branch?
 *** After 'view_requests_at_node', is there any reason to keep the view requests in the node?
     The function pushes the node's requests onto 'view_requests_out'.
     If they should be deleted from the node thereafter,
     the function should be renamed something like 'transfer_requests'.
 *** On what Interps can 'completeDefinitiveOrgnode' be validly called?
-    The comment says only Content nodes.
+    The comment says only nodes with Interp = Content.
     If that's right (I think so) the name should reflect it.
 *** making something indefinitive twice
 **** as of this commit
