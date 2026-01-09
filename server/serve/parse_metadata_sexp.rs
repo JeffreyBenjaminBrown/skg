@@ -1,12 +1,159 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
+///
+/// This module contains the parsing types (OrgnodeMetadata, Interp, etc.)
+/// which are internal to the parsing pipeline. External code should use
+/// OrgNode from types::orgnode_new.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
-use crate::types::orgnode::{OrgnodeMetadata, OrgnodeViewData, OrgnodeCode, OrgnodeRelationships, Interp, EditRequest, ViewRequest, default_metadata};
+use crate::types::orgnode::{OrgnodeViewData, OrgnodeRelationships, EditRequest, ViewRequest};
+use crate::types::orgnode_new::{
+    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode, EffectOnParent,
+};
 
 use sexp::Sexp;
 use std::collections::HashSet;
 use std::str::FromStr;
+
+//
+// Parsing-internal types
+// These are used by the parser to produce OrgNode.
+//
+
+/// Intermediate parsed metadata. Converted to OrgNode via from_parsed().
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrgnodeMetadata {
+    pub id: Option<ID>,
+    pub source: Option<String>,
+    pub viewData: OrgnodeViewData,
+    pub code: OrgnodeCode,
+}
+
+/// Code-related metadata (determines how node is saved).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrgnodeCode {
+    pub interp: Interp,
+    pub indefinitive: bool,
+    pub editRequest: Option<EditRequest>,
+    pub viewRequests: HashSet<ViewRequest>,
+}
+
+/// Interpretation of a node in the tree.
+/// Internal to parsing; external code uses OrgNodeKind.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Interp {
+    ForestRoot,
+    Content,
+    AliasCol,
+    Alias,
+    ParentIgnores,
+    SubscribeeCol,
+    Subscribee,
+    HiddenOutsideOfSubscribeeCol,
+    HiddenInSubscribeeCol,
+    HiddenFromSubscribees,
+}
+
+impl Default for OrgnodeCode {
+    fn default() -> Self {
+        OrgnodeCode {
+            interp: Interp::Content,
+            indefinitive: false,
+            editRequest: None,
+            viewRequests: HashSet::new(),
+        }
+    }
+}
+
+pub fn default_metadata() -> OrgnodeMetadata {
+    OrgnodeMetadata {
+        id: None,
+        source: None,
+        viewData: OrgnodeViewData::default(),
+        code: OrgnodeCode::default(),
+    }
+}
+
+/// Create an OrgNode from parsed metadata components.
+/// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
+pub fn from_parsed(
+    metadata: &OrgnodeMetadata,
+    title: String,
+    body: Option<String>,
+) -> OrgNode {
+    let focused = metadata.viewData.focused;
+    let folded = metadata.viewData.folded;
+
+    let kind = match metadata.code.interp {
+        // Scaffold kinds
+        Interp::ForestRoot => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::ForestRoot,
+        }),
+        Interp::AliasCol => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::AliasCol,
+        }),
+        Interp::Alias => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::Alias(title.clone()),
+        }),
+        Interp::SubscribeeCol => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::SubscribeeCol,
+        }),
+        Interp::HiddenOutsideOfSubscribeeCol => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::HiddenOutsideOfSubscribeeCol,
+        }),
+        Interp::HiddenInSubscribeeCol => OrgNodeKind::Scaff(Scaffold {
+            kind: ScaffoldKind::HiddenInSubscribeeCol,
+        }),
+
+        // TrueNode kinds
+        Interp::Content => OrgNodeKind::True(TrueNode {
+            title,
+            body,
+            id: metadata.id.clone(),
+            source: metadata.source.clone(),
+            effect_on_parent: EffectOnParent::Content,
+            indefinitive: metadata.code.indefinitive,
+            view_data: metadata.viewData.clone(),
+            edit_request: metadata.code.editRequest.clone(),
+            view_requests: metadata.code.viewRequests.clone(),
+        }),
+        Interp::Subscribee => OrgNodeKind::True(TrueNode {
+            title,
+            body,
+            id: metadata.id.clone(),
+            source: metadata.source.clone(),
+            effect_on_parent: EffectOnParent::Subscribee,
+            indefinitive: metadata.code.indefinitive,
+            view_data: metadata.viewData.clone(),
+            edit_request: metadata.code.editRequest.clone(),
+            view_requests: metadata.code.viewRequests.clone(),
+        }),
+        Interp::ParentIgnores => OrgNodeKind::True(TrueNode {
+            title,
+            body,
+            id: metadata.id.clone(),
+            source: metadata.source.clone(),
+            effect_on_parent: EffectOnParent::ParentIgnores,
+            indefinitive: metadata.code.indefinitive,
+            view_data: metadata.viewData.clone(),
+            edit_request: metadata.code.editRequest.clone(),
+            view_requests: metadata.code.viewRequests.clone(),
+        }),
+        Interp::HiddenFromSubscribees => OrgNodeKind::True(TrueNode {
+            title,
+            body,
+            id: metadata.id.clone(),
+            source: metadata.source.clone(),
+            effect_on_parent: EffectOnParent::HiddenFromSubscribees,
+            indefinitive: metadata.code.indefinitive,
+            view_data: metadata.viewData.clone(),
+            edit_request: metadata.code.editRequest.clone(),
+            view_requests: metadata.code.viewRequests.clone(),
+        }),
+    };
+
+    OrgNode { focused, folded, kind }
+}
 
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.

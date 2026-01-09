@@ -2,9 +2,10 @@
 /// I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
-use crate::serve::parse_metadata_sexp::parse_metadata_to_orgnodemd;
-use crate::types::orgnode::{default_metadata, OrgnodeMetadata};
-use crate::types::orgnode_new::{from_parsed, forest_root_orgnode, OrgNode};
+use crate::serve::parse_metadata_sexp::{
+    parse_metadata_to_orgnodemd, default_metadata, from_parsed, OrgnodeMetadata
+};
+use crate::types::orgnode_new::{forest_root_orgnode, OrgNode};
 
 use ego_tree::{Tree, NodeId};
 use regex::Regex;

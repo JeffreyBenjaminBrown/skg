@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode_new::{
-    OrgNode, EffectOnParent, effect_on_parent_from_interp, orgnode_with_metadata };
+    OrgNode, OrgNodeKind, EffectOnParent, orgnode_with_metadata };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -267,7 +267,7 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, source, interp, indefinitive, edit_request, view_requests) = {
+  let (pid, source, effect, indefinitive, edit_request, view_requests) = {
     // Extract values to preserve from existing new_orgnode
     let node_ref : NodeRef < NodePair > =
       tree . get ( node_id )
@@ -277,20 +277,22 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID" ) ?;
     let source : String = org . source () . cloned ()
       . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no source" ) ?;
+    let effect : EffectOnParent = match &org . kind {
+      OrgNodeKind::True ( t ) => t . effect_on_parent . clone (),
+      OrgNodeKind::Scaff ( _ ) => return Err (
+        "rebuild_pair_from_disk_mostly_clobbering_the_org: node is Scaffold, not TrueNode" . into () ),
+    };
     ( pid,
       source,
-      org . interp (),
+      effect,
       org . is_indefinitive (),
       org . edit_request () . cloned (),
       org . view_requests () . cloned () . unwrap_or_default () ) };
   let (skgnode, disk_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_pid_and_source (
       config, &pid, &source ) ?;
-  let effect = effect_on_parent_from_interp ( &interp )
-    . ok_or_else ( || format! (
-      "rebuild_pair_from_disk: Interp {:?} is not a TrueNode interp", interp ) ) ?;
   let orgnode = orgnode_with_metadata (
-    pid, source,
+    pid, source . to_string (),
     disk_orgnode . title () . to_string (),
     disk_orgnode . body () . cloned (),
     effect, indefinitive, edit_request, view_requests );

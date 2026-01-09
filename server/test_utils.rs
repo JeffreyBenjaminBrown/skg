@@ -7,8 +7,8 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
-use crate::types::orgnode::OrgnodeMetadata;
-use crate::types::orgnode_new::OrgNode;
+use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
+use crate::types::orgnode_new::{OrgNode, OrgNodeKind};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{PairTree, NodePair};
 
@@ -287,6 +287,19 @@ pub fn compare_two_forests_modulo_id(
     { return false; }}
   true }
 
+/// Compare two OrgNodeKind values, ignoring the id field inside TrueNode.
+/// For Scaffolds, compares the ScaffoldKind directly.
+/// For TrueNodes, compares effect_on_parent but ignores id.
+fn kinds_equal_modulo_id(k1: &OrgNodeKind, k2: &OrgNodeKind) -> bool {
+  match (k1, k2) {
+    (OrgNodeKind::Scaff(s1), OrgNodeKind::Scaff(s2)) =>
+      s1.kind == s2.kind,
+    (OrgNodeKind::True(t1), OrgNodeKind::True(t2)) =>
+      t1.effect_on_parent == t2.effect_on_parent,
+    _ => false,
+  }
+}
+
 /// Compare two nodes and their subtrees modulo ID differences.
 fn compare_two_orgnodes_recursively_modulo_id (
   node1: NodeRef<OrgNode>,
@@ -304,7 +317,8 @@ fn compare_two_orgnodes_recursively_modulo_id (
   if n1.title() != n2.title() { return false; }
   if n1.body() != n2.body() { return false; }
   if n1.source() != n2.source() { return false; }
-  if n1.interp() != n2.interp() { return false; }
+  // Compare kind/effect but skip ID (which is inside TrueNode)
+  if !kinds_equal_modulo_id(&n1.kind, &n2.kind) { return false; }
   if n1.is_indefinitive() != n2.is_indefinitive() { return false; }
   if n1.focused != n2.focused { return false; }
   if n1.folded != n2.folded { return false; }

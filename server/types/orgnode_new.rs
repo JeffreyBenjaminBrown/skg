@@ -185,56 +185,6 @@ impl OrgNode {
             OrgNodeKind::Scaff ( _ ) => false,
         } }
 
-    /// Returns the Interp that this OrgNode corresponds to.
-    /// Used during transition to bridge old and new type systems.
-    pub fn interp ( &self ) -> Interp {
-        match &self . kind {
-            OrgNodeKind::Scaff ( s ) => match &s . kind {
-                ScaffoldKind::ForestRoot => Interp::ForestRoot,
-                ScaffoldKind::AliasCol => Interp::AliasCol,
-                ScaffoldKind::Alias ( _ ) => Interp::Alias,
-                ScaffoldKind::SubscribeeCol => Interp::SubscribeeCol,
-                ScaffoldKind::HiddenInSubscribeeCol => Interp::HiddenInSubscribeeCol,
-                ScaffoldKind::HiddenOutsideOfSubscribeeCol => Interp::HiddenOutsideOfSubscribeeCol,
-            },
-            OrgNodeKind::True ( t ) => match t . effect_on_parent {
-                EffectOnParent::Content => Interp::Content,
-                EffectOnParent::Subscribee => Interp::Subscribee,
-                EffectOnParent::ParentIgnores => Interp::ParentIgnores,
-                EffectOnParent::HiddenFromSubscribees => Interp::HiddenFromSubscribees,
-            },
-        } }
-
-    /// Returns true if this OrgNode corresponds to the given old Interp.
-    /// Used during transition to bridge old and new type systems.
-    pub fn matches_interp ( &self, interp : &Interp ) -> bool {
-        match ( &self . kind, interp ) {
-            // Scaffolds
-            ( OrgNodeKind::Scaff ( s ), Interp::ForestRoot ) =>
-                matches! ( s . kind, ScaffoldKind::ForestRoot ),
-            ( OrgNodeKind::Scaff ( s ), Interp::AliasCol ) =>
-                matches! ( s . kind, ScaffoldKind::AliasCol ),
-            ( OrgNodeKind::Scaff ( s ), Interp::Alias ) =>
-                matches! ( s . kind, ScaffoldKind::Alias ( _ ) ),
-            ( OrgNodeKind::Scaff ( s ), Interp::SubscribeeCol ) =>
-                matches! ( s . kind, ScaffoldKind::SubscribeeCol ),
-            ( OrgNodeKind::Scaff ( s ), Interp::HiddenInSubscribeeCol ) =>
-                matches! ( s . kind, ScaffoldKind::HiddenInSubscribeeCol ),
-            ( OrgNodeKind::Scaff ( s ), Interp::HiddenOutsideOfSubscribeeCol ) =>
-                matches! ( s . kind, ScaffoldKind::HiddenOutsideOfSubscribeeCol ),
-            // TrueNodes
-            ( OrgNodeKind::True ( t ), Interp::Content ) =>
-                t . effect_on_parent == EffectOnParent::Content,
-            ( OrgNodeKind::True ( t ), Interp::Subscribee ) =>
-                t . effect_on_parent == EffectOnParent::Subscribee,
-            ( OrgNodeKind::True ( t ), Interp::ParentIgnores ) =>
-                t . effect_on_parent == EffectOnParent::ParentIgnores,
-            ( OrgNodeKind::True ( t ), Interp::HiddenFromSubscribees ) =>
-                t . effect_on_parent == EffectOnParent::HiddenFromSubscribees,
-            // Mismatched kinds
-            _ => false,
-        } }
-
     //
     // Mutation helpers (for TrueNodes only; no-op for Scaffolds)
     //
@@ -420,96 +370,11 @@ impl Default for OrgNode {
         } } }
 
 //
-// Conversion functions
+// Constructor functions
 //
 
-use crate::types::orgnode::{
-    Interp, OrgnodeMetadata,
-};
-
-/// Create a OrgNode directly from parsed components.
-/// This is the direct constructor for parsing, avoiding the intermediate OrgNode.
-/// Takes the same inputs as parsing produces: metadata, title, and optional body.
-pub fn from_parsed (
-    metadata : &OrgnodeMetadata,
-    title    : String,
-    body     : Option < String >,
-) -> OrgNode {
-    let focused = metadata . viewData . focused;
-    let folded  = metadata . viewData . folded;
-
-    let kind = match metadata . code . interp {
-        // Scaffold kinds
-        Interp::ForestRoot => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::ForestRoot,
-        }),
-        Interp::AliasCol => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::AliasCol,
-        }),
-        Interp::Alias => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::Alias ( title.clone () ),
-        }),
-        Interp::SubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::SubscribeeCol,
-        }),
-        Interp::HiddenOutsideOfSubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::HiddenOutsideOfSubscribeeCol,
-        }),
-        Interp::HiddenInSubscribeeCol => OrgNodeKind::Scaff ( Scaffold {
-            kind : ScaffoldKind::HiddenInSubscribeeCol,
-        }),
-
-        // TrueNode kinds
-        Interp::Content => OrgNodeKind::True ( TrueNode {
-            title,
-            body,
-            id               : metadata . id . clone (),
-            source           : metadata . source . clone (),
-            effect_on_parent : EffectOnParent::Content,
-            indefinitive     : metadata . code . indefinitive,
-            view_data        : metadata . viewData . clone (),
-            edit_request     : metadata . code . editRequest . clone (),
-            view_requests    : metadata . code . viewRequests . clone (),
-        }),
-        Interp::Subscribee => OrgNodeKind::True ( TrueNode {
-            title,
-            body,
-            id               : metadata . id . clone (),
-            source           : metadata . source . clone (),
-            effect_on_parent : EffectOnParent::Subscribee,
-            indefinitive     : metadata . code . indefinitive,
-            view_data        : metadata . viewData . clone (),
-            edit_request     : metadata . code . editRequest . clone (),
-            view_requests    : metadata . code . viewRequests . clone (),
-        }),
-        Interp::ParentIgnores => OrgNodeKind::True ( TrueNode {
-            title,
-            body,
-            id               : metadata . id . clone (),
-            source           : metadata . source . clone (),
-            effect_on_parent : EffectOnParent::ParentIgnores,
-            indefinitive     : metadata . code . indefinitive,
-            view_data        : metadata . viewData . clone (),
-            edit_request     : metadata . code . editRequest . clone (),
-            view_requests    : metadata . code . viewRequests . clone (),
-        }),
-        Interp::HiddenFromSubscribees => OrgNodeKind::True ( TrueNode {
-            title,
-            body,
-            id               : metadata . id . clone (),
-            source           : metadata . source . clone (),
-            effect_on_parent : EffectOnParent::HiddenFromSubscribees,
-            indefinitive     : metadata . code . indefinitive,
-            view_data        : metadata . viewData . clone (),
-            edit_request     : metadata . code . editRequest . clone (),
-            view_requests    : metadata . code . viewRequests . clone (),
-        }),
-    };
-
-    OrgNode { focused, folded, kind } }
-
 /// Create a Content OrgNode directly from disk data.
-/// This is used when loading nodes from disk, bypassing the old OrgNode type.
+/// This is used when loading nodes from disk.
 pub fn orgnode_content_from_disk (
     id     : ID,
     source : String,
@@ -531,37 +396,6 @@ pub fn orgnode_content_from_disk (
             view_requests    : HashSet::new (),
         }),
     } }
-
-/// Convert Interp to EffectOnParent for TrueNode cases.
-/// Returns None for Scaffold interps.
-pub fn effect_on_parent_from_interp ( interp : &Interp ) -> Option < EffectOnParent > {
-    match interp {
-        Interp::Content               => Some ( EffectOnParent::Content ),
-        Interp::Subscribee            => Some ( EffectOnParent::Subscribee ),
-        Interp::HiddenFromSubscribees => Some ( EffectOnParent::HiddenFromSubscribees ),
-        Interp::ParentIgnores         => Some ( EffectOnParent::ParentIgnores ),
-        _ => None, // Scaffold interps
-    } }
-
-/// Create a Scaffold OrgNode from an Interp and optional title.
-/// For Alias, the title is required and becomes the alias text.
-/// For other scaffolds, title is ignored.
-/// Returns Err if the interp is not a scaffold type.
-/// DEPRECATED: Use orgnode_from_scaffold_kind instead.
-pub fn orgnode_scaffold_from_interp (
-    interp : Interp,
-    title  : &str,
-) -> Result < OrgNode, String > {
-    let kind = match interp {
-        Interp::AliasCol                     => ScaffoldKind::AliasCol,
-        Interp::Alias                        => ScaffoldKind::Alias ( title . to_string () ),
-        Interp::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
-        Interp::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
-        Interp::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
-        Interp::ForestRoot                   => ScaffoldKind::ForestRoot,
-        _ => return Err ( format! ( "Interp {:?} is not a scaffold type", interp ) ),
-    };
-    Ok ( orgnode_from_scaffold_kind ( kind ) ) }
 
 /// Create a Scaffold OrgNode from a ScaffoldKind.
 pub fn orgnode_from_scaffold_kind ( kind : ScaffoldKind ) -> OrgNode {

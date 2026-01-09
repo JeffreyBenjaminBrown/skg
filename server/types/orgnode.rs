@@ -1,37 +1,22 @@
-/// OrgNode, // metadata, title, opt body
-///   OrgnodeMetadata, // opt id, opt source, viewdata, code
-///     OrgnodeViewData, // cycle, focused, folded, relationships
-///       OrgnodeRelationships, // 2 bools, 3 opt ints
-///     OrgnodeCode, // interp, indef, opt editRequest, viewRequests
-///       Interp, // forestRoot | content | aliasCol | alias |
-///               // parentIgnores | subscribeeCol | subscribee |
-///               // hiddenOutsideOfSubscribeeCol |
-///               // hiddenInSubscribeeCol | hiddenFromSubscribees
-///       EditRequest, // merge | delete
-///                    //   Mutually excclusive.
-///       ViewRequest, // aliases | containerward
-///                    //   | sourceward | definitive
-///                    //   *Not* mutually exclusive.
+/// Types used by OrgNode (the new unified type in orgnode_new.rs).
+///
+/// OrgnodeViewData, // cycle, focused, folded, relationships
+///   OrgnodeRelationships, // 2 bools, 3 opt ints
+/// EditRequest, // merge | delete (mutually exclusive)
+/// ViewRequest, // aliases | containerward | sourceward | definitive
+///              // (NOT mutually exclusive)
 
 use super::misc::ID;
-use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
-
-/// Each org headline corresponds to a node.
-/// This is the metadata necessary to interpret the headline.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeMetadata {
-  pub id: Option<ID>,
-  pub source: Option<String>,
-  pub viewData: OrgnodeViewData,
-  pub code: OrgnodeCode,
-}
 
 /// View-related metadata. It dictates only how the node is shown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeViewData {
-  // PITFALL: One could reasonably describe 'focused' and 'folded' as code rather than data. They tell Emacs what to do. Once Emacs has done that, it deletes them from the metadata. The other fields in this type are only acted on to the extent that Emacs displays them.
+  // PITFALL: One could reasonably describe 'focused' and 'folded' as code
+  // rather than data. They tell Emacs what to do. Once Emacs has done that,
+  // it deletes them from the metadata. The other fields in this type are
+  // only acted on to the extent that Emacs displays them.
 
   pub cycle: bool, // True if a node is in its own org-precedessors.
   pub focused: bool, // Where the cursor is. True for only one node.
@@ -50,38 +35,6 @@ pub struct OrgnodeRelationships {
   pub numContainers: Option<usize>,
   pub numContents: Option<usize>,
   pub numLinksIn: Option<usize>,
-}
-
-/// These data determine how the node is treated when saved.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeCode {
-  pub interp: Interp,
-  pub indefinitive: bool, // Describes a node's relationship to those of its children that are content. A definitive node defines the title, body and initial contents, if present. So changing which nodes are its children can change its contents. Indefinitive nodes, by contrast, do not permit the user to modify the node they represent. If it has children, they are kept in the view when the user saves, but saving does not create a 'contains' relationship from the indefinitive parent to the child.
-  // (On word choice: I record the negative 'indefinitive', rather than the positive default 'definitive', to save characters in the buffer, because the default is omitted from metadata strings, and is much more common.)
-  pub editRequest: Option<EditRequest>,
-  pub viewRequests: HashSet<ViewRequest>,
-}
-
-/// 'Interp' describes the meaning of a node --
-/// how it relates to its ancestors and its descendents in the tree.
-/// It influences both how the user should read it,
-/// and how Rust should treat the data when it is saved.
-/// PITFALL: Nodes with certain Interp values need a source and an id.
-///   Others should not have them. See should_be_sourceless.
-/// PITFALL: It does not describe every potential relationship
-/// between the node and its parent.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Interp {
-  ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
-  Content, // Most nodes are this. Parents 'contain' most children.
-  AliasCol, // The node collects (as children) aliases for its parent.
-  Alias, // The node is an alias for its grandparent.
-  ParentIgnores, // This node is not used to update its parent. (That does *not* mean it is ignored when the buffer is saved. It and its recursive org-content are processed normally. It only means it has no impact on its parent.)
-  SubscribeeCol, // Collects subscribees for its parent.
-  Subscribee, // The node represents a subscribee of its grandparent. Its ID identifies the subscribed node.
-  HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
-  HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
-  HiddenFromSubscribees, // Child of HiddenOutsideOfSubscribeeCol or HiddenInSubscribeeCol. Represents a node hidden from the subscriber's subscriptions.
 }
 
 /// Requests for editing operations on a node.
@@ -106,58 +59,6 @@ pub enum ViewRequest {
 //
 // Implementations
 //
-
-impl Interp {
-  /// Nodes with certain Interps should have no source or id. They are synthetic containers, and don't correspond to .skg files.
-  pub fn should_be_sourceless ( &self ) -> bool {
-    matches! (
-      self,
-      ( Interp::ForestRoot                   |
-        Interp::AliasCol                     |
-        Interp::Alias                        |
-        Interp::SubscribeeCol                |
-        Interp::HiddenOutsideOfSubscribeeCol |
-        Interp::HiddenInSubscribeeCol )) }}
-
-impl fmt::Display for Interp {
-  fn fmt (
-    &self,
-    f : &mut fmt::Formatter<'_>
-  ) -> fmt::Result {
-    let s : &str =
-      match self {
-        Interp::Content => "content",
-        Interp::AliasCol => "aliasCol",
-        Interp::Alias => "alias",
-        Interp::ParentIgnores => "parentIgnores",
-        Interp::SubscribeeCol => "subscribeeCol",
-        Interp::Subscribee => "subscribee",
-        Interp::ForestRoot => "forestRoot", // Should never be rendered
-        Interp::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
-        Interp::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
-        Interp::HiddenFromSubscribees => "hiddenFromSubscribees",
-      };
-    write! ( f, "{}", s ) } }
-
-impl FromStr for Interp {
-  type Err = String;
-
-  fn from_str (
-    s : &str
-  ) -> Result<Self, Self::Err> {
-    match s {
-      "content"       => Ok ( Interp::Content ),
-      "aliasCol"      => Ok ( Interp::AliasCol ),
-      "alias"         => Ok ( Interp::Alias ),
-      "parentIgnores" => Ok ( Interp::ParentIgnores ),
-      "subscribeeCol" => Ok ( Interp::SubscribeeCol ),
-      "subscribee"    => Ok ( Interp::Subscribee ),
-      "forestRoot"    => Ok ( Interp::ForestRoot ),
-      "hiddenOutsideOfSubscribeeCol" => Ok ( Interp::HiddenOutsideOfSubscribeeCol ),
-      "hiddenInSubscribeeCol"        => Ok ( Interp::HiddenInSubscribeeCol ),
-      "hiddenFromSubscribees"        => Ok ( Interp::HiddenFromSubscribees ),
-      _ => Err ( format! ( "Unknown Interp value: {}", s )),
-    }} }
 
 impl fmt::Display for EditRequest {
   fn fmt (
@@ -229,101 +130,3 @@ impl Default for OrgnodeViewData {
       folded : false,
       relationships : OrgnodeRelationships::default (),
     }} }
-
-impl Default for OrgnodeCode {
-  fn default () -> Self {
-    OrgnodeCode {
-      interp : Interp::Content,
-      indefinitive : false,
-      editRequest : None,
-      viewRequests : HashSet::new (),
-    }} }
-
-pub fn default_metadata () -> OrgnodeMetadata {
-  OrgnodeMetadata {
-    id : None,
-    source : None,
-    viewData : OrgnodeViewData::default (),
-    code : OrgnodeCode::default (),
-  }}
-
-/// Renders OrgnodeMetadata as a metadata string suitable for org-mode display.
-/// This is the inverse of parse_metadata_to_orgnodemd.
-/// Returns string like "(id abc123) (view ...) (code ...)" etc.
-pub fn orgnodemd_to_string (
-  metadata : &OrgnodeMetadata
-) -> String {
-  let mut parts : Vec<String> =
-    Vec::new ();
-  if let Some ( ref id ) = metadata.id {
-    parts.push ( format! ( "(id {})", id.0 )); }
-  if let Some ( ref source ) = metadata.source {
-    parts.push ( format! ( "(source {})", source )); }
-
-  // Build view s-expr
-  let mut view_parts : Vec<String> = Vec::new ();
-  if metadata.viewData.cycle {
-    view_parts.push ( "cycle".to_string () ); }
-  if metadata.viewData.focused {
-    view_parts.push ( "focused".to_string () ); }
-  if metadata.viewData.folded {
-    view_parts.push ( "folded".to_string () ); }
-
-  // Build rels s-expr (only if has non-default values)
-  let mut rel_parts : Vec<String> = Vec::new ();
-  // Only emit if not default (default is true)
-  if ! metadata.viewData.relationships.parentIsContainer {
-    rel_parts.push ( "notInParent".to_string () ); }
-  // Only emit if not default (default is false)
-  if metadata.viewData.relationships.parentIsContent {
-    rel_parts.push ( "containsParent".to_string () ); }
-  // Only emit if not default (default is Some(1))
-  if metadata.viewData.relationships.numContainers != Some ( 1 ) {
-    if let Some ( count )
-      = metadata.viewData.relationships.numContainers {
-        rel_parts.push ( format! ( "(containers {})", count )); }}
-  // Only emit if not default (default is Some(0))
-  if metadata.viewData.relationships.numContents != Some ( 0 ) {
-    if let Some ( count )
-      = metadata.viewData.relationships.numContents {
-        rel_parts.push ( format! ( "(contents {})", count )); }}
-  // Only emit if not default (default is Some(0))
-  if metadata.viewData.relationships.numLinksIn != Some ( 0 ) {
-    if let Some ( count )
-      = metadata.viewData.relationships.numLinksIn {
-        rel_parts.push ( format! ( "(linksIn {})", count )); }}
-
-  if ! rel_parts . is_empty () {
-    view_parts.push ( format! ( "(rels {})",
-                                  rel_parts . join ( " " ))); }
-
-  if ! view_parts . is_empty () {
-    parts.push ( format! ( "(view {})",
-                             view_parts . join ( " " ))); }
-
-  // Build code s-expr
-  let mut code_parts : Vec<String> = Vec::new ();
-  if metadata.code.interp != Interp::Content {
-    code_parts.push ( format! (
-      "(interp {})", metadata.code.interp )); }
-  if metadata.code.indefinitive {
-    code_parts.push ( "indefinitive".to_string () ); }
-
-  // Handle editRequest (toDelete or merge)
-  if let Some(ref edit_req) = metadata.code.editRequest {
-    code_parts.push ( edit_req . to_string () ); }
-
-  // Build viewRequests s-expr (inside code)
-  if ! metadata.code.viewRequests . is_empty () {
-    let mut request_strings : Vec<String> =
-      metadata.code.viewRequests . iter ()
-      . map ( | req | req . to_string () )
-      . collect ();
-    request_strings . sort (); // Ensure consistent ordering
-    code_parts.push ( format! ( "(viewRequests {})",
-                                  request_strings . join ( " " ))); }
-
-  if ! code_parts . is_empty () {
-    parts.push ( format! ( "(code {})",
-                             code_parts . join ( " " ))); }
-  parts.join ( " " ) }

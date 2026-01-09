@@ -175,8 +175,8 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     let child_new = child . value () . orgnode ();
     if ! child_new . is_scaffold ( &ScaffoldKind::Alias ( String::new () ) ) {
       return Err (
-        format! ( "AliasCol has non-Alias child with interp: {:?}",
-                  child_new . interp () )
+        format! ( "AliasCol has non-Alias child with kind: {:?}",
+                  child_new . kind )
         . into () ); }
     aliases . push (
       child_new . title () . to_string () ); }
@@ -233,8 +233,8 @@ pub fn collect_grandchild_aliases_for_orgnode (
             if ! alias_child.value().is_scaffold(
                    &ScaffoldKind::Alias(String::new())) {
               return Err ( format! (
-                "AliasCol has non-Alias child with interp: {:?}",
-                alias_child.value().interp() )); }}
+                "AliasCol has non-Alias child with kind: {:?}",
+                alias_child.value().kind )); }}
           aliases . push(
             alias_child . value() . title() . to_string() ); }
         aliases };
