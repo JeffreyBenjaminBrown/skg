@@ -407,5 +407,7 @@ pub async fn ensure_source (
     write_at_node_in_tree (
       tree, node_id,
       |np| {
-        np . orgnode . set_source ( source ); } ) ?; }
+        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+          else { panic! ( "ensure_source: expected TrueNode" ) };
+        t . source_opt = Some ( source ); } ) ?; }
   Ok (( )) }

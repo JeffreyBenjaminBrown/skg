@@ -163,29 +163,11 @@ impl OrgNode {
       t . indefinitive = value;
     }}
 
-  /// Set the title. No-op for Scaffolds.
-  pub fn set_title ( &mut self, title : String ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . title = title;
-    }}
-
-  /// Set the source. No-op for Scaffolds.
-  pub fn set_source ( &mut self, source : String ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . source_opt = Some ( source );
-    }}
-
   /// Get mutable access to view_requests. Returns None for Scaffolds.
   pub fn view_requests_mut ( &mut self ) -> Option < &mut HashSet < ViewRequest > > {
     match &mut self . kind {
       OrgNodeKind::True ( t ) => Some ( &mut t . view_requests ),
       OrgNodeKind::Scaff ( _ ) => None,
-    }}
-
-  /// Set the edit_request. No-op for Scaffolds.
-  pub fn set_edit_request ( &mut self, edit_request : Option < EditRequest > ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . edit_request = edit_request;
     }}
 
   /// Set numContainers in relationships. No-op for Scaffolds.
