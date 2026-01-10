@@ -167,12 +167,10 @@ fn collect_contents_that_are_not_to_delete<'a> (
     Vec::new();
   for child_ref in node_ref.children() {
     let child : &OrgNode = child_ref . value();
-    if ( child . has_effect ( EffectOnParent::Content )
+    if let OrgNodeKind::True(t) = &child.kind {
+      if t.effect_on_parent == EffectOnParent::Content
          && ! matches!( child . edit_request(),
-                        Some(EditRequest::Delete)) )
-    { let child_id_opt : Option<&ID> = match &child.kind {
-        OrgNodeKind::True(t) => t.id_opt.as_ref(),
-        OrgNodeKind::Scaff(_) => None };
-      if let Some(id) = child_id_opt
-        { contents.push(id.clone()); }} }
+                        Some(EditRequest::Delete))
+      { if let Some(id) = &t.id_opt
+          { contents.push(id.clone()); }} } }
   contents }

@@ -137,13 +137,6 @@ impl OrgNode {
       OrgNodeKind::Scaff ( s ) => s . title (),
     }}
 
-  /// Returns true if this is a TrueNode with the given effect_on_parent.
-  pub fn has_effect ( &self, effect : EffectOnParent ) -> bool {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . effect_on_parent == effect,
-      OrgNodeKind::Scaff ( _ ) => false,
-    }}
-
   /// Returns true if this is a Scaffold with the given kind.
   pub fn is_scaffold ( &self, scaffold : &Scaffold ) -> bool {
     match &self . kind {

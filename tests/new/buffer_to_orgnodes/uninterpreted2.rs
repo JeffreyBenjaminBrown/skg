@@ -90,9 +90,12 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 
   // Test parentIgnores node
   let parentIgnores_node = tree_roots[1].value();
+  let parentIgnores_t = match &parentIgnores_node.kind {
+    OrgNodeKind::True(t) => t,
+    OrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(parentIgnores_node.title(), "parentIgnores node");
-  assert!(parentIgnores_node.has_effect(EffectOnParent::ParentIgnores));
-  assert_eq!(parentIgnores_node.is_indefinitive(), true);
+  assert_eq!(parentIgnores_t.effect_on_parent, EffectOnParent::ParentIgnores);
+  assert_eq!(parentIgnores_t.indefinitive, true);
   assert_eq!(parentIgnores_node.body(), Some(&"ParentIgnores body".to_string()));
 
   // Test cycling node
@@ -130,7 +133,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_t.id_opt.as_ref(), None);
   assert_eq!(first_t.cycle, false);
-  assert!(first_node.has_effect(EffectOnParent::Content));
+  assert_eq!(first_t.effect_on_parent, EffectOnParent::Content);
   assert_eq!(first_node.focused, false);
   assert_eq!(first_node.folded, false);
   assert_eq!(first_node.is_indefinitive(), false);

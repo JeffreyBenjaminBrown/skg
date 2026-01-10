@@ -126,8 +126,8 @@ fn validate_node_and_children (
           HashSet::new ();
         for child in node_ref.children() {
           let child_orgnode : &OrgNode = child.value();
-          if child_orgnode.has_effect( EffectOnParent::Content ) {
-            if let OrgNodeKind::True ( ct ) = &child_orgnode.kind {
+          if let OrgNodeKind::True ( ct ) = &child_orgnode.kind {
+            if ct.effect_on_parent == EffectOnParent::Content {
               if let Some ( child_skgid ) = &ct.id_opt {
                 if ! seen_content_ids.insert( child_skgid.clone() ) {
                   errors.push(

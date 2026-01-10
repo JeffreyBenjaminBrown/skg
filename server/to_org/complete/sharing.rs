@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNodeKind, EffectOnParent, Scaffold};
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
@@ -88,9 +88,12 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
 ) -> Result < (), Box<dyn Error> > {
   { // error if not a Subscribee
     let is_subscribee: bool =
-      read_at_node_in_tree(tree, subscribee_treeid, |node| {
-        node.orgnode.has_effect ( EffectOnParent::Subscribee )
-      })?;
+      read_at_node_in_tree(
+        tree, subscribee_treeid,
+        |node| { matches! (
+          &node.orgnode.kind,
+          OrgNodeKind::True(t)
+          if t.effect_on_parent == EffectOnParent::Subscribee ) } )?;
     if ! is_subscribee { return Err (
       "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee"
         . into () ); }}

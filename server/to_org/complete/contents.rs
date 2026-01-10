@@ -298,8 +298,9 @@ fn categorize_children_by_treatment (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if child . value () . orgnode
-        . has_effect ( EffectOnParent::Content )
+    if matches! ( &child . value () . orgnode . kind,
+                  OrgNodeKind::True(t)
+                  if t.effect_on_parent == EffectOnParent::Content )
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}

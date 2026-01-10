@@ -108,8 +108,9 @@ async fn execute_definitive_view_request (
       let node_ref : NodeRef < NodePair > =
         forest . get ( node_id ) . ok_or (
           "execute_definitive_view_request: node not found" ) ?;
-      node_ref . value () .orgnode
-        . has_effect ( EffectOnParent::Subscribee ) };
+      matches! ( &node_ref . value() . orgnode . kind,
+                 OrgNodeKind::True(t)
+                 if t.effect_on_parent == EffectOnParent::Subscribee ) };
     if is_subscribee {
       maybe_add_hiddenInSubscribeeCol_branch (
         forest, node_id, config, typedb_driver ) . await ?; }}
@@ -117,7 +118,8 @@ async fn execute_definitive_view_request (
 
 /// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
 /// return the Subscriber's 'hides_from_its_subscriptions' as a HashSet.
-/// Otherwise return an empty set.
+/// Otherwise return an empty set (which might be dangerous --
+/// see the PITFALL | TODO comment in the function body.
 fn get_hidden_ids_if_subscribee (
   tree    : &PairTree,
   node_id : NodeId,
@@ -125,8 +127,10 @@ fn get_hidden_ids_if_subscribee (
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
-  if ! node_ref . value () .orgnode
-       . has_effect ( EffectOnParent::Subscribee ) {
+  if ! matches! ( &node_ref . value () .orgnode . kind,
+                  OrgNodeKind::True(t)
+                  if t.effect_on_parent == EffectOnParent::Subscribee )
+  { // PITFALL \ TODO: Maybe this is dangerous, because it's misleading. We're saying 'the subscriber hides none of its content', and that's technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
     return Ok ( HashSet::new () ); }
   else {
     let subscribee_col : NodeRef < NodePair > =
@@ -165,8 +169,9 @@ fn indefinitize_content_subtree (
       OrgNodeKind::Scaff ( _ ) => None };
   let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
-    . filter ( |c| c . value () .orgnode
-                   . has_effect ( EffectOnParent::Content ) )
+    . filter ( |c| matches! ( &c . value () .orgnode . kind,
+                              OrgNodeKind::True(t)
+                              if t.effect_on_parent == EffectOnParent::Content ))
     . map ( |c| c . id () )
     . collect ();
   if let Some(ref pid) = node_pid_opt { // remove from visited
