@@ -85,11 +85,15 @@ fn add_missing_info_dfs (
           ( is_aliascol, parent_source ) } )
       { Ok ( ( is_aliascol, source ) ) => ( is_aliascol, source ),
         Err ( _ ) => ( false, None ) } };
-    if parent_is_aliascol
-    { node_ref . value () . convert_to_alias ();
+    if parent_is_aliascol { // convert it to an alias
+      let org = node_ref . value ();
+      let OrgNodeKind::True ( t ) = &org . kind
+        else { unreachable! () };
+      org . kind = OrgNodeKind::Scaff (
+        Scaffold::Alias ( t . title . clone() ));
     } else {
-    let OrgNodeKind::True ( t ) = &mut node_ref . value () . kind // the borrow-checker forces this otherwise redundant pattern match
-        else { unreachable!() };
+      let OrgNodeKind::True ( t ) = &mut node_ref . value () . kind // the borrow-checker forces this otherwise redundant pattern match
+        else { unreachable! () };
       inherit_source_if_needed ( t, parent_source );
       assign_new_id_if_needed ( t ); } }
   // For Scaffolds, leave the node unchanged, but still recurse.

@@ -165,15 +165,6 @@ impl OrgNode {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . indefinitive = value;
     }}
-
-  /// Convert a TrueNode to an Alias scaffold.
-  /// Uses the TrueNode's title as the alias text.
-  /// No-op if already a Scaffold.
-  pub fn convert_to_alias ( &mut self ) {
-    if let OrgNodeKind::True ( true_node ) = &self . kind {
-      self . kind = OrgNodeKind::Scaff (
-        Scaffold::Alias ( true_node . title . clone () ) );
-    }}
 }
 
 impl fmt::Display for EditRequest {
