@@ -3,7 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::orgnode::{OrgNode, OrgNodeKind, EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, EffectOnParent, Scaffold};
 use crate::types::misc::ID;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_orgnode_tree, assign_pids_throughout_orgnode_tree_from_map};
@@ -87,11 +87,12 @@ fn add_missing_info_dfs (
     if parent_is_aliascol
     { node_ref . value () . convert_to_alias ();
     } else {
-      inherit_source_if_needed ( node_ref . value (), parent_source );
-      assign_new_id_if_needed ( node_ref . value () ); } }
+    let OrgNodeKind::True ( t ) = &mut node_ref . value () . kind // the borrow-checker forces this otherwise redundant pattern match
+        else { unreachable!() };
+      inherit_source_if_needed ( t, parent_source );
+      assign_new_id_if_needed ( t ); } }
   // For Scaffolds, leave the node unchanged, but still recurse.
-  { // Recurse into children DFS.
-    for child_treeid in {
+  { for child_treeid in { // Recurse into children, DFS.
       let child_treeids: Vec < ego_tree::NodeId > = {
         let treeid: ego_tree::NodeId = node_ref . id ();
         let tree = node_ref . tree ();
@@ -105,23 +106,20 @@ fn add_missing_info_dfs (
 
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_new_id_if_needed(
-  node: &mut OrgNode
+  t: &mut TrueNode
 ) {
-  let has_no_id : bool = match &node . kind {
-    OrgNodeKind::True ( t ) => t . id_opt . is_none (),
-    OrgNodeKind::Scaff ( _ ) => true };
-  if node . has_effect ( EffectOnParent::Content )
-     && has_no_id
+  if t . effect_on_parent == EffectOnParent::Content
+     && t . id_opt . is_none ()
   { let new_id: String = Uuid::new_v4().to_string();
-    node . set_id ( Some( ID (new_id)) ); }}
+    t . id_opt = Some ( ID (new_id) ); }}
 
 /// Inherit source from parent if node doesn't have one.
 /// (The caller is responsible for recognizing, if it's true,
 /// that the parent should have no associated source.)
 fn inherit_source_if_needed(
-  node: &mut OrgNode,
+  t: &mut TrueNode,
   parent_source: Option<String>
 ) {
-  if ! node . has_source () {
+  if t . source_opt . is_none () {
     if let Some ( source ) = parent_source {
-      node . set_source ( source ); } } }
+      t . source_opt = Some ( source ); } } }
