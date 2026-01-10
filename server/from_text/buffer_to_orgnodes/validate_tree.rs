@@ -142,7 +142,7 @@ fn validate_node_and_children (
           errors.push(
             BufferValidationError::SourceNotInConfig(
               skgid, source_nickname )); }}
-      if t.indefinitive && orgnode.edit_request().is_some() {
+      if t.indefinitive && t.edit_request.is_some() {
         errors.push(
           BufferValidationError::IndefinitiveWithEditRequest(
             orgnode.clone() )); }} };
@@ -166,14 +166,11 @@ fn validate_definitive_view_requests (
   { if let Edge::Open(node_ref) = edge
     { let orgnode : &OrgNode =
         node_ref.value();
-      if let Some(view_reqs) = orgnode.view_requests()
-      { if view_reqs.contains( &ViewRequest::Definitive )
-        { let id_opt : Option<&ID> = match &orgnode.kind
-          { OrgNodeKind::True(t) => t.id_opt.as_ref(),
-            OrgNodeKind::Scaff(_) => None };
-          if let Some(id) = id_opt {
+      if let OrgNodeKind::True(t) = &orgnode.kind
+      { if t.view_requests.contains( &ViewRequest::Definitive )
+        { if let Some(id) = &t.id_opt {
           { // Error: must be indefinitive
-            if ! orgnode.is_indefinitive()
+            if ! t.indefinitive
             { errors.push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id.clone() )); }}
           { // Error: must be childless
             if node_ref.children().next().is_some()

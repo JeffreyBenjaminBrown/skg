@@ -169,7 +169,7 @@ fn collect_contents_that_are_not_to_delete<'a> (
     let child : &OrgNode = child_ref . value();
     if let OrgNodeKind::True(t) = &child.kind {
       if t.effect_on_parent == EffectOnParent::Content
-         && ! matches!( child . edit_request(),
+         && ! matches!( t . edit_request,
                         Some(EditRequest::Delete))
       { if let Some(id) = &t.id_opt
           { contents.push(id.clone()); }} } }
