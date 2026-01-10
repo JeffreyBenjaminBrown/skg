@@ -132,18 +132,25 @@ impl Scaffold {
     }} }
 
 impl OrgNode {
-  /// PITFALL: Don't let this convince you a Scaff can have an ID.
-  pub fn id_opt ( &self ) -> Option<&ID> {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
-    }}
-
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title ( &self ) -> &str {
     match &self . kind {
       OrgNodeKind::True ( t ) => &t . title,
       OrgNodeKind::Scaff ( s ) => s . title (),
+    }}
+
+  /// Reasonable for both TrueNodes and Scaffolds.
+  pub fn body ( &self ) -> Option < &String > {
+    match &self . kind {
+      OrgNodeKind::True ( t ) => t . body . as_ref (),
+      OrgNodeKind::Scaff ( _ ) => None,
+    }}
+
+  /// PITFALL: Don't let this convince you a Scaff can have an ID.
+  pub fn id_opt ( &self ) -> Option<&ID> {
+    match &self . kind {
+      OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
+      OrgNodeKind::Scaff ( _ ) => None,
     }}
 
   /// Returns true if this is a TrueNode and is indefinitive.
@@ -152,10 +159,6 @@ impl OrgNode {
       OrgNodeKind::True ( t ) => t . indefinitive,
       OrgNodeKind::Scaff ( _ ) => false,
     }}
-
-  //
-  // Mutation helpers (for TrueNodes only; no-op for Scaffolds)
-  //
 
   /// Set the indefinitive flag. No-op for Scaffolds.
   pub fn set_indefinitive ( &mut self, value : bool ) {
@@ -170,13 +173,6 @@ impl OrgNode {
     if let OrgNodeKind::True ( true_node ) = &self . kind {
       self . kind = OrgNodeKind::Scaff (
         Scaffold::Alias ( true_node . title . clone () ) );
-    }}
-
-  /// Reasonable for both TrueNodes and Scaffolds.
-  pub fn body ( &self ) -> Option < &String > {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . body . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
     }}
 }
 
