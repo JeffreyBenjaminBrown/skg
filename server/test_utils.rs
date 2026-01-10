@@ -287,54 +287,33 @@ pub fn compare_two_forests_modulo_id(
     { return false; }}
   true }
 
-fn compare_orgnode_interpretations(
-  k1: &OrgNodeKind,
-  k2: &OrgNodeKind
-) -> bool {
-  match (k1, k2) {
-    (OrgNodeKind::Scaff(s1), OrgNodeKind::Scaff(s2)) =>
-      // two Scaffolds of the same variant
-      s1 == s2,
-    (OrgNodeKind::True(t1), OrgNodeKind::True(t2)) =>
-      // two TrueNodes of the same Effect_On_Parent
-      t1.effect_on_parent == t2.effect_on_parent,
-    _ => false, }}
-
-/// Compare two nodes and their subtrees modulo ID differences.
+/// Compare two nodes and their subtrees, ignoring ID values
+/// (but requiring ID presence to match).
 fn compare_two_orgnode_branches_recursively_modulo_id (
   node1: NodeRef<OrgNode>,
   node2: NodeRef<OrgNode>
 ) -> bool {
   let n1 : &OrgNode = node1.value();
   let n2 : &OrgNode = node2.value();
-
-  // Check if ID presence differs
-  if ( n1.id().is_some() !=
-       n2.id().is_some() )
-  { return false; }
-
-  // Compare all fields except ID
-  if n1.title() != n2.title() { return false; }
-  if n1.body() != n2.body() { return false; }
-  if n1.source() != n2.source() { return false; }
-  // Compare kind/effect but skip ID (which is inside TrueNode)
-  if !compare_orgnode_interpretations(&n1.kind, &n2.kind) { return false; }
-  if n1.is_indefinitive() != n2.is_indefinitive() { return false; }
-  if n1.focused != n2.focused { return false; }
-  if n1.folded != n2.folded { return false; }
-  if n1.edit_request() != n2.edit_request() { return false; }
-
-  // Compare children recursively
-  let children1 : Vec<_> =
-    node1.children().collect();
-  let children2 : Vec<_> =
-    node2.children().collect();
-
-  children1.len() == children2.len() &&
-    children1 . iter() . zip ( children2.iter() )
-    . all ( | ( c1, c2 ) |
-                compare_two_orgnode_branches_recursively_modulo_id (
-                  *c1, *c2 )) }
+  match (&n1.kind, &n2.kind) {
+    (OrgNodeKind::True(t1), OrgNodeKind::True(t2)) => {
+      // Copy the ID from one to the other, then compare.
+      let mut n1_copy : OrgNode = n1.clone();
+      if let OrgNodeKind::True(t) = &mut n1_copy.kind {
+        t.id_opt = t2.id_opt.clone(); }
+      if n1_copy != *n2 { return false; }}
+    (OrgNodeKind::Scaff(_), OrgNodeKind::Scaff(_)) => {
+      if n1 != n2 { return false; }}
+    _ => return false, // mismatched kinds
+  }
+  { // Recurse on children
+    let children1 : Vec<_> = node1.children().collect();
+    let children2 : Vec<_> = node2.children().collect();
+    ( children1.len() == children2.len() &&
+      children1 . iter() . zip(children2.iter())
+      . all (|(c1, c2)|
+             compare_two_orgnode_branches_recursively_modulo_id(
+               *c1, *c2)) ) }}
 
 /// Compare a PairTree forest (with ForestRoot) against a Vec of OrgNode trees.
 /// This compares just the OrgNode portions, ignoring the SkgNode Option.
@@ -499,7 +478,7 @@ pub fn orgnode_forest_to_paired (
       add_orgnode_tree_as_child_of_forest_root (
         paired_forest, new_treeid, orgnode_tree, child_treeid ); } }
   let mut result : PairTree = Tree::new ( forest_root_pair () );
-  let forest_root_treeid = result . root () . id ();
+  let forest_root_treeid : NodeId = result . root () . id ();
   // Iterate over tree roots (children of ForestRoot)
   for tree_root in forest . root () . children () {
     add_orgnode_tree_as_child_of_forest_root (

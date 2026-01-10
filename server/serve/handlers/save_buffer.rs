@@ -9,7 +9,7 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::forest_root_pair;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode::OrgNode;
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{NodePair, PairTree};
@@ -218,7 +218,7 @@ fn pair_orgnode_forest_with_save_instructions (
 /// Add an OrgNode subtree as a child of a parent in the PairTree,
 /// pairing each node with its SkgNode from the map.
 fn add_paired_subtree_as_child (
-  pair_tree      : &mut PairTree,
+  parent_tree    : &mut PairTree,
   parent_treeid  : NodeId,
   orgnode_tree   : &Tree<OrgNode>,
   orgnode_treeid : NodeId,
@@ -228,12 +228,14 @@ fn add_paired_subtree_as_child (
     orgnode_tree . get ( orgnode_treeid ) . unwrap ()
     . value () . clone ();
   let mskgnode : Option<SkgNode> =
-    orgnode . id ()
-    . and_then (
-      |id| skgnode_map . get (id) . cloned () );
+    match &orgnode . kind {
+      OrgNodeKind::True ( t ) =>
+        t . id_opt . as_ref ()
+        . and_then ( |id| skgnode_map . get (id) . cloned () ),
+      OrgNodeKind::Scaff ( _ ) => None };
   let new_treeid : NodeId = {
     let mut parent_mut : NodeMut < _ > =
-      pair_tree . get_mut ( parent_treeid ) . unwrap ();
+      parent_tree . get_mut ( parent_treeid ) . unwrap ();
     parent_mut . append ( // add new node
       NodePair { mskgnode, orgnode } ) . id () };
   { // recurse in new node
@@ -242,6 +244,6 @@ fn add_paired_subtree_as_child (
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
       add_paired_subtree_as_child (
-        pair_tree, new_treeid,
+        parent_tree, new_treeid,
         orgnode_tree, child_treeid,
         skgnode_map ); }} }

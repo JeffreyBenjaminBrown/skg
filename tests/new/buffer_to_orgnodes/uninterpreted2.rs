@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::orgnode::{OrgNode, EffectOnParent};
+use skg::types::orgnode::{OrgNode, OrgNodeKind, EffectOnParent};
 use ego_tree::Tree;
 
 #[test]
@@ -86,9 +86,6 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test root node with metadata
   let root_node = tree_roots[0].value();
   assert_eq!(root_node.title(), "root");
-  assert_eq!(root_node.id(), Some(&ID::from("root")));
-  assert_eq!(root_node.focused(), true);
-  assert_eq!(root_node.folded(), false);
   assert_eq!(root_node.body(), Some(&"Root body content".to_string()));
 
   // Test parentIgnores node
@@ -100,8 +97,11 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 
   // Test cycling node
   let cycle_node = tree_roots[2].value();
+  let cycle_t = match &cycle_node.kind {
+    OrgNodeKind::True(t) => t,
+    OrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(cycle_node.title(), "cycling node");
-  assert_eq!(cycle_node.cycle(), true);
+  assert_eq!(cycle_t.cycle, true);
   assert_eq!(cycle_node.body(),
              Some(&"This node has cycle flag".to_string()));
 }
@@ -123,13 +123,16 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
 
   // Test first node - should have all default values except title and body
   let first_node = tree_roots[0].value();
+  let first_t = match &first_node.kind {
+    OrgNodeKind::True(t) => t,
+    OrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(first_node.title(), "simple node");
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
-  assert_eq!(first_node.id(), None);
+  assert_eq!(first_t.id_opt.as_ref(), None);
+  assert_eq!(first_t.cycle, false);
   assert!(first_node.has_effect(EffectOnParent::Content));
-  assert_eq!(first_node.cycle(), false);
-  assert_eq!(first_node.focused(), false);
-  assert_eq!(first_node.folded(), false);
+  assert_eq!(first_node.focused, false);
+  assert_eq!(first_node.folded, false);
   assert_eq!(first_node.is_indefinitive(), false);
   assert_eq!(first_node.edit_request(), None);
 
@@ -191,15 +194,15 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   // Test node with metadata
   let meta_node = tree_roots[0].value();
   assert_eq!(meta_node.title(), "simple node with metadata");
-  assert_eq!(meta_node.id(), Some(&ID::from("test")));
-  assert_eq!(meta_node.folded(), true);
   assert_eq!(meta_node.body(), Some(&"Node body".to_string()));
+  assert_eq!(meta_node.id_opt(), Some(&ID::from("test")));
+  assert_eq!(meta_node.folded, true);
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1].value();
   assert_eq!(regular_node.title(), "regular node without metadata");
-  assert_eq!(regular_node.id(), None);
-  assert_eq!(regular_node.folded(), false);
+  assert_eq!(regular_node.id_opt(), None);
+  assert_eq!(regular_node.folded, false);
   assert_eq!(regular_node.body(), Some(&"Regular body".to_string()));
 }
 

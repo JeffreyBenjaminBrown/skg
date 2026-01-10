@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId};
 
-use crate::types::orgnode::OrgNode;
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
@@ -23,10 +23,10 @@ pub fn collect_ids_in_orgnode_tree (
   node_ref : NodeRef < OrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let Some ( id )
-    = node_ref . value () . id ()
-  { // Collect ID if present
-    ids_to_lookup . push ( id . clone () ); }
+  if let OrgNodeKind::True ( t ) =
+    &node_ref . value () . kind
+  { if let Some ( id ) = &t . id_opt
+    { ids_to_lookup . push ( id . clone () ); }}
   for child in node_ref . children () { // Recurse
     collect_ids_in_orgnode_tree (
       child,
@@ -36,14 +36,14 @@ pub fn assign_pids_throughout_orgnode_tree_from_map (
   mut node_ref : NodeMut < OrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let Some ( current_id )
-    = node_ref . value () . id () . cloned ()
-  { // Assign PID if we have one
-    if let Some ( Some ( pid )) =
-      pid_map . get ( &current_id )
-    { node_ref . value () . set_id (
-        Some ( pid . clone () ) ); }}
-  { // Process children recursively
+  if let OrgNodeKind::True ( t ) =
+    &node_ref . value () . kind
+  { if let Some ( id ) = &t . id_opt
+    { if let Some ( Some ( pid )) =
+        pid_map . get ( id )
+      { node_ref . value () . set_id (
+          Some ( pid . clone () ) ); }}}
+  { // Recurse into children
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {

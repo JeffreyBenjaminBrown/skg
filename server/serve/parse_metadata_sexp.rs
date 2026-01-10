@@ -132,8 +132,8 @@ pub fn from_parsed (
       OrgNodeKind::True ( TrueNode {
         title,
         body,
-        id               : metadata . id . clone (),
-        source           : metadata . source . clone (),
+        id_opt           : metadata . id . clone (),
+        source_opt       : metadata . source . clone (),
         effect_on_parent : effect,
         indefinitive     : metadata . code . indefinitive,
         cycle            : metadata . cycle,

@@ -6,7 +6,7 @@ use std::error::Error;
 use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode::{OrgNode};
 use skg::types::misc::SkgConfig;
 use skg::types::tree::PairTree;
 
@@ -77,10 +77,10 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_1_ref =
       forest . get ( aliascol_1_id ) . unwrap ();
-    let children : Vec < &str > =
-      aliascol_1_ref . children ()
-      . map ( |n| n . value () .orgnode . title () )
-      . collect ();
+    let children : Vec < String > =
+      aliascol_1_ref . children () . map (
+        |n| n . value() . orgnode . title() . to_string() )
+      . collect();
 
     assert_eq! (
       children . len (),
@@ -110,11 +110,11 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_2_ref =
       forest . get ( aliascol_2_id ) . unwrap ();
-    let aliascol_2_new = &aliascol_2_ref . value () .orgnode;
-    let children : Vec < &str > =
-      aliascol_2_ref . children ()
-      . map ( |n| n . value () .orgnode . title () )
-      . collect ();
+    let aliascol_2_new : &OrgNode = &aliascol_2_ref . value () .orgnode;
+    let children : Vec < String > =
+      aliascol_2_ref . children () . map (
+        |n| n . value() . orgnode . title() . to_string() )
+      . collect();
 
     assert_eq! (
       children . len (),

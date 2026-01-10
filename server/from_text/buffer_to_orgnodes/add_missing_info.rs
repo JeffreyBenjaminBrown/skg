@@ -67,30 +67,30 @@ async fn assign_pids_throughout_forest (
 fn add_missing_info_dfs (
   mut node_ref: NodeMut < OrgNode >,
 ) {
-  let (parent_is_aliascol, parent_source)
-    : (bool, Option<String>) = {
-      let treeid = node_ref.id();
-      let tree = node_ref.tree();
+  if let OrgNodeKind::True ( _ ) =
+    &node_ref . value () . kind
+  { let ( parent_is_aliascol, parent_source )
+      : ( bool, Option < String > ) =
+    { let treeid = node_ref . id ();
       match read_at_ancestor_in_tree (
-        tree, treeid, 1,
+        node_ref . tree (), treeid, 1,
         |orgnode| {
-          let is_aliascol =
+          let is_aliascol : bool =
             orgnode . is_scaffold ( &Scaffold::AliasCol );
-          let parent_source = (
-            if matches!(&orgnode.kind, OrgNodeKind::Scaff(_)) { None }
-            else { orgnode . source () . cloned () } );
-          ( is_aliascol, parent_source ) })
-      { Ok (( is_aliascol, source )) => ( is_aliascol, source ),
-        Err (_)                      => ( false, None ) }};
-  { // process this node
-    assign_alias_relation_if_needed (
-      node_ref . value (), parent_is_aliascol );
-    if let OrgNodeKind::True(_) = &node_ref.value().kind {
-      inherit_source_if_needed (
-        node_ref . value (), parent_source ); }
-    assign_new_id_if_needed (
-      node_ref . value () ); }
-  { // recurse into children DFS
+          let parent_source : Option < String > =
+            match &orgnode . kind
+            { OrgNodeKind::True ( t ) => t . source_opt . clone (),
+              OrgNodeKind::Scaff ( _ ) => None };
+          ( is_aliascol, parent_source ) } )
+      { Ok ( ( is_aliascol, source ) ) => ( is_aliascol, source ),
+        Err ( _ ) => ( false, None ) } };
+    if parent_is_aliascol
+    { node_ref . value () . convert_to_alias ();
+    } else {
+      inherit_source_if_needed ( node_ref . value (), parent_source );
+      assign_new_id_if_needed ( node_ref . value () ); } }
+  // For Scaffolds, leave the node unchanged, but still recurse.
+  { // Recurse into children DFS.
     for child_treeid in {
       let child_treeids: Vec < ego_tree::NodeId > = {
         let treeid: ego_tree::NodeId = node_ref . id ();
@@ -103,23 +103,17 @@ fn add_missing_info_dfs (
         = node_ref . tree () . get_mut ( child_treeid )
       { add_missing_info_dfs ( child_mut ); }} }}
 
-/// Assign treatment=Alias (convert to Alias scaffold)
-/// to nodes whose parent has treatment=AliasCol
-fn assign_alias_relation_if_needed(
-  node: &mut OrgNode,
-  parent_is_aliascol: bool
-) {
-  if parent_is_aliascol {
-    node . convert_to_alias (); } }
-
 /// Assign a UUID v4 to Content nodes that don't have an ID
 fn assign_new_id_if_needed(
   node: &mut OrgNode
 ) {
+  let has_no_id : bool = match &node . kind {
+    OrgNodeKind::True ( t ) => t . id_opt . is_none (),
+    OrgNodeKind::Scaff ( _ ) => true };
   if node . has_effect ( EffectOnParent::Content )
-     && node . id () . is_none () {
-    let new_id: String = Uuid::new_v4().to_string();
-    node . set_id ( Some ( ID ( new_id ) ) ); } }
+     && has_no_id
+  { let new_id: String = Uuid::new_v4().to_string();
+    node . set_id ( Some( ID (new_id)) ); }}
 
 /// Inherit source from parent if node doesn't have one.
 /// (The caller is responsible for recognizing, if it's true,

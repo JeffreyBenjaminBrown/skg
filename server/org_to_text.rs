@@ -129,9 +129,9 @@ fn true_node_metadata_to_string (
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
 
-  if let Some ( ref id ) = true_node . id {
+  if let Some ( ref id ) = true_node . id_opt {
     parts . push ( format! ( "(id {})", id . 0 )); }
-  if let Some ( ref source ) = true_node . source {
+  if let Some ( ref source ) = true_node . source_opt {
     parts . push ( format! ( "(source {})", source )); }
 
   // Build view s-expr

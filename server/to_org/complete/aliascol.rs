@@ -1,4 +1,4 @@
-use crate::types::orgnode::Scaffold;
+use crate::types::orgnode::{OrgNode, Scaffold};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
@@ -84,7 +84,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
     let mut seen : HashSet < String > =
       HashSet::new ();
     for child in aliascol_ref . children () {
-      let child_orgnode = &child . value () . orgnode;
+      let child_orgnode : &OrgNode = &child . value () . orgnode;
       let title : &str = child_orgnode . title ();
       let is_duplicate : bool =
         ! seen . insert ( title . to_string () );

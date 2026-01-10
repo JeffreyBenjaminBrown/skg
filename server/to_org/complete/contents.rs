@@ -230,9 +230,12 @@ pub async fn completeDefinitiveOrgnode (
     let child_ref : NodeRef < NodePair > =
       tree . get ( *child_treeid )
       . ok_or ( "Child node not found" ) ?;
-    let child_pid : &ID =
-      child_ref . value () . orgnode . id ()
-      . ok_or ( "Content child has no ID" ) ?;
+    let child_pid : &ID = {
+      let child_id_opt : Option<&ID>
+      = match &child_ref . value () . orgnode . kind
+      { OrgNodeKind::True(t) => t.id_opt.as_ref(),
+        OrgNodeKind::Scaff(_) => None };
+      child_id_opt . ok_or ( "Content child has no ID" ) ? };
     content_skgid_to_treeid . insert (
       child_pid . clone (), *child_treeid ); }
 
@@ -247,10 +250,12 @@ pub async fn completeDefinitiveOrgnode (
     let mut child_mut : NodeMut < NodePair > =
       tree . get_mut ( *invalid_treeid )
       . ok_or ( "Invalid content child not found" ) ?;
-    let pair = child_mut . value ();
+    let pair : &mut NodePair = child_mut . value ();
     pair . orgnode . set_effect_on_parent (
       EffectOnParent::ParentIgnores );
-    let child_pid = pair.orgnode . id () . cloned () . unwrap ();
+    let child_pid : ID = match &pair.orgnode.kind {
+      OrgNodeKind::True(t) => t.id_opt.clone(),
+      OrgNodeKind::Scaff(_) => None } . unwrap ();
     content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
 

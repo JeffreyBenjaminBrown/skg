@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode::{OrgNode};
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
@@ -75,7 +75,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
                  "Expected exactly 1 RootWithoutSource error for pub-1");
       if let BufferValidationError::RootWithoutSource(node)
       = root_without_source_errors[0]
-      { assert_eq!(node.id().map(|id| id.0.as_str()),
+      { assert_eq!(node.id_opt().map(|id| id.0.as_str()),
                    Some("pub-1"),
                    "RootWithoutSource should be for pub-1"); }}
 

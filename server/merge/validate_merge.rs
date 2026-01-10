@@ -1,15 +1,14 @@
 /// Validation rules:
-///   - Both merge partners must have IDs.
+///   - Both merge partners must be TrueNodes with IDs.
 ///     - Those two IDs must represent distinct nodes.
 ///     - Those two IDs must already be in the DB.
 ///   - Neither merge partner can be marked for deletion.
-///   - Neither merge partner can be an Alias or AliasCol.
 ///   - Monogamy:
 ///     - No node can be an acquirer and an acquiree.
 ///     - No node can be involved in more than one merge.
 
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -32,69 +31,58 @@ pub async fn validate_merge_requests(
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
-  let collections : MergeValidationData =
+  let merge_validation_data : MergeValidationData =
     collect_merge_validation_data ( forest );
-  for node in collections.acquirer_orgnodes {
-    let acquirer_id : &ID =
-      node.id()
-      .ok_or("Acquirer node must have an ID")?;
-    if ( node.is_scaffold( &Scaffold::Alias(String::new()) ) ||
-         node.is_scaffold( &Scaffold::AliasCol ))
-    { errors.push(
-        format!(
-          "Acquirer node '{}' cannot be an Alias or AliasCol",
-          acquirer_id.as_str() ));
-      continue; }
-    if let Some(EditRequest::Merge(acquiree_id))
-      = node.edit_request()
-    { errors.extend ( { let pair_errors : Vec<String> =
-                           validate_merge_pair(
-                             config,
-                             driver,
-                             acquirer_id,
-                             acquiree_id,
-                             &collections.to_delete_ids ). await?;
-                      pair_errors } ); }}
+  for node in merge_validation_data.acquirer_orgnodes {
+    let t : &TrueNode = match &node.kind {
+      OrgNodeKind::True(t) => t,
+      OrgNodeKind::Scaff(s) => {
+        errors.push(format!(
+          "Acquirer node cannot be a Scaffold: {:?}", s));
+        continue; }};
+    let acquirer_id : &ID = match &t.id_opt {
+      Some(id) => id,
+      None => { errors.push(format!(
+                  "Acquirer node '{}' must have an ID", t.title));
+                continue; }};
+    if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request
+    { let pair_errors : Vec<String> = validate_merge_pair(
+        config, driver, acquirer_id, acquiree_id,
+        &merge_validation_data.to_delete_ids).await?;
+      errors.extend( pair_errors ); }}
   errors.extend( {
     let monogamy_errors : Vec<String> =
       validate_monogamy_for_all_merges(
-        &collections.acquirer_to_acquirees,
-        &collections.acquiree_to_acquirers );
+        &merge_validation_data.acquirer_to_acquirees,
+        &merge_validation_data.acquiree_to_acquirers );
     monogamy_errors } );
   Ok(errors) }
 
 fn collect_merge_validation_data<'a>(
   forest: &'a Tree<OrgNode>,
 ) -> MergeValidationData<'a> {
-  let mut acquirer_orgnodes: Vec<&OrgNode> =
-    Vec::new();
-  let mut acquirer_to_acquirees: HashMap<ID, HashSet<ID>> =
-    HashMap::new();
-  let mut acquiree_to_acquirers: HashMap<ID, HashSet<ID>> =
-    HashMap::new();
-  let mut to_delete_ids: HashSet<ID> =
-    HashSet::new();
+  let mut acquirer_orgnodes : Vec<&OrgNode> = Vec::new();
+  let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
+  let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
+  let mut to_delete_ids : HashSet<ID> = HashSet::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-        let orgnode: &OrgNode = node_ref.value();
-        if matches!(orgnode.edit_request(),
-                    Some(EditRequest::Delete)) {
-          if let Some(id) = orgnode.id() {
-            to_delete_ids.insert( // Mutate!
-              id.clone()); }}
-        if let Some(EditRequest::Merge(acquiree_id))
-          = orgnode.edit_request() {
-            if let Some(acquirer_id) = orgnode.id() {
-              acquirer_orgnodes.push( // Mutate!
-                orgnode);
-              acquirer_to_acquirees // Mutate!
-                .entry(acquirer_id.clone())
-                .or_insert_with(HashSet::new)
-                .insert(acquiree_id.clone());
-              acquiree_to_acquirers // Mutate!
-                .entry(acquiree_id.clone())
-                .or_insert_with(HashSet::new)
-                .insert(acquirer_id.clone()); }} }}
+      let orgnode : &OrgNode = node_ref.value();
+      if let OrgNodeKind::True(t) = &orgnode.kind {
+        if let Some(id) = &t.id_opt {
+          if matches!(&t.edit_request, Some(EditRequest::Delete)) {
+            to_delete_ids.insert(id.clone()); } // mutate!
+          if let Some(EditRequest::Merge(acquiree_id))
+          = &t.edit_request
+          { acquirer_orgnodes.push(orgnode); // mutate!
+            acquirer_to_acquirees // mutate!
+              .entry(id.clone())
+              .or_insert_with(HashSet::new)
+              .insert(acquiree_id.clone());
+            acquiree_to_acquirers // mutate!
+              .entry(acquiree_id.clone())
+              .or_insert_with(HashSet::new)
+              .insert(id.clone()); }} }} }
   MergeValidationData { acquirer_orgnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,

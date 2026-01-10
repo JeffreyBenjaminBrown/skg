@@ -5,7 +5,7 @@ use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::{compare_orgnode_portions_of_pairforest_and_orgnodeforest, run_with_test_db, orgnode_forest_to_paired};
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode::{OrgNode};
 use skg::types::tree::PairTree;
 
 use ego_tree::Tree;
@@ -118,7 +118,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().orgnode.id() {
+      if let Some(id) = node_ref.value().orgnode.id_opt() {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -203,7 +203,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().orgnode.id() {
+      if let Some(id) = node_ref.value().orgnode.id_opt() {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;

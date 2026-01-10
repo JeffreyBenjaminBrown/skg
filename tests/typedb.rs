@@ -12,7 +12,7 @@ mod util {
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode::{OrgNode};
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -370,7 +370,7 @@ async fn test_recursive_document (
   let root_node : &OrgNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert_eq! ( root_node.id(), Some ( &ID::from ("a") ),
+  assert_eq! ( root_node.id_opt(), Some ( &ID::from ("a") ),
     "Root node should have id 'a'" );
   assert_eq! ( root_node.title(), "a",
     "Root node should have title 'a'" );
@@ -381,11 +381,11 @@ async fn test_recursive_document (
     . expect ( "Root should have child 'b'" );
   let b_node : &OrgNode = b_node_ref . value ();
 
-  assert_eq! ( b_node.id(), Some ( &ID::from ("b") ),
+  assert_eq! ( b_node.id_opt(), Some ( &ID::from ("b") ),
     "First child should have id 'b'" );
   assert_eq! ( b_node.title(), "b",
     "First child should have title 'b'" );
-  assert_eq! ( b_node.body(), Some ( "b has a body" . to_string () ).as_ref(),
+  assert_eq! ( b_node.body(), Some ( &"b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
   assert! ( ! b_node.is_indefinitive(),
     "First occurrence of 'b' should not be marked as indefinitive" );
@@ -396,7 +396,7 @@ async fn test_recursive_document (
     . expect ( "Node 'b' should have child 'c'" );
   let c_node : &OrgNode = c_node_ref . value ();
 
-  assert_eq! ( c_node.id(), Some ( &ID::from ("c") ),
+  assert_eq! ( c_node.id_opt(), Some ( &ID::from ("c") ),
     "Child of 'b' should have id 'c'" );
   assert_eq! ( c_node.title(), "c",
     "Child of 'b' should have title 'c'" );
@@ -407,7 +407,7 @@ async fn test_recursive_document (
     . expect ( "Node 'c' should have child 'b' (repeated)" );
   let b_repeat : &OrgNode = b_repeat_ref . value ();
 
-  assert_eq! ( b_repeat.id(), Some ( &ID::from ("b") ),
+  assert_eq! ( b_repeat.id_opt(), Some ( &ID::from ("b") ),
     "Child of 'c' should have id 'b'" );
   assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );

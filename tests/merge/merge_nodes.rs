@@ -69,8 +69,8 @@ async fn test_merge_2_into_1_impl(
     kind: OrgNodeKind::True(TrueNode {
       title: "1".to_string(),
       body: None,
-      id: Some(ID::from("1")),
-      source: None,
+      id_opt: Some(ID::from("1")),
+      source_opt: None,
       effect_on_parent: EffectOnParent::Content,
       indefinitive: false,
       cycle: false,
@@ -332,8 +332,8 @@ async fn test_merge_1_into_2_impl(
     kind: OrgNodeKind::True(TrueNode {
       title: "2".to_string(),
       body: None,
-      id: Some(ID::from("2")),
-      source: None,
+      id_opt: Some(ID::from("2")),
+      source_opt: None,
       effect_on_parent: EffectOnParent::Content,
       indefinitive: false,
       cycle: false,

@@ -70,7 +70,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       "Root level Alias (bad)" ];
     for error in &alias_no_aliascol_parent_errors {
       if let BufferValidationError::Alias_with_no_AliasCol_Parent(node) = error {
-        assert!(expected_titles.contains(&node.title().as_ref()),
+        assert!(expected_titles.contains(&node.title()),
                 "Alias_with_no_AliasCol_Parent error should come from expected node, got: {}", node.title()); }} }
 
   { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors.iter()

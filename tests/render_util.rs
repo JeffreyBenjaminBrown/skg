@@ -43,7 +43,7 @@ fn test_orgnode_to_text_with_id_metadata () {
   let node = OrgNode {
     kind: OrgNodeKind::True ( TrueNode {
       title: "Test Title".to_string(),
-      id: Some ( ID::from ( "test123" )),
+      id_opt: Some ( ID::from ( "test123" )),
       indefinitive: true,
       .. TrueNode::default() }),
     .. OrgNode::default() };
@@ -56,7 +56,7 @@ fn test_metadata_ordering () {
   let node = OrgNode {
     kind: OrgNodeKind::True ( TrueNode {
       title: "Test".to_string(),
-      id: Some ( ID::from ( "xyz" )),
+      id_opt: Some ( ID::from ( "xyz" )),
       cycle: true,
       relationships: OrgnodeRelationships {
         parentIsContainer: false,

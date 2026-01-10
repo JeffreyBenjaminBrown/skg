@@ -5,6 +5,7 @@ use crate::dbs::typedb::search::count_relationships::{
   count_link_sources};
 use crate::to_org::util::collect_ids_from_pair_tree;
 use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::OrgNode;
 use crate::types::tree::PairTree;
 
 use std::collections::{HashSet, HashMap};
@@ -95,12 +96,12 @@ fn set_metadata_relationships_in_node_recursive (
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( treeid ) . unwrap ()
-    . value () .orgnode . id () . cloned ();
+    . value () . orgnode . id_opt () . cloned ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
-    let num_containers = rel_data . num_containers . get ( node_pid ) . copied ();
-    let num_contents = rel_data . num_contents . get ( node_pid ) . copied ();
-    let num_links_in = rel_data . num_links_in . get ( node_pid ) . copied ();
+    let num_containers : Option<usize> = rel_data . num_containers . get ( node_pid ) . copied ();
+    let num_contents : Option<usize> = rel_data . num_contents . get ( node_pid ) . copied ();
+    let num_links_in : Option<usize> = rel_data . num_links_in . get ( node_pid ) . copied ();
     let (parent_is_container, parent_is_content) : (bool, bool) =
       if let Some ( parent_skgid ) = parent_pid {
         ( rel_data . content_to_containers
@@ -113,12 +114,13 @@ fn set_metadata_relationships_in_node_recursive (
                        contents . contains ( parent_skgid )) )
       } else { (true, false) }; // default if no parent
     let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
-    let org = &mut node_mut . value () .orgnode;
-    org . set_num_containers ( num_containers );
-    org . set_num_contents ( num_contents );
-    org . set_num_links_in ( num_links_in );
-    org . set_parent_is_container ( parent_is_container );
-    org . set_parent_is_content ( parent_is_content ); }
+    { // mutations
+      let org : &mut OrgNode = &mut node_mut . value () .orgnode;
+      org . set_num_containers ( num_containers );
+      org . set_num_contents ( num_contents );
+      org . set_num_links_in ( num_links_in );
+      org . set_parent_is_container ( parent_is_container );
+      org . set_parent_is_content ( parent_is_content ); }}
   { // recurse
     let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()

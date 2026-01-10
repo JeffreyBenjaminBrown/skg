@@ -121,7 +121,7 @@ fn format_buffer_validation_error (
               id.0, source_list) },
     BufferValidationError::RootWithoutSource(node) => {
       format!("Root node (top-level in forest) must have a source:\n- Title: {}\n- ID: {:?}\n- Please add (source nickname) to the metadata.\n",
-              node.title(), node.id()) },
+              node.title(), node.id_opt()) },
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
               id.0, source) },
@@ -133,7 +133,7 @@ fn format_buffer_validation_error (
               id.0, source) },
     BufferValidationError::IndefinitiveWithEditRequest(node) => {
       format!("Indefinitive node cannot have an edit request:\n- Title: {}\n- ID: {:?}\n- Indefinitive nodes represent views and should not be edited or deleted.\n",
-              node.title(), node.id()) },
+              node.title(), node.id_opt()) },
     BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) => {
       format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
               id.0) },

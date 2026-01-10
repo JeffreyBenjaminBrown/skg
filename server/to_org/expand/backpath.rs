@@ -16,7 +16,7 @@ use crate::dbs::typedb::search::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    OrgNode, EffectOnParent, mk_indefinitive_orgnode };
+    OrgNode, OrgNodeKind, EffectOnParent, mk_indefinitive_orgnode };
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -213,15 +213,16 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid
     ). await ?;
-  let effect = EffectOnParent::ParentIgnores;
-  let id = child_orgnode . id ()
-    . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no ID" ) ?
-    . clone ();
-  let source = child_orgnode . source ()
-    . ok_or ( "prepend_indefinitive_child_with_parent_ignores: node has no source" ) ?
-    . clone ();
+  let (id, source, title) : (ID, String, String)
+  = match &child_orgnode.kind
+  { OrgNodeKind::True(t) => (
+      t . id_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores: node has no ID")? . clone(),
+      t . source_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores: node has no source")? . clone(),
+      t . title . clone() ),
+    OrgNodeKind::Scaff(_) =>
+      return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
   let orgnode = mk_indefinitive_orgnode (
-    id, source, child_orgnode . title () . to_string (), effect );
+    id, source, title, EffectOnParent::ParentIgnores );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode : None,
@@ -235,12 +236,11 @@ fn find_child_by_id (
   parent_treeid : ego_tree::NodeId,
   target_skgid  : & ID,
 ) -> Option < ego_tree::NodeId > {
-  for child in tree . get ( parent_treeid ) . unwrap () . children () {
-    if let Some ( child_skgpid ) =
-      child . value () . orgnode . id () {
-        if child_skgpid == target_skgid {
-          return Some ( child . id () ); }} }
-  None }
+  let singleton : HashSet<ID> =
+    std::iter::once( target_skgid.clone() )
+    . collect();
+  find_children_by_ids( tree, parent_treeid, &singleton)
+    . remove(target_skgid) }
 
 /// Find child nodes by their IDs.
 /// Returns a map from ID to NodeId for children that were found.
@@ -250,11 +250,10 @@ fn find_children_by_ids (
   parent_treeid : ego_tree::NodeId,
   target_skgids : & HashSet < ID >,
 ) -> HashMap < ID, ego_tree::NodeId > {
-  let mut result : HashMap < ID, ego_tree::NodeId > =
-    HashMap::new ();
-  for child in tree . get ( parent_treeid ) . unwrap () . children () {
-    if let Some ( child_skgpid )
-      = child . value () . orgnode . id ()
-    { if target_skgids . contains ( child_skgpid )
-      { result . insert ( child_skgpid . clone (), child . id () ); }} }
+  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
+  for child in tree.get(parent_treeid).unwrap().children() {
+    if let OrgNodeKind::True(t) = &child.value().orgnode.kind {
+      if let Some(child_id) = &t.id_opt {
+        if target_skgids.contains(child_id) {
+          result.insert(child_id.clone(), child.id()); }}}}
   result }

@@ -4,7 +4,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{
-    OrgNode, Scaffold, EffectOnParent,
+    OrgNode, OrgNodeKind, Scaffold, EffectOnParent,
     mk_indefinitive_orgnode,
     orgnode_from_scaffold };
 use crate::types::skgnode::SkgNode;
@@ -96,23 +96,26 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
-    node_ref . value () .orgnode . id () . cloned ()
-    . ok_or ( "Subscribee has no ID" ) ?;
+    match &node_ref . value () .orgnode . kind {
+      OrgNodeKind::True ( t ) => t . id_opt . clone () . expect (
+        "Subscribee should have an ID." ),
+      OrgNodeKind::Scaff ( _ ) => return Err (
+        "Subscribee is not a true node." . into() ) };
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
   if ! parent_ref . value () .orgnode
       . is_scaffold ( &Scaffold::SubscribeeCol ) {
-      return Err ( "Subscribee's parent is not a SubscribeeCol" .
-                    into () ); }
+    return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                 into () ); }
   let grandparent_ref : NodeRef < NodePair > =
     parent_ref . parent ()
     . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
   let skgnode : &SkgNode =
     grandparent_ref . value () . mskgnode . as_ref ()
     . ok_or ( "Subscriber has no SkgNode" ) ?;
-  Ok ( ( subscribee_pid,
-         skgnode . ids [ 0 ] . clone () ) ) }
+  Ok (( subscribee_pid,
+        skgnode . ids[0] . clone() )) }
 
 pub fn insert_scaffold_as_child (
   tree          : &mut PairTree,
@@ -120,7 +123,8 @@ pub fn insert_scaffold_as_child (
   scaffold_kind : Scaffold,
   prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode = orgnode_from_scaffold ( scaffold_kind );
+  let orgnode : OrgNode =
+    orgnode_from_scaffold ( scaffold_kind );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -142,14 +146,19 @@ pub async fn append_indefinitive_from_disk_as_child (
   let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id ) . await ?;
-  let id = content_orgnode . id ()
-    . ok_or ( "append_indefinitive_from_disk_as_child: node has no ID" ) ?
-    . clone ();
-  let source = content_orgnode . source ()
-    . ok_or ( "append_indefinitive_from_disk_as_child: node has no source" ) ?
-    . clone ();
-  let orgnode = mk_indefinitive_orgnode (
-    id, source, content_orgnode . title () . to_string (), effect );
+  let (id, source, title) : (ID, String, String)
+  = match &content_orgnode.kind
+  { OrgNodeKind::True(t) => (
+      t.id_opt.as_ref()
+        .ok_or("append_indefinitive_from_disk_as_child: node has no ID")?
+        .clone(),
+      t.source_opt.as_ref()
+        .ok_or("append_indefinitive_from_disk_as_child: node has no source")?
+        .clone(),
+      t.title.clone() ),
+    OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
+  let orgnode : OrgNode = mk_indefinitive_orgnode (
+    id, source, title, effect );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -170,15 +179,14 @@ pub async fn ancestor_skgnode_from_disk (
   let ancestor_skgid : ID =
     read_at_ancestor_in_tree(
       tree, treeid, generation,
-      |np| np.orgnode.id().cloned() )
-    . map_err( |e| -> Box<dyn Error> { e . into () })?
-    . ok_or_else(
-      || -> Box<dyn Error> {
-        "Ancestor node has no ID" . into () })?;
-  Ok ( { let skgnode : SkgNode =
-           skgnode_from_id(
-             config, driver, &ancestor_skgid ) . await?;
-         skgnode } ) }
+      |np| match &np.orgnode.kind {
+        OrgNodeKind::True(t) => t.id_opt.clone()
+          .ok_or("Ancestor TrueNode has no ID"),
+        OrgNodeKind::Scaff(_) => Err(
+          "Ancestor  is a Scaffold, not a TrueNode") } )??;
+  let skgnode : SkgNode =
+    skgnode_from_id( config, driver, &ancestor_skgid ) . await?;
+  Ok ( skgnode ) }
 
 /// Collect titles from Alias children of an AliasCol node (for PairTree).
 /// Duplicates are removed (preserving order of first occurrence).
@@ -192,15 +200,15 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
   let aliascol_ref : NodeRef < NodePair > =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
-  for child in aliascol_ref . children () {
-    let child_new = &child . value () .orgnode;
-    if ! child_new . is_scaffold ( &Scaffold::Alias ( String::new () ) ) {
+  for child_ref in aliascol_ref . children() {
+    let child : &OrgNode = &child_ref . value() . orgnode;
+    if ! child . is_scaffold ( &Scaffold::Alias ( String::new () ) ) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",
-                  child_new . kind )
+                  child . kind )
         . into () ); }
     aliases . push (
-      child_new . title () . to_string () ); }
+      child . title () . to_string () ); }
   Ok ( dedup_vector ( aliases ) ) }
 
 /// Collect aliases for a node (for Tree<OrgNode>):

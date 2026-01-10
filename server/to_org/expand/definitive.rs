@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, EffectOnParent, mk_orgnode };
+    OrgNode, OrgNodeKind, TrueNode, EffectOnParent, mk_orgnode };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -160,7 +160,9 @@ fn indefinitize_content_subtree (
   let pair : &NodePair =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
-    pair .orgnode . id () . cloned ();
+    match &pair .orgnode . kind {
+      OrgNodeKind::True ( t ) => t . id_opt . clone (),
+      OrgNodeKind::Scaff ( _ ) => None };
   let content_child_treeids : Vec < NodeId > =
     node_ref . children ()
     . filter ( |c| c . value () .orgnode
@@ -266,37 +268,34 @@ fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, source, effect, indefinitive, edit_request, view_requests) = {
-    // Extract values to preserve from existing orgnode
-    let node_ref : NodeRef < NodePair > =
-      tree . get ( node_id )
-      . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node not found" ) ?;
-    let org = &node_ref . value () .orgnode;
-    let pid : ID = org . id () . cloned ()
-      . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID" ) ?;
-    let source : String = org . source () . cloned ()
-      . ok_or ( "rebuild_pair_from_disk_mostly_clobbering_the_org: node has no source" ) ?;
-    let effect : EffectOnParent = match &org . kind {
-      OrgNodeKind::True ( t ) => t . effect_on_parent . clone (),
-      OrgNodeKind::Scaff ( _ ) => return Err (
-        "rebuild_pair_from_disk_mostly_clobbering_the_org: node is Scaffold, not TrueNode" . into () ),
-    };
-    ( pid,
-      source,
-      effect,
-      org . is_indefinitive (),
-      org . edit_request () . cloned (),
-      org . view_requests () . cloned () . unwrap_or_default () ) };
-  let (skgnode, disk_orgnode) : (SkgNode, OrgNode) =
-    skgnode_and_orgnode_from_pid_and_source (
-      config, &pid, &source ) ?;
-  let orgnode = mk_orgnode (
-    pid, source . to_string (),
-    disk_orgnode . title () . to_string (),
-    disk_orgnode . body () . cloned (),
-    effect, indefinitive, edit_request, view_requests );
-  write_at_node_in_tree ( // replace it
+  let (pid, src, effect, indef, edit_request, view_requests) = {
+    // values to preserve from existing orgnode
+    let node_ref : NodeRef<NodePair> = tree.get(node_id)
+      .ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node not found")?;
+    let org : &OrgNode = &node_ref.value().orgnode;
+    let t : &TrueNode = match &org.kind {
+      OrgNodeKind::True(t) => t,
+      OrgNodeKind::Scaff(_) => return Err( "rebuild_pair_from_disk_mostly_clobbering_the_org: node is Scaffold, not TrueNode" . into( )), };
+    let pid : ID = t . id_opt . clone() . ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID")?;
+    let src : String = t . source_opt . clone() . ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node has no source")?;
+    (pid, src,
+     t.effect_on_parent.clone(),
+     t.indefinitive,
+     t.edit_request.clone(),
+     t.view_requests.clone()) };
+  let (skgnode, disk_orgnode) : (SkgNode, OrgNode) = // from disk
+    skgnode_and_orgnode_from_pid_and_source(config, &pid, &src)?;
+  let disk_t : &TrueNode = match &disk_orgnode.kind {
+    OrgNodeKind::True(t) => t,
+    OrgNodeKind::Scaff(_) => unreachable!(
+      "disk orgnode is always a TrueNode"), };
+  let orgnode : OrgNode = mk_orgnode(
+    pid, src,
+    disk_t . title . clone(),
+    disk_t . body . clone(),
+    effect, indef, edit_request, view_requests);
+  write_at_node_in_tree(
     tree, node_id,
-    |np| * np = NodePair { mskgnode : Some ( skgnode ),
-                           orgnode  : orgnode } ) ?;
+    |np| *np = NodePair { mskgnode: Some(skgnode),
+                          orgnode })?;
   Ok (( )) }

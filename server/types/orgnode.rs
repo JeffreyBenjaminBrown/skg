@@ -33,8 +33,8 @@ pub enum OrgNodeKind {
 pub struct TrueNode {
   pub title            : String,
   pub body             : Option < String >,
-  pub id               : Option < ID >,
-  pub source           : Option < String >,
+  pub id_opt           : Option < ID >,
+  pub source_opt       : Option < String >,
   pub effect_on_parent : EffectOnParent,
   pub indefinitive     : bool,
   pub cycle            : bool,
@@ -123,15 +123,14 @@ impl Scaffold {
     }} }
 
 impl OrgNode {
-  /// Returns the ID if this is a TrueNode with an ID, None otherwise.
-  pub fn id ( &self ) -> Option < &ID > {
+  /// PITFALL: Don't let this convince you a Scaff can have an ID.
+  pub fn id_opt ( &self ) -> Option<&ID> {
     match &self . kind {
-      OrgNodeKind::True ( t ) => t . id . as_ref (),
+      OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
     }}
 
-  /// Returns the title. For TrueNode, returns the title field.
-  /// For Scaffold, returns the scaffold's title.
+  /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title ( &self ) -> &str {
     match &self . kind {
       OrgNodeKind::True ( t ) => &t . title,
@@ -205,7 +204,7 @@ impl OrgNode {
   /// Set the source. No-op for Scaffolds.
   pub fn set_source ( &mut self, source : String ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . source = Some ( source );
+      t . source_opt = Some ( source );
     }}
 
   /// Set the cycle flag. No-op for Scaffolds.
@@ -224,29 +223,7 @@ impl OrgNode {
   /// Check if source is set. Returns false for Scaffolds.
   pub fn has_source ( &self ) -> bool {
     match &self . kind {
-      OrgNodeKind::True ( t ) => t . source . is_some (),
-      OrgNodeKind::Scaff ( _ ) => false,
-    }}
-
-  /// Get the source if this is a TrueNode. Returns None for Scaffolds.
-  pub fn source ( &self ) -> Option < &String > {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . source . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
-    }}
-
-  /// Get the focused flag.
-  pub fn focused ( &self ) -> bool {
-    self . focused }
-
-  /// Get the folded flag.
-  pub fn folded ( &self ) -> bool {
-    self . folded }
-
-  /// Get the cycle flag. Returns false for Scaffolds.
-  pub fn cycle ( &self ) -> bool {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . cycle,
+      OrgNodeKind::True ( t ) => t . source_opt . is_some (),
       OrgNodeKind::Scaff ( _ ) => false,
     }}
 
@@ -318,10 +295,10 @@ impl OrgNode {
   /// Set the id. No-op for Scaffolds.
   pub fn set_id ( &mut self, id : Option < ID > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . id = id;
+      t . id_opt = id;
     }}
 
-  /// Get the body if this is a TrueNode. Returns None for Scaffolds.
+  /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . body . as_ref (),
@@ -400,8 +377,8 @@ impl Default for TrueNode {
     TrueNode {
       title            : String::new (),
       body             : None,
-      id               : None,
-      source           : None,
+      id_opt           : None,
+      source_opt       : None,
       effect_on_parent : EffectOnParent::Content,
       indefinitive     : false,
       cycle            : false,
@@ -434,8 +411,8 @@ pub fn mk_definitive_orgnode (
     kind    : OrgNodeKind::True ( TrueNode {
       title,
       body,
-      id               : Some ( id ),
-      source           : Some ( source ),
+      id_opt           : Some ( id ),
+      source_opt       : Some ( source ),
       effect_on_parent : EffectOnParent::Content,
       indefinitive     : false,
       cycle            : false,
@@ -460,8 +437,8 @@ pub fn mk_indefinitive_orgnode (
     kind    : OrgNodeKind::True ( TrueNode {
       title,
       body             : None,
-      id               : Some ( id ),
-      source           : Some ( source ),
+      id_opt           : Some ( id ),
+      source_opt       : Some ( source ),
       effect_on_parent,
       indefinitive     : true,
       cycle            : false,
@@ -491,8 +468,8 @@ pub fn mk_orgnode (
     kind    : OrgNodeKind::True ( TrueNode {
       title,
       body,
-      id               : Some ( id ),
-      source           : Some ( source ),
+      id_opt           : Some ( id ),
+      source_opt       : Some ( source ),
       effect_on_parent,
       indefinitive,
       cycle            : false,

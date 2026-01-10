@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::OrgNode;
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
@@ -77,15 +77,15 @@ fn traverse_forest_and_collect(
   let mut id_to_sources
     : HashMap<ID, HashSet<SourceNickname>>
     = HashMap::new();
-  traverse_node_recursively_and_collect(
+  traverse_branch_and_collect(
     forest.root(),
     &mut id_toDelete_instructions,
     &mut id_to_definer_count,
     &mut id_to_sources);
   (id_toDelete_instructions, id_to_definer_count, id_to_sources) }
 
-/// Traverse a single node and its children to collect delete instructions, defining containers, and sources
-fn traverse_node_recursively_and_collect(
+/// Collect delete instructions, defining containers, and sources.
+fn traverse_branch_and_collect(
   node_ref: NodeRef<OrgNode>,
   id_toDelete_instructions: &mut
     HashMap<ID, HashSet<WhetherToDelete>>,
@@ -94,31 +94,31 @@ fn traverse_node_recursively_and_collect(
   id_to_sources: &mut
     HashMap<ID, HashSet<SourceNickname>>
 ) {
-  let orgnode: &OrgNode = node_ref.value();
-  if let Some(id) = orgnode.id() {
-    let delete_instruction: WhetherToDelete =
-      if matches!(orgnode.edit_request(),
-                  Some(EditRequest::Delete)) {
-        WhetherToDelete::Delete
-      } else { WhetherToDelete::DoNotDelete };
-    id_toDelete_instructions // record delete_instruction
-      . entry(id.clone())
-      . or_insert_with(HashSet::new)
-      . insert(delete_instruction);
-    if !orgnode.is_indefinitive() {
-      // Increment the count for this defining container
-      *id_defining_count . entry (id.clone())
-        . or_insert(0) += 1; }
-    if let Some(source_str) = orgnode.source() {
-      // Collect source for this ID
-      let source : SourceNickname =
-        SourceNickname::from(source_str.as_str());
-      id_to_sources
+  let orgnode : &OrgNode = node_ref.value();
+  if let OrgNodeKind::True(t) = &orgnode.kind {
+    if let Some(id) = &t.id_opt {
+      let delete_instruction : WhetherToDelete =
+        if matches!(t.edit_request, Some(EditRequest::Delete)) {
+          WhetherToDelete::Delete
+        } else { WhetherToDelete::DoNotDelete };
+      id_toDelete_instructions // record delete_instruction
         . entry(id.clone())
         . or_insert_with(HashSet::new)
-        . insert(source); }}
+        . insert(delete_instruction);
+      if ! t.indefinitive {
+        // Increment the count for this defining container
+        *id_defining_count . entry(id.clone())
+          . or_insert(0) += 1; }
+      if let Some(source_str) = &t.source_opt {
+        // Collect source for this ID
+        let source : SourceNickname =
+          SourceNickname::from(source_str.as_str());
+        id_to_sources
+          . entry(id.clone())
+          . or_insert_with(HashSet::new)
+          . insert(source); }}}
   for child in node_ref.children() { // recurse
-    traverse_node_recursively_and_collect(
+    traverse_branch_and_collect(
       child,
       id_toDelete_instructions,
       id_defining_count,
