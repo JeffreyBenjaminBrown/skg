@@ -5,7 +5,7 @@ use crate::dbs::typedb::search::count_relationships::{
   count_link_sources};
 use crate::to_org::util::collect_ids_from_pair_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::OrgNode;
+use crate::types::orgnode::OrgNodeKind;
 use crate::types::tree::PairTree;
 
 use std::collections::{HashSet, HashMap};
@@ -114,13 +114,12 @@ fn set_metadata_relationships_in_node_recursive (
                        contents . contains ( parent_skgid )) )
       } else { (true, false) }; // default if no parent
     let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
-    { // mutations
-      let org : &mut OrgNode = &mut node_mut . value () .orgnode;
-      org . set_num_containers ( num_containers );
-      org . set_num_contents ( num_contents );
-      org . set_num_links_in ( num_links_in );
-      org . set_parent_is_container ( parent_is_container );
-      org . set_parent_is_content ( parent_is_content ); }}
+    if let OrgNodeKind::True ( t ) = &mut node_mut . value () .orgnode . kind {
+      t . relationships . numContainers = num_containers;
+      t . relationships . numContents = num_contents;
+      t . relationships . numLinksIn = num_links_in;
+      t . relationships . parentIsContainer = parent_is_container;
+      t . relationships . parentIsContent = parent_is_content; }}
   { // recurse
     let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()

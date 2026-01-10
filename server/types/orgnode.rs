@@ -170,36 +170,6 @@ impl OrgNode {
       OrgNodeKind::Scaff ( _ ) => None,
     }}
 
-  /// Set numContainers in relationships. No-op for Scaffolds.
-  pub fn set_num_containers ( &mut self, value : Option < usize > ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . relationships . numContainers = value;
-    }}
-
-  /// Set numContents in relationships. No-op for Scaffolds.
-  pub fn set_num_contents ( &mut self, value : Option < usize > ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . relationships . numContents = value;
-    }}
-
-  /// Set numLinksIn in relationships. No-op for Scaffolds.
-  pub fn set_num_links_in ( &mut self, value : Option < usize > ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . relationships . numLinksIn = value;
-    }}
-
-  /// Set parentIsContainer in relationships. No-op for Scaffolds.
-  pub fn set_parent_is_container ( &mut self, value : bool ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . relationships . parentIsContainer = value;
-    }}
-
-  /// Set parentIsContent in relationships. No-op for Scaffolds.
-  pub fn set_parent_is_content ( &mut self, value : bool ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . relationships . parentIsContent = value;
-    }}
-
   /// Set effect_on_parent. No-op for Scaffolds.
   pub fn set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {

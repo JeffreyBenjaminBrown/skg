@@ -17,12 +17,6 @@ server/org_to_text.rs
 ***** is_indefinitive() -- used maybe 13 times
 ***** view_requests_mut
 ***** set_indefinitive
-***** set_edit_request
-***** All these at once:
-      pub fn set_num_containers ( &mut self, value : Option < usize > )      pub fn set_num_contents ( &mut self, value : Option < usize > ) {
-      pub fn set_num_links_in ( &mut self, value : Option < usize > ) {
-      pub fn set_parent_is_container ( &mut self, value : bool ) {
-      pub fn set_parent_is_content ( &mut self, value : bool ) {
 ***** set_effect_on_parent
 ***** set_id
 *** TrueNode should bundle the id and source in a single Opt
