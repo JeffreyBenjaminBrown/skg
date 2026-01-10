@@ -198,13 +198,6 @@ impl OrgNode {
       OrgNodeKind::Scaff ( _ ) => None,
     }}
 
-  /// Check if source is set. Returns false for Scaffolds.
-  pub fn has_source ( &self ) -> bool {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . source_opt . is_some (),
-      OrgNodeKind::Scaff ( _ ) => false,
-    }}
-
   /// Get the view_requests if this is a TrueNode. Returns None for Scaffolds.
   pub fn view_requests ( &self ) -> Option < &HashSet < ViewRequest > > {
     match &self . kind {

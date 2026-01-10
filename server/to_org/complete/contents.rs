@@ -377,20 +377,21 @@ pub async fn ensure_skgnode (
       |np| np . mskgnode = Some ( skgnode ) ) ?; }
   Ok (( )) }
 
-/// Ensure a node in a PairTree has a source in its metadata.
-/// If the node already has Some(source), does nothing.
-/// Otherwise fetches from TypeDB and stores it.
+/// Noop for Scaffolds. Otherwise, ensures the node has a source.
+/// If needed, fetches the data from TypeDB.
 pub async fn ensure_source (
   tree    : &mut PairTree,
   node_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let has_source : bool =
+  let needs_source : bool =
     read_at_node_in_tree (
       tree, node_id,
-      |np| np . orgnode . has_source () ) ?;
-  if ! has_source {
+      |np| matches! ( &np . orgnode . kind,
+                      OrgNodeKind::True(t)
+                      if t . source_opt . is_none () )) ?;
+  if needs_source {
     let node_pid : ID =
       get_pid_in_pairtree ( tree, node_id ) ?;
     let (_pid, source) : (ID, String) =
