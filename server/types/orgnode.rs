@@ -170,12 +170,6 @@ impl OrgNode {
       OrgNodeKind::Scaff ( _ ) => None,
     }}
 
-  /// Set effect_on_parent. No-op for Scaffolds.
-  pub fn set_effect_on_parent ( &mut self, effect : EffectOnParent ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . effect_on_parent = effect;
-    }}
-
   /// Convert a TrueNode to an Alias scaffold.
   /// Uses the TrueNode's title as the alias text.
   /// No-op if already a Scaffold.

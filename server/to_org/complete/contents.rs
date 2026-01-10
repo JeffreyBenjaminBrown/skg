@@ -255,11 +255,10 @@ pub async fn completeDefinitiveOrgnode (
       tree . get_mut ( *invalid_treeid )
       . ok_or ( "Invalid content child not found" ) ?;
     let pair : &mut NodePair = child_mut . value ();
-    pair . orgnode . set_effect_on_parent (
-      EffectOnParent::ParentIgnores );
-    let child_pid : ID = match &pair.orgnode.kind {
-      OrgNodeKind::True(t) => t.id_opt.clone(),
-      OrgNodeKind::Scaff(_) => None } . unwrap ();
+    let OrgNodeKind::True(t) = &mut pair . orgnode . kind
+      else { return Err ( "Not-really-content child is not a TrueNode" . into () ) };
+    t . effect_on_parent = EffectOnParent::ParentIgnores;
+    let child_pid : ID = t . id_opt . clone () . unwrap ();
     content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
 
