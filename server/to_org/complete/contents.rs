@@ -75,12 +75,15 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
   Box::pin(async move {
     let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode.is_scaffold ( &Scaffold::AliasCol ) })?;
+        matches!(&node.orgnode.kind,
+                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })?;
     let is_col_scaffold: bool =
       read_at_node_in_tree(tree, node_id, |node| {
-        node.orgnode.is_scaffold ( &Scaffold::SubscribeeCol )
-        || node.orgnode.is_scaffold ( &Scaffold::HiddenOutsideOfSubscribeeCol )
-        || node.orgnode.is_scaffold ( &Scaffold::HiddenInSubscribeeCol ) })?;
+        matches!( &node.orgnode.kind,
+                  OrgNodeKind::Scaff(
+                    Scaffold::SubscribeeCol |
+                    Scaffold::HiddenOutsideOfSubscribeeCol |
+                    Scaffold::HiddenInSubscribeeCol )) } )?;
     if is_alias_col {
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;

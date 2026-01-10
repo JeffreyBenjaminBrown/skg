@@ -53,8 +53,8 @@ fn is_forest_root (
 ) -> bool {
   tree . get ( node_id )
     . map ( |node_ref|
-             node_ref . value () . orgnode
-             . is_scaffold ( &Scaffold::ForestRoot ) )
+             matches! ( &node_ref . value () . orgnode . kind,
+                        OrgNodeKind::Scaff ( Scaffold::ForestRoot ) ) )
     . unwrap_or ( false ) }
 
 

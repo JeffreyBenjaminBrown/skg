@@ -76,7 +76,8 @@ fn add_missing_info_dfs (
         node_ref . tree (), treeid, 1,
         |orgnode| {
           let is_aliascol : bool =
-            orgnode . is_scaffold ( &Scaffold::AliasCol );
+            matches! ( &orgnode . kind,
+              OrgNodeKind::Scaff( Scaffold::AliasCol ));
           let parent_source : Option < String > =
             match &orgnode . kind
             { OrgNodeKind::True ( t ) => t . source_opt . clone (),

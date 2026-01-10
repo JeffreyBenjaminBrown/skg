@@ -114,8 +114,10 @@ fn validate_node_and_children (
       { errors.push(
           BufferValidationError::Child_of_AliasCol_with_ID(
             orgnode.clone() )); }
-      { let aliascol_count : usize = node_ref.children()
-          .filter(|c| c.value().is_scaffold(&Scaffold::AliasCol))
+      { let aliascol_count : usize =
+          node_ref.children() .filter(
+            |c| matches!( &c.value().kind,
+                          OrgNodeKind::Scaff(Scaffold::AliasCol)) )
           .count();
         if aliascol_count > 1
         { errors.push(

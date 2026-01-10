@@ -33,7 +33,9 @@ pub fn unique_scaffold_child (
     tree.get(node_id)
     .ok_or("unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().orgnode.is_scaffold ( scaffold_kind ))
+    .filter(|c| matches!(&c.value().orgnode.kind,
+                         OrgNodeKind::Scaff(s)
+                         if s.matches_kind(scaffold_kind)) )
     .map(|c| c.id())
     .collect();
   match matches.len() {
@@ -57,7 +59,9 @@ pub fn unique_orgnode_scaffold_child (
     tree . get(node_id) . ok_or(
       "unique_orgnode_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| c.value().is_scaffold ( scaffold_kind ))
+    .filter(|c| matches!(&c.value().kind,
+                         OrgNodeKind::Scaff(s)
+                         if s.matches_kind(scaffold_kind)) )
     .map(|c| c.id())
     .collect();
   match matches.len() {
@@ -104,8 +108,8 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   let parent_ref : NodeRef < NodePair > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if ! parent_ref . value () .orgnode
-      . is_scaffold ( &Scaffold::SubscribeeCol ) {
+  if ! matches! ( &parent_ref . value () . orgnode . kind,
+                  OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )) {
     return Err ( "Subscribee's parent is not a SubscribeeCol" .
                  into () ); }
   let grandparent_ref : NodeRef < NodePair > =
@@ -202,7 +206,8 @@ pub fn collect_child_aliases_at_nodepair_aliascol (
     . ok_or ( "AliasCol node not found" ) ?;
   for child_ref in aliascol_ref . children() {
     let child : &OrgNode = &child_ref . value() . orgnode;
-    if ! child . is_scaffold ( &Scaffold::Alias ( String::new () ) ) {
+    if ! matches! ( &child . kind,
+                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",
                   child . kind )
@@ -234,8 +239,8 @@ pub fn collect_grandchild_aliases_for_orgnode (
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in col_ref.children() {
           { // check for invalid state
-            if ! alias_child.value().is_scaffold(
-                   &Scaffold::Alias(String::new())) {
+            if ! matches!(&alias_child.value().kind,
+                          OrgNodeKind::Scaff(Scaffold::Alias(_))) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child.value().kind )); }}

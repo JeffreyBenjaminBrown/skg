@@ -78,6 +78,15 @@ pub enum Scaffold {
   SubscribeeCol, // Collects subscribees for its parent.
 }
 
+impl Scaffold {
+  /// Compare scaffold kinds. For Alias, compares variant only (ignoring string content).
+  pub fn matches_kind ( &self, other : &Scaffold ) -> bool {
+    match ( self, other ) {
+      ( Scaffold::Alias ( _ ), Scaffold::Alias ( _ ) ) => true,
+      _ => std::mem::discriminant ( self )
+           == std::mem::discriminant ( other ),
+    }} }
+
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,19 +144,6 @@ impl OrgNode {
     match &self . kind {
       OrgNodeKind::True ( t ) => &t . title,
       OrgNodeKind::Scaff ( s ) => s . title (),
-    }}
-
-  /// Returns true if this is a Scaffold with the given kind.
-  pub fn is_scaffold ( &self, scaffold : &Scaffold ) -> bool {
-    match &self . kind {
-      OrgNodeKind::Scaff ( s ) => {
-        // For Alias, we compare the variant, not the string content
-        match ( s, scaffold ) {
-          ( Scaffold::Alias ( _ ), Scaffold::Alias ( _ ) ) => true,
-          _ => std::mem::discriminant ( s )
-          == std::mem::discriminant ( scaffold ),
-        }}
-      OrgNodeKind::True ( _ ) => false,
     }}
 
   /// Returns true if this is a TrueNode and is indefinitive.
