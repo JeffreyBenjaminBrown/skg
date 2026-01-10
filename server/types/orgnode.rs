@@ -157,21 +157,6 @@ impl OrgNode {
       OrgNodeKind::True ( _ ) => false,
     }}
 
-  /// Returns true if this is a TrueNode (not a Scaffold).
-  pub fn is_true_node ( &self ) -> bool {
-    matches! ( &self . kind, OrgNodeKind::True ( _ ) ) }
-
-  /// Returns true if this is a Scaffold (not a TrueNode).
-  pub fn is_scaffold_any ( &self ) -> bool {
-    matches! ( &self . kind, OrgNodeKind::Scaff ( _ ) ) }
-
-  /// Returns the Scaffold if this is a Scaffold, None otherwise.
-  pub fn scaffold ( &self ) -> Option < &Scaffold > {
-    match &self . kind {
-      OrgNodeKind::Scaff ( s ) => Some ( s ),
-      OrgNodeKind::True ( _ ) => None,
-    }}
-
   /// Returns true if this is a TrueNode and is indefinitive.
   pub fn is_indefinitive ( &self ) -> bool {
     match &self . kind {

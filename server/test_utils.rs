@@ -296,7 +296,7 @@ fn compare_two_orgnode_branches_recursively_modulo_id (
   let n1 : &OrgNode = node1.value();
   let n2 : &OrgNode = node2.value();
   match (&n1.kind, &n2.kind) {
-    (OrgNodeKind::True(t1), OrgNodeKind::True(t2)) => {
+    (OrgNodeKind::True(_), OrgNodeKind::True(t2)) => {
       // Copy the ID from one to the other, then compare.
       let mut n1_copy : OrgNode = n1.clone();
       if let OrgNodeKind::True(t) = &mut n1_copy.kind {
