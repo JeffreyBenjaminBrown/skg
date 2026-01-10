@@ -154,14 +154,14 @@ impl OrgNode {
     }}
 
   /// Returns true if this is a TrueNode and is indefinitive.
-  pub fn is_indefinitive ( &self ) -> bool {
+  pub fn is_indefinitive_truenode ( &self ) -> bool {
     match &self . kind {
       OrgNodeKind::True ( t ) => t . indefinitive,
       OrgNodeKind::Scaff ( _ ) => false,
     }}
 
   /// Set the indefinitive flag. No-op for Scaffolds.
-  pub fn set_indefinitive ( &mut self, value : bool ) {
+  pub fn set_indefinitive_if_truenode ( &mut self, value : bool ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {
       t . indefinitive = value;
     }}

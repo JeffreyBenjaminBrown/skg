@@ -387,7 +387,7 @@ async fn test_recursive_document (
     "First child should have title 'b'" );
   assert_eq! ( b_node.body(), Some ( &"b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_node.is_indefinitive(),
+  assert! ( ! b_node.is_indefinitive_truenode(),
     "First occurrence of 'b' should not be marked as indefinitive" );
 
   // "b" should have 1 child: "c"
@@ -411,7 +411,7 @@ async fn test_recursive_document (
     "Child of 'c' should have id 'b'" );
   assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat.is_indefinitive(),
+  assert! ( b_repeat.is_indefinitive_truenode(),
     "Second occurrence of 'b' should be marked as indefinitive" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)

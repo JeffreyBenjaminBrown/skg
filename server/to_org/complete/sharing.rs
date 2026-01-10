@@ -31,7 +31,7 @@ pub async fn maybe_add_subscribeeCol_branch (
     let is_indefinitive : bool =
       read_at_node_in_tree (
         tree, node_id,
-        |np| np . orgnode . is_indefinitive () ) ?;
+        |np| np . orgnode . is_indefinitive_truenode () ) ?;
     if is_indefinitive { return Ok (( )); }}
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.

@@ -152,10 +152,10 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   if visited . contains_key ( &pid ) {
     // Mark as indefinitive (it's a repeat).
     write_at_node_in_tree ( tree, node_id, |np| {
-      np . orgnode . set_indefinitive ( true ); } ) ?; }
+      np . orgnode . set_indefinitive_if_truenode ( true ); } ) ?; }
   let is_indefinitive : bool =
     read_at_node_in_tree ( tree, node_id, |np|
-      np . orgnode . is_indefinitive () ) ?;
+      np . orgnode . is_indefinitive_truenode () ) ?;
   if is_indefinitive {
     clobberIndefinitiveOrgnode ( tree, node_id ) ?;
   } else {
@@ -324,7 +324,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid,
     |nodepair| {
-      if nodepair . orgnode . is_indefinitive () {
+      if nodepair . orgnode . is_indefinitive_truenode () {
         return Vec::new (); }
       match & nodepair . mskgnode {
         Some ( skgnode ) =>
@@ -365,12 +365,13 @@ pub(super) fn nodes_after_in_generation (
 
 /// Check if a node in a PairTree is marked indefinitive.
 /// Returns an error if the node is not found.
+/// TODO ? Is this necessary?
 pub(super) fn is_indefinitive (
   tree    : &PairTree,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid, |np|
-    np . orgnode . is_indefinitive () )
+    np . orgnode . is_indefinitive_truenode () )
     . map_err ( |e| e . into () ) }
 
 /// Collect all child tree NodeIds from a node in a PairTree.

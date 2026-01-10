@@ -38,7 +38,7 @@ fn naive_saveinstructions_from_tree(
   let (node_kind, is_indefinitive): (OrgNodeKind, bool) =
     read_at_node_in_tree(tree, node_id, |node| {
       ( node.kind.clone(),
-        node.is_indefinitive() ) } )?;
+        node.is_indefinitive_truenode() ) } )?;
   if matches!(&node_kind, OrgNodeKind::Scaff(s)
               if *s == Scaffold::ForestRoot)
   { // for ForestRoot, just recurse to children
