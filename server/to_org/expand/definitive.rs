@@ -86,7 +86,7 @@ async fn execute_definitive_view_request (
   ensure_source (
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
-    rebuild_pair_from_disk_mostly_clobbering_the_org (
+    from_disk_replace_title_body_and_skgnode (
       // preserves relevant orgnode fields
       forest, node_id, config ) ?;
     write_at_node_in_tree (
@@ -267,7 +267,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
 /// Fetches SkgNode from disk.
 /// Updates NodePair's title, body, mskgnode.
 /// Preserves all other OrgNode data.
-fn rebuild_pair_from_disk_mostly_clobbering_the_org (
+fn from_disk_replace_title_body_and_skgnode (
   tree    : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,

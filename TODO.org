@@ -10,7 +10,7 @@ server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
 *** ONGOING seems baroque
-fn rebuild_pair_from_disk_mostly_clobbering_the_org (
+fn from_disk_replace_title_body_and_skgnode (
 *** validate_node_and_children
 **** Rather than two bool arguments,
      take a single ScaffoldKind argument.
