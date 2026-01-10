@@ -198,13 +198,6 @@ impl OrgNode {
       OrgNodeKind::Scaff ( _ ) => None,
     }}
 
-  /// Get the edit_request if this is a TrueNode. Returns None for Scaffolds.
-  pub fn edit_request ( &self ) -> Option < &EditRequest > {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . edit_request . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
-    }}
-
   /// Set the edit_request. No-op for Scaffolds.
   pub fn set_edit_request ( &mut self, edit_request : Option < EditRequest > ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {

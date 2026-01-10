@@ -136,8 +136,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_t.effect_on_parent, EffectOnParent::Content);
   assert_eq!(first_node.focused, false);
   assert_eq!(first_node.folded, false);
-  assert_eq!(first_node.is_indefinitive(), false);
-  assert_eq!(first_node.edit_request(), None);
+  assert_eq!(first_t.indefinitive, false);
+  assert_eq!(first_t.edit_request, None);
 
   // Test second node - should have no body
   let second_node = tree_roots[1].value();

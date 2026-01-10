@@ -51,18 +51,14 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
             Box<dyn Error>> {
   let mut merge_instructions: Vec<MergeInstructionTriple> =
     Vec::new();
-  if let Some(EditRequest::Merge(acquiree_id))
-    = node.edit_request() {
+  if let OrgNodeKind::True(t) = &node.kind {
+    if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request {
+      let acquirer_id : &ID =
+        t.id_opt.as_ref()
+        .ok_or("Node with merge request must have an ID")?;
       let acquirer_from_disk : SkgNode =
         skgnode_from_id(
-          config, driver,
-          { let acquirer_id : &ID = {
-              let id_opt : Option<&ID> = match &node.kind {
-                OrgNodeKind::True(t) => t.id_opt.as_ref(),
-                OrgNodeKind::Scaff(_) => None };
-              id_opt.ok_or("Node with merge request must have an ID")? };
-            acquirer_id }
-        ). await?;
+          config, driver, acquirer_id ). await?;
       let acquiree_from_disk : SkgNode =
         skgnode_from_id(
           config, driver, acquiree_id ) . await?;
@@ -83,7 +79,7 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
             acquiree_to_delete : (
               acquiree_from_disk,
               NonMerge_NodeAction::Delete ),
-          } ); }}
+          } ); }} }
   Ok(merge_instructions) }
 
 /// Computes the updated acquirer node with all fields properly merged.

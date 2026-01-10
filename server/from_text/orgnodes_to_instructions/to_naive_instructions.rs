@@ -70,8 +70,9 @@ fn naive_saveinstructions_from_tree(
     result.push((skg_node, {
       let save_action: NonMerge_NodeAction =
         read_at_node_in_tree(tree, node_id, |node| {
-          if matches!( node.edit_request(),
-                       Some(EditRequest::Delete) )
+          if matches!( &node.kind,
+                       OrgNodeKind::True(t)
+                       if t.edit_request == Some(EditRequest::Delete))
           { NonMerge_NodeAction::Delete
           } else { NonMerge_NodeAction::Save } })?;
       save_action } )); }
