@@ -109,9 +109,10 @@ pub(super) fn makeIndefinitiveAndClobber (
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree ( tree, node_id, |np| {
-    let org = &mut np.orgnode;
-    org . set_indefinitive ( true );
-    org . clear_body (); } ) ?;
+    let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+      else { panic! ( "makeIndefinitiveAndClobber: expected TrueNode" ) };
+    t . indefinitive = true;
+    t . body = None; } ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context

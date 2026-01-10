@@ -163,12 +163,6 @@ impl OrgNode {
       t . indefinitive = value;
     }}
 
-  /// Clear the body (set to None). No-op for Scaffolds.
-  pub fn clear_body ( &mut self ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . body = None;
-    }}
-
   /// Set the title. No-op for Scaffolds.
   pub fn set_title ( &mut self, title : String ) {
     if let OrgNodeKind::True ( t ) = &mut self . kind {

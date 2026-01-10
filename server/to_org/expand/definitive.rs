@@ -184,11 +184,12 @@ fn indefinitize_content_subtree (
     write_at_node_in_tree (
       tree, node_id,
       |np| {
-        let org = &mut np.orgnode;
-        org . set_indefinitive ( true );
+        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+          else { panic! ( "indefinitize_content_subtree: expected TrueNode" ) };
+        t . indefinitive = true;
         if let Some ( title ) = canonical_title.clone () {
-          org . set_title ( title ); }
-        org . clear_body (); } ) ?; }
+          t . title = title; }
+        t . body = None; } ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, child_treeid, visited ) ?; }

@@ -169,10 +169,11 @@ pub fn clobberIndefinitiveOrgnode (
           . ok_or ("SkgNode should exist after fetch" . to_string() )?;
       ( skgnode . title . clone (),
         skgnode . source . clone () ) };
-    let org = &mut pair.orgnode;
-    org . set_title ( title );
-    org . set_source ( source );
-    org . clear_body ();
+    let OrgNodeKind::True ( t ) = &mut pair.orgnode.kind
+      else { return Err ( "clobberIndefinitiveOrgnode: expected TrueNode" . into () ) };
+    t . title = title;
+    t . source_opt = Some ( source );
+    t . body = None;
     Ok::<(), String>(( ))
   } )? // before the '?' it's a nested Result: R<R<(),String>,String>
     . map_err( |e| -> Box<dyn Error> { e.into() } ) }
