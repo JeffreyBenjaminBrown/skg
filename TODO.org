@@ -9,17 +9,8 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** ONGOING functions to delete
-    KEEP THE SAME SPACING
-**** search for this text
-     impl OrgNode
-**** functions to delete
-***** is_indefinitive() -- used maybe 13 times
-***** set_indefinitive
-*** compare_two_orgnode_branches_recursively_modulo_id
-    is baroque
-*** merge assign_alias_relation_if_needed into its caller
-*** assign_new_id_if_needed should verify it's owned
+*** ONGOING seems baroque
+fn rebuild_pair_from_disk_mostly_clobbering_the_org (
 *** validate_node_and_children
 **** Rather than two bool arguments,
      take a single ScaffoldKind argument.
@@ -58,12 +49,15 @@ Actually that whole test seems unneeded -- it can't happen.
 +    = root_without_source_errors[0] {
 +      assert_eq!(node.title(), "Root level Alias (bad)",
 +                 "RootWithoutSource error should come from root-level Alias"); }}
-*** seems baroque
-fn rebuild_pair_from_disk_mostly_clobbering_the_org (
 *** these seem redundant
 clobberIndefinitiveOrgnode
 indefinitize_content_subtree
 makeIndefinitiveAndClobber
+*** AWAITS functions to delete
+**** remember to ask to keep the same spacing
+**** functions to delete
+***** is_indefinitive() -- used maybe 13 times
+***** set_indefinitive
 ** change metadata rendering
    'code' is now an obsolete s-exp title, etc.
 ** type changes

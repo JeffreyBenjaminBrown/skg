@@ -5,19 +5,18 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request };
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::maybe_add_hiddenInSubscribeeCol_branch;
 use crate::to_org::util::{
-  skgnode_and_orgnode_from_pid_and_source,
   build_node_branch_minus_content,
   get_pid_in_pairtree,
   VisitedMap, is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, TrueNode, EffectOnParent, mk_orgnode };
+  OrgNodeKind, EffectOnParent, ViewRequest };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -265,43 +264,33 @@ async fn extendDefinitiveSubtreeFromLeaf (
     generation += 1; }
   Ok (( )) }
 
-/// Fetches fresh (SkgNode, OrgNode) from disk
-///   and replaces both in the tree.
-/// Preserves OrgnodeCode fields.
-/// Replaces all other OrgNode data.
+/// Fetches SkgNode from disk.
+/// Updates NodePair's title, body, mskgnode.
+/// Preserves all other OrgNode data.
 fn rebuild_pair_from_disk_mostly_clobbering_the_org (
   tree    : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, src, effect, indef, edit_request, view_requests) = {
-    // values to preserve from existing orgnode
-    let node_ref : NodeRef<NodePair> = tree.get(node_id)
-      .ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node not found")?;
-    let org : &OrgNode = &node_ref.value().orgnode;
-    let t : &TrueNode = match &org.kind {
-      OrgNodeKind::True(t) => t,
-      OrgNodeKind::Scaff(_) => return Err( "rebuild_pair_from_disk_mostly_clobbering_the_org: node is Scaffold, not TrueNode" . into( )), };
-    let pid : ID = t . id_opt . clone() . ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node has no ID")?;
-    let src : String = t . source_opt . clone() . ok_or("rebuild_pair_from_disk_mostly_clobbering_the_org: node has no source")?;
-    (pid, src,
-     t.effect_on_parent.clone(),
-     t.indefinitive,
-     t.edit_request.clone(),
-     t.view_requests.clone()) };
-  let (skgnode, disk_orgnode) : (SkgNode, OrgNode) = // from disk
-    skgnode_and_orgnode_from_pid_and_source(config, &pid, &src)?;
-  let disk_t : &TrueNode = match &disk_orgnode.kind {
-    OrgNodeKind::True(t) => t,
-    OrgNodeKind::Scaff(_) => unreachable!(
-      "disk orgnode is always a TrueNode"), };
-  let orgnode : OrgNode = mk_orgnode(
-    pid, src,
-    disk_t . title . clone(),
-    disk_t . body . clone(),
-    effect, indef, edit_request, view_requests);
-  write_at_node_in_tree(
-    tree, node_id,
-    |np| *np = NodePair { mskgnode: Some(skgnode),
-                          orgnode })?;
+  let (pid, src) : (ID, String) = {
+    let node_ref : NodeRef<NodePair> = tree . get(node_id) . ok_or(
+      "rebuild_pair_from_disk: node not found") ?;
+    let OrgNodeKind::True ( t )
+    = &node_ref . value () . orgnode . kind
+    else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
+    ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
+      t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk: no source" ) ? ) };
+  let skgnode : SkgNode =
+    skgnode_from_pid_and_source (
+      config, pid.clone (), &src ) ?;
+  let title : String = skgnode . title . clone();
+  if title . is_empty () {
+    return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
+  let body : Option < String > = skgnode . body . clone ();
+  write_at_node_in_tree ( tree, node_id, |np| {
+    let OrgNodeKind::True ( t ) = &mut np . orgnode . kind
+      else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
+    t . title = title;
+    t . body = body;
+    np . mskgnode = Some ( skgnode ); } ) ?;
   Ok (( )) }
