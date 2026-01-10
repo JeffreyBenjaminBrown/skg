@@ -163,13 +163,6 @@ impl OrgNode {
       t . indefinitive = value;
     }}
 
-  /// Get mutable access to view_requests. Returns None for Scaffolds.
-  pub fn view_requests_mut ( &mut self ) -> Option < &mut HashSet < ViewRequest > > {
-    match &mut self . kind {
-      OrgNodeKind::True ( t ) => Some ( &mut t . view_requests ),
-      OrgNodeKind::Scaff ( _ ) => None,
-    }}
-
   /// Convert a TrueNode to an Alias scaffold.
   /// Uses the TrueNode's title as the alias text.
   /// No-op if already a Scaffold.

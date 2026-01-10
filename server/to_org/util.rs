@@ -404,7 +404,7 @@ pub(super) fn remove_completed_view_request (
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut = tree . get_mut ( node_id )
     . ok_or ( "remove_completed_view_request: node not found" ) ?;
-  if let Some ( vr ) =
-    node_mut . value () . orgnode . view_requests_mut ()
-  { vr . remove ( &view_request ); }
+  if let OrgNodeKind::True ( t )
+  = &mut node_mut . value () . orgnode . kind
+  { t . view_requests . remove ( &view_request ); }
   Ok (()) }

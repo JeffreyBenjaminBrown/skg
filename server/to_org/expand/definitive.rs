@@ -93,10 +93,10 @@ async fn execute_definitive_view_request (
     write_at_node_in_tree (
       forest, node_id,
       |np| { // remove ViewRequest and mark definitive
-        let org = &mut np.orgnode;
-        if let Some ( vr ) = org . view_requests_mut () {
-          vr . remove ( & ViewRequest::Definitive ); }
-        org . set_indefinitive ( false ); } ) ?; }
+        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+          else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
+        t . view_requests . remove ( & ViewRequest::Definitive );
+        t . indefinitive = false; } ) ?; }
   visited . insert ( node_pid.clone(), node_id );
   extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
     forest, node_id,
