@@ -185,12 +185,6 @@ impl OrgNode {
         Scaffold::Alias ( true_node . title . clone () ) );
     }}
 
-  /// Set the id. No-op for Scaffolds.
-  pub fn set_id ( &mut self, id : Option < ID > ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . id_opt = id;
-    }}
-
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {

@@ -36,13 +36,13 @@ pub fn assign_pids_throughout_orgnode_tree_from_map (
   mut node_ref : NodeMut < OrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let OrgNodeKind::True ( t ) =
-    &node_ref . value () . kind
-  { if let Some ( id ) = &t . id_opt
-    { if let Some ( Some ( pid )) =
-        pid_map . get ( id )
-      { node_ref . value () . set_id (
-          Some ( pid . clone () ) ); }}}
+  if let OrgNodeKind::True(t)
+  = &mut node_ref . value() . kind
+  { let pid_opt : Option < ID > = t . id_opt . as_ref ()
+      . and_then ( |id| pid_map . get ( id ) )
+      . and_then ( |opt| opt . clone () );
+    if let Some ( pid ) = pid_opt {
+      t . id_opt = Some ( pid ); }}
   { // Recurse into children
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();

@@ -18,7 +18,6 @@ server/org_to_text.rs
 ***** view_requests_mut
 ***** set_indefinitive
 ***** set_effect_on_parent
-***** set_id
 *** TrueNode should bundle the id and source in a single Opt
 *** these seem redundant
 clobberIndefinitiveOrgnode
