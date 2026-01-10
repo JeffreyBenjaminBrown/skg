@@ -175,12 +175,6 @@ impl OrgNode {
       t . source_opt = Some ( source );
     }}
 
-  /// Set the cycle flag. No-op for Scaffolds.
-  pub fn set_cycle ( &mut self, value : bool ) {
-    if let OrgNodeKind::True ( t ) = &mut self . kind {
-      t . cycle = value;
-    }}
-
   /// Get mutable access to view_requests. Returns None for Scaffolds.
   pub fn view_requests_mut ( &mut self ) -> Option < &mut HashSet < ViewRequest > > {
     match &mut self . kind {

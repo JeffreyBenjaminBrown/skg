@@ -11,11 +11,10 @@ server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
 *** ONGOING functions to delete
     KEEP THE SAME SPACING
-**** a table of uses
-***** ONGOING is_scaffold
-***** AWAITS clear_body
-Next, clear_body. Note that in any context in which we are setting the body, we should be expecting a TrueNode, so error otherwise.
-***** set_cycle
+**** search for this text
+     impl OrgNode
+**** functions to delete
+***** ONGOING set_cycle
 ***** is_indefinitive() -- used maybe 13 times
 ***** view_requests_mut
 ***** set_title
@@ -27,8 +26,11 @@ Next, clear_body. Note that in any context in which we are setting the body, we 
 ***** set_parent_is_content
 ***** set_effect_on_parent
 ***** set_id
-**** impl OrgNode {
 *** TrueNode should bundle the id and source in a single Opt
+*** these seem redundant
+clobberIndefinitiveOrgnode
+indefinitize_content_subtree
+makeIndefinitiveAndClobber
 *** compare_two_orgnode_branches_recursively_modulo_id
     is baroque
 *** merge assign_alias_relation_if_needed into its caller

@@ -172,7 +172,9 @@ fn detect_and_mark_cycle (
     let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
   write_at_node_in_tree ( tree, node_id, |np| {
-    np . orgnode . set_cycle ( is_cycle ); } ) ?;
+    let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+      else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
+    t . cycle = is_cycle; } ) ?;
   Ok (( )) }
 
 
@@ -236,7 +238,7 @@ fn is_ancestor_id (
 /// Extract the PID from a node in a PairTree.
 /// Returns an error if the node is not found or has no ID.
 pub(super) fn get_pid_in_pairtree (
-  tree    : &PairTree,
+  tree   : &PairTree,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
   read_at_node_in_tree ( tree, treeid, |np|
