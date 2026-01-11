@@ -44,7 +44,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       let mut errors: Vec<BufferValidationError> = parsing_errors;
       errors.extend(validation_errors);
 
-  // Errors: Body_of_AliasCol(1), Body_of_Alias(1), Child_of_AliasCol_with_ID(1), Child_of_Alias(1),
+  // Errors: Body_of_Scaffold(2), Child_of_AliasCol_with_ID(1), Child_of_Alias(1),
   //         Alias_with_no_AliasCol_Parent(3), AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1),
   //         RootWithoutSource(1) = 10
   assert_eq!(errors.len(), 10,
@@ -104,28 +104,20 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       assert_eq!(node.title(), "Root level Alias (bad)",
                  "RootWithoutSource error should come from root-level Alias"); }}
 
-  { let body_of_aliascol_errors: Vec<&BufferValidationError> = errors.iter()
-    .filter(|e| matches!(e, BufferValidationError::Body_of_AliasCol(_)))
+  { let body_of_scaffold_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Body_of_Scaffold(_, _)))
     .collect();
-  assert_eq!(body_of_aliascol_errors.len(), 1, "Should find 1 Body_of_AliasCol error");
-    if let BufferValidationError::Body_of_AliasCol(title)
-    = body_of_aliascol_errors[0] {
-      assert_eq!(title, "AliasCol with body problem",
-                 "Body_of_AliasCol error should come from correct node"); }}
+  assert_eq!(body_of_scaffold_errors.len(), 2, "Should find 2 Body_of_Scaffold errors");
+  assert!(body_of_scaffold_errors.iter().any(|e| {
+    matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
+             if title == "AliasCol with body problem" && kind == "aliasCol")
+  }), "Should find Body_of_Scaffold error for aliasCol");
+  assert!(body_of_scaffold_errors.iter().any(|e| {
+    matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
+             if title == "Alias with body problem and orphaned" && kind == "alias")
+  }), "Should find Body_of_Scaffold error for alias"); }
 
-  { let body_of_alias_errors: Vec<&BufferValidationError> = errors.iter()
-    .filter(|e| matches!(e, BufferValidationError::Body_of_Alias(_)))
-    .collect();
-  assert_eq!(body_of_alias_errors.len(), 1, "Should find 1 Body_of_Alias error");
-    if let BufferValidationError::Body_of_Alias(title)
-    = body_of_alias_errors[0] {
-      assert_eq!(title, "Alias with body problem and orphaned",
-                 "Body_of_Alias error should come from correct node"); }}
-
-      Ok(())
-    })
-  )
-}
+      Ok (( )) } )) }
 
 #[test]
 fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>> {

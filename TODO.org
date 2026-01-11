@@ -9,29 +9,6 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** ONGOING fix *_indefinitive_* users
-**** get_pid_in_pairtree
-     Scaffolds should throw an error (the caller should not consider getting a PID branch from a Scaffold).
-     Don't use is_indefinitive_truenode().
-**** mark_if_visited_or_repeat_or_cycle
-     Scaffolds should throw an error (the caller should not consider doing these things to a Scaffold -- they can't be done).
-     After casing on Scaffold | TrueNode once, can deal for the rest of the function directly with the TrueNode.
-     Don't use is_indefinitive_truenode().
-**** content_ids_if_definitive_else_empty
-     Scaffolds should throw an error (the caller should not consider getting content IDs from a Scaffold because it can't be definitive).
-     After casing on Scaffold | TrueNode once, can deal for the rest of the function directly with the TrueNode.
-     Don't use is_indefinitive_truenode().
-**** check_and_complete
-     Rename to check_and_complete_if_truenode.
-     Scaffolds should return Ok().
-**** delete fn is_indefinitive
-**** tests/typedb.rs
-     those passages that use is_indefinitive_truenode
-     both expect a TrueNode, so test that,
-     and then assume it's a TrueNode.
-     (We can then use body instead of body(),
-     title instead of title(), and id_opt instead of id_opt()
-     in those passages.)
 *** these seem redundant
 clobberIndefinitiveOrgnode
 indefinitize_content_subtree
@@ -40,11 +17,9 @@ makeIndefinitiveAndClobber
     rather than alias has body and aliascol has body,
     just 'scaffold has body',
     providing both its text and its ScaffoldKind.
-*** AWAITS functions to delete
-**** remember to ask to keep the same spacing
-**** functions to delete
-***** is_indefinitive_truenode() -- used maybe 13 times
-***** set_indefinitive_if_truenode()
+** I renamed emacs_string -> repr_in_client.
+** For string reps, use bimaps in more places
+   'impl Scaffold : repr_in_client' uses one.
 ** change metadata rendering
    'code' is now an obsolete s-exp title, etc.
 ** type changes

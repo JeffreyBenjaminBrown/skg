@@ -87,15 +87,12 @@ fn format_buffer_validation_error (
   error : &BufferValidationError
 ) -> String {
   match error {
-    BufferValidationError::Body_of_AliasCol(title) => {
-      format!("AliasCol node has a body (not allowed):\n- Title: {}\n",
-              title) },
+    BufferValidationError::Body_of_Scaffold(title, kind) => {
+      format!("{} node has a body (not allowed):\n- Title: {}\n",
+              kind, title) },
     BufferValidationError::Child_of_AliasCol_with_ID(node) => {
       format!("Child of AliasCol has an ID (not allowed):\n- Title: {}\n",
               node.title()) },
-    BufferValidationError::Body_of_Alias(title) => {
-      format!("Alias node has a body (not allowed):\n- Title: {}\n",
-              title) },
     BufferValidationError::Child_of_Alias(node) => {
       format!("Alias node has children (not allowed):\n- Title: {}\n",
               node.title()) },

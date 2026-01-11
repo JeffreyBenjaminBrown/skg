@@ -78,14 +78,72 @@ pub enum Scaffold {
   SubscribeeCol, // Collects subscribees for its parent.
 }
 
+/// A discriminant (i.e. some labels) for the Scaffold variants.
+/// (We can't simply use the Scaffold variants themselves,
+/// because of the Alias payload.)
+/// Used for the bijective Emacs string mapping.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ScaffoldKind { Alias,
+                        AliasCol,
+                        ForestRoot,
+                        HiddenInSubscribeeCol,
+                        HiddenOutsideOfSubscribeeCol,
+                        SubscribeeCol, }
+
 impl Scaffold {
+  /// Single source of truth for Scaffold <-> Emacs string bijection.
+  const REPRS_IN_CLIENT: &'static [(&'static str, ScaffoldKind)] = &[
+    ("alias",                        ScaffoldKind::Alias),
+    ("aliasCol",                     ScaffoldKind::AliasCol),
+    ("forestRoot",                   ScaffoldKind::ForestRoot),
+    ("hiddenInSubscribeeCol",        ScaffoldKind::HiddenInSubscribeeCol),
+    ("hiddenOutsideOfSubscribeeCol", ScaffoldKind::HiddenOutsideOfSubscribeeCol),
+    ("subscribeeCol",                ScaffoldKind::SubscribeeCol),
+  ];
+
+  /// Get the kind (discriminant) of this Scaffold.
+  pub fn kind ( &self ) -> ScaffoldKind {
+    match self {
+      Scaffold::Alias ( _ )                  => ScaffoldKind::Alias,
+      Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
+      Scaffold::ForestRoot                   => ScaffoldKind::ForestRoot,
+      Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
+      Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
+      Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
+    }}
+
   /// Compare scaffold kinds. For Alias, compares variant only (ignoring string content).
   pub fn matches_kind ( &self, other : &Scaffold ) -> bool {
-    match ( self, other ) {
-      ( Scaffold::Alias ( _ ), Scaffold::Alias ( _ ) ) => true,
-      _ => std::mem::discriminant ( self )
-           == std::mem::discriminant ( other ),
-    }} }
+    self.kind() == other.kind() }
+
+  /// String representation as used in Emacs metadata sexps.
+  pub fn repr_in_client ( &self ) -> String {
+    let kind = self.kind();
+    Self::REPRS_IN_CLIENT.iter()
+      .find ( |(_, k)| *k == kind )
+      .map ( |(s, _)| s.to_string() )
+      .expect ( "REPRS_IN_CLIENT should cover all ScaffoldKinds" ) }
+
+  /// Parse an Emacs string to a Scaffold. For Alias, uses the provided title.
+  pub fn from_repr_in_client ( s: &str, title: &str
+                             ) -> Option<Scaffold>
+  { Self::REPRS_IN_CLIENT.iter()
+      .find ( |(es, _)| *es == s )
+      .map ( |(_, kind)| kind.to_scaffold ( title ) ) }
+}
+
+impl ScaffoldKind {
+  /// Construct a Scaffold from this kind. For Alias, uses the provided title.
+  pub fn to_scaffold ( &self, title: &str ) -> Scaffold {
+    match self {
+      ScaffoldKind::Alias                     => Scaffold::Alias ( title.to_string() ),
+      ScaffoldKind::AliasCol                  => Scaffold::AliasCol,
+      ScaffoldKind::ForestRoot                => Scaffold::ForestRoot,
+      ScaffoldKind::HiddenInSubscribeeCol     => Scaffold::HiddenInSubscribeeCol,
+      ScaffoldKind::HiddenOutsideOfSubscribeeCol => Scaffold::HiddenOutsideOfSubscribeeCol,
+      ScaffoldKind::SubscribeeCol             => Scaffold::SubscribeeCol,
+    }}
+}
 
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.

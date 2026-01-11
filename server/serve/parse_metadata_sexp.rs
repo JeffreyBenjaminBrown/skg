@@ -12,7 +12,7 @@ use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
 use crate::types::orgnode::{TruenodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, TrueNode, EffectOnParent,
+    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode, EffectOnParent,
 };
 
 use sexp::Sexp;
@@ -130,14 +130,9 @@ pub fn from_parsed (
   let (kind, error) =
     if let Some ( scaffold ) = interp . to_scaffold ( &title ) {
       let error = if body . is_some () {
-        Some ( match &scaffold {
-          Scaffold::AliasCol =>
-            BufferValidationError::Body_of_AliasCol (
-              title.clone () ),
-          Scaffold::Alias ( _ ) =>
-            BufferValidationError::Body_of_Alias (
-              title.clone () ),
-          _ => BufferValidationError::Other ( format! ( "Scaffold {:?} should not have a body", scaffold ) ), } )
+        Some ( BufferValidationError::Body_of_Scaffold (
+          title . clone (),
+          scaffold . repr_in_client () ))
       } else { None };
       ( OrgNodeKind::Scaff ( scaffold ), error )
     } else if let Some ( effect ) = interp . to_effect_on_parent () {
@@ -260,19 +255,27 @@ fn parse_code_sexp (
           "interp" => {
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            code . interp = match value . as_str () {
-              "alias"         => Interp::Alias,
-              "aliasCol"      => Interp::AliasCol,
-              "content"       => Interp::Content,
-              "parentIgnores" => Interp::ParentIgnores,
-              "subscribeeCol" => Interp::SubscribeeCol,
-              "subscribee"    => Interp::Subscribee,
-              "hiddenOutsideOfSubscribeeCol" => Interp::HiddenOutsideOfSubscribeeCol,
-              "hiddenInSubscribeeCol"        => Interp::HiddenInSubscribeeCol,
-              "hiddenFromSubscribees"        => Interp::HiddenFromSubscribees,
-              _ => return Err (
-                format! ( "Unknown interp value: {}", value )),
-            }; },
+            code . interp =
+              if let Some ( scaffold ) = Scaffold::from_repr_in_client (
+                   &value, "" ) // title unused for kind detection
+              { // Try scaffold strings first (uses Scaffold::REPRS_IN_CLIENT)
+                match scaffold.kind() {
+                  ScaffoldKind::Alias                 => Interp::Alias,
+                  ScaffoldKind::AliasCol              => Interp::AliasCol,
+                  ScaffoldKind::ForestRoot            => Interp::ForestRoot,
+                  ScaffoldKind::HiddenInSubscribeeCol =>
+                    Interp::HiddenInSubscribeeCol,
+                  ScaffoldKind::HiddenOutsideOfSubscribeeCol =>
+                    Interp::HiddenOutsideOfSubscribeeCol,
+                  ScaffoldKind::SubscribeeCol                =>
+                    Interp::SubscribeeCol, }}
+              else { match value . as_str () {
+                       // Non-scaffold interp values
+                       "content"               => Interp::Content,
+                       "parentIgnores"         => Interp::ParentIgnores,
+                       "subscribee"            => Interp::Subscribee,
+                       "hiddenFromSubscribees" => Interp::HiddenFromSubscribees,
+                       _ => return Err ( format! ( "Unknown interp value: {}", value )), }}; },
           "merge" => {
             // (merge id) sets editRequest to Merge(id)
             let id_str : String = atom_to_string ( &kv_pair[1] ) ?;

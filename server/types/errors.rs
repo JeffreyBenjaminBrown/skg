@@ -23,9 +23,9 @@ pub enum SaveError {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum BufferValidationError {
-  Body_of_AliasCol               (String), // Title from buffer. Cannot provide more information because this error is detected while parsing the raw text, rather than the OrgNode tree. (In an OrgNode, an AliasCol has no body field.)
+  Body_of_Scaffold               (String,   // Title from buffer
+                                  String),  // Scaffold kind (e.g. "aliasCol", "alias")
   Child_of_AliasCol_with_ID      (OrgNode),
-  Body_of_Alias                  (String), // Title from buffer. Cannot provide more information because this error is detected while parsing the raw text, rather than the OrgNode tree. (In an OrgNode, an AliasCol has no body field.)
   Child_of_Alias                 (OrgNode),
   Alias_with_no_AliasCol_Parent  (OrgNode),
   Multiple_AliasCols_in_Children (OrgNode),
@@ -73,15 +73,12 @@ impl std::fmt::Display for BufferValidationError {
     f: &mut std::fmt::Formatter<'_>
   ) -> std::fmt::Result {
     match self {
-      BufferValidationError::Body_of_AliasCol(title) =>
-        write!(f, "AliasCol node should not have a body. Node title: '{}'",
-               title),
+      BufferValidationError::Body_of_Scaffold(title, kind) =>
+        write!(f, "{} node should not have a body. Node title: '{}'",
+               kind, title),
       BufferValidationError::Child_of_AliasCol_with_ID(node) =>
         write!(f, "Children of AliasCol should not have IDs. Node: {:?}",
                node.id_opt()),
-      BufferValidationError::Body_of_Alias(title) =>
-        write!(f, "Alias node should not have a body. Node title: '{}'",
-               title),
       BufferValidationError::Child_of_Alias(node) =>
         write!(f, "Alias nodes should not have children. Node: {:?}",
                node.id_opt()),
