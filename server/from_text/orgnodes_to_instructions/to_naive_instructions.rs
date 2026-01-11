@@ -35,56 +35,47 @@ fn naive_saveinstructions_from_tree(
   node_id: NodeId,
   result: &mut Vec<SaveInstruction>
 ) -> Result<(), String> {
-  let (node_kind, is_indefinitive): (OrgNodeKind, bool) =
-    read_at_node_in_tree(tree, node_id, |node| {
-      ( node.kind.clone(),
-        node.is_indefinitive_truenode() ) } )?;
-  if matches!(&node_kind, OrgNodeKind::Scaff(s)
-              if *s == Scaffold::ForestRoot)
-  { // for ForestRoot, just recurse to children
+  fn recurse ( // because it's called in two places
+    tree: &mut Tree<OrgNode>,
+    node_id: NodeId,
+    result: &mut Vec<SaveInstruction>
+  ) -> Result<(), String> {
     for child_treeid in {
       let child_treeids: Vec<NodeId> =
-        tree . get(node_id) . unwrap() . children()
-        . map( |c| c.id() )
-        . collect();
-      child_treeids }
-    { naive_saveinstructions_from_tree (
-        tree, child_treeid, result)?; }
-    return Ok(( )); }
-  if matches!(&node_kind, OrgNodeKind::Scaff(_)) {
-    // Other scaffolds currently produce no SaveInstructions.
-    // TODO : Recurse into SubscribeeCols.
-    return Ok(( )); }
-  let aliases =
-    collect_grandchild_aliases_for_orgnode(tree, node_id)?;
-  let subscribees =
-    collect_subscribees(tree, node_id)?;
-  let skg_node_opt = if !is_indefinitive {
-    let node_ref = tree.get(node_id) . ok_or(
-      "saveinstructions_from_tree: node not found after deletion")?;
-    Some(skgnode_for_orgnode_in_tree(
-      node_ref.value(), &node_ref, aliases, subscribees )?)
-  } else { None };
-  if let Some(skg_node) = skg_node_opt {
-    // Push SaveInstruction if applicable
-    result.push((skg_node, {
-      let save_action: NonMerge_NodeAction =
-        read_at_node_in_tree(tree, node_id, |node| {
-          if matches!( &node.kind,
-                       OrgNodeKind::True(t)
-                       if t.edit_request == Some(EditRequest::Delete))
-          { NonMerge_NodeAction::Delete
-          } else { NonMerge_NodeAction::Save } })?;
-      save_action } )); }
-  { // recurse
-    for child_treeid in {
-      let child_treeids: Vec<NodeId> =
-        tree . get(node_id) . unwrap() . children()
-        . map(|c| c.id()) . collect();
+        tree.get(node_id).unwrap().children()
+        .map(|c| c.id()).collect();
       child_treeids }
     { naive_saveinstructions_from_tree(
-        tree, child_treeid, result )?; }}
-  Ok (( )) }
+        tree, child_treeid, result)?; }
+    Ok(( )) }
+
+  let node_kind: OrgNodeKind =
+    read_at_node_in_tree(tree, node_id, |node| node.kind.clone())?;
+  match node_kind {
+    OrgNodeKind::Scaff ( Scaffold::ForestRoot ) =>
+      recurse( tree, node_id, result )?,
+    OrgNodeKind::Scaff ( _ ) => {
+      // Other scaffolds currently produce no SaveInstructions.
+      // TODO: Recurse into SubscribeeCols.
+    },
+    OrgNodeKind::True ( t ) => {
+      if ! t.indefinitive {
+        let aliases: Option<Vec<String>> =
+          collect_grandchild_aliases_for_orgnode(tree, node_id)?;
+        let subscribees: Option<Vec<ID>> =
+          collect_subscribees(tree, node_id)?;
+        let node_ref: NodeRef<OrgNode> = tree.get(node_id).ok_or(
+          "saveinstructions_from_tree: node not found")?;
+        let skg_node: SkgNode = skgnode_for_orgnode_in_tree(
+          node_ref.value(), &node_ref, aliases, subscribees)?;
+        let save_action: NonMerge_NodeAction =
+          if t.edit_request == Some(EditRequest::Delete)
+          { NonMerge_NodeAction::Delete }
+          else { NonMerge_NodeAction::Save };
+        result.push((skg_node, save_action)); }
+      recurse( tree, node_id, result )?; }}
+
+  Ok(( )) }
 
 fn skgnode_for_orgnode_in_tree<'a> (
   orgnode: &OrgNode,
