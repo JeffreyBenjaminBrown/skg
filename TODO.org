@@ -9,28 +9,6 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** ONGOING seems baroque
-fn from_disk_replace_title_body_and_skgnode (
-*** validate_node_and_children
-**** Rather than two bool arguments,
-     take a single ScaffoldKind argument.
-**** Case directly, rather than defining is_alias etc.
-*** validate_merge_requests and friends
-**** 1
-It does this:
-```
-    if ( node.is_scaffold( &ScaffoldKind::Alias(String::new()) ) ||
-         node.is_scaffold( &ScaffoldKind::AliasCol ))
-```
-That's *terrible* -- it's imagining every Alias will contain an empty String. Find any such test anywhere, and replace it with something that just tests the constructor, not its contents. If a parallel enum ScaffoldKindConstructorName is needed, so be it.
-**** 2
-Don't worry about alias, aliascol, etc.
-Just test whether it's a Scaffold, period.
-Actually that whole test seems unneeded -- it can't happen.
-*** rename
-**** OrgnodeViewData -> TrueNodeViewData
-*** rewrite mk_*_orgnode
-    in terms of mk_orgnode
 *** what's up with this?
 **** the comment
   // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
@@ -66,8 +44,6 @@ makeIndefinitiveAndClobber
 *** definitive OrgNode != definitive skgnode
 **** One is that the orgnode stuff is intended as definitive.
 **** SkgNode might need definitive modifiers for each field.
-*** merge OrgnodeRelationships and OrgnodeViewData
-    deleting the second name
 ** DONE restructure types, divide Interp
 *** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
     NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)

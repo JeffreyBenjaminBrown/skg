@@ -9,7 +9,7 @@
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
-use crate::types::orgnode::{OrgnodeRelationships, EditRequest, ViewRequest};
+use crate::types::orgnode::{TruenodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode, EffectOnParent,
 };
@@ -31,7 +31,7 @@ pub struct OrgnodeMetadata {
   pub focused: bool,
   pub folded: bool,
   pub cycle: bool,
-  pub relationships: OrgnodeRelationships,
+  pub relationships: TruenodeRelationships,
   pub code: OrgnodeCode,
 }
 
@@ -112,7 +112,7 @@ pub fn default_metadata() -> OrgnodeMetadata {
     focused: false,
     folded: false,
     cycle: false,
-    relationships: OrgnodeRelationships::default(),
+    relationships: TruenodeRelationships::default(),
     code: OrgnodeCode::default(),
   }
 }
@@ -286,7 +286,7 @@ fn parse_code_sexp (
 /// Parse the (rels ...) s-expression and update relationships.
 fn parse_rels_sexp (
   items : &[Sexp],
-  relationships : &mut OrgnodeRelationships
+  relationships : &mut TruenodeRelationships
 ) -> Result<(), String> {
   for rel_element in items {
     match rel_element {

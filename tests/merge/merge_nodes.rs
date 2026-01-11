@@ -4,7 +4,7 @@ use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::orgnode::{EditRequest, OrgnodeRelationships};
+use skg::types::orgnode::{EditRequest, TruenodeRelationships};
 use skg::types::orgnode::{
     OrgNode, OrgNodeKind, TrueNode, EffectOnParent, forest_root_orgnode
 };
@@ -74,7 +74,7 @@ async fn test_merge_2_into_1_impl(
       effect_on_parent: EffectOnParent::Content,
       indefinitive: false,
       cycle: false,
-      relationships: OrgnodeRelationships::default(),
+      relationships: TruenodeRelationships::default(),
       edit_request: Some(EditRequest::Merge(ID::from("2"))),
       view_requests: HashSet::new(), } ), };
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
@@ -337,7 +337,7 @@ async fn test_merge_1_into_2_impl(
       effect_on_parent: EffectOnParent::Content,
       indefinitive: false,
       cycle: false,
-      relationships: OrgnodeRelationships::default(),
+      relationships: TruenodeRelationships::default(),
       edit_request: Some(EditRequest::Merge(ID::from("1"))),
       view_requests: HashSet::new(),
     }),

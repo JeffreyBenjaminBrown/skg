@@ -38,7 +38,7 @@ pub struct TrueNode {
   pub effect_on_parent : EffectOnParent,
   pub indefinitive     : bool,
   pub cycle            : bool,
-  pub relationships    : OrgnodeRelationships,
+  pub relationships    : TruenodeRelationships,
   pub edit_request     : Option < EditRequest >,
   pub view_requests    : HashSet < ViewRequest >,
 }
@@ -57,7 +57,7 @@ pub enum EffectOnParent {
 /// and the edits would be immediately lost,
 /// as this data is regenerated each time the view is rebuilt.
 #[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeRelationships {
+pub struct TruenodeRelationships {
   pub parentIsContainer: bool,
   pub parentIsContent: bool,
   pub numContainers: Option<usize>,
@@ -223,9 +223,9 @@ impl FromStr for ViewRequest {
 // Defaults
 //
 
-impl Default for OrgnodeRelationships {
+impl Default for TruenodeRelationships {
   fn default () -> Self {
-    OrgnodeRelationships {
+    TruenodeRelationships {
       parentIsContainer : true,
       parentIsContent   : false,
       numContainers : Some ( 1 ),
@@ -243,7 +243,7 @@ impl Default for TrueNode {
       effect_on_parent : EffectOnParent::Content,
       indefinitive     : false,
       cycle            : false,
-      relationships    : OrgnodeRelationships::default (),
+      relationships    : TruenodeRelationships::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }} }
@@ -265,23 +265,14 @@ pub fn mk_definitive_orgnode (
   source : String,
   title  : String,
   body   : Option < String >,
-) -> OrgNode {
-  OrgNode {
-    focused : false,
-    folded  : false,
-    kind    : OrgNodeKind::True ( TrueNode {
-      title,
-      body,
-      id_opt           : Some ( id ),
-      source_opt       : Some ( source ),
-      effect_on_parent : EffectOnParent::Content,
-      indefinitive     : false,
-      cycle            : false,
-      relationships    : OrgnodeRelationships::default (),
-      edit_request     : None,
-      view_requests    : HashSet::new (),
-    }),
-  }}
+) -> OrgNode { mk_orgnode ( id,
+                            source,
+                            title,
+                            body,
+                            EffectOnParent::Content,
+                            false,              // indefinitive
+                            None,               // edit_request
+                            HashSet::new () ) } // view_requests
 
 /// Create an indefinitive OrgNode from disk data with a specific effect.
 /// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).
@@ -291,26 +282,17 @@ pub fn mk_indefinitive_orgnode (
   source           : String,
   title            : String,
   effect_on_parent : EffectOnParent,
-) -> OrgNode {
-  OrgNode {
-    focused : false,
-    folded  : false,
-    kind    : OrgNodeKind::True ( TrueNode {
-      title,
-      body             : None,
-      id_opt           : Some ( id ),
-      source_opt       : Some ( source ),
-      effect_on_parent,
-      indefinitive     : true,
-      cycle            : false,
-      relationships    : OrgnodeRelationships::default (),
-      edit_request     : None,
-      view_requests    : HashSet::new (),
-    }),
-  }}
+) -> OrgNode { mk_orgnode ( id,
+                            source,
+                            title,
+                            None, // body
+                            effect_on_parent,
+                            true, // indefinitive
+                            None, // edit_request
+                            HashSet::new () ) }
 
 /// Create a OrgNode with *nearly* full metadata control.
-/// The exception is that the 'OrgnodeRelationships' is intentionally omitted,
+/// The exception is that the 'TruenodeRelationships' is intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the OrgNode tree.
 pub fn mk_orgnode (
@@ -334,7 +316,7 @@ pub fn mk_orgnode (
       effect_on_parent,
       indefinitive,
       cycle            : false,
-      relationships    : OrgnodeRelationships::default (),
+      relationships    : TruenodeRelationships::default (),
       edit_request,
       view_requests,
     }),
