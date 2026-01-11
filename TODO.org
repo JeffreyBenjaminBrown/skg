@@ -2,6 +2,12 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
+** type changes
+*** delete EffectOnParent
+    should only be a bool, parentIgnores, defaulting to false.
+*** definitive OrgNode != definitive skgnode
+**** One is that the orgnode stuff is intended as definitive.
+**** SkgNode might need definitive modifiers for each field.
 ** ONGOING futzing the refactor
 *** DONE files that changed a lot since main
 server/from_text/buffer_to_orgnodes/validate_tree.rs
@@ -9,25 +15,15 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** these seem redundant
-clobberIndefinitiveOrgnode
-indefinitize_content_subtree
-makeIndefinitiveAndClobber
-*** merge two buffer validation errors
-    rather than alias has body and aliascol has body,
-    just 'scaffold has body',
-    providing both its text and its ScaffoldKind.
 ** ONGOING more bimaps for parsing
 *** DONE ViewRequest
 *** EffectOnParent
+** these seem redundant
+clobberIndefinitiveOrgnode
+indefinitize_content_subtree
+makeIndefinitiveAndClobber
 ** change metadata rendering
    'code' is now an obsolete s-exp title, etc.
-** type changes
-*** delete EffectOnParent
-    should only be a bool, parentIgnores, defaulting to false.
-*** definitive OrgNode != definitive skgnode
-**** One is that the orgnode stuff is intended as definitive.
-**** SkgNode might need definitive modifiers for each field.
 ** DONE restructure types, divide Interp
 *** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
     NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)

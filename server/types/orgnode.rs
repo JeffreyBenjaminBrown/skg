@@ -44,12 +44,35 @@ pub struct TrueNode {
 }
 
 /// Describes how a TrueNode affects its parent when saved.
-#[derive( Debug, Clone, PartialEq, Eq )]
+#[derive( Debug, Clone, Copy, PartialEq, Eq )]
 pub enum EffectOnParent {
   Content,               // Normal content relationship
   Subscribee,            // Subscription relationship
   ParentIgnores,         // No effect on parent (containerward views)
   HiddenFromSubscribees, // No effect on parent (hidden from subscriptions)
+}
+
+impl EffectOnParent {
+  /// Single source of truth for EffectOnParent <-> client string bijection.
+  const REPRS_IN_CLIENT: &'static [(&'static str, EffectOnParent)] = &[
+    ("content",             EffectOnParent::Content),
+    ("subscribee",          EffectOnParent::Subscribee),
+    ("parentIgnores",       EffectOnParent::ParentIgnores),
+    ("hiddenFromSubscribees", EffectOnParent::HiddenFromSubscribees),
+  ];
+
+  /// String representation as used in client metadata.
+  pub fn repr_in_client ( &self ) -> &'static str {
+    Self::REPRS_IN_CLIENT.iter()
+      .find ( |(_, eop)| eop == self )
+      .map ( |(s, _)| *s )
+      .expect ( "REPRS_IN_CLIENT should cover all EffectOnParent variants" ) }
+
+  /// Parse a client string to an EffectOnParent.
+  pub fn from_client_string ( s: &str ) -> Option<EffectOnParent> {
+    Self::REPRS_IN_CLIENT.iter()
+      .find ( |(cs, _)| *cs == s )
+      .map ( |(_, eop)| *eop ) }
 }
 
 /// These data only influence how the node is shown.

@@ -269,13 +269,16 @@ fn parse_code_sexp (
                     Interp::HiddenOutsideOfSubscribeeCol,
                   ScaffoldKind::SubscribeeCol                =>
                     Interp::SubscribeeCol, }}
-              else { match value . as_str () {
-                       // Non-scaffold interp values
-                       "content"               => Interp::Content,
-                       "parentIgnores"         => Interp::ParentIgnores,
-                       "subscribee"            => Interp::Subscribee,
-                       "hiddenFromSubscribees" => Interp::HiddenFromSubscribees,
-                       _ => return Err ( format! ( "Unknown interp value: {}", value )), }}; },
+              else if let Some ( effect )
+                = EffectOnParent::from_client_string ( &value )
+              { // Non-scaffold interp values
+                match effect {
+                  EffectOnParent::Content       => Interp::Content,
+                  EffectOnParent::Subscribee    => Interp::Subscribee,
+                  EffectOnParent::ParentIgnores => Interp::ParentIgnores,
+                  EffectOnParent::HiddenFromSubscribees =>
+                    Interp::HiddenFromSubscribees, }}
+              else { return Err ( format! ( "Unknown interp value: {}", value )) }; },
           "merge" => {
             // (merge id) sets editRequest to Merge(id)
             let id_str : String = atom_to_string ( &kv_pair[1] ) ?;

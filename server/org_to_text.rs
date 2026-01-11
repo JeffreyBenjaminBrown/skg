@@ -169,13 +169,8 @@ fn true_node_metadata_to_string (
   let mut code_parts : Vec < String > = Vec::new ();
   // Only emit interp if not Content
   if true_node . effect_on_parent != EffectOnParent::Content {
-    let interp_str = match true_node . effect_on_parent {
-      EffectOnParent::Content              => "content",
-      EffectOnParent::Subscribee           => "subscribee",
-      EffectOnParent::ParentIgnores        => "parentIgnores",
-      EffectOnParent::HiddenFromSubscribees => "hiddenFromSubscribees",
-    };
-    code_parts . push ( format! ( "(interp {})", interp_str )); }
+    code_parts . push ( format! ( "(interp {})",
+      true_node . effect_on_parent . repr_in_client () )); }
   if true_node . indefinitive {
     code_parts . push ( "indefinitive" . to_string () ); }
 
