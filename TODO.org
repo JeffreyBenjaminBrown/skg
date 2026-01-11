@@ -9,11 +9,7 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** fix *_indefinitive_* users
-**** maybe_add_subscribeeCol_branch
-     should case on OrgNodeKind only once.
-     Scaffolds should throw an error (the caller should not consider adding a SubscribeeCol branch under a Scaffold).
-     Don't use is_indefinitive_truenode().
+*** ONGOING fix *_indefinitive_* users
 **** get_pid_in_pairtree
      Scaffolds should throw an error (the caller should not consider getting a PID branch from a Scaffold).
      Don't use is_indefinitive_truenode().

@@ -27,12 +27,15 @@ pub async fn maybe_add_subscribeeCol_branch (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  { // Skip indefinitive nodes.
-    let is_indefinitive : bool =
+  { let node_kind: OrgNodeKind =
       read_at_node_in_tree (
-        tree, node_id,
-        |np| np . orgnode . is_indefinitive_truenode () ) ?;
-    if is_indefinitive { return Ok (( )); }}
+        tree, node_id, |np| np.orgnode.kind.clone() )?;
+    match node_kind {
+      OrgNodeKind::Scaff ( _ ) =>
+        return Err ( "maybe_add_subscribeeCol_branch: \
+                      caller should not pass a Scaffold".into() ),
+      OrgNodeKind::True ( t ) => // skip indefinitive nodes
+        if t.indefinitive { return Ok(( )) }} }
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     if unique_scaffold_child (
@@ -68,11 +71,13 @@ pub async fn maybe_add_subscribeeCol_branch (
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
           tree, hidden_outside_col_nid, & hidden_id,
-          EffectOnParent::HiddenFromSubscribees, config, driver ). await ?; }}
+          EffectOnParent::HiddenFromSubscribees, config, driver
+        ). await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
         tree, subscribee_col_nid, & subscribee_id,
-        EffectOnParent::Subscribee, config, driver ) . await ?; }}
+        EffectOnParent::Subscribee, config, driver
+      ). await ?; }}
   Ok (( )) }
 
 /// If this node is a Subscribee,
