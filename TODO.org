@@ -8,16 +8,12 @@
 *** definitive OrgNode != definitive skgnode
 **** One is that the orgnode stuff is intended as definitive.
 **** SkgNode might need definitive modifiers for each field.
-** ONGOING futzing the refactor
-*** DONE files that changed a lot since main
+** DONE files that changed a lot since main
 server/from_text/buffer_to_orgnodes/validate_tree.rs
   annoying, minor
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-** ONGOING more bimaps for parsing
-*** DONE ViewRequest
-*** EffectOnParent
 ** these seem redundant
 clobberIndefinitiveOrgnode
 indefinitize_content_subtree

@@ -292,7 +292,8 @@ pub async fn completeDefinitiveOrgnode (
 fn categorize_children_by_treatment (
   tree    : &PairTree,
   node_id : NodeId,
-) -> Result < ( Vec < NodeId >, Vec < NodeId > ), Box<dyn Error> > {
+) -> Result < ( Vec <NodeId>, Vec <NodeId> ),
+              Box<dyn Error> > {
   let mut content_child_ids : Vec < NodeId > =
     Vec::new ();
   let mut non_content_child_ids : Vec < NodeId > =
