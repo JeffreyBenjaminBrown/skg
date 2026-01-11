@@ -45,7 +45,7 @@ async fn test_completeAliasCol_logic (
     " };
 
   let orgnode_forest : Tree < OrgNode > =
-    org_to_uninterpreted_nodes ( org_text ) ?;
+    org_to_uninterpreted_nodes ( org_text ) ?.0;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );
 
@@ -187,7 +187,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
     " };
 
   let orgnode_forest : Tree < OrgNode > =
-    org_to_uninterpreted_nodes ( org_text ) ?;
+    org_to_uninterpreted_nodes ( org_text ) ?.0;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );
 

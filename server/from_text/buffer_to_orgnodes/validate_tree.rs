@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind, EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, EffectOnParent, Scaffold};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
@@ -13,6 +13,12 @@ use typedb_driver::TypeDBDriver;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
+///
+/// SHARES RESPONSIBILITY for error detection
+/// with 'org_to_uninterpreted_nodes',
+/// which runs earlier and detects a few errors that this one can't,
+/// because this one acts on a tree of OrgNodes rather than raw text.
+/// (Namely, Alias and AliasCol should not have body text.)
 ///
 /// ASSUMES that in the "forest" (tree with ForestRoot):
 /// - IDs have been replaced with PIDs. Otherwise two org nodes
@@ -90,68 +96,81 @@ fn validate_node_and_children (
         orgnode.clone() )); }
 
   match &orgnode.kind {
-    OrgNodeKind::Scaff ( Scaffold::AliasCol ) => {
-      if orgnode.body().is_some() {
-        errors.push(
-          BufferValidationError::Body_of_AliasCol(
-            orgnode.clone() )); }}
-    OrgNodeKind::Scaff ( Scaffold::Alias ( _ ) ) => {
-      if orgnode.body().is_some() {
-        errors.push(
-          BufferValidationError::Body_of_Alias(
-            orgnode.clone() )); }
+    OrgNodeKind::Scaff ( s ) =>
+      validate_scaffold ( s, orgnode, parent_kind, errors ),
+    OrgNodeKind::True ( t ) =>
+      validate_truenode ( t, orgnode, node_ref, parent_kind, config, errors ),
+  };
+
+  for child in node_ref.children()
+  { validate_node_and_children ( // recurse
+      child, config, errors ); }}
+
+fn validate_scaffold (
+  scaffold    : &Scaffold,
+  orgnode     : &OrgNode,
+  parent_kind : Option<&OrgNodeKind>,
+  errors      : &mut Vec<BufferValidationError>
+) {
+  // Note: Body_of_AliasCol and Body_of_Alias are detected during parsing
+  // (in from_parsed), not here, because Scaffold nodes don't store body data.
+  match scaffold {
+    Scaffold::Alias ( _ ) => {
       if ! matches!(parent_kind,
                     Some(OrgNodeKind::Scaff(Scaffold::AliasCol))) {
         errors.push(
           BufferValidationError::Alias_with_no_AliasCol_Parent(
             orgnode.clone() )); }}
-    OrgNodeKind::Scaff ( _ ) => {}
+    _ => {} }}
 
-    OrgNodeKind::True ( t ) => {
-      if matches!(parent_kind,
-                  Some(OrgNodeKind::Scaff(Scaffold::AliasCol)))
-         && t.id_opt.is_some()
-      { errors.push(
-          BufferValidationError::Child_of_AliasCol_with_ID(
-            orgnode.clone() )); }
-      { let aliascol_count : usize =
-          node_ref.children() .filter(
-            |c| matches!( &c.value().kind,
-                          OrgNodeKind::Scaff(Scaffold::AliasCol)) )
-          .count();
-        if aliascol_count > 1
-        { errors.push(
-            BufferValidationError::Multiple_AliasCols_in_Children(
-              orgnode.clone() )); }}
-      if ! t.indefinitive { // Check for duplicate content children
-        let mut seen_content_ids : HashSet < ID > =
-          HashSet::new ();
-        for child in node_ref.children() {
-          let child_orgnode : &OrgNode = child.value();
-          if let OrgNodeKind::True ( ct ) = &child_orgnode.kind {
-            if ct.effect_on_parent == EffectOnParent::Content {
-              if let Some ( child_skgid ) = &ct.id_opt {
-                if ! seen_content_ids.insert( child_skgid.clone() ) {
-                  errors.push(
-                    BufferValidationError::DuplicatedContent(
-                      child_skgid.clone() )); }} }} }}
-      if let Some ( source_str ) = &t.source_opt {
-        if ! config.sources.contains_key( source_str ) {
-          let source_nickname : SourceNickname =
-            SourceNickname::from( source_str.as_str() );
-          let skgid : ID = t.id_opt.clone()
-            .unwrap_or_else(|| ID::from("<no ID>"));
-          errors.push(
-            BufferValidationError::SourceNotInConfig(
-              skgid, source_nickname )); }}
-      if t.indefinitive && t.edit_request.is_some() {
-        errors.push(
-          BufferValidationError::IndefinitiveWithEditRequest(
-            orgnode.clone() )); }} };
-
-  for child in node_ref.children()
-  { validate_node_and_children ( // recurse
-      child, config, errors ); }}
+fn validate_truenode (
+  t           : &TrueNode,
+  orgnode     : &OrgNode,
+  node_ref    : ego_tree::NodeRef<OrgNode>,
+  parent_kind : Option<&OrgNodeKind>,
+  config      : &SkgConfig,
+  errors      : &mut Vec<BufferValidationError>
+) {
+  if matches!(parent_kind,
+              Some(OrgNodeKind::Scaff(Scaffold::AliasCol)))
+     && t.id_opt.is_some()
+  { errors.push(
+      BufferValidationError::Child_of_AliasCol_with_ID(
+        orgnode.clone() )); }
+  { let aliascol_count : usize =
+      node_ref.children() .filter(
+        |c| matches!( &c.value().kind,
+                      OrgNodeKind::Scaff(Scaffold::AliasCol)) )
+      .count();
+    if aliascol_count > 1
+    { errors.push(
+        BufferValidationError::Multiple_AliasCols_in_Children(
+          orgnode.clone() )); }}
+  if ! t.indefinitive { // Check for duplicate content children
+    let mut seen_content_ids : HashSet < ID > =
+      HashSet::new ();
+    for child in node_ref.children() {
+      let child_orgnode : &OrgNode = child.value();
+      if let OrgNodeKind::True ( ct ) = &child_orgnode.kind {
+        if ct.effect_on_parent == EffectOnParent::Content {
+          if let Some ( child_skgid ) = &ct.id_opt {
+            if ! seen_content_ids.insert( child_skgid.clone() ) {
+              errors.push(
+                BufferValidationError::DuplicatedContent(
+                  child_skgid.clone() )); }} }} }}
+  if let Some ( source_str ) = &t.source_opt {
+    if ! config.sources.contains_key( source_str ) {
+      let source_nickname : SourceNickname =
+        SourceNickname::from( source_str.as_str() );
+      let skgid : ID = t.id_opt.clone()
+        .unwrap_or_else(|| ID::from("<no ID>"));
+      errors.push(
+        BufferValidationError::SourceNotInConfig(
+          skgid, source_nickname )); }}
+  if t.indefinitive && t.edit_request.is_some() {
+    errors.push(
+      BufferValidationError::IndefinitiveWithEditRequest(
+        orgnode.clone() )); }}
 
 /// For each node in the forest, if it has a definitive view request,
 /// verify that:

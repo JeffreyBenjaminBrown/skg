@@ -22,7 +22,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_consistent: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input_consistent).unwrap();
+    org_to_uninterpreted_nodes(input_consistent).unwrap().0;
   let (inconsistent_ids_consistent, _, _) =
     find_inconsistent_instructions(&forest_consistent);
   assert_eq!(inconsistent_ids_consistent.len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
@@ -38,7 +38,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_inconsistent: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input_inconsistent).unwrap();
+    org_to_uninterpreted_nodes(input_inconsistent).unwrap().0;
   let (inconsistent_ids, _, _) = find_inconsistent_instructions(&forest_inconsistent);
 
   assert_eq!(inconsistent_ids.len(), 2, "Should find exactly 2 conflicting IDs");
@@ -54,7 +54,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_no_ids: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input_no_ids).unwrap();
+    org_to_uninterpreted_nodes(input_no_ids).unwrap().0;
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
@@ -87,7 +87,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap();
+        org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 

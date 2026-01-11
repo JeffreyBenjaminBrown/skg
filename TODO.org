@@ -9,24 +9,6 @@ server/from_text/buffer_to_orgnodes/validate_tree.rs
 server/types/orgnode.rs
 server/serve/parse_metadata_sexp.rs
 server/org_to_text.rs
-*** what's up with this?
-**** the comment
-  // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
-  // because Scaffold nodes don't store body data. These validations should happen during parsing.
-  // Remaining errors: Child_of_AliasCol_with_ID(1), Child_of_Alias(1), Alias_with_no_AliasCol_Parent(3),
-  //                   AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1), RootWithoutSource(1) = 8
-**** my concern
-     That passage seems to test parsing.
-     If the error wouldn't happen there, where would it happen?
-*** why did this new RootWithoutSource test need to be added?
-+  { let root_without_source_errors: Vec<&BufferValidationError> = errors.iter()
-+    .filter(|e| matches!(e, BufferValidationError::RootWithoutSource(_)))
-+    .collect();
-+  assert_eq!(root_without_source_errors.len(), 1, "Should find 1 RootWithoutSource error");
-+    if let BufferValidationError::RootWithoutSource(node)
-+    = root_without_source_errors[0] {
-+      assert_eq!(node.title(), "Root level Alias (bad)",
-+                 "RootWithoutSource error should come from root-level Alias"); }}
 *** these seem redundant
 clobberIndefinitiveOrgnode
 indefinitize_content_subtree

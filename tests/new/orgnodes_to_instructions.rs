@@ -25,7 +25,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -71,7 +71,7 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -106,7 +106,7 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -133,7 +133,7 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let result : Result<Vec<(SkgNode, NonMerge_NodeAction)>, String> =
     naive_saveinstructions_from_forest(forest);
 
@@ -155,7 +155,7 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -181,7 +181,7 @@ fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -213,7 +213,7 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let result = naive_saveinstructions_from_forest(forest);
 
   assert!(result.is_err(), "Should return error for missing ID");
@@ -242,7 +242,7 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -271,7 +271,7 @@ fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
             ** (skg (id ref_section) (source main) (code (interp parentIgnores))) Reference Section
         "};
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
 

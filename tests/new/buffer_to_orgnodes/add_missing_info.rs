@@ -51,14 +51,14 @@ async fn test_add_missing_info_logic (
         "};
   let mut after_adding_missing_info: Tree<OrgNode> =
     org_to_uninterpreted_nodes(
-      with_missing_info).unwrap();
+      with_missing_info).unwrap().0;
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
     &config.db_name,
     driver ).await ?;
   let expected_forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(
-      without_missing_info ). unwrap();
+      without_missing_info ). unwrap().0;
   assert_eq!(
     expected_forest.root().children().count(),
     1,
@@ -124,13 +124,13 @@ async fn test_source_inheritance_logic (
         "};
 
   let mut actual_forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes( input ).unwrap();
+    org_to_uninterpreted_nodes( input ).unwrap().0;
   add_missing_info_to_forest(
     &mut actual_forest,
     &config.db_name,
     driver ).await ?;
   let expected_forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes( expected ).unwrap();
+    org_to_uninterpreted_nodes( expected ).unwrap().0;
 
   assert!(
     compare_orgnode_forests(

@@ -2,6 +2,7 @@
 /// I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
+use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{
     parse_metadata_to_orgnodemd, default_metadata, from_parsed, OrgnodeMetadata
 };
@@ -26,10 +27,21 @@ struct OrgNodeLineCol {
 
 /// Parse org text into a "forest": a tree with a ForestRoot.
 /// Each level-1 headline becomes a child of the ForestRoot.
+/// Returns (tree, parsing_errors).
+///
+/// SHARES RESPONSIBILITY for error detection
+/// with 'find_buffer_errors_for_saving', which runs later.
+/// That function detects the majority of possible errors,
+/// but it can't detect them all because it uses a tree of OrgNodes,
+/// which permit fewer kinds of invalid state than the raw text.
+/// (For instance, Alias and AliasCol cannot have bodies,
+/// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result<Tree<OrgNode>, String> {
+) -> Result < ( Tree<OrgNode>, Vec<BufferValidationError> ),
+              String > {
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let forest_root_treeid: NodeId = forest.root().id();
@@ -38,8 +50,11 @@ pub fn org_to_uninterpreted_nodes(
     let org_node_line_cols: Vec<OrgNodeLineCol> =
       divide_into_orgNodeLineCols(input)?;
     org_node_line_cols } {
-    let (level, orgnode): (usize, OrgNode) =
-      linecol_to_orgnode(org_node_line_col)?;
+    let (level, orgnode, error_opt)
+      : (usize, OrgNode, Option<BufferValidationError>)
+      = linecol_to_orgnode(org_node_line_col)?;
+    if let Some ( error ) = error_opt {
+      parsing_errors . push ( error ); }
     // Adjust treeid_stack to proper level (ForestRoot is level 0, tree roots are level 1)
     while treeid_stack.len() > level {
       treeid_stack.pop(); }
@@ -55,7 +70,7 @@ pub fn org_to_uninterpreted_nodes(
         let mut parent_mut = forest.get_mut(parent_treeid).unwrap();
         parent_mut.append(orgnode).id() };
       new_treeid } ); }
-  Ok(forest) }
+  Ok ( ( forest, parsing_errors ) ) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.
@@ -98,10 +113,11 @@ fn divide_into_orgNodeLineCols (
 
 /// Create a OrgNode from an OrgNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns an error if the metadata cannot be parsed.
+/// Returns (level, OrgNode, Option<BufferValidationError>).
 fn linecol_to_orgnode(
   org_node_line_col: &OrgNodeLineCol
-) -> Result<(usize, OrgNode), String> {
+) -> Result < ( usize, OrgNode, Option<BufferValidationError> ),
+              String > {
   let (level, metadata_option, title): HeadlineInfo =
     org_node_line_col.headline.clone();
   let body_lines: &[String] = &org_node_line_col.body;
@@ -113,8 +129,10 @@ fn linecol_to_orgnode(
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
-  Ok (( level,
-        from_parsed ( &metadata, title, body_text ) )) }
+  let ( orgnode, error_opt )
+    : ( OrgNode, Option<BufferValidationError> )
+    = from_parsed ( &metadata, title, body_text );
+  Ok ( ( level, orgnode, error_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.
 /// Returns Ok(HeadlineInfo) if it's a valid headline with valid metadata.

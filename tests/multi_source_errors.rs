@@ -59,7 +59,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
     let mut forest: Tree<OrgNode> =
-      org_to_uninterpreted_nodes (&buffer_text)?;
+      org_to_uninterpreted_nodes (&buffer_text)?.0;
     add_missing_info_to_forest(
       &mut forest, &config.db_name, &driver).await?;
     let errors: Vec<BufferValidationError> =

@@ -9,6 +9,7 @@
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
+use crate::types::errors::BufferValidationError;
 use crate::types::orgnode::{TruenodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode, EffectOnParent,
@@ -119,31 +120,44 @@ pub fn default_metadata() -> OrgnodeMetadata {
 
 /// Create an OrgNode from parsed metadata components.
 /// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
+/// Returns (OrgNode, Option<BufferValidationError>) - error if Scaffold has body.
 pub fn from_parsed (
   metadata : &OrgnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> OrgNode {
-  let interp  = &metadata . code . interp;
-  let kind =
+) -> ( OrgNode, Option < BufferValidationError > ) {
+  let interp = &metadata . code . interp;
+  let (kind, error) =
     if let Some ( scaffold ) = interp . to_scaffold ( &title ) {
-      OrgNodeKind::Scaff ( scaffold )
+      let error = if body . is_some () {
+        Some ( match &scaffold {
+          Scaffold::AliasCol =>
+            BufferValidationError::Body_of_AliasCol (
+              title.clone () ),
+          Scaffold::Alias ( _ ) =>
+            BufferValidationError::Body_of_Alias (
+              title.clone () ),
+          _ => BufferValidationError::Other ( format! ( "Scaffold {:?} should not have a body", scaffold ) ), } )
+      } else { None };
+      ( OrgNodeKind::Scaff ( scaffold ), error )
     } else if let Some ( effect ) = interp . to_effect_on_parent () {
-      OrgNodeKind::True ( TrueNode {
-        title,
-        body,
-        id_opt           : metadata . id . clone (),
-        source_opt       : metadata . source . clone (),
-        effect_on_parent : effect,
-        indefinitive     : metadata . code . indefinitive,
-        cycle            : metadata . cycle,
-        relationships    : metadata . relationships . clone (),
-        edit_request     : metadata . code . editRequest . clone (),
-        view_requests    : metadata . code . viewRequests . clone (), } )
+      ( OrgNodeKind::True ( TrueNode {
+          title,
+          body,
+          id_opt           : metadata . id . clone (),
+          source_opt       : metadata . source . clone (),
+          effect_on_parent : effect,
+          indefinitive     : metadata . code . indefinitive,
+          cycle            : metadata . cycle,
+          relationships    : metadata . relationships . clone (),
+          edit_request     : metadata . code . editRequest . clone (),
+          view_requests    : metadata . code . viewRequests . clone (), } ),
+        None )
     } else { panic! ( "Invalid Interp: {:?}", interp ) };
-  OrgNode { focused : metadata.focused,
-            folded  : metadata.folded,
-            kind } }
+  ( OrgNode { focused : metadata.focused,
+              folded  : metadata.folded,
+              kind },
+    error ) }
 
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.

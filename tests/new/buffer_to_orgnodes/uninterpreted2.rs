@@ -25,7 +25,7 @@ fn test_org_to_uninterpreted_nodes2() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
 
   let forest_roots: Vec<_> = forest.root().children().collect();
   assert_eq!(forest_roots.len(), 2, "Should have exactly 2 tree roots");
@@ -77,7 +77,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
 
   // Get tree roots (children of ForestRoot)
   let tree_roots: Vec<_> = forest.root().children().collect();
@@ -119,7 +119,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
 
   let tree_roots: Vec<_> = forest.root().children().collect();
   assert_eq!(tree_roots.len(), 2);
@@ -160,7 +160,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   let tree_roots: Vec<_> = forest.root().children().collect();
 
   assert_eq!(tree_roots.len(), 2);
@@ -188,7 +188,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
 
   // Get tree roots (children of ForestRoot)
   let tree_roots: Vec<_> = forest.root().children().collect();
@@ -213,13 +213,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   // ForestRoot should have no children
   assert_eq!(forest.root().children().count(), 0);
 
   let input2 = "   \n  \n  ";
   let trees2: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input2).unwrap();
+    org_to_uninterpreted_nodes(input2).unwrap().0;
   assert_eq!(trees2.root().children().count(), 0);
 }
 
@@ -233,7 +233,7 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
         "};
 
   let forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input).unwrap();
+    org_to_uninterpreted_nodes(input).unwrap().0;
   assert_eq!(forest.root().children().count(), 0,
              "Should have no tree roots when there are no headlines");
 }

@@ -33,18 +33,22 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 * (skg (id conflict) (source main)) Same ID but no toDelete flag
             "};
 
-      let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(
-          input_with_errors).unwrap();
-      let errors: Vec<BufferValidationError> =
+      let (forest, parsing_errors)
+        : (Tree<OrgNode>, Vec<BufferValidationError>)
+        = org_to_uninterpreted_nodes(
+            input_with_errors).unwrap();
+      let validation_errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
-  // NOTE: Body_of_AliasCol and Body_of_Alias errors are not detectable with OrgNode
-  // because Scaffold nodes don't store body data. These validations should happen during parsing.
-  // Remaining errors: Child_of_AliasCol_with_ID(1), Child_of_Alias(1), Alias_with_no_AliasCol_Parent(3),
-  //                   AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1), RootWithoutSource(1) = 8
-  assert_eq!(errors.len(), 8,
-             "Should find exactly 8 validation errors");
+      // Combine parsing errors with validation errors
+      let mut errors: Vec<BufferValidationError> = parsing_errors;
+      errors.extend(validation_errors);
+
+  // Errors: Body_of_AliasCol(1), Body_of_Alias(1), Child_of_AliasCol_with_ID(1), Child_of_Alias(1),
+  //         Alias_with_no_AliasCol_Parent(3), AmbiguousDeletion(1), Multiple_Defining_Orgnodes(1),
+  //         RootWithoutSource(1) = 10
+  assert_eq!(errors.len(), 10,
+             "Should find exactly 10 validation errors");
 
   { let aliasCol_child_id_errors: Vec<&BufferValidationError> = errors.iter()
     .filter(|e| matches!(e, BufferValidationError::Child_of_AliasCol_with_ID(_)))
@@ -99,6 +103,25 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
     = root_without_source_errors[0] {
       assert_eq!(node.title(), "Root level Alias (bad)",
                  "RootWithoutSource error should come from root-level Alias"); }}
+
+  { let body_of_aliascol_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Body_of_AliasCol(_)))
+    .collect();
+  assert_eq!(body_of_aliascol_errors.len(), 1, "Should find 1 Body_of_AliasCol error");
+    if let BufferValidationError::Body_of_AliasCol(title)
+    = body_of_aliascol_errors[0] {
+      assert_eq!(title, "AliasCol with body problem",
+                 "Body_of_AliasCol error should come from correct node"); }}
+
+  { let body_of_alias_errors: Vec<&BufferValidationError> = errors.iter()
+    .filter(|e| matches!(e, BufferValidationError::Body_of_Alias(_)))
+    .collect();
+  assert_eq!(body_of_alias_errors.len(), 1, "Should find 1 Body_of_Alias error");
+    if let BufferValidationError::Body_of_Alias(title)
+    = body_of_alias_errors[0] {
+      assert_eq!(title, "Alias with body problem and orphaned",
+                 "Body_of_Alias error should come from correct node"); }}
+
       Ok(())
     })
   )
@@ -123,10 +146,11 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let forest: Tree<OrgNode> =
+      let (forest, parsing_errors): (Tree<OrgNode>, Vec<BufferValidationError>) =
         org_to_uninterpreted_nodes(valid_input).unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver).await?;
 
+      assert_eq!(parsing_errors.len(), 0, "Should find no parsing errors in valid input");
       assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
       Ok(())
     })
@@ -169,7 +193,7 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap();
+        org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
@@ -205,7 +229,7 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap();
+        org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
@@ -241,7 +265,7 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
             "};
 
       let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap();
+        org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
@@ -272,7 +296,7 @@ fn test_root_without_source_validation(
             "};
 
       let forest: Tree<OrgNode> =
-        org_to_uninterpreted_nodes(input).unwrap();
+        org_to_uninterpreted_nodes(input).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
       assert_eq!(errors.len(), 1,
@@ -309,7 +333,7 @@ fn test_nonexistent_source_validation(
                   * (skg (id root2) (source invalid_source)) Root with nonexistent source
               "};
         let forest: Tree<OrgNode> =
-          org_to_uninterpreted_nodes(input).unwrap();
+          org_to_uninterpreted_nodes(input).unwrap().0;
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&forest, config, driver).await?;
         let nonexistent_source_errors: Vec<&BufferValidationError> =

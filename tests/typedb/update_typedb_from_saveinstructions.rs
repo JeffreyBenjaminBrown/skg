@@ -33,7 +33,7 @@ fn test_update_nodes_and_relationships2 (
     "};
 
     let forest : Tree<OrgNode> =
-      org_to_uninterpreted_nodes ( org_text )?;
+      org_to_uninterpreted_nodes ( org_text )?.0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =

@@ -20,7 +20,7 @@ fn test_inconsistent_delete() {
         * (skg (id 1) (source main) (code toDelete)) 2
     "};
 
-  let forest = org_to_uninterpreted_nodes(input).unwrap();
+  let forest = org_to_uninterpreted_nodes(input).unwrap().0;
   let (inconsistent_deletes, _, _) = find_inconsistent_instructions(&forest);
   assert!(!inconsistent_deletes.is_empty(),
           "Should detect inconsistent toDelete");
@@ -54,7 +54,7 @@ fn test_deletions_excluded (
             ** (skg (id 3) (source main)) 3
         "};
 
-      let forest = org_to_uninterpreted_nodes(input)?;
+      let forest = org_to_uninterpreted_nodes(input)?.0;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
@@ -90,7 +90,7 @@ fn test_defining_node_defines (
             ** (skg (id 3) (source main)) 3
         "};
 
-      let forest = org_to_uninterpreted_nodes(input)?;
+      let forest = org_to_uninterpreted_nodes(input)?.0;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
@@ -120,7 +120,7 @@ fn test_adding_without_definer (
             ** (skg (id 4) (source main)) 4
             ** (skg (id 4) (source main) (code indefinitive)) 4 again
         "};
-      let forest = org_to_uninterpreted_nodes(input)?;
+      let forest = org_to_uninterpreted_nodes(input)?.0;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;

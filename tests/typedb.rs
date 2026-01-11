@@ -359,7 +359,7 @@ async fn test_recursive_document (
     ) . await ?;
   let result_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
-    . map_err ( |e| format! ( "Parse error: {}", e ) ) ?;
+    . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
 
   let tree_roots : Vec<_> =
     result_forest.root().children().collect();

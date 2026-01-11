@@ -37,7 +37,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let orgnode_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?;
+    org_to_uninterpreted_nodes(input)?.0;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -72,7 +72,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?;
+    org_to_uninterpreted_nodes(expected)?.0;
 
   assert!(
     compare_orgnode_portions_of_pairforest_and_orgnodeforest(
@@ -107,7 +107,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let orgnode_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?;
+    org_to_uninterpreted_nodes(input)?.0;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -157,7 +157,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?;
+    org_to_uninterpreted_nodes(expected)?.0;
 
   assert!(
     compare_orgnode_portions_of_pairforest_and_orgnodeforest(
@@ -192,7 +192,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let orgnode_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?;
+    org_to_uninterpreted_nodes(input)?.0;
   assert_eq!(orgnode_trees.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -242,7 +242,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?;
+    org_to_uninterpreted_nodes(expected)?.0;
 
   assert!(
     compare_orgnode_portions_of_pairforest_and_orgnodeforest(

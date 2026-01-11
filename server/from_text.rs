@@ -32,9 +32,10 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
       Vec<SaveInstruction>,
       Vec<MergeInstructionTriple>
     ), SaveError> {
-  let mut orgnode_forest : Tree<OrgNode> =
-    org_to_uninterpreted_nodes ( buffer_text )
-    . map_err ( SaveError::ParseError ) ?;
+  let ( mut orgnode_forest, parsing_errors )
+    : ( Tree<OrgNode>, Vec<BufferValidationError> )
+    = org_to_uninterpreted_nodes ( buffer_text )
+      . map_err ( SaveError::ParseError ) ?;
   add_missing_info_to_forest (
     // Precedes all validation functions.
     // For why, see the header comment of one of them,
@@ -43,10 +44,11 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
   ). await . map_err ( SaveError::DatabaseError ) ?;
 
   { // If saving is impossible, don't.
-    let validation_errors : Vec<BufferValidationError> =
+    let mut validation_errors : Vec<BufferValidationError> =
       find_buffer_errors_for_saving (
         & orgnode_forest, config, driver
       ) . await . map_err ( SaveError::DatabaseError ) ?;
+    validation_errors . extend ( parsing_errors );
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}

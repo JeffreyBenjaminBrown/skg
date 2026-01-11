@@ -70,7 +70,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
 
   { // Test running on root with empty visited
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_org_text ) ?;
+      org_to_uninterpreted_nodes ( input_org_text ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
@@ -97,7 +97,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
 
   { // Test running on root with 'a' in visited
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_org_text ) ?;
+      org_to_uninterpreted_nodes ( input_org_text ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
@@ -130,7 +130,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
 
   { // Test running on second node (c)
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_org_text ) ?;
+      org_to_uninterpreted_nodes ( input_org_text ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let second_node_id : ego_tree::NodeId =
@@ -186,7 +186,7 @@ async fn test_visited_and_indefinitive_logic (
     // Test with empty visited
     {
       let orgnode_forest : Tree < OrgNode > =
-        org_to_uninterpreted_nodes ( input_org_text ) ?;
+        org_to_uninterpreted_nodes ( input_org_text ) ?.0;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
@@ -213,7 +213,7 @@ async fn test_visited_and_indefinitive_logic (
     // Test with 'a' in visited - should mark as repeated
     {
       let orgnode_forest : Tree < OrgNode > =
-        org_to_uninterpreted_nodes ( input_org_text ) ?;
+        org_to_uninterpreted_nodes ( input_org_text ) ?.0;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
@@ -252,7 +252,7 @@ async fn test_visited_and_indefinitive_logic (
     // Running from root
     {
       let orgnode_forest : Tree < OrgNode > =
-        org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
+        org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?.0;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
@@ -280,7 +280,7 @@ async fn test_visited_and_indefinitive_logic (
     // Running from second node
     {
       let orgnode_forest : Tree < OrgNode > =
-        org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?;
+        org_to_uninterpreted_nodes ( input_org_text_self_ref ) ?.0;
       let mut forest : PairTree =
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
@@ -340,7 +340,7 @@ async fn test_visited_and_not_indefinitive_logic (
   // Test with 'a' in visited
   {
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_org_text ) ?;
+      org_to_uninterpreted_nodes ( input_org_text ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
@@ -375,7 +375,7 @@ async fn test_visited_and_not_indefinitive_logic (
   // Test with empty visited
   {
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_org_text ) ?;
+      org_to_uninterpreted_nodes ( input_org_text ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
@@ -413,7 +413,7 @@ async fn test_visited_and_not_indefinitive_logic (
       " };
 
     let orgnode_forest : Tree < OrgNode > =
-      org_to_uninterpreted_nodes ( input_with_existing_content ) ?;
+      org_to_uninterpreted_nodes ( input_with_existing_content ) ?.0;
     let mut forest : PairTree =
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
@@ -464,7 +464,7 @@ async fn test_false_content_logic (
     " };
 
   let orgnode_forest : Tree < OrgNode > =
-    org_to_uninterpreted_nodes ( input_org_text ) ?;
+    org_to_uninterpreted_nodes ( input_org_text ) ?.0;
   let mut forest : PairTree =
     orgnode_forest_to_paired ( orgnode_forest );
   let root_id : ego_tree::NodeId =
