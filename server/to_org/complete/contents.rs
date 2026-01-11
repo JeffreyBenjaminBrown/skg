@@ -2,7 +2,7 @@
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
-  get_pid_in_pairtree, is_indefinitive, collect_child_treeids,
+  get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids,
   mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::{
@@ -98,7 +98,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
         tree, node_id, config, typedb_driver ). await ?;
       mark_if_visited_or_repeat_or_cycle (
         tree, node_id, visited ) ?;
-      { if is_indefinitive ( tree, node_id ) ? {
+      { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, node_id ) ?;
         } else { // futz with the orgnode and its content children

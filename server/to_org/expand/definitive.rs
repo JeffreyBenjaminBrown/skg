@@ -11,7 +11,7 @@ use crate::to_org::complete::sharing::maybe_add_hiddenInSubscribeeCol_branch;
 use crate::to_org::util::{
   build_node_branch_minus_content,
   get_pid_in_pairtree,
-  VisitedMap, is_indefinitive,
+  VisitedMap, truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -253,7 +253,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
           Some((tree, parent_treeid)),
           &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
-      if ! is_indefinitive ( tree, new_treeid ) ? {
+      if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (

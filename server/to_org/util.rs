@@ -147,15 +147,18 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   node_id  : NodeId,
   visited  : &mut VisitedMap,
 ) -> Result<(), Box<dyn Error>> {
-  let pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
+  let pid : ID = // Will error if node is a Scaffold.
+    get_pid_in_pairtree ( tree, node_id ) ?;
   detect_and_mark_cycle ( tree, node_id ) ?;
-  if visited . contains_key ( &pid ) {
-    // Mark as indefinitive (it's a repeat).
-    write_at_node_in_tree ( tree, node_id, |np| {
-      np . orgnode . set_indefinitive_if_truenode ( true ); } ) ?; }
   let is_indefinitive : bool =
-    read_at_node_in_tree ( tree, node_id, |np|
-      np . orgnode . is_indefinitive_truenode () ) ?;
+    write_at_node_in_tree ( tree, node_id, |np| {
+      let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+        else { unreachable!(
+                 "get_pid_in_pairtree verified TrueNode"); };
+      if visited . contains_key ( &pid ) {
+        // It's a repeat, so it should be indefinitive.
+        t . indefinitive = true; }
+      t . indefinitive } ) ?;
   if is_indefinitive {
     clobberIndefinitiveOrgnode ( tree, node_id ) ?;
   } else {
@@ -235,18 +238,19 @@ fn is_ancestor_id (
       Err(_) => return Ok(false), }}
   unreachable!() }
 
-/// Extract the PID from a node in a PairTree.
-/// Returns an error if the node is not found or has no ID.
+/// Errors if the node is a Scaffold, not found, or has no ID.
 pub(super) fn get_pid_in_pairtree (
   tree   : &PairTree,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  read_at_node_in_tree ( tree, treeid, |np|
-    match &np . orgnode . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . clone (),
-      OrgNodeKind::Scaff ( _ ) => None } ) ?
-    . ok_or_else ( || "get_pid_in_pairtree: node has no ID"
-                       . into () ) }
+  let node_kind: OrgNodeKind =
+    read_at_node_in_tree (
+      tree, treeid, |np| np.orgnode.kind.clone() )?;
+  match node_kind {
+    OrgNodeKind::Scaff ( _ ) => Err ( "get_pid_in_pairtree: caller should not pass a Scaffold".into() ),
+    OrgNodeKind::True ( t ) =>
+      t . id_opt . ok_or_else (
+        || "get_pid_in_pairtree: node has no ID" . into( )) }}
 
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
@@ -318,20 +322,28 @@ pub async fn build_node_branch_minus_content (
 
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
+/// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
-  tree    : &PairTree,
+  tree   : &PairTree,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
-  read_at_node_in_tree ( tree, treeid,
-    |nodepair| {
-      if nodepair . orgnode . is_indefinitive_truenode () {
-        return Vec::new (); }
-      match & nodepair . mskgnode {
+  let ( node_kind, mskgnode_opt ) : ( OrgNodeKind, Option<SkgNode> ) =
+    read_at_node_in_tree (
+      tree, treeid,
+      |np| ( np.orgnode.kind.clone(),
+             np.mskgnode.clone() ) )?;
+  match node_kind {
+    OrgNodeKind::Scaff ( _ ) =>
+      Err ( "content_ids_if_definitive_else_empty: \
+             caller should not pass a Scaffold".into() ),
+    OrgNodeKind::True ( t ) => {
+      if t.indefinitive {
+        return Ok ( Vec::new () ); }
+      Ok ( match mskgnode_opt {
         Some ( skgnode ) =>
-          skgnode . contains . clone () . unwrap_or_default (),
+          skgnode . contains . unwrap_or_default (),
         None => Vec::new (),  // No SkgNode yet
-      }}
-  ). map_err ( |e| e . into () ) }
+      } ) } }}
 
 /// Collect ego_tree::NodeIds after
 ///   some member of some generation of a tree.
@@ -364,15 +376,17 @@ pub(super) fn nodes_after_in_generation (
 // ==============================================
 
 /// Check if a node in a PairTree is marked indefinitive.
-/// Returns an error if the node is not found.
-/// TODO ? Is this necessary?
-pub(super) fn is_indefinitive (
-  tree    : &PairTree,
+/// Errs if given a Scaffold.
+pub fn truenode_in_tree_is_indefinitive (
+  tree   : &PairTree,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  read_at_node_in_tree ( tree, treeid, |np|
-    np . orgnode . is_indefinitive_truenode () )
-    . map_err ( |e| e . into () ) }
+  let node_kind: OrgNodeKind =
+    read_at_node_in_tree ( tree, treeid,
+                           |np| np.orgnode.kind.clone() )?;
+  match node_kind {
+    OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
+    OrgNodeKind::True (t)  => Ok (t.indefinitive) }}
 
 /// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.

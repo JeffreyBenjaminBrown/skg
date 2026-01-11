@@ -7,11 +7,11 @@ use ego_tree::{Tree, NodeId};
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
-use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle};
+use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
 use skg::to_org::complete::contents::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode::OrgNode;
+use skg::types::orgnode::{OrgNode, OrgNodeKind};
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
@@ -21,23 +21,24 @@ fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
 /// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
 /// (matches the pattern used in completeAndRestoreNode_collectingViewRequests).
 /// TODO: Unify with completeAndRestoreNode_collectingViewRequests.
-async fn check_and_complete (
+/// Does nothing for Scaffolds.
+async fn check_and_complete_if_truenode (
   tree     : &mut PairTree,
   node_id  : NodeId,
   config   : &SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
   visited  : &mut VisitedMap,
 ) -> Result < (), Box<dyn Error> > {
+  { let node_ref = tree . get ( node_id )
+      . ok_or ( "Node not found" ) ?;
+    let OrgNodeKind::True ( _ ) = & node_ref . value () . orgnode . kind
+      else { return Ok (( )); }; } // Skip Scaffolds.
   ensure_skgnode (
     tree, node_id, config, driver ) . await ?;
   mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
-  let is_indefinitive : bool = {
-    // 'mark_if_visited_or_repeat_or_cycle' may have changed this value.
-    let node_ref = tree . get ( node_id )
-      . ok_or ( "Node not found" ) ?;
-    node_ref . value () .orgnode . is_indefinitive_truenode () };
-  if is_indefinitive {
+  // 'mark_if_visited_or_repeat_or_cycle' may have changed indefinitive.
+  if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
     clobberIndefinitiveOrgnode (
       tree, node_id ) ?;
   } else {
@@ -77,7 +78,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       first_tree_root_id ( &forest );
     let mut visited : VisitedMap =
       VisitedMap::new ();
-    check_and_complete ( // processes root but *not* its descendents
+    check_and_complete_if_truenode ( // processes root but *not* its descendents
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
@@ -106,7 +107,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       VisitedMap::new ();
     // Pre-populate visited with 'a' at a dummy location
     visited . insert ( ID::new ( "a" ), root_id );
-    check_and_complete (
+    check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ). await ?;
 
     let expected_output : &str =
@@ -141,7 +142,7 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
-    check_and_complete (
+    check_and_complete_if_truenode (
       &mut forest, second_node_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
@@ -194,7 +195,7 @@ async fn test_visited_and_indefinitive_logic (
       let mut visited : VisitedMap =
         VisitedMap::new ();
 
-      check_and_complete (
+      check_and_complete_if_truenode (
         &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
@@ -222,7 +223,7 @@ async fn test_visited_and_indefinitive_logic (
         VisitedMap::new ();
       visited . insert ( ID::new ( "a" ), root_id );
 
-      check_and_complete (
+      check_and_complete_if_truenode (
         &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
@@ -260,7 +261,7 @@ async fn test_visited_and_indefinitive_logic (
       let mut visited : VisitedMap =
         VisitedMap::new ();
 
-      check_and_complete (
+      check_and_complete_if_truenode (
         &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
       let expected_output : &str =
@@ -294,7 +295,7 @@ async fn test_visited_and_indefinitive_logic (
         VisitedMap::new ();
       visited . insert ( ID::new ( "d" ), root_id );
 
-      check_and_complete (
+      check_and_complete_if_truenode (
         &mut forest, second_node_id, config, driver, &mut visited ) . await ?;
 
       let expected_output_from_second : &str =
@@ -351,7 +352,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let visited_keys_before : Vec < ID > =
       visited . keys () . cloned () . collect ();
 
-    check_and_complete (
+    check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
@@ -383,7 +384,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
-    check_and_complete (
+    check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
@@ -421,7 +422,7 @@ async fn test_visited_and_not_indefinitive_logic (
     let mut visited : VisitedMap =
       VisitedMap::new ();
 
-    check_and_complete (
+    check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
     let expected_output : &str =
@@ -472,7 +473,7 @@ async fn test_false_content_logic (
   let mut visited : VisitedMap =
     VisitedMap::new ();
 
-  check_and_complete (
+  check_and_complete_if_truenode (
     &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
   let expected_output : &str =

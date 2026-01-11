@@ -12,7 +12,7 @@ mod util {
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode::{OrgNode};
+use skg::types::orgnode::{OrgNode, OrgNodeKind};
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -387,8 +387,10 @@ async fn test_recursive_document (
     "First child should have title 'b'" );
   assert_eq! ( b_node.body(), Some ( &"b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_node.is_indefinitive_truenode(),
-    "First occurrence of 'b' should not be marked as indefinitive" );
+  { let OrgNodeKind::True ( t ) = &b_node.kind
+      else { panic!("expected TrueNode for 'b'"); };
+    assert! ( ! t.indefinitive,
+      "First occurrence of 'b' should not be marked as indefinitive" ); }
 
   // "b" should have 1 child: "c"
   let mut b_children = b_node_ref . children ();
@@ -411,8 +413,10 @@ async fn test_recursive_document (
     "Child of 'c' should have id 'b'" );
   assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat.is_indefinitive_truenode(),
-    "Second occurrence of 'b' should be marked as indefinitive" );
+  { let OrgNodeKind::True ( t ) = &b_repeat.kind
+      else { panic!("expected TrueNode for repeated 'b'"); };
+    assert! ( t.indefinitive,
+      "Second occurrence of 'b' should be marked as indefinitive" ); }
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)
   assert! ( b_repeat_ref . children () . next () . is_none (),
