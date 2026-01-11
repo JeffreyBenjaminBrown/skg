@@ -4,7 +4,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, EffectOnParent,
+    OrgNode, OrgNodeKind, Scaffold,
     mk_indefinitive_orgnode,
     orgnode_from_scaffold };
 use crate::types::skgnode::SkgNode;
@@ -138,14 +138,14 @@ pub fn insert_scaffold_as_child (
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
 
-/// Fetch a node from disk and append it as an indefinitive child with the given effect.
+/// Fetch a node from disk and append it as an indefinitive child.
 pub async fn append_indefinitive_from_disk_as_child (
-  tree      : &mut PairTree,
-  parent_id : NodeId,
-  node_id   : &ID,
-  effect    : EffectOnParent,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  tree           : &mut PairTree,
+  parent_id      : NodeId,
+  node_id        : &ID,
+  parent_ignores : bool,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
@@ -153,16 +153,14 @@ pub async fn append_indefinitive_from_disk_as_child (
   let (id, source, title) : (ID, String, String)
   = match &content_orgnode.kind
   { OrgNodeKind::True(t) => (
-      t.id_opt.as_ref()
-        .ok_or("append_indefinitive_from_disk_as_child: node has no ID")?
-        .clone(),
-      t.source_opt.as_ref()
-        .ok_or("append_indefinitive_from_disk_as_child: node has no source")?
-        .clone(),
-      t.title.clone() ),
+      t . id_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child: node has no ID")?
+        . clone(),
+      t . source_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child: node has no source")?
+        . clone(),
+      t . title . clone( )),
     OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
   let orgnode : OrgNode = mk_indefinitive_orgnode (
-    id, source, title, effect );
+    id, source, title, parent_ignores );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {

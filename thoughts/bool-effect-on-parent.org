@@ -1,212 +1,103 @@
-* Refactor: Replace EffectOnParent with parentIgnores: bool
+* Refactor: Replace EffectOnParent with parent_ignores: bool
 
 ** Overview
 
-The current ~EffectOnParent~ enum has four variants:
-- ~Content~ - normal content relationship (default)
-- ~Subscribee~ - subscription relationship
-- ~ParentIgnores~ - no effect on parent (containerward views)
-- ~HiddenFromSubscribees~ - hidden from subscriptions
+Replace ~EffectOnParent~ enum (Content, Subscribee, ParentIgnores, HiddenFromSubscribees) with a single boolean:
+: parent_ignores: bool  // defaults to false
 
-The proposal is to replace this with a single boolean field:
-: parentIgnores: bool  // defaults to false
+The other discriminators are inferred from tree position:
+- Parent is ~SubscribeeCol~ -> was Subscribee
+- Parent is ~HiddenInSubscribeeCol~ or ~HiddenOutsideOfSubscribeeCol~ -> was HiddenFromSubscribees
+- Otherwise -> was Content (when ~parent_ignores = false~)
 
-The other three discriminators can be inferred from the parent node's scaffold type:
-- If parent is ~SubscribeeCol~ -> was ~Subscribee~
-- If parent is ~HiddenInSubscribeeCol~ or ~HiddenOutsideOfSubscribeeCol~ -> was ~HiddenFromSubscribees~
-- Otherwise -> was ~Content~ (when ~parentIgnores = false~)
+** Implementation Plan
 
-** Functions, by file, that need changing and seem straightforward
+*** Phase 1: Core type changes (server/types/orgnode.rs)
 
-*** server/types/orgnode.rs
-**** EffectOnParent enum
-Delete entirely.
+1. Delete ~EffectOnParent~ enum entirely (including REPRS_IN_CLIENT and methods)
+2. In ~TrueNode~ struct: replace ~effect_on_parent: EffectOnParent~ with ~parent_ignores: bool~
+3. Update ~TrueNode::default()~: set ~parent_ignores: false~
+4. Update ~mk_orgnode~: change parameter to ~parent_ignores: bool~
+5. Update ~mk_definitive_orgnode~: pass ~false~
+6. Update ~mk_indefinitive_orgnode~: change parameter to ~parent_ignores: bool~
 
-**** TrueNode struct
-Replace ~effect_on_parent: EffectOnParent~ with ~parent_ignores: bool~.
+*** Phase 2: Serialization (server/org_to_text.rs)
 
-**** TrueNode::default()
-Already sets ~effect_on_parent: EffectOnParent::Content~. Change to ~parent_ignores: false~.
+In ~true_node_metadata_to_string~:
+- Remove the check for ~effect_on_parent != Content~
+- Only emit ~(interp parentIgnores)~ when ~parent_ignores == true~
 
-**** mk_orgnode
-Change parameter from ~effect_on_parent: EffectOnParent~ to ~parent_ignores: bool~.
+*** Phase 3: Parsing (server/serve/parse_metadata_sexp.rs)
 
-**** mk_definitive_orgnode
-Currently passes ~EffectOnParent::Content~. Change to ~parent_ignores: false~.
+1. Modify ~Interp~ enum: remove Content, Subscribee, ParentIgnores, HiddenFromSubscribees variants. Keep only scaffold variants (ForestRoot, AliasCol, Alias, SubscribeeCol, HiddenOutsideOfSubscribeeCol, HiddenInSubscribeeCol).
 
-**** mk_indefinitive_orgnode
-Change parameter from ~effect_on_parent: EffectOnParent~ to ~parent_ignores: bool~.
+2. Add ~parent_ignores: bool~ field to ~OrgnodeCode~ struct.
 
-*** server/org_to_text.rs
-**** true_node_metadata_to_string
-Currently emits ~(interp X)~ only when not Content. Change to emit ~(interp parentIgnores)~ only when ~parent_ignores == true~.
+3. Delete ~Interp::to_effect_on_parent~ method entirely.
 
-*** server/to_org/complete/contents.rs
-**** line 260 (marking invalid content)
-~t.effect_on_parent = EffectOnParent::ParentIgnores~ -> ~t.parent_ignores = true~
+4. Update ~parse_code_sexp~: when parsing ~(interp X)~:
+   - If X is a scaffold string -> use ~Scaffold::from_repr_in_client~
+   - If X == "parentIgnores" -> set ~code.parent_ignores = true~
+   - If X is "content", "subscribee", or "hiddenFromSubscribees" -> ERROR (not silently ignored)
+   - Otherwise -> error
 
-*** server/to_org/complete/sharing.rs
-**** maybe_add_subscribeeCol_branch (lines 74, 79)
-Calls ~append_indefinitive_from_disk_as_child~ with ~EffectOnParent::HiddenFromSubscribees~ and ~EffectOnParent::Subscribee~. Both become ~parent_ignores: false~ - the tree position determines meaning.
+5. Update ~from_parsed~:
+   - If ~interp~ is a scaffold variant -> build Scaffold
+   - Otherwise -> build TrueNode with ~parent_ignores~ from OrgnodeCode
 
-**** maybe_add_hiddenInSubscribeeCol_branch (line 127)
-Calls ~append_indefinitive_from_disk_as_child~ with ~EffectOnParent::HiddenFromSubscribees~. Becomes ~parent_ignores: false~.
+*** Phase 4: Tree building
 
-*** server/to_org/expand/backpath.rs
-**** prepend_indefinitive_child_with_parent_ignores
-Uses ~EffectOnParent::ParentIgnores~. Change to ~parent_ignores: true~.
+**** server/to_org/complete/contents.rs
+- Line 260: ~t.effect_on_parent = EffectOnParent::ParentIgnores~ -> ~t.parent_ignores = true~
+- ~categorize_children_by_treatment~: change filter to ~!t.parent_ignores~
 
-*** server/types/tree/orgnode_skgnode.rs
-**** append_indefinitive_from_disk_as_child
-Change parameter from ~effect: EffectOnParent~ to ~parent_ignores: bool~.
+**** server/to_org/complete/sharing.rs
+- ~maybe_add_subscribeeCol_branch~: pass ~false~ instead of EffectOnParent variants
+- ~maybe_add_hiddenInSubscribeeCol_branch~: pass ~false~
 
-*** server/serve/handlers/title_matches.rs
-**** format_matches_as_org_mode (line 125)
-Creates OrgNode with ~effect_on_parent: EffectOnParent::ParentIgnores~. Change to ~parent_ignores: true~.
+**** server/to_org/expand/backpath.rs
+- ~prepend_indefinitive_child_with_parent_ignores~: pass ~true~
 
-*** tests/new/buffer_to_orgnodes/uninterpreted2.rs
-**** test assertions (line 97)
-~assert_eq!(parentIgnores_t.effect_on_parent, EffectOnParent::ParentIgnores)~ -> ~assert!(parentIgnores_t.parent_ignores)~
+**** server/to_org/expand/definitive.rs
+- ~execute_definitive_view_request~: replace Subscribee check with: parent is ~Scaffold::SubscribeeCol~
+- ~get_hidden_ids_if_subscribee~: check node is TrueNode with ID, parent is SubscribeeCol, grandparent is TrueNode with ID
+- ~indefinitize_content_subtree~: change filter to ~!t.parent_ignores~
 
-*** tests/merge/merge_nodes.rs
-Any references to EffectOnParent need updating (likely straightforward).
+**** server/types/tree/orgnode_skgnode.rs
+- ~append_indefinitive_from_disk_as_child~: change parameter to ~parent_ignores: bool~
 
-** Functions, by file, that need changing and could be tricky
+*** Phase 5: Validation and instruction generation
 
-*** server/serve/parse_metadata_sexp.rs
-**** Interp enum
-Currently has variants for both scaffolds AND effects (Content, Subscribee, ParentIgnores, HiddenFromSubscribees). Need to decide:
-- Remove effect variants entirely?
-- Keep for backward compatibility / validation?
-***** a
-      Remove effect variants entirely.
-      We'll have to change how orgnodes are serialized for Emacs soon anyway.
-**** to_effect_on_parent method
-Would need to return just a bool, or be removed.
-***** a
-      remove entirely
-**** parse_code_sexp
-Parses ~(interp X)~ where X can be scaffold OR effect strings. Need to decide how to handle legacy effect strings.
-***** a
-      This is a solo project. There are no legacy devs or users.
-*** server/to_org/complete/contents.rs
-**** categorize_children_by_treatment
-Checks ~t.effect_on_parent == EffectOnParent::Content~.
-- Q: Do we need "is Content" or just "parent doesn't ignore and parent isn't a subscription scaffold"?
-***** a
-      The aim is just to partition TrueNode children into TrueNodes the parent does not ignore (what was being called Content) and anything else (both TrueNodes and Saffolds).
-*** server/to_org/expand/definitive.rs
-**** execute_definitive_view_request (lines 106-112)
-Checks ~t.effect_on_parent == EffectOnParent::Subscribee~ to detect if node is a subscribee.
-- Q: Can we instead check if parent is SubscribeeCol?
-***** a
-      Exactly. Verify the parent is a SubscribeeCol, but *also* verify that this node is a TrueNode. (Unless that was already verified earlier in the fucntion.)
-**** get_hidden_ids_if_subscribee (lines 129-131)
-Same check for Subscribee.
-- Q: Same - can check parent scaffold?
-***** a
-      Yes, but check the node itself, the parent and the grandparent. It should be a truenode with an ID. The parent should be a subscribeecol. The grandparent should be a truenode with an ID.
-**** indefinitize_content_subtree (lines 171-173)
-Filters by ~t.effect_on_parent == EffectOnParent::Content~.
-- Q: Do we need "is Content" specifically, or "parent doesn't ignore"?
-***** a
-      We just need it to be a truenode. It can be ParentIgnores or not, but when recursing into its descendents, we ignore ParentIgnores TrueNodes.
-*** server/from_text/buffer_to_orgnodes/validate_tree.rs
-**** validate_truenode (line 155)
-Checks ~ct.effect_on_parent == EffectOnParent::Content~ for duplicate content detection.
-- Q: Is this checking "is a content child" or "is not parent-ignored"?
-***** a
-      Sufficient to trigger the error here is that it be a truenode the parent does not ignore.
-*** server/from_text/buffer_to_orgnodes/add_missing_info.rs
-**** assign_new_id_if_needed
-Checks ~t.effect_on_parent == EffectOnParent::Content~ before assigning UUID.
-- Q: Should Subscribees and HiddenFromSubscribees also get new IDs if missing? Or only Content?
-***** a
-      This looks like it may have been a bug. The interpretation is irrelevant -- content, subscribee, parent ignores, they're all irrelevant. The only relevant condition is whether it's missing an ID. If it is, then assign one.
-*** server/from_text/orgnodes_to_instructions/to_naive_instructions.rs
-**** collect_subscribees (line 138)
-Validates ~t.effect_on_parent != EffectOnParent::Subscribee~ and errors.
-- Q: With inference, any TrueNode under SubscribeeCol is a subscribee. Is explicit validation still needed?
-***** a
-This error from the current code should become no longer possible:
-```
-              if t.effect_on_parent != EffectOnParent::Subscribee {
-                return Err(format!(
-                  "SubscribeeCol has non-Subscribee child: {:?}",
-                  child_node.kind)); }
-```
-But we don't treat all TrueNodes equally: Where parentIgnores=true, we don't collect the ID.
-**** collect_contents_that_are_not_to_delete (line 163)
-Checks ~t.effect_on_parent == EffectOnParent::Content~.
-- Q: Is "Content" the right filter, or "not parent_ignores"?
-***** a
-      Collect every TrueNode for which parent_ignores=false.
-** Problems
+**** server/from_text/buffer_to_orgnodes/validate_tree.rs
+- ~validate_truenode~ (line 155): change filter to ~!ct.parent_ignores~
 
-*** 1. Loss of explicit semantics in serialization
+**** server/from_text/buffer_to_orgnodes/add_missing_info.rs
+- ~assign_new_id_if_needed~: remove effect_on_parent check entirely (bug fix - just check if ID is missing)
 
-Currently the sexp contains ~(interp subscribee)~ which makes the node's role explicit. With inference:
-- The buffer would only show ~(interp parentIgnores)~ when true
-- Subscribee and HiddenFromSubscribees become implicit
+**** server/from_text/orgnodes_to_instructions/to_naive_instructions.rs
+- ~collect_subscribees~: remove validation error for non-Subscribee children; only collect IDs where ~!t.parent_ignores~
+- ~collect_contents_that_are_not_to_delete~: change filter to ~!t.parent_ignores~
 
-This could be confusing for users reading/editing the buffer. They might not realize moving a node changes its meaning.
+*** Phase 6: Handlers
 
-*Counter-argument*: Maybe this is actually clearer? The tree structure is the source of truth.
+**** server/serve/handlers/title_matches.rs
+- ~format_matches_as_org_mode~: set ~parent_ignores: true~
 
-*** 2. Orphaned/detached node ambiguity
+*** Phase 7: Tests
 
-If a node is detached from its parent (e.g., during tree manipulation), we lose the ability to know what its effect was. This might cause bugs in intermediate states during tree operations.
+**** tests/new/buffer_to_orgnodes/uninterpreted2.rs
+- Update assertions to use ~parent_ignores~
+- Update test input strings: remove legacy interp values, parser now errors on them
 
-*** 3. Validation becomes harder
+**** tests/merge/merge_nodes.rs
+- Update any EffectOnParent references
 
-Currently ~collect_subscribees~ validates that all children of ~SubscribeeCol~ have ~effect_on_parent == Subscribee~. With inference, any TrueNode child of SubscribeeCol is *automatically* a subscribee. This means:
-- Misplaced nodes silently become subscribees
-- No way to express "this node is here but shouldn't be treated as a subscribee"
+**** Other test files
+- Search for "interp content", "interp subscribee", "interp hiddenFromSubscribees" and update to remove or replace with valid syntax
 
-*Question*: Is this a feature or a bug? Maybe structural correctness is sufficient?
+** Key decisions
 
-*** 4. The Interp enum in parsing
-
-~parse_metadata_sexp.rs~ uses an intermediate ~Interp~ enum that conflates scaffolds and effects. This dual-purpose enum would need careful redesign. Options:
-- Remove effect variants from Interp entirely
-- Keep them but only use for validation
-
-*** 5. API surface change for node construction
-
-Functions like ~mk_indefinitive_orgnode~ and ~append_indefinitive_from_disk_as_child~ take an explicit effect. Callers explicitly state intent. With a boolean:
-- We lose the ability to assert "I'm creating a Subscribee"
-- The same ~parent_ignores: false~ could mean Content, Subscribee, or HiddenFromSubscribees
-
-*** 6. Testing becomes position-dependent
-
-Tests that currently check ~effect_on_parent == Subscribee~ would need to also verify the node is under a ~SubscribeeCol~. More complex assertions.
-
-*** 7. What about nodes not yet in a tree?
-
-When constructing an OrgNode before inserting it into a tree (e.g., in ~skgnode_and_orgnode_from_id~), we can't infer its effect. We'd need to:
-- Set ~parent_ignores~ to a default
-- Update it after insertion based on parent
-- Or: restructure code to only create nodes in context
-
-*** 8. Backward compatibility / migration
-
-Existing buffers contain explicit interp values. How to handle them:
-- Ignore them (infer from structure)?
-- Parse but validate against inferred value?
-- Error on mismatch?
-
-** Summary
-
-The refactor is conceptually clean: the enum was encoding redundant information derivable from tree structure. But the implementation has friction points:
-
-*Easier*: Changes to serialization, type definitions, simple checks
-*Harder*: Validation logic, node construction without parent context, parsing migration
-
-The biggest conceptual issue is whether to *trust the tree structure* entirely (simpler but loses validation) or maintain some explicit semantics (more complex, partially defeats the purpose).
-
-*Recommendation*: Consider a middle path:
-1. Replace ~effect_on_parent~ with ~parent_ignores: bool~ internally
-2. Keep parsing ~(interp subscribee)~ etc. but only as *validation hints* - they must match what the tree structure implies
-3. Serialize the full interp value (for readability) but derive it from structure
-
-This gives cleaner internal code while preserving the user-facing clarity.
+1. Parser ERRORS on legacy interp values ("content", "subscribee", "hiddenFromSubscribees") - no silent ignoring
+2. ~assign_new_id_if_needed~ is a bug fix: now assigns IDs to all TrueNodes missing them, not just Content
+3. TrueNodes under SubscribeeCol with ~parent_ignores=true~ are valid (supports nested independent trees)
+4. Interp enum keeps its name for now; cleanup deferred

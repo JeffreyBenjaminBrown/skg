@@ -2,7 +2,7 @@ use crate::serve::util::send_response;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::dbs::tantivy::search_index;
 use crate::types::orgnode::{
-  OrgNode, OrgNodeKind, TrueNode, EffectOnParent,
+  OrgNode, OrgNodeKind, TrueNode,
 };
 use crate::types::misc::TantivyIndex;
 use crate::org_to_text::orgnode_to_text;
@@ -122,7 +122,7 @@ fn format_matches_as_org_mode (
           title :
           ( // The unique level-1 headline states the search terms.
             search_terms.to_string ()),
-          effect_on_parent : EffectOnParent::ParentIgnores,
+          parent_ignores : true,
           ..TrueNode::default ()
         } ), } ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap

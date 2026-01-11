@@ -35,44 +35,12 @@ pub struct TrueNode {
   pub body             : Option < String >,
   pub id_opt           : Option < ID >,
   pub source_opt       : Option < String >,
-  pub effect_on_parent : EffectOnParent,
+  pub parent_ignores   : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   pub indefinitive     : bool,
   pub cycle            : bool,
   pub relationships    : TruenodeRelationships,
   pub edit_request     : Option < EditRequest >,
   pub view_requests    : HashSet < ViewRequest >,
-}
-
-/// Describes how a TrueNode affects its parent when saved.
-#[derive( Debug, Clone, Copy, PartialEq, Eq )]
-pub enum EffectOnParent {
-  Content,               // Normal content relationship
-  Subscribee,            // Subscription relationship
-  ParentIgnores,         // No effect on parent (containerward views)
-  HiddenFromSubscribees, // No effect on parent (hidden from subscriptions)
-}
-
-impl EffectOnParent {
-  /// Single source of truth for EffectOnParent <-> client string bijection.
-  const REPRS_IN_CLIENT: &'static [(&'static str, EffectOnParent)] = &[
-    ("content",             EffectOnParent::Content),
-    ("subscribee",          EffectOnParent::Subscribee),
-    ("parentIgnores",       EffectOnParent::ParentIgnores),
-    ("hiddenFromSubscribees", EffectOnParent::HiddenFromSubscribees),
-  ];
-
-  /// String representation as used in client metadata.
-  pub fn repr_in_client ( &self ) -> &'static str {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(_, eop)| eop == self )
-      .map ( |(s, _)| *s )
-      .expect ( "REPRS_IN_CLIENT should cover all EffectOnParent variants" ) }
-
-  /// Parse a client string to an EffectOnParent.
-  pub fn from_client_string ( s: &str ) -> Option<EffectOnParent> {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(cs, _)| *cs == s )
-      .map ( |(_, eop)| *eop ) }
 }
 
 /// These data only influence how the node is shown.
@@ -321,7 +289,7 @@ impl Default for TrueNode {
       body             : None,
       id_opt           : None,
       source_opt       : None,
-      effect_on_parent : EffectOnParent::Content,
+      parent_ignores   : false,
       indefinitive     : false,
       cycle            : false,
       relationships    : TruenodeRelationships::default (),
@@ -350,41 +318,40 @@ pub fn mk_definitive_orgnode (
                             source,
                             title,
                             body,
-                            EffectOnParent::Content,
+                            false,              // parent_ignores
                             false,              // indefinitive
                             None,               // edit_request
                             HashSet::new () ) } // view_requests
 
-/// Create an indefinitive OrgNode from disk data with a specific effect.
-/// This is used for subscription-related nodes (Subscribee, HiddenFromSubscribees).
+/// Create an indefinitive OrgNode from disk data.
 /// Body is always None since indefinitive nodes don't have editable content.
 pub fn mk_indefinitive_orgnode (
-  id               : ID,
-  source           : String,
-  title            : String,
-  effect_on_parent : EffectOnParent,
+  id             : ID,
+  source         : String,
+  title          : String,
+  parent_ignores : bool,
 ) -> OrgNode { mk_orgnode ( id,
                             source,
                             title,
                             None, // body
-                            effect_on_parent,
+                            parent_ignores,
                             true, // indefinitive
                             None, // edit_request
-                            HashSet::new () ) }
+                            HashSet::new ( )) } // view_requests
 
 /// Create a OrgNode with *nearly* full metadata control.
 /// The exception is that the 'TruenodeRelationships' is intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the OrgNode tree.
 pub fn mk_orgnode (
-  id               : ID,
-  source           : String,
-  title            : String,
-  body             : Option < String >,
-  effect_on_parent : EffectOnParent,
-  indefinitive     : bool,
-  edit_request     : Option < EditRequest >,
-  view_requests    : HashSet < ViewRequest >,
+  id             : ID,
+  source         : String,
+  title          : String,
+  body           : Option < String >,
+  parent_ignores : bool,
+  indefinitive   : bool,
+  edit_request   : Option < EditRequest >,
+  view_requests  : HashSet < ViewRequest >,
 ) -> OrgNode {
   OrgNode {
     focused : false,
@@ -394,7 +361,7 @@ pub fn mk_orgnode (
       body,
       id_opt           : Some ( id ),
       source_opt       : Some ( source ),
-      effect_on_parent,
+      parent_ignores,
       indefinitive,
       cycle            : false,
       relationships    : TruenodeRelationships::default (),

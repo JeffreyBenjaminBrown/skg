@@ -1,5 +1,5 @@
 use crate::types::orgnode::{
-    EffectOnParent, OrgNode, OrgNodeKind, Scaffold, TrueNode,
+    OrgNode, OrgNodeKind, Scaffold, TrueNode,
 };
 use crate::types::tree::{NodePair, PairTree};
 
@@ -167,10 +167,9 @@ fn true_node_metadata_to_string (
 
   // Build code s-expr
   let mut code_parts : Vec < String > = Vec::new ();
-  // Only emit interp if not Content
-  if true_node . effect_on_parent != EffectOnParent::Content {
-    code_parts . push ( format! ( "(interp {})",
-      true_node . effect_on_parent . repr_in_client () )); }
+  // Only emit interp if parent_ignores is true
+  if true_node . parent_ignores {
+    code_parts . push ( "(interp parentIgnores)" . to_string () ); }
   if true_node . indefinitive {
     code_parts . push ( "indefinitive" . to_string () ); }
 

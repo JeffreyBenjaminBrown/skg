@@ -5,9 +5,7 @@ use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::orgnode::{EditRequest, TruenodeRelationships};
-use skg::types::orgnode::{
-    OrgNode, OrgNodeKind, TrueNode, EffectOnParent, forest_root_orgnode
-};
+use skg::types::orgnode::{ OrgNode, OrgNodeKind, TrueNode, forest_root_orgnode };
 use skg::types::skgnode::SkgNode;
 use skg::types::save::MergeInstructionTriple;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
@@ -71,7 +69,7 @@ async fn test_merge_2_into_1_impl(
       body: None,
       id_opt: Some(ID::from("1")),
       source_opt: None,
-      effect_on_parent: EffectOnParent::Content,
+      parent_ignores: false,
       indefinitive: false,
       cycle: false,
       relationships: TruenodeRelationships::default(),
@@ -334,7 +332,7 @@ async fn test_merge_1_into_2_impl(
       body: None,
       id_opt: Some(ID::from("2")),
       source_opt: None,
-      effect_on_parent: EffectOnParent::Content,
+      parent_ignores: false,
       indefinitive: false,
       cycle: false,
       relationships: TruenodeRelationships::default(),

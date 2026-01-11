@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::orgnode::{OrgNode, OrgNodeKind, EffectOnParent};
+use skg::types::orgnode::{OrgNode, OrgNodeKind};
 use ego_tree::Tree;
 
 #[test]
@@ -94,7 +94,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
     OrgNodeKind::True(t) => t,
     OrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(parentIgnores_node.title(), "parentIgnores node");
-  assert_eq!(parentIgnores_t.effect_on_parent, EffectOnParent::ParentIgnores);
+  assert_eq!(parentIgnores_t.parent_ignores, true);
   assert_eq!(parentIgnores_t.indefinitive, true);
   assert_eq!(parentIgnores_node.body(), Some(&"ParentIgnores body".to_string()));
 
@@ -133,7 +133,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_t.id_opt.as_ref(), None);
   assert_eq!(first_t.cycle, false);
-  assert_eq!(first_t.effect_on_parent, EffectOnParent::Content);
+  assert_eq!(first_t.parent_ignores, false);
   assert_eq!(first_node.focused, false);
   assert_eq!(first_node.folded, false);
   assert_eq!(first_t.indefinitive, false);

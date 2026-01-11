@@ -190,13 +190,13 @@ fn test_multi_root_view_with_shared_nodes
          ** (skg (id 3) (source main) (view (rels (linksIn 1)))) title 3
          this one string could span pages
          *** (skg (code (interp subscribeeCol))) it subscribes to these
-         **** (skg (id 4) (source main) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) this title includes a [[id:22][textlink to another file]]
+         **** (skg (id 4) (source main) (view (rels (containers 0))) (code indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code indefinitive)) this title includes a [[id:22][textlink to another file]]
          * (skg (id 2) (source main) (view (rels (linksIn 1)))) title 2
          this one string could span pages
          ** (skg (code (interp subscribeeCol))) it subscribes to these
-         *** (skg (id 4) (source main) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) this title includes a [[id:22][textlink to another file]]
+         *** (skg (id 4) (source main) (view (rels (containers 0))) (code indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code indefinitive)) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -248,8 +248,8 @@ fn test_multi_root_view_with_node_limit
          ** (skg (id 3) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 3
          * (skg (id 2) (source main) (view (rels (linksIn 1))) (code indefinitive)) title 2
          ** (skg (code (interp subscribeeCol))) it subscribes to these
-         *** (skg (id 4) (source main) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code (interp subscribee) indefinitive)) this title includes a [[id:22][textlink to another file]]
+         *** (skg (id 4) (source main) (view (rels (containers 0))) (code indefinitive)) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (id 5) (source main) (view (rels (containers 0) (linksIn 1))) (code indefinitive)) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view with limit=3 should truncate generation 2 sibling group");

@@ -12,7 +12,7 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNodeKind, EffectOnParent, OrgNode, Scaffold};
+use crate::types::orgnode::{OrgNodeKind, OrgNode, Scaffold};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
@@ -257,7 +257,7 @@ pub async fn completeDefinitiveOrgnode (
     let pair : &mut NodePair = child_mut . value ();
     let OrgNodeKind::True(t) = &mut pair . orgnode . kind
       else { return Err ( "Not-really-content child is not a TrueNode" . into () ) };
-    t . effect_on_parent = EffectOnParent::ParentIgnores;
+    t . parent_ignores = true;
     let child_pid : ID = t . id_opt . clone () . unwrap ();
     content_skgid_to_treeid . remove ( & child_pid );
     non_content_child_treeids . push ( *invalid_treeid ); }
@@ -287,7 +287,8 @@ pub async fn completeDefinitiveOrgnode (
     & completed_content_treeids ) ?;
   Ok (( )) }
 
-/// Categorize a node's children into Content and non-Content.
+/// Categorize a node's children into content and non-content,
+/// where content = any truenode it doesn't ignore.
 /// Returns (content_child_ids, non_content_child_ids).
 fn categorize_children_by_treatment (
   tree    : &PairTree,
@@ -304,7 +305,7 @@ fn categorize_children_by_treatment (
   for child in node_ref . children () {
     if matches! ( &child . value () . orgnode . kind,
                   OrgNodeKind::True(t)
-                  if t.effect_on_parent == EffectOnParent::Content )
+                  if !t.parent_ignores )
     { content_child_ids . push ( child . id () );
     } else {
       non_content_child_ids . push ( child . id () ); }}

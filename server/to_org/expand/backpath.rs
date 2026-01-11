@@ -16,7 +16,7 @@ use crate::dbs::typedb::search::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, EffectOnParent, mk_indefinitive_orgnode };
+    OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
 use crate::types::tree::{PairTree, NodePair};
 
 use std::collections::{HashSet, HashMap};
@@ -222,7 +222,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     OrgNodeKind::Scaff(_) =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
   let orgnode = mk_indefinitive_orgnode (
-    id, source, title, EffectOnParent::ParentIgnores );
+    id, source, title, true );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode : None,

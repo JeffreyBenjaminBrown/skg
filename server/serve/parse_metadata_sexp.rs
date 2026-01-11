@@ -12,7 +12,7 @@ use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
 use crate::types::orgnode::{TruenodeRelationships, EditRequest, ViewRequest};
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode, EffectOnParent,
+    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
 
 use sexp::Sexp;
@@ -40,31 +40,30 @@ pub struct OrgnodeMetadata {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeCode {
   pub interp: Interp,
+  pub parent_ignores: bool,
   pub indefinitive: bool,
   pub editRequest: Option<EditRequest>,
   pub viewRequests: HashSet<ViewRequest>,
 }
 
 /// Interpretation of a node in the tree.
-/// Internal to parsing; external code uses OrgNodeKind.
+/// Internal to parsing; scaffold variants map to Scaffold, TrueNode is default.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Interp {
+  TrueNode, // Default for non-scaffold nodes
   ForestRoot,
-  Content,
   AliasCol,
   Alias,
-  ParentIgnores,
   SubscribeeCol,
-  Subscribee,
   HiddenOutsideOfSubscribeeCol,
   HiddenInSubscribeeCol,
-  HiddenFromSubscribees,
 }
 
 impl Interp {
-  /// Convert scaffold Interps to Scaffold. Returns None for TrueNode interps.
+  /// Convert scaffold Interps to Scaffold. Returns None for TrueNode.
   fn to_scaffold ( &self, title : &str ) -> Option < Scaffold > {
     match self {
+      Interp::TrueNode => None,
       Interp::ForestRoot =>
         Some ( Scaffold::ForestRoot ),
       Interp::AliasCol =>
@@ -77,28 +76,14 @@ impl Interp {
         Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
       Interp::HiddenInSubscribeeCol =>
         Some ( Scaffold::HiddenInSubscribeeCol ),
-      _ => None,
-    }}
-
-  /// Convert TrueNode Interps to EffectOnParent. Returns None for scaffold interps.
-  fn to_effect_on_parent ( &self ) -> Option < EffectOnParent > {
-    match self {
-      Interp::Content =>
-        Some ( EffectOnParent::Content ),
-      Interp::Subscribee =>
-        Some ( EffectOnParent::Subscribee ),
-      Interp::ParentIgnores =>
-        Some ( EffectOnParent::ParentIgnores ),
-      Interp::HiddenFromSubscribees =>
-        Some ( EffectOnParent::HiddenFromSubscribees ),
-      _ => None,
     }}
 }
 
 impl Default for OrgnodeCode {
   fn default() -> Self {
     OrgnodeCode {
-      interp: Interp::Content,
+      interp: Interp::TrueNode,
+      parent_ignores: false,
       indefinitive: false,
       editRequest: None,
       viewRequests: HashSet::new(),
@@ -135,20 +120,21 @@ pub fn from_parsed (
           scaffold . repr_in_client () ))
       } else { None };
       ( OrgNodeKind::Scaff ( scaffold ), error )
-    } else if let Some ( effect ) = interp . to_effect_on_parent () {
+    } else {
+      // Interp::TrueNode
       ( OrgNodeKind::True ( TrueNode {
           title,
           body,
           id_opt           : metadata . id . clone (),
           source_opt       : metadata . source . clone (),
-          effect_on_parent : effect,
+          parent_ignores   : metadata . code . parent_ignores,
           indefinitive     : metadata . code . indefinitive,
           cycle            : metadata . cycle,
           relationships    : metadata . relationships . clone (),
           edit_request     : metadata . code . editRequest . clone (),
           view_requests    : metadata . code . viewRequests . clone (), } ),
         None )
-    } else { panic! ( "Invalid Interp: {:?}", interp ) };
+    };
   ( OrgNode { focused : metadata.focused,
               folded  : metadata.folded,
               kind },
@@ -255,30 +241,33 @@ fn parse_code_sexp (
           "interp" => {
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            code . interp =
-              if let Some ( scaffold ) = Scaffold::from_repr_in_client (
-                   &value, "" ) // title unused for kind detection
-              { // Try scaffold strings first (uses Scaffold::REPRS_IN_CLIENT)
-                match scaffold.kind() {
-                  ScaffoldKind::Alias                 => Interp::Alias,
-                  ScaffoldKind::AliasCol              => Interp::AliasCol,
-                  ScaffoldKind::ForestRoot            => Interp::ForestRoot,
-                  ScaffoldKind::HiddenInSubscribeeCol =>
-                    Interp::HiddenInSubscribeeCol,
-                  ScaffoldKind::HiddenOutsideOfSubscribeeCol =>
-                    Interp::HiddenOutsideOfSubscribeeCol,
-                  ScaffoldKind::SubscribeeCol                =>
-                    Interp::SubscribeeCol, }}
-              else if let Some ( effect )
-                = EffectOnParent::from_client_string ( &value )
-              { // Non-scaffold interp values
-                match effect {
-                  EffectOnParent::Content       => Interp::Content,
-                  EffectOnParent::Subscribee    => Interp::Subscribee,
-                  EffectOnParent::ParentIgnores => Interp::ParentIgnores,
-                  EffectOnParent::HiddenFromSubscribees =>
-                    Interp::HiddenFromSubscribees, }}
-              else { return Err ( format! ( "Unknown interp value: {}", value )) }; },
+            if let Some ( scaffold ) = Scaffold::from_repr_in_client (
+                 &value, "" ) // title unused for kind detection
+            { match scaffold.kind() { // Try scaffold strings first
+                ScaffoldKind::Alias =>
+                  code . interp = Interp::Alias,
+                ScaffoldKind::AliasCol =>
+                  code . interp = Interp::AliasCol,
+                ScaffoldKind::ForestRoot =>
+                  code . interp = Interp::ForestRoot,
+                ScaffoldKind::HiddenInSubscribeeCol =>
+                  code . interp = Interp::HiddenInSubscribeeCol,
+                ScaffoldKind::HiddenOutsideOfSubscribeeCol =>
+                  code . interp = Interp::HiddenOutsideOfSubscribeeCol,
+                ScaffoldKind::SubscribeeCol =>
+                  code . interp = Interp::SubscribeeCol, }}
+            else if value == "parentIgnores" {
+              // TrueNode with parent_ignores=true
+              code . interp = Interp::TrueNode;
+              code . parent_ignores = true; }
+            else if value == "content"
+                 || value == "subscribee"
+                 || value == "hiddenFromSubscribees"
+            { return Err ( format! (
+                "Legacy interp value '{}' is no longer supported. \
+                 Remove the (interp ...) clause; these are now implicit from tree structure.",
+                value )); }
+            else { return Err ( format! ( "Unknown interp value: {}", value )) }; },
           "merge" => {
             // (merge id) sets editRequest to Merge(id)
             let id_str : String = atom_to_string ( &kv_pair[1] ) ?;

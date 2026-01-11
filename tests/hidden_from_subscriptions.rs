@@ -57,21 +57,20 @@ async fn cleanup_test(
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
 /// Modifies the code section of each subscribee to request a definitive view.
+/// Subscribees are TrueNodes under SubscribeeCol scaffolds.
 ///
-/// Input:  `(code (interp subscribee) indefinitive)`
-/// Output: `(code (interp subscribee) indefinitive (viewRequests definitiveView))`
+/// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
+/// That's easier than navigating the org-tree's topoogy.
 fn add_definitive_view_request_to_subscribees (
   org_text : &str,
 ) -> String {
-  // Match subscribee code sections and add viewRequests before the closing paren
-  // Pattern: (code (interp subscribee) indefinitive)
-  // We need to add (viewRequests definitiveView) inside the code section
+  // Match lines with "subscribee-" in title AND (code indefinitive)
   let re = Regex::new(
-    r"\(code \(interp subscribee\) indefinitive\)"
+    r"(\(code indefinitive\))(\) subscribee-)"
   ).unwrap();
   re.replace_all(
     org_text,
-    "(code (interp subscribee) indefinitive (viewRequests definitiveView))"
+    "(code indefinitive (viewRequests definitiveView))) subscribee-"
   ).to_string() }
 
 /// Every kind of Col:
@@ -108,9 +107,9 @@ fn test_every_kind_of_col(
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
        *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code (interp hiddenFromSubscribees) indefinitive)) hidden-for-no-reason
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee) indefinitive)) E1
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee) indefinitive)) E2
+       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code indefinitive)) hidden-for-no-reason
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-1
+       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-2
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -129,14 +128,14 @@ fn test_every_kind_of_col(
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
        *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code (interp hiddenFromSubscribees) indefinitive)) hidden-for-no-reason
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee))) E1
+       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code indefinitive)) hidden-for-no-reason
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2)))) subscribee-1
        **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id hidden-in-E1) (source main) (code (interp hiddenFromSubscribees) indefinitive)) hidden-in-E1
+       ***** (skg (id hidden-in-E1) (source main) (code indefinitive)) hidden-in-E1
        **** (skg (id E11) (source main)) E11
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee))) E2
+       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2)))) subscribee-2
        **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id hidden-in-E2) (source main) (code (interp hiddenFromSubscribees) indefinitive)) hidden-in-E2
+       ***** (skg (id hidden-in-E2) (source main) (code indefinitive)) hidden-in-E2
        **** (skg (id E21) (source main)) E21
        ** (skg (id R1) (source main)) R1
        "};
@@ -177,7 +176,7 @@ fn test_hidden_within_but_none_without(
     let expected_initial = indoc! {
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3))) (code (interp subscribee) indefinitive)) E1
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3))) (code indefinitive)) subscribee-1
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -197,9 +196,9 @@ fn test_hidden_within_but_none_without(
     let expected_expanded = indoc! {
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3))) (code (interp subscribee))) E1
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3)))) subscribee-1
        **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (code (interp hiddenFromSubscribees) indefinitive)) H
+       ***** (skg (id H) (source main) (code indefinitive)) H
        **** (skg (id E11) (source main)) E11
        **** (skg (id E12) (source main)) E12
        ** (skg (id R1) (source main)) R1
@@ -244,9 +243,9 @@ fn test_hidden_without_but_none_within(
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
        *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id H) (source main) (view (rels (containers 0))) (code (interp hiddenFromSubscribees) indefinitive)) H
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee) indefinitive)) E1
-       *** (skg (id E2) (source main) (view (rels (containers 0))) (code (interp subscribee) indefinitive)) E2
+       **** (skg (id H) (source main) (view (rels (containers 0))) (code indefinitive)) H
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-1
+       *** (skg (id E2) (source main) (view (rels (containers 0))) (code indefinitive)) subscribee-2
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -264,12 +263,12 @@ fn test_hidden_without_but_none_within(
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
        *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id H) (source main) (view (rels (containers 0))) (code (interp hiddenFromSubscribees) indefinitive)) H
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code (interp subscribee))) E1
+       **** (skg (id H) (source main) (view (rels (containers 0))) (code indefinitive)) H
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2)))) subscribee-1
        **** (skg (id E11) (source main)) E11
        **** (skg (id E12) (source main) (view (rels (contents 1)))) E12
        ***** (skg (id E121) (source main)) E121
-       *** (skg (id E2) (source main) (view (rels (containers 0))) (code (interp subscribee))) E2
+       *** (skg (id E2) (source main) (view (rels (containers 0)))) subscribee-2
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
@@ -309,8 +308,8 @@ fn test_overlapping_hidden_within(
     let expected_initial = indoc! {
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1))) (code (interp subscribee) indefinitive)) E1
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1))) (code (interp subscribee) indefinitive)) E2
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1))) (code indefinitive)) subscribee-1
+       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1))) (code indefinitive)) subscribee-2
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -327,12 +326,12 @@ fn test_overlapping_hidden_within(
     let expected_expanded = indoc! {
       "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
        ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1))) (code (interp subscribee))) E1
+       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1)))) subscribee-1
        **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (view (rels (containers 2))) (code (interp hiddenFromSubscribees) indefinitive)) H
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1))) (code (interp subscribee))) E2
+       ***** (skg (id H) (source main) (view (rels (containers 2))) (code indefinitive)) H
+       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1)))) subscribee-2
        **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (view (rels (containers 2))) (code (interp hiddenFromSubscribees) indefinitive)) H
+       ***** (skg (id H) (source main) (view (rels (containers 2))) (code indefinitive)) H
        ** (skg (id R1) (source main)) R1
        "};
     assert_eq!(expanded, expected_expanded,

@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold, EffectOnParent};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
@@ -135,14 +135,11 @@ fn collect_subscribees (
           let child_node : &OrgNode = subscribeecol_child.value();
           match &child_node.kind {
             OrgNodeKind::True(t) => {
-              if t.effect_on_parent != EffectOnParent::Subscribee {
-                return Err(format!(
-                  "SubscribeeCol has non-Subscribee child: {:?}",
-                  child_node.kind)); }
-              match &t.id_opt {
-                Some(id) => subscribees.push(id.clone()),
-                None => return Err(format!(
-                  "Subscribee '{}' has no ID", t.title)), }},
+              if !t.parent_ignores {
+                match &t.id_opt {
+                  Some(id) => subscribees.push(id.clone()),
+                  None => return Err(format!(
+                    "Subscribee '{}' has no ID", t.title)), }}},
             OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
             OrgNodeKind::Scaff(s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
@@ -160,7 +157,7 @@ fn collect_contents_that_are_not_to_delete<'a> (
   for child_ref in node_ref.children() {
     let child : &OrgNode = child_ref . value();
     if let OrgNodeKind::True(t) = &child.kind {
-      if t.effect_on_parent == EffectOnParent::Content
+      if !t.parent_ignores
          && ! matches!( t . edit_request,
                         Some(EditRequest::Delete))
       { if let Some(id) = &t.id_opt

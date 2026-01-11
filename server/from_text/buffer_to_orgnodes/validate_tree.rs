@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig, SourceNickname};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
@@ -152,7 +152,7 @@ fn validate_truenode (
     for child in node_ref.children() {
       let child_orgnode : &OrgNode = child.value();
       if let OrgNodeKind::True ( ct ) = &child_orgnode.kind {
-        if ct.effect_on_parent == EffectOnParent::Content {
+        if !ct.parent_ignores {
           if let Some ( child_skgid ) = &ct.id_opt {
             if ! seen_content_ids.insert( child_skgid.clone() ) {
               errors.push(

@@ -22,8 +22,8 @@ fn test_compare_headlines_modulo_id() {
 
   // Test headlines with same other metadata but different IDs
   assert!(compare_headlines_modulo_id(
-    "* (skg (id abc) (code (interp content))) Title",
-    "* (skg (id xyz) (code (interp content))) Title"
+    "* (skg (id abc)) Title",
+    "* (skg (id xyz)) Title"
   ));
 
   // Test headlines that differ by title
@@ -40,7 +40,7 @@ fn test_compare_headlines_modulo_id() {
 
   // Test headlines that differ by other metadata
   assert!(!compare_headlines_modulo_id(
-    "* (skg (id abc) (code (interp content))) Title",
+    "* (skg (id abc)) Title",
     "* (skg (id xyz) (code (interp alias))) Title"
   ));
 

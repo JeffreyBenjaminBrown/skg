@@ -3,7 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, EffectOnParent, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use crate::types::misc::ID;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_orgnode_tree, assign_pids_throughout_orgnode_tree_from_map};
@@ -109,12 +109,11 @@ fn add_missing_info_dfs (
         = node_ref . tree () . get_mut ( child_treeid )
       { add_missing_info_dfs ( child_mut ); }} }}
 
-/// Assign a UUID v4 to Content nodes that don't have an ID
+/// Assign a UUID v4 to TrueNodes that don't have an ID.
 fn assign_new_id_if_needed(
   t: &mut TrueNode
 ) {
-  if t . effect_on_parent == EffectOnParent::Content
-     && t . id_opt . is_none ()
+  if t . id_opt . is_none ()
   { let new_id: String = Uuid::new_v4().to_string();
     t . id_opt = Some ( ID (new_id) ); }}
 
