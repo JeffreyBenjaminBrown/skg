@@ -155,12 +155,35 @@ pub enum EditRequest {
 
 /// Requests for additional views related to a node.
 /// Multiple view requests can be active simultaneously.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
   Aliases,
   Containerward,
   Sourceward,
   Definitive,
+}
+
+impl ViewRequest {
+  /// Single source of truth for ViewRequest <-> client string bijection.
+  const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
+    ("aliases",          ViewRequest::Aliases),
+    ("containerwardView", ViewRequest::Containerward),
+    ("sourcewardView",   ViewRequest::Sourceward),
+    ("definitiveView",   ViewRequest::Definitive),
+  ];
+
+  /// String representation as used in client metadata.
+  pub fn repr_in_client ( &self ) -> &'static str {
+    Self::REPRS_IN_CLIENT.iter()
+      .find ( |(_, vr)| vr == self )
+      .map ( |(s, _)| *s )
+      .expect ( "REPRS_IN_CLIENT should cover all ViewRequest variants" ) }
+
+  /// Parse a client string to a ViewRequest.
+  pub fn from_client_string ( s: &str ) -> Option<ViewRequest> {
+    Self::REPRS_IN_CLIENT.iter()
+      .find ( |(cs, _)| *cs == s )
+      .map ( |(_, vr)| *vr ) }
 }
 
 //
@@ -243,12 +266,7 @@ impl fmt::Display for ViewRequest {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    match self {
-      ViewRequest::Aliases       => write!(f, "aliases"),
-      ViewRequest::Containerward => write!(f, "containerwardView"),
-      ViewRequest::Sourceward    => write!(f, "sourcewardView"),
-      ViewRequest::Definitive    => write!(f, "definitiveView"),
-    }} }
+    write!(f, "{}", self.repr_in_client()) } }
 
 impl FromStr for ViewRequest {
   type Err = String;
@@ -256,13 +274,8 @@ impl FromStr for ViewRequest {
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
-    match s {
-      "aliases"           => Ok ( ViewRequest::Aliases ),
-      "containerwardView" => Ok ( ViewRequest::Containerward ),
-      "sourcewardView"    => Ok ( ViewRequest::Sourceward ),
-      "definitiveView"    => Ok ( ViewRequest::Definitive ),
-      _ => Err ( format! ( "Unknown ViewRequest value: {}", s )),
-    }} }
+    Self::from_client_string ( s )
+      .ok_or_else ( || format! ( "Unknown ViewRequest value: {}", s ) ) } }
 
 //
 // Defaults

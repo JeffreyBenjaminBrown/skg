@@ -17,9 +17,9 @@ makeIndefinitiveAndClobber
     rather than alias has body and aliascol has body,
     just 'scaffold has body',
     providing both its text and its ScaffoldKind.
-** I renamed emacs_string -> repr_in_client.
-** For string reps, use bimaps in more places
-   'impl Scaffold : repr_in_client' uses one.
+** ONGOING more bimaps for parsing
+*** DONE ViewRequest
+*** EffectOnParent
 ** change metadata rendering
    'code' is now an obsolete s-exp title, etc.
 ** type changes
