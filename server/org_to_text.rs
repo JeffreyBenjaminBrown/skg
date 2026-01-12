@@ -145,18 +145,18 @@ fn true_node_metadata_to_string (
 
   // Build rels s-expr
   let mut rel_parts : Vec < String > = Vec::new ();
-  if ! true_node . relationships . parentIsContainer {
+  if ! true_node . stats . parentIsContainer {
     rel_parts . push ( "notInParent" . to_string () ); }
-  if true_node . relationships . parentIsContent {
+  if true_node . stats . parentIsContent {
     rel_parts . push ( "containsParent" . to_string () ); }
-  if true_node . relationships . numContainers != Some ( 1 ) {
-    if let Some ( count ) = true_node . relationships . numContainers {
+  if true_node . stats . numContainers != Some ( 1 ) {
+    if let Some ( count ) = true_node . stats . numContainers {
       rel_parts . push ( format! ( "(containers {})", count )); }}
-  if true_node . relationships . numContents != Some ( 0 ) {
-    if let Some ( count ) = true_node . relationships . numContents {
+  if true_node . stats . numContents != Some ( 0 ) {
+    if let Some ( count ) = true_node . stats . numContents {
       rel_parts . push ( format! ( "(contents {})", count )); }}
-  if true_node . relationships . numLinksIn != Some ( 0 ) {
-    if let Some ( count ) = true_node . relationships . numLinksIn {
+  if true_node . stats . numLinksIn != Some ( 0 ) {
+    if let Some ( count ) = true_node . stats . numLinksIn {
       rel_parts . push ( format! ( "(linksIn {})", count )); }}
 
   if ! rel_parts . is_empty () {

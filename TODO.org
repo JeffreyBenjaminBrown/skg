@@ -2,6 +2,8 @@
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
 * s, by urgency
+** change metadata rendering
+   'code' is now an obsolete s-exp title, etc.
 ** ? definitive OrgNode != definitive skgnode
 *** One is that the orgnode stuff is intended as definitive.
 *** SkgNode might need definitive modifiers for each field.
@@ -15,8 +17,6 @@ server/org_to_text.rs
 clobberIndefinitiveOrgnode
 indefinitize_content_subtree
 makeIndefinitiveAndClobber
-** change metadata rendering
-   'code' is now an obsolete s-exp title, etc.
 ** DONE restructure types, divide Interp
 *** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
     NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)

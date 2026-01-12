@@ -31,16 +31,16 @@ pub enum OrgNodeKind {
 /// An OrgNode that corresponds to a SkgNode.
 #[derive( Debug, Clone, PartialEq )]
 pub struct TrueNode {
-  pub title            : String,
-  pub body             : Option < String >,
-  pub id_opt           : Option < ID >,
-  pub source_opt       : Option < String >,
-  pub parent_ignores   : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
-  pub indefinitive     : bool,
-  pub cycle            : bool,
-  pub relationships    : TruenodeRelationships,
-  pub edit_request     : Option < EditRequest >,
-  pub view_requests    : HashSet < ViewRequest >,
+  pub title          : String,
+  pub body           : Option < String >,
+  pub id_opt         : Option < ID >,
+  pub source_opt     : Option < String >,
+  pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
+  pub indefinitive   : bool,
+  pub cycle          : bool,
+  pub stats          : TrueNodeStats,
+  pub edit_request   : Option < EditRequest >,
+  pub view_requests  : HashSet < ViewRequest >,
 }
 
 /// These data only influence how the node is shown.
@@ -48,7 +48,7 @@ pub struct TrueNode {
 /// and the edits would be immediately lost,
 /// as this data is regenerated each time the view is rebuilt.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TruenodeRelationships {
+pub struct TrueNodeStats {
   pub parentIsContainer: bool,
   pub parentIsContent: bool,
   pub numContainers: Option<usize>,
@@ -61,7 +61,7 @@ pub struct TruenodeRelationships {
 /// but encode information about the OrgNodes around them.
 #[derive( Debug, Clone, PartialEq, Eq )]
 pub enum Scaffold {
-  Alias (String), // The node is an alias for its grandparent.
+  Alias (String), // The string is an alias for the node's grandparent.
   AliasCol, // The node collects (as children) aliases for its parent.
   ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
@@ -80,6 +80,28 @@ pub enum ScaffoldKind { Alias,
                         HiddenInSubscribeeCol,
                         HiddenOutsideOfSubscribeeCol,
                         SubscribeeCol, }
+
+/// Requests for editing operations on a node.
+/// Only one edit request is allowed per node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditRequest {
+  Merge(ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
+  Delete, // request to delete this node
+}
+
+/// Requests for additional views related to a node.
+/// Multiple view requests can be active simultaneously.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ViewRequest {
+  Aliases,
+  Containerward,
+  Sourceward,
+  Definitive,
+}
+
+//
+// Implementations
+//
 
 impl Scaffold {
   /// Single source of truth for Scaffold <-> Emacs string bijection.
@@ -121,7 +143,27 @@ impl Scaffold {
   { Self::REPRS_IN_CLIENT.iter()
       .find ( |(es, _)| *es == s )
       .map ( |(_, kind)| kind.to_scaffold ( title ) ) }
-}
+
+  pub fn title ( &self ) -> &str {
+    match self {
+      Scaffold::Alias ( s ) => s,
+      Scaffold::AliasCol => "its aliases",
+      Scaffold::ForestRoot => "",
+      Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
+      Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      Scaffold::SubscribeeCol => "it subscribes to these",
+    }}
+
+  /// For serialization.
+  pub fn interp_str ( &self ) -> &str {
+    match self {
+      Scaffold::Alias ( _ ) => "alias",
+      Scaffold::AliasCol => "aliasCol",
+      Scaffold::ForestRoot => "forestRoot",
+      Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
+      Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
+      Scaffold::SubscribeeCol => "subscribeeCol",
+    }} }
 
 impl ScaffoldKind {
   /// Construct a Scaffold from this kind. For Alias, uses the provided title.
@@ -134,24 +176,6 @@ impl ScaffoldKind {
       ScaffoldKind::HiddenOutsideOfSubscribeeCol => Scaffold::HiddenOutsideOfSubscribeeCol,
       ScaffoldKind::SubscribeeCol             => Scaffold::SubscribeeCol,
     }}
-}
-
-/// Requests for editing operations on a node.
-/// Only one edit request is allowed per node.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EditRequest {
-  Merge(ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
-  Delete, // request to delete this node
-}
-
-/// Requests for additional views related to a node.
-/// Multiple view requests can be active simultaneously.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ViewRequest {
-  Aliases,
-  Containerward,
-  Sourceward,
-  Definitive,
 }
 
 impl ViewRequest {
@@ -176,32 +200,6 @@ impl ViewRequest {
       .find ( |(cs, _)| *cs == s )
       .map ( |(_, vr)| *vr ) }
 }
-
-//
-// Implementations
-//
-
-impl Scaffold {
-  pub fn title ( &self ) -> &str {
-    match self {
-      Scaffold::Alias ( s ) => s,
-      Scaffold::AliasCol => "its aliases",
-      Scaffold::ForestRoot => "",
-      Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
-      Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
-      Scaffold::SubscribeeCol => "it subscribes to these",
-    }}
-
-  /// For serialization.
-  pub fn interp_str ( &self ) -> &str {
-    match self {
-      Scaffold::Alias ( _ ) => "alias",
-      Scaffold::AliasCol => "aliasCol",
-      Scaffold::ForestRoot => "forestRoot",
-      Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
-      Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
-      Scaffold::SubscribeeCol => "subscribeeCol",
-    }} }
 
 impl OrgNode {
   /// Reasonable for both TrueNodes and Scaffolds.
@@ -272,9 +270,9 @@ impl FromStr for ViewRequest {
 // Defaults
 //
 
-impl Default for TruenodeRelationships {
+impl Default for TrueNodeStats {
   fn default () -> Self {
-    TruenodeRelationships {
+    TrueNodeStats {
       parentIsContainer : true,
       parentIsContent   : false,
       numContainers : Some ( 1 ),
@@ -292,7 +290,7 @@ impl Default for TrueNode {
       parent_ignores   : false,
       indefinitive     : false,
       cycle            : false,
-      relationships    : TruenodeRelationships::default (),
+      stats            : TrueNodeStats::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }} }
@@ -340,7 +338,7 @@ pub fn mk_indefinitive_orgnode (
                             HashSet::new ( )) } // view_requests
 
 /// Create a OrgNode with *nearly* full metadata control.
-/// The exception is that the 'TruenodeRelationships' is intentionally omitted,
+/// The exception is that the 'TrueNodeStats' is intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the OrgNode tree.
 pub fn mk_orgnode (
@@ -364,7 +362,7 @@ pub fn mk_orgnode (
       parent_ignores,
       indefinitive,
       cycle            : false,
-      relationships    : TruenodeRelationships::default (),
+      stats            : TrueNodeStats::default (),
       edit_request,
       view_requests,
     }),

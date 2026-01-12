@@ -115,11 +115,11 @@ fn set_metadata_relationships_in_node_recursive (
       } else { (true, false) }; // default if no parent
     let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
     if let OrgNodeKind::True ( t ) = &mut node_mut . value () .orgnode . kind {
-      t . relationships . numContainers = num_containers;
-      t . relationships . numContents = num_contents;
-      t . relationships . numLinksIn = num_links_in;
-      t . relationships . parentIsContainer = parent_is_container;
-      t . relationships . parentIsContent = parent_is_content; }}
+      t . stats . numContainers = num_containers;
+      t . stats . numContents = num_contents;
+      t . stats . numLinksIn = num_links_in;
+      t . stats . parentIsContainer = parent_is_container;
+      t . stats . parentIsContent = parent_is_content; }}
   { // recurse
     let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()

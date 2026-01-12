@@ -10,7 +10,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
-use crate::types::orgnode::{TruenodeRelationships, EditRequest, ViewRequest};
+use crate::types::orgnode::{TrueNodeStats, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
 };
@@ -32,7 +32,7 @@ pub struct OrgnodeMetadata {
   pub focused: bool,
   pub folded: bool,
   pub cycle: bool,
-  pub relationships: TruenodeRelationships,
+  pub stats: TrueNodeStats,
   pub code: OrgnodeCode,
 }
 
@@ -98,7 +98,7 @@ pub fn default_metadata() -> OrgnodeMetadata {
     focused: false,
     folded: false,
     cycle: false,
-    relationships: TruenodeRelationships::default(),
+    stats: TrueNodeStats::default(),
     code: OrgnodeCode::default(),
   }
 }
@@ -130,7 +130,7 @@ pub fn from_parsed (
           parent_ignores   : metadata . code . parent_ignores,
           indefinitive     : metadata . code . indefinitive,
           cycle            : metadata . cycle,
-          relationships    : metadata . relationships . clone (),
+          stats            : metadata . stats . clone (),
           edit_request     : metadata . code . editRequest . clone (),
           view_requests    : metadata . code . viewRequests . clone (), } ),
         None )
@@ -209,7 +209,7 @@ fn parse_view_sexp (
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         if key == "rels" {
-          parse_rels_sexp ( &subitems[1..], &mut metadata . relationships ) ?;
+          parse_rels_sexp ( &subitems[1..], &mut metadata . stats ) ?;
         } else {
           return Err ( format! ( "Unknown view key: {}", key )); }
       },
@@ -292,10 +292,10 @@ fn parse_code_sexp (
   Ok (( )) }
 
 
-/// Parse the (rels ...) s-expression and update relationships.
+/// Parse the (rels ...) s-expression and update stats.
 fn parse_rels_sexp (
   items : &[Sexp],
-  relationships : &mut TruenodeRelationships
+  stats : &mut TrueNodeStats
 ) -> Result<(), String> {
   for rel_element in items {
     match rel_element {
@@ -306,17 +306,17 @@ fn parse_rels_sexp (
           atom_to_string ( &kv_pair[1] ) ?;
         match rel_key . as_str () {
           "containers" => {
-            relationships . numContainers = Some (
+            stats . numContainers = Some (
               rel_value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid containers value: {}", rel_value )) ? ); },
           "contents" => {
-            relationships . numContents = Some (
+            stats . numContents = Some (
               rel_value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid contents value: {}", rel_value )) ? ); },
           "linksIn" => {
-            relationships . numLinksIn = Some (
+            stats . numLinksIn = Some (
               rel_value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid linksIn value: {}", rel_value )) ? ); },
@@ -326,8 +326,8 @@ fn parse_rels_sexp (
         let bare_value : String =
           atom_to_string ( rel_element ) ?;
         match bare_value . as_str () {
-          "notInParent"    => relationships . parentIsContainer = false,
-          "containsParent" => relationships . parentIsContent   = true,
+          "notInParent"    => stats . parentIsContainer = false,
+          "containsParent" => stats . parentIsContent   = true,
           _ => {
             return Err ( format! ( "Unknown rels value: {}",
                                     bare_value )); }} },
