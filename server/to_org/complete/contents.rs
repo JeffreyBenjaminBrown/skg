@@ -16,7 +16,7 @@ use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
 
-use ego_tree::{NodeId, NodeMut, NodeRef};
+use ego_tree::{NodeId, NodeRef};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
@@ -158,37 +158,21 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
     content_from_disk_as_list . as_ref ()
     . map ( |v| v . iter () . cloned () . collect () )
     . unwrap_or_default ();
-
   let ( content_child_treeids,
         mut non_content_child_treeids )
     : ( Vec < NodeId >, Vec < NodeId > )
     = partition_nonignored_true_content_from_other_children (
       tree,
       node_id ) ?;
-
   let mut content_skgid_to_treeid : HashMap < ID, NodeId > =
+    // PITFALL: This map initially includes non-content, which is soon removed by mark_and_move_invalidated_content.
     map_skgid_to_treeid ( tree, &content_child_treeids ) ?;
 
-  // Mark invalidated content as ParentIgnores
-  // and move to non-content list.
-  // Content can become invalidated, i.e. non-content,
-  // if a separate buffer edited the invalidated content's container.
-  let mut invalid_content_treeids : Vec < NodeId > =
-    Vec::new ();
-  for ( child_pid, child_treeid ) in & content_skgid_to_treeid {
-    if ! content_from_disk_as_set . contains ( child_pid ) {
-      invalid_content_treeids . push ( *child_treeid ); }}
-  for invalid_treeid in & invalid_content_treeids {
-    let mut child_mut : NodeMut < NodePair > =
-      tree . get_mut ( *invalid_treeid )
-      . ok_or ( "Invalid content child not found" ) ?;
-    let pair : &mut NodePair = child_mut . value ();
-    let OrgNodeKind::True(t) = &mut pair . orgnode . kind
-      else { return Err ( "Not-really-content child is not a TrueNode" . into () ) };
-    t . parent_ignores = true;
-    let child_pid : ID = t . id_opt . clone () . unwrap ();
-    content_skgid_to_treeid . remove ( & child_pid );
-    non_content_child_treeids . push ( *invalid_treeid ); }
+  mark_and_move_invalidated_content (
+    tree,
+    &content_from_disk_as_set,
+    &mut content_skgid_to_treeid,
+    &mut non_content_child_treeids ) ?;
 
   // Build completed-content list
   // preserving order from SkgNode
@@ -270,6 +254,34 @@ fn map_skgid_to_treeid (
       ) ? . ok_or ( "Content child has no ID" ) ?;
     result . insert ( child_pid, *child_treeid ); }
   Ok ( result ) }
+
+/// PURPOSE : If an entry in 'supposedly_content'
+/// is not truly content, then move it to 'non_content'.
+///
+/// MOTIVATION: Content can become invalidated (i.e. non-content)
+/// if a separate buffer edited the invalidated content's container.
+fn mark_and_move_invalidated_content (
+  tree               : &mut PairTree,
+  truly_content      : &HashSet<ID>, // immutable, used to judge
+  supposedly_content : &mut HashMap<ID, NodeId>, // might lose some
+  non_content        : &mut Vec<NodeId>, // might correspondingly gain some
+) -> Result<(), Box<dyn Error>> {
+  let invalid_content_treeids : Vec<NodeId> =
+    supposedly_content . iter ()
+    . filter ( |(pid, _)| ! truly_content . contains ( *pid ) )
+    . map ( |(_, treeid)| *treeid )
+    . collect ();
+  for invalid_treeid in & invalid_content_treeids {
+    let child_pid : ID =
+      write_at_node_in_tree ( tree, *invalid_treeid, |np| {
+        let OrgNodeKind::True(t) = &mut np . orgnode . kind
+          else { return Err ( "Not-really-content child is not a TrueNode" ) };
+        t . parent_ignores = true;
+        Ok ( t . id_opt . clone () . unwrap () )
+      } ) ? ?;
+    supposedly_content . remove ( & child_pid );
+    non_content . push ( *invalid_treeid ); }
+  Ok (()) }
 
 /// Create a new Content node from disk (using 'disk_id')
 /// and append it to the children of 'parent_nid'.
