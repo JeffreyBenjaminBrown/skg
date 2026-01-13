@@ -31,9 +31,9 @@ async fn test_path_with_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (id 1)) 1
-    ** (skg (id 2) (view folded)) 2
-    *** (skg (id off-path)) off-path
+    * (skg (node (id 1))) 1
+    ** (skg folded (node (id 2))) 2
+    *** (skg (node (id off-path))) off-path
   "};
 
   let orgnode_trees: Tree<OrgNode> =
@@ -63,12 +63,12 @@ async fn test_path_with_cycle_impl(
     cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (id 1)) 1
-    ** (skg (id 2) (view folded)) 2
-    *** (skg (id 3) (source main) (code indefinitive (interp parentIgnores))) 3
-    **** (skg (id 4) (source main) (code indefinitive (interp parentIgnores))) 4
-    ***** (skg (id 1) (source main) (code indefinitive (interp parentIgnores))) 1
-    *** (skg (id off-path)) off-path
+    * (skg (node (id 1))) 1
+    ** (skg folded (node (id 2))) 2
+    *** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    **** (skg (node (id 4) (source main) parentIgnores indefinitive)) 4
+    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    *** (skg (node (id off-path))) off-path
   "};
 
   let expected_trees: Tree<OrgNode> =
@@ -100,10 +100,10 @@ async fn test_path_with_branches_no_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (id 0)) 0
-    ** (skg (id 1)) 1
-    *** (skg (id 2) (view folded)) 2
-    **** (skg (id off-path)) off-path
+    * (skg (node (id 0))) 0
+    ** (skg (node (id 1))) 1
+    *** (skg folded (node (id 2))) 2
+    **** (skg (node (id off-path))) off-path
   "};
 
   let orgnode_trees: Tree<OrgNode> =
@@ -146,14 +146,14 @@ async fn test_path_with_branches_no_cycle_impl(
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (id 0)) 0
-    ** (skg (id 1)) 1
-    *** (skg (id 2) (view folded)) 2
-    **** (skg (id 3) (source main) (code indefinitive (interp parentIgnores))) 3
-    ***** (skg (id 1) (source main) (code indefinitive (interp parentIgnores))) 1
-    ***** (skg (id 2) (source main) (code indefinitive (interp parentIgnores))) 2
-    ***** (skg (id 3) (source main) (code indefinitive (interp parentIgnores))) 3
-    **** (skg (id off-path)) off-path
+    * (skg (node (id 0))) 0
+    ** (skg (node (id 1))) 1
+    *** (skg folded (node (id 2))) 2
+    **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
+    ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    **** (skg (node (id off-path))) off-path
   "};
 
   let expected_trees: Tree<OrgNode> =
@@ -185,10 +185,10 @@ async fn test_path_with_branches_with_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (id 0)) 0
-    ** (skg (id 1)) 1
-    *** (skg (id 2) (view folded)) 2
-    **** (skg (id off-path)) off-path
+    * (skg (node (id 0))) 0
+    ** (skg (node (id 1))) 1
+    *** (skg folded (node (id 2))) 2
+    **** (skg (node (id off-path))) off-path
   "};
 
   let orgnode_trees: Tree<OrgNode> =
@@ -231,14 +231,14 @@ async fn test_path_with_branches_with_cycle_impl(
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (id 0)) 0
-    ** (skg (id 1)) 1
-    *** (skg (id 2) (view folded)) 2
-    **** (skg (id 3) (source main) (code indefinitive (interp parentIgnores))) 3
-    ***** (skg (id 1) (source main) (code indefinitive (interp parentIgnores))) 1
-    ***** (skg (id 2) (source main) (code indefinitive (interp parentIgnores))) 2
-    ***** (skg (id 3) (source main) (code indefinitive (interp parentIgnores))) 3
-    **** (skg (id off-path)) off-path
+    * (skg (node (id 0))) 0
+    ** (skg (node (id 1))) 1
+    *** (skg folded (node (id 2))) 2
+    **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
+    ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    **** (skg (node (id off-path))) off-path
   "};
 
   let expected_trees: Tree<OrgNode> =

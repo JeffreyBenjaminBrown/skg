@@ -68,17 +68,17 @@ fn test_subscribee_col_appears_for_subscribers(
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
     let expected = indoc! {
-      "* (skg (id 1) (source home) (view (rels (containers 0) (contents 4)))) 1
-      ** (skg (id 11) (source home) (view (rels (contents 1)))) 11
-      *** (skg (code (interp subscribeeCol))) it subscribes to these
-      **** (skg (id 11-sees) (source away) (view (rels (containers 0))) (code indefinitive)) 11-sees
-      *** (skg (id 111) (source home)) 111
-      ** (skg (id 12) (source home)) 12
-      *** (skg (code (interp subscribeeCol))) it subscribes to these
-      **** (skg (id 12-sees) (source away) (view (rels (containers 0))) (code indefinitive)) 12-sees
-      ** (skg (id 13) (source home)) 13
-      ** (skg (id 14) (source home) (view (rels (contents 1)))) 14
-      *** (skg (id 141) (source home)) 141
+      "* (skg (node (id 1) (source home) (stats (containers 0) (contents 4)))) 1
+      ** (skg (node (id 11) (source home) (stats (contents 1)))) 11
+      *** (skg subscribeeCol) it subscribes to these
+      **** (skg (node (id 11-sees) (source away) indefinitive (stats (containers 0)))) 11-sees
+      *** (skg (node (id 111) (source home))) 111
+      ** (skg (node (id 12) (source home))) 12
+      *** (skg subscribeeCol) it subscribes to these
+      **** (skg (node (id 12-sees) (source away) indefinitive (stats (containers 0)))) 12-sees
+      ** (skg (node (id 13) (source home))) 13
+      ** (skg (node (id 14) (source home) (stats (contents 1)))) 14
+      *** (skg (node (id 141) (source home))) 141
 "};
     assert_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeCol children");

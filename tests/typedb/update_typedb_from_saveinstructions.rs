@@ -27,9 +27,9 @@ fn test_update_nodes_and_relationships2 (
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
-      * (skg (id 3) (source main) (code toDelete)) 33
-      * (skg (id 2) (source main)) 22
-      ** (skg (id 1) (source main) (code indefinitive)) 1
+      * (skg (node (id 3) (source main) (editRequest delete))) 33
+      * (skg (node (id 2) (source main))) 22
+      ** (skg (node (id 1) (source main) indefinitive)) 1
     "};
 
     let forest : Tree<OrgNode> =

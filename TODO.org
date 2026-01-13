@@ -1,12 +1,22 @@
 * NOTE TO READER: Most plans are online.
   e.g. here:
   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+* analysis
+** to regenerate call graph .org files
+   cargo run -p call-graph update_from_and_rerender_buffer
+** prompt to Claude
+Welcome! Please read ai-agents.md and whatever it points to (maybe recursively) to get acquainted.
+
+Then: I'd like you to do an analysis that I'd like to be able to do in a systematic way myself but don't know how. Maybe I just have to read more, write more about the architecture, try harder. I've found tools/introspect/call-graph/*.org helpful, but still it's very difficult to keep the whole program in mind at once, enough to do this kind of analysis. I'll keep trying, but anyway:
+
+I'd like you to analyze the call-tree top-down from main, in search of bundled concerns that ought to be separate, and separate concerns that ought to be bundled.
+
+But before I ask you to do this, I should ask you to help me sculpt the request. Is there a word for this kind of analysis? How does one go about finding better ways to structure the data flow of a program?
 * s, by urgency
-** change metadata rendering
-   'code' is now an obsolete s-exp title, etc.
 ** ? definitive OrgNode != definitive skgnode
 *** One is that the orgnode stuff is intended as definitive.
 *** SkgNode might need definitive modifiers for each field.
+** try a top-down reorganization not of files but of calls
 ** DONE files that changed a lot since main
 server/from_text/buffer_to_orgnodes/validate_tree.rs
   annoying, minor

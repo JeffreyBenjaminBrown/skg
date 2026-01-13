@@ -10,10 +10,10 @@
 
 (defun skg-set-metadata-indefinitive ()
   "Mark the headline at point as indefinitive.
-Edits the metadata to include `indefinitive` in the `code` section.
+Edits the metadata to include `indefinitive` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-edit-metadata-at-point '(skg (code indefinitive))))
+  (skg-edit-metadata-at-point '(skg (node indefinitive))))
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.
@@ -181,13 +181,13 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
                   (let ((key (format "%s" (car element)))
                         (val (format "%s" (cadr element))))
                     (push (cons key val) alist)))
-                 (;; Special case: (rels ...) sub-s-expr
+                 (;; Special case: (stats ...) sub-s-expr
                   (and (listp element)
                        (> (length element) 2)
-                       (eq (car element) 'rels))
-                  ;; Store the complete (rels ...) s-expression as a string
-                  (let ((rel-sexp (format "%S" element)))
-                    (push (cons "rels" rel-sexp) alist)))
+                       (eq (car element) 'stats))
+                  ;; Store the complete (stats ...) s-expression as a string
+                  (let ((stats-sexp (format "%S" element)))
+                    (push (cons "stats" stats-sexp) alist)))
                  (t ;; Bare value (symbol or other atom)
                   (let ((bare-val (format "%s" element)))
                     (push bare-val set))))))
@@ -199,11 +199,11 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
   "Reconstruct complete (skg ...) metadata s-expression from ALIST and BARE-VALUES.
 Returns a string containing the complete s-expression.
 Key-value pairs are formatted as (key value),
-except 'rels' which is already a complete s-expression."
+except 'stats' which is already a complete s-expression."
   (let ((parts '()))
     (dolist (kv alist)
-      (if (string-equal (car kv) "rels")
-          ;; rels value is already a complete (rels ...) sexp string
+      (if (string-equal (car kv) "stats")
+          ;; stats value is already a complete (stats ...) sexp string
           (push (cdr kv) parts)
         ;; Regular key-value pair
         (push (format "(%s %s)" (car kv) (cdr kv))

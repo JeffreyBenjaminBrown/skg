@@ -124,7 +124,8 @@ fn format_matches_as_org_mode (
             search_terms.to_string ()),
           parent_ignores : true,
           ..TrueNode::default ()
-        } ), } ));
+        } ), } )
+    . expect ( "TrueNode rendering never fails" ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
@@ -160,7 +161,8 @@ fn format_matches_as_org_mode (
             title : format! (
               "score: {:.2}, [[id:{}][{}]]",
               score, id, title ),
-            ..TrueNode::default () } ), } ));
+            ..TrueNode::default () } ), } )
+      . expect ( "TrueNode rendering never fails" ));
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
       result.push_str (
@@ -173,7 +175,8 @@ fn format_matches_as_org_mode (
               title : format! (
                 "score: {:.2}, [[id:{}][{}]]",
                 score, id, title ),
-              ..TrueNode::default () } ), } )); }}
+              ..TrueNode::default () } ), } )
+        . expect ( "TrueNode rendering never fails" )); }}
   result }
 
 pub fn search_terms_from_request (

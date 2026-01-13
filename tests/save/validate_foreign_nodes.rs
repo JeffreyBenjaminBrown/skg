@@ -47,7 +47,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
     let (config, driver) = setup_multi_source_test("skg-test-foreign-unmodified").await?;
 
     let org_text = indoc! {"
-      * (skg (id foreign1) (source foreign)) Foreign node unchanged
+      * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
       This is a foreign node
     "};
 
@@ -73,7 +73,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
     // Try to save buffer with modified foreign node (title changed)
     let org_text = indoc! {"
-      * (skg (id foreign2) (source foreign)) MODIFIED TITLE
+      * (skg (node (id foreign2) (source foreign))) MODIFIED TITLE
       Original body
     "};
 
@@ -108,7 +108,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
 
     // Try to save buffer with modified foreign node (body changed)
     let org_text = indoc! {"
-      * (skg (id foreign2) (source foreign)) Foreign node to modify
+      * (skg (node (id foreign2) (source foreign))) Foreign node to modify
       MODIFIED BODY
     "};
 
@@ -137,7 +137,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
 
     // Save buffer with indefinitive foreign node
     let org_text = indoc! {"
-      * (skg (id foreign3) (source foreign) (code indefinitive)) Foreign indefinitive node
+      * (skg (node (id foreign3) (source foreign) indefinitive)) Foreign indefinitive node
     "};
 
     let result = buffer_to_orgnode_forest_and_save_instructions(
@@ -163,9 +163,9 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
 
     // Save buffer with owned node
     let org_text = indoc! {"
-      * (skg (id node1) (source main)) Modified owned node
-      ** (skg (id child1) (source main)) _
-      ** (skg (id child2) (source main)) _
+      * (skg (node (id node1) (source main))) Modified owned node
+      ** (skg (node (id child1) (source main))) _
+      ** (skg (node (id child2) (source main))) _
     "};
 
     let result = buffer_to_orgnode_forest_and_save_instructions(
@@ -191,7 +191,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
     // Try to delete a foreign node
     let org_text = indoc! {"
-      * (skg (id foreign1) (source foreign) (code toDelete)) Foreign node unchanged
+      * (skg (node (id foreign1) (source foreign) (editRequest delete))) Foreign node unchanged
       This is a foreign node
     "};
 
@@ -221,7 +221,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
     // Try to create a new node in foreign source
     let org_text = indoc! {"
-      * (skg (id new_foreign) (source foreign)) New foreign node
+      * (skg (node (id new_foreign) (source foreign))) New foreign node
       This should not be allowed
     "};
 
@@ -251,10 +251,10 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
 
     // Save buffer with mix of owned and unmodified foreign nodes
     let org_text = indoc! {"
-      * (skg (id node1) (source main)) Modified owned node
-      ** (skg (id child1) (source main)) _
-      ** (skg (id child2) (source main)) _
-      * (skg (id foreign1) (source foreign)) Foreign node unchanged
+      * (skg (node (id node1) (source main))) Modified owned node
+      ** (skg (node (id child1) (source main))) _
+      ** (skg (node (id child2) (source main))) _
+      * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
       This is a foreign node
     "};
 
@@ -285,10 +285,10 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
     let (config, driver) = setup_multi_source_test("skg-test-merge-foreign-acquirer").await?;
 
     // Try to merge where the acquirer is foreign
-    // Format: (skg (code (merge ID))) - acquiree merges into acquirer
+    // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
     let org_text = indoc! {"
-      * (skg (id node1) (source main) (code (merge foreign1))) Node merging into foreign
-      * (skg (id foreign1) (source foreign)) Foreign node unchanged
+      * (skg (node (id node1) (source main) (editRequest (merge foreign1)))) Node merging into foreign
+      * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
       This is a foreign node
     "};
 
@@ -318,9 +318,9 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
 
     // Try to merge where the acquiree is foreign
     let org_text = indoc! {"
-      * (skg (id foreign1) (source foreign) (code (merge node1))) Foreign merging into owned
+      * (skg (node (id foreign1) (source foreign) (editRequest (merge node1)))) Foreign merging into owned
       This is a foreign node
-      * (skg (id node1) (source main)) Owned node
+      * (skg (node (id node1) (source main))) Owned node
     "};
 
     let result = buffer_to_orgnode_forest_and_save_instructions(
@@ -349,8 +349,8 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
 
     // Merge where both nodes are owned - should work
     let org_text = indoc! {"
-      * (skg (id node1) (source main) (code (merge child1))) Node merging into child
-      * (skg (id child1) (source main)) Child node
+      * (skg (node (id node1) (source main) (editRequest (merge child1)))) Node merging into child
+      * (skg (node (id child1) (source main))) Child node
     "};
 
     let result = buffer_to_orgnode_forest_and_save_instructions(

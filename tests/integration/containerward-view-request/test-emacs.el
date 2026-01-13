@@ -70,12 +70,12 @@
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
-      (insert "* (skg (id 0) (source main)) 0\n")
-      (insert "** (skg (id 1)) 1\n")
-      (insert "*** (skg (id 11)) 11\n")
-      (insert "*** (skg (id 12)) 12\n")
-      (insert "**** (skg (id 121)) 121\n")
-      (insert "*** (skg (id 13)) 13\n")
+      (insert "* (skg (node (id 0) (source main))) 0\n")
+      (insert "** (skg (node (id 1))) 1\n")
+      (insert "*** (skg (node (id 11))) 11\n")
+      (insert "*** (skg (node (id 12))) 12\n")
+      (insert "**** (skg (node (id 121))) 121\n")
+      (insert "*** (skg (node (id 13))) 13\n")
       (message "✓ Created initial buffer with full structure")
 
       ;; Save to establish relationships
@@ -99,11 +99,11 @@
     (when buffer
       (with-current-buffer buffer
         (erase-buffer)
-        (insert "* (skg (id 1) (source main)) 1\n")
-        (insert "** (skg (id 11)) 11\n")
-        (insert "** (skg (id 12)) 12\n")
-        (insert "*** (skg (id 121)) 121\n")
-        (insert "** (skg (id 13)) 13\n")
+        (insert "* (skg (node (id 1) (source main))) 1\n")
+        (insert "** (skg (node (id 11))) 11\n")
+        (insert "** (skg (node (id 12))) 12\n")
+        (insert "*** (skg (node (id 121))) 121\n")
+        (insert "** (skg (node (id 13))) 13\n")
         (message "✓ Created new buffer without node 0")
 
         ;; Position on line 3 (** (skg (id 12)) 12)
@@ -150,13 +150,13 @@
                     "*** 121\n"
                     "** 13\n"))
            (expected
-            (concat "* (skg (id 1) (source main) (view (rels (contents 3)))) 1\n"
-                    "** (skg (id 11) (source main)) 11\n"
-                    "** (skg (id 12) (source main) (view (rels (contents 1)))) 12\n"
-                    "*** (skg (id 1) (source main) (view (rels notInParent containsParent (contents 3))) (code (interp parentIgnores) indefinitive)) 1\n"
-                    "**** (skg (id 0) (source main) (view (rels notInParent containsParent (containers 0) (contents 1))) (code (interp parentIgnores) indefinitive)) 0\n"
-                    "*** (skg (id 121) (source main)) 121\n"
-                    "** (skg (id 13) (source main)) 13\n")))
+            (concat "* (skg (node (id 1) (source main) (stats (contents 3)))) 1\n"
+                    "** (skg (node (id 11) (source main))) 11\n"
+                    "** (skg (node (id 12) (source main) (stats (contents 1)))) 12\n"
+                    "*** (skg (node (id 1) (source main) parentIgnores indefinitive (stats notInParent containsParent (contents 3)))) 1\n"
+                    "**** (skg (node (id 0) (source main) parentIgnores indefinitive (stats notInParent containsParent (containers 0) (contents 1)))) 0\n"
+                    "*** (skg (node (id 121) (source main))) 121\n"
+                    "** (skg (node (id 13) (source main))) 13\n")))
 
       (message "Buffer-Content with metadata: %s" buffer-content)
       (message "Expected buffer-content with metadata: %s" expected)

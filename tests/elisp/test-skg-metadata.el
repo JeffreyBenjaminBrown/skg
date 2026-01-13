@@ -68,32 +68,30 @@ Returns the parsed s-expression or nil if not found."
           (read (substring text 0 end-pos)))))))
 
 (ert-deftest test-skg-set-metadata-indefinitive ()
-  "Test skg-set-metadata-indefinitive adds indefinitive to code section."
-  ;; Test adding indefinitive to headline with no code section
+  "Test skg-set-metadata-indefinitive adds indefinitive to node section."
+  ;; Test adding indefinitive to headline with id
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (id 1)) title")
+    (insert "* (skg (node (id 1))) title")
     (goto-char (point-min))
     (skg-set-metadata-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in code section
-      (should (skg-sexp-subtree-p result '(skg (code indefinitive))))
+      ;; Verify indefinitive is in node section
+      (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
       ;; Verify id is preserved
-      (should (skg-sexp-subtree-p result '(skg (id 1))))))
+      (should (skg-sexp-subtree-p result '(skg (node (id 1)))))))
 
-  ;; Test adding indefinitive to headline with existing code section
+  ;; Test adding indefinitive to headline with existing node section
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (id 2)) title")
+    (insert "* (skg (node (id 2))) title")
     (goto-char (point-min))
     (skg-set-metadata-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in code section
-      (should (skg-sexp-subtree-p result '(skg (code indefinitive))))
-      ;; Verify existing code content is preserved
-      (should (skg-sexp-subtree-p result '(skg)))
+      ;; Verify indefinitive is in node section
+      (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
       ;; Verify id is preserved
-      (should (skg-sexp-subtree-p result '(skg (id 2))))))
+      (should (skg-sexp-subtree-p result '(skg (node (id 2)))))))
 
   ;; Test adding indefinitive to headline with no metadata
   (with-temp-buffer
@@ -102,7 +100,7 @@ Returns the parsed s-expression or nil if not found."
     (goto-char (point-min))
     (skg-set-metadata-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in code section
-      (should (skg-sexp-subtree-p result '(skg (code indefinitive)))))))
+      ;; Verify indefinitive is in node section
+      (should (skg-sexp-subtree-p result '(skg (node indefinitive)))))))
 
 (provide 'test-skg-metadata)

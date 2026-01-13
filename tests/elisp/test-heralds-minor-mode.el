@@ -13,8 +13,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (id 123) (view (cycle) (relationships (numContents 2))) (code (interp aliasCol))) herald\n")
-      (insert "Another line (skg (id 456) (view (relationships (numContainers 1) (numLinksIn 3))) (code (toDelete))) more text\n")
+      (insert "Test line with (skg (node (id 123) cycle (stats (contents 2)))) herald\n")
+      (insert "Another line (skg (node (id 456) (stats (containers 1) (linksIn 3)) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -42,7 +42,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (id 123) (view (cycle) (rels notInParent (containers 3) (linksIn 1))) (code toDelete)) text")
+    (insert "Line with (skg (node (id 123) cycle (stats notInParent (containers 3) (linksIn 1)) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -83,28 +83,49 @@
   (with-temp-buffer
     ;; Test aliases viewRequest
     (erase-buffer)
-    (insert "(skg (id 1) (code (viewRequests aliases)))")
+    (insert "(skg (node (id 1) (viewRequests aliases)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:aliases" result)))
 
     ;; Test containerwardView viewRequest
     (erase-buffer)
-    (insert "(skg (id 2) (code (viewRequests containerwardView)))")
+    (insert "(skg (node (id 2) (viewRequests containerwardView)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:containers" result)))
 
     ;; Test sourcewardView viewRequest
     (erase-buffer)
-    (insert "(skg (id 3) (code (viewRequests sourcewardView)))")
+    (insert "(skg (node (id 3) (viewRequests sourcewardView)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:sources" result)))
 
     ;; Test multiple viewRequests
     (erase-buffer)
-    (insert "(skg (id 4) (code (viewRequests aliases containerwardView sourcewardView)))")
+    (insert "(skg (node (id 4) (viewRequests aliases containerwardView sourcewardView)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:aliases" result))
       (should (string-match "req:containers" result))
       (should (string-match "req:sources" result)))))
+
+(ert-deftest test-heralds-scaffold-display ()
+  "Test that scaffold kinds are displayed correctly."
+  (with-temp-buffer
+    ;; Test aliasCol
+    (erase-buffer)
+    (insert "(skg aliasCol)")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "aliases" result)))
+
+    ;; Test alias
+    (erase-buffer)
+    (insert "(skg alias)")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "alias" result)))
+
+    ;; Test aliasCol with folded
+    (erase-buffer)
+    (insert "(skg folded aliasCol)")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "aliases" result)))))
 
 (provide 'test-heralds-minor-mode)

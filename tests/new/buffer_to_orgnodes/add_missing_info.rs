@@ -33,21 +33,21 @@ async fn test_add_missing_info_logic (
   // Also tests source inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
-            * (skg (id root) (source main)) root
-            ** (skg (code (interp aliasCol))) aliases
+            * (skg (node (id root) (source main))) root
+            ** (skg aliasCol) aliases
             *** new alias
-            *** (skg (code (interp alias))) preexisting alias
+            *** (skg alias) preexisting alias
             ** no id
             *** also no id
         "};
   let without_missing_info: &str =
     indoc! {"
-            * (skg (id root-pid) (source main)) root
-            ** (skg (code (interp aliasCol))) aliases
-            *** (skg (code (interp alias))) new alias
-            *** (skg (code (interp alias))) preexisting alias
-            ** (skg (id unpredictable) (source main)) no id
-            *** (skg (id unpredictable) (source main)) also no id
+            * (skg (node (id root-pid) (source main))) root
+            ** (skg aliasCol) aliases
+            *** (skg alias) new alias
+            *** (skg alias) preexisting alias
+            ** (skg (node (id unpredictable) (source main))) no id
+            *** (skg (node (id unpredictable) (source main))) also no id
         "};
   let mut after_adding_missing_info: Tree<OrgNode> =
     org_to_uninterpreted_nodes(
@@ -101,26 +101,26 @@ async fn test_source_inheritance_logic (
   // with explicit sources overriding inheritance at various depths.
   let input: &str =
     indoc! {"
-            * (skg (id 1) (source main)) _
-            ** (skg (id 11)) _
-            *** (skg (id 111) (source alt)) _
-            **** (skg (id 1111)) _
-            *** (skg (id 112)) _
-            * (skg (id 2)) _
-            ** (skg (id 21) (source alt)) _
-            ** (skg (id 22)) _
+            * (skg (node (id 1) (source main))) _
+            ** (skg (node (id 11))) _
+            *** (skg (node (id 111) (source alt))) _
+            **** (skg (node (id 1111))) _
+            *** (skg (node (id 112))) _
+            * (skg (node (id 2))) _
+            ** (skg (node (id 21) (source alt))) _
+            ** (skg (node (id 22))) _
         "};
 
   let expected: &str =
     indoc! {"
-            * (skg (id 1) (source main)) _
-            ** (skg (id 11) (source main)) _
-            *** (skg (id 111) (source alt)) _
-            **** (skg (id 1111) (source alt)) _
-            *** (skg (id 112) (source main)) _
-            * (skg (id 2)) _
-            ** (skg (id 21) (source alt)) _
-            ** (skg (id 22)) _
+            * (skg (node (id 1) (source main))) _
+            ** (skg (node (id 11) (source main))) _
+            *** (skg (node (id 111) (source alt))) _
+            **** (skg (node (id 1111) (source alt))) _
+            *** (skg (node (id 112) (source main))) _
+            * (skg (node (id 2))) _
+            ** (skg (node (id 21) (source alt))) _
+            ** (skg (node (id 22))) _
         "};
 
   let mut actual_forest: Tree<OrgNode> =

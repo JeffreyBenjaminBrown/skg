@@ -40,9 +40,9 @@ fn test_parentignores_and_indefinitive(
         // Node 2 contains node 3 (already) and should contain node 4 (new)
         // Node 2 should NOT affect node 1 because treatment=parentIgnores
         let org_text = indoc! {"
-          * (skg (id 1) (source main)) 1
-          ** (skg (id 2) (source main) (code (interp parentIgnores) indefinitive)) 2
-          *** (skg (id 4) (source main)) 4
+          * (skg (node (id 1) (source main))) 1
+          ** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
+          *** (skg (node (id 4) (source main))) 4
         "};
         let (_orgnode_forest, save_instructions, _merge_instructions) =
           buffer_to_orgnode_forest_and_save_instructions(

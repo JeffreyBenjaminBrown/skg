@@ -6,7 +6,7 @@
 (defvar integration-test-completed nil)
 
 (defconst skg-aliases-base-buffer
-  "* (skg (id test-node)) Test Node
+  "* (skg (node (id test-node))) Test Node
 ")
 
 (defun strip-metadata-and-bodies (text)
@@ -72,10 +72,10 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-with-aliases
-         (concat "* (skg (id test-node) (source main) (view (rels (containers 0)))) Test Node\n"
-                 "** (skg (code (interp aliasCol))) its aliases\n"
-                 "*** (skg (code (interp alias))) first alias\n"
-                 "*** (skg (code (interp alias))) second alias\n"))
+         (concat "* (skg (node (id test-node) (source main) (stats (containers 0)))) Test Node\n"
+                 "** (skg aliasCol) its aliases\n"
+                 "*** (skg alias) first alias\n"
+                 "*** (skg alias) second alias\n"))
         (expected-stripped
          (concat "* Test Node\n"
                  "** its aliases\n"

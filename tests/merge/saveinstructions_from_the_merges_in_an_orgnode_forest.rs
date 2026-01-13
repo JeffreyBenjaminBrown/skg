@@ -16,7 +16,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
             Box::pin(async move {
                 // Create a forest with node 1 requesting to merge node 2
                 let input = indoc! {"
-                    * (skg (id 1) (code (merge 2))) 1
+                    * (skg (node (id 1) (editRequest (merge 2)))) 1
                 "};
 
                 let forest = org_to_uninterpreted_nodes(input)?.0;

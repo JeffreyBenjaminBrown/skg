@@ -10,29 +10,37 @@
 (require 'skg-sexpr)
 
 (defconst heralds--transform-rules
-  '(skg (id (BLUE ANY "ID"))
-        (BLUE view (cycle (ANY "⟳"))
-              (folded) ;; ignored
-              (focused) ;; ignored
-              (rels
-                (RED notInParent "!{")
-                (containsParent "}")
-                (containers (ANY IT "{"))
-                (contents (ANY "{" IT))
-                (linksIn (ANY IT "→"))))
-        (GREEN code (interp
-                (content) ;; ignored
-                (aliasCol "aliases")
-                (alias "alias")
-                (RED parentIgnores "!{"))
-              (indefinitive "indef")
-              (RED toDelete "delete")
-              (RED merge (ANY "merge:" IT))
-              (viewRequests
-                (aliases "req:aliases")
-                (containerwardView "req:containers")
-                (sourcewardView "req:sources")
-                (definitiveView "req:definitive"))))
+  '(skg
+    ;; Top-level focused/folded (ignored in herald)
+    (focused)
+    (folded)
+    ;; Scaffold kinds at top level
+    (GREEN aliasCol "aliases")
+    (GREEN alias "alias")
+    (GREEN hiddenInSubscribeeCol "hiddenIn")
+    (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
+    (GREEN subscribeeCol "subscribees")
+    ;; TrueNode wrapped in (node ...)
+    (node
+      (id (BLUE ANY "ID"))
+      (source) ;; ignored
+      (RED parentIgnores "!{")
+      (GREEN indefinitive "indef")
+      (BLUE cycle "⟳")
+      (BLUE stats
+        (RED notInParent "!{")
+        (containsParent "}")
+        (containers (ANY IT "{"))
+        (contents (ANY "{" IT))
+        (linksIn (ANY IT "→")))
+      (editRequest
+        (RED delete "delete")
+        (RED merge (ANY "merge:" IT)))
+      (GREEN viewRequests
+        (aliases "req:aliases")
+        (containerwardView "req:containers")
+        (sourcewardView "req:sources")
+        (definitiveView "req:definitive"))))
   "Rules to convert metadata sexps into herald tokens.")
 
 (defun heralds--read-metadata (metadata-sexp)

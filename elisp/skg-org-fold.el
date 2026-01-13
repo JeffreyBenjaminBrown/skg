@@ -67,7 +67,7 @@ Re-folds headlines that had folded children using org-mode functions."
           (when (and (org-at-heading-p)
                      (skg-headline-has-folded-in-view-p))
             (skg-edit-metadata-at-point
-             '(skg (view (DELETE folded)))))
+             '(skg (DELETE folded))))
           (forward-line 1)))
       (progn;; This is a third pass through the entire buffer.
         (dolist (parent-marker parent-markers)
@@ -77,16 +77,16 @@ Re-folds headlines that had folded children using org-mode functions."
           (set-marker parent-marker nil))))))
 
 (defun skg-add-folded-markers ()
-  "Add 'folded' to (view ...) metadata of all invisible headlines in the buffer.
-Merges '(skg (view folded))' into existing metadata, creating nested structure
-if needed. If metadata already contains 'folded' in the view section, no change."
+  "Add 'folded' to metadata of all invisible headlines in the buffer.
+Merges '(skg folded)' into existing metadata.
+If metadata already contains 'folded', no change."
   (save-excursion
     (goto-char (point-min))
     (while (not (eobp))
       (beginning-of-line)
       (when (and (org-at-heading-p)
                  (invisible-p (point)))
-        (skg-edit-metadata-at-point '(skg (view folded))))
+        (skg-edit-metadata-at-point '(skg folded)))
       (forward-line 1))))
 
 (defun skg-collect-parent-markers-of-folded-headlines ()
@@ -113,9 +113,9 @@ Caller is responsible for freeing the markers with set-marker."
     parent-markers))
 
 (defun skg-headline-has-folded-in-view-p ()
-  "Return t if the current headline has 'folded' in its (view ...) metadata.
+  "Return t if the current headline has 'folded' in its metadata.
 Assumes point is at the beginning of a headline.
-Verifies the structure is (skg ... (view ... folded ...) ...)."
+Verifies the structure is (skg ... folded ...)."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title
@@ -125,6 +125,6 @@ Verifies the structure is (skg ... (view ... folded ...) ...)."
           (when (and metadata-sexp
                      (not (string-empty-p metadata-sexp)))
             (skg-sexp-subtree-p (read metadata-sexp)
-                                '(skg (view folded)))))))))
+                                '(skg folded))))))))
 
 (provide 'skg-org-fold)

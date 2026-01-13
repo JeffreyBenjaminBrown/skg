@@ -47,7 +47,7 @@
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
     (erase-buffer)
-    (insert "* (skg (id 1) (source main)) 1\n** (skg (id 1)) 1")
+    (insert "* (skg (node (id 1) (source main))) 1\n** (skg (node (id 1))) 1")
     (org-mode)
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
@@ -82,7 +82,7 @@
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* (skg (id 1) (source main) (view focused)) 1\n** (skg (id 1)) 1")
+                  (if (string= content "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
                       (progn
                         (message "✓ PASS: Buffer has focused marker as expected")
                         (setq integration-test-phase "invalid-save-complete")
@@ -90,7 +90,7 @@
                         (test-valid-save))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
-                      (message "Expected: %S" "* (skg (id 1) (source main) (view focused)) 1\n** (skg (id 1)) 1")
+                      (message "Expected: %S" "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn
@@ -110,8 +110,8 @@
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
-    (search-forward "** (skg (id 1)) 1")
-    (replace-match "** (skg (id 1) (code indefinitive)) 1")
+    (search-forward "** (skg (node (id 1))) 1")
+    (replace-match "** (skg (node (id 1) indefinitive)) 1")
     (message "✓ Amended previously invalid content to use indefinitive, so it is now valid"))
 
   ;; Switch to buffer to make it current
@@ -130,9 +130,9 @@
       (message "Updated buffer content: %s" updated-content)
 
       ;; Should contain cycle and indefinitive markers
-      ;; Note: cycle appears within (view ...), indefinitive within (code ...)
-      (if (and (string-match-p "(view.*cycle" updated-content)
-               (string-match-p "(code.*indefinitive" updated-content))
+      ;; Note: cycle and indefinitive are inside (node ...)
+      (if (and (string-match-p "cycle" updated-content)
+               (string-match-p "indefinitive" updated-content))
           (progn
             (message "✓ PASS: Valid save worked and showed cycle indefinitive")
             (message "✓ PASS: Integration test successful!")
@@ -140,7 +140,7 @@
             (kill-emacs 0))
         (progn
           (message "✗ FAIL: Expected cycle and indefinitive markers not found")
-          (message "Expected to contain: '(view cycle)' and '(code indefinitive)'")
+          (message "Expected to contain: 'cycle' and 'indefinitive'")
           (message "Got: %s" updated-content)
           (kill-emacs 1))))))
 

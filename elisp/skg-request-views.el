@@ -45,6 +45,6 @@ until the user calls `skg-request-save-buffer'."
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (code (viewRequests ,view-token)))) ))
+     `(skg (node (viewRequests ,view-token)))) ))
 
 (provide 'skg-request-views)

@@ -6,7 +6,6 @@
 // 2. After saving with definitive view requests, HiddenInSubscribeeCol is shown
 
 use indoc::indoc;
-use regex::Regex;
 use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -56,7 +55,7 @@ async fn cleanup_test(
   Ok (( )) }
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
-/// Modifies the code section of each subscribee to request a definitive view.
+/// Modifies the node section of each subscribee to request a definitive view.
 /// Subscribees are TrueNodes under SubscribeeCol scaffolds.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
@@ -64,14 +63,21 @@ async fn cleanup_test(
 fn add_definitive_view_request_to_subscribees (
   org_text : &str,
 ) -> String {
-  // Match lines with "subscribee-" in title AND (code indefinitive)
-  let re = Regex::new(
-    r"(\(code indefinitive\))(\) subscribee-)"
-  ).unwrap();
-  re.replace_all(
-    org_text,
-    "(code indefinitive (viewRequests definitiveView))) subscribee-"
-  ).to_string() }
+  // Process line-by-line, inserting viewRequests after indefinitive
+  // for lines containing "subscribee-" in the title
+  org_text
+    .lines()
+    .map(|line| {
+      if line.contains("subscribee-") && line.contains("indefinitive") {
+        // Insert viewRequests after indefinitive, before ) or (stats
+        line.replace("indefinitive)", "indefinitive (viewRequests definitiveView))")
+            .replace("indefinitive (stats", "indefinitive (viewRequests definitiveView) (stats")
+      } else {
+        line.to_string()
+      }
+    })
+    .collect::<Vec<_>>()
+    .join("\n") + "\n" }
 
 /// Every kind of Col:
 /// - R subscribes to E1, E2
@@ -104,13 +110,13 @@ fn test_every_kind_of_col(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code indefinitive)) hidden-for-no-reason
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-1
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-2
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id hidden-for-no-reason) (source main) indefinitive (stats (containers 0)))) hidden-for-no-reason
+       *** (skg (node (id E1) (source main) indefinitive (stats (containers 0) (contents 2)))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (stats (containers 0) (contents 2)))) subscribee-2
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indefinitive subscribees are bare leaves; only HiddenOutsideOfSubscribeeCol shown");
@@ -125,19 +131,19 @@ fn test_every_kind_of_col(
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id hidden-for-no-reason) (source main) (view (rels (containers 0))) (code indefinitive)) hidden-for-no-reason
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2)))) subscribee-1
-       **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id hidden-in-E1) (source main) (code indefinitive)) hidden-in-E1
-       **** (skg (id E11) (source main)) E11
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 2)))) subscribee-2
-       **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id hidden-in-E2) (source main) (code indefinitive)) hidden-in-E2
-       **** (skg (id E21) (source main)) E21
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id hidden-for-no-reason) (source main) indefinitive (stats (containers 0)))) hidden-for-no-reason
+       *** (skg (node (id E1) (source main) (stats (containers 0) (contents 2)))) subscribee-1
+       **** (skg hiddenInSubscribeeCol) hidden from this subscription
+       ***** (skg (node (id hidden-in-E1) (source main) indefinitive)) hidden-in-E1
+       **** (skg (node (id E11) (source main))) E11
+       *** (skg (node (id E2) (source main) (stats (containers 0) (contents 2)))) subscribee-2
+       **** (skg hiddenInSubscribeeCol) hidden from this subscription
+       ***** (skg (node (id hidden-in-E2) (source main) indefinitive)) hidden-in-E2
+       **** (skg (node (id E21) (source main))) E21
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol shown before content");
@@ -174,10 +180,10 @@ fn test_hidden_within_but_none_without(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3))) (code indefinitive)) subscribee-1
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg (node (id E1) (source main) indefinitive (stats (containers 0) (contents 3)))) subscribee-1
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indefinitive subscribee is bare leaf; H doesn't appear");
@@ -194,14 +200,14 @@ fn test_hidden_within_but_none_without(
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 3)))) subscribee-1
-       **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (code indefinitive)) H
-       **** (skg (id E11) (source main)) E11
-       **** (skg (id E12) (source main)) E12
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg (node (id E1) (source main) (stats (containers 0) (contents 3)))) subscribee-1
+       **** (skg hiddenInSubscribeeCol) hidden from this subscription
+       ***** (skg (node (id H) (source main) indefinitive)) H
+       **** (skg (node (id E11) (source main))) E11
+       **** (skg (node (id E12) (source main))) E12
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
@@ -240,13 +246,13 @@ fn test_hidden_without_but_none_within(
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id H) (source main) (view (rels (containers 0))) (code indefinitive)) H
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2))) (code indefinitive)) subscribee-1
-       *** (skg (id E2) (source main) (view (rels (containers 0))) (code indefinitive)) subscribee-2
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id H) (source main) indefinitive (stats (containers 0)))) H
+       *** (skg (node (id E1) (source main) indefinitive (stats (containers 0) (contents 2)))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (stats (containers 0)))) subscribee-2
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indefinitive bare leaves");
@@ -260,16 +266,16 @@ fn test_hidden_without_but_none_within(
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (code (interp hiddenOutsideOfSubscribeeCol))) hidden from all subscriptions
-       **** (skg (id H) (source main) (view (rels (containers 0))) (code indefinitive)) H
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 2)))) subscribee-1
-       **** (skg (id E11) (source main)) E11
-       **** (skg (id E12) (source main) (view (rels (contents 1)))) E12
-       ***** (skg (id E121) (source main)) E121
-       *** (skg (id E2) (source main) (view (rels (containers 0)))) subscribee-2
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id H) (source main) indefinitive (stats (containers 0)))) H
+       *** (skg (node (id E1) (source main) (stats (containers 0) (contents 2)))) subscribee-1
+       **** (skg (node (id E11) (source main))) E11
+       **** (skg (node (id E12) (source main) (stats (contents 1)))) E12
+       ***** (skg (node (id E121) (source main))) E121
+       *** (skg (node (id E2) (source main) (stats (containers 0)))) subscribee-2
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
       "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol; E1 expanded with E11, E12; E2 expanded but empty");
@@ -306,11 +312,11 @@ fn test_overlapping_hidden_within(
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1))) (code indefinitive)) subscribee-1
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1))) (code indefinitive)) subscribee-2
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg (node (id E1) (source main) indefinitive (stats (containers 0) (contents 1)))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (stats (containers 0) (contents 1)))) subscribee-2
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indefinitive subscribees are bare leaves; H doesn't appear");
@@ -324,15 +330,15 @@ fn test_overlapping_hidden_within(
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (id R) (source main) (view (rels (containers 0) (contents 1)))) R
-       ** (skg (code (interp subscribeeCol))) it subscribes to these
-       *** (skg (id E1) (source main) (view (rels (containers 0) (contents 1)))) subscribee-1
-       **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (view (rels (containers 2))) (code indefinitive)) H
-       *** (skg (id E2) (source main) (view (rels (containers 0) (contents 1)))) subscribee-2
-       **** (skg (code (interp hiddenInSubscribeeCol))) hidden from this subscription
-       ***** (skg (id H) (source main) (view (rels (containers 2))) (code indefinitive)) H
-       ** (skg (id R1) (source main)) R1
+      "* (skg (node (id R) (source main) (stats (containers 0) (contents 1)))) R
+       ** (skg subscribeeCol) it subscribes to these
+       *** (skg (node (id E1) (source main) (stats (containers 0) (contents 1)))) subscribee-1
+       **** (skg hiddenInSubscribeeCol) hidden from this subscription
+       ***** (skg (node (id H) (source main) indefinitive (stats (containers 2)))) H
+       *** (skg (node (id E2) (source main) (stats (containers 0) (contents 1)))) subscribee-2
+       **** (skg hiddenInSubscribeeCol) hidden from this subscription
+       ***** (skg (node (id H) (source main) indefinitive (stats (containers 2)))) H
+       ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");

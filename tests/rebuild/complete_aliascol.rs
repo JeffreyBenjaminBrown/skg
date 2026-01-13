@@ -31,17 +31,17 @@ async fn test_completeAliasCol_logic (
   // Create org text with three AliasCol scenarios
   let org_text : &str =
     indoc! { "
-      * (skg (id a)) a
-      ** (skg (code (interp aliasCol))) aliases 1
-      *** (skg (code (interp alias))) c
-      *** (skg (code (interp alias))) d
-      *** (skg (code (interp alias))) c
-      *** (skg (code (interp alias))) d
-      ** (skg (code (interp aliasCol))) aliases 2
-      *** (skg (code (interp alias))) b
-      *** (skg (view focused) (code (interp alias))) d
-      * (skg (code (interp aliasCol))) aliases 3
-      ** (skg (code (interp alias))) the above should break
+      * (skg (node (id a))) a
+      ** (skg aliasCol) aliases 1
+      *** (skg alias) c
+      *** (skg alias) d
+      *** (skg alias) c
+      *** (skg alias) d
+      ** (skg aliasCol) aliases 2
+      *** (skg alias) b
+      *** (skg focused alias) d
+      * (skg aliasCol) aliases 3
+      ** (skg alias) the above should break
     " };
 
   let orgnode_forest : Tree < OrgNode > =
@@ -177,13 +177,13 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   let org_text : &str =
     indoc! { "
-      * (skg (id a)) a
-      ** (skg (code (interp aliasCol))) aliases
-      *** (skg (code (interp alias))) b
-      *** (skg (view focused) (code (interp alias))) b
-      ** (skg (code (interp aliasCol))) aliases
-      *** (skg (view focused) (code (interp alias))) b
-      *** (skg (code (interp alias))) b
+      * (skg (node (id a))) a
+      ** (skg aliasCol) aliases
+      *** (skg alias) b
+      *** (skg focused alias) b
+      ** (skg aliasCol) aliases
+      *** (skg focused alias) b
+      *** (skg alias) b
     " };
 
   let orgnode_forest : Tree < OrgNode > =

@@ -16,9 +16,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with consistent toDelete instructions (no conflicts)
   let input_consistent: &str =
     indoc! {"
-            * (skg (id node1) (code toDelete)) first node
-            * (skg (id node2)) second node
-            * (skg (id node1) (code toDelete)) duplicate of first node (same delete instruction)
+            * (skg (node (id node1) (editRequest delete))) first node
+            * (skg (node (id node2))) second node
+            * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
         "};
 
   let forest_consistent: Tree<OrgNode> =
@@ -30,11 +30,11 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with inconsistent toDelete instructions (conflicts)
   let input_inconsistent: &str =
     indoc! {"
-            * (skg (id conflict1) (code toDelete)) first conflicting node (toDelete=true)
-            * (skg (id normal)) normal node
-            * (skg (id conflict1)) duplicate node but toDelete=false
-            * (skg (id conflict2) (code toDelete)) another conflict start
-            * (skg (id conflict2)) another conflict end
+            * (skg (node (id conflict1) (editRequest delete))) first conflicting node (toDelete=true)
+            * (skg (node (id normal))) normal node
+            * (skg (node (id conflict1))) duplicate node but toDelete=false
+            * (skg (node (id conflict2) (editRequest delete))) another conflict start
+            * (skg (node (id conflict2))) another conflict end
         "};
 
   let forest_inconsistent: Tree<OrgNode> =
@@ -48,9 +48,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with nodes that have no IDs (should be skipped)
   let input_no_ids: &str =
     indoc! {"
-            * (skg (code toDelete)) node without id (should be skipped)
+            * (skg (node (editRequest delete))) node without id (should be skipped)
             * regular node without any metadata
-            * (skg (id valid_node)) only node with id
+            * (skg (node (id valid_node))) only node with id
         "};
 
   let forest_no_ids: Tree<OrgNode> =
@@ -74,15 +74,15 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
       // Test input with multiple nodes having the same ID and indefinitive=false
       let input_with_multiple_defining_containers: &str =
         indoc! {"
-                * (skg (id duplicate)) First defining container
+                * (skg (node (id duplicate))) First defining container
                 Regular node with shared ID
-                * (skg (id duplicate)) Second defining container
+                * (skg (node (id duplicate))) Second defining container
                 Another regular node with the same ID
-                * (skg (id duplicate) (code indefinitive)) Repeated node (not defining)
+                * (skg (node (id duplicate) indefinitive)) Repeated node (not defining)
                 This one is ok because indefinitive=true
-                * (skg (id duplicate) (code indefinitive)) Might contain more (not defining)
+                * (skg (node (id duplicate) indefinitive)) Might contain more (not defining)
                 This one is also ok because indefinitive=true
-                * (skg (id unique)) Unique node
+                * (skg (node (id unique))) Unique node
                 This one is fine
             "};
 

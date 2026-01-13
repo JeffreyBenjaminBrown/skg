@@ -49,8 +49,8 @@
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
-      (insert (concat "* (skg (source main)) a\n"
-                      "* (skg (source main)) b\n"
+      (insert (concat "* (skg (node (source main))) a\n"
+                      "* (skg (node (source main))) b\n"
                       "** c\n"
                       "** d\n"
                       "*** d1\n"

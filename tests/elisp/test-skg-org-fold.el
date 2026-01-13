@@ -15,11 +15,11 @@
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
-*** (skg (id 1) (view folded)) 111
-*** (skg (id 2) (view folded) (code indefinitive)) 112
+*** (skg folded (node (id 1))) 111
+*** (skg folded (node (id 2) indefinitive)) 112
 ** 12
 12 body
-*** (skg (id 3) (view folded)) 121
+*** (skg folded (node (id 3))) 121
 121 body
 *** 122
 ** 13")
@@ -36,19 +36,18 @@
       (skg-add-folded-markers)
       (let*
           ((expected
-            ;; Every sibling of a folded node should be folded
-            ;; and folded should be nested under view.
-            ;; Note: order of (code...) and (view...) may vary after editing
+            ;; Every sibling of a folded node should be folded.
+            ;; folded is now a top-level bare atom (appended at end by elisp merge).
             "* 1
 1 body
 ** 11
-*** (skg (id 1) (view folded)) 111
-*** (skg (id 2) (code indefinitive) (view folded)) 112
+*** (skg (node (id 1)) folded) 111
+*** (skg (node (id 2) indefinitive) folded) 112
 ** 12
 12 body
-*** (skg (id 3) (view folded)) 121
+*** (skg (node (id 3)) folded) 121
 121 body
-*** (skg (view folded)) 122
+*** (skg folded) 122
 ** 13")
            (actual (buffer-substring-no-properties (point-min)
                                                    (point-max))))
@@ -61,11 +60,11 @@
   (let ((buf (generate-new-buffer "*test-remove-folded*")))
     (with-current-buffer buf
       (org-mode)
-      (insert "* (skg (view folded)) only folded
-* (skg (view folded) other) folded first
+      (insert "* (skg folded) only folded
+* (skg folded other) folded first
 Body text.
-* (skg (key value) (view folded)) folded last
-* (skg (k v) (view folded) other) folded middle
+* (skg folded (key value)) folded last
+* (skg folded (k v) other) folded middle
 * (skg other) no folded")
       (skg-remove-folded-markers)
       (should (equal (buffer-substring-no-properties (point-min)

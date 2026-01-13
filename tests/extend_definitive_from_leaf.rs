@@ -23,11 +23,11 @@ fn test_definitive_view_limit_10
     "/tmp/tantivy-test-definitive-view-limit-10",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (id 1) (source main)) 1
-        ** (skg (id 11)) 11
-        ** (skg (id 12) (code indefinitive (viewRequests definitiveView))) 12
-        ** (skg (id 13)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (node (id 1) (source main))) 1
+        ** (skg (node (id 11))) 11
+        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 13))) 13
+        * (skg (node (id 2) (source main))) 2
       "};
 
       let result = {
@@ -41,26 +41,26 @@ fn test_definitive_view_limit_10
 
       // With limit=10, all children should be expanded
       let expected = indoc! {"
-        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
-        ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
+        * (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+        ** (skg (node (id 11) (source main))) 11
+        ** (skg (node (id 12) (source main) (stats (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main) (view (rels (contents 2)))) 121
+        *** (skg (node (id 121) (source main) (stats (contents 2)))) 121
         121 body
-        **** (skg (id 1211) (source main)) 1211
+        **** (skg (node (id 1211) (source main))) 1211
         1211 body
-        **** (skg (id 1212) (source main)) 1212
+        **** (skg (node (id 1212) (source main))) 1212
         1212 body
-        *** (skg (id 122) (source main) (view (rels (contents 1)))) 122
+        *** (skg (node (id 122) (source main) (stats (contents 1)))) 122
         122 body
-        **** (skg (id 1221) (source main)) 1221
+        **** (skg (node (id 1221) (source main))) 1221
         1221 body
-        *** (skg (id 123) (source main)) 123
+        *** (skg (node (id 123) (source main))) 123
         123 body
-        *** (skg (id 124) (source main)) 124
+        *** (skg (node (id 124) (source main))) 124
         124 body
-        ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
+        ** (skg (node (id 13) (source main))) 13
+        * (skg (node (id 2) (source main) (stats (containers 0)))) 2
       "};
 
       assert_eq!(result, expected,
@@ -84,11 +84,11 @@ fn test_definitive_view_limit_5_or_6
     "/tmp/tantivy-test-definitive-view-limit-5-or-6",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (id 1) (source main)) 1
-        ** (skg (id 11)) 11
-        ** (skg (id 12) (code indefinitive (viewRequests definitiveView))) 12
-        ** (skg (id 13)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (node (id 1) (source main))) 1
+        ** (skg (node (id 11))) 11
+        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 13))) 13
+        * (skg (node (id 2) (source main))) 2
       "};
 
       let result_5 = {
@@ -115,19 +115,19 @@ fn test_definitive_view_limit_5_or_6
       // Both limits produce the same result because truncation
       // completes the sibling group.
       let expected = indoc! {"
-        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
-        ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
+        * (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+        ** (skg (node (id 11) (source main))) 11
+        ** (skg (node (id 12) (source main) (stats (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main) (view (rels (contents 2)))) 121
+        *** (skg (node (id 121) (source main) (stats (contents 2)))) 121
         121 body
-        **** (skg (id 1211) (source main) (code indefinitive)) 1211
-        **** (skg (id 1212) (source main) (code indefinitive)) 1212
-        *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
-        *** (skg (id 123) (source main) (code indefinitive)) 123
-        *** (skg (id 124) (source main) (code indefinitive)) 124
-        ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
+        **** (skg (node (id 1211) (source main) indefinitive)) 1211
+        **** (skg (node (id 1212) (source main) indefinitive)) 1212
+        *** (skg (node (id 122) (source main) indefinitive (stats (contents 1)))) 122
+        *** (skg (node (id 123) (source main) indefinitive)) 123
+        *** (skg (node (id 124) (source main) indefinitive)) 124
+        ** (skg (node (id 13) (source main))) 13
+        * (skg (node (id 2) (source main) (stats (containers 0)))) 2
       "};
 
       assert_eq!(result_5, expected,
@@ -154,11 +154,11 @@ fn test_definitive_view_limit_1_to_4
     "/tmp/tantivy-test-definitive-view-limit-1-to-4",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (id 1) (source main)) 1
-        ** (skg (id 11)) 11
-        ** (skg (id 12) (code indefinitive (viewRequests definitiveView))) 12
-        ** (skg (id 13)) 13
-        * (skg (id 2) (source main)) 2
+        * (skg (node (id 1) (source main))) 1
+        ** (skg (node (id 11))) 11
+        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 13))) 13
+        * (skg (node (id 2) (source main))) 2
       "};
 
       let result_1 = {
@@ -182,16 +182,16 @@ fn test_definitive_view_limit_1_to_4
       // - Limit is hit on the first generation
       // - Sibling group is completed, all are indefinitive
       let expected = indoc! {"
-        * (skg (id 1) (source main) (view (rels (containers 0) (contents 3)))) 1
-        ** (skg (id 11) (source main)) 11
-        ** (skg (id 12) (source main) (view (rels (contents 4)))) 12
+        * (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+        ** (skg (node (id 11) (source main))) 11
+        ** (skg (node (id 12) (source main) (stats (contents 4)))) 12
         12 body
-        *** (skg (id 121) (source main) (view (rels (contents 2))) (code indefinitive)) 121
-        *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
-        *** (skg (id 123) (source main) (code indefinitive)) 123
-        *** (skg (id 124) (source main) (code indefinitive)) 124
-        ** (skg (id 13) (source main)) 13
-        * (skg (id 2) (source main) (view (rels (containers 0)))) 2
+        *** (skg (node (id 121) (source main) indefinitive (stats (contents 2)))) 121
+        *** (skg (node (id 122) (source main) indefinitive (stats (contents 1)))) 122
+        *** (skg (node (id 123) (source main) indefinitive)) 123
+        *** (skg (node (id 124) (source main) indefinitive)) 124
+        ** (skg (node (id 13) (source main))) 13
+        * (skg (node (id 2) (source main) (stats (containers 0)))) 2
       "};
 
       assert_eq!(result_1, expected,
@@ -220,10 +220,10 @@ fn test_definitive_view_conflicting
       // - First as a regular child of 1 (will be definitive after completion)
       // - Second with a definitive view request
       let input_org_text = indoc! {"
-        * (skg (id 1) (source main)) 1
-        ** (skg (id 12)) 12
-        *** (skg (id 122) (code indefinitive)) 122
-        * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12 copy
+        * (skg (node (id 1) (source main))) 1
+        ** (skg (node (id 12))) 12
+        *** (skg (node (id 122) indefinitive)) 122
+        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12 copy
       "};
 
       let result = {
@@ -240,13 +240,13 @@ fn test_definitive_view_conflicting
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (id 1) (source main) (view (rels (containers 0) (contents 1)))) 1
-         ** (skg (id 12) (source main) (view (rels (contents 1))) (code indefinitive)) 12
-         *** (skg (id 122) (source main) (view (rels (contents 1))) (code indefinitive)) 122
-         * (skg (id 12) (source main) (view (rels (contents 1)))) 12
-         ** (skg (id 122) (source main) (view (rels (contents 1)))) 122
+        "* (skg (node (id 1) (source main) (stats (containers 0) (contents 1)))) 1
+         ** (skg (node (id 12) (source main) indefinitive (stats (contents 1)))) 12
+         *** (skg (node (id 122) (source main) indefinitive (stats (contents 1)))) 122
+         * (skg (node (id 12) (source main) (stats (contents 1)))) 12
+         ** (skg (node (id 122) (source main) (stats (contents 1)))) 122
          122 body
-         *** (skg (id 1221) (source main)) 1221
+         *** (skg (node (id 1221) (source main))) 1221
          1221 body
       "};
 
@@ -271,7 +271,7 @@ fn test_definitive_view_with_cycle
       // Node a has definitive request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
-        * (skg (id cyc-a) (source main) (code indefinitive (viewRequests definitiveView))) cyc-a
+        * (skg (node (id cyc-a) (source main) indefinitive (viewRequests definitiveView))) cyc-a
       "};
 
       let result = {
@@ -285,11 +285,11 @@ fn test_definitive_view_with_cycle
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (id cyc-a) (source main) (view (rels (contents 1)))) cyc-a
+        * (skg (node (id cyc-a) (source main) (stats (contents 1)))) cyc-a
         cyc-a body
-        ** (skg (id cyc-b) (source main) (view (rels containsParent (contents 1)))) cyc-b
+        ** (skg (node (id cyc-b) (source main) (stats containsParent (contents 1)))) cyc-b
         cyc-b body
-        *** (skg (id cyc-a) (source main) (view cycle (rels containsParent (contents 1))) (code indefinitive)) cyc-a
+        *** (skg (node (id cyc-a) (source main) indefinitive cycle (stats containsParent (contents 1)))) cyc-a
       "};
 
       assert_eq!(result, expected,
@@ -312,8 +312,8 @@ fn test_definitive_view_with_repeat
     "/tmp/tantivy-test-definitive-view-repeat",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (id 121) (source main)) 121
-        * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12
+        * (skg (node (id 121) (source main))) 121
+        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12
       "};
 
       let result = {
@@ -330,17 +330,17 @@ fn test_definitive_view_with_repeat
         // but the definitive view of 121 deleted its children.
         // The new 121 under 12 is rendered indefinitive,
         // because it was already rendered as a sibling of 12.
-        "* (skg (id 121) (source main)) 121
-         * (skg (id 12) (source main) (view (rels (contents 4)))) 12
+        "* (skg (node (id 121) (source main))) 121
+         * (skg (node (id 12) (source main) (stats (contents 4)))) 12
          12 body
-         ** (skg (id 121) (source main) (code indefinitive)) 121
-         ** (skg (id 122) (source main) (view (rels (contents 1)))) 122
+         ** (skg (node (id 121) (source main) indefinitive)) 121
+         ** (skg (node (id 122) (source main) (stats (contents 1)))) 122
          122 body
-         *** (skg (id 1221) (source main)) 1221
+         *** (skg (node (id 1221) (source main))) 1221
          1221 body
-         ** (skg (id 123) (source main)) 123
+         ** (skg (node (id 123) (source main))) 123
          123 body
-         ** (skg (id 124) (source main)) 124
+         ** (skg (node (id 124) (source main))) 124
          124 body
       "};
 
@@ -362,7 +362,7 @@ fn test_definitive_view_request_cleared
     "/tmp/tantivy-test-definitive-view-cleared",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (id 12) (source main) (code indefinitive (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12
       "};
 
       let result = {

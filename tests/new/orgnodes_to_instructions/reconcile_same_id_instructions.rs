@@ -16,8 +16,8 @@ use std::error::Error;
 #[test]
 fn test_inconsistent_delete() {
   let input = indoc! {"
-        * (skg (id 1) (source main)) 1
-        * (skg (id 1) (source main) (code toDelete)) 2
+        * (skg (node (id 1) (source main))) 1
+        * (skg (node (id 1) (source main) (editRequest delete))) 2
     "};
 
   let forest = org_to_uninterpreted_nodes(input).unwrap().0;
@@ -49,9 +49,9 @@ fn test_deletions_excluded (
     "/tmp/tantivy-test-deletions-excluded",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) (source main)) 1
-            ** (skg (id 2) (source main) (code toDelete)) 2
-            ** (skg (id 3) (source main)) 3
+            * (skg (node (id 1) (source main))) 1
+            ** (skg (node (id 2) (source main) (editRequest delete))) 2
+            ** (skg (node (id 3) (source main))) 3
         "};
 
       let forest = org_to_uninterpreted_nodes(input)?.0;
@@ -83,11 +83,11 @@ fn test_defining_node_defines (
     "/tmp/tantivy-test-defining-node",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) (source main) (code indefinitive)) 1 adder
+            * (skg (node (id 1) (source main) indefinitive)) 1 adder
             Ignored body.
-            ** (skg (id 2) (source main)) 2
-            * (skg (id 1) (source main)) 1 definer
-            ** (skg (id 3) (source main)) 3
+            ** (skg (node (id 2) (source main))) 2
+            * (skg (node (id 1) (source main))) 1 definer
+            ** (skg (node (id 3) (source main))) 3
         "};
 
       let forest = org_to_uninterpreted_nodes(input)?.0;
@@ -115,10 +115,10 @@ fn test_adding_without_definer (
     "/tmp/tantivy-test-adding-without-definer",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (id 1) (source main) (code indefinitive)) 1 adder
-            ** (skg (id 2) (source main)) 2
-            ** (skg (id 4) (source main)) 4
-            ** (skg (id 4) (source main) (code indefinitive)) 4 again
+            * (skg (node (id 1) (source main) indefinitive)) 1 adder
+            ** (skg (node (id 2) (source main))) 2
+            ** (skg (node (id 4) (source main))) 4
+            ** (skg (node (id 4) (source main) indefinitive)) 4 again
         "};
       let forest = org_to_uninterpreted_nodes(input)?.0;
       let instructions = naive_saveinstructions_from_forest(forest)?;

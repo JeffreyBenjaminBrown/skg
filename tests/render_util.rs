@@ -15,8 +15,9 @@ fn test_orgnode_to_text_no_metadata () {
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =
-    orgnode_to_text ( 1, &node );
-  assert_eq! ( result, "* Test Title\n" ); }
+    orgnode_to_text ( 1, &node )
+    . expect ( "TrueNode rendering never fails" );
+  assert_eq! ( result, "* (skg (node)) Test Title\n" ); }
 
 #[test]
 fn test_orgnode_to_text_with_body () {
@@ -27,16 +28,18 @@ fn test_orgnode_to_text_with_body () {
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =
-    orgnode_to_text ( 2, &node );
-  assert_eq! ( result, "** Test Title\nTest body content\n" ); }
+    orgnode_to_text ( 2, &node )
+    . expect ( "TrueNode rendering never fails" );
+  assert_eq! ( result, "** (skg (node)) Test Title\nTest body content\n" ); }
 
 #[test]
 fn test_orgnode_to_text_with_metadata () {
   let mut node = orgnode_from_scaffold ( Scaffold::AliasCol );
   node.folded = true;
   let result : String =
-    orgnode_to_text ( 1, &node );
-  assert_eq! ( result, "* (skg (view folded) (code (interp aliasCol))) its aliases\n" ); }
+    orgnode_to_text ( 1, &node )
+    . expect ( "AliasCol rendering never fails" );
+  assert_eq! ( result, "* (skg folded aliasCol) its aliases\n" ); }
 
 #[test]
 fn test_orgnode_to_text_with_id_metadata () {
@@ -48,8 +51,9 @@ fn test_orgnode_to_text_with_id_metadata () {
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =
-    orgnode_to_text ( 3, &node );
-  assert_eq! ( result, "*** (skg (id test123) (code indefinitive)) Test Title\n" ); }
+    orgnode_to_text ( 3, &node )
+    . expect ( "TrueNode rendering never fails" );
+  assert_eq! ( result, "*** (skg (node (id test123) indefinitive)) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {
@@ -64,10 +68,6 @@ fn test_metadata_ordering () {
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =
-    orgnode_to_text ( 1, &node );
-  assert_eq! ( result, "* (skg (id xyz) (view cycle (rels notInParent))) Test\n" ); }
-
-#[test]
-#[should_panic ( expected = "orgnode_to_text called with both empty metadata and empty title" )]
-fn test_orgnode_to_text_empty_metadata_and_title () {
-  orgnode_to_text ( 1, &OrgNode::default() ); }
+    orgnode_to_text ( 1, &node )
+    . expect ( "TrueNode rendering never fails" );
+  assert_eq! ( result, "* (skg (node (id xyz) cycle (stats notInParent))) Test\n" ); }

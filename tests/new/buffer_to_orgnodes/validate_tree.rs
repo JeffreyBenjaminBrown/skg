@@ -19,18 +19,18 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       // Test input with various validation errors
       let input_with_errors: &str =
         indoc! {"
-                * (skg (id root) (source main)) Valid root node
-                ** (skg (code (interp aliasCol))) AliasCol with body problem
+                * (skg (node (id root) (source main))) Valid root node
+                ** (skg aliasCol) AliasCol with body problem
                 This body should not exist on AliasCol
-                *** (skg (id bad_child)) Child of AliasCol with ID
+                *** (skg (node (id bad_child))) Child of AliasCol with ID
                 *** Regular child without ID
-                ** (skg (code (interp alias))) Alias with body problem and orphaned
+                ** (skg alias) Alias with body problem and orphaned
                 This body should not exist on Alias
                 *** Any child of Alias (bad)
-                ** (skg (code (interp alias))) Alias under non-AliasCol parent
-                * (skg (code (interp alias))) Root level Alias (bad)
-                * (skg (id conflict) (code toDelete) (source main)) Node with deletion conflict
-                * (skg (id conflict) (source main)) Same ID but no toDelete flag
+                ** (skg alias) Alias under non-AliasCol parent
+                * (skg alias) Root level Alias (bad)
+                * (skg (node (id conflict) (source main) (editRequest delete))) Node with deletion conflict
+                * (skg (node (id conflict) (source main))) Same ID but no toDelete flag
             "};
 
       let (forest, parsing_errors)
@@ -129,12 +129,12 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
       // Test input with no validation errors
       let valid_input: &str =
         indoc! {"
-                * (skg (id root) (source main)) Valid root node
-                ** (skg (code (interp aliasCol))) AliasCol without body
+                * (skg (node (id root) (source main))) Valid root node
+                ** (skg aliasCol) AliasCol without body
                 *** Regular child without ID
                 *** Another child without ID
-                *** (skg (code (interp alias))) Alias without body
-                ** (skg (id normal)) Normal node with body
+                *** (skg alias) Alias without body
+                ** (skg (node (id normal))) Normal node with body
                 This body is allowed on normal nodes
             "};
 
@@ -176,11 +176,11 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
       // Test input with multiple AliasCol children
       let input_with_multiple_aliascols: &str =
         indoc! {"
-                * (skg (id root)) Node with multiple AliasCol children
-                ** (skg (code (interp aliasCol))) First AliasCol
-                *** (skg (code (interp alias))) First alias
-                ** (skg (code (interp aliasCol))) Second AliasCol
-                *** (skg (code (interp alias))) Second alias
+                * (skg (node (id root))) Node with multiple AliasCol children
+                ** (skg aliasCol) First AliasCol
+                *** (skg alias) First alias
+                ** (skg aliasCol) Second AliasCol
+                *** (skg alias) Second alias
                 ** Normal child
             "};
 
@@ -215,9 +215,9 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
       // Test input with duplicated Content children (same ID)
       let input_with_duplicated_content: &str =
         indoc! {"
-                * (skg (id root)) Node with duplicated content
-                ** (skg (id 1)) 1
-                ** (skg (id 1)) 1
+                * (skg (node (id root))) Node with duplicated content
+                ** (skg (node (id 1))) 1
+                ** (skg (node (id 1))) 1
             "};
 
       let forest: Tree<OrgNode> =
@@ -251,9 +251,9 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
       // Test input with different Content children IDs (should be valid)
       let input_without_duplicated_content: &str =
         indoc! {"
-                * (skg (id root) (source main)) Node with duplicated content
-                ** (skg (id 1)) 1
-                ** (skg (id 2)) 2
+                * (skg (node (id root) (source main))) Node with duplicated content
+                ** (skg (node (id 1))) 1
+                ** (skg (node (id 2))) 2
             "};
 
       let forest: Tree<OrgNode> =
@@ -283,8 +283,8 @@ fn test_root_without_source_validation(
       // root without source should be rejected
       let input: &str =
         indoc! {"
-                * (skg (id root1) (source main)) Root with source (valid)
-                * (skg (id root2)) Root without source (invalid)
+                * (skg (node (id root1) (source main))) Root with source (valid)
+                * (skg (node (id root2))) Root without source (invalid)
             "};
 
       let forest: Tree<OrgNode> =
@@ -320,9 +320,9 @@ fn test_nonexistent_source_validation(
       { // Node with nonexistent source should be rejected
         let input: &str =
           indoc! {"
-                  * (skg (id root1) (source main)) Root with valid source
-                  ** (skg (id child1) (source nonexistent)) Child with invalid source
-                  * (skg (id root2) (source invalid_source)) Root with nonexistent source
+                  * (skg (node (id root1) (source main))) Root with valid source
+                  ** (skg (node (id child1) (source nonexistent))) Child with invalid source
+                  * (skg (node (id root2) (source invalid_source))) Root with nonexistent source
               "};
         let forest: Tree<OrgNode> =
           org_to_uninterpreted_nodes(input).unwrap().0;

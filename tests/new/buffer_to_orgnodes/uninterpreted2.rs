@@ -66,13 +66,13 @@ fn test_org_to_uninterpreted_nodes2() {
 fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let input: &str =
     indoc! {"
-            * (skg (id root) (view focused)) root
+            * (skg focused (node (id root))) root
             Root body content
-            ** (skg (id child1) (view folded)) child1
+            ** (skg folded (node (id child1))) child1
             Child1 body
-            * (skg (code (interp parentIgnores) indefinitive)) parentIgnores node
+            * (skg (node parentIgnores indefinitive)) parentIgnores node
             ParentIgnores body
-            * (skg (view cycle)) cycling node
+            * (skg (node cycle)) cycling node
             This node has cycle flag
         "};
 
@@ -181,7 +181,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
-            * (skg (id test) (view folded)) simple node with metadata
+            * (skg folded (node (id test))) simple node with metadata
             Node body
             * regular node without metadata
             Regular body
@@ -243,29 +243,31 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * (skg invalidKey:value) invalid key
-            * (skg (code (interp invalidValue)) invalid value
+            * (skg (node invalidValue)) invalid value
             * (skg unknownFlag) unknown flag
         "};
 
-  // Test invalid key
-  let input_invalid_key = "* (skg (invalidKey value)) invalid key";
+  // Test invalid key in node
+  let input_invalid_key = "* (skg (node (invalidKey value))) invalid key";
   let result = org_to_uninterpreted_nodes(input_invalid_key);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unknown metadata key: invalidKey"));
+  assert!(result.unwrap_err().contains("Unknown node key: invalidKey"));
 
-  // Test invalid interp value
-  let input_invalid_value = "* (skg (code (interp invalidValue))) invalid value";
+  // Test invalid scaffold value
+  let input_invalid_value = "* (skg invalidScaffold) invalid value";
   let result = org_to_uninterpreted_nodes(input_invalid_value);
   assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Unknown interp value: invalidValue"));
+  // Error message for unknown top-level element
+  let err_msg = result.unwrap_err();
+  assert!(err_msg.contains("Unknown top-level value") && err_msg.contains("invalidScaffold"));
 
   // Test unknown flag
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";
   let result = org_to_uninterpreted_nodes(input_unknown_flag);
   assert!(result.is_err());
-  // Error message now includes the problematic element and full sexp
+  // Error message for unknown top-level value
   let err_msg = result.unwrap_err();
-  assert!(err_msg.contains("Unexpected element") && err_msg.contains("unknownFlag"));
+  assert!(err_msg.contains("Unknown top-level value") && err_msg.contains("unknownFlag"));
 }
 
 #[test]

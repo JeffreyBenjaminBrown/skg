@@ -1,18 +1,26 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 ///
-/// WARNING: I had Claude auto-refactor a lot of code,
-/// just after commit bb8da95e14f1243d54926e58de612f7b1969487a,
-/// to improve the type hierarchy. The old types have persisted
-/// in this module. Many of the names involved are bad.
-///
-/// TODO ? Rewrite this whole thing from scratch.
+/// Format:
+///   Scaffolds: (skg [focused] [folded] scaffoldKind)
+///   TrueNodes: (skg [focused] [folded] (node [(id ID)]
+///                                            [(source SOURCE)]
+///                                            [parentIgnores]
+///                                            [indefinitive]
+///                                            [cycle]
+///                                            [(stats [notInParent]
+///                                                    [containsParent]
+///                                                    [(containers N)]
+///                                                    [(contents N)]
+///                                                    [(linksIn N)])]
+///                                            [(editRequest <delete | (merge ID)>)]
+///                                            [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
 use crate::types::orgnode::{TrueNodeStats, EditRequest, ViewRequest};
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, ScaffoldKind, TrueNode,
+    OrgNode, OrgNodeKind, Scaffold, TrueNode,
 };
 
 use sexp::Sexp;
@@ -21,85 +29,39 @@ use std::str::FromStr;
 
 //
 // Parsing-internal types
-// These are used by the parser to produce OrgNode.
 //
 
 /// Intermediate parsed metadata. Converted to OrgNode via from_parsed().
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
-  pub id: Option<ID>,
-  pub source: Option<String>,
   pub focused: bool,
   pub folded: bool,
-  pub cycle: bool,
-  pub stats: TrueNodeStats,
-  pub code: OrgnodeCode,
-}
-
-/// Code-related metadata (determines how node is saved).
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeCode {
-  pub interp: Interp,
+  // None means TrueNode, Some means Scaffold
+  pub scaffold: Option<Scaffold>,
+  // TrueNode fields (ignored if scaffold is Some)
+  pub id: Option<ID>,
+  pub source: Option<String>,
   pub parent_ignores: bool,
   pub indefinitive: bool,
-  pub editRequest: Option<EditRequest>,
-  pub viewRequests: HashSet<ViewRequest>,
-}
-
-/// Interpretation of a node in the tree.
-/// Internal to parsing; scaffold variants map to Scaffold, TrueNode is default.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Interp {
-  TrueNode, // Default for non-scaffold nodes
-  ForestRoot,
-  AliasCol,
-  Alias,
-  SubscribeeCol,
-  HiddenOutsideOfSubscribeeCol,
-  HiddenInSubscribeeCol,
-}
-
-impl Interp {
-  /// Convert scaffold Interps to Scaffold. Returns None for TrueNode.
-  fn to_scaffold ( &self, title : &str ) -> Option < Scaffold > {
-    match self {
-      Interp::TrueNode => None,
-      Interp::ForestRoot =>
-        Some ( Scaffold::ForestRoot ),
-      Interp::AliasCol =>
-        Some ( Scaffold::AliasCol ),
-      Interp::Alias =>
-        Some ( Scaffold::Alias ( title.to_string() )),
-      Interp::SubscribeeCol =>
-        Some ( Scaffold::SubscribeeCol ),
-      Interp::HiddenOutsideOfSubscribeeCol =>
-        Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
-      Interp::HiddenInSubscribeeCol =>
-        Some ( Scaffold::HiddenInSubscribeeCol ),
-    }}
-}
-
-impl Default for OrgnodeCode {
-  fn default() -> Self {
-    OrgnodeCode {
-      interp: Interp::TrueNode,
-      parent_ignores: false,
-      indefinitive: false,
-      editRequest: None,
-      viewRequests: HashSet::new(),
-    }
-  }
+  pub cycle: bool,
+  pub stats: TrueNodeStats,
+  pub edit_request: Option<EditRequest>,
+  pub view_requests: HashSet<ViewRequest>,
 }
 
 pub fn default_metadata() -> OrgnodeMetadata {
   OrgnodeMetadata {
-    id: None,
-    source: None,
     focused: false,
     folded: false,
+    scaffold: None,
+    id: None,
+    source: None,
+    parent_ignores: false,
+    indefinitive: false,
     cycle: false,
     stats: TrueNodeStats::default(),
-    code: OrgnodeCode::default(),
+    edit_request: None,
+    view_requests: HashSet::new(),
   }
 }
 
@@ -111,28 +73,32 @@ pub fn from_parsed (
   title    : String,
   body     : Option < String >,
 ) -> ( OrgNode, Option < BufferValidationError > ) {
-  let interp = &metadata . code . interp;
   let (kind, error) =
-    if let Some ( scaffold ) = interp . to_scaffold ( &title ) {
+    if let Some ( ref scaffold ) = metadata . scaffold {
       let error = if body . is_some () {
         Some ( BufferValidationError::Body_of_Scaffold (
           title . clone (),
           scaffold . repr_in_client () ))
       } else { None };
-      ( OrgNodeKind::Scaff ( scaffold ), error )
+      // For Alias, use the headline title as the alias string
+      let scaffold_with_title = match scaffold {
+        Scaffold::Alias ( _ ) => Scaffold::Alias ( title . clone () ),
+        other => other . clone (),
+      };
+      ( OrgNodeKind::Scaff ( scaffold_with_title ), error )
     } else {
-      // Interp::TrueNode
+      // TrueNode
       ( OrgNodeKind::True ( TrueNode {
           title,
           body,
           id_opt           : metadata . id . clone (),
           source_opt       : metadata . source . clone (),
-          parent_ignores   : metadata . code . parent_ignores,
-          indefinitive     : metadata . code . indefinitive,
+          parent_ignores   : metadata . parent_ignores,
+          indefinitive     : metadata . indefinitive,
           cycle            : metadata . cycle,
           stats            : metadata . stats . clone (),
-          edit_request     : metadata . code . editRequest . clone (),
-          view_requests    : metadata . code . viewRequests . clone (), } ),
+          edit_request     : metadata . edit_request . clone (),
+          view_requests    : metadata . view_requests . clone (), } ),
         None )
     };
   ( OrgNode { focused : metadata.focused,
@@ -142,8 +108,7 @@ pub fn from_parsed (
 
 
 /// Parse metadata from org-mode headline into OrgnodeMetadata.
-/// Format: "(skg (id xyz) (view ...) (code (requests ...) ...))"
-/// Takes the full s-expression including the "(skg ...)" wrapper.
+/// See file header comment for full syntax.
 pub fn parse_metadata_to_orgnodemd (
   sexp_str : &str
 ) -> Result<OrgnodeMetadata, String> {
@@ -174,166 +139,165 @@ pub fn parse_metadata_to_orgnodemd (
         let first : String =
           atom_to_string ( &items[0] ) ?;
         match first . as_str () {
-          "id" => {
-            if items . len () != 2 {
-              return Err ( "id requires exactly one value".to_string () ); }
-            let value : String =
-              atom_to_string ( &items[1] ) ?;
-            result.id = Some ( ID::from ( value )); },
-          "source" => {
-            if items . len () != 2 {
-              return Err ( "source requires exactly one value".to_string () ); }
-            let value : String =
-              atom_to_string ( &items[1] ) ?;
-            result.source = Some ( value ); },
-          "view" => {
-            parse_view_sexp ( &items[1..], &mut result ) ?; },
-          "code" => {
-            parse_code_sexp ( &items[1..], &mut result . code ) ?; },
+          "node" => {
+            parse_node_sexp ( &items[1..], &mut result ) ?; },
+          // Note: "alias" as a list like (alias "string") is no longer supported.
+          // Use bare "alias" atom instead - the alias string comes from headline title.
+          // Legacy format detection - reject with helpful error
+          "id" | "source" | "view" | "code" => {
+            return Err ( format! (
+              "Legacy metadata format detected (found '{}' at top level). \
+               The new format uses (skg [focused] [folded] (node ...)) for TrueNodes \
+               and (skg [focused] [folded] scaffoldKind) for Scaffolds.",
+              first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
+      Sexp::Atom ( _ ) => {
+        let bare_value : String =
+          atom_to_string ( element ) ?;
+        match bare_value . as_str () {
+          "focused"  => result . focused = true,
+          "folded"   => result . folded = true,
+          // Scaffold kinds as bare atoms (alias string comes from title in from_parsed)
+          "alias"    => result . scaffold = Some ( Scaffold::Alias ( String::new () )),
+          "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
+          "forestRoot" => result . scaffold = Some ( Scaffold::ForestRoot ),
+          "hiddenInSubscribeeCol" =>
+            result . scaffold = Some ( Scaffold::HiddenInSubscribeeCol ),
+          "hiddenOutsideOfSubscribeeCol" =>
+            result . scaffold = Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
+          "subscribeeCol" =>
+            result . scaffold = Some ( Scaffold::SubscribeeCol ),
+          _ => {
+            return Err ( format! ( "Unknown top-level value: {}",
+                                    bare_value )); }} },
       _ => { return Err ( format! (
-        "Unexpected element '{}' in metadata sexp: {}",
-        element, sexp_str )); }} }
+        "Unexpected element in metadata sexp: {}",
+        sexp_str )); }} }
   Ok ( result ) }
 
 
-/// Parse the (view ...) s-expression and update metadata.
-fn parse_view_sexp (
+/// Parse the (node ...) s-expression contents.
+fn parse_node_sexp (
   items : &[Sexp],
   metadata : &mut OrgnodeMetadata
 ) -> Result<(), String> {
-  for view_element in items {
-    match view_element {
-      Sexp::List ( subitems ) if subitems . len () >= 2 => {
+  for element in items {
+    match element {
+      Sexp::List ( subitems ) if subitems . len () >= 1 => {
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
-        if key == "rels" {
-          parse_rels_sexp ( &subitems[1..], &mut metadata . stats ) ?;
-        } else {
-          return Err ( format! ( "Unknown view key: {}", key )); }
-      },
-      Sexp::Atom ( _ ) => {
-        let bare_value : String =
-          atom_to_string ( view_element ) ?;
-        match bare_value . as_str () {
-          "cycle"    => metadata . cycle = true,
-          "focused"  => metadata . focused = true,
-          "folded"   => metadata . folded = true,
-          _ => {
-            return Err ( format! ( "Unknown view value: {}",
-                                    bare_value )); }} },
-      _ => { return Err ( "Unexpected element in view"
-                           . to_string () ); }} }
-  Ok (( )) }
-
-/// Parse the (code ...) s-expression and update code.
-fn parse_code_sexp (
-  items : &[Sexp],
-  code : &mut OrgnodeCode
-) -> Result<(), String> {
-  for code_element in items {
-    match code_element {
-      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
-        let key : String =
-          atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
-          "interp" => {
+          "id" => {
+            if subitems . len () != 2 {
+              return Err ( "id requires exactly one value".to_string () ); }
             let value : String =
-              atom_to_string ( &kv_pair[1] ) ?;
-            if let Some ( scaffold ) = Scaffold::from_repr_in_client (
-                 &value, "" ) // title unused for kind detection
-            { match scaffold.kind() { // Try scaffold strings first
-                ScaffoldKind::Alias =>
-                  code . interp = Interp::Alias,
-                ScaffoldKind::AliasCol =>
-                  code . interp = Interp::AliasCol,
-                ScaffoldKind::ForestRoot =>
-                  code . interp = Interp::ForestRoot,
-                ScaffoldKind::HiddenInSubscribeeCol =>
-                  code . interp = Interp::HiddenInSubscribeeCol,
-                ScaffoldKind::HiddenOutsideOfSubscribeeCol =>
-                  code . interp = Interp::HiddenOutsideOfSubscribeeCol,
-                ScaffoldKind::SubscribeeCol =>
-                  code . interp = Interp::SubscribeeCol, }}
-            else if value == "parentIgnores" {
-              // TrueNode with parent_ignores=true
-              code . interp = Interp::TrueNode;
-              code . parent_ignores = true; }
-            else if value == "content"
-                 || value == "subscribee"
-                 || value == "hiddenFromSubscribees"
-            { return Err ( format! (
-                "Legacy interp value '{}' is no longer supported. \
-                 Remove the (interp ...) clause; these are now implicit from tree structure.",
-                value )); }
-            else { return Err ( format! ( "Unknown interp value: {}", value )) }; },
-          "merge" => {
-            // (merge id) sets editRequest to Merge(id)
-            let id_str : String = atom_to_string ( &kv_pair[1] ) ?;
-            code . editRequest = Some (
-              EditRequest::Merge ( ID::from ( id_str ))); },
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . id = Some ( ID::from ( value )); },
+          "source" => {
+            if subitems . len () != 2 {
+              return Err ( "source requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . source = Some ( value ); },
+          "stats" => {
+            parse_stats_sexp ( &subitems[1..], &mut metadata . stats ) ?; },
+          "editRequest" => {
+            parse_editrequest_sexp ( &subitems[1..], metadata ) ?; },
           "viewRequests" => {
             parse_viewrequests_sexp (
-              &kv_pair[1..], &mut code . viewRequests ) ?; },
-          _ => { return Err ( format! ( "Unknown code key: {}",
+              &subitems[1..], &mut metadata . view_requests ) ?; },
+          _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => {
         let bare_value : String =
-          atom_to_string ( code_element ) ?;
+          atom_to_string ( element ) ?;
         match bare_value . as_str () {
-          "indefinitive" => code . indefinitive = true,
-          "toDelete"     => code . editRequest =
-            Some ( EditRequest::Delete ),
-          _ => { return Err ( format! ( "Unknown code value: {}",
-                                         bare_value )); }} },
-      _ => { return Err ( "Unexpected element in code"
+          "parentIgnores" => metadata . parent_ignores = true,
+          "indefinitive"  => metadata . indefinitive = true,
+          "cycle"         => metadata . cycle = true,
+          _ => {
+            return Err ( format! ( "Unknown node value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in node"
                            . to_string () ); }} }
   Ok (( )) }
 
 
-/// Parse the (rels ...) s-expression and update stats.
-fn parse_rels_sexp (
+/// Parse the (stats ...) s-expression contents.
+fn parse_stats_sexp (
   items : &[Sexp],
   stats : &mut TrueNodeStats
 ) -> Result<(), String> {
-  for rel_element in items {
-    match rel_element {
+  for element in items {
+    match element {
       Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
-        let rel_key : String =
+        let key : String =
           atom_to_string ( &kv_pair[0] ) ?;
-        let rel_value : String =
+        let value : String =
           atom_to_string ( &kv_pair[1] ) ?;
-        match rel_key . as_str () {
+        match key . as_str () {
           "containers" => {
             stats . numContainers = Some (
-              rel_value.parse::<usize>()
+              value.parse::<usize>()
                 . map_err ( |_| format! (
-                  "Invalid containers value: {}", rel_value )) ? ); },
+                  "Invalid containers value: {}", value )) ? ); },
           "contents" => {
             stats . numContents = Some (
-              rel_value.parse::<usize>()
+              value.parse::<usize>()
                 . map_err ( |_| format! (
-                  "Invalid contents value: {}", rel_value )) ? ); },
+                  "Invalid contents value: {}", value )) ? ); },
           "linksIn" => {
             stats . numLinksIn = Some (
-              rel_value.parse::<usize>()
+              value.parse::<usize>()
                 . map_err ( |_| format! (
-                  "Invalid linksIn value: {}", rel_value )) ? ); },
-          _ => { return Err ( format! ( "Unknown rels key: {}",
-                                         rel_key )); }} },
+                  "Invalid linksIn value: {}", value )) ? ); },
+          _ => { return Err ( format! ( "Unknown stats key: {}",
+                                         key )); }} },
       Sexp::Atom ( _ ) => {
         let bare_value : String =
-          atom_to_string ( rel_element ) ?;
+          atom_to_string ( element ) ?;
         match bare_value . as_str () {
           "notInParent"    => stats . parentIsContainer = false,
           "containsParent" => stats . parentIsContent   = true,
           _ => {
-            return Err ( format! ( "Unknown rels value: {}",
+            return Err ( format! ( "Unknown stats value: {}",
                                     bare_value )); }} },
-      _ => { return Err ( "Unexpected element in rels"
+      _ => { return Err ( "Unexpected element in stats"
                            . to_string () ); }} }
   Ok (( )) }
+
+
+/// Parse the (editRequest ...) s-expression contents.
+fn parse_editrequest_sexp (
+  items : &[Sexp],
+  metadata : &mut OrgnodeMetadata
+) -> Result<(), String> {
+  for element in items {
+    match element {
+      Sexp::List ( subitems ) if subitems . len () == 2 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        if key == "merge" {
+          let id_str : String =
+            atom_to_string ( &subitems[1] ) ?;
+          metadata . edit_request = Some (
+            EditRequest::Merge ( ID::from ( id_str )));
+        } else {
+          return Err ( format! ( "Unknown editRequest key: {}", key )); }
+      },
+      Sexp::Atom ( _ ) => {
+        let bare_value : String =
+          atom_to_string ( element ) ?;
+        match bare_value . as_str () {
+          "delete" => metadata . edit_request = Some ( EditRequest::Delete ),
+          _ => {
+            return Err ( format! ( "Unknown editRequest value: {}",
+                                    bare_value )); }} },
+      _ => { return Err ( "Unexpected element in editRequest"
+                           . to_string () ); }} }
+  Ok (( )) }
+
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
 fn parse_viewrequests_sexp (
@@ -354,3 +318,12 @@ fn parse_viewrequests_sexp (
         "Unexpected element in viewRequests (expected atoms)"
           . to_string () ); }} }
   Ok (( )) }
+
+
+/// Parse a string literal like "foo" from an s-expression.
+fn parse_string_literal ( sexp : &Sexp ) -> Result<String, String> {
+  match sexp {
+    Sexp::Atom ( sexp::Atom::S ( s )) => Ok ( s . clone () ),
+    _ => Err ( format! ( "Expected string literal, got: {:?}", sexp )),
+  }
+}

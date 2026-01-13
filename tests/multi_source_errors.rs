@@ -51,10 +51,10 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     // Comments indicate the expected error for each line/group
     let buffer_with_errors: &str =
       indoc! {"
-        * (skg (id pub-1)) pub-1                                      # root with no source
-        * (skg (id dub-1) (source dub)) dub-1                         # source does not exist
-        * (skg (id priv-1) (source public)) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_orgnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
-        * (skg (id priv-1) (source private)) priv-1                   # error: multiple defining orgnodes for this id
+        * (skg (node (id pub-1))) pub-1                                      # root with no source
+        * (skg (node (id dub-1) (source dub))) dub-1                         # source does not exist
+        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_orgnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
+        * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining orgnodes for this id
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
@@ -151,16 +151,16 @@ fn test_foreign_node_modification_errors(
     // Each line tests a different type of modification to get separate error reports
     {
       let buffer_with_errors: &str = indoc! {"
-        * (skg (id ext-1) (source ext)) ext-1
-        ** (skg (code (interp aliasCol))) aliases         # edit to aliases (set to empty)
-        * (skg (id ext-2) (source ext)) ext-2-edited           # edit to title
-        * (skg (id ext-3) (source ext)) ext-3
+        * (skg (node (id ext-1) (source ext))) ext-1
+        ** (skg aliasCol) aliases         # edit to aliases (set to empty)
+        * (skg (node (id ext-2) (source ext))) ext-2-edited           # edit to title
+        * (skg (node (id ext-3) (source ext))) ext-3
         new body                                               # edit to body
-        * (skg (id ext-4) (source ext)) ext-4                  # edit to content
-        ** (skg (id ext-5) (source ext)) ext-5
-        * (skg (id ext-new) (source ext)) ext-new              # add new node to foreign source
-        * (skg (id ext-6) (source ext) (code toDelete)) ext-6  # delete from foreign source
-        * (skg (id ext-7) (source ext) (code toDelete)) ext-7  # delete with body modification
+        * (skg (node (id ext-4) (source ext))) ext-4                  # edit to content
+        ** (skg (node (id ext-5) (source ext))) ext-5
+        * (skg (node (id ext-new) (source ext))) ext-new              # add new node to foreign source
+        * (skg (node (id ext-6) (source ext) (editRequest delete))) ext-6  # delete from foreign source
+        * (skg (node (id ext-7) (source ext) (editRequest delete))) ext-7  # delete with body modification
         Different body.
       "}; // note that nothing is wrong with ext-5
 
@@ -226,8 +226,8 @@ fn test_foreign_node_modification_errors(
     // Pipeline short-circuits on modification errors, so this tests merge errors separately
     {
       let buffer_with_merges: &str = indoc! {"
-        * (skg (id pub-1) (source public) (code (merge ext-8))) pub-1  # merge into foreign acquirer (ext-8)
-        * (skg (id ext-9) (source ext) (code (merge pub-2))) ext-9     # merge foreign acquiree (would delete ext-9)
+        * (skg (node (id pub-1) (source public) (editRequest (merge ext-8)))) pub-1  # merge into foreign acquirer (ext-8)
+        * (skg (node (id ext-9) (source ext) (editRequest (merge pub-2)))) ext-9     # merge foreign acquiree (would delete ext-9)
       "};
 
       let buffer_text: String = strip_org_comments(
@@ -313,7 +313,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
     {
       let buffer_with_conflict: &str = indoc! {"
-        * (skg (id priv-1) (source public)) priv-1  # disk has 'private', buffer says 'public'
+        * (skg (node (id priv-1) (source public))) priv-1  # disk has 'private', buffer says 'public'
       "};
 
       let buffer_text: String =
@@ -354,8 +354,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Two instances of pub-1 with different sources (validation should catch this)
     {
       let buffer_with_inconsistent_sources: &str = indoc! {"
-        * (skg (id pub-1) (source public)) pub-1                # definitive instance with 'public'
-        * (skg (id pub-1) (source private) (code indefinitive)) pub-1  # indefinitive instance with 'private'
+        * (skg (node (id pub-1) (source public))) pub-1                # definitive instance with 'public'
+        * (skg (node (id pub-1) (source private) indefinitive)) pub-1  # indefinitive instance with 'private'
       "};
 
       let buffer_text: String =

@@ -1,5 +1,5 @@
 use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, TrueNode,
+    OrgNode, OrgNodeKind, Scaffold, TrueNode, EditRequest,
 };
 use crate::types::tree::{NodePair, PairTree};
 
@@ -18,17 +18,17 @@ pub fn orgnode_forest_to_string (
   fn render_node_subtree_to_org (
     node_ref : NodeRef < NodePair >,
     level    : usize,
-  ) -> String {
+  ) -> Result < String, Box<dyn Error> > {
     let orgnode : &OrgNode =
       &node_ref . value () .orgnode;
     let mut out : String =
-      orgnode_to_text ( level, orgnode );
+      orgnode_to_text ( level, orgnode )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
           child,
-          level + 1 )); }
-    out }
+          level + 1 )? ); }
+    Ok ( out ) }
   let root_ref = forest . root ();
   let is_forest_root : bool = {
     let root_orgnode : &OrgNode =
@@ -43,17 +43,18 @@ pub fn orgnode_forest_to_string (
     String::new ();
   for child in root_ref . children () {
     result . push_str (
-      & render_node_subtree_to_org ( child, 1 )); }
+      & render_node_subtree_to_org ( child, 1 )? ); }
   Ok ( result ) }
 
 /// Renders an OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
+/// ERRORS: If orgnode is a ForestRoot.
 pub fn orgnode_to_text (
   level   : usize,
   orgnode : &OrgNode
-) -> String {
+) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    orgnode_to_string ( orgnode );
+    orgnode_to_string ( orgnode )?;
   let title : &str = match &orgnode . kind {
     OrgNodeKind::True  ( t ) => &t . title,
     OrgNodeKind::Scaff ( s ) => s . title (),
@@ -84,111 +85,108 @@ pub fn orgnode_to_text (
       result . push_str ( body_text );
       if ! body_text . ends_with ( '\n' ) {
         result . push ( '\n' ); }} }
-  result }
+  Ok ( result ) }
 
 pub fn orgnode_to_string (
   orgnode : &OrgNode
-) -> String {
+) -> Result < String, Box<dyn Error> > {
   match &orgnode . kind {
     OrgNodeKind::Scaff ( scaffold ) =>
       scaffold_metadata_to_string ( orgnode . focused, orgnode . folded, scaffold ),
     OrgNodeKind::True ( true_node ) =>
-      true_node_metadata_to_string ( orgnode . focused, orgnode . folded, true_node ),
+      Ok ( true_node_metadata_to_string ( orgnode . focused, orgnode . folded, true_node )),
   }}
 
-/// Render metadata for a Scaffold.
-/// Scaffolds have minimal metadata: just interp, and maybe focused/folded.
+/// Render metadata for a Scaffold:
+///   (skg [focused] [folded] scaffoldKind)
+/// where scaffoldKind is a bare atom.
+/// ERRORS: if scaffold is ForestRoot.
 fn scaffold_metadata_to_string (
   focused  : bool,
   folded   : bool,
   scaffold : &Scaffold
-) -> String {
+) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
+  if focused { parts . push ( "focused" . to_string () ); }
+  if folded  { parts . push ( "folded" . to_string () ); }
+  match scaffold {
+    Scaffold::Alias ( _ ) =>
+      parts . push ( "alias" . to_string () ),
+    Scaffold::AliasCol =>
+      parts . push ( "aliasCol" . to_string () ),
+    Scaffold::ForestRoot =>
+      return Err ( "scaffold_metadata_to_string: ForestRoot should never be rendered" . into () ),
+    Scaffold::HiddenInSubscribeeCol =>
+      parts . push ( "hiddenInSubscribeeCol" . to_string () ),
+    Scaffold::HiddenOutsideOfSubscribeeCol =>
+      parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
+    Scaffold::SubscribeeCol =>
+      parts . push ( "subscribeeCol" . to_string () ),
+  }
+  Ok ( parts . join ( " " )) }
 
-  // Build view s-expr (only focused/folded, no relationships)
-  let mut view_parts : Vec < String > = Vec::new ();
-  if focused { view_parts . push ( "focused" . to_string () ); }
-  if folded  { view_parts . push ( "folded" . to_string () ); }
-  if ! view_parts . is_empty () {
-    parts . push ( format! ( "(view {})", view_parts . join ( " " ))); }
-
-  // Build code s-expr
-  let mut code_parts : Vec < String > = Vec::new ();
-  // Scaffolds always have non-Content interp
-  code_parts . push ( format! ( "(interp {})", scaffold . interp_str () ));
-  if ! code_parts . is_empty () {
-    parts . push ( format! ( "(code {})", code_parts . join ( " " ))); }
-
-  parts . join ( " " ) }
-
-/// Render metadata for a TrueNode.
+/// Render metadata for a TrueNode:
+///   (skg [focused] [folded] (node ...))
 fn true_node_metadata_to_string (
   focused   : bool,
   folded    : bool,
   true_node : & TrueNode
 ) -> String {
+  fn node_sexp ( true_node : & TrueNode ) -> String {
+    fn stats ( true_node : & TrueNode ) -> Option < String > {
+      let mut parts : Vec < String > = Vec::new ();
+      if ! true_node . stats . parentIsContainer {
+        parts . push ( "notInParent" . to_string () ); }
+      if true_node . stats . parentIsContent {
+        parts . push ( "containsParent" . to_string () ); }
+      if true_node . stats . numContainers != Some ( 1 ) {
+        if let Some ( count ) = true_node . stats . numContainers {
+          parts . push ( format! ( "(containers {})", count )); }}
+      if true_node . stats . numContents != Some ( 0 ) {
+        if let Some ( count ) = true_node . stats . numContents {
+          parts . push ( format! ( "(contents {})", count )); }}
+      if true_node . stats . numLinksIn != Some ( 0 ) {
+        if let Some ( count ) = true_node . stats . numLinksIn {
+          parts . push ( format! ( "(linksIn {})", count )); }}
+      if parts . is_empty () { None }
+      else { Some ( format! ( "(stats {})", parts . join ( " " ))) }}
+    fn edit_request ( true_node : & TrueNode ) -> Option < String > {
+      true_node . edit_request . as_ref () . map ( | edit_req | {
+        let edit_str = match edit_req {
+          EditRequest::Merge ( id ) => format! ( "(merge {})", id . 0 ),
+          EditRequest::Delete => "delete" . to_string () };
+        format! ( "(editRequest {})", edit_str ) })}
+    fn view_requests ( true_node : & TrueNode ) -> Option < String > {
+      if true_node . view_requests . is_empty () { return None; }
+      let mut request_strings : Vec < String > =
+        true_node . view_requests . iter ()
+          . map ( | req | req . to_string () )
+          . collect ();
+      request_strings . sort ();
+      Some ( format! ( "(viewRequests {})", request_strings . join ( " " ))) }
+    let mut parts : Vec < String > =
+      vec! [ "node" . to_string () ];
+    if let Some ( ref id ) = true_node . id_opt {
+      parts . push ( format! ( "(id {})", id . 0 )); }
+    if let Some ( ref source ) = true_node . source_opt {
+      parts . push ( format! ( "(source {})", source )); }
+    if true_node . parent_ignores {
+      parts . push ( "parentIgnores" . to_string () ); }
+    if true_node . indefinitive {
+      parts . push ( "indefinitive" . to_string () ); }
+    if true_node . cycle {
+      parts . push ( "cycle" . to_string () ); }
+    if let Some ( s ) = stats ( true_node )
+    { parts . push ( s ); }
+    if let Some ( s ) = edit_request ( true_node )
+    { parts . push ( s ); }
+    if let Some ( s ) = view_requests ( true_node )
+    { parts . push ( s ); }
+    format! ( "({})", parts . join ( " " )) }
   let mut parts : Vec < String > = Vec::new ();
-
-  if let Some ( ref id ) = true_node . id_opt {
-    parts . push ( format! ( "(id {})", id . 0 )); }
-  if let Some ( ref source ) = true_node . source_opt {
-    parts . push ( format! ( "(source {})", source )); }
-
-  // Build view s-expr
-  let mut view_parts : Vec < String > = Vec::new ();
-  if true_node . cycle {
-    view_parts . push ( "cycle" . to_string () ); }
-  if focused {
-    view_parts . push ( "focused" . to_string () ); }
-  if folded {
-    view_parts . push ( "folded" . to_string () ); }
-
-  // Build rels s-expr
-  let mut rel_parts : Vec < String > = Vec::new ();
-  if ! true_node . stats . parentIsContainer {
-    rel_parts . push ( "notInParent" . to_string () ); }
-  if true_node . stats . parentIsContent {
-    rel_parts . push ( "containsParent" . to_string () ); }
-  if true_node . stats . numContainers != Some ( 1 ) {
-    if let Some ( count ) = true_node . stats . numContainers {
-      rel_parts . push ( format! ( "(containers {})", count )); }}
-  if true_node . stats . numContents != Some ( 0 ) {
-    if let Some ( count ) = true_node . stats . numContents {
-      rel_parts . push ( format! ( "(contents {})", count )); }}
-  if true_node . stats . numLinksIn != Some ( 0 ) {
-    if let Some ( count ) = true_node . stats . numLinksIn {
-      rel_parts . push ( format! ( "(linksIn {})", count )); }}
-
-  if ! rel_parts . is_empty () {
-    view_parts . push ( format! ( "(rels {})", rel_parts . join ( " " ))); }
-
-  if ! view_parts . is_empty () {
-    parts . push ( format! ( "(view {})", view_parts . join ( " " ))); }
-
-  // Build code s-expr
-  let mut code_parts : Vec < String > = Vec::new ();
-  // Only emit interp if parent_ignores is true
-  if true_node . parent_ignores {
-    code_parts . push ( "(interp parentIgnores)" . to_string () ); }
-  if true_node . indefinitive {
-    code_parts . push ( "indefinitive" . to_string () ); }
-
-  // Handle editRequest
-  if let Some ( ref edit_req ) = true_node . edit_request {
-    code_parts . push ( edit_req . to_string () ); }
-
-  // Build viewRequests s-expr
-  if ! true_node . view_requests . is_empty () {
-    let mut request_strings : Vec < String > =
-      true_node . view_requests . iter ()
-        . map ( | req | req . to_string () )
-        . collect ();
-    request_strings . sort ();
-    code_parts . push ( format! ( "(viewRequests {})", request_strings . join ( " " ))); }
-
-  if ! code_parts . is_empty () {
-    parts . push ( format! ( "(code {})", code_parts . join ( " " ))); }
-
+  if focused { parts . push ( "focused" . to_string () ); }
+  if folded  { parts . push ( "folded" . to_string () ); }
+  parts . push ( node_sexp ( true_node ));
   parts . join ( " " ) }
 
 fn org_bullet ( level: usize ) -> String {
