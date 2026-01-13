@@ -159,28 +159,15 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
     . map ( |v| v . iter () . cloned () . collect () )
     . unwrap_or_default ();
 
-  let ( content_child_treeids, mut non_content_child_treeids )
+  let ( content_child_treeids,
+        mut non_content_child_treeids )
     : ( Vec < NodeId >, Vec < NodeId > )
     = partition_nonignored_true_content_from_other_children (
       tree,
       node_id ) ?;
 
-  // Validate content children have IDs
-  // and build map from skg ID to tree NodeId
   let mut content_skgid_to_treeid : HashMap < ID, NodeId > =
-    HashMap::new ();
-  for child_treeid in & content_child_treeids {
-    let child_ref : NodeRef < NodePair > =
-      tree . get ( *child_treeid )
-      . ok_or ( "Child node not found" ) ?;
-    let child_pid : &ID = {
-      let child_id_opt : Option<&ID>
-      = match &child_ref . value () . orgnode . kind
-      { OrgNodeKind::True(t) => t.id_opt.as_ref(),
-        OrgNodeKind::Scaff(_) => None };
-      child_id_opt . ok_or ( "Content child has no ID" ) ? };
-    content_skgid_to_treeid . insert (
-      child_pid . clone (), *child_treeid ); }
+    map_skgid_to_treeid ( tree, &content_child_treeids ) ?;
 
   // Mark invalidated content as ParentIgnores
   // and move to non-content list.
@@ -262,6 +249,27 @@ fn partition_nonignored_true_content_from_other_children (
     } else {
       non_content_child_ids . push ( child . id () ); }}
   Ok (( content_child_ids, non_content_child_ids )) }
+
+/// Builds a map from each node's Skg ID to its tree ID.
+/// Errors if any node lacks an ID.
+///
+/// PITFALL: If the same ID appeared twice in the list,
+/// the resulting map would not be well-defined.
+/// But 'find_buffer_errors_for_saving' prevents that.
+fn map_skgid_to_treeid (
+  tree          : &PairTree,
+  child_treeids : &[NodeId],
+) -> Result < HashMap < ID, NodeId >, Box<dyn Error> > {
+  let mut result : HashMap < ID, NodeId > = HashMap::new ();
+  for child_treeid in child_treeids {
+    let child_pid : ID =
+      read_at_node_in_tree ( tree, *child_treeid, |np|
+        match &np . orgnode . kind
+        { OrgNodeKind::True(t) => t.id_opt.clone(),
+          OrgNodeKind::Scaff(_) => None }
+      ) ? . ok_or ( "Content child has no ID" ) ?;
+    result . insert ( child_pid, *child_treeid ); }
+  Ok ( result ) }
 
 /// Create a new Content node from disk (using 'disk_id')
 /// and append it to the children of 'parent_nid'.
