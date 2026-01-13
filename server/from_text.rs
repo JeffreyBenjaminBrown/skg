@@ -53,13 +53,13 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
 
-  let instructions : Vec<SaveInstruction> =
+  let nonmerge_instructions : Vec<SaveInstruction> =
     validate_and_filter_foreign_instructions (
-      { let instructions : Vec<SaveInstruction> =
+      { let nonmerge_instructions : Vec<SaveInstruction> =
           orgnode_forest_to_nonmerge_save_instructions (
             & orgnode_forest, config, driver )
           . await . map_err ( SaveError::DatabaseError ) ?;
-        instructions },
+        nonmerge_instructions },
       config, driver
     ). await . map_err ( SaveError::BufferValidationErrors ) ?;
   let mergeInstructions : Vec<MergeInstructionTriple> =
@@ -71,5 +71,5 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
     . map_err ( SaveError::BufferValidationErrors ) ?;
 
   Ok ((orgnode_forest,
-       instructions,
+       nonmerge_instructions,
        mergeInstructions)) }
