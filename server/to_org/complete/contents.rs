@@ -23,7 +23,7 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// TRIVIAL: Just wraps 'completeAndRestoreNode',
+/// TRIVIAL: Just wraps 'complete_or_restore_each_node_in_branch',
 /// calling it on each "tree root" (child of the ForestRoot),
 /// but threading 'visited' through that sequence of calls.
 pub async fn completeAndRestoreForest (
@@ -37,13 +37,17 @@ pub async fn completeAndRestoreForest (
     . map ( |c| c . id () )
     . collect ();
   for tree_root_id in tree_root_ids {
-    completeAndRestoreNode (
+    complete_or_restore_each_node_in_branch (
       forest, tree_root_id, config, typedb_driver,
       &mut visited ) . await ?; }
   Ok ( visited ) }
 
-/// Complete a node, and then its children ("preorder DFS").
-fn completeAndRestoreNode<'a> (
+/// PURPOSE: Complete or restore a node,
+/// and then its children (a preorder DFS traversal).
+/// - "complete": Because definitive nodes can be missing branches.
+/// - "restore": Because indefinitive nodes may have had their titles or bodies edited. (Such edits have no effect when saving, and it would be misleading to let them persist.
+///   TODO ? Maybe the system should look for such edits and throw an error, like it does for foreign nodes.)
+fn complete_or_restore_each_node_in_branch<'a> (
   tree          : &'a mut PairTree,
   node_id       : NodeId,
   config        : &'a SkgConfig,
@@ -62,7 +66,7 @@ fn completeAndRestoreNode<'a> (
       let child_treeids : Vec < NodeId > =
         collect_child_treeids ( tree, node_id ) ?;
       for child_treeid in child_treeids {
-        completeAndRestoreNode (
+        complete_or_restore_each_node_in_branch (
           tree, child_treeid, config, typedb_driver,
           visited ) . await ?; }
       Ok (( )) } ) }

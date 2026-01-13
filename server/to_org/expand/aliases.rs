@@ -30,7 +30,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// PITFALL: This function fetches aliases from disk and populates them immediately,
 /// whereas 'completeAliasCol' is only called on an AliasCol already in the tree.
 /// These two distinct ways of populating an AliasCol are necessary,
-/// because in 'completeAndRestoreNode_collectingDefinitiveRequests',
+/// because in 'complete_or_restore_each_node_in_branch',
 /// view requests are only processed AFTER recursing to children
 /// (for reasons explained in that function's header comment),
 /// so any newly-created empty AliasCol

@@ -19,8 +19,8 @@ fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
 
 /// Helper to call ensure_skgnode, mark_if_visited_or_repeat_or_cycle,
 /// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
-/// (matches the pattern used in completeAndRestoreNode_collectingViewRequests).
-/// TODO: Unify with completeAndRestoreNode_collectingViewRequests.
+/// (matches the pattern used in complete_or_restore_each_node_in_branch).
+/// TODO: Unify with complete_or_restore_each_node_in_branch.
 /// Does nothing for Scaffolds.
 async fn check_and_complete_if_truenode (
   tree     : &mut PairTree,

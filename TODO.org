@@ -54,7 +54,7 @@ makeIndefinitiveAndClobber
      { if is_indefinitive ( tree, node_id ) ? {
          clobberIndefinitiveOrgnode (
 **** in this function
-     completeAndRestoreNode_collectingViewRequests
+     complete_or_restore_each_node_in_branch
 **** seems problematic
      because we're rewriting the node as indefinitive twice.
 **** solution
@@ -68,7 +68,7 @@ makeIndefinitiveAndClobber
     it can't assume that col is still accurate
 *** ? ignorable
 **** what if 'ensure_skgnode' is omitted?
-***** omitted from completeAndRestoreNode_collectingViewRequests
+***** omitted from complete_or_restore_each_node_in_branch
 ***** elaboration
       It seems like an absent skgnode where ensure_skgnode is called
       might be an unreachable state.
@@ -127,7 +127,7 @@ makeIndefinitiveAndClobber
 ***** how to treat foreign content
    Compare content to what's on disk.
    If there's a discrepancy, override and subscribe.
-*** extend completeAndRestoreNode_collectingViewRequests
+*** extend complete_or_restore_each_node_in_branch
     to complete a SubscribeeCol, and within one
     to handle Subscribees
 ** What does the SkgNode in a PairTree represent?
