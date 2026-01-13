@@ -158,36 +158,39 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
     content_from_disk_as_list . as_ref ()
     . map ( |v| v . iter () . cloned () . collect () )
     . unwrap_or_default ();
-  let ( content_child_treeids,
-        mut non_content_child_treeids )
-    : ( Vec < NodeId >, Vec < NodeId > )
-    = partition_nonignored_true_content_from_other_children (
-      tree,
-      node_id ) ?;
-  let mut content_skgid_to_treeid : HashMap < ID, NodeId > =
-    // PITFALL: This map initially includes non-content, which is soon removed by mark_and_move_invalidated_content.
-    map_skgid_to_treeid ( tree, &content_child_treeids ) ?;
+  let ( mut content_skgid_to_treeid, // longer-term content map
+        mut non_content_child_treeids) =
+    { let ( content_child_treeids, // short-term content vector
+            non_content_child_treeids )
+        : ( Vec < NodeId >, Vec < NodeId > )
+        = partition_nonignored_true_content_from_other_children (
+            tree,
+            node_id ) ?;
+      let content_skgid_to_treeid : HashMap < ID, NodeId > =
+        // PITFALL: This map initially includes non-content, which is soon removed by mark_and_move_invalidated_content.
+          map_skgid_to_treeid ( tree, &content_child_treeids ) ?;
+      ( content_skgid_to_treeid,
+        non_content_child_treeids ) };
 
+  // Move false content from content_skgid_to_treeid to non_content_child_treeids
   mark_and_move_invalidated_content (
     tree,
     &content_from_disk_as_set,
     &mut content_skgid_to_treeid,
     &mut non_content_child_treeids ) ?;
 
-  // Build completed-content list
-  // preserving order from SkgNode
+  // Build completed-content list, preserving order from SkgNode
   let mut completed_content_treeids : Vec < NodeId > =
     Vec::new ();
   if let Some(contains) = & content_from_disk_as_list {
     for disk_skgid in contains {
-      if let Some ( existing_treeid ) =
-        content_skgid_to_treeid . get ( disk_skgid ) {
-        // Content already exists in tree
+      if let Some ( existing_treeid )
+      = content_skgid_to_treeid . get ( disk_skgid )
+      { // Content already exists in tree
         completed_content_treeids . push ( *existing_treeid );
-      } else
-      { // PITFALL: The preorder DFS traversal for complete_or_restore_each_node_in_branch lets us add a child without considering grandchildren yet.
+      } else { // PITFALL: The preorder DFS traversal for complete_or_restore_each_node_in_branch lets us add a child without considering grandchildren yet.
         completed_content_treeids . push (
-          extend_content (
+          append_new_nodepair_to_children_based_on_skgid (
             tree, node_id, disk_skgid, config, driver
           ) . await ? ); }} }
 
@@ -285,7 +288,7 @@ fn mark_and_move_invalidated_content (
 
 /// Create a new Content node from disk (using 'disk_id')
 /// and append it to the children of 'parent_nid'.
-async fn extend_content (
+async fn append_new_nodepair_to_children_based_on_skgid (
   tree       : &mut PairTree,
   parent_nid : NodeId,
   skgid      : &ID,
