@@ -13,7 +13,7 @@ use crate::to_org::complete::sharing::{
 use crate::to_org::util::{
   build_node_branch_minus_content,
   get_pid_in_pairtree,
-  VisitedMap, truenode_in_tree_is_indefinitive,
+  DefinitiveMap, truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
@@ -32,7 +32,7 @@ pub async fn execute_view_requests (
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-  visited       : &mut VisitedMap,
+  visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
@@ -70,7 +70,7 @@ async fn execute_definitive_view_request (
   node_id       : NodeId, // had the request
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-  visited       : &mut VisitedMap,
+  visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_pid_in_pairtree (
@@ -151,7 +151,7 @@ fn get_hidden_ids_if_subscribee (
 fn indefinitize_content_subtree (
   tree    : &mut PairTree,
   node_id : NodeId,
-  visited : &mut VisitedMap,
+  visited : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> > {
   let node_ref : NodeRef < NodePair > =
     tree . get ( node_id )
@@ -217,7 +217,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut PairTree,
   effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
-  visited        : &mut VisitedMap,
+  visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
   hidden_ids     : &HashSet < ID >,

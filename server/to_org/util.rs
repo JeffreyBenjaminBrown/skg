@@ -27,7 +27,7 @@ use typedb_driver::TypeDBDriver;
 /// - prevent duplicate definitive expansions
 /// - locate the conflict when an earlier definitive view
 ///   conflicts with a new definitive view request
-pub type VisitedMap =
+pub type DefinitiveMap =
   HashMap < ID, NodeId >;
 
 
@@ -125,7 +125,7 @@ pub(super) fn makeIndefinitiveAndClobber (
 pub async fn complete_branch_minus_content (
   tree     : &mut PairTree,
   node_id  : NodeId,
-  visited  : &mut VisitedMap,
+  visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
@@ -141,7 +141,7 @@ pub async fn complete_branch_minus_content (
 pub fn mark_if_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   node_id  : NodeId,
-  visited  : &mut VisitedMap,
+  visited  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Scaffold.
     get_pid_in_pairtree ( tree, node_id ) ?;
@@ -185,7 +185,7 @@ pub async fn stub_forest_from_root_ids (
   root_skgids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-  visited  : &mut VisitedMap,
+  visited  : &mut DefinitiveMap,
 ) -> Result < PairTree, Box<dyn Error> > {
   let mut forest : PairTree = new_forest ();
   let forest_root_treeid : NodeId = forest . root () . id ();
@@ -283,10 +283,10 @@ pub async fn make_and_append_child_pair (
 ///   appends to tree, returns (None, branch_root_nodeid)
 pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut PairTree, NodeId)>, // if modifying an existing tree, attach as a child here
-  skgid          : &ID, // what to fetch
+  skgid           : &ID, // what to fetch
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
-  visited         : &mut VisitedMap,
+  visited         : &mut DefinitiveMap,
 ) -> Result < (Option<PairTree>, NodeId), Box<dyn Error> > {
   let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (

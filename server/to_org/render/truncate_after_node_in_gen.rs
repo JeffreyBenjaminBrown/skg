@@ -1,5 +1,5 @@
 use crate::to_org::util::{
-  VisitedMap,
+  DefinitiveMap,
   get_pid_in_pairtree,
   makeIndefinitiveAndClobber,
   make_and_append_child_pair,
@@ -27,7 +27,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
   children       : &[(NodeId, ID)],
   space_left     : usize,
   effective_root : NodeId, // it had the definitive view request
-  visited        : &mut VisitedMap,
+  visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -62,7 +62,7 @@ fn truncate_after_node_in_generation_in_tree (
   generation     : usize,
   node_id        : NodeId, // truncate after this one
   effective_root : NodeId,
-  visited        : &mut VisitedMap,
+  visited        : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> > {
   let nodes_to_truncate : Vec < NodeId > =
     nodes_after_in_generation (

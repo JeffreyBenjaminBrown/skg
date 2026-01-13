@@ -1,6 +1,6 @@
 /// SINGLE ENTRY POINT: 'completeAndRestoreForest'.
 
-use crate::to_org::util::{ VisitedMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, mark_if_visited_or_repeat_or_cycle };
+use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
 use crate::to_org::complete::sharing::{
@@ -27,8 +27,8 @@ pub async fn completeAndRestoreForest (
   forest        : &mut PairTree,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-) -> Result < VisitedMap, Box<dyn Error> > {
-  let mut visited : VisitedMap = VisitedMap::new ();
+) -> Result < DefinitiveMap, Box<dyn Error> > {
+  let mut visited : DefinitiveMap = DefinitiveMap::new ();
   let tree_root_ids : Vec < NodeId > =
     forest . root () . children ()
     . map ( |c| c . id () )
@@ -53,7 +53,7 @@ fn complete_or_restore_each_node_in_branch<'a> (
   node_id       : NodeId,
   config        : &'a SkgConfig,
   typedb_driver : &'a TypeDBDriver,
-  visited       : &'a mut VisitedMap,
+  visited       : &'a mut DefinitiveMap,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   fn recurse<'b> (
@@ -61,7 +61,7 @@ fn complete_or_restore_each_node_in_branch<'a> (
     node_id       : NodeId,
     config        : &'b SkgConfig,
     typedb_driver : &'b TypeDBDriver,
-    visited       : &'b mut VisitedMap,
+    visited       : &'b mut DefinitiveMap,
   ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>>
   { Box::pin(async move {
       let child_treeids : Vec < NodeId > =

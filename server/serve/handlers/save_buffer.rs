@@ -163,7 +163,7 @@ pub async fn update_from_and_rerender_buffer (
       & save_instructions );
 
   { // modify the paired forest before re-rendering it
-    let mut visited : VisitedMap =
+    let mut visited : DefinitiveMap =
       completeAndRestoreForest (
         &mut paired_forest,
         config,

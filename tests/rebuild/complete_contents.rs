@@ -7,7 +7,7 @@ use ego_tree::{Tree, NodeId};
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
-use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
+use skg::to_org::util::{DefinitiveMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
 use skg::to_org::complete::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
 use skg::to_org::complete::contents::{clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
@@ -28,7 +28,7 @@ async fn check_and_complete_if_truenode (
   node_id  : NodeId,
   config   : &SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
-  visited  : &mut VisitedMap,
+  visited  : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> > {
   { let node_ref = tree . get ( node_id )
       . ok_or ( "Node not found" ) ?;
@@ -77,8 +77,8 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
       first_tree_root_id ( &forest );
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
     check_and_complete_if_truenode ( // processes root but *not* its descendents
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
 
@@ -104,8 +104,8 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
       first_tree_root_id ( &forest );
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
     // Pre-populate visited with 'a' at a dummy location
     visited . insert ( ID::new ( "a" ), root_id );
     check_and_complete_if_truenode (
@@ -140,8 +140,8 @@ async fn test_indefinitive_identity_at_multiple_levels_logic (
       . first_child () . unwrap () // first "tree root"
       . first_child () . unwrap () // first child of that
       . id ();
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
 
     check_and_complete_if_truenode (
       &mut forest, second_node_id, config, driver, &mut visited ) . await ?;
@@ -193,8 +193,8 @@ async fn test_visited_and_indefinitive_logic (
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
         first_tree_root_id ( &forest );
-      let mut visited : VisitedMap =
-        VisitedMap::new ();
+      let mut visited : DefinitiveMap =
+        DefinitiveMap::new ();
 
       check_and_complete_if_truenode (
         &mut forest, root_id, config, driver, &mut visited ) . await ?;
@@ -220,8 +220,8 @@ async fn test_visited_and_indefinitive_logic (
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
         first_tree_root_id ( &forest );
-      let mut visited : VisitedMap =
-        VisitedMap::new ();
+      let mut visited : DefinitiveMap =
+        DefinitiveMap::new ();
       visited . insert ( ID::new ( "a" ), root_id );
 
       check_and_complete_if_truenode (
@@ -259,8 +259,8 @@ async fn test_visited_and_indefinitive_logic (
         orgnode_forest_to_paired ( orgnode_forest );
       let root_id : ego_tree::NodeId =
         first_tree_root_id ( &forest );
-      let mut visited : VisitedMap =
-        VisitedMap::new ();
+      let mut visited : DefinitiveMap =
+        DefinitiveMap::new ();
 
       check_and_complete_if_truenode (
         &mut forest, root_id, config, driver, &mut visited ) . await ?;
@@ -292,8 +292,8 @@ async fn test_visited_and_indefinitive_logic (
         . first_child () . unwrap () // first "tree root"
         . first_child () . unwrap () // first child
         . id ();
-      let mut visited : VisitedMap =
-        VisitedMap::new ();
+      let mut visited : DefinitiveMap =
+        DefinitiveMap::new ();
       visited . insert ( ID::new ( "d" ), root_id );
 
       check_and_complete_if_truenode (
@@ -347,8 +347,8 @@ async fn test_visited_and_not_indefinitive_logic (
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
       first_tree_root_id ( &forest );
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
     visited . insert ( ID::new ( "a" ), root_id );
     let visited_keys_before : Vec < ID > =
       visited . keys () . cloned () . collect ();
@@ -382,8 +382,8 @@ async fn test_visited_and_not_indefinitive_logic (
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
       first_tree_root_id ( &forest );
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
 
     check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
@@ -420,8 +420,8 @@ async fn test_visited_and_not_indefinitive_logic (
       orgnode_forest_to_paired ( orgnode_forest );
     let root_id : ego_tree::NodeId =
       first_tree_root_id ( &forest );
-    let mut visited : VisitedMap =
-      VisitedMap::new ();
+    let mut visited : DefinitiveMap =
+      DefinitiveMap::new ();
 
     check_and_complete_if_truenode (
       &mut forest, root_id, config, driver, &mut visited ) . await ?;
@@ -471,8 +471,8 @@ async fn test_false_content_logic (
     orgnode_forest_to_paired ( orgnode_forest );
   let root_id : ego_tree::NodeId =
     first_tree_root_id ( &forest );
-  let mut visited : VisitedMap =
-    VisitedMap::new ();
+  let mut visited : DefinitiveMap =
+    DefinitiveMap::new ();
 
   check_and_complete_if_truenode (
     &mut forest, root_id, config, driver, &mut visited ) . await ?;

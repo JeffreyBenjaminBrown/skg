@@ -22,7 +22,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{
   content_ids_if_definitive_else_empty,
   build_node_branch_minus_content,
-  VisitedMap };
+  DefinitiveMap };
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::tree::PairTree;
 
@@ -39,7 +39,7 @@ pub async fn render_initial_forest_bfs (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result < PairTree, Box<dyn Error> > {
-  let mut visited : VisitedMap = VisitedMap::new();
+  let mut visited : DefinitiveMap = DefinitiveMap::new();
   let mut forest : PairTree =
     stub_forest_from_root_ids (
       root_ids, config, driver, &mut visited ) . await ?;
@@ -69,7 +69,7 @@ fn render_generation_and_recurse<'a> (
   rendered_count : usize,
   limit          : usize,
   effective_root : NodeId,         // ForestRoot for initial rendering
-  visited        : &'a mut VisitedMap,
+  visited        : &'a mut DefinitiveMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,
 ) -> Pin<Box<dyn Future<
@@ -108,7 +108,7 @@ fn render_generation_and_recurse<'a> (
 async fn add_children_and_collect_their_ids (
   forest      : &mut PairTree,
   rels_to_add : Vec < (NodeId, ID) >,
-  visited     : &mut VisitedMap,
+  visited     : &mut DefinitiveMap,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
