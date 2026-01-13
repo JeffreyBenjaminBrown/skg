@@ -45,8 +45,8 @@ pub async fn completeAndRestoreForest (
 /// PURPOSE: Complete or restore a node,
 /// and then its children (a preorder DFS traversal).
 /// - "complete": Because definitive nodes can be missing branches.
-/// - "restore": Because indefinitive nodes may have had their titles or bodies edited. (Such edits have no effect when saving, and it would be misleading to let them persist.
-///   TODO ? Maybe the system should look for such edits and throw an error, like it does for foreign nodes.)
+/// - "restore": Because indefinitive nodes may have had their titles or bodies edited.
+///   TODO ? Maybe look for edits to indefinitive nodes and throw an error, as is done for foreign nodes.
 fn complete_or_restore_each_node_in_branch<'a> (
   tree          : &'a mut PairTree,
   node_id       : NodeId,
@@ -61,8 +61,8 @@ fn complete_or_restore_each_node_in_branch<'a> (
     config        : &'b SkgConfig,
     typedb_driver : &'b TypeDBDriver,
     visited       : &'b mut VisitedMap,
-  ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>> {
-    Box::pin(async move {
+  ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>>
+  { Box::pin(async move {
       let child_treeids : Vec < NodeId > =
         collect_child_treeids ( tree, node_id ) ?;
       for child_treeid in child_treeids {
@@ -83,10 +83,11 @@ fn complete_or_restore_each_node_in_branch<'a> (
                     Scaffold::HiddenOutsideOfSubscribeeCol |
                     Scaffold::HiddenInSubscribeeCol )) } )?;
     if is_alias_col {
+      // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
-      // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if is_col_scaffold { // Skip, but recurse into children.
+    } else if is_col_scaffold {
+      // Skip, but recurse into children.
       recurse ( tree, node_id, config, typedb_driver, visited
               ) . await ?;
     } else {
@@ -100,23 +101,18 @@ fn complete_or_restore_each_node_in_branch<'a> (
         } else { // futz with the orgnode and its content children
           completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
-        recurse (
-          // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
-          tree, node_id, config, typedb_driver,
-          visited ) . await ?; } }
+        recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
+          tree, node_id, config, typedb_driver, visited
+        ). await ?; }}
     Ok (( )) } ) }
 
-/// Completes an indefinitive orgnode using its SkgNode.
-/// Affects only the input node, not its tree-children.
-///
-/// ASSUMES: Node's 'id' field is its PID.
-/// ASSUMES: The SkgNode at that tree node is accurate.
-/// ASSUMES: The input is indefinitive.
-///
-/// METHOD: Given an indefinitive node N:
+/// PURPOSE: Given an indefinitive node N:
 /// - Reset title.
 /// - Reset source.
 /// - Set body to None.
+///
+/// ASSUMES: The SkgNode at that tree node is accurate.
+/// ASSUMES: The input is indefinitive.
 pub fn clobberIndefinitiveOrgnode (
   tree    : &mut PairTree,
   treeid : NodeId,

@@ -37,7 +37,7 @@ async fn check_and_complete_if_truenode (
     tree, node_id, config, driver ) . await ?;
   mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
-  // 'mark_if_visited_or_repeat_or_cycle' may have changed indefinitive.
+  // 'mark_if_visited_or_repeat_or_cycle' may have changed 'indefinitive'.
   if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
     clobberIndefinitiveOrgnode (
       tree, node_id ) ?;

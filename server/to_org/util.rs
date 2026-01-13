@@ -138,13 +138,6 @@ pub async fn complete_branch_minus_content (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 
-/// Handles repetitions, cycles, and the VisitedMap.
-/// Contains no surprising of complex logic.
-/// - Check for cycle and mark viewData.cycle accordingly.
-/// - If node is a repeat (already in visited), mark it indefinitive.
-/// - If node is indefinitive, rewrite it (clear body, etc.).
-///   (repeat should imply indefinitive. The reverse need not hold.)
-/// - If node is definitive, add it to visited.
 pub fn mark_if_visited_or_repeat_or_cycle (
   tree     : &mut PairTree,
   node_id  : NodeId,
@@ -156,8 +149,7 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   let is_indefinitive : bool =
     write_at_node_in_tree ( tree, node_id, |np| {
       let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-        else { unreachable!(
-                 "get_pid_in_pairtree verified TrueNode"); };
+        else { unreachable!( "In mark_if_visited_or_repeat_or_cycle, get_pid_in_pairtree already verified TrueNode"); };
       if visited . contains_key ( &pid ) {
         // It's a repeat, so it should be indefinitive.
         t . indefinitive = true; }
@@ -305,8 +297,9 @@ pub async fn build_node_branch_minus_content (
         with_node_mut (
           tree, parent_treeid,
           ( |mut parent_mut|
-            parent_mut . append ( NodePair { mskgnode : Some(skgnode),
-                                             orgnode  : orgnode } ) . id () )) ?;
+            parent_mut . append (
+              NodePair { mskgnode : Some(skgnode),
+                         orgnode  : orgnode } ) . id () )) ?;
       complete_branch_minus_content (
         tree, child_treeid, visited,
         config, driver ) . await ?;
