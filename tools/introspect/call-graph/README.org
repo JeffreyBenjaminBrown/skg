@@ -1,0 +1,6 @@
+* USAGE
+This was copied from the .rs file:
+** Generate a call tree for a function:
+   cargo run -p call-graph [-- function_name]
+** Regenerate all existing call trees:
+   cargo run -p call-graph --bin call-graph-regen

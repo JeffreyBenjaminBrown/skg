@@ -7,7 +7,7 @@ use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_cont
 use crate::to_org::complete::contents::completeAndRestoreForest;
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
 use crate::to_org::expand::definitive::execute_view_requests;
-use crate::to_org::util::{forest_root_pair, VisitedMap};
+use crate::to_org::util::{forest_root_pair, DefinitiveMap};
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
