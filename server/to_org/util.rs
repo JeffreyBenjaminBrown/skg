@@ -131,6 +131,9 @@ pub async fn complete_branch_minus_content (
 ) -> Result<(), Box<dyn Error>> {
   mark_if_visited_or_repeat_or_cycle (
     tree, node_id, visited ) ?;
+  if truenode_in_tree_is_indefinitive ( tree, node_id )?
+  { clobberIndefinitiveOrgnode (
+      tree, node_id ) ?; }
   maybe_add_subscribeeCol_branch (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
@@ -159,9 +162,7 @@ pub fn mark_if_visited_or_repeat_or_cycle (
         // It's a repeat, so it should be indefinitive.
         t . indefinitive = true; }
       t . indefinitive } ) ?;
-  if is_indefinitive {
-    clobberIndefinitiveOrgnode ( tree, node_id ) ?;
-  } else {
+  if !is_indefinitive {
     visited . insert ( pid, node_id ); }
   Ok (( )) }
 
