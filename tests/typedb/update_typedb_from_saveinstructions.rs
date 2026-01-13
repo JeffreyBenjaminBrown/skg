@@ -5,7 +5,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::orgnodes_to_instructions::orgnodes_to_reconciled_save_instructions;
+use skg::from_text::orgnodes_to_instructions::orgnode_forest_to_nonmerge_save_instructions;
 use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::orgnode::OrgNode;
@@ -50,7 +50,7 @@ fn test_update_nodes_and_relationships2 (
 
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<SaveInstruction> =
-      orgnodes_to_reconciled_save_instructions (
+      orgnode_forest_to_nonmerge_save_instructions (
         & forest, & config, & driver ) . await ?;
 
     // Apply the update

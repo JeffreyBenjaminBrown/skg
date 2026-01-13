@@ -18,8 +18,8 @@ use std::error::Error;
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// (which filters out indefinitive instructions),
 /// and clobbering None fields with data from disk.
-pub async fn orgnodes_to_reconciled_save_instructions (
-  forest  : &Tree<OrgNode>, // "forest" = tree with ForestRoot
+pub async fn orgnode_forest_to_nonmerge_save_instructions (
+  forest : &Tree<OrgNode>, // "forest" = tree with ForestRoot
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {

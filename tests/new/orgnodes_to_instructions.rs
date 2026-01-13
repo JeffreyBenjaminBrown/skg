@@ -13,7 +13,7 @@ use skg::types::save::NonMerge_NodeAction;
 use ego_tree::Tree;
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_basic() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_basic() {
   let input: &str =
     indoc! {"
             * (skg (node (id root1) (source main))) root node 1
@@ -58,7 +58,7 @@ fn test_orgnodes_to_reconciled_save_instructions_basic() {
                    NonMerge_NodeAction::Delete)); }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -96,7 +96,7 @@ fn test_orgnodes_to_reconciled_save_instructions_with_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id node1) (source main))) node without aliases
@@ -118,7 +118,7 @@ fn test_orgnodes_to_reconciled_save_instructions_no_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
   // Multiple AliasCols under the same node is invalid
   // (validate_tree rejects this). The function should error.
   let input: &str =
@@ -142,7 +142,7 @@ fn test_orgnodes_to_reconciled_save_instructions_multiple_alias_cols() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root node
@@ -170,7 +170,7 @@ fn test_orgnodes_to_reconciled_save_instructions_mixed_relations() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
             * (skg (node (id level1) (source main))) level 1
@@ -205,7 +205,7 @@ fn test_orgnodes_to_reconciled_save_instructions_deep_nesting() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
             * (skg (node (id good_node) (source main))) good node
@@ -223,7 +223,7 @@ fn test_orgnodes_to_reconciled_save_instructions_error_missing_id() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_empty_input() {
   let forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -232,7 +232,7 @@ fn test_orgnodes_to_reconciled_save_instructions_empty_input() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -254,7 +254,7 @@ fn test_orgnodes_to_reconciled_save_instructions_only_aliases() {
 }
 
 #[test]
-fn test_orgnodes_to_reconciled_save_instructions_complex_scenario() {
+fn test_orgnode_forest_to_nonmerge_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
             * (skg (node (id doc1) (source main))) Document 1

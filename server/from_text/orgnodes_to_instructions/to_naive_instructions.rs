@@ -13,7 +13,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 /// taking them all at face value.
 ///
 /// PITFALL: Leaves important work undone,
-/// which its caller 'orgnodes_to_reconciled_save_instructions'
+/// which its caller 'orgnode_forest_to_nonmerge_save_instructions'
 /// does after calling it.
 pub fn naive_saveinstructions_from_forest (
   mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot

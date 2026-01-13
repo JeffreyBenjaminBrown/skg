@@ -20,7 +20,7 @@ pub mod validate_foreign_nodes;
 use buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
 use buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
-use orgnodes_to_instructions::orgnodes_to_reconciled_save_instructions;
+use orgnodes_to_instructions::orgnode_forest_to_nonmerge_save_instructions;
 use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
 
 pub async fn buffer_to_orgnode_forest_and_save_instructions (
@@ -56,7 +56,7 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
   let instructions : Vec<SaveInstruction> =
     validate_and_filter_foreign_instructions (
       { let instructions : Vec<SaveInstruction> =
-          orgnodes_to_reconciled_save_instructions (
+          orgnode_forest_to_nonmerge_save_instructions (
             & orgnode_forest, config, driver )
           . await . map_err ( SaveError::DatabaseError ) ?;
         instructions },
