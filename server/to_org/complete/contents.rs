@@ -99,6 +99,8 @@ fn complete_or_restore_each_node_in_branch<'a> (
           clobberIndefinitiveOrgnode (
             tree, node_id ) ?;
         } else { // futz with the orgnode and its content children
+          maybe_add_subscribeeCol_branch (
+            tree, node_id, config, typedb_driver ) . await ?;
           completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
         recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
@@ -158,8 +160,6 @@ pub async fn completeDefinitiveOrgnode (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  maybe_add_subscribeeCol_branch (
-    tree, node_id, config, driver ) . await ?;
   let (content_from_disk, contains_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
       let node_ref : NodeRef < NodePair > =
