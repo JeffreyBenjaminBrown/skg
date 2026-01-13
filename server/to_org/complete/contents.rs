@@ -47,31 +47,32 @@ pub async fn completeAndRestoreForest_collectingViewRequests (
       &mut visited, &mut view_requests ) . await ?; }
   Ok (( visited, view_requests )) }
 
-/// Completes a node, and then its children ('preorder DFS traversal').
-/// - For most nodes, these happen (in order):
-///   - Futz with the node itself
-///     - Fetch a skgnode from disk if needed ('ensure_skgnode')
-///     - Check for repetition via 'mark_if_visited_or_repeat_or_cycle'
-///       (if repeated, modify body and metadata, update 'visited')
-///   - Futz with its descendents
-///     - If definitive, call completeDefinitiveOrgnode.
-///         LOTS OF WORK happens here.
-///       Else, call clobberIndefinitiveOrgnode.
-///     - Recurse via 'map_completeAndRestoreNodeCollectingViewRequests_over_children'.
-///     - Collect all view requests for later processing.
-/// - For AliasCol nodes, this delegates to 'completeAliasCol'.
-///   It handles the whole subtree, so don't recurse into children.
-/// - For *Col Interps that don't generate instructions themselves,
-///   merely recurse into children, otherwise ignoring.
+/// Complete a node, and then its children ("preorder DFS").
 fn completeAndRestoreNode_collectingViewRequests<'a> (
-  tree                 : &'a mut PairTree,
-  node_id              : NodeId,
-  config               : &'a SkgConfig,
-  typedb_driver        : &'a TypeDBDriver,
-  visited              : &'a mut VisitedMap,
-  view_requests    : &'a mut Vec < (NodeId, ViewRequest) >,
+  tree          : &'a mut PairTree,
+  node_id       : NodeId,
+  config        : &'a SkgConfig,
+  typedb_driver : &'a TypeDBDriver,
+  visited       : &'a mut VisitedMap,
+  view_requests : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
+  fn recurse<'b> (
+    tree              : &'b mut PairTree,
+    node_id           : NodeId,
+    config            : &'b SkgConfig,
+    typedb_driver     : &'b TypeDBDriver,
+    visited           : &'b mut VisitedMap,
+    view_requests_out : &'b mut Vec < (NodeId, ViewRequest) >,
+  ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>> {
+    Box::pin(async move {
+      let child_treeids : Vec < NodeId > =
+        collect_child_treeids ( tree, node_id ) ?;
+      for child_treeid in child_treeids {
+        completeAndRestoreNode_collectingViewRequests (
+          tree, child_treeid, config, typedb_driver,
+          visited, view_requests_out ) . await ?; }
+      Ok (( )) } ) }
   Box::pin(async move {
     let is_alias_col: bool =
       read_at_node_in_tree(tree, node_id, |node| {
@@ -90,7 +91,7 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
       // Don't recurse; completeAliasCol handles the whole subtree.
     } else if is_col_scaffold {
       // Recurse into children to collect view requests (e.g. from Subscribee nodes) but don't try to complete the SubscribeeCol node itself.
-      map_completeAndRestoreNodeCollectingViewRequests_over_children (
+      recurse (
         tree, node_id, config, typedb_driver,
         visited, view_requests ) . await ?;
     } else {
@@ -104,30 +105,13 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
         } else { // futz with the orgnode and its content children
           completeDefinitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
-        map_completeAndRestoreNodeCollectingViewRequests_over_children (
+        recurse (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver,
           visited, view_requests ) . await ?; }
       view_requests_at_node (
         tree, node_id, view_requests ) ?; }
     Ok (( )) } ) }
-
-fn map_completeAndRestoreNodeCollectingViewRequests_over_children<'a> (
-  tree                 : &'a mut PairTree,
-  node_id              : NodeId,
-  config               : &'a SkgConfig,
-  typedb_driver        : &'a TypeDBDriver,
-  visited              : &'a mut VisitedMap,
-  view_requests_out    : &'a mut Vec < (NodeId, ViewRequest) >,
-) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
-  Box::pin(async move {
-    let child_treeids : Vec < NodeId > =
-      collect_child_treeids ( tree, node_id ) ?;
-    for child_treeid in child_treeids {
-      completeAndRestoreNode_collectingViewRequests (
-        tree, child_treeid, config, typedb_driver,
-        visited, view_requests_out ) . await ?; }
-    Ok (( )) }) }
 
 /// Append its view requests to the output vector.
 fn view_requests_at_node (
