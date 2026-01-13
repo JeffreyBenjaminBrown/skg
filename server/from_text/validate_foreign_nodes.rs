@@ -7,15 +7,15 @@ use typedb_driver::TypeDBDriver;
 /// Validates that foreign (read-only) nodes are not being modified.
 /// Filters out foreign nodes without modifications (no need to write).
 ///
-/// Returns errors if:
-/// - Foreign nodes have been modified (title, body, or contains changed)
-/// - Foreign nodes are being deleted
-/// - New nodes are being created in foreign sources
+/// ERRORS: if an instruction
+/// - Would modify or delete a foreign node
+/// - Would create a node in a foreign source
 pub async fn validate_and_filter_foreign_instructions(
   instructions: Vec<SaveInstruction>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<SaveInstruction>, Vec<BufferValidationError>> {
+) -> Result<Vec<SaveInstruction>,
+            Vec<BufferValidationError>> {
   let mut errors: Vec<BufferValidationError> = Vec::new();
   let mut filtered: Vec<SaveInstruction> = Vec::new();
   for (node, action) in instructions {

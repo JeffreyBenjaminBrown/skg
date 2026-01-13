@@ -117,19 +117,15 @@ fn empty_response_sexp (
         Sexp::Atom ( Atom::S (
           error_buffer_content . to_string () )) ] ) ] ) ] ) }
 
-/// Update dbs and filesystem, and generate text for a new org-buffer.
-/// Steps:
-/// - Build an orgnode forest and save instructions,
-///   via `buffer_to_orgnode_forest_and_save_instructions`.
-/// - Update the graph:
-///   - 'update_graph_minus_merges'
-///   - 'merge_nodes'
-/// - Modify the orgnode forest:
-///   - 'pair_orgnode_forest_with_save_instructions'
-///   - 'completeAndRestoreForest_collectingViewRequests'
-///   - 'execute_view_requests'
-///   - 'set_metadata_relationship_viewdata_in_forest'
-/// - Return a content view, via 'orgnode_forest_to_string'.
+/// PURPOSE: Process the buffer that a user wants to save.
+/// - "save": Update dbs and filesystem.
+/// - "rerender": Create a new buffer for the user.
+/// ERRORS: If the buffer is invalid.
+/// COMPLEX:
+/// - Validation must happen at many stages.
+/// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
+/// - completeAndRestoreForest_collectingViewRequests is complex.
+/// - execute_view_requests is complex, because it attempts to integrate existing NodePair branches before generating new ones
 pub async fn update_from_and_rerender_buffer (
   org_buffer_text : &str,
   typedb_driver   : &TypeDBDriver,
@@ -160,7 +156,7 @@ pub async fn update_from_and_rerender_buffer (
 
   let mut errors : Vec < String > = Vec::new ();
   let mut paired_forest : PairTree =
-    pair_orgnode_forest_with_save_instructions (
+    pair_orgnode_forest_with_skgnodes_from_saveinstructions (
       // Definitive nodes get Some(skgnode), indefinitive get None.
       & orgnode_forest,
       & save_instructions );
@@ -169,19 +165,19 @@ pub async fn update_from_and_rerender_buffer (
       completeAndRestoreForest_collectingViewRequests (
         &mut paired_forest,
         config,
-        typedb_driver ) . await ?;
-    execute_view_requests ( // PITFALL: Should follow completion.
+        typedb_driver ). await ?;
+    execute_view_requests ( // PITFALL: Must follow completion.
       // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
       &mut paired_forest,
       view_requests,
       config,
       typedb_driver,
       &mut visited,
-      &mut errors ) . await ?; }
-  set_metadata_relationship_viewdata_in_forest (
-    &mut paired_forest,
-    config,
-    typedb_driver ) . await ?;
+      &mut errors ). await ?;
+    set_metadata_relationship_viewdata_in_forest (
+      &mut paired_forest,
+      config,
+      typedb_driver ). await ?; }
 
   let buffer_content : String =
     orgnode_forest_to_string ( & paired_forest ) ?;
@@ -193,7 +189,7 @@ pub async fn update_from_and_rerender_buffer (
 ///
 /// Definitive nodes that generated SaveInstructions get Some(skgnode).
 /// Indefinitive nodes (views) get None.
-fn pair_orgnode_forest_with_save_instructions (
+fn pair_orgnode_forest_with_skgnodes_from_saveinstructions (
   orgnode_tree : &Tree<OrgNode>,
   instructions : &[SaveInstruction],
 ) -> PairTree {
