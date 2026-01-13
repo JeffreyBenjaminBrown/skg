@@ -1,4 +1,4 @@
-/// SINGLE ENTRY POINT: 'completeAndRestoreForest_collectingViewRequests'.
+/// SINGLE ENTRY POINT: 'completeAndRestoreForest'.
 
 use crate::to_org::util::{
   skgnode_and_orgnode_from_id, VisitedMap,
@@ -11,7 +11,6 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{OrgNodeKind, OrgNode, Scaffold};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
@@ -24,54 +23,48 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// TRIVIAL: Just a wrapper for
-///   'completeAndRestoreNode_collectingViewRequests',
-/// which it calls on each "tree root" (child of the ForestRoot),
-/// threading 'visited' through the forest.
-pub async fn completeAndRestoreForest_collectingViewRequests (
+/// TRIVIAL: Just wraps 'completeAndRestoreNode',
+/// calling it on each "tree root" (child of the ForestRoot),
+/// but threading 'visited' through that sequence of calls.
+pub async fn completeAndRestoreForest (
   forest        : &mut PairTree,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-) -> Result < ( VisitedMap,
-                Vec < ( NodeId, ViewRequest ) > ),
-              Box<dyn Error> > {
+) -> Result < VisitedMap, Box<dyn Error> > {
   let mut visited : VisitedMap = VisitedMap::new ();
-  let mut view_requests : Vec < (NodeId, ViewRequest) > = Vec::new ();
   let tree_root_ids : Vec < NodeId > =
     forest . root () . children ()
     . map ( |c| c . id () )
     . collect ();
   for tree_root_id in tree_root_ids {
-    completeAndRestoreNode_collectingViewRequests (
+    completeAndRestoreNode (
       forest, tree_root_id, config, typedb_driver,
-      &mut visited, &mut view_requests ) . await ?; }
-  Ok (( visited, view_requests )) }
+      &mut visited ) . await ?; }
+  Ok ( visited ) }
 
 /// Complete a node, and then its children ("preorder DFS").
-fn completeAndRestoreNode_collectingViewRequests<'a> (
+fn completeAndRestoreNode<'a> (
   tree          : &'a mut PairTree,
   node_id       : NodeId,
   config        : &'a SkgConfig,
   typedb_driver : &'a TypeDBDriver,
   visited       : &'a mut VisitedMap,
-  view_requests : &'a mut Vec < (NodeId, ViewRequest) >,
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   fn recurse<'b> (
-    tree              : &'b mut PairTree,
-    node_id           : NodeId,
-    config            : &'b SkgConfig,
-    typedb_driver     : &'b TypeDBDriver,
-    visited           : &'b mut VisitedMap,
-    view_requests_out : &'b mut Vec < (NodeId, ViewRequest) >,
+    tree          : &'b mut PairTree,
+    node_id       : NodeId,
+    config        : &'b SkgConfig,
+    typedb_driver : &'b TypeDBDriver,
+    visited       : &'b mut VisitedMap,
   ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>> {
     Box::pin(async move {
       let child_treeids : Vec < NodeId > =
         collect_child_treeids ( tree, node_id ) ?;
       for child_treeid in child_treeids {
-        completeAndRestoreNode_collectingViewRequests (
+        completeAndRestoreNode (
           tree, child_treeid, config, typedb_driver,
-          visited, view_requests_out ) . await ?; }
+          visited ) . await ?; }
       Ok (( )) } ) }
   Box::pin(async move {
     let is_alias_col: bool =
@@ -89,11 +82,9 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
       // Don't recurse; completeAliasCol handles the whole subtree.
-    } else if is_col_scaffold {
-      // Recurse into children to collect view requests (e.g. from Subscribee nodes) but don't try to complete the SubscribeeCol node itself.
-      recurse (
-        tree, node_id, config, typedb_driver,
-        visited, view_requests ) . await ?;
+    } else if is_col_scaffold { // Skip, but recurse into children.
+      recurse ( tree, node_id, config, typedb_driver, visited
+              ) . await ?;
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
@@ -108,28 +99,8 @@ fn completeAndRestoreNode_collectingViewRequests<'a> (
         recurse (
           // Always recurse to children, even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver,
-          visited, view_requests ) . await ?; }
-      view_requests_at_node (
-        tree, node_id, view_requests ) ?; }
+          visited ) . await ?; } }
     Ok (( )) } ) }
-
-/// Append its view requests to the output vector.
-fn view_requests_at_node (
-  tree              : &PairTree,
-  node_id           : NodeId,
-  view_requests_out : &mut Vec < (NodeId, ViewRequest) >,
-) -> Result < (), Box<dyn Error> > {
-  let node_view_requests : Vec < ViewRequest > =
-    read_at_node_in_tree (
-      tree, node_id,
-      |np| match &np . orgnode . kind {
-             OrgNodeKind::True ( t ) =>
-               t . view_requests . iter () . cloned () . collect (),
-             OrgNodeKind::Scaff ( _ ) => Vec::new (),
-      } ) ?;
-  for request in node_view_requests {
-    view_requests_out . push ( (node_id, request) ); }
-  Ok (( )) }
 
 /// Completes an indefinitive orgnode using its SkgNode.
 /// Affects only the input node, not its tree-children.
@@ -300,7 +271,7 @@ fn categorize_children_by_treatment (
 async fn extend_content (
   tree       : &mut PairTree,
   parent_nid : NodeId,
-  skgid     : &ID,
+  skgid      : &ID,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {

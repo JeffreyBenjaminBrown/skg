@@ -4,12 +4,13 @@ use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::completeAndRestoreForest_collectingViewRequests;
+use crate::to_org::complete::contents::completeAndRestoreForest;
+use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
 use crate::to_org::expand::definitive::execute_view_requests;
-use crate::to_org::util::forest_root_pair;
+use crate::to_org::util::{forest_root_pair, VisitedMap};
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::{NodePair, PairTree};
@@ -160,12 +161,16 @@ pub async fn update_from_and_rerender_buffer (
       // Definitive nodes get Some(skgnode), indefinitive get None.
       & orgnode_forest,
       & save_instructions );
+
   { // modify the paired forest before re-rendering it
-    let (mut visited, view_requests) =
-      completeAndRestoreForest_collectingViewRequests (
+    let mut visited : VisitedMap =
+      completeAndRestoreForest (
         &mut paired_forest,
         config,
-        typedb_driver ). await ?;
+        typedb_driver ) . await ?;
+    let view_requests : Vec < (NodeId, ViewRequest) > =
+      collectViewRequestsFromForest (
+        & paired_forest ) ?;
     execute_view_requests ( // PITFALL: Must follow completion.
       // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
       &mut paired_forest,
