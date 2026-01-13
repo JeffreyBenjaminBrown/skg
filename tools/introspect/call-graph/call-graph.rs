@@ -63,6 +63,7 @@ struct CallRelation {
   caller: String,
   callee_file: String,
   callee: String,
+  call_order: usize,  // order in which callee is first called within caller
 }
 
 //
@@ -73,7 +74,7 @@ struct FunctionCollector {
   file_path: String,
   source: String,
   functions: Vec<FunctionDef>,
-  current_impl_type: Option<String>,
+  function_context: Vec<String>,  // Stack of qualified parent function names
 }
 
 impl FunctionCollector {
@@ -82,7 +83,17 @@ impl FunctionCollector {
       file_path,
       source,
       functions: Vec::new(),
-      current_impl_type: None,
+      function_context: Vec::new(),
+    }
+  }
+
+  /// Build qualified name for a function, prefixing with parent context if any.
+  /// Inner functions get names like "parent:child" or "Type::method:inner".
+  fn qualified_name(&self, raw_name: &str) -> String {
+    if let Some(parent) = self.function_context.last() {
+      format!("{}:{}", parent, raw_name)
+    } else {
+      raw_name.to_string()
     }
   }
 
@@ -106,30 +117,33 @@ impl FunctionCollector {
 
 impl<'ast> Visit<'ast> for FunctionCollector {
   fn visit_item_fn(&mut self, node: &'ast ItemFn) {
-    let name = node.sig.ident.to_string();
+    let raw_name = node.sig.ident.to_string();
+    let qualified_name = self.qualified_name(&raw_name);
     let start_line = node.span().start().line;
     let end_line = node.span().end().line;
     let loc = self.count_non_blank_lines(start_line, end_line);
 
     self.functions.push(FunctionDef {
-      name,
+      name: qualified_name.clone(),
       file: self.file_path.clone(),
       loc,
       start_line,
       end_line,
     });
 
+    // Push context before recursing into body (to find inner functions)
+    self.function_context.push(qualified_name);
     syn::visit::visit_item_fn(self, node);
+    self.function_context.pop();
   }
 
   fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
     let type_name = Self::get_type_name(&node.self_ty);
-    self.current_impl_type = type_name;
 
     for item in &node.items {
       if let ImplItem::Fn(method) = item {
         let method_name = method.sig.ident.to_string();
-        let full_name = match &self.current_impl_type {
+        let qualified_name = match &type_name {
           Some(ty) => format!("{}::{}", ty, method_name),
           None => method_name,
         };
@@ -139,26 +153,30 @@ impl<'ast> Visit<'ast> for FunctionCollector {
         let loc = self.count_non_blank_lines(start_line, end_line);
 
         self.functions.push(FunctionDef {
-          name: full_name,
+          name: qualified_name.clone(),
           file: self.file_path.clone(),
           loc,
           start_line,
           end_line,
         });
+
+        // Push context and visit method body to find inner functions
+        self.function_context.push(qualified_name);
+        syn::visit::visit_impl_item_fn(self, method);
+        self.function_context.pop();
       }
     }
-
-    self.current_impl_type = None;
+    // Don't call default visitor - we handled items manually
   }
 }
 
 struct CallCollector {
-  calls: HashSet<String>,
+  calls: Vec<(String, usize)>,  // (name, line_number)
 }
 
 impl CallCollector {
   fn new() -> Self {
-    Self { calls: HashSet::new() }
+    Self { calls: Vec::new() }
   }
 }
 
@@ -170,7 +188,8 @@ impl<'ast> Visit<'ast> for CallCollector {
         if !(is_std_call(last) ||
              is_boring_skg_call(last))
         {
-          self.calls.insert(last.clone());
+          let line = node.span().start().line;
+          self.calls.push((last.clone(), line));
         }
       }
     }
@@ -180,7 +199,8 @@ impl<'ast> Visit<'ast> for CallCollector {
   fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
     let method_name = node.method.to_string();
     if !is_std_method(&method_name) {
-      self.calls.insert(method_name);
+      let line = node.span().start().line;
+      self.calls.push((method_name, line));
     }
     syn::visit::visit_expr_method_call(self, node);
   }
@@ -253,7 +273,8 @@ fn is_std_method(name: &str) -> bool {
 // Parsing helpers
 //
 
-fn extract_calls_from_fn(source: &str, start_line: usize, end_line: usize) -> HashSet<String> {
+/// Returns calls in the order they appear in source (deduplicated by first occurrence).
+fn extract_calls_from_fn(source: &str, start_line: usize, end_line: usize) -> Vec<String> {
   let lines: Vec<&str> = source.lines().collect();
   let fn_source: String = lines
     .get((start_line.saturating_sub(1))..end_line)
@@ -267,7 +288,21 @@ fn extract_calls_from_fn(source: &str, start_line: usize, end_line: usize) -> Ha
     collector.visit_file(&file);
   }
 
-  collector.calls
+  // Sort by line number, then deduplicate preserving first occurrence
+  let mut calls = collector.calls;
+  calls.sort_by_key(|(_, line)| *line);
+
+  let mut seen = HashSet::new();
+  calls
+    .into_iter()
+    .filter_map(|(name, _)| {
+      if seen.insert(name.clone()) {
+        Some(name)
+      } else {
+        None
+      }
+    })
+    .collect()
 }
 
 fn parse_file(path: &Path, base_path: &Path) -> Result<(Vec<FunctionDef>, String), String> {
@@ -310,13 +345,18 @@ fn write_csvs(
   fs::write(&functions_csv, csv_content).expect("Failed to write functions.csv");
   println!("Wrote {}", functions_csv.display());
 
-  // Write calls.csv
+  // Write calls.csv (sorted for reproducibility)
   let calls_csv = output_dir.join("calls.csv");
-  let mut csv_content = String::from("caller_file,caller,callee_file,callee\n");
-  for rel in calls {
+  let mut csv_content = String::from("caller_file,caller,callee_file,callee,call_order\n");
+  let mut sorted_calls: Vec<_> = calls.iter().collect();
+  sorted_calls.sort_by(|a, b| {
+    (&a.caller_file, &a.caller, a.call_order)
+      .cmp(&(&b.caller_file, &b.caller, b.call_order))
+  });
+  for rel in sorted_calls {
     csv_content.push_str(&format!(
-      "\"{}\",\"{}\",\"{}\",\"{}\"\n",
-      rel.caller_file, rel.caller, rel.callee_file, rel.callee
+      "\"{}\",\"{}\",\"{}\",\"{}\",{}\n",
+      rel.caller_file, rel.caller, rel.callee_file, rel.callee, rel.call_order
     ));
   }
   fs::write(&calls_csv, csv_content).expect("Failed to write calls.csv");
@@ -345,19 +385,20 @@ fn read_functions_csv(path: &Path) -> Vec<(String, String, usize)> {
   result
 }
 
-fn read_calls_csv(path: &Path) -> Vec<(String, String, String, String)> {
+fn read_calls_csv(path: &Path) -> Vec<(String, String, String, String, usize)> {
   let content = fs::read_to_string(path).expect("Failed to read calls.csv");
   let mut result = Vec::new();
 
   for line in content.lines().skip(1) {
-    // Parse CSV: "caller_file","caller","callee_file","callee"
+    // Parse CSV: "caller_file","caller","callee_file","callee",call_order
     let parts: Vec<&str> = line.split(',').collect();
-    if parts.len() >= 4 {
+    if parts.len() >= 5 {
       let caller_file = parts[0].trim_matches('"').to_string();
       let caller = parts[1].trim_matches('"').to_string();
       let callee_file = parts[2].trim_matches('"').to_string();
       let callee = parts[3].trim_matches('"').to_string();
-      result.push((caller_file, caller, callee_file, callee));
+      let call_order: usize = parts[4].parse().unwrap_or(0);
+      result.push((caller_file, caller, callee_file, callee, call_order));
     }
   }
 
@@ -387,23 +428,38 @@ impl CallGraph {
       graph.functions.insert(name, (file, loc));
     }
 
-    // Load calls
-    for (_, caller, _, callee) in read_calls_csv(calls_path) {
-      graph.calls
+    // Load calls with order information
+    let mut calls_with_order: HashMap<String, Vec<(String, usize)>> = HashMap::new();
+    for (_, caller, _, callee, call_order) in read_calls_csv(calls_path) {
+      calls_with_order
         .entry(caller.clone())
         .or_default()
-        .push(callee.clone());
+        .push((callee.clone(), call_order));
       graph.callers
         .entry(callee)
         .or_default()
         .push(caller);
     }
 
-    // Deduplicate (preserving first-appearance order)
-    for callees in graph.calls.values_mut() {
+    // Sort by call_order, then deduplicate preserving order
+    for (caller, callees_with_order) in calls_with_order {
+      let mut callees = callees_with_order;
+      callees.sort_by_key(|(_, order)| *order);
       let mut seen = HashSet::new();
-      callees.retain(|c| seen.insert(c.clone()));
+      let deduped: Vec<String> = callees
+        .into_iter()
+        .filter_map(|(callee, _)| {
+          if seen.insert(callee.clone()) {
+            Some(callee)
+          } else {
+            None
+          }
+        })
+        .collect();
+      graph.calls.insert(caller, deduped);
     }
+
+    // Deduplicate callers (order doesn't matter for callers)
     for callers in graph.callers.values_mut() {
       let mut seen = HashSet::new();
       callers.retain(|c| seen.insert(c.clone()));
@@ -574,6 +630,33 @@ fn main() {
     }
   }
 
+  // Build set of all known function names for scoped lookup
+  let all_function_names: HashSet<String> = all_functions
+    .iter()
+    .map(|f| f.name.clone())
+    .collect();
+
+  // Resolve a call with scope awareness: check caller's ancestry first.
+  // For caller "A:B:C" calling "x", checks: A:B:C:x, A:B:x, A:x, then global.
+  let resolve_call = |caller: &str, call_name: &str| -> Vec<String> {
+    // Try scoped lookup: walk up caller's ancestry
+    let mut prefix = caller.to_string();
+    loop {
+      let candidate = format!("{}:{}", prefix, call_name);
+      if all_function_names.contains(&candidate) {
+        return vec![candidate];
+      }
+      // Move up one level (strip after last ':')
+      if let Some(pos) = prefix.rfind(':') {
+        prefix = prefix[..pos].to_string();
+      } else {
+        break;
+      }
+    }
+    // Fall back to global resolution
+    short_to_full.get(call_name).cloned().unwrap_or_default()
+  };
+
   // Extract call relationships
   let mut call_relations: HashSet<CallRelation> = HashSet::new();
 
@@ -581,18 +664,18 @@ fn main() {
     if let Some(source) = file_sources.get(&func.file) {
       let calls = extract_calls_from_fn(source, func.start_line, func.end_line);
 
-      for call_name in calls {
-        if let Some(full_names) = short_to_full.get(&call_name) {
-          for full_name in full_names {
-            if let Some(callee_files) = name_to_files.get(full_name) {
-              for callee_file in callee_files {
-                call_relations.insert(CallRelation {
-                  caller_file: func.file.clone(),
-                  caller: func.name.clone(),
-                  callee_file: callee_file.clone(),
-                  callee: full_name.clone(),
-                });
-              }
+      for (call_order, call_name) in calls.into_iter().enumerate() {
+        let resolved_names = resolve_call(&func.name, &call_name);
+        for full_name in resolved_names {
+          if let Some(callee_files) = name_to_files.get(&full_name) {
+            for callee_file in callee_files {
+              call_relations.insert(CallRelation {
+                caller_file: func.file.clone(),
+                caller: func.name.clone(),
+                callee_file: callee_file.clone(),
+                callee: full_name.clone(),
+                call_order,
+              });
             }
           }
         }
