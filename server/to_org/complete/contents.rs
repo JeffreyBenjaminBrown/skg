@@ -101,7 +101,7 @@ fn complete_or_restore_each_node_in_branch<'a> (
         } else { // futz with the orgnode and its content children
           maybe_add_subscribeeCol_branch (
             tree, node_id, config, typedb_driver ) . await ?;
-          completeDefinitiveOrgnode (
+          completeAndReorder_childrenOf_definitiveOrgnode (
             tree, node_id, config, typedb_driver ). await ?; }
         recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver, visited
@@ -143,8 +143,8 @@ pub fn clobberIndefinitiveOrgnode (
 /// ASSUMES: The PairTree has a SkgNode here (via "ensure_skgnode").
 /// ASSUMES: 'mark_if_visited_or_repeat_or_cycle' was already called.
 /// ASSUMES: Input is definitive.
-pub async fn completeDefinitiveOrgnode (
-  tree   : &mut PairTree,
+pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
+  tree    : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
@@ -221,8 +221,7 @@ pub async fn completeDefinitiveOrgnode (
         // Content already exists in tree
         completed_content_treeids . push ( *existing_treeid );
       } else
-      { // PITFALL: A preorder DFS traversal for completeOrgnodeTree
-        // lets us add a child without considering grandchildren yet.
+      { // PITFALL: The preorder DFS traversal for complete_or_restore_each_node_in_branch lets us add a child without considering grandchildren yet.
         completed_content_treeids . push (
           extend_content (
             tree, node_id, disk_skgid, config, driver

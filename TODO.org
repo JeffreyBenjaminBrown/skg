@@ -52,14 +52,14 @@ makeIndefinitiveAndClobber
     post-parsing because Scaffold nodes don't store body data.
     These validations should happen during parsing if needed.
 ** AWAITS Completion is complex.
-*** break up completeDefinitiveOrgnode
+*** break up completeAndReorder_childrenOf_definitiveOrgnode
     it's super-long
-*** Why do complete_branch_minus_content and completeDefinitiveOrgnode both call maybe_add_subscribeeCol_branch?
+*** Why do complete_branch_minus_content and completeAndReorder_childrenOf_definitiveOrgnode both call maybe_add_subscribeeCol_branch?
 *** After 'view_requests_at_node', is there any reason to keep the view requests in the node?
     The function pushes the node's requests onto 'view_requests_out'.
     If they should be deleted from the node thereafter,
     the function should be renamed something like 'transfer_requests'.
-*** On what Interps can 'completeDefinitiveOrgnode' be validly called?
+*** On what Interps can 'completeAndReorder_childrenOf_definitiveOrgnode' be validly called?
     The comment says only nodes with Interp = Content.
     If that's right (I think so) the name should reflect it.
 *** making something indefinitive twice

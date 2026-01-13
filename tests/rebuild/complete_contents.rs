@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
 use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
-use skg::to_org::complete::contents::{completeDefinitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
+use skg::to_org::complete::contents::{completeAndReorder_childrenOf_definitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode, OrgNodeKind};
@@ -18,7 +18,7 @@ fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
   forest . root () . first_child () . unwrap () . id () }
 
 /// Helper to call ensure_skgnode, mark_if_visited_or_repeat_or_cycle,
-/// and then clobberIndefinitiveOrgnode or completeDefinitiveOrgnode.
+/// and then clobberIndefinitiveOrgnode or completeAndReorder_childrenOf_definitiveOrgnode.
 /// (matches the pattern used in complete_or_restore_each_node_in_branch).
 /// TODO: Unify with complete_or_restore_each_node_in_branch.
 /// Does nothing for Scaffolds.
@@ -42,7 +42,7 @@ async fn check_and_complete_if_truenode (
     clobberIndefinitiveOrgnode (
       tree, node_id ) ?;
   } else {
-    completeDefinitiveOrgnode (
+    completeAndReorder_childrenOf_definitiveOrgnode (
       tree, node_id, config, driver ) . await ?; }
   Ok (( )) }
 
