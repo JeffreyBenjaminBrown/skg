@@ -51,89 +51,12 @@ pub async fn update_graph_minus_merges (
     println!( "3) Updating Tantivy index ..." );
     println!( "   Tantivy updated for {} document(s).",
               { let indexed_count : usize =
-                  update_index_from_saveinstructions (
+                  update_tantivy_from_saveinstructions (
                       &instructions, tantivy_index )?;
               indexed_count } ); }
 
   println!( "All updates finished successfully." );
   Ok (( )) }
-
-
-//
-// Filesystem
-//
-
-pub fn update_fs_from_saveinstructions (
-  instructions : Vec<SaveInstruction>,
-  config       : SkgConfig,
-) -> io::Result<(usize, usize)> { // (deleted, written)
-  let ( to_delete, to_write ) // functional; no IO
-    : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
-    instructions . into_iter ()
-    . partition (|(_, action)|
-                 matches!(action, NonMerge_NodeAction::Delete) );
-  let deleted : usize = {
-    let nodes_to_delete : Vec<SkgNode> =
-      to_delete . into_iter ()
-      . map ( |(node, _)| node )
-      . collect ();
-    if ! nodes_to_delete . is_empty () {
-      delete_all_nodes_from_fs (
-        nodes_to_delete, config . clone () ) ?
-    } else { 0 } };
-  let written : usize = {
-    let nodes_to_write : Vec<SkgNode> =
-      to_write . into_iter ()
-      . map ( |(node, _)| node )
-      . collect ();
-    if ! nodes_to_write . is_empty () {
-      write_all_nodes_to_fs (
-        nodes_to_write, config ) ?
-    } else { 0 } };
-  Ok ( (deleted, written) ) }
-
-
-//
-// Tantivy
-//
-
-/// Updates the index with the provided SaveInstructions.
-/// Deletes IDs from the index for every instruction,
-/// but only adds documents for instructions where toDelete is false.
-/// Returns the number of documents processed.
-pub(super) fn update_index_from_saveinstructions (
-  instructions  : &[SaveInstruction],
-  tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
-
-  let mut writer: IndexWriter =
-    tantivy_index.index.writer(50_000_000)?;
-  delete_nodes_from_index(
-    // Delete all IDs in the SaveInstructions from the index.
-    // (Instructions that aren't toDelete are then recreated.)
-    instructions.iter().map(|(node, _)| node),
-    &mut writer,
-    tantivy_index)?;
-  let processed_count: usize =
-    add_documents_to_tantivy_writer(
-      { // Add documents only for non-deletion instructions.
-        let nodes_to_add: Vec<&SkgNode> =
-          instructions . iter()
-          . filter_map( |(node, action)|
-                         if !matches!( action,
-                                       NonMerge_NodeAction::Delete)
-                         { Some (node) } else { None } )
-          . collect();
-        nodes_to_add },
-      &mut writer, tantivy_index )? ;
-  commit_with_status(
-    &mut writer, processed_count, "Updated")?;
-  Ok (processed_count) }
-
-
-//
-// TypeDB
-//
 
 /// Update the DB from a batch of `(SkgNode, NonMerge_NodeAction)` pairs:
 /// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids
@@ -202,3 +125,66 @@ pub async fn update_typedb_from_saveinstructions (
       db_name, driver, & to_write_skgnodes ). await ?; }
 
   Ok (( )) }
+
+pub fn update_fs_from_saveinstructions (
+  instructions : Vec<SaveInstruction>,
+  config       : SkgConfig,
+) -> io::Result<(usize, usize)> { // (deleted, written)
+  let ( to_delete, to_write ) // functional; no IO
+    : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
+    instructions . into_iter ()
+    . partition (|(_, action)|
+                 matches!(action, NonMerge_NodeAction::Delete) );
+  let deleted : usize = {
+    let nodes_to_delete : Vec<SkgNode> =
+      to_delete . into_iter ()
+      . map ( |(node, _)| node )
+      . collect ();
+    if ! nodes_to_delete . is_empty () {
+      delete_all_nodes_from_fs (
+        nodes_to_delete, config . clone () ) ?
+    } else { 0 } };
+  let written : usize = {
+    let nodes_to_write : Vec<SkgNode> =
+      to_write . into_iter ()
+      . map ( |(node, _)| node )
+      . collect ();
+    if ! nodes_to_write . is_empty () {
+      write_all_nodes_to_fs (
+        nodes_to_write, config ) ?
+    } else { 0 } };
+  Ok ( (deleted, written) ) }
+
+
+/// Updates the index with the provided SaveInstructions.
+/// Deletes IDs from the index for every instruction,
+/// but only adds documents for instructions where toDelete is false.
+/// Returns the number of documents processed.
+pub(super) fn update_tantivy_from_saveinstructions (
+  instructions  : &[SaveInstruction],
+  tantivy_index : &TantivyIndex,
+) -> Result<usize, Box<dyn Error>> {
+
+  let mut writer: IndexWriter =
+    tantivy_index.index.writer(50_000_000)?;
+  delete_nodes_from_index(
+    // Delete all IDs in the SaveInstructions from the index.
+    // (Instructions that aren't toDelete are then recreated.)
+    instructions.iter().map(|(node, _)| node),
+    &mut writer,
+    tantivy_index)?;
+  let processed_count: usize =
+    add_documents_to_tantivy_writer(
+      { // Add documents only for non-deletion instructions.
+        let nodes_to_add: Vec<&SkgNode> =
+          instructions . iter()
+          . filter_map( |(node, action)|
+                         if !matches!( action,
+                                       NonMerge_NodeAction::Delete)
+                         { Some (node) } else { None } )
+          . collect();
+        nodes_to_add },
+      &mut writer, tantivy_index )? ;
+  commit_with_status(
+    &mut writer, processed_count, "Updated")?;
+  Ok (processed_count) }

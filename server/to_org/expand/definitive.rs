@@ -1,5 +1,3 @@
-/// SINGLE ENTRY POINT: 'execute_view_requests'.
-
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{
@@ -17,8 +15,7 @@ use crate::to_org::util::{
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{
-  OrgNodeKind, ViewRequest };
+use crate::types::orgnode::{ OrgNodeKind, ViewRequest };
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::write_at_node_in_tree;
 
