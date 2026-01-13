@@ -72,22 +72,15 @@ fn complete_or_restore_each_node_in_branch<'a> (
           visited ) . await ?; }
       Ok (( )) } ) }
   Box::pin(async move {
-    let is_alias_col: bool =
-      read_at_node_in_tree(tree, node_id, |node| {
+    if read_at_node_in_tree(tree, node_id, |node| {
         matches!(&node.orgnode.kind,
-                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })?;
-    let is_col_scaffold: bool =
-      read_at_node_in_tree(tree, node_id, |node| {
-        matches!( &node.orgnode.kind,
-                  OrgNodeKind::Scaff(
-                    Scaffold::SubscribeeCol |
-                    Scaffold::HiddenOutsideOfSubscribeeCol |
-                    Scaffold::HiddenInSubscribeeCol )) } )?;
-    if is_alias_col {
+                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })? {
       // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
         tree, node_id, config, typedb_driver ). await ?;
-    } else if is_col_scaffold {
+    } else if read_at_node_in_tree(tree, node_id, |node| {
+        matches!( &node.orgnode.kind,
+                  OrgNodeKind::Scaff(_)) } )? {
       // Skip, but recurse into children.
       recurse ( tree, node_id, config, typedb_driver, visited
               ) . await ?;
