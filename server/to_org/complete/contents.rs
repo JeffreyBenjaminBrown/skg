@@ -139,28 +139,18 @@ pub fn clobberIndefinitiveOrgnode (
 /// by reconciling them with the 'contains' relationships
 /// found in the SkgNode.
 ///
-/// ASSUMES: Node has been normalized so its "id" field is the PID
-/// ASSUMES: the PairTree has a SkgNode here (via "ensure_skgnode")
-/// ASSUMES: 'mark_if_visited_or_repeat_or_cycle' was already called
-/// ASSUMES: Input is definitive
-///
-/// METHOD: Given a node N:
-/// - Add SubscribeeCol if node subscribes to something and one is not already present
-/// - If node is a Subscribee, and its predecessor Subscriber hides any of its content, then add a HiddenInSubscribeeCol
-/// - Categorize N's children into content/non-content
-/// - Mark 'invalid content' as parentIgnores and move to non-content
-///   - 'invalid content' = nodes marked content that are not content.
-///     This can happen if a separate buffer edited their container.
-/// - Build completed-content list from SkgNode, preserving order
-/// - Add missing content children from disk (via extend_content)
-/// - Reorder children: non-content first, then completed-content
+/// ASSUMES: The node's "id" field is its PID.
+/// ASSUMES: The PairTree has a SkgNode here (via "ensure_skgnode").
+/// ASSUMES: 'mark_if_visited_or_repeat_or_cycle' was already called.
+/// ASSUMES: Input is definitive.
 pub async fn completeDefinitiveOrgnode (
   tree   : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let (content_from_disk, contains_list)
+  let (content_from_disk_as_set,
+       content_from_disk_as_list)
     : (HashSet<ID>, Option<Vec<ID>>) = {
       let node_ref : NodeRef < NodePair > =
         tree . get ( node_id )
@@ -168,16 +158,17 @@ pub async fn completeDefinitiveOrgnode (
       let skgnode : &SkgNode =
         node_ref . value () . mskgnode . as_ref ()
         . ok_or ( "SkgNode should exist" ) ?;
-      let content_from_disk : HashSet<ID> =
+      let content_from_disk_as_set : HashSet<ID> =
         skgnode . contains . clone ()
         . unwrap_or_default ()
         . into_iter ()
         . collect ();
-      (content_from_disk, skgnode . contains . clone ()) };
+      ( content_from_disk_as_set,
+        skgnode . contains . clone() ) };
 
   let ( content_child_treeids, mut non_content_child_treeids )
     : ( Vec < NodeId >, Vec < NodeId > )
-    = categorize_children_by_treatment (
+    = partition_nonignored_true_content_from_other_children (
       tree,
       node_id ) ?;
 
@@ -199,11 +190,13 @@ pub async fn completeDefinitiveOrgnode (
       child_pid . clone (), *child_treeid ); }
 
   // Mark invalidated content as ParentIgnores
-  // and move to non-content list
+  // and move to non-content list.
+  // Content can become invalidated, i.e. non-content,
+  // if a separate buffer edited the invalidated content's container.
   let mut invalid_content_treeids : Vec < NodeId > =
     Vec::new ();
   for ( child_pid, child_treeid ) in & content_skgid_to_treeid {
-    if ! content_from_disk . contains ( child_pid ) {
+    if ! content_from_disk_as_set . contains ( child_pid ) {
       invalid_content_treeids . push ( *child_treeid ); }}
   for invalid_treeid in & invalid_content_treeids {
     let mut child_mut : NodeMut < NodePair > =
@@ -221,7 +214,7 @@ pub async fn completeDefinitiveOrgnode (
   // preserving order from SkgNode
   let mut completed_content_treeids : Vec < NodeId > =
     Vec::new ();
-  if let Some(contains) = & contains_list {
+  if let Some(contains) = & content_from_disk_as_list {
     for disk_skgid in contains {
       if let Some ( existing_treeid ) =
         content_skgid_to_treeid . get ( disk_skgid ) {
@@ -242,13 +235,25 @@ pub async fn completeDefinitiveOrgnode (
     & completed_content_treeids ) ?;
   Ok (( )) }
 
-/// Categorize a node's children into content and non-content,
-/// where content = any truenode it doesn't ignore.
-/// Returns (content_child_ids, non_content_child_ids).
-fn categorize_children_by_treatment (
+/// PURPOSE: Separate a node's non-ignored true content from its other
+/// children.
+///
+/// SOME TERMS:
+/// - "False" content would look like content based on
+/// the orgnode tree, but without corresponding content relationships
+/// in the dbs. Maybe it can't happen, but the types don't prevent it.
+/// - 'Non-intentional' content would be nodes that the parent *does*
+/// contain, but marked as parentIgnores. We assume such nodes
+/// are copies the user wants to keep in view without affecting
+/// the graph. Therefore, when populating a definitive node's contents,
+/// they will be ignored. A non-ignored duplicate is made if necessary.
+///
+/// RETURNS (content_child_ids, non_content_child_ids).
+fn partition_nonignored_true_content_from_other_children (
   tree    : &PairTree,
   node_id : NodeId,
-) -> Result < ( Vec <NodeId>, Vec <NodeId> ),
+) -> Result < ( Vec <NodeId>, // intentional true content
+                Vec <NodeId> ), // others
               Box<dyn Error> > {
   let mut content_child_ids : Vec < NodeId > =
     Vec::new ();
