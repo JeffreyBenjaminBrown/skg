@@ -8,7 +8,8 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::org_to_text::orgnode_forest_to_string;
 use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
 use skg::to_org::util::{VisitedMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
-use skg::to_org::complete::contents::{completeAndReorder_childrenOf_definitiveOrgnode, clobberIndefinitiveOrgnode, ensure_skgnode};
+use skg::to_org::complete::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
+use skg::to_org::complete::contents::{clobberIndefinitiveOrgnode, ensure_skgnode};
 use skg::types::tree::PairTree;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode, OrgNodeKind};
