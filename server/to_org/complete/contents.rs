@@ -135,14 +135,11 @@ pub fn clobberIndefinitiveOrgnode (
   } )? // before the '?' it's a nested Result: R<R<(),String>,String>
     . map_err( |e| -> Box<dyn Error> { e.into() } ) }
 
-/// Completes a definitive Content node's children,
-/// by reconciling them with the 'contains' relationships
-/// found in the SkgNode.
+/// Completes the 'content' of a definitive node's children,
+/// using the associated SkgNode's 'contains' field as a reference,
+/// maintaining the correct order and creating any that need it.
 ///
 /// ASSUMES: The node's "id" field is its PID.
-/// ASSUMES: The PairTree has a SkgNode here (via "ensure_skgnode").
-/// ASSUMES: 'mark_if_visited_or_repeat_or_cycle' was already called.
-/// ASSUMES: Input is definitive.
 pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
   tree    : &mut PairTree,
   node_id : NodeId,
@@ -159,7 +156,9 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
     . map ( |v| v . iter () . cloned () . collect () )
     . unwrap_or_default ();
   let ( mut content_skgid_to_treeid, // longer-term content map
-        mut non_content_child_treeids) =
+        mut non_content_child_treeids )
+    : ( HashMap < ID, NodeId >,
+        Vec < NodeId > ) =
     { let ( content_child_treeids, // short-term content vector
             non_content_child_treeids )
         : ( Vec < NodeId >, Vec < NodeId > )
@@ -167,38 +166,40 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
             tree,
             node_id ) ?;
       let content_skgid_to_treeid : HashMap < ID, NodeId > =
-        // PITFALL: This map initially includes non-content, which is soon removed by mark_and_move_invalidated_content.
+        // PITFALL: This map can initially include non-content. Any such items are next removed by 'mark_parentignores_and_move_invalidated_content'.
           map_skgid_to_treeid ( tree, &content_child_treeids ) ?;
       ( content_skgid_to_treeid,
         non_content_child_treeids ) };
 
-  // Move false content from content_skgid_to_treeid to non_content_child_treeids
-  mark_and_move_invalidated_content (
+  mark_parentignores_and_move_invalidated_content ( // Move false content from content_skgid_to_treeid to non_content_child_treeids.
     tree,
     &content_from_disk_as_set,
     &mut content_skgid_to_treeid,
     &mut non_content_child_treeids ) ?;
 
-  // Build completed-content list, preserving order from SkgNode
-  let mut completed_content_treeids : Vec < NodeId > =
+  let mut complete_list_of_content_branch_treeids : Vec < NodeId > =
     Vec::new ();
-  if let Some(contains) = & content_from_disk_as_list {
-    for disk_skgid in contains {
+  if let Some(should_contain) = & content_from_disk_as_list {
+    for disk_skgid in should_contain {
       if let Some ( existing_treeid )
       = content_skgid_to_treeid . get ( disk_skgid )
-      { // Content already exists in tree
-        completed_content_treeids . push ( *existing_treeid );
-      } else { // PITFALL: The preorder DFS traversal for complete_or_restore_each_node_in_branch lets us add a child without considering grandchildren yet.
-        completed_content_treeids . push (
-          append_new_nodepair_to_children_based_on_skgid (
+      { // It's already in the tree. Push it on unchanged. It might be a deep branch.
+        complete_list_of_content_branch_treeids . push (
+          *existing_treeid );
+      } else { // It's not in the tree. Push on a new leaf.
+        // PITFALL: The preorder DFS traversal for complete_or_restore_each_node_in_branch lets us add a child without considering grandchildren yet.
+        complete_list_of_content_branch_treeids . push (
+          append_new_definitive_nodepair_to_children_based_on_skgid (
             tree, node_id, disk_skgid, config, driver
-          ) . await ? ); }} }
+          ) . await ? ); }}
+    // 'complete_list_of_content_branch_treeids' is now "complete" as in "missing no content". BUT a branch of it could still be incomplete, until 'complete_or_restore_each_node_in_branch' recurses into it.
+  }
 
   reorder_children (
     tree,
     node_id,
     & non_content_child_treeids,
-    & completed_content_treeids ) ?;
+    & complete_list_of_content_branch_treeids ) ?;
   Ok (( )) }
 
 /// PURPOSE: Separate a node's non-ignored true content from its other
@@ -259,11 +260,12 @@ fn map_skgid_to_treeid (
   Ok ( result ) }
 
 /// PURPOSE : If an entry in 'supposedly_content'
-/// is not truly content, then move it to 'non_content'.
+/// is not truly content, then mark it 'parentIgnores'.
+/// and move it to 'non_content'.
 ///
 /// MOTIVATION: Content can become invalidated (i.e. non-content)
 /// if a separate buffer edited the invalidated content's container.
-fn mark_and_move_invalidated_content (
+fn mark_parentignores_and_move_invalidated_content (
   tree               : &mut PairTree,
   truly_content      : &HashSet<ID>, // immutable, used to judge
   supposedly_content : &mut HashMap<ID, NodeId>, // might lose some
@@ -288,7 +290,7 @@ fn mark_and_move_invalidated_content (
 
 /// Create a new Content node from disk (using 'disk_id')
 /// and append it to the children of 'parent_nid'.
-async fn append_new_nodepair_to_children_based_on_skgid (
+async fn append_new_definitive_nodepair_to_children_based_on_skgid (
   tree       : &mut PairTree,
   parent_nid : NodeId,
   skgid      : &ID,
@@ -309,25 +311,24 @@ async fn append_new_nodepair_to_children_based_on_skgid (
 /// Reorder a node's children by detaching all
 /// and re-appending in desired order.
 fn reorder_children (
-  tree                       : &mut PairTree,
-  parent_treeid              : NodeId,
-  non_content_child_treeids  : &Vec < NodeId >,
-  completed_content_treeids  : &Vec < NodeId >,
+  tree          : &mut PairTree,
+  parent_treeid : NodeId,
+  first         : &Vec < NodeId >,
+  second        : &Vec < NodeId >,
 ) -> Result < (), Box<dyn Error> > {
-  // Collect all child NodeIds in desired order
   let mut desired_order : Vec < NodeId > =
     Vec::new ();
-  desired_order . extend ( non_content_child_treeids );
-  desired_order . extend ( completed_content_treeids );
+  desired_order . extend ( first );
+  desired_order . extend ( second );
 
-  // Detach all children
   for child_treeid in & desired_order {
+    // Detach all children
     with_node_mut ( tree, *child_treeid,
                     |mut child_mut| child_mut . detach () ) ?; }
 
   for child_treeid in & desired_order {
-    // Re-append in desired order,
-    // using append_id, which preserves entire subtrees.
+    // Re-append in desired order.
+    // ('append_id' preserves entire subtrees.)
     with_node_mut (
       tree, parent_treeid,
       |mut parent_mut| {
