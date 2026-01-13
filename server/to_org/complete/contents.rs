@@ -149,22 +149,15 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let (content_from_disk_as_set,
-       content_from_disk_as_list)
-    : (HashSet<ID>, Option<Vec<ID>>) = {
-      let node_ref : NodeRef < NodePair > =
-        tree . get ( node_id )
-        . ok_or ( "Node not found in tree" ) ?;
-      let skgnode : &SkgNode =
-        node_ref . value () . mskgnode . as_ref ()
-        . ok_or ( "SkgNode should exist" ) ?;
-      let content_from_disk_as_set : HashSet<ID> =
-        skgnode . contains . clone ()
-        . unwrap_or_default ()
-        . into_iter ()
-        . collect ();
-      ( content_from_disk_as_set,
-        skgnode . contains . clone() ) };
+  let content_from_disk_as_list : Option<Vec<ID>> =
+    read_at_node_in_tree ( tree, node_id, |np|
+      np . mskgnode . as_ref ()
+      . map ( |s| s . contains . clone () )
+    ) ? . ok_or ( "SkgNode should exist" ) ?;
+  let content_from_disk_as_set : HashSet<ID> =
+    content_from_disk_as_list . as_ref ()
+    . map ( |v| v . iter () . cloned () . collect () )
+    . unwrap_or_default ();
 
   let ( content_child_treeids, mut non_content_child_treeids )
     : ( Vec < NodeId >, Vec < NodeId > )
