@@ -47,9 +47,10 @@
    'load-path
    (expand-file-name "elisp/skg-sexpr" project-root)) )
 
+(require 'skg-buffer)
 (require 'skg-client)
 (require 'skg-id-search)
-(require 'skg-buffer)
-(require 'skg-request-views)
 (require 'skg-request-title-matches)
+(require 'skg-request-views)
+(require 'skg-sexpr-edit)
 (require 'skg-sexpr-search)

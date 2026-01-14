@@ -1,0 +1,50 @@
+* TODO
+** commands that aren't really user-facing
+*** skg-request-single-root-content-view-from-id
+*** skg-request-title-matches
+* user-facing skg commands
+** whole buffer requests
+*** skg-open-empty-content-view.el
+*** skg-request-title-matches
+asks Rust to search the Tantivy index
+for titles matching the search terms,
+and displays the results in a buffer.
+*** skg-request-single-root-content-view-from-id
+causes Emacs to ask Rust to ask TypeDB for a content-view document
+containing the node with the specified ID.
+Rust builds an s-expression representing an org-document
+based on the result, and sends that to Emacs,
+causing Emacs to open an org-mode buffer displaying the results.
+*** skg-request-save-buffer
+** ids
+*** skg-next-id
+*** skg-previous-id
+*** skg-push-id-to-stack
+*** skg-validate-id-stack-buffer
+*** skg-replace-id-stack-from-buffer
+*** skg-edit-id-stack
+** links
+*** skg-visit-link
+** view requests
+*** skg-request-aliases-view
+*** skg-request-containerward-view
+*** skg-request-sourceward-view
+** metadata edits
+*** skg-set-metadata-indefinitive
+*** skg-edit-first-sexpr-on-line
+*** skg-edit-sexp-at-or-after-point
+** misc
+*** heralds-minor-mode
+*** org-ancestry
+** tcp (likely never needed)
+*** skg-doc-disconnect
+*** skg-verify-connection
+sends a simple ping to the Rust server
+to verify the connection is working. The server responds with a
+confirmation message that is displayed in the minibuffer.
+
+Surprisingly, the TCP connection
+does not need to be explicitly launched,
+because each of the client's `request-*` functions
+calls `(skg-tcp-connect-to-rust)`
+(which is idempotent and cheap to rerun).

@@ -4,32 +4,8 @@
    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
    This document is mostly things I considered highest-priority.
 * u
+** DOGFOOD
 ** herald whether something has suubscriptions
-** USE IT
-*** Collect user-facing functions to learn in one module
-**** rarely if ever consciously used
-     skg-open-empty-content-view.el
-     skg-doc-disconnect
-     skg-verify-connection
-**** to learn
-     heralds-minor-mode
-     skg-request-aliases-view
-     skg-request-containerward-view
-     skg-request-sourceward-view
-     skg-visit-link
-     skg-next-id
-     skg-previous-id
-     skg-push-id-to-stack
-     skg-validate-id-stack-buffer
-     skg-replace-id-stack-from-buffer
-     skg-edit-id-stack
-     skg-request-title-matches
-     skg-set-metadata-indefinitive
-**** learned
-     skg-request-single-root-content-view-from-id
-     skg-request-save-buffer
-**** not skg-specific
-     org-ancestry
 ** Develop a cleanup routine?
 *** for local changes
 **** Add type signatures to everything touched.
