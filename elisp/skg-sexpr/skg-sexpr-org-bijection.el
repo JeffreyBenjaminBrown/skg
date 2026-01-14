@@ -154,10 +154,11 @@ Assumes SEXP has already been validated."
 
 (defun sexp-to-org--make-headline (level text)
   "Create an org headline at LEVEL with TEXT.
-TEXT can be a symbol or string."
-  (let ((text-str (if (stringp text)
-                      text
-                    (symbol-name text))))
+TEXT can be a symbol, string, or number."
+  (let ((text-str (cond
+                   ((stringp text) text)
+                   ((numberp text) (number-to-string text))
+                   (t (symbol-name text)))))
     (concat (make-string level ?*) " " text-str)))
 
 (defun org-to-sexp--build-tree (headlines expected-level)
