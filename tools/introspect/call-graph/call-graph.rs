@@ -8,10 +8,11 @@
 /// tools/introspect/call-graph/output/function-name.org, for some function name. Each headline
 /// is a function name. The root headline is the same as the file's basename. Each
 /// headline calls each of its child headlines. The first appearance of a function
-/// lists what it calls; subsequent appearances merely indicate that it was already
-/// described earlier (thereby avoiding infinite regress). Only functions that are
-/// part of the library are listed; functions from other libraries ('std::collections',
-/// etc.) are not listed.
+/// lists what it calls; subsequent appearances are marked with a prefix:
+///   - "DUP" (duplicate): the function was already described earlier in the tree
+///   - "REC" (recursive): the function appears in its own ancestry (a cycle)
+/// Only functions that are part of the library are listed; functions from other
+/// libraries ('std::collections', etc.) are not listed.
 ///
 /// The program creates a simple .csv database, saved to tools/introspect/call-graph/db/,
 /// with two files: 'functions.csv' and 'calls.csv'. 'functions' has one row per
@@ -28,7 +29,8 @@
 /// includes everything, even the header comment, except blank lines. Some especially
 /// boring implementations are ignored -- namely "new", "default", "from", and "from_str".
 ///
-/// The program only analyzes server/. It ignores macros.
+/// The program only analyzes server/. It looks inside macro invocations
+/// (like println! or format!) to find function calls within their arguments.
 ///
 /// By default it starts from 'main'. But if the user supplies an alternative function
 /// name, it looks for a function of that name, and if there's only one, starts from
@@ -106,6 +108,19 @@ impl FunctionCollector {
       .count()
   }
 
+  /// Record a function definition from its span info.
+  fn record_function(&mut self, qualified_name: String, start_line: usize, end_line: usize) {
+    let loc = self.count_non_blank_lines(start_line, end_line);
+    self.functions.push(FunctionDef {
+      name: qualified_name.clone(),
+      file: self.file_path.clone(),
+      loc,
+      start_line,
+      end_line,
+    });
+    self.function_context.push(qualified_name);
+  }
+
   fn get_type_name(ty: &syn::Type) -> Option<String> {
     match ty {
       syn::Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),
@@ -121,18 +136,8 @@ impl<'ast> Visit<'ast> for FunctionCollector {
     let qualified_name = self.qualified_name(&raw_name);
     let start_line = node.span().start().line;
     let end_line = node.span().end().line;
-    let loc = self.count_non_blank_lines(start_line, end_line);
 
-    self.functions.push(FunctionDef {
-      name: qualified_name.clone(),
-      file: self.file_path.clone(),
-      loc,
-      start_line,
-      end_line,
-    });
-
-    // Push context before recursing into body (to find inner functions)
-    self.function_context.push(qualified_name);
+    self.record_function(qualified_name, start_line, end_line);
     syn::visit::visit_item_fn(self, node);
     self.function_context.pop();
   }
@@ -147,21 +152,10 @@ impl<'ast> Visit<'ast> for FunctionCollector {
           Some(ty) => format!("{}::{}", ty, method_name),
           None => method_name,
         };
-
         let start_line = method.span().start().line;
         let end_line = method.span().end().line;
-        let loc = self.count_non_blank_lines(start_line, end_line);
 
-        self.functions.push(FunctionDef {
-          name: qualified_name.clone(),
-          file: self.file_path.clone(),
-          loc,
-          start_line,
-          end_line,
-        });
-
-        // Push context and visit method body to find inner functions
-        self.function_context.push(qualified_name);
+        self.record_function(qualified_name, start_line, end_line);
         syn::visit::visit_impl_item_fn(self, method);
         self.function_context.pop();
       }
@@ -203,6 +197,23 @@ impl<'ast> Visit<'ast> for CallCollector {
       self.calls.push((method_name, line));
     }
     syn::visit::visit_expr_method_call(self, node);
+  }
+
+  /// Handle macro invocations like println!(...), format!(...), etc.
+  /// by attempting to parse their token streams for function calls.
+  fn visit_macro(&mut self, node: &'ast syn::Macro) {
+    // Try to parse the macro's tokens as comma-separated expressions.
+    // This handles cases like: println!("...", { some_fn_call() })
+    use syn::punctuated::Punctuated;
+    use syn::Token;
+    if let Ok(args) = node.parse_body_with(
+      Punctuated::<syn::Expr, Token![,]>::parse_terminated
+    ) {
+      for expr in args.iter() {
+        self.visit_expr(expr);
+      }
+    }
+    syn::visit::visit_macro(self, node);
   }
 }
 
@@ -273,6 +284,15 @@ fn is_std_method(name: &str) -> bool {
 // Parsing helpers
 //
 
+/// Deduplicate a vector, preserving order of first occurrences.
+fn dedup_preserving_order<T: Clone + Eq + std::hash::Hash>(items: Vec<T>) -> Vec<T> {
+  let mut seen = HashSet::new();
+  items
+    .into_iter()
+    .filter(|item| seen.insert(item.clone()))
+    .collect()
+}
+
 /// Returns calls in the order they appear in source (deduplicated by first occurrence).
 fn extract_calls_from_fn(source: &str, start_line: usize, end_line: usize) -> Vec<String> {
   let lines: Vec<&str> = source.lines().collect();
@@ -292,17 +312,7 @@ fn extract_calls_from_fn(source: &str, start_line: usize, end_line: usize) -> Ve
   let mut calls = collector.calls;
   calls.sort_by_key(|(_, line)| *line);
 
-  let mut seen = HashSet::new();
-  calls
-    .into_iter()
-    .filter_map(|(name, _)| {
-      if seen.insert(name.clone()) {
-        Some(name)
-      } else {
-        None
-      }
-    })
-    .collect()
+  dedup_preserving_order(calls.into_iter().map(|(name, _)| name).collect())
 }
 
 fn parse_file(path: &Path, base_path: &Path) -> Result<(Vec<FunctionDef>, String), String> {
@@ -442,27 +452,15 @@ impl CallGraph {
     }
 
     // Sort by call_order, then deduplicate preserving order
-    for (caller, callees_with_order) in calls_with_order {
-      let mut callees = callees_with_order;
-      callees.sort_by_key(|(_, order)| *order);
-      let mut seen = HashSet::new();
-      let deduped: Vec<String> = callees
-        .into_iter()
-        .filter_map(|(callee, _)| {
-          if seen.insert(callee.clone()) {
-            Some(callee)
-          } else {
-            None
-          }
-        })
-        .collect();
-      graph.calls.insert(caller, deduped);
+    for (caller, mut callees_with_order) in calls_with_order {
+      callees_with_order.sort_by_key(|(_, order)| *order);
+      let callees: Vec<String> = callees_with_order.into_iter().map(|(c, _)| c).collect();
+      graph.calls.insert(caller, dedup_preserving_order(callees));
     }
 
     // Deduplicate callers (order doesn't matter for callers)
     for callers in graph.callers.values_mut() {
-      let mut seen = HashSet::new();
-      callers.retain(|c| seen.insert(c.clone()));
+      *callers = dedup_preserving_order(std::mem::take(callers));
     }
 
     graph

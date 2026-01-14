@@ -1,12 +1,5 @@
 * u
 ** herald whether something has suubscriptions
-** emacs
-*** Rename elisp/skg-client.el -> skg-tcp.el
-*** a metadata viewer/editor
-*** relevant files
-    elisp/skg-sexpr/*.el
-    elisp/heralds-minor-mode.el
-      esp. heralds--transform-rules
 ** USE IT
 *** Collect user-facing functions to learn in one module
 **** rarely if ever consciously used
