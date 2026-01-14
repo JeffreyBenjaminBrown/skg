@@ -86,14 +86,6 @@ If the current line is not a headline, or has no metadata, no effect."
                          (line-end-position))
           (insert (skg-format-headline stars new-metadata-sexp title)))))))
 
-(defun skg-replace-current-line (new-content)
-  "Replace the current line with NEW-CONTENT.
-Moves to beginning of line, deletes the line, and inserts NEW-CONTENT."
-  (beginning-of-line)
-  (delete-region (line-beginning-position)
-                 (line-end-position))
-  (insert new-content))
-
 (defun skg-edit-metadata-at-point (edits)
   "Use EDITS to edit the metadata of the headline at point.
 If there is metadata, merges it with existing metadata.
@@ -124,6 +116,14 @@ If the current line is not a headline, no effect."
                                  (format "%S" edits))))
             (skg-replace-current-line
              (skg-format-headline stars metadata-sexp title)))))))))
+
+(defun skg-replace-current-line (new-content)
+  "Replace the current line with NEW-CONTENT.
+Moves to beginning of line, deletes the line, and inserts NEW-CONTENT."
+  (beginning-of-line)
+  (delete-region (line-beginning-position)
+                 (line-end-position))
+  (insert new-content))
 
 (defun skg-split-as-stars-metadata-title (headline-text)
   "Match HEADLINE-TEXT and extract stars, metadata sexp, and title.

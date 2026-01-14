@@ -11,7 +11,7 @@
 /.ssh/
 /bash/kill-servers.sh
 /call-trees
-/data/skg
+/data/*/skg
 /devel-handy/temp.org
 /rust-indent/
 /target
@@ -19,6 +19,7 @@
 /tests/tantivy/generated_aliases/
 Cargo.lock
 TAGS
+emacs-ugly-copy/
 temp-*
 temp/
 tools/introspect/call-graph/db/

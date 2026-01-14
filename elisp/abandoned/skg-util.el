@@ -47,6 +47,14 @@ Preserves folding state by using save-excursion and save-restriction."
            line-start  line-end
            'id  headline-text )) )) ))
 
+(defun skg-doc-get-property (node property-key)
+  "Get PROPERTY from NODE."
+  (when (and node (consp node))
+    (if (and (symbolp (car node))
+             (eq (car node) property-key))
+        (cdr node)
+      (cdr (assq property-key node)))))
+
 (defun skg-alist-diff (expected actual &optional path)
   "Compare two recursive alists and show differences, ignoring order."
   (let ((path (or path "root")) )
@@ -82,13 +90,5 @@ Preserves folding state by using save-excursion and save-restriction."
      ((not (equal expected actual))
       (message "Value mismatch at %s: expected %S, got %S"
                path expected actual)) )) )
-
-(defun skg-doc-get-property (node property-key)
-  "Get PROPERTY from NODE."
-  (when (and node (consp node))
-    (if (and (symbolp (car node))
-             (eq (car node) property-key))
-        (cdr node)
-      (cdr (assq property-key node)))))
 
 (provide 'skg-util)

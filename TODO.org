@@ -13,6 +13,8 @@
     skg-doc-disconnect
     skg-verify-connection
 *** to learn
+    skg-minor-mode
+    heralds-minor-mode
     skg-request-aliases-view
     skg-request-containerward-view
     skg-request-sourceward-view

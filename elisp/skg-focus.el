@@ -10,19 +10,6 @@
 (require 'skg-metadata)
 (require 'skg-sexpr)
 
-(defun skg-headline-has-focused-in-view-p ()
-  "Return t if the current headline has 'focused' in its metadata.
-Assumes point is at the beginning of a headline.
-Verifies the structure is (skg ... focused ...)."
-  (when (org-at-heading-p)
-    (let* ((headline-text (skg-get-current-headline-text))
-           (match-result (skg-split-as-stars-metadata-title headline-text)))
-      (when match-result
-        (let ((metadata-sexp (nth 1 match-result)))
-          (when (and metadata-sexp
-                     (not (string-empty-p metadata-sexp)))
-            (skg-sexp-subtree-p (read metadata-sexp) '(skg focused))))))))
-
 (defun skg-add-focused-marker ()
   "Add 'focused' to metadata of the current headline.
 If point is in a headline body, navigates to the owning headline.
@@ -69,5 +56,18 @@ If no focused headline is found, does nothing."
         (goto-char found-position)
         (skg-edit-metadata-at-point
          '(skg (DELETE focused)))))))
+
+(defun skg-headline-has-focused-in-view-p ()
+  "Return t if the current headline has 'focused' in its metadata.
+Assumes point is at the beginning of a headline.
+Verifies the structure is (skg ... focused ...)."
+  (when (org-at-heading-p)
+    (let* ((headline-text (skg-get-current-headline-text))
+           (match-result (skg-split-as-stars-metadata-title headline-text)))
+      (when match-result
+        (let ((metadata-sexp (nth 1 match-result)))
+          (when (and metadata-sexp
+                     (not (string-empty-p metadata-sexp)))
+            (skg-sexp-subtree-p (read metadata-sexp) '(skg focused))))))))
 
 (provide 'skg-focus)

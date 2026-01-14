@@ -53,6 +53,21 @@ while preserving all other text properties."
     (unless has-id
       (message "Pasted text without ID property."))))
 
+(define-minor-mode skg-minor-mode
+  "Toggle SKG minor mode.
+When enabled, copy|kill|paste operations handle ID properties specially."
+  :init-value nil
+  :lighter " SKG"
+  :keymap skg-minor-mode-map
+  :group 'org
+  (if skg-minor-mode
+      (progn
+        (skg-enable-all-advice)
+        (message "SKG minor mode enabled"))
+    (progn
+      (skg-disable-all-advice)
+      (message "SKG minor mode disabled"))))
+
 ;; Functions to add|remove all advice
 (defun skg-enable-all-advice ()
   ;; Modify kill commands
@@ -90,20 +105,5 @@ while preserving all other text properties."
   (advice-remove 'yank #'skg-advice-for-paste)
   (advice-remove 'yank-pop #'skg-advice-for-paste)
   (advice-remove 'org-yank #'skg-advice-for-paste))
-
-(define-minor-mode skg-minor-mode
-  "Toggle SKG minor mode.
-When enabled, copy|kill|paste operations handle ID properties specially."
-  :init-value nil
-  :lighter " SKG"
-  :keymap skg-minor-mode-map
-  :group 'org
-  (if skg-minor-mode
-      (progn
-        (skg-enable-all-advice)
-        (message "SKG minor mode enabled"))
-    (progn
-      (skg-disable-all-advice)
-      (message "SKG minor mode disabled"))))
 
 (provide 'skg-minor-mode)

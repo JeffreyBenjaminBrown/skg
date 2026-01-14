@@ -98,6 +98,26 @@ Such singleton leaf-lists can be omitted from the rule to no effect."
       '()
     (skg--transform-sexp-flat-from object rules nil)))
 
+(defun skg--tokens->string
+  (tokens
+    current-color)
+  "Convert TOKENS to a propertized string with CURRENT-COLOR.
+Returns a string with text properties for color rendering."
+  (let
+      ((str
+         (mapconcat #'skg--token->string tokens ":")))
+    (when current-color
+      (put-text-property 0 (length str) 'skg-color current-color str))
+    str))
+
+(defun skg--token->string
+  (token)
+  "Convert TOKEN to string representation."
+  (cond
+    ((symbolp token) (symbol-name token))
+    ((stringp token) token)
+    (t (format "%s" token))))
+
 (defun skg--color-keyword-p
   (sym)
   "Return t if SYM is a color keyword (RED, GREEN, or BLUE)."
@@ -277,25 +297,5 @@ Such singleton leaf-lists can be omitted from the rule to no effect."
       (not (listp element))
       (equal element label))
     collect element))
-
-(defun skg--tokens->string
-  (tokens
-    current-color)
-  "Convert TOKENS to a propertized string with CURRENT-COLOR.
-Returns a string with text properties for color rendering."
-  (let
-      ((str
-         (mapconcat #'skg--token->string tokens ":")))
-    (when current-color
-      (put-text-property 0 (length str) 'skg-color current-color str))
-    str))
-
-(defun skg--token->string
-  (token)
-  "Convert TOKEN to string representation."
-  (cond
-    ((symbolp token) (symbol-name token))
-    ((stringp token) token)
-    (t (format "%s" token))))
 
 (provide 'skg-lens)

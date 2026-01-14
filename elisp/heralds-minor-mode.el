@@ -43,22 +43,6 @@
         (definitiveView "req:definitive"))))
   "Rules to convert metadata sexps into herald tokens.")
 
-(defun heralds--read-metadata (metadata-sexp)
-  "Read METADATA-SEXP string into a Lisp object.
-Returns nil if parsing fails."
-  (condition-case nil
-      (car (read-from-string metadata-sexp))
-    (error nil)))
-
-(defun heralds--color-to-face
-  (color-keyword)
-  "Map COLOR-KEYWORD (RED, GREEN, BLUE) to a face."
-  (cond
-    ((eq color-keyword 'RED) 'heralds-red-face)
-    ((eq color-keyword 'GREEN) 'heralds-green-face)
-    ((eq color-keyword 'BLUE) 'heralds-blue-face)
-    (t nil)))
-
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to display string.
 Tokens are propertized strings created by skg-transform-sexp-flat.
@@ -93,6 +77,15 @@ Hide ID if there are other tokens present."
       (mapconcat #'identity
                  (if non-id-tokens non-id-tokens token-strings)
                  " "))))
+
+(defun heralds--color-to-face
+  (color-keyword)
+  "Map COLOR-KEYWORD (RED, GREEN, BLUE) to a face."
+  (cond
+    ((eq color-keyword 'RED) 'heralds-red-face)
+    ((eq color-keyword 'GREEN) 'heralds-green-face)
+    ((eq color-keyword 'BLUE) 'heralds-blue-face)
+    (t nil)))
 
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
@@ -186,6 +179,25 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
             (push ov keep)))))
     (setq heralds-overlays (nreverse keep))))
 
+(defun heralds-from-metadata
+    (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
+  "Returns a space-separated string of herald markers.
+METADATA-SEXP should be the complete (skg ...) s-expression."
+  (let* ((sexp (heralds--read-metadata metadata-sexp))
+         (tokens (when (and (listp sexp)
+                            (eq (car sexp) 'skg))
+                   (skg-transform-sexp-flat
+                    sexp heralds--transform-rules)))
+         (raw-text (heralds--tokens->text tokens)))
+    (heralds--post-process-text raw-text)))
+
+(defun heralds--read-metadata (metadata-sexp)
+  "Read METADATA-SEXP string into a Lisp object.
+Returns nil if parsing fails."
+  (condition-case nil
+      (car (read-from-string metadata-sexp))
+    (error nil)))
+
 (defun heralds--post-process-text
     (text)
   "Some post-processing rules for heralds:
@@ -215,18 +227,6 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
           (concat (substring joined 0 second-brace-pos)
                   (substring joined (+ second-brace-pos 2)))
         joined))))
-
-(defun heralds-from-metadata
-    (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
-  "Returns a space-separated string of herald markers.
-METADATA-SEXP should be the complete (skg ...) s-expression."
-  (let* ((sexp (heralds--read-metadata metadata-sexp))
-         (tokens (when (and (listp sexp)
-                            (eq (car sexp) 'skg))
-                   (skg-transform-sexp-flat
-                    sexp heralds--transform-rules)))
-         (raw-text (heralds--tokens->text tokens)))
-    (heralds--post-process-text raw-text)))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."

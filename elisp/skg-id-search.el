@@ -53,31 +53,6 @@ If point is not on a link, print a message and do nothing."
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
-(defun skg--metadata-sexp-contains-id-p
-    (sexp)
-  "Return t if SEXP (a list starting with 'skg) contains an (id ...) pair."
-  (and (listp sexp)
-       (seq-some (lambda (elem)
-                   (and (listp elem)
-                        (eq (car elem) 'id) ))
-                 sexp) ))
-
-(defun skg--find-metadata-start-on-line ()
-  "If current line has metadata with id, return position of its opening paren.
-Otherwise return nil."
-  ;; todo ? speed : Is verifying that it has an ID over-cautious?
-  (save-excursion
-    (beginning-of-line)
-    (when (looking-at "^\\*+ (skg")
-      (let* ( ( skg-start (- (match-end 0) 4) )
-              ( after-bullet (buffer-substring-no-properties
-                              skg-start (line-end-position) )))
-        (condition-case nil
-            (let (( sexp (read after-bullet) ))
-              (when (skg--metadata-sexp-contains-id-p sexp)
-                skg-start ))
-          (error nil) )) )))
-
 (defun skg-next-id ()
   "Move point to the next ID occurrence.
 An ID can appear in metadata like (skg (id X) ...) or in a link like [[id:X][label]].
@@ -145,16 +120,40 @@ For links, point moves to the opening bracket of [[id:..."
      ( prev-metadata
        (goto-char prev-metadata) )) ))
 
-(defun skg--extract-id-from-sexp
-    (sexp)
-  "Extract the id value from SEXP, a list like (skg (id X) ...).
-Returns the id as a string, or nil if not found."
-  (let (( id-pair (seq-find (lambda (elem)
-                              (and (listp elem)
-                                   (eq (car elem) 'id) ))
-                            sexp) ))
-    (when id-pair
-      (format "%s" (cadr id-pair)) )))
+(defun skg--find-metadata-start-on-line ()
+  "If current line has metadata with id, return position of its opening paren.
+Otherwise return nil."
+  ;; todo ? speed : Is verifying that it has an ID over-cautious?
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "^\\*+ (skg")
+      (let* ( ( skg-start (- (match-end 0) 4) )
+              ( after-bullet (buffer-substring-no-properties
+                              skg-start (line-end-position) )))
+        (condition-case nil
+            (let (( sexp (read after-bullet) ))
+              (when (skg--metadata-sexp-contains-id-p sexp)
+                skg-start ))
+          (error nil) )) )))
+
+(defun skg-push-id-to-stack ()
+  "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
+For metadata, id comes from (id X) and label is the headline title.
+For links, id and label come from [[id:X][label]].
+Does nothing if point is not within metadata or a link."
+  (interactive)
+  (let ( ( md-result (skg--point-in-metadata-p) )
+         ( result nil ))
+    (if md-result
+        (setq result md-result)
+      (setq result (skg--point-in-link-p)) )
+    (if result
+        (let ( ( id (car result) )
+               ( label (cdr result) ))
+          (push (list id label) skg-id-stack)
+          (message "pushed (%s, %s) to skg-id-stack"
+                   (skg--truncate-id id) label) )
+      (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
@@ -178,6 +177,26 @@ Returns the id as a string, or nil if not found."
                                    skg-end (line-end-position)) )))
                     (cons id title) )) )
             (error nil) )) )) ))
+
+(defun skg--metadata-sexp-contains-id-p
+    (sexp)
+  "Return t if SEXP (a list starting with 'skg) contains an (id ...) pair."
+  (and (listp sexp)
+       (seq-some (lambda (elem)
+                   (and (listp elem)
+                        (eq (car elem) 'id) ))
+                 sexp) ))
+
+(defun skg--extract-id-from-sexp
+    (sexp)
+  "Extract the id value from SEXP, a list like (skg (id X) ...).
+Returns the id as a string, or nil if not found."
+  (let (( id-pair (seq-find (lambda (elem)
+                              (and (listp elem)
+                                   (eq (car elem) 'id) ))
+                            sexp) ))
+    (when id-pair
+      (format "%s" (cadr id-pair)) )))
 
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."
@@ -203,24 +222,32 @@ Returns the id as a string, or nil if not found."
       (concat (substring id 0 6) "...")
     id ))
 
-(defun skg-push-id-to-stack ()
-  "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
-For metadata, id comes from (id X) and label is the headline title.
-For links, id and label come from [[id:X][label]].
-Does nothing if point is not within metadata or a link."
-  (interactive)
-  (let ( ( md-result (skg--point-in-metadata-p) )
-         ( result nil ))
-    (if md-result
-        (setq result md-result)
-      (setq result (skg--point-in-link-p)) )
-    (if result
-        (let ( ( id (car result) )
-               ( label (cdr result) ))
-          (push (list id label) skg-id-stack)
-          (message "pushed (%s, %s) to skg-id-stack"
-                   (skg--truncate-id id) label) )
-      (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
+(defun skg-replace-id-stack-from-buffer ()
+  "Replace `skg-id-stack' with contents parsed from current buffer.
+Uses `skg-validate-id-stack-buffer' to parse and validate.
+On success, sets `skg-id-stack' to the parsed result.
+On failure, prints error message and leaves `skg-id-stack' unchanged."
+  (let (( validation-result (skg-validate-id-stack-buffer) ))
+    (if (eq (car validation-result) 'success)
+        (setq skg-id-stack (cadr validation-result))
+      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
+
+(defun skg--save-id-stack-buffer ()
+  "Save handler for the id-stack buffer.
+Validates and replaces `skg-id-stack' with buffer contents.
+Rather than make this function 'interactive'
+(which would interfere with tab-completing
+'skg-save' to become 'skg-request-save-buffer'),
+it is bound to C-x C-s (which normally calls 'save-buffer')
+by 'skg-id-stack-mode'."
+  (let (( validation-result (skg-validate-id-stack-buffer) ))
+    (if (eq (car validation-result) 'success)
+        (progn
+          (setq skg-id-stack (cadr validation-result))
+          (set-buffer-modified-p nil)
+          (message "ID stack updated (%d items)"
+                   (length skg-id-stack)) )
+      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
 
 (defun skg-validate-id-stack-buffer ()
   "Validate current buffer as an id-stack buffer and return the stack.
@@ -278,56 +305,11 @@ Returns (error MESSAGE) if validation fails."
         ;; nreverse so first headline in buffer = head of stack
         (list 'success (nreverse result)) )) ))
 
-(defun skg-replace-id-stack-from-buffer ()
-  "Replace `skg-id-stack' with contents parsed from current buffer.
-Uses `skg-validate-id-stack-buffer' to parse and validate.
-On success, sets `skg-id-stack' to the parsed result.
-On failure, prints error message and leaves `skg-id-stack' unchanged."
-  (let (( validation-result (skg-validate-id-stack-buffer) ))
-    (if (eq (car validation-result) 'success)
-        (setq skg-id-stack (cadr validation-result))
-      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
-
-(defun skg--format-id-stack-as-org ()
-  "Format `skg-id-stack' as org-mode text.
-Each (id label) pair becomes a headline with label as title and id as body.
-Head of stack (most recently pushed) appears at top of buffer."
-  (mapconcat
-   (lambda (entry)
-     (let (( id (car entry) )
-           ( label (cadr entry) ))
-       (format "* %s\n%s" label id) ))
-   skg-id-stack
-   "\n" ))
-
-(defun skg--save-id-stack-buffer ()
-  "Save handler for the id-stack buffer.
-Validates and replaces `skg-id-stack' with buffer contents.
-Rather than make this function 'interactive'
-(which would interfere with tab-completing
-'skg-save' to become 'skg-request-save-buffer'),
-it is bound to C-x C-s (which normally calls 'save-buffer')
-by 'skg-id-stack-mode'."
-  (let (( validation-result (skg-validate-id-stack-buffer) ))
-    (if (eq (car validation-result) 'success)
-        (progn
-          (setq skg-id-stack (cadr validation-result))
-          (set-buffer-modified-p nil)
-          (message "ID stack updated (%d items)"
-                   (length skg-id-stack)) )
-      (message "Invalid ID buffer: %s" (cadr validation-result)) )))
-
 (defvar skg-id-stack-mode-map
   (let (( map (make-sparse-keymap) ))
     (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer)
     map )
   "Keymap for `skg-id-stack-mode'.")
-
-(define-minor-mode skg-id-stack-mode
-  "Minor mode for editing the skg ID stack.
-Overrides save to update `skg-id-stack' instead of writing to a file."
-  :lighter " ID-Stack"
-  :keymap skg-id-stack-mode-map)
 
 (defun skg-edit-id-stack ()
   "Open a buffer to edit `skg-id-stack'.
@@ -345,5 +327,23 @@ without writing to disk."
     (skg-id-stack-mode 1)
     (set-buffer-modified-p nil)
     (message "Edit ID stack. C-x C-s to save changes.") ))
+
+(defun skg--format-id-stack-as-org ()
+  "Format `skg-id-stack' as org-mode text.
+Each (id label) pair becomes a headline with label as title and id as body.
+Head of stack (most recently pushed) appears at top of buffer."
+  (mapconcat
+   (lambda (entry)
+     (let (( id (car entry) )
+           ( label (cadr entry) ))
+       (format "* %s\n%s" label id) ))
+   skg-id-stack
+   "\n" ))
+
+(define-minor-mode skg-id-stack-mode
+  "Minor mode for editing the skg ID stack.
+Overrides save to update `skg-id-stack' instead of writing to a file."
+  :lighter " ID-Stack"
+  :keymap skg-id-stack-mode-map)
 
 (provide 'skg-id-search)
