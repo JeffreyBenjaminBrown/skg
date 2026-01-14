@@ -6,8 +6,6 @@
 #     SKG_CONFIG=another_skg_config ./bash/run-servers.sh
 #   Override, my usual:
 #     SKG_CONFIG=data/subscribe/skgconfig.toml ./bash/run-servers.sh
-
-# Config file path (override with: SKG_CONFIG=data/subscribe/skgconfig.toml ./bash/run-servers.sh)
 SKG_CONFIG="${SKG_CONFIG:-data/default/skgconfig.toml}"
 
 # USAGE:

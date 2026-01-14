@@ -40,7 +40,7 @@ If point is not on a link, print a message and do nothing."
                    ( re-search-forward link-regex line-end t ))
         (let ( ( match-start ( match-beginning 0 ))
                ( match-end ( match-end 0 ))
-               ( id ( match-string 1 )) )
+               ( id ( match-string-no-properties 1 )) )
           (when ( and ;; Check if point is within this link
                   ( >= pos match-start )
                   ( <= pos match-end ))

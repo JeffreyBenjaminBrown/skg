@@ -12,10 +12,13 @@
   "Request title matches from the Rust server."
   (interactive "sSearch terms: ")
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
+         (clean-terms (if (stringp search-terms)
+                          (substring-no-properties search-terms)
+                        search-terms))
          (request-s-exp
           (concat (prin1-to-string
                    `((request . "title matches")
-                     (terms . ,search-terms)))
+                     (terms . ,clean-terms)))
                   "\n")))
     (setq skg-doc--response-handler
           ;; Prepare for response.
