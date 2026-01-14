@@ -36,7 +36,8 @@
 *** some shortcuts
 **** copy ID
 **** make link
-** Everything I'm worried about: Just read it, over and over. More natural ways will become visible.
+** Read the Rust repeatedly.
+   More natural ways will become visible.
 * s, by urgency
 ** Any place I can separate concerns by re-traversing the tree, do it.
 ** clarify completion

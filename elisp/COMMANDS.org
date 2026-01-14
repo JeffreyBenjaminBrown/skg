@@ -1,7 +1,3 @@
-* TODO
-** commands that aren't really user-facing
-*** skg-request-single-root-content-view-from-id
-*** skg-request-title-matches
 * user-facing skg commands
 ** whole buffer requests
 *** skg-open-empty-content-view.el

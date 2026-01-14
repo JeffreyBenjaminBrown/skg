@@ -11,18 +11,16 @@
 
 (defconst heralds--transform-rules
   '(skg
-    ;; Top-level focused/folded (ignored in herald)
     (focused)
     (folded)
-    ;; Scaffold kinds at top level
     (GREEN aliasCol "aliases")
     (GREEN alias "alias")
     (GREEN hiddenInSubscribeeCol "hiddenIn")
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
-    ;; TrueNode wrapped in (node ...)
-    (node
-      (id (BLUE ANY "ID"))
+    (BLUE node
+      (ANY "◌")
+      (id (ANY "⦿"))
       (source) ;; ignored
       (RED parentIgnores "!{")
       (GREEN indefinitive "indef")
@@ -201,24 +199,19 @@ Returns nil if parsing fails."
 (defun heralds--post-process-text
     (text)
   "Some post-processing rules for heralds:
-- Remove ID if other tokens are present
+- Remove ◌ if ⦿ is present (show filled circle when id exists)
 - Remove duplicate '!{' symbol if it appears twice"
   (when text
     (let* ((parts (split-string text " " t))
-           ;; Remove ID if other tokens are present
-           (processed-parts
-            (if (and (> (length parts) 1)
-                     (cl-some (lambda (part)
-                                (string=
-                                 (substring-no-properties part)
-                                 "ID"))
-                              parts))
+           (parts ;; Remove ◌ if ⦿ is present
+            (if (cl-some (lambda (part)
+                           (string= (substring-no-properties part) "⦿"))
+                         parts)
                 (cl-remove-if (lambda (part)
-                                (string=
-                                 (substring-no-properties part) "ID"))
+                                (string= (substring-no-properties part) "◌"))
                               parts)
               parts))
-           (joined (mapconcat #'identity processed-parts " "))
+           (joined (mapconcat #'identity parts " "))
            (first-brace-pos (string-match "!{" joined))
            (second-brace-pos
             (when first-brace-pos
