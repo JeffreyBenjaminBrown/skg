@@ -15,10 +15,13 @@ Installs a length-prefixed response handler.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
+         (clean-id (if (stringp node-id)
+                       (substring-no-properties node-id)
+                     node-id))
          (request-s-exp
           (concat (prin1-to-string
                    `((request . "single root content view")
-                     (id . ,node-id)))
+                     (id . ,clean-id)))
                   "\n")))
     (setq ;; Prepare LP state and handler
      skg-lp--buf               (unibyte-string) ;; empty string
