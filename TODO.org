@@ -1,17 +1,64 @@
-* as if anyone else is reading this
+* emacs
+** Rename elisp/skg-client.el -> skg-tcp.el
+** a metadata viewer/editor
+   Transform rules, maybe the only mirror in elisp of orgnode.rs,
+   are defined in
+     heralds--transform-rules
+   in the file
+     elisp/heralds-minor-mode.el
+* USE IT
+** Collect user-facing functions to learn in one module
+*** rarely if ever consciously used
+    skg-open-empty-content-view.el
+    skg-doc-disconnect
+    skg-verify-connection
+*** to learn
+    skg-request-aliases-view
+    skg-request-containerward-view
+    skg-request-sourceward-view
+    skg-visit-link
+    skg-next-id
+    skg-previous-id
+    skg-push-id-to-stack
+    skg-validate-id-stack-buffer
+    skg-replace-id-stack-from-buffer
+    skg-edit-id-stack
+    skg-request-title-matches
+    skg-set-metadata-indefinitive
+*** learned
+    skg-request-single-root-content-view-from-id
+    skg-request-save-buffer
+*** not skg-specific
+    org-ancestry
+* bug in tools/introspect/call-graph/call-graph.rs
+  e.g. update_graph_minus_merges should have three children,
+    but only has two
+  -- or at least, that's true in in
+    tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
+* Develop a cleanup routine?
+** for local changes
+*** Add type signatures to everything touched.
+*** Update comments for anything that was touched.
+    Including the header comment for any file, if needed.
+** for the whole codebase
+*** Add type signatures.
+*** Update list of user-facing functions in elisp/*.el.
+* if anyone else is reading this
 ** NOTE TO READER: Most plans are not here but online.
    e.g. here:
    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
    This document is mostly things I considered highest-priority.
-* TODO out of sync with remote
-* integration-test that skg-visit-link works
-  That was great! Let's integration-test skg-visit-link, to keep that fixed. See tests/integration/ for what integration tests look like. each folder therein is a separate integration test. (Be sure to include the new one in 'tests/integration/run-all-tests.sh' -- actually better yet, just make that script traverse all the subfolders there, so we don't need to remember to update it when adding another integration test.)
-  The integration test should be:
-  The skg data folder should begin with two .skg files with IDs 'src' and 'dest'. The title of dest is "Dest need not be aware of the link." The title of src is "Src has a [[id:dest][link to dest]]." Neither node has any content or other relationships -- there's just the link, a relationship implicit from the text of one of them. (The server understands it.)
-  In Emacs we load skg-mode and do a title search for the word "has". We should now be in the title search buffer (entitled "skg-title-search"). Unfold the headlin (whatever TAB does in org-mode) and put the cursor on the first character of the substring '][' on the second line.
-  Run skg-visit-link. Now we should be at a single-root content view of src, and in the headline there should be a link. Again goto the start of the '][' substring, and skg-visit-link.
-  We should now be at a single-root content view of the dest.
-* USE IT
+* extension strategy for subscriptions
+** dataflow incrementalism
+*** the idea
+    Start from a new kind of action to receive from the client.
+    Move it one phase along update_from_and_rerender_buffer.
+    Provide a test that it gets there.
+    Keep doing that.
+*** a benefit
+    It reduces the amount of context one needs to stay conscious of at each step.
+*** a potential cost
+    Might reduce the probability of seeing a global simplification.
 * All I need working in order to use it.
 ** safe save
 ** some views I think work
@@ -20,6 +67,9 @@
 *** backward content
 *** backward links
 *** TODO forward links
+** some shortcuts
+*** copy ID
+*** make link
 * I don't mind letting Claude know my .emacs config.
 * Everything I'm worried about: Just read it, over and over. More natural ways will become visible.
 * s, by urgency
