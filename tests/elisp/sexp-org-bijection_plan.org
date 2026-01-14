@@ -1,0 +1,79 @@
+* goal
+Code for transforming a sexp into org-text,
+and vice-versa, losslessly.
+It only needs to work for
+  a narrow class of especially convenient sexps that I call
+  'atom-headed paren-terse list sexps',
+  and a narrow class of org expressions anyone might call
+  'bodyless org text'.
+The two functions should be called
+  sexp-to-org
+  org-to-sexp
+org-to-sexp should discard all body text before transforming.
+  (So it's not really a bijection.)
+  It should refuse if the passage contains multiple roots,
+  or if there is a jump where the first child of a headline is indented more than one level beyond its parent, as in:
+    * a
+    *** b
+  or
+    * a
+    ** b ;; fine
+    **** d ;; not fine
+sexp-to-org should refuse unless its input is all of
+  atom-headed, paren-terse and 'list' (i.e. not a bare atom).
+* "atom-headedness"
+  A sexp is atom-headed if it,
+  and every sublist contained within it at any level,
+  has a bare atom as its first member.
+  So (a (a (a (a)))) qualifies,
+  as does (a b (a b (a b)) a b),
+  but ((a)) does not qualify,
+  nor does ((a) b),
+  nor (a ((b) a)).
+* "paren-terseness"
+  No proper sub-sexp of a paren-terse sexp
+    puts parens around a single atom.
+** examples that are paren-terse
+   (a)
+   (a b)
+   (a (b c) d)
+   (a (b (c d)) e (f g))
+** counter-examples
+   ;; All but one of these are also disallowed by the atom-headedness requirement.
+   ((a))
+   ((a b))
+   (a (b) c) ;; This one *is* atom-headed, but the (b) violates paren-terseness.
+   (a ((a b)))
+* a note on formatting
+  The org-text passages described in this document
+  are indented to the left. That's just for my convenience.
+  In fact there should be no whitespace to the left of the bullets
+  in those passages, consistent with the org format.
+  To translate, find the minimum whitespace margin across all lines
+  of a passage, and subtract that amount of whitespace from every line.
+* transformations
+  These should, I believe, all be bijective.
+** the simplest case : (a)
+*** this sexp
+    (a)
+*** should correspond to this org-text
+    * a
+** (a b) should correspond to this org-text
+    * a
+    ** b
+** ((a) b) is invalid.
+   It is not atom-headed.
+** (a (b a)) should correspond to this org-text
+   * a
+   ** b
+   *** a
+** (a (b a) c) should correspond to this org-text
+   * a
+   ** b
+   *** a
+   ** c
+** Whitespace in symbols and headlines is permissible.
+*** (a |b c| d) would map to
+    * a
+    ** b c
+    ** d

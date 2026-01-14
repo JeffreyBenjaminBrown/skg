@@ -1,78 +1,79 @@
-* emacs
-** Rename elisp/skg-client.el -> skg-tcp.el
-** a metadata viewer/editor
-** relevant files
-   elisp/skg-sexpr/*.el
-   elisp/heralds-minor-mode.el
-     esp. heralds--transform-rules
-* USE IT
-** Collect user-facing functions to learn in one module
-*** rarely if ever consciously used
-    skg-open-empty-content-view.el
-    skg-doc-disconnect
-    skg-verify-connection
-*** to learn
-    skg-minor-mode
-    heralds-minor-mode
-    skg-request-aliases-view
-    skg-request-containerward-view
-    skg-request-sourceward-view
-    skg-visit-link
-    skg-next-id
-    skg-previous-id
-    skg-push-id-to-stack
-    skg-validate-id-stack-buffer
-    skg-replace-id-stack-from-buffer
-    skg-edit-id-stack
-    skg-request-title-matches
-    skg-set-metadata-indefinitive
-*** learned
-    skg-request-single-root-content-view-from-id
-    skg-request-save-buffer
-*** not skg-specific
-    org-ancestry
-* bug in tools/introspect/call-graph/call-graph.rs
-  e.g. update_graph_minus_merges should have three children,
-    but only has two
-  -- or at least, that's true in in
-    tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
-* Develop a cleanup routine?
-** for local changes
-*** Add type signatures to everything touched.
-*** Update comments for anything that was touched.
-    Including the header comment for any file, if needed.
-** for the whole codebase
-*** Add type signatures.
-*** Update list of user-facing functions in elisp/*.el.
-* if anyone else is reading this
-** NOTE TO READER: Most plans are not here but online.
-   e.g. here:
-   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
-   This document is mostly things I considered highest-priority.
-* extension strategy for subscriptions
-** dataflow incrementalism
-*** the idea
-    Start from a new kind of action to receive from the client.
-    Move it one phase along update_from_and_rerender_buffer.
-    Provide a test that it gets there.
-    Keep doing that.
-*** a benefit
-    It reduces the amount of context one needs to stay conscious of at each step.
-*** a potential cost
-    Might reduce the probability of seeing a global simplification.
-* All I need working in order to use it.
-** safe save
-** some views I think work
-*** (forward) content
-*** herald # of parents
-*** backward content
-*** backward links
-*** TODO forward links
-** some shortcuts
-*** copy ID
-*** make link
-* I don't mind letting Claude know my .emacs config.
-* Everything I'm worried about: Just read it, over and over. More natural ways will become visible.
+* u
+** herald whether something has suubscriptions
+** emacs
+*** Rename elisp/skg-client.el -> skg-tcp.el
+*** a metadata viewer/editor
+*** relevant files
+    elisp/skg-sexpr/*.el
+    elisp/heralds-minor-mode.el
+      esp. heralds--transform-rules
+** USE IT
+*** Collect user-facing functions to learn in one module
+**** rarely if ever consciously used
+     skg-open-empty-content-view.el
+     skg-doc-disconnect
+     skg-verify-connection
+**** to learn
+     skg-minor-mode
+     heralds-minor-mode
+     skg-request-aliases-view
+     skg-request-containerward-view
+     skg-request-sourceward-view
+     skg-visit-link
+     skg-next-id
+     skg-previous-id
+     skg-push-id-to-stack
+     skg-validate-id-stack-buffer
+     skg-replace-id-stack-from-buffer
+     skg-edit-id-stack
+     skg-request-title-matches
+     skg-set-metadata-indefinitive
+**** learned
+     skg-request-single-root-content-view-from-id
+     skg-request-save-buffer
+**** not skg-specific
+     org-ancestry
+** bug in tools/introspect/call-graph/call-graph.rs
+   e.g. update_graph_minus_merges should have three children,
+     but only has two
+   -- or at least, that's true in in
+     tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
+** Develop a cleanup routine?
+*** for local changes
+**** Add type signatures to everything touched.
+**** Update comments for anything that was touched.
+     Including the header comment for any file, if needed.
+*** for the whole codebase
+**** Add type signatures.
+**** Update list of user-facing functions in elisp/*.el.
+** if anyone else is reading this
+*** NOTE TO READER: Most plans are not here but online.
+    e.g. here:
+    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+    This document is mostly things I considered highest-priority.
+** extension strategy for subscriptions
+*** dataflow incrementalism
+**** the idea
+     Start from a new kind of action to receive from the client.
+     Move it one phase along update_from_and_rerender_buffer.
+     Provide a test that it gets there.
+     Keep doing that.
+**** a benefit
+     It reduces the amount of context one needs to stay conscious of at each step.
+**** a potential cost
+     Might reduce the probability of seeing a global simplification.
+** All I need working in order to use it.
+*** safe save
+*** some views I think work
+**** (forward) content
+**** herald # of parents
+**** backward content
+**** backward links
+**** TODO forward links
+*** some shortcuts
+**** copy ID
+**** make link
+** Everything I'm worried about: Just read it, over and over. More natural ways will become visible.
 * s, by urgency
 ** Any place I can separate concerns by re-traversing the tree, do it.
 ** clarify completion

@@ -3,8 +3,8 @@
 ;;; PURPOSE: Edit s-expressions with 'DELETE', 'REPLACE', 'ENSURE',
 ;;; and (the default, so no keyword) merge operations.
 ;;;
-;;; USER-FACING FUNCTIONS
-;;;   (none)
+;;; User-facing functions:
+;;;   NONE
 
 (defun skg-edit-nested-sexp (target instructions)
   "Edit TARGET s-expression according to INSTRUCTIONS.
