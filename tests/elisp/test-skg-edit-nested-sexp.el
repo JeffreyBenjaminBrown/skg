@@ -10,7 +10,7 @@
                    (file-name-directory load-file-name)))
 
 (require 'ert)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
 
 (ert-deftest test-edit-sexp-delete-from-top ()
   (let ((target '(skg a b c d))

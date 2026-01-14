@@ -10,7 +10,7 @@
                    (file-name-directory load-file-name)))
 
 (require 'ert)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
 
 (ert-deftest test-sexp-subtree-simple-match ()
   "Simple subtree match: (a b c) contains (a)."

@@ -6,7 +6,7 @@
 ;;;   skg-set-metadata-indefinitive
 
 (require 'org)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
 
 (defun skg-set-metadata-indefinitive ()
   "Mark the headline at point as indefinitive.

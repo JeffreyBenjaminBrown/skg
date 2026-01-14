@@ -1,12 +1,16 @@
-;;; test-skg-sexpr-edit.el --- Tests for skg-sexpr-edit
+;;; test-skg-sexpr-search.el --- Tests for skg-sexpr-search
 
 (add-to-list
  'load-path
  (expand-file-name "../../elisp"
                    (file-name-directory load-file-name)))
+(add-to-list
+ 'load-path
+ (expand-file-name "../../elisp/skg-sexpr"
+                   (file-name-directory load-file-name)))
 
 (require 'ert)
-(require 'skg-sexpr-edit)
+(require 'skg-sexpr-search)
 
 ;;
 ;; Test text 1: ** (a (b c) d) hello
@@ -122,4 +126,4 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
             (ert-fail (format "Should have errored at position %d, got: %S"
                               pos result))))))))
 
-(provide 'test-skg-sexpr-edit)
+(provide 'test-skg-sexpr-search)

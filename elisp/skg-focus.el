@@ -8,7 +8,7 @@
 
 (require 'org)
 (require 'skg-metadata)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
 
 (defun skg-add-focused-marker ()
   "Add 'focused' to metadata of the current headline.

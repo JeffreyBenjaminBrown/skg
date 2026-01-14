@@ -16,7 +16,7 @@
 
 (require 'org)
 (require 'skg-metadata)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
 
 (defun skg-fold-marked-headlines ()
   "PURPOSE:

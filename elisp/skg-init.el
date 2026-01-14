@@ -52,4 +52,4 @@
 (require 'skg-buffer)
 (require 'skg-request-views)
 (require 'skg-request-title-matches)
-(require 'skg-sexpr-util)
+(require 'skg-sexpr-search)
