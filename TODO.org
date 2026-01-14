@@ -1,8 +1,9 @@
-* internalized
+* as if anyone else is reading this
 ** NOTE TO READER: Most plans are not here but online.
    e.g. here:
    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
    This document is mostly things I considered highest-priority.
+* TODO out of sync with remote
 * integration-test that skg-visit-link works
   That was great! Let's integration-test skg-visit-link, to keep that fixed. See tests/integration/ for what integration tests look like. each folder therein is a separate integration test. (Be sure to include the new one in 'tests/integration/run-all-tests.sh' -- actually better yet, just make that script traverse all the subfolders there, so we don't need to remember to update it when adding another integration test.)
   The integration test should be:

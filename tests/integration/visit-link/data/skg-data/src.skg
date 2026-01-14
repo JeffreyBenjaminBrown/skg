@@ -1,0 +1,4 @@
+title: "Src has a [[id:dest][link to dest]]."
+ids:
+  - "src"
+contains: []

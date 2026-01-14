@@ -27,19 +27,15 @@ PROJECT_ROOT="$(cd "$INTEGRATION_DIR/../.." && pwd)"
 "$PROJECT_ROOT/target/debug/cleanup-test-dbs"
 echo ""
 
-# List of test directories to run
-TEST_DIRS=(
-  "verify-connection"
-  "search-for-title-and-visit-link"
-  "content-view-and-save"
-  "valid_and_invalid_saves"
-  "empty-content-save"
-  "focus-and-folded-markers"
-  "containerward-view-request"
-  "sourceward-view-request"
-  "fold-preservation"
-  "aliases-view-request"
-)
+# Auto-discover test directories (any subdirectory with a run-test.sh)
+TEST_DIRS=()
+for dir in "$INTEGRATION_DIR"/*/; do
+  if [ -f "$dir/run-test.sh" ]; then
+    TEST_DIRS+=("$(basename "$dir")")
+  fi
+done
+
+echo "Found ${#TEST_DIRS[@]} tests: ${TEST_DIRS[*]}"
 
 # Function to run a single test in its directory
 run_single_test() {
