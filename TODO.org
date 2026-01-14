@@ -26,11 +26,6 @@
      skg-request-save-buffer
 **** not skg-specific
      org-ancestry
-** bug in tools/introspect/call-graph/call-graph.rs
-   e.g. update_graph_minus_merges should have three children,
-     but only has two
-   -- or at least, that's true in in
-     tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 ** Develop a cleanup routine?
 *** for local changes
 **** Add type signatures to everything touched.
