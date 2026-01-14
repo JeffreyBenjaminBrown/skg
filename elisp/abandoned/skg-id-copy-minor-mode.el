@@ -53,14 +53,14 @@ while preserving all other text properties."
     (unless has-id
       (message "Pasted text without ID property."))))
 
-(define-minor-mode skg-minor-mode
+(define-minor-mode skg-id-copy-minor-mode
   "Toggle SKG minor mode.
 When enabled, copy|kill|paste operations handle ID properties specially."
   :init-value nil
   :lighter " SKG"
-  :keymap skg-minor-mode-map
+  :keymap skg-id-copy-minor-mode-map
   :group 'org
-  (if skg-minor-mode
+  (if skg-id-copy-minor-mode
       (progn
         (skg-enable-all-advice)
         (message "SKG minor mode enabled"))
@@ -106,4 +106,4 @@ When enabled, copy|kill|paste operations handle ID properties specially."
   (advice-remove 'yank-pop #'skg-advice-for-paste)
   (advice-remove 'org-yank #'skg-advice-for-paste))
 
-(provide 'skg-minor-mode)
+(provide 'skg-id-copy-minor-mode)
