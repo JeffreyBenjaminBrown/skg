@@ -1,4 +1,14 @@
-#!/bin/bash
+# USAGE:
+#   Default:
+#     ./bash/run-servers.sh
+#       uses data/default/skgconfig.toml
+#   Override, general:
+#     SKG_CONFIG=another_skg_config ./bash/run-servers.sh
+#   Override, my usual:
+#     SKG_CONFIG=data/subscribe/skgconfig.toml ./bash/run-servers.sh
+
+# Config file path (override with: SKG_CONFIG=data/subscribe/skgconfig.toml ./bash/run-servers.sh)
+SKG_CONFIG="${SKG_CONFIG:-data/default/skgconfig.toml}"
 
 # USAGE:
 #   Start
@@ -48,7 +58,7 @@ start_skg_with_restart() {
 
   echo "Cargo output will be logged to logs/skg.log"
   echo "cargo-watch starting..."
-  cargo watch -x "run --bin skg" > logs/skg.log 2>&1
+  cargo watch -x "run --bin skg -- $SKG_CONFIG" > logs/skg.log 2>&1
 }
 
 cleanup() { # trap handler for graceful shutdown
