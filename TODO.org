@@ -1,11 +1,10 @@
 * emacs
 ** Rename elisp/skg-client.el -> skg-tcp.el
 ** a metadata viewer/editor
-   Transform rules, maybe the only mirror in elisp of orgnode.rs,
-   are defined in
-     heralds--transform-rules
-   in the file
-     elisp/heralds-minor-mode.el
+** relevant files
+   elisp/skg-sexpr/*.el
+   elisp/heralds-minor-mode.el
+     esp. heralds--transform-rules
 * USE IT
 ** Collect user-facing functions to learn in one module
 *** rarely if ever consciously used
