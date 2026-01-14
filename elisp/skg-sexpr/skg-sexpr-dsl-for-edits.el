@@ -290,4 +290,4 @@ Returns the filtered list of elements."
           (= (length elem) 1))))
     elements))
 
-(provide 'skg-edit-sexpr)
+(provide 'skg-sexpr-dsl-for-edits)

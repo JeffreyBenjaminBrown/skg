@@ -22,7 +22,10 @@
 ;;; - Multi-word headlines become symbols with spaces.
 ;;; - Childless non-root headlines become bare atoms, not lists.
 ;;;
-;;; USER-FACING FUNCTIONS
+;;; User-facing functions:
+;;;   NONE
+;;;
+;;; ENTRY POINTS:
 ;;;   sexp-to-org
 ;;;   org-to-sexp
 
@@ -181,4 +184,4 @@ For root or headlines with children, returns a list."
                    (t head-symbol))))
         (cons sexp rest)))))
 
-(provide 'sexp-org-bijection)
+(provide 'skg-sexpr-org-bijection)

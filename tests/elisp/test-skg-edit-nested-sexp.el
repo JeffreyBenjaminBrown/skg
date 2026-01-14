@@ -4,9 +4,13 @@
  'load-path
  (expand-file-name "../../elisp"
                    (file-name-directory load-file-name)))
+(add-to-list
+ 'load-path
+ (expand-file-name "../../elisp/skg-sexpr"
+                   (file-name-directory load-file-name)))
 
 (require 'ert)
-(require 'skg-sexpr)
+(require 'skg-sexpr-util)
 
 (ert-deftest test-edit-sexp-delete-from-top ()
   (let ((target '(skg a b c d))

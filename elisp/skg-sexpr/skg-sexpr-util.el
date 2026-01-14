@@ -6,7 +6,7 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   (none)
 
-(require 'skg-edit-sexpr)
+(require 'skg-sexpr-dsl-for-edits)
 (require 'skg-compare-sexpr)
 (require 'skg-lens)
 
@@ -29,4 +29,4 @@ or nil if parentheses are unbalanced or no complete s-expression is found."
     (when end
       (1+ end))))
 
-(provide 'skg-sexpr)
+(provide 'skg-sexpr-util)

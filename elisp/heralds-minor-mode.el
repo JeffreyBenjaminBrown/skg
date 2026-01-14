@@ -7,7 +7,7 @@
 ;;;   heralds-minor-mode
 
 (require 'cl-lib)
-(require 'skg-sexpr)
+(require 'skg-sexpr-util)
 
 (defconst heralds--transform-rules
   '(skg

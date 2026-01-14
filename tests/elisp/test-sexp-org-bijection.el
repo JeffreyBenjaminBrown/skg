@@ -4,9 +4,13 @@
  'load-path
  (expand-file-name "../../elisp"
                    (file-name-directory load-file-name)))
+(add-to-list
+ 'load-path
+ (expand-file-name "../../elisp/skg-sexpr"
+                   (file-name-directory load-file-name)))
 
 (require 'ert)
-(require 'sexp-org-bijection)
+(require 'skg-sexpr-org-bijection)
 
 ;;
 ;; Test case data: (sexp org-text description)
