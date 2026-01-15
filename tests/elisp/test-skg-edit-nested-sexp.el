@@ -1,14 +1,7 @@
 ;;; test-skg-edit-nested-sexp.el --- Tests for skg-edit-nested-sexp
 
-(add-to-list
- 'load-path
- (expand-file-name "../../elisp"
-                   (file-name-directory load-file-name)))
-(add-to-list
- 'load-path
- (expand-file-name "../../elisp/skg-sexpr"
-                   (file-name-directory load-file-name)))
-
+(load-file (expand-file-name "../../elisp/skg-test-utils.el"
+                             (file-name-directory load-file-name)))
 (require 'ert)
 (require 'skg-sexpr-search)
 

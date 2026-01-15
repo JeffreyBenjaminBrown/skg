@@ -1,11 +1,7 @@
 ;;; test-skg-metadata-editing.el --- Tests for skg metadata editing functions
 
-(add-to-list
- 'load-path
- (expand-file-name
-  "../../elisp"
-  (file-name-directory load-file-name)))
-
+(load-file (expand-file-name "../../elisp/skg-test-utils.el"
+                             (file-name-directory load-file-name)))
 (require 'ert)
 (require 'org)
 (require 'skg-metadata)

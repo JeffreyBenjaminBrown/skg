@@ -1,14 +1,7 @@
 ;;; test-sexp-org-bijection.el --- Tests for sexp-org-bijection
 
-(add-to-list
- 'load-path
- (expand-file-name "../../elisp"
-                   (file-name-directory load-file-name)))
-(add-to-list
- 'load-path
- (expand-file-name "../../elisp/skg-sexpr"
-                   (file-name-directory load-file-name)))
-
+(load-file (expand-file-name "../../elisp/skg-test-utils.el"
+                             (file-name-directory load-file-name)))
 (require 'ert)
 (require 'skg-sexpr-org-bijection)
 
