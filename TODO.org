@@ -8,7 +8,6 @@
 ** try a dataflow trace
 *** as a user
 *** in the save pathway
-** herald whether something has suubscriptions
 ** Develop a cleanup routine?
 *** for local changes
 **** Add type signatures to everything touched.
@@ -167,6 +166,7 @@ makeIndefinitiveAndClobber
      The Contents of its children can be edited to change Hides relationships.
      The rest of the SubscribeeCol branch are respawned on save,
        and have no effect if edited before saving.
+*** herald whether something has suubscriptions
 *** extend saving for sharing relations
 **** In saveinstructions_from_tree, recurse into subscribees
 ***** change this passage in saveinstructions_from_tree

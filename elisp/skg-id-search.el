@@ -55,9 +55,10 @@ If point is not on a link, print a message and do nothing."
 
 (defun skg-next-id ()
   "Move point to the next ID occurrence.
-An ID can appear in metadata like (skg (id X) ...) or in a link like [[id:X][label]].
-For metadata, point moves to the opening paren of (skg ...).
-For links, point moves to the opening bracket of [[id:..."
+An ID can appear in metadata like (skg (node (id X)) ...),
+  in which case point moves to the opening paren of (skg ...),
+or in a link like [[id:X][label]],
+  in which case point moves to the opening bracket of [[id:..."
   (interactive)
   (let ( ( start-pos (point) )
          ( next-link nil )
@@ -180,23 +181,16 @@ Does nothing if point is not within metadata or a link."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP (a list starting with 'skg) contains an (id ...) pair."
-  (and (listp sexp)
-       (seq-some (lambda (elem)
-                   (and (listp elem)
-                        (eq (car elem) 'id) ))
-                 sexp) ))
+  "Return t if SEXP contains an id in the structure (skg (node (id ...)))."
+  (require 'skg-sexpr-search)
+  (skg-sexp-subtree-p sexp '(skg (node (id)))))
 
 (defun skg--extract-id-from-sexp
     (sexp)
-  "Extract the id value from SEXP, a list like (skg (id X) ...).
+  "Extract the id value from SEXP, a list like (skg (node (id X) ...)).
 Returns the id as a string, or nil if not found."
-  (let (( id-pair (seq-find (lambda (elem)
-                              (and (listp elem)
-                                   (eq (car elem) 'id) ))
-                            sexp) ))
-    (when id-pair
-      (format "%s" (cadr id-pair)) )))
+  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node id)))))
+    (when val (format "%s" val))))
 
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."

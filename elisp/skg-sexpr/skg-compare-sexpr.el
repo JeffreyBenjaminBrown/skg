@@ -57,5 +57,3 @@ must match exactly, while remaining elements are treated as an unordered set wit
         ( cdr structure ) ) ) ) )
 
 (provide 'skg-compare-sexpr)
-
-;;; skg-compare-sexpr.el ends here

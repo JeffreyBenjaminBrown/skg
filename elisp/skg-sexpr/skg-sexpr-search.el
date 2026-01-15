@@ -78,4 +78,27 @@ or nil if parentheses are unbalanced or no complete s-expression is found."
     (when end
       (1+ end))))
 
+(defun skg-sexp-cdr-at-path (sexp path)
+  "Extract the value at PATH in SEXP.
+PATH is a list of labels like (skg node id).
+Returns all elements after the label of the innermost matching sublist,
+or nil if the path doesn't exist.
+
+Examples:
+  (skg-sexp-cdr-at-path '(skg (node (id 123))) '(skg node id))
+  => (123)
+  (skg-sexp-cdr-at-path '(a (b c d)) '(a b))
+  => (c d)"
+  (when (and (listp sexp)
+             (eq (car sexp) (car path)))
+    (if (= (length path) 1)
+        (cdr sexp)
+      (let ((next-label (cadr path))
+            (rest-path (cdr path)))
+        (cl-some (lambda (elem)
+                   (when (and (listp elem)
+                              (eq (car elem) next-label))
+                     (skg-sexp-cdr-at-path elem rest-path)))
+                 (cdr sexp))))))
+
 (provide 'skg-sexpr-search)
