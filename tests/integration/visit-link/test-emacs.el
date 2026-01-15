@@ -3,6 +3,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../../../elisp/skg-test-utils.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -49,6 +50,24 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                 (setq found t)))))))
     found))
 
+(defun wait-for-content-view (pattern &optional timeout-seconds)
+  "Wait for a content view buffer to exist and contain PATTERN.
+Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
+  (let ((timeout (or timeout-seconds 5))
+        (start-time (float-time))
+        (found nil))
+    (while (and (not found)
+                (< (- (float-time) start-time) timeout))
+      (accept-process-output nil 0.1)
+      (let ((buf (find-skg-content-buffer)))
+        (when buf
+          (with-current-buffer buf
+            (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+              (when (and (> (length content) 0)
+                         (string-match-p pattern content))
+                (setq found t)))))))
+    found))
+
 ;;; Test phases (caller precedes callee)
 
 (defun integration-test-main ()
@@ -70,7 +89,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   (message "Sent title-matches request")
 
   ;; Wait for search results buffer to contain the expected link
-  (unless (wait-for-buffer "*skg-title-search*" "\\[\\[id:src\\]" 5)
+  (unless (wait-for-buffer (skg-search-buffer-name "has") "\\[\\[id:src\\]" 5)
     (test-fail "Timeout waiting for search results"))
 
   ;; Start the link traversal
@@ -89,7 +108,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   "PHASE 1: From search results, visit src."
   (message "=== PHASE 1: Visiting src from search results ===")
 
-  (let ((search-buffer (get-buffer "*skg-title-search*")))
+  (let ((search-buffer (get-buffer (skg-search-buffer-name "has"))))
     (if search-buffer
         (with-current-buffer search-buffer
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
@@ -121,7 +140,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                         (skg-visit-link)
 
                         ;; Wait for content view buffer to show src's content
-                        (unless (wait-for-buffer "*skg-content-view*" "\\[\\[id:dest\\]" 5)
+                        (unless (wait-for-content-view "\\[\\[id:dest\\]" 5)
                           (test-fail "Timeout waiting for src content view"))
 
                         ;; Continue to phase 2
@@ -134,7 +153,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   "PHASE 2: From src's content view, follow link to dest."
   (message "=== PHASE 2: Following link from src to dest ===")
 
-  (let ((content-buffer (get-buffer "*skg-content-view*")))
+  (let ((content-buffer (find-skg-content-buffer)))
     (if content-buffer
         (with-current-buffer content-buffer
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
@@ -158,7 +177,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                         (skg-visit-link)
 
                         ;; Wait for content view buffer to show dest's content
-                        (unless (wait-for-buffer "*skg-content-view*" "Dest need not be aware" 5)
+                        (unless (wait-for-content-view "Dest need not be aware" 5)
                           (test-fail "Timeout waiting for dest content view"))
 
                         ;; Verify we reached dest
@@ -171,7 +190,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   "PHASE 3: Verify we arrived at dest's content view."
   (message "=== PHASE 3: Verifying dest content view ===")
 
-  (let ((content-buffer (get-buffer "*skg-content-view*")))
+  (let ((content-buffer (find-skg-content-buffer)))
     (if content-buffer
         (with-current-buffer content-buffer
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))

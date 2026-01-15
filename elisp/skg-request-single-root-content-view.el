@@ -42,12 +42,12 @@ Optional TCP-PROC allows reusing an existing connection."
              (errors-pair (assoc 'errors response))
              (content-value (cadr content-pair))
              (errors-list (cadr errors-pair)))
-        ;; If content is not nil, open the buffer
-        (when content-value
+        (when content-value ;; If content is not nil, open the buffer
           (skg-open-org-buffer-from-text
-           tcp-proc content-value skg-content-view-buffer-name))
-        ;; If there are errors, show them
-        (when (and errors-list (not (equal errors-list nil)))
+           tcp-proc content-value (skg-content-view-buffer-name
+                                   content-value)))
+        (when ;; If there are errors, show them
+            (and errors-list (not (equal errors-list nil)))
           (let ((errors-text (if (listp errors-list)
                                  (mapconcat 'identity errors-list "\n\n")
                                errors-list)))

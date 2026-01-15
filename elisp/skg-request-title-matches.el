@@ -6,6 +6,7 @@
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-client)
+(require 'skg-buffer)
 (require 'heralds-minor-mode)
 
 (defun skg-request-title-matches (search-terms)
@@ -22,13 +23,14 @@
                   "\n")))
     (setq skg-doc--response-handler
           ;; Prepare for response.
-          #'skg-display-search-results)
+          (lambda (tcp-proc string)
+            (skg-display-search-results tcp-proc string clean-terms)))
     (process-send-string tcp-proc request-s-exp)))
 
-(defun skg-display-search-results (tcp-proc string)
+(defun skg-display-search-results (_tcp-proc string search-terms)
   "Display title search results from the Rust server."
   (with-current-buffer
-      (get-buffer-create "*skg-title-search*")
+      (get-buffer-create (skg-search-buffer-name search-terms))
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert (string-trim string))
@@ -38,7 +40,6 @@
       (heralds-minor-mode)
       (goto-char (point-min)))
     (set-buffer-modified-p nil)
-    (switch-to-buffer (current-buffer)))
-  )
+    (switch-to-buffer (current-buffer))))
 
 (provide 'skg-request-title-matches)

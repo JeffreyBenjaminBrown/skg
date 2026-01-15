@@ -3,6 +3,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../../../elisp/skg-test-utils.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -14,7 +15,7 @@
   (message "=== PHASE 2: Testing link visit ===")
 
   ;; Get the search results buffer
-  (let ((search-buffer (get-buffer "*skg-title-search*")))
+  (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
     (if search-buffer
         (with-current-buffer search-buffer
           (goto-char (point-min))
@@ -35,11 +36,12 @@
                 ;; Wait a moment for the content view to be created
                 (sleep-for 0.25)
 
-                ;; Check if the content view buffer was created successfully
-                (let ((content-buffer (get-buffer "*skg-content-view*")))
+                (let ;; Check if the content view buffer was created successfully
+                    ((content-buffer (find-skg-content-buffer)))
                   (if content-buffer
                       (with-current-buffer content-buffer
-                        (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+                        (let ((content (buffer-substring-no-properties
+                                        (point-min) (point-max))))
                           (message "Content view buffer created successfully")
                           (message "Content: %s" content)
                           (if (string-match-p "apples" content)
@@ -61,7 +63,7 @@
               (message "%s" (buffer-substring-no-properties (point-min) (point-max)))
               (kill-emacs 1))))
       (progn
-        (message "✗ FAIL: No *skg-title-search* buffer found")
+        (message "✗ FAIL: No skg search buffer found")
         (kill-emacs 1)))))
 
 (defun integration-test-title-matches ()
@@ -86,7 +88,7 @@
   (sleep-for 0.25)
 
   ;; Check if the title search buffer was created and contains expected content
-  (let ((search-buffer (get-buffer "*skg-title-search*")))
+  (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
     (if search-buffer
         (with-current-buffer search-buffer
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
@@ -104,7 +106,7 @@
                 (message "Got: %s" content)
                 (kill-emacs 1)))))
       (progn
-        (message "✗ FAIL: No *skg-title-search* buffer was created")
+        (message "✗ FAIL: No skg search buffer was created")
         (kill-emacs 1))))
 
   ;; Wait for completion with timeout

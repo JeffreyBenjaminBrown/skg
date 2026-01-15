@@ -19,11 +19,11 @@
   (setq integration-test-phase "open-empty-buffer")
   (skg-open-empty-content-view)
 
-  (let ((content-buffer (get-buffer skg-content-view-buffer-name)))
+  (let ((content-buffer (get-buffer skg-fallback-buffer-name)))
     (unless content-buffer
       (fail-test "skg content buffer was not created")))
 
-  (with-current-buffer skg-content-view-buffer-name
+  (with-current-buffer skg-fallback-buffer-name
     (erase-buffer)
     (insert "* (skg (node (id 1) (source main))) 1\n")
     (goto-char (point-min))
