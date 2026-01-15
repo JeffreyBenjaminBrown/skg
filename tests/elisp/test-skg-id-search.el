@@ -8,11 +8,11 @@
 (ert-deftest test-skg-next-and-previous-id ()
   "Test navigation between ID occurrences with skg-next-id and skg-previous-id."
   (with-temp-buffer
-    (insert "* (skg (id 1)) [[id:2][link to 2]]\n")
-    (insert "* (skg (id 3)) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
+    (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
+    (insert "* (skg (node (id 3))) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
     (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
-    (insert "* (skg (id 6)) just a title\n")
-    (insert "* (skg (id 7)) [[id:8][link to 8]]\n")
+    (insert "* (skg (node (id 6))) just a title\n")
+    (insert "* (skg (node (id 7))) [[id:8][link to 8]]\n")
     (goto-char (point-min))
     (search-forward "hello")
     (backward-char 5) ;; now on the 'h' in 'hello'
@@ -47,11 +47,11 @@
   "Test that skg-push-id-to-stack extracts id and label from links and metadata."
   (setq skg-id-stack nil)
   (with-temp-buffer
-    (insert "* (skg (id 1)) [[id:2][link to 2]]\n")
-    (insert "* (skg (id 3)) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
+    (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
+    (insert "* (skg (node (id 3))) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
     (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
-    (insert "* (skg (id 6)) just a title\n")
-    (insert "* (skg (id 7)) [[id:8][link to 8]]\n")
+    (insert "* (skg (node (id 6))) just a title\n")
+    (insert "* (skg (node (id 7))) [[id:8][link to 8]]\n")
     (let* ( ( link-start
               (progn (goto-char (point-min))
                      (search-forward "[[id:2][link to 2]]")
@@ -59,8 +59,8 @@
             ( link-end (point) )
             ( metadata-start
               (progn (goto-char (point-min))
-                     (search-forward "(skg (id 6))")
-                     (- (point) (length "(skg (id 6))")) ))
+                     (search-forward "(skg (node (id 6)))")
+                     (- (point) (length "(skg (node (id 6)))")) ))
             ( metadata-end (point) )
             ( line3-start
               (progn (goto-char (point-min))
@@ -83,7 +83,7 @@
         (dolist (id '("1" "3" "6" "7"))
           ;; First whitespace after )) on each line
           (goto-char (point-min))
-          (search-forward (format "(skg (id %s))" id))
+          (search-forward (format "(skg (node (id %s)))" id))
           (skg-push-id-to-stack)
           (should (equal (length skg-id-stack) len-before)) )
         (progn (goto-char (point-min)) ;; The 'h' in "hello"
