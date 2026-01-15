@@ -5,43 +5,69 @@
 (require 'ert)
 (require 'skg-id-search)
 
-(ert-deftest test-skg-next-and-previous-id ()
-  "Test navigation between ID occurrences with skg-next-id and skg-previous-id."
+(defconst test-skg-id-navigation-buffer
+  (concat "* no id\n"
+          "* (skg (node (id 1))) 1 has a [[id:2][link to 2]]\n"
+          "* (skg (node (id 2))) 2\n"
+          "* no id\n")
+  "Test buffer for skg-next-id and skg-previous-id tests.")
+
+(defconst test-skg-id-navigation-line2-paren
   (with-temp-buffer
-    (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
-    (insert "* (skg (node (id 3))) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
-    (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
-    (insert "* (skg (node (id 6))) just a title\n")
-    (insert "* (skg (node (id 7))) [[id:8][link to 8]]\n")
+    (insert test-skg-id-navigation-buffer)
     (goto-char (point-min))
-    (search-forward "hello")
-    (backward-char 5) ;; now on the 'h' in 'hello'
-    (should (equal (char-after) ?h))
-    (let ( ( line2-skg-start
-             (save-excursion
-               (goto-char (point-min))
-               (forward-line 1)
-               (forward-char 2)
-               (point) ))
-           ( line2-link-to-5-start
-             (save-excursion
-               (goto-char (point-min))
-               (search-forward "[[id:2][link to 5]]")
-               (- (point) (length "[[id:2][link to 5]]")) ))
-           ( line3-skg-start
-             (save-excursion
-               (goto-char (point-min))
-               (forward-line 3)
-               (forward-char 2)
-               (point) )) )
+    (forward-line 1)
+    (search-forward "(")
+    (1- (point)))
+  "Position of first paren on line 2 of test-skg-id-navigation-buffer.")
+
+(defconst test-skg-id-navigation-line2-bracket
+  (with-temp-buffer
+    (insert test-skg-id-navigation-buffer)
+    (goto-char (point-min))
+    (forward-line 1)
+    (search-forward "[")
+    (1- (point)))
+  "Position of first bracket on line 2 of test-skg-id-navigation-buffer.")
+
+(defconst test-skg-id-navigation-line3-paren
+  (with-temp-buffer
+    (insert test-skg-id-navigation-buffer)
+    (goto-char (point-min))
+    (forward-line 2)
+    (search-forward "(")
+    (1- (point)))
+  "Position of first paren on line 3 of test-skg-id-navigation-buffer.")
+
+(ert-deftest test-skg-next-id ()
+  "Test forward navigation between ID occurrences."
+  (with-temp-buffer
+    (insert test-skg-id-navigation-buffer)
+    (goto-char (point-min))
+    (skg-next-id)
+    (should (equal (point) test-skg-id-navigation-line2-paren))
+    (skg-next-id)
+    (should (equal (point) test-skg-id-navigation-line2-bracket))
+    (skg-next-id)
+    (should (equal (point) test-skg-id-navigation-line3-paren))
+    (let (( pos-before (point) ))
       (skg-next-id)
-      (should (equal (point) line2-link-to-5-start))
-      (skg-next-id)
-      (should (equal (point) line3-skg-start))
+      (should (equal (point) pos-before)) )))
+
+(ert-deftest test-skg-previous-id ()
+  "Test backward navigation between ID occurrences."
+  (with-temp-buffer
+    (insert test-skg-id-navigation-buffer)
+    (goto-char (point-max))
+    (skg-previous-id)
+    (should (equal (point) test-skg-id-navigation-line3-paren))
+    (skg-previous-id)
+    (should (equal (point) test-skg-id-navigation-line2-bracket))
+    (skg-previous-id)
+    (should (equal (point) test-skg-id-navigation-line2-paren))
+    (let (( pos-before (point) ))
       (skg-previous-id)
-      (skg-previous-id)
-      (skg-previous-id)
-      (should (equal (point) line2-skg-start)) )))
+      (should (equal (point) pos-before)) )))
 
 (ert-deftest test-skg-push-id-to-stack ()
   "Test that skg-push-id-to-stack extracts id and label from links and metadata."
