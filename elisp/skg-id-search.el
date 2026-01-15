@@ -14,6 +14,7 @@
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
 
+(require 'cl-lib)
 (require 'skg-state)
 
 (defconst skg-link-regex
@@ -63,63 +64,44 @@ or in a link like [[id:X][label]],
   (let ( ( start-pos (point) )
          ( next-link nil )
          ( next-metadata nil ))
-    (progn ;; Find next link
-      (save-excursion
-        (forward-char 1)
-        (when (re-search-forward skg-link-regex nil t)
-          (setq next-link (match-beginning 0)) )) )
-    (progn ;; Find next metadata
-      (save-excursion
-        (forward-line 1)
-        (while (and (not next-metadata)
-                    (not (eobp)) )
-          (let (( md-pos (skg--find-metadata-start-on-line) ))
-            (if md-pos
-                (setq next-metadata md-pos)
-              (forward-line 1) )) )) )
-    (cond
-     ( (and next-link next-metadata)
-       (goto-char (min next-link next-metadata)) )
-     ( next-link
-       (goto-char next-link) )
-     ( next-metadata
-       (goto-char next-metadata) )) ))
+    (save-excursion ;; Find next link
+      (forward-char 1)
+      (when (re-search-forward skg-link-regex nil t)
+        (setq next-link (match-beginning 0)) ))
+    (save-excursion ;; Find next metadata
+      (beginning-of-line)
+      (cl-loop while (not (eobp))
+               for md-pos = (skg--find-metadata-start-on-line)
+               when (and md-pos (> md-pos start-pos))
+               return (setq next-metadata md-pos)
+               do (forward-line 1) ))
+    (let (( candidates (delq nil (list next-link next-metadata)) ))
+      (when candidates
+        (goto-char (apply #'min candidates)) )) ))
 
 (defun skg-previous-id ()
   "Move point to the previous ID occurrence.
-An ID can appear in metadata like (skg (id X) ...) or in a link like [[id:X][label]].
-For metadata, point moves to the opening paren of (skg ...).
-For links, point moves to the opening bracket of [[id:..."
+An ID can appear in metadata like (skg (node (id X)) ...),
+  in which case point moves to the opening paren of (skg ...),
+or in a link like [[id:X][label]],
+  in which case point moves to the opening bracket of [[id:..."
   (interactive)
   (let ( ( start-pos (point) )
          ( prev-link nil )
          ( prev-metadata nil ))
-    (progn ;; Find previous link
-      (save-excursion
-        (backward-char 1)
-        (when (re-search-backward skg-link-regex nil t)
-          (setq prev-link (match-beginning 0)) )) )
-    (progn ;; Find previous metadata
-      (save-excursion
-        (beginning-of-line)
-        (let (( md-pos (skg--find-metadata-start-on-line) ))
-          (when (and md-pos (< md-pos start-pos))
-            (setq prev-metadata md-pos) ))
-        (unless prev-metadata
-          (forward-line -1)
-          (while (and (not prev-metadata)
-                      (not (bobp)) )
-            (let (( md-pos (skg--find-metadata-start-on-line) ))
-              (if md-pos
-                  (setq prev-metadata md-pos)
-                (forward-line -1) )) )) ))
-    (cond
-     ( (and prev-link prev-metadata)
-       (goto-char (max prev-link prev-metadata)) )
-     ( prev-link
-       (goto-char prev-link) )
-     ( prev-metadata
-       (goto-char prev-metadata) )) ))
+    (save-excursion ;; Find previous link
+      (backward-char 1)
+      (when (re-search-backward skg-link-regex nil t)
+        (setq prev-link (match-beginning 0)) ))
+    (save-excursion ;; Find previous metadata
+      (beginning-of-line)
+      (cl-loop for md-pos = (skg--find-metadata-start-on-line)
+               when (and md-pos (< md-pos start-pos))
+               return (setq prev-metadata md-pos)
+               while (zerop (forward-line -1)) ))
+    (let (( candidates (delq nil (list prev-link prev-metadata)) ))
+      (when candidates
+        (goto-char (apply #'max candidates)) )) ))
 
 (defun skg--find-metadata-start-on-line ()
   "If current line has metadata with id, return position of its opening paren.
