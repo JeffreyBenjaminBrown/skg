@@ -3,10 +3,10 @@
 Reorder elisp definitions so that callers precede callees.
 
 Usage:
-    python reorder.py <file.el>           # Print reordered content to stdout
-    python reorder.py <file.el> --inplace # Modify file in place
-    python reorder.py <directory> --inplace # Process all .el files in directory
-    python reorder.py <file.el> --debug   # Show debug info about definitions and calls
+    python3 tools/elisp-to-caller-order/reorder.py <file.el>           # Print reordered content to stdout
+    python3 tools/elisp-to-caller-order/reorder.py <file.el> --inplace # Modify file in place
+    python3 tools/elisp-to-caller-order/reorder.py <directory> --inplace # Process all .el files in directory
+    python3 tools/elisp-to-caller-order/reorder.py <file.el> --debug   # Show debug info about definitions and calls
 """
 
 import re

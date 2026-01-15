@@ -4,7 +4,10 @@
    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
    This document is mostly things I considered highest-priority.
 * u
-** DOGFOOD
+** DOGFOOD IT
+** try a dataflow trace
+*** as a user
+*** in the save pathway
 ** herald whether something has suubscriptions
 ** Develop a cleanup routine?
 *** for local changes
