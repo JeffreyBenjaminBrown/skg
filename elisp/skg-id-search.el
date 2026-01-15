@@ -15,6 +15,8 @@
 ;; It re-reads the same text a few times.
 
 (require 'cl-lib)
+(require 'skg-request-single-root-content-view)
+(require 'skg-sexpr-search)
 (require 'skg-state)
 
 (defconst skg-link-regex
@@ -50,7 +52,6 @@ If point is not on a link, print a message and do nothing."
     (if found-link
         (progn
           (message "Visiting node: %s" link-id)
-          (require 'skg-request-single-root-content-view)
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
@@ -164,7 +165,6 @@ Does nothing if point is not within metadata or a link."
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
   "Return t if SEXP contains an id in the structure (skg (node (id ...)))."
-  (require 'skg-sexpr-search)
   (skg-sexp-subtree-p sexp '(skg (node (id)))))
 
 (defun skg--extract-id-from-sexp
