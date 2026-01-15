@@ -3,6 +3,8 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-open-empty-content-view
 
+(require 'skg-sexpr-search)
+
 (defconst skg-fallback-buffer-name
   "*skg*")
 
@@ -19,9 +21,16 @@
 
 (defun skg-extract-top-headline-title (org-text)
   "Extract the title from the first headline in ORG-TEXT.
+Strips any leading (skg ...) metadata from the title.
 Returns nil if no headline is found."
   (when (and org-text (string-match "^\\*+ +\\(.+\\)$" org-text))
-    (match-string 1 org-text)))
+    (let ((after-stars (match-string 1 org-text)))
+      (if (string-prefix-p "(skg" after-stars)
+          (let ((sexp-end-pos (skg-find-sexp-end after-stars)))
+            (if sexp-end-pos
+                (string-trim (substring after-stars sexp-end-pos))
+              after-stars))
+        after-stars))))
 
 (defun skg-sanitize-buffer-name (name)
   "Sanitize NAME for use as a buffer name.
