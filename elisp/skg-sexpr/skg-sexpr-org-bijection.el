@@ -161,6 +161,18 @@ TEXT can be a symbol, string, or number."
                    (t (symbol-name text)))))
     (concat (make-string level ?*) " " text-str)))
 
+(defun org-to-sexp--text-to-atom (text)
+  "Convert TEXT to an atom, preserving numbers as integers.
+If TEXT looks like an integer, return it as an integer.
+Otherwise return it as a symbol."
+  (let ((num (string-to-number text)))
+    (if (and (not (zerop num))
+             (string= text (number-to-string num)))
+        num
+      (if (string= text "0")
+          0
+        (intern text)))))
+
 (defun org-to-sexp--build-tree (headlines expected-level)
   "Build a sexp tree from HEADLINES starting at EXPECTED-LEVEL.
 Returns (SEXP . REMAINING-HEADLINES).
@@ -169,7 +181,7 @@ For root or headlines with children, returns a list."
   (when (and headlines (= (caar headlines) expected-level))
     (let* ((head-hl (car headlines))
            (head-text (cdr head-hl))
-           (head-symbol (intern head-text))
+           (head-atom (org-to-sexp--text-to-atom head-text))
            (rest (cdr headlines))
            (children nil)
            (child-level (1+ expected-level)))
@@ -180,9 +192,9 @@ For root or headlines with children, returns a list."
               (setq rest (cdr child-result)))
           (setq rest (cdr rest))))
       (let ((sexp (cond
-                   (children (cons head-symbol (nreverse children)))
-                   ((= expected-level 1) (list head-symbol))
-                   (t head-symbol))))
+                   (children (cons head-atom (nreverse children)))
+                   ((= expected-level 1) (list head-atom))
+                   (t head-atom))))
         (cons sexp rest)))))
 
 (provide 'skg-sexpr-org-bijection)
