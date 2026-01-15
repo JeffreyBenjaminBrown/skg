@@ -19,8 +19,8 @@
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
     (BLUE node
-      (ANY "◌")
-      (id (ANY "⦿"))
+      (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
+      (id (ANY "⦿")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
       (source) ;; ignored
       (RED parentIgnores "!{")
       (GREEN indefinitive "indef")
@@ -186,8 +186,8 @@ METADATA-SEXP should be the complete (skg ...) s-expression."
                             (eq (car sexp) 'skg))
                    (skg-transform-sexp-flat
                     sexp heralds--transform-rules)))
-         (raw-text (heralds--tokens->text tokens)))
-    (heralds--post-process-text raw-text)))
+         (heralds (heralds--tokens->text tokens)))
+    (heralds--post-process-text heralds sexp)))
 
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.
@@ -197,21 +197,18 @@ Returns nil if parsing fails."
     (error nil)))
 
 (defun heralds--post-process-text
-    (text)
+    (herald-string sexp)
   "Some post-processing rules for heralds:
-- Remove ◌ if ⦿ is present (show filled circle when id exists)
+- Remove ◌ if id present in SEXP
+- Remove ⦿ if stats present in SEXP
 - Remove duplicate '!{' symbol if it appears twice"
-  (when text
-    (let* ((parts (split-string text " " t))
-           (parts ;; Remove ◌ if ⦿ is present
-            (if (cl-some (lambda (part)
-                           (string= (substring-no-properties part) "⦿"))
-                         parts)
-                (cl-remove-if (lambda (part)
-                                (string= (substring-no-properties part) "◌"))
-                              parts)
-              parts))
-           (joined (mapconcat #'identity parts " "))
+  (when herald-string
+    (let* ((heralds (split-string herald-string " " t))
+           (heralds (heralds--remove-token-if-sexp-matches-structure
+                   "◌" heralds sexp '(skg (node (id)) )) )
+           (heralds (heralds--remove-token-if-sexp-matches-structure
+                   "⦿" heralds sexp '(skg (node (stats)) )) )
+           (joined (mapconcat #'identity heralds " "))
            (first-brace-pos (string-match "!{" joined))
            (second-brace-pos
             (when first-brace-pos
@@ -220,6 +217,15 @@ Returns nil if parsing fails."
           (concat (substring joined 0 second-brace-pos)
                   (substring joined (+ second-brace-pos 2)))
         joined))))
+
+(defun heralds--remove-token-if-sexp-matches-structure
+    (token tokens sexp structure)
+  "Remove TOKEN from TOKENS if STRUCTURE is present in SEXP."
+  (if (skg-sexp-subtree-p sexp structure)
+      (cl-remove-if (lambda (part)
+                      (string= (substring-no-properties part) token))
+                    tokens)
+    tokens))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."
