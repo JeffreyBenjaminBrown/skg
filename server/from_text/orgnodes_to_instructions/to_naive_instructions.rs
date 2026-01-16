@@ -10,11 +10,11 @@ use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
 /// Converts a forest of OrgNodes to SaveInstructions,
-/// taking them all at face value.
-///
-/// PITFALL: Leaves important work undone,
-/// which its caller 'orgnode_forest_to_nonmerge_save_instructions'
-/// does after calling it.
+/// taking them all at face value. In particular,
+/// it does *not*:
+/// - reconcile SaveInstructions with the same ID
+/// - clobber None fields with data from disk
+/// (Its caller 'orgnode_forest_to_nonmerge_save_instructions' does.)
 pub fn naive_saveinstructions_from_forest (
   mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
 ) -> Result<Vec<SaveInstruction>, String> {
@@ -50,7 +50,6 @@ fn naive_saveinstructions_from_tree(
     { naive_saveinstructions_from_tree(
         tree, child_treeid, result)?; }
     Ok(( )) }
-
   let node_kind: OrgNodeKind =
     read_at_node_in_tree(tree, node_id, |node| node.kind.clone())?;
   match node_kind {
@@ -76,7 +75,6 @@ fn naive_saveinstructions_from_tree(
           else { NonMerge_NodeAction::Save };
         result.push((skg_node, save_action)); }
       recurse( tree, node_id, result )?; }}
-
   Ok(( )) }
 
 fn skgnode_for_orgnode_in_tree<'a> (

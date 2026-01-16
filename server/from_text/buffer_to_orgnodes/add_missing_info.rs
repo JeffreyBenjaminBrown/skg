@@ -78,12 +78,12 @@ fn add_missing_info_dfs (
           let is_aliascol : bool =
             matches! ( &orgnode . kind,
               OrgNodeKind::Scaff( Scaffold::AliasCol ));
-          let parent_source : Option < String > =
+          let source : Option < String > =
             match &orgnode . kind
             { OrgNodeKind::True ( t ) => t . source_opt . clone (),
               OrgNodeKind::Scaff ( _ ) => None };
-          ( is_aliascol, parent_source ) } )
-      { Ok ( ( is_aliascol, source ) ) => ( is_aliascol, source ),
+          ( is_aliascol, source ) } )
+      { Ok (( ia, s )) => (ia, s),
         Err ( _ ) => ( false, None ) } };
     if parent_is_aliascol { // convert it to an alias
       let org = node_ref . value ();

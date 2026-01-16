@@ -25,7 +25,12 @@ struct OrgNodeLineCol {
 
 /// Parse org text into a "forest": a tree with a ForestRoot.
 /// Each level-1 headline becomes a child of the ForestRoot.
-/// Returns (tree, parsing_errors).
+/// The result takes the org-buffer at face value,
+/// without changing the tree (e.g. without absorbing aliases
+/// into the relevant ancestor) and without supplementing information
+/// (e.g. missing IDs).
+///
+/// RETURNS (tree, parsing_errors).
 ///
 /// SHARES RESPONSIBILITY for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
