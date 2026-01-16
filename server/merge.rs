@@ -14,7 +14,7 @@ use typedb_driver::TypeDBDriver;
 ///   1) TypeDB
 ///   2) Filesystem
 ///   3) Tantivy
-/// PITFALL: If any but the first step fails,
+/// PITFALL | TODO: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn merge_nodes (
   merge_instructions : Vec<MergeInstructionTriple>,

@@ -3,11 +3,12 @@
    e.g. here:
    github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
    This document is mostly things I considered highest-priority.
+* [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 * u
 ** DOGFOOD IT
-** try a dataflow trace
-*** as a user
-*** in the save pathway
+** sourceward view ? ugly
+   Rather than being top-level children,
+   maybe they should be under a 'these link to it' scaffold.
 ** Develop a cleanup routine?
 *** for local changes
 **** Add type signatures to everything touched.

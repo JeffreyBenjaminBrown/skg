@@ -144,50 +144,49 @@ pub async fn update_from_and_rerender_buffer (
   if orgnode_forest.root().children().next().is_none() { return Err (
     "Nothing to save found in org_buffer_text" . into( )); }
 
-  update_graph_minus_merges (
-    save_instructions.clone(),
-    config.clone(),
-    tantivy_index,
-    typedb_driver ) . await ?;
-  merge_nodes (
-    mergeInstructions,
-    config.clone(),
-    tantivy_index,
-    typedb_driver ) . await ?;
+  { // update the graph
+    update_graph_minus_merges (
+      save_instructions.clone(),
+      config.clone(),
+      tantivy_index,
+      typedb_driver ) . await ?;
+    merge_nodes (
+      mergeInstructions,
+      config.clone(),
+      tantivy_index,
+      typedb_driver ) . await ?; }
 
-  let mut errors : Vec < String > = Vec::new ();
-  let mut paired_forest : PairTree =
-    pair_orgnode_forest_with_skgnodes_from_saveinstructions (
-      // Definitive nodes get Some(skgnode), indefinitive get None.
-      & orgnode_forest,
-      & save_instructions );
-
-  { // modify the paired forest before re-rendering it
-    let mut visited : DefinitiveMap =
-      completeAndRestoreForest (
+  { // update the view and return it to the client
+    let mut errors : Vec < String > = Vec::new ();
+    let mut paired_forest : PairTree =
+      pair_orgnode_forest_with_skgnodes_from_saveinstructions (
+        // Definitive nodes get Some(skgnode), indefinitive get None.
+        & orgnode_forest,
+        & save_instructions );
+    { // modify the paired forest before re-rendering it
+      let mut visited : DefinitiveMap =
+        completeAndRestoreForest (
+          &mut paired_forest,
+          config,
+          typedb_driver ) . await ?;
+      let view_requests : Vec < (NodeId, ViewRequest) > =
+        collectViewRequestsFromForest (
+          & paired_forest ) ?;
+      execute_view_requests ( // PITFALL: Must follow completion.
+        // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
+        &mut paired_forest,
+        view_requests,
+        config,
+        typedb_driver,
+        &mut visited,
+        &mut errors ). await ?;
+      set_metadata_relationship_viewdata_in_forest (
         &mut paired_forest,
         config,
-        typedb_driver ) . await ?;
-    let view_requests : Vec < (NodeId, ViewRequest) > =
-      collectViewRequestsFromForest (
-        & paired_forest ) ?;
-    execute_view_requests ( // PITFALL: Must follow completion.
-      // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
-      &mut paired_forest,
-      view_requests,
-      config,
-      typedb_driver,
-      &mut visited,
-      &mut errors ). await ?;
-    set_metadata_relationship_viewdata_in_forest (
-      &mut paired_forest,
-      config,
-      typedb_driver ). await ?; }
-
-  let buffer_content : String =
-    orgnode_forest_to_string ( & paired_forest ) ?;
-
-  Ok ( SaveResponse { buffer_content, errors } ) }
+        typedb_driver ). await ?; }
+    let buffer_content : String =
+      orgnode_forest_to_string ( & paired_forest ) ?;
+    Ok ( SaveResponse { buffer_content, errors } ) }}
 
 /// Converts an OrgNode forest to a PairTree forest
 /// (both represented as Trees, via ForestRoot).
