@@ -79,6 +79,8 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
 /// Integrate a sourceward path into an OrgNode tree.
 /// TODO ? Can this be dedup'd w/r/t
 ///   'build_and_integrate_containerward_path'?
+///   Claude thought extracting the common logic would be hard,
+///   due to async lifetime issues.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut PairTree,
   node_id   : ego_tree::NodeId,
@@ -94,7 +96,8 @@ pub async fn build_and_integrate_sourceward_path (
       driver,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
-    tree, node_id, path, branches, cycle_node, config, driver ) . await }
+    tree, node_id, path, branches, cycle_node, config, driver
+  ). await }
 
 /// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
 /// using provided backpath data.

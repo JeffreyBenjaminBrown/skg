@@ -1,18 +1,16 @@
-// cargo test --test rebuild -- --nocapture
-
 use indoc::indoc;
 use std::error::Error;
 
 use ego_tree::{Tree, NodeId};
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::org_to_text::orgnode_forest_to_string;
-use skg::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
-use skg::to_org::util::{DefinitiveMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
-use skg::to_org::complete::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
-use skg::to_org::complete::contents::{clobberIndefinitiveOrgnode, ensure_skgnode};
-use skg::types::tree::PairTree;
-use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use crate::org_to_text::orgnode_forest_to_string;
+use crate::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
+use crate::to_org::util::{DefinitiveMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
+use super::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
+use crate::to_org::complete::contents::{clobberIndefinitiveOrgnode, ensure_skgnode};
+use crate::types::tree::PairTree;
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 
 /// Get the NodeId of the first "tree root" (child of ForestRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
@@ -52,7 +50,7 @@ fn test_indefinitive_identity_at_multiple_levels
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-contents-indefinitive",
-    "tests/rebuild/complete_contents/fixtures",
+    "server/abandoned/to-org_complete_content-children/fixtures",
     "/tmp/tantivy-test-complete-contents-indefinitive",
     |config, driver, _tantivy| Box::pin ( async move {
       test_indefinitive_identity_at_multiple_levels_logic (
@@ -165,7 +163,7 @@ fn test_visited_and_indefinitive
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-contents-visited-indefinitive",
-    "tests/rebuild/complete_contents/fixtures",
+    "server/abandoned/to-org_complete_content-children/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-indefinitive",
     |config, driver, _tantivy| Box::pin ( async move {
       test_visited_and_indefinitive_logic (
@@ -321,7 +319,7 @@ fn test_visited_and_not_indefinitive
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-contents-visited-not-indefinitive",
-    "tests/rebuild/complete_contents/fixtures",
+    "server/abandoned/to-org_complete_content-children/fixtures",
     "/tmp/tantivy-test-complete-contents-visited-not-indefinitive",
     |config, driver, _tantivy| Box::pin ( async move {
       test_visited_and_not_indefinitive_logic (
@@ -447,7 +445,7 @@ fn test_false_content
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-contents-false-content",
-    "tests/rebuild/complete_contents/fixtures",
+    "server/abandoned/to-org_complete_content-children/fixtures",
     "/tmp/tantivy-test-complete-contents-false-content",
     |config, driver, _tantivy| Box::pin ( async move {
       test_false_content_logic (

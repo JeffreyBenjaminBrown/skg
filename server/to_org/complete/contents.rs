@@ -2,7 +2,6 @@
 
 use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::to_org::complete::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
 use crate::to_org::complete::sharing::{
   maybe_add_subscribeeCol_branch };
 use crate::dbs::filesystem::one_node::skgnode_from_id;
@@ -94,9 +93,7 @@ fn complete_or_restore_each_node_in_branch<'a> (
             tree, node_id ) ?;
         } else { // futz with the orgnode and its content children
           maybe_add_subscribeeCol_branch (
-            tree, node_id, config, typedb_driver ) . await ?;
-          completeAndReorder_childrenOf_definitiveOrgnode (
-            tree, node_id, config, typedb_driver ). await ?; }
+            tree, node_id, config, typedb_driver ) . await ?; }
         recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, node_id, config, typedb_driver, visited
         ). await ?; }}
