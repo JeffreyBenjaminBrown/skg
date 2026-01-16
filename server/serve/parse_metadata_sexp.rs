@@ -31,7 +31,7 @@ use std::str::FromStr;
 // Parsing-internal types
 //
 
-/// Intermediate parsed metadata. Converted to OrgNode via from_parsed().
+/// Intermediate parsed metadata. Converted to OrgNode via orgnode_from_metadata().
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrgnodeMetadata {
   pub focused: bool,
@@ -68,7 +68,7 @@ pub fn default_metadata() -> OrgnodeMetadata {
 /// Create an OrgNode from parsed metadata components.
 /// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
 /// Returns (OrgNode, Option<BufferValidationError>) - error if Scaffold has body.
-pub fn from_parsed (
+pub fn orgnode_from_metadata (
   metadata : &OrgnodeMetadata,
   title    : String,
   body     : Option < String >,
@@ -158,7 +158,7 @@ pub fn parse_metadata_to_orgnodemd (
         match bare_value . as_str () {
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
-          // Scaffold kinds as bare atoms (alias string comes from title in from_parsed)
+          // Scaffold kinds as bare atoms (alias string comes from title in orgnode_from_metadata)
           "alias"    => result . scaffold = Some ( Scaffold::Alias ( String::new () )),
           "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
           "forestRoot" => result . scaffold = Some ( Scaffold::ForestRoot ),

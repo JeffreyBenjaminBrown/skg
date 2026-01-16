@@ -28,8 +28,10 @@ pub fn naive_saveinstructions_from_forest (
 /// Appends another pair to 'result' and recurses (in DFS order).
 /// Skips some nodes, because:
 /// - indefinitive nodes don't generate instructions
-/// - aliases     are handled by 'collect_aliases'
-/// - subscribees are handled by 'collect_subscribees'
+/// - aliases     are handled by
+///   'collect_grandchild_aliases_for_orgnode'
+/// - subscribees are handled by
+///   'collect_subscribees'
 fn naive_saveinstructions_from_tree(
   tree: &mut Tree<OrgNode>,
   node_id: NodeId,

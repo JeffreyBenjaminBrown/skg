@@ -30,7 +30,8 @@ pub async fn orgnode_forest_to_nonmerge_save_instructions (
       reconcile_same_id_instructions (
         config, driver, {
           let instructions : Vec<SaveInstruction> =
-            naive_saveinstructions_from_forest ( forest . clone () ) ?;
+            naive_saveinstructions_from_forest (
+              forest . clone( )) ?;
           instructions } ) . await ?;
     instructions_without_dups }
   { clobbered_instructions.push (

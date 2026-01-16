@@ -3,9 +3,7 @@
 
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::BufferValidationError;
-use crate::serve::parse_metadata_sexp::{
-    parse_metadata_to_orgnodemd, default_metadata, from_parsed, OrgnodeMetadata
-};
+use crate::serve::parse_metadata_sexp::{ parse_metadata_to_orgnodemd, default_metadata, orgnode_from_metadata, OrgnodeMetadata };
 use crate::types::orgnode::{forest_root_orgnode, OrgNode};
 
 use ego_tree::{Tree, NodeId};
@@ -131,7 +129,7 @@ fn linecol_to_orgnode(
       default_metadata () };
   let ( orgnode, error_opt )
     : ( OrgNode, Option<BufferValidationError> )
-    = from_parsed ( &metadata, title, body_text );
+    = orgnode_from_metadata ( &metadata, title, body_text );
   Ok ( ( level, orgnode, error_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.

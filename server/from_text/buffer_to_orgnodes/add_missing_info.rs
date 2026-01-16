@@ -15,18 +15,18 @@ use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
 /// Runs the following on each node:
-/// - assign_alias_relation_if_needed(
-/// - assign_new_id_if_needed(
-/// - assign_pid_if_possible(
+/// - transforms TrueNode to Alias if needed
+/// - modifies ID
+///   - make a new one if it doesn't exist
+///   - replace with PID if it already exists
+/// - assigns source
 /// .
 /// PITFALL:
 /// Does not add *all* missing info.
 /// 'clobber_none_fields_with_data_from_disk' does some of that, too,
 /// but it operates on SaveInstructions, downstream.
-///
-/// Input forest has ForestRoot at root; tree roots are its children.
 pub async fn add_missing_info_to_forest(
-  forest: &mut Tree<OrgNode>,
+  forest: &mut Tree<OrgNode>, // has ForestRoot at root
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
@@ -61,9 +61,9 @@ async fn assign_pids_throughout_forest (
           tree_root_mut, &pid_map); }}
   Ok(( )) }
 
-/// - assign alias Interp, if missing and appropriate
-/// - assign source if knowable
-/// - assign new ID,       if missing and appropriate
+/// - make it a n Scaffold::Alias if appropriate
+/// - inherit parent source if knowable
+/// - assign new ID, if missing and appropriate
 fn add_missing_info_dfs (
   mut node_ref: NodeMut < OrgNode >,
 ) {

@@ -113,7 +113,7 @@ fn validate_scaffold (
   errors      : &mut Vec<BufferValidationError>
 ) {
   // Note: Body_of_AliasCol and Body_of_Alias are detected during parsing
-  // (in from_parsed), not here, because Scaffold nodes don't store body data.
+  // (in orgnode_from_metadata), not here, because Scaffold nodes don't store body data.
   match scaffold {
     Scaffold::Alias ( _ ) => {
       if ! matches!(parent_kind,

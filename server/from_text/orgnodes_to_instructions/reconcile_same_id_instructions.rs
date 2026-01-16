@@ -88,20 +88,19 @@ pub async fn reconcile_same_id_instructions_for_one_id(
 
   // Separate Deletes from Saves
   let mut save: Option<SaveInstruction> = None;
-  let mut delete: Option<SaveInstruction> = None;
+  let mut delete_opt: Option<SaveInstruction> = None;
   for instruction in instructions {
     let instr: SaveInstruction = instruction;
     match instr.1 {
       NonMerge_NodeAction::Save => {
         // Validation ensures at most one save per ID
         if save.is_some() {
-          return Err("Multiple save instructions for same ID (should be caught by validation)".into()); }
+          return Err("Multiple save instructions for same ID (should be caught by validation)".into( )); }
         save = Some(instr); }
       NonMerge_NodeAction::Delete => {
         // Multiple deletes are equivalent, just keep one
-        if delete.is_none() {
-          delete = Some(instr); }} } }
-  let delete_opt: Option<SaveInstruction> = delete;
+        if delete_opt.is_none() {
+          delete_opt = Some(instr); }} }}
   if let Some(delete_instr) = delete_opt { // Return a Delete.
     if save.is_some() {
       return Err("Cannot have both Delete and Save for same ID"
@@ -113,10 +112,10 @@ pub async fn reconcile_same_id_instructions_for_one_id(
       definer.0.ids.first()
       . ok_or("No primary ID found")?.clone();
     let source : String = definer.0.source.clone();
-    let from_disk: Option<SkgNode> =
+    let skgnode_from_disk: Option<SkgNode> =
       optskgnode_from_id(
         config, driver, &pid).await?;
-    if let Some(ref disk_node) = from_disk {
+    if let Some(ref disk_node) = skgnode_from_disk {
       if source != disk_node.source { // sources don't match
         return Err(Box::new(
           BufferValidationError::DiskSourceBufferSourceConflict(
@@ -128,33 +127,36 @@ pub async fn reconcile_same_id_instructions_for_one_id(
       title         : definer.0.title.clone(),
       aliases       : (
         definer.0.aliases.clone() . or(
-          from_disk.as_ref().and_then(
+          skgnode_from_disk.as_ref().and_then(
             |node| node.aliases.clone() )) ),
       source        : source,
-      ids           : supplement_ids( &definer, &from_disk),
+      ids           : supplement_ids( &definer, &skgnode_from_disk),
       body          : definer.0.body.clone(),
       contains      : definer.0.contains.clone(),
       subscribes_to : (
         definer.0.subscribes_to.clone() . or (
-          from_disk.as_ref().and_then(
+          skgnode_from_disk.as_ref().and_then(
             |node| node.subscribes_to.clone() )) ),
       hides_from_its_subscriptions : (
         definer.0.hides_from_its_subscriptions.clone() . or (
-          from_disk.as_ref().and_then(
+          skgnode_from_disk.as_ref().and_then(
             |node| node.hides_from_its_subscriptions.clone() )) ),
       overrides_view_of : (
         definer.0.overrides_view_of.clone() . or (
-          from_disk.as_ref().and_then(
+          skgnode_from_disk.as_ref().and_then(
             |node| node.overrides_view_of.clone() )) ), };
     Ok((supplemented_node, NonMerge_NodeAction::Save)) }}
 
 /// Supplements instruction's IDs with any extra IDs from disk.
+/// MOTIVATION: An OrgNode uses only one ID,
+/// while a SkgNode can have many.
 fn supplement_ids(
   definer: &SaveInstruction,
-  from_disk: &Option<SkgNode>
+  optskgnode_from_disk: &Option<SkgNode>
 ) -> Vec<ID> {
   let mut return_val: Vec<ID> = definer.0.ids.clone();
-  let disk_node_opt: Option<&SkgNode> = from_disk.as_ref();
+  let disk_node_opt: Option<&SkgNode> =
+    optskgnode_from_disk.as_ref();
   if let Some(disk_node) = disk_node_opt {
     for disk_id in &disk_node.ids {
       if !return_val.contains(disk_id) {

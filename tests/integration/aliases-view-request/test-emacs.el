@@ -35,7 +35,7 @@ LINE-NUMBER is zero-based."
   (skg-request-single-root-content-view-from-id "test-node")
   (sleep-for 0.5)
 
-  (let ((buffer (get-buffer "*skg-content-view*")))
+  (let ((buffer (get-buffer "*skg: Test Node*")))
     (unless buffer
       (error "Content buffer not created"))
     (with-current-buffer buffer
