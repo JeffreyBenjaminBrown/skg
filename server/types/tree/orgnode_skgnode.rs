@@ -1,4 +1,4 @@
-/// Node access utilities for ego_tree::Tree.
+/// Node access utilities for ego_tree::Tree<OrgNode|NodePair>
 
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
