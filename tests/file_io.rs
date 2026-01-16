@@ -45,7 +45,8 @@ fn test_node_io() {
     vec![ ID::new("reversed") ];
 
   write_skgnode_to_source(&reversed, &config).unwrap();
-  let out_filename: PathBuf = test_dir.join(&example.ids[0].0);
+  let out_filename: PathBuf =
+    test_dir.join(&example.ids[0].0).with_extension("skg");
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
 
