@@ -7,6 +7,7 @@ use crate::types::orgnode::{OrgNodeKind, OrgNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
+use crate::types::tree::orgnode_skgnode::reorder_children;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{HashSet, HashMap};
@@ -185,30 +186,3 @@ async fn append_new_definitive_nodepair_to_children_based_on_skgid (
                                        orgnode  : orgnode } )
       . id () )) ?;
   Ok ( new_child_id ) }
-
-/// Reorder a node's children by detaching all
-/// and re-appending in desired order.
-fn reorder_children (
-  tree          : &mut PairTree,
-  parent_treeid : NodeId,
-  first         : &Vec < NodeId >,
-  second        : &Vec < NodeId >,
-) -> Result < (), Box<dyn Error> > {
-  let mut desired_order : Vec < NodeId > =
-    Vec::new ();
-  desired_order . extend ( first );
-  desired_order . extend ( second );
-
-  for child_treeid in & desired_order {
-    // Detach all children
-    with_node_mut ( tree, *child_treeid,
-                    |mut child_mut| child_mut . detach () ) ?; }
-
-  for child_treeid in & desired_order {
-    // Re-append in desired order.
-    // ('append_id' preserves entire subtrees.)
-    with_node_mut (
-      tree, parent_treeid,
-      |mut parent_mut| {
-        parent_mut . append_id ( *child_treeid ); } ) ?; }
-  Ok (( )) }

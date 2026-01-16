@@ -13,6 +13,7 @@ use super::{NodePair, PairTree};
 use super::generic::{read_at_ancestor_in_tree, read_at_node_in_tree, with_node_mut};
 
 use ego_tree::{Tree, NodeId, NodeRef};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -246,3 +247,60 @@ pub fn collect_grandchild_aliases_for_orgnode (
             alias_child . value() . title() . to_string() ); }
         aliases };
       Ok(Some(dedup_vector(aliases))) }} }
+
+/// Find a child node by its ID.
+/// Returns the NodeId of the child if found, None otherwise.
+pub fn find_child_by_id (
+  tree          : & PairTree,
+  parent_treeid : ego_tree::NodeId,
+  target_skgid  : & ID,
+) -> Option < ego_tree::NodeId > {
+  let singleton : HashSet<ID> =
+    std::iter::once( target_skgid.clone() )
+    . collect();
+  find_children_by_ids( tree, parent_treeid, &singleton)
+    . remove(target_skgid) }
+
+/// Find child nodes by their IDs.
+/// Returns a map from ID to NodeId for children that were found.
+/// IDs not found as children are not included in the result.
+pub fn find_children_by_ids (
+  tree          : & PairTree,
+  parent_treeid : ego_tree::NodeId,
+  target_skgids : & HashSet < ID >,
+) -> HashMap < ID, ego_tree::NodeId > {
+  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
+  for child in tree.get(parent_treeid).unwrap().children() {
+    if let OrgNodeKind::True(t) = &child.value().orgnode.kind {
+      if let Some(child_id) = &t.id_opt {
+        if target_skgids.contains(child_id) {
+          result.insert(child_id.clone(), child.id()); }}}}
+  result }
+
+/// Reorder children of a parent node.
+/// Takes two vectors of NodeIds: first and second.
+/// All children in 'first' will be placed before all children in 'second'.
+pub fn reorder_children (
+  tree          : &mut PairTree,
+  parent_treeid : NodeId,
+  first         : &Vec < NodeId >,
+  second        : &Vec < NodeId >,
+) -> Result < (), Box<dyn Error> > {
+  let mut desired_order : Vec < NodeId > =
+    Vec::new ();
+  desired_order . extend ( first );
+  desired_order . extend ( second );
+
+  for child_treeid in & desired_order {
+    // Detach all children
+    with_node_mut ( tree, *child_treeid,
+                    |mut child_mut| child_mut . detach () ) ?; }
+
+  for child_treeid in & desired_order {
+    // Re-append in desired order.
+    // ('append_id' preserves entire subtrees.)
+    with_node_mut (
+      tree, parent_treeid,
+      |mut parent_mut| {
+        parent_mut . append_id ( *child_treeid ); } ) ?; }
+  Ok (( )) }

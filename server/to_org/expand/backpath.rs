@@ -18,6 +18,8 @@ use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
 use crate::types::tree::{PairTree, NodePair};
+use crate::types::tree::orgnode_skgnode::{
+  find_child_by_id, find_children_by_ids};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -231,32 +233,3 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     . prepend ( NodePair { mskgnode : None,
                            orgnode  : orgnode } ) . id ();
   Ok ( new_child_treeid ) }
-
-/// Find a child node by its ID.
-/// Returns the NodeId of the child if found, None otherwise.
-fn find_child_by_id (
-  tree          : & PairTree,
-  parent_treeid : ego_tree::NodeId,
-  target_skgid  : & ID,
-) -> Option < ego_tree::NodeId > {
-  let singleton : HashSet<ID> =
-    std::iter::once( target_skgid.clone() )
-    . collect();
-  find_children_by_ids( tree, parent_treeid, &singleton)
-    . remove(target_skgid) }
-
-/// Find child nodes by their IDs.
-/// Returns a map from ID to NodeId for children that were found.
-/// IDs not found as children are not included in the result.
-fn find_children_by_ids (
-  tree          : & PairTree,
-  parent_treeid : ego_tree::NodeId,
-  target_skgids : & HashSet < ID >,
-) -> HashMap < ID, ego_tree::NodeId > {
-  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
-  for child in tree.get(parent_treeid).unwrap().children() {
-    if let OrgNodeKind::True(t) = &child.value().orgnode.kind {
-      if let Some(child_id) = &t.id_opt {
-        if target_skgids.contains(child_id) {
-          result.insert(child_id.clone(), child.id()); }}}}
-  result }
