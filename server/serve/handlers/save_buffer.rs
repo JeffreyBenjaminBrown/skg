@@ -165,9 +165,10 @@ pub async fn update_from_and_rerender_buffer (
         & save_instructions );
     { // modify the paired forest before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
+      let forest_root_id : NodeId = paired_forest.root().id();
       complete_or_restore_each_node_in_branch (
         &mut paired_forest,
-        paired_forest.root().id(),
+        forest_root_id,
         config,
         typedb_driver,
         &mut visited ). await ?;

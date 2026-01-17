@@ -146,16 +146,17 @@ pub fn mark_if_visited_or_repeat_or_cycle (
   let pid : ID = // Will error if node is a Scaffold.
     get_pid_in_pairtree ( tree, node_id ) ?;
   detect_and_mark_cycle ( tree, node_id ) ?;
-  let is_indefinitive : bool =
-    write_at_node_in_tree ( tree, node_id, |np| {
-      let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-        else { unreachable!( "In mark_if_visited_or_repeat_or_cycle, get_pid_in_pairtree already verified TrueNode"); };
-      if visited . contains_key ( &pid ) {
-        // It's a repeat, so it should be indefinitive.
-        t . indefinitive = true; }
-      t . indefinitive } ) ?;
-  if !is_indefinitive {
-    visited . insert ( pid, node_id ); }
+  { let is_indefinitive : bool =
+      write_at_node_in_tree (
+        tree, node_id,
+        |np| { let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+               else { unreachable!( "In mark_if_visited_or_repeat_or_cycle, get_pid_in_pairtree already verified TrueNode"); };
+               if visited . contains_key ( &pid )
+               { // It's a repeat, so it should be indefinitive.
+                 t . indefinitive = true; }
+               t . indefinitive } ) ?;
+    if !is_indefinitive {
+      visited . insert ( pid, node_id ); }}
   Ok (( )) }
 
 /// Check if the node's PID appears in its ancestors,
