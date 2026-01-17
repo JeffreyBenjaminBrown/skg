@@ -1,3 +1,4 @@
+* flatten mark_if_visited_or_repeat_or_cycle
 * understand it
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 ** Why is show not reusable in save?

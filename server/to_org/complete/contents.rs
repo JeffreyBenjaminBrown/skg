@@ -1,4 +1,4 @@
-/// SINGLE ENTRY POINT: 'completeAndRestoreForest'.
+/// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, mark_if_visited_or_repeat_or_cycle };
 use crate::to_org::complete::aliascol::completeAliasCol;
@@ -19,25 +19,6 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-/// TRIVIAL: Just wraps 'complete_or_restore_each_node_in_branch',
-/// calling it on each "tree root" (child of the ForestRoot),
-/// but threading 'visited' through that sequence of calls.
-pub async fn completeAndRestoreForest (
-  forest        : &mut PairTree,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-) -> Result < DefinitiveMap, Box<dyn Error> > {
-  let mut visited : DefinitiveMap = DefinitiveMap::new ();
-  let tree_root_ids : Vec < NodeId > =
-    forest . root () . children ()
-    . map ( |c| c . id () )
-    . collect ();
-  for tree_root_id in tree_root_ids {
-    complete_or_restore_each_node_in_branch (
-      forest, tree_root_id, config, typedb_driver,
-      &mut visited ) . await ?; }
-  Ok ( visited ) }
-
 /// PURPOSE: Complete or restore a node,
 /// and then its children (a preorder DFS traversal).
 /// - "complete": Since another buffer might have already saved,
@@ -47,7 +28,7 @@ pub async fn completeAndRestoreForest (
 ///   TODO: Complete other kinds of branches.
 /// - "restore": Because indefinitive nodes may have had their titles or bodies edited.
 ///   TODO ? Maybe look for edits to indefinitive nodes and throw an error, as is done for foreign nodes.
-fn complete_or_restore_each_node_in_branch<'a> (
+pub fn complete_or_restore_each_node_in_branch<'a> (
   tree          : &'a mut PairTree,
   node_id       : NodeId,
   config        : &'a SkgConfig,

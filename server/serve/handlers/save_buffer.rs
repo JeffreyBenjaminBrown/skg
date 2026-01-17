@@ -4,7 +4,7 @@ use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::completeAndRestoreForest;
+use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::{forest_root_pair, DefinitiveMap};
@@ -164,11 +164,13 @@ pub async fn update_from_and_rerender_buffer (
         & orgnode_forest,
         & save_instructions );
     { // modify the paired forest before re-rendering it
-      let mut visited : DefinitiveMap =
-        completeAndRestoreForest (
-          &mut paired_forest,
-          config,
-          typedb_driver ) . await ?;
+      let mut visited : DefinitiveMap = DefinitiveMap::new();
+      complete_or_restore_each_node_in_branch (
+        &mut paired_forest,
+        paired_forest.root().id(),
+        config,
+        typedb_driver,
+        &mut visited ). await ?;
       let view_requests : Vec < (NodeId, ViewRequest) > =
         collectViewRequestsFromForest (
           & paired_forest ) ?;
