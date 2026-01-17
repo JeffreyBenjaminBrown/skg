@@ -49,5 +49,5 @@ fn test_do_everywhere_adding_grandchild() {
       *node.value() = new_title;
       Ok(()) }
   ).unwrap();
-  ssert!(eq_trees(tree.root(), expected_tree.root()));
+  assert!(eq_trees(tree.root(), expected_tree.root()));
 }
