@@ -1,9 +1,82 @@
-* if anyone else is reading this
-** Most plans are not here but online.
-   e.g. here:
-   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
-   This document is mostly things I considered highest-priority.
-* [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
+* understand it
+** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
+** Why is show not reusable in save?
+* extend it
+** save subscribees
+*** the subscribee tree format
+  - truenode // suppose this is a subscriber
+    - subscribeeCol
+      - [truenodes] // anything here is a subscribee
+        - [truenodes] // nodes here are content of the subscribee
+        - hiddeninsubscribeecol
+          - [truenodes] // nodes here are hidden by the subscriber
+      - hiddenoutsideofsubscribeecol
+        - [truenodes]
+*** extant procedure
+    Currently, subscribees are collected, nothing more.
+*** editing a subscribee
+    Suppose R is a subscriber.
+**** validate
+     A TrueNode can have at most one SubscribeeCol.
+     SubscribeeCol can have at most one Hiddenoutsideofsubscribeecol. Its TrueNode children (subscribees) cannot have the ID of its parent (subscriber) -- it can't subscribe to itself.
+     Nothing special to validate in a subscribee.
+     A Hidden*Col can only have TrueNode children.
+**** generate instructions
+***** collect subscribees
+      Already implemented. Whether they are definitive has no effect.
+***** collect hidden
+      Recurse into R's definitive subscribees.
+      For any such subcsribee E,
+      make a list C of IDs of its non-ignored content children.
+      Subtract from C any ID not in E's content on disk.
+      Everything E contains on disk that is absent from C
+      should be hidden from R.
+**** update view
+     The subscribees themselves need no updating,
+     nor do their content, but the hidden*Cols do.
+     For each hidden*Col, determine what it should contain,
+     see what it already contains, and insert anything missing.
+     Anything it should not contain should be marked parentIgnores.
+     The order in a Hiddeninsubscribeecol should correspond
+     to the order of the content of the subscribee.
+     The order in a Hiddenoutsideofsubscribeecol should correspond
+     to the order of the content of the subscriber's 'hidden' field.
+*** ruminating
+**** Edits to a foreign node.
+     Creates a lens.
+     It begins as whatever the user tried to save,
+     plus an overrides relationship to the foreign node,
+     plus a subscribes-to relationship to the foreign node,
+     plus hides relationships to the intersection
+     of its content and the foreign node's.
+**** Edits to a subscribee.
+     These don't make sense.
+**** Edits to a subscribee's content.
+     If it's deletion or insertion of a node the suscribee contains,
+     update the subscriber's hidden list.
+     If it's anything else, create a lens,
+     and use the lens when showing the subscribee's recursive content.
+**** A subscribee E can have its own subscribees.
+     Editing one of those is an edit to E, i.e. doesn't make sense.
+     To lens onto one, copy it elsewhere and edit that.
+** show subscribees
+* refactor it
+** ONGOING There seem to be unnecessary mid-functions.
+   as in midparent in a tree
+*** instances
+**** TODO flatten add_missing_info_to_forest
+** Write how each piece, if inelegant, at least fits into an elegant scheme.
+** complete_or_restore_each_node_in_branch
+   Unbundle those two ideas.
+   I think the completion is unnecessary. All it does is add a subscribeecol if it can.
+** ? validate ancestry, not descendents
+   This seems like it might prevent combinatorial explosion.
+   For instance, "an alias should have an aliascol parent"
+   is easier to say than "an aliascol's children can only be aliases".
+** ? could initial buffer creation be rewritten in terms of save
+*** root or roots each with a definitive view request
+*** but maybe definitive view requests are in terms of de novo creation
+** thoughts/saving-builds-tree-a-different-way.org
 * u
 ** DOGFOOD IT
 ** sourceward view ? ugly
@@ -404,3 +477,8 @@ fold-preservation
 * dubious
 ** fold body into false headline
    there in Emacs but (at worst ignored) when Rust rebuilds
+* if anyone else is reading this
+** Most plans are not here but online.
+   e.g. here:
+   github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+   This document is mostly things I considered highest-priority.

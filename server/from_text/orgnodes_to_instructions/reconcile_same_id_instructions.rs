@@ -85,67 +85,78 @@ pub async fn reconcile_same_id_instructions_for_one_id(
 ) -> Result<SaveInstruction, Box<dyn Error>> {
   if instructions.is_empty() {
     return Err("Cannot process empty instruction list".into()); }
-
-  // Separate Deletes from Saves
-  let mut save: Option<SaveInstruction> = None;
+  let mut save_opt: Option<SaveInstruction> = None;
   let mut delete_opt: Option<SaveInstruction> = None;
   for instruction in instructions {
     let instr: SaveInstruction = instruction;
     match instr.1 {
       NonMerge_NodeAction::Save => {
-        // Validation ensures at most one save per ID
-        if save.is_some() {
+        if save_opt.is_some() {
           return Err("Multiple save instructions for same ID (should be caught by validation)".into( )); }
-        save = Some(instr); }
+        save_opt = Some(instr); }
       NonMerge_NodeAction::Delete => {
-        // Multiple deletes are equivalent, just keep one
+        // Multiple deletes are harmless; keep either one.
         if delete_opt.is_none() {
           delete_opt = Some(instr); }} }}
   if let Some(delete_instr) = delete_opt { // Return a Delete.
-    if save.is_some() {
+    if save_opt.is_some() {
       return Err("Cannot have both Delete and Save for same ID"
                  . into() ); }
     return Ok(delete_instr); }
-  { // Build and return a Save.
-    let definer: SaveInstruction = save . ok_or( "No delete and no save instruction found. This should not be possible." )?;
-    let pid: ID =
-      definer.0.ids.first()
-      . ok_or("No primary ID found")?.clone();
-    let source : String = definer.0.source.clone();
-    let skgnode_from_disk: Option<SkgNode> =
-      optskgnode_from_id(
-        config, driver, &pid).await?;
-    if let Some(ref disk_node) = skgnode_from_disk {
-      if source != disk_node.source { // sources don't match
-        return Err(Box::new(
-          BufferValidationError::DiskSourceBufferSourceConflict(
-            pid.clone(),
-            SourceNickname::from( disk_node.source.clone() ),
-            SourceNickname::from( source.clone() )) )); }}
+  build_supplemented_save (
+    // Return a Save. Replace None fields from the skgnode implied by the buffer with whatever was already on disk. (The buffer node can delete the data in such a field by sending Some([]) rather than None.)
+    config, driver, save_opt ). await }
 
-    let supplemented_node: SkgNode = SkgNode {
-      title         : definer.0.title.clone(),
-      aliases       : (
-        definer.0.aliases.clone() . or(
-          skgnode_from_disk.as_ref().and_then(
-            |node| node.aliases.clone() )) ),
-      source        : source,
-      ids           : supplement_ids( &definer, &skgnode_from_disk),
-      body          : definer.0.body.clone(),
-      contains      : definer.0.contains.clone(),
-      subscribes_to : (
-        definer.0.subscribes_to.clone() . or (
-          skgnode_from_disk.as_ref().and_then(
-            |node| node.subscribes_to.clone() )) ),
-      hides_from_its_subscriptions : (
-        definer.0.hides_from_its_subscriptions.clone() . or (
-          skgnode_from_disk.as_ref().and_then(
-            |node| node.hides_from_its_subscriptions.clone() )) ),
-      overrides_view_of : (
-        definer.0.overrides_view_of.clone() . or (
-          skgnode_from_disk.as_ref().and_then(
-            |node| node.overrides_view_of.clone() )) ), };
-    Ok((supplemented_node, NonMerge_NodeAction::Save)) }}
+/// Build and return a Save instruction supplemented with disk data.
+/// Replaces None fields in the instruction with values from disk,
+/// and validates that sources match.
+async fn build_supplemented_save(
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  save: Option<SaveInstruction>
+) -> Result<SaveInstruction, Box<dyn Error>> {
+  let (from_buffer, action)
+    : (SkgNode, NonMerge_NodeAction)
+    = save.ok_or("No delete and no save instruction found. This should not be possible.")?;
+  let pid: ID =
+    from_buffer.ids.first()
+    .ok_or("No primary ID found")?.clone();
+  let source: String = from_buffer.source.clone();
+  let from_disk: Option<SkgNode> =
+    optskgnode_from_id(config, driver, &pid).await?;
+  if let Some(ref disk_node) = from_disk {
+    if source != disk_node.source { // sources don't match
+      return Err(Box::new(
+        BufferValidationError::DiskSourceBufferSourceConflict(
+          pid.clone(),
+          SourceNickname::from(disk_node.source.clone()),
+          SourceNickname::from(source.clone())))); }}
+  let supplemented_node: SkgNode = SkgNode {
+    title: from_buffer.title.clone(),
+    aliases: (
+      from_buffer.aliases.clone().or(
+        from_disk.as_ref().and_then(
+          |node| node.aliases.clone()))),
+    source: source,
+    ids: supplement_ids( &(from_buffer.clone(),
+                           action),
+                         &from_disk),
+    body: from_buffer.body.clone(),
+    contains: from_buffer.contains.clone(),
+    subscribes_to: (
+      from_buffer.subscribes_to.clone().or(
+        from_disk.as_ref().and_then(
+          |node| node.subscribes_to.clone()))),
+    hides_from_its_subscriptions: (
+      from_buffer.hides_from_its_subscriptions.clone().or(
+        from_disk.as_ref().and_then(
+          |node| node.hides_from_its_subscriptions.clone()))),
+    overrides_view_of: (
+      from_buffer.overrides_view_of.clone().or(
+        from_disk.as_ref().and_then(
+          |node| node.overrides_view_of.clone()))), };
+  Ok((supplemented_node,
+      NonMerge_NodeAction::Save)) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
 /// MOTIVATION: An OrgNode uses only one ID,
