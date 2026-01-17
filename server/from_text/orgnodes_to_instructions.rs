@@ -38,6 +38,6 @@ pub async fn orgnode_forest_to_nonmerge_save_instructions (
   { clobbered_instructions.push (
       { let clobbered_node : SkgNode =
           clobber_none_fields_with_data_from_disk (
-              config, driver, node ) . await ?;
+            config, driver, node ). await ?;
         (clobbered_node, action) } ); }
   Ok (clobbered_instructions) }

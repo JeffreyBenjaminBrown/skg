@@ -7,6 +7,7 @@
 pub mod orgnode_skgnode;
 pub mod generic;
 pub mod generations;
+pub mod from_org_text;
 
 use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;

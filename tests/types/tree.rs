@@ -1,3 +1,9 @@
+#[path = "tree/generic.rs"]
+mod generic;
+
+#[path = "tree/from_org_text.rs"]
+mod from_org_text;
+
 use ego_tree::Tree;
 use skg::types::tree::generations::{
   first_in_generation,

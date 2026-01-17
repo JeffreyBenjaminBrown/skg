@@ -75,3 +75,63 @@ where F: FnOnce(NodeMut<T>) -> R {
   let node_mut : NodeMut<T> = tree . get_mut ( node_id )
     . ok_or ( "with_node_mut: node not found" ) ?;
   Ok ( f ( node_mut ) ) }
+
+/// Apply a function to every node in a subtree, DFS preorder traversal.
+/// Starts at `start_node_id` and recursively visits all descendants.
+/// The function receives `NodeMut<T>`, which allows:
+/// - Mutating the node's value via `.value()`
+/// - Navigating to parent via `.parent()` (immutable)
+/// - Accessing the tree via `.tree()` (immutable)
+///
+/// Example: Convert TrueNodes to Aliases when parent is AliasCol
+/// ```ignore
+/// do_everywhere_in_tree_dfs(&mut tree, root_id, |mut node| {
+///   if let Some(parent) = node.parent() {
+///     if matches!(parent.value(), OrgNode { kind: Scaff(AliasCol), .. }) {
+///       // Convert to Alias
+///       let val = node.value();
+///       // mutate val
+///     }
+///   }
+///   Ok(())
+/// })
+/// ```
+pub fn do_everywhere_in_tree_dfs<T, F>(
+  tree          : &mut Tree<T>,
+  start_node_id : NodeId,
+  f             : &mut F
+) -> Result<(), String>
+where F: FnMut(NodeMut<T>) -> Result<(), String> {
+  let child_ids : Vec<NodeId> = {
+    // Collect early so no borrow conflicts
+    let node_ref = tree . get ( start_node_id )
+      . ok_or ( "do_everywhere_in_tree_dfs: start node not found" ) ?;
+    node_ref . children ()
+      . map ( |c| c . id( ))
+      . collect () };
+  { // do F here
+    let node_mut = tree . get_mut ( start_node_id )
+      . ok_or ( "do_everywhere_in_tree_dfs: node not found" ) ?;
+    f ( node_mut ) ?; }
+  for child_id in child_ids { // recurse
+    do_everywhere_in_tree_dfs (
+      tree, child_id, f ) ?; }
+  Ok (( ))}
+
+/// Compare two trees for structural and value equality.
+/// Returns true if both trees have the same structure and all node values are equal.
+pub fn eq_trees<T: PartialEq>(
+  node1: ego_tree::NodeRef<T>,
+  node2: ego_tree::NodeRef<T>
+) -> bool {
+  if node1.value() != node2.value() {
+    return false;
+  }
+  let children1: Vec<_> = node1.children().collect();
+  let children2: Vec<_> = node2.children().collect();
+  if children1.len() != children2.len() {
+    return false;
+  }
+  children1.iter().zip(children2.iter())
+    .all(|(c1, c2)| eq_trees(*c1, *c2))
+}
