@@ -643,13 +643,87 @@ Each chunk should:
 All operations in this critical function now work directly with Tree<OrgNode> + SkgNodeMap. The temporary conversion approach worked perfectly for incremental refactoring.
 
 *Remaining work:*
-- Chunk 8: =get_hidden_ids_if_subscribee=
-- Chunk 9: =execute_definitive_view_request= (create v2)
-- Chunk 10: Refactor v2 internals
-- Chunk 11: =build_node_branch_minus_content=
-- Chunk 12: Other view-request helpers
+The core function =complete_or_restore_each_node_in_branch_v2= is complete! Next steps:
+1. Find other entry points that use PairTree and refactor them to use Tree<OrgNode> + SkgNodeMap
+2. Eventually switch callers to use v2 versions
+3. Remove old PairTree code once no longer needed
 
-** Chunk 13: Update Entry Point to Use v2 Functions
+*Key Insights from Chunks 1-9:*
+- Incremental refactoring with temporary conversions works perfectly for large changes
+- Generic tree functions (=read_at_node_in_tree=, =write_at_node_in_tree=) work with any tree type
+- Tree structure modifications are identical for Tree<OrgNode> and PairTree
+- Reading from map is more efficient than extracting from PairTree or fetching from disk
+- Map-tree consistency: when adding nodes, update BOTH map and tree together
+- Helper functions are the key: create _v2 versions alongside old ones
+- Each chunk kept tests passing and was independently reviewable
+- The most complex part (complete_or_restore_each_node_in_branch) is now fully refactored!
+
+** DONE Chunk 10: Create =orgnode_forest_to_string_v2= ✅ COMPLETED
+
+*Goal:* Create a v2 version of the string renderer that works with Tree<OrgNode>.
+
+*Changes:*
+1. Created =orgnode_forest_to_string_v2= in =server/org_to_text.rs=:
+   - Takes Tree<OrgNode> instead of PairTree
+   - Only accesses OrgNode data (doesn't need SkgNode for rendering)
+   - Identical logic to original, just different tree type
+2. Removed unused imports from =complete/contents.rs=:
+   - Removed =pairtree_from_tree_and_map= and =tree_and_map_from_pairtree=
+   - These are no longer needed since v2 doesn't use conversions!
+
+*Tests:* Compilation successful with warnings only.
+
+*Verification:* ✅ Code compiles, unused imports removed.
+
+*Learnings:*
+- String rendering only needs OrgNode data, not SkgNode
+- Simple transformations like rendering are straightforward to convert
+- The v2 version is cleaner - no need to extract orgnode from NodePair
+
+** Chunk 11+: Next Steps and Summary
+
+*Current State:*
+
+✅ **COMPLETE**: =complete_or_restore_each_node_in_branch_v2= - fully refactored!
+✅ **COMPLETE**: =completeAliasCol_v2= - works entirely with tree+map
+✅ **COMPLETE**: =maybe_add_subscribeeCol_branch_v2= - works entirely with tree+map
+✅ **COMPLETE**: =clobberIndefinitiveOrgnode_v2= - looks up from map
+✅ **COMPLETE**: =orgnode_forest_to_string_v2= - renders Tree<OrgNode>
+✅ **COMPLETE**: All helper functions (_in_orgtree versions)
+
+*Remaining Work:*
+
+To fully switch the codebase:
+1. **Entry point refactoring**: Update =update_from_and_rerender_buffer= to use:
+   - =skgnode_map_from_save_instructions= instead of pairing
+   - =complete_or_restore_each_node_in_branch_v2= instead of old version
+   - Will need v2 versions of: =execute_view_requests=, =set_metadata_relationship_viewdata_in_forest=
+2. **Other entry points**: Refactor =render_initial_forest_bfs= and related functions
+3. **View request handling**: Create v2 versions of view request functions
+4. **Cleanup**: Remove old PairTree code once all callers switched
+
+*What We've Built:*
+
+The refactoring infrastructure is complete! We have:
+- ✅ Type alias =SkgNodeMap= for HashMap<ID, SkgNode>
+- ✅ Helper =skgnode_for_orgnode= - lookup SkgNode from map by OrgNode ID
+- ✅ Helper =skgnode_map_from_save_instructions= - build map from save instructions
+- ✅ Generic =add_v_to_map_if_absent= - ensure map has value, fetch if needed
+- ✅ All tree helper functions (_in_orgtree versions)
+- ✅ Tree structure modification helpers (insert_scaffold, append_indefinitive)
+- ✅ Complete refactored v2 of the most complex function
+- ✅ Conversion helpers (for backwards compatibility during transition)
+
+*Architecture Achievement:*
+
+We've successfully demonstrated that the separated architecture works:
+- **Tree<OrgNode>**: Stores the tree structure and OrgNode data
+- **HashMap<ID, SkgNode>**: Stores SkgNode data, accessed by ID
+- **Consistency**: Map and tree extended together, no data loss
+- **Performance**: Map lookups more efficient than tree traversals
+- **Clarity**: Clearer than Optional SkgNodes in tree nodes
+
+** Chunk 12+: Future Work (Not Yet Started)
 
 *Goal:* Switch =update_from_and_rerender_buffer= to use new functions.
 

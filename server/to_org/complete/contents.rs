@@ -21,8 +21,6 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::PairTree;
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::orgnode_skgnode::{
-  pairtree_from_tree_and_map, tree_and_map_from_pairtree };
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;

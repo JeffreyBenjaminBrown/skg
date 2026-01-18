@@ -3,7 +3,7 @@ use crate::types::orgnode::{
 };
 use crate::types::tree::{NodePair, PairTree};
 
-use ego_tree::NodeRef;
+use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
 /// PURPOSE: Render a "forest" -- a tree with ForestRoot at root
@@ -39,6 +39,39 @@ pub fn orgnode_forest_to_string (
   if ! is_forest_root {
     return Err (
       "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
+  let mut result : String =
+    String::new ();
+  for child in root_ref . children () {
+    result . push_str (
+      & render_node_subtree_to_org ( child, 1 )? ); }
+  Ok ( result ) }
+
+/// V2: Render a Tree<OrgNode> forest to org-mode text.
+/// ForestRoot is not rendered; its children start at level 1.
+pub fn orgnode_forest_to_string_v2 (
+  forest : &Tree<OrgNode>,
+) -> Result < String, Box<dyn Error> > {
+  fn render_node_subtree_to_org (
+    node_ref : NodeRef < OrgNode >,
+    level    : usize,
+  ) -> Result < String, Box<dyn Error> > {
+    let orgnode : &OrgNode = node_ref . value ();
+    let mut out : String =
+      orgnode_to_text ( level, orgnode )?;
+    for child in node_ref . children () {
+      out . push_str (
+        & render_node_subtree_to_org (
+          child,
+          level + 1 )? ); }
+    Ok ( out ) }
+  let root_ref = forest . root ();
+  let is_forest_root : bool =
+    matches! (
+      & root_ref . value () . kind,
+      OrgNodeKind::Scaff ( Scaffold::ForestRoot ));
+  if ! is_forest_root {
+    return Err (
+      "orgnode_forest_to_string_v2: root is not a ForestRoot".into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {
