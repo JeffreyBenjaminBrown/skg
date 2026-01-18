@@ -1,7 +1,9 @@
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
-use super::misc::ID;
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::util::option_vec_is_empty_or_none;
+use super::misc::ID;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SkgNode {
@@ -45,6 +47,16 @@ impl SkgNode {
       format!("SkgNode '{}' has no IDs", self.title)) }
 }
 
+
+//
+// New map-based helpers for refactoring away from PairTree
+//
+
+/// Type alias for the new map-based approach.
+/// Maps node IDs to their corresponding SkgNodes.
+pub type SkgNodeMap = HashMap<ID, SkgNode>;
+
+
 //
 // Functions
 //
@@ -79,3 +91,18 @@ pub fn empty_skgnode () -> SkgNode {
     hides_from_its_subscriptions : None,
     overrides_view_of            : None,
   }}
+
+/// Extract SkgNode for an OrgNode from the map, if applicable.
+/// Returns None for Scaffolds or TrueNodes without IDs.
+pub fn skgnode_for_orgnode<'a> (
+  orgnode : &OrgNode,
+  map     : &'a SkgNodeMap,
+) -> Option<&'a SkgNode>
+{
+  match &orgnode.kind {
+    OrgNodeKind::True(t) =>
+      t.id_opt.as_ref()
+        .and_then(|id| map.get(id)),
+    OrgNodeKind::Scaff(_) => None,
+  }
+}
