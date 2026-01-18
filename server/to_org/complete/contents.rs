@@ -4,7 +4,7 @@ use crate::to_org::util::{
   DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree, truenode_in_orgtree_is_indefinitive, collect_child_treeids_in_orgtree, detect_and_mark_cycle_in_orgtree,
   make_indef_if_repeat_then_extend_defmap_in_orgtree,
 };
-use crate::to_org::complete::aliascol::completeAliasCol_v2;
+use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch_v2;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
@@ -63,7 +63,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
                  OrgNodeKind::Scaff(Scaffold::AliasCol)) })
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // AliasCol: use v2 version working directly with tree+map
-      completeAliasCol_v2 (
+      completeAliasCol (
         tree, map, node_id, config, typedb_driver ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
         matches!( &node.kind, OrgNodeKind::Scaff(_)) } )
@@ -190,36 +190,6 @@ pub async fn ensure_skgnode (
 /// Noop for Scaffolds. Otherwise, ensures the node has a source.
 /// If needed, fetches the data from TypeDB.
 pub async fn ensure_source (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let needs_source : bool =
-    read_at_node_in_tree (
-      tree, node_id,
-      |np| matches! ( &np . orgnode . kind,
-                      OrgNodeKind::True(t)
-                      if t . source_opt . is_none () )) ?;
-  if needs_source {
-    let node_pid : ID =
-      get_pid_in_pairtree ( tree, node_id ) ?;
-    let (_pid, source) : (ID, String) =
-      pid_and_source_from_id (
-        db_name, driver, &node_pid ) . await ?
-      . ok_or_else ( || format! (
-        "ensure_source: could not find source for ID {:?}",
-        node_pid ) ) ?;
-    write_at_node_in_tree (
-      tree, node_id,
-      |np| {
-        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-          else { panic! ( "ensure_source: expected TrueNode" ) };
-        t . source_opt = Some ( source ); } ) ?; }
-  Ok (( )) }
-
-/// V2: Tree<OrgNode> version of ensure_source.
-pub async fn ensure_source_v2 (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
   db_name : &str,
@@ -239,13 +209,13 @@ pub async fn ensure_source_v2 (
       pid_and_source_from_id (
         db_name, driver, &node_pid ) . await ?
       . ok_or_else ( || format! (
-        "ensure_source_v2: could not find source for ID {:?}",
+        "ensure_source: could not find source for ID {:?}",
         node_pid ) ) ?;
     write_at_node_in_tree (
       tree, node_id,
       |orgnode| {
         let OrgNodeKind::True ( t ) = &mut orgnode.kind
-          else { panic! ( "ensure_source_v2: expected TrueNode" ) };
+          else { panic! ( "ensure_source: expected TrueNode" ) };
         t . source_opt = Some ( source ); } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   Ok (( )) }

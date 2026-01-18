@@ -40,7 +40,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request_v2 (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_aliases_view_then_drop_request
-** build_and_integrate_containerward_path_v2
+** DONE build_and_integrate_containerward_path_v2
 pub async fn build_and_integrate_containerward_path_v2 (
   tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
@@ -48,7 +48,7 @@ pub async fn build_and_integrate_containerward_path_v2 (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_containerward_path
-** build_and_integrate_containerward_view_then_drop_request_v2
+** DONE build_and_integrate_containerward_view_then_drop_request_v2
 pub async fn build_and_integrate_containerward_view_then_drop_request_v2 (
   tree          : &mut Tree<OrgNode>,
   _map          : &mut SkgNodeMap,
@@ -58,7 +58,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request_v2 (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_containerward_view_then_drop_request
-** build_and_integrate_sourceward_path_v2
+** DONE build_and_integrate_sourceward_path_v2
 pub async fn build_and_integrate_sourceward_path_v2 (
   tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
@@ -66,7 +66,7 @@ pub async fn build_and_integrate_sourceward_path_v2 (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_sourceward_path
-** build_and_integrate_sourceward_view_then_drop_request_v2
+** DONE build_and_integrate_sourceward_view_then_drop_request_v2
 pub async fn build_and_integrate_sourceward_view_then_drop_request_v2 (
   tree          : &mut Tree<OrgNode>,
   _map          : &mut SkgNodeMap,
@@ -92,7 +92,7 @@ pub fn clobberIndefinitiveOrgnode_v2 (
   treeid  : NodeId,
 ) -> Result < (), Box<dyn Error> >
 *** clobberIndefinitiveOrgnode
-** completeAliasCol_v2
+** DONE completeAliasCol_v2
 pub async fn completeAliasCol_v2 (
   tree             : &mut Tree<OrgNode>,
   map              : &SkgNodeMap,
@@ -128,7 +128,7 @@ pub fn complete_or_restore_each_node_in_branch_v2<'a> (
   visited       : &'a mut DefinitiveMap,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 *** complete_or_restore_each_node_in_branch
-** ensure_source_v2
+** DONE ensure_source_v2
 pub async fn ensure_source_v2 (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
@@ -197,7 +197,7 @@ fn integrate_linear_portion_of_path_v2<'a> (
   driver     : &'a TypeDBDriver,
 ) -> Pin<Box<dyn Future<Output = Result<ego_tree::NodeId, Box<dyn Error>>> + 'a>>
 *** integrate_linear_portion_of_path
-** integrate_path_that_might_fork_or_cycle_v2
+** DONE integrate_path_that_might_fork_or_cycle_v2
 pub async fn integrate_path_that_might_fork_or_cycle_v2 (
   tree        : &mut Tree<OrgNode>,
   node_id     : ego_tree::NodeId,

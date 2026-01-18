@@ -3,6 +3,11 @@
    remove_completed_view_request
 ** keep this up to date
    refactor-ongoing/functions.org
+** once it's not globally needed, restrict PairTree and NodePair
+   via 'super' or, better even if isolated enough, local
+** functions miscategorized as pairless
+   in 'new-functions-without-correspondences',
+   lots of '{name}_in_orgtree' functions correspond to '{name}' ones.
 * two kinds of stats
 ** the idea
    One regards the view, the other the graph.

@@ -1,10 +1,10 @@
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous_v2;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{
-  build_and_integrate_containerward_view_then_drop_request_v2,
-  build_and_integrate_sourceward_view_then_drop_request_v2};
+  build_and_integrate_containerward_view_then_drop_request,
+  build_and_integrate_sourceward_view_then_drop_request};
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::to_org::complete::contents::ensure_source_v2;
+use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::{
   maybe_add_hiddenInSubscribeeCol_branch_v2,
   type_and_parent_type_consistent_with_subscribee_in_orgtree };
@@ -39,11 +39,11 @@ pub async fn execute_view_requests (
           forest, map, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
-        build_and_integrate_containerward_view_then_drop_request_v2 (
+        build_and_integrate_containerward_view_then_drop_request (
           forest, map, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Sourceward => {
-        build_and_integrate_sourceward_view_then_drop_request_v2 (
+        build_and_integrate_sourceward_view_then_drop_request (
           forest, map, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Definitive => {
@@ -82,7 +82,7 @@ async fn execute_definitive_view_request (
                                      preexisting_node_id,
                                      visited ) ?; }}
   // Ensure node has a source
-  ensure_source_v2 (
+  ensure_source (
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
     from_disk_replace_title_body_and_skgnode (

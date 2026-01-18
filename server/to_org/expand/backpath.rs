@@ -8,7 +8,7 @@
 ///   maybe even all of it, might already be there.
 
 use crate::to_org::util::{
-  get_pid_in_pairtree, get_pid_in_tree, skgnode_and_orgnode_from_id,
+  get_pid_in_tree, skgnode_and_orgnode_from_id,
   remove_completed_view_request};
 use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
@@ -31,7 +31,8 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_containerward_view_then_drop_request (
-  tree          : &mut PairTree,
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -45,44 +46,10 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
     "Failed to integrate containerward path",
     errors, result ) }
 
-pub async fn build_and_integrate_containerward_view_then_drop_request_v2 (
-  tree          : &mut Tree<OrgNode>,
-  _map          : &mut SkgNodeMap,
-  node_id       : ego_tree::NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_containerward_path_v2 (
-    tree, node_id, config, typedb_driver ) . await;
-  remove_completed_view_request (
-    tree, node_id,
-    ViewRequest::Containerward,
-    "Failed to integrate containerward path",
-    errors, result ) }
-
 /// Integrate a containerward path into an OrgNode tree.
 /// This is called on a specific node in the tree,
 /// and integrates the containerward path from that node.
 pub async fn build_and_integrate_containerward_path (
-  tree      : &mut PairTree,
-  node_id   : ego_tree::NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let terminus_pid : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
-  let ( path, cycle_node, branches )
-    : ( Vec < ID >, Option < ID >, HashSet < ID > )
-    = path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
-      & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle (
-    tree, node_id, path, branches, cycle_node, config, driver
-  ). await }
-
-pub async fn build_and_integrate_containerward_path_v2 (
   tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
@@ -96,12 +63,13 @@ pub async fn build_and_integrate_containerward_path_v2 (
       & config . db_name,
       driver,
       & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle_v2 (
+  integrate_path_that_might_fork_or_cycle (
     tree, node_id, path, branches, cycle_node, config, driver
   ). await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
-  tree          : &mut PairTree,
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -115,46 +83,12 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
     "Failed to integrate sourceward path",
     errors, result ) }
 
-pub async fn build_and_integrate_sourceward_view_then_drop_request_v2 (
-  tree          : &mut Tree<OrgNode>,
-  _map          : &mut SkgNodeMap,
-  node_id       : ego_tree::NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_sourceward_path_v2 (
-    tree, node_id, config, typedb_driver ) . await;
-  remove_completed_view_request (
-    tree, node_id,
-    ViewRequest::Sourceward,
-    "Failed to integrate sourceward path",
-    errors, result ) }
-
 /// Integrate a sourceward path into an OrgNode tree.
 /// TODO ? Can this be dedup'd w/r/t
 ///   'build_and_integrate_containerward_path'?
 ///   Claude thought extracting the common logic would be hard,
 ///   due to async lifetime issues.
 pub async fn build_and_integrate_sourceward_path (
-  tree      : &mut PairTree,
-  node_id   : ego_tree::NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let terminus_pid : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
-  let ( path, cycle_node, branches )
-    : ( Vec < ID >, Option < ID >, HashSet < ID > )
-    = path_sourceward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
-      & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle (
-    tree, node_id, path, branches, cycle_node, config, driver
-  ). await }
-
-pub async fn build_and_integrate_sourceward_path_v2 (
   tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
@@ -168,45 +102,13 @@ pub async fn build_and_integrate_sourceward_path_v2 (
       & config . db_name,
       driver,
       & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle_v2 (
+  integrate_path_that_might_fork_or_cycle (
     tree, node_id, path, branches, cycle_node, config, driver
   ). await }
 
 /// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
 /// using provided backpath data.
 pub async fn integrate_path_that_might_fork_or_cycle (
-  tree        : &mut PairTree,
-  node_id     : ego_tree::NodeId,
-  mut path    : Vec < ID >,
-  branches    : HashSet < ID >,
-  cycle_node  : Option < ID >,
-  config      : &SkgConfig,
-  driver      : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let terminus_pid : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
-  if ! path . is_empty () {
-    // The head of the path should be the terminus. We strip it.
-    if path[0] != terminus_pid {
-      return Err (
-        format! (
-          "Path head {:?} does not match terminus {:?}",
-          path[0], terminus_pid
-        ) . into () ); }
-    path . remove ( 0 ); }
-  let last_node_id : ego_tree::NodeId =
-    integrate_linear_portion_of_path (
-      tree, node_id, &path, config, driver ) . await ?;
-  if ! branches . is_empty () {
-    integrate_branches_in_node (
-      tree, last_node_id, branches, config, driver ) . await ?;
-  } else if let Some ( cycle_id ) = cycle_node {
-    // PITFALL: If there are branches, the cycle node is ignored.
-    integrate_cycle_in_node (
-      tree, last_node_id, cycle_id, config, driver ) . await ?; }
-  Ok (( )) }
-
-pub async fn integrate_path_that_might_fork_or_cycle_v2 (
   tree        : &mut Tree<OrgNode>,
   node_id     : ego_tree::NodeId,
   mut path    : Vec < ID >,
