@@ -1,5 +1,5 @@
 use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
-use crate::types::tree::{PairTree, NodePair};
+use crate::types::tree::NodePair;
 use crate::types::tree::generic::read_at_node_in_tree;
 
 use ego_tree::NodeId;

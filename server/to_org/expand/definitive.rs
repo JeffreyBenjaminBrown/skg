@@ -1,33 +1,22 @@
-use crate::to_org::render::truncate_after_node_in_gen::{
-  add_last_generation_and_truncate_some_of_previous,
-  add_last_generation_and_truncate_some_of_previous_v2};
-use crate::to_org::expand::aliases::{
-  build_and_integrate_aliases_view_then_drop_request,
-  build_and_integrate_aliases_view_then_drop_request_v2};
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous_v2;
+use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{
-  build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_containerward_view_then_drop_request_v2,
-  build_and_integrate_sourceward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request_v2};
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::to_org::complete::contents::{ensure_source, ensure_source_v2};
+use crate::to_org::complete::contents::ensure_source_v2;
 use crate::to_org::complete::sharing::{
-  maybe_add_hiddenInSubscribeeCol_branch,
   maybe_add_hiddenInSubscribeeCol_branch_v2,
-  type_and_parent_type_consistent_with_subscribee,
   type_and_parent_type_consistent_with_subscribee_in_orgtree };
 use crate::to_org::util::{
-  build_node_branch_minus_content, build_node_branch_minus_content_v2,
-  get_pid_in_pairtree, get_pid_in_tree,
-  DefinitiveMap, truenode_in_tree_is_indefinitive,
+  build_node_branch_minus_content_v2, get_pid_in_tree,
+  DefinitiveMap,
   truenode_in_orgtree_is_indefinitive,
-  content_ids_if_definitive_else_empty,
   content_ids_if_definitive_else_empty_in_orgtree };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
-use crate::types::tree::{NodePair, PairTree};
-use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::write_at_node_in_tree;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
@@ -46,7 +35,7 @@ pub async fn execute_view_requests (
   for (node_id, request) in requests {
     match request {
       ViewRequest::Aliases => {
-        build_and_integrate_aliases_view_then_drop_request_v2 (
+        build_and_integrate_aliases_view_then_drop_request (
           forest, map, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
@@ -58,7 +47,7 @@ pub async fn execute_view_requests (
           forest, map, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Definitive => {
-        execute_definitive_view_request_v2 (
+        execute_definitive_view_request (
           forest, map, node_id, config, typedb_driver,
           visited, errors ) . await ?; }, } }
   Ok (( )) }
@@ -74,53 +63,6 @@ pub async fn execute_view_requests (
 /// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
 /// list is used to filter out content that should be hidden.
 async fn execute_definitive_view_request (
-  forest        : &mut PairTree, // "forest" = tree with ForestRoot
-  node_id       : NodeId, // had the request
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  visited       : &mut DefinitiveMap,
-  _errors       : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID = get_pid_in_pairtree (
-    forest, node_id ) ?;
-  let hidden_ids : HashSet < ID > =
-    // If node is a subscribee, we may need to hide some content.
-    get_hidden_ids_if_subscribee ( forest, node_id ) ?;
-  if let Some ( &preexisting_node_id ) =
-    visited . get ( & node_pid )
-  { if preexisting_node_id != node_id {
-    indefinitize_content_subtree ( forest,
-                                   preexisting_node_id,
-                                   visited ) ?; }}
-  // Ensure node has a source (Subscribee nodes may not have one yet)
-  ensure_source (
-    forest, node_id, &config.db_name, typedb_driver ) . await ?;
-  { // Mutate the root of the definitive view request:
-    from_disk_replace_title_body_and_skgnode (
-      // preserves relevant orgnode fields
-      forest, node_id, config ) ?;
-    write_at_node_in_tree (
-      forest, node_id,
-      |np| { // remove ViewRequest and mark definitive
-        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-          else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
-        t . view_requests . remove ( & ViewRequest::Definitive );
-        t . indefinitive = false; } ) ?; }
-  visited . insert ( node_pid.clone(), node_id );
-  extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
-    forest, node_id,
-    config.initial_node_limit, visited, config, typedb_driver,
-    &hidden_ids,
-  ) . await ?;
-  // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
-  if type_and_parent_type_consistent_with_subscribee (
-    forest, node_id )?
-  { maybe_add_hiddenInSubscribeeCol_branch (
-      forest, node_id, config, typedb_driver
-    ). await ?; }
-  Ok (( )) }
-
-async fn execute_definitive_view_request_v2 (
   forest        : &mut ego_tree::Tree<OrgNode>,
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
@@ -132,18 +74,18 @@ async fn execute_definitive_view_request_v2 (
   let node_pid : ID = get_pid_in_tree (
     forest, node_id ) ?;
   let hidden_ids : HashSet < ID > =
-    get_hidden_ids_if_subscribee_v2 ( forest, map, node_id ) ?;
+    get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;
   if let Some ( &preexisting_node_id ) =
     visited . get ( & node_pid )
   { if preexisting_node_id != node_id {
-    indefinitize_content_subtree_v2 ( forest, map,
+    indefinitize_content_subtree ( forest, map,
                                      preexisting_node_id,
                                      visited ) ?; }}
   // Ensure node has a source
   ensure_source_v2 (
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
-    from_disk_replace_title_body_and_skgnode_v2 (
+    from_disk_replace_title_body_and_skgnode (
       forest, map, node_id, config ) ?;
     write_at_node_in_tree (
       forest, node_id,
@@ -154,7 +96,7 @@ async fn execute_definitive_view_request_v2 (
         t . indefinitive = false; } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   visited . insert ( node_pid.clone(), node_id );
-  extendDefinitiveSubtreeFromLeaf_v2 (
+  extendDefinitiveSubtreeFromLeaf (
     forest, map, node_id,
     config.initial_node_limit, visited, config, typedb_driver,
     &hidden_ids,
@@ -172,50 +114,24 @@ async fn execute_definitive_view_request_v2 (
 /// Otherwise return an empty set (which might be dangerous --
 /// see the PITFALL | TODO comment in the function body.
 fn get_hidden_ids_if_subscribee (
-  tree    : &PairTree,
-  node_id : NodeId,
-) -> Result < HashSet < ID >, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
-    . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
-  if !type_and_parent_type_consistent_with_subscribee (
-       tree, node_id )?
-  { // PITFALL \ TODO: Maybe this should return an error rather than the empty set. The empty set says 'the subscriber hides none of its content', which is technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
-    return Ok ( HashSet::new () ); }
-  else {
-    let subscribee_col : NodeRef < NodePair > =
-      node_ref . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)" ) ?;
-    let subscriber : NodeRef < NodePair > =
-      subscribee_col . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
-    let hidden_ids : HashSet < ID > =
-      match & subscriber . value () . mskgnode {
-        Some ( skgnode ) =>
-          skgnode . hides_from_its_subscriptions . clone ()
-          . unwrap_or_default () . into_iter () . collect (),
-        None => HashSet::new (), };
-    Ok ( hidden_ids ) }}
-
-/// V2: Tree<OrgNode> + SkgNodeMap version of get_hidden_ids_if_subscribee.
-fn get_hidden_ids_if_subscribee_v2 (
   tree    : &ego_tree::Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < HashSet < ID >, Box<dyn Error> > {
   let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id )
-    . ok_or ( "get_hidden_ids_if_subscribee_v2: node not found" ) ?;
+    . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
   if !type_and_parent_type_consistent_with_subscribee_in_orgtree (
        tree, node_id )?
-  { return Ok ( HashSet::new () ); }
+  { // PITFALL \ TODO: Maybe this should return an error rather than the empty set. The empty set says 'the subscriber hides none of its content', which is technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
+    return Ok ( HashSet::new () ); }
   else {
     let subscribee_col : NodeRef < OrgNode > =
       node_ref . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee_v2: Subscribee has no parent (SubscribeeCol)" ) ?;
+      . ok_or ( "get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)" ) ?;
     let subscriber : NodeRef < OrgNode > =
       subscribee_col . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee_v2: SubscribeeCol has no parent (Subscriber)" ) ?;
+      . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
     // Get subscriber ID from the node
     let subscriber_id : Option<ID> = match &subscriber . value () . kind {
       OrgNodeKind::True(t) => t . id_opt . clone(),
@@ -237,51 +153,6 @@ fn get_hidden_ids_if_subscribee_v2 (
 ///   Non-content children (AliasCol, ParentIgnores, etc.)
 ///   persist unchanged.
 fn indefinitize_content_subtree (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  visited : &mut DefinitiveMap,
-) -> Result < (), Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id )
-    . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-  let pair : &NodePair =
-    node_ref . value ();
-  let node_pid_opt : Option < ID > =
-    match &pair .orgnode . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . clone (),
-      OrgNodeKind::Scaff ( _ ) => None };
-  let content_child_treeids : Vec < NodeId > =
-    node_ref . children ()
-    . filter ( |c| matches! ( &c . value() . orgnode . kind,
-                              OrgNodeKind::True(t)
-                              if !t.parent_ignores ))
-    . map ( |c| c . id () )
-    . collect ();
-  if let Some(ref pid) = node_pid_opt { // remove from visited
-    visited . remove ( pid ); }
-  { // mark indefinitive, restore title if SkgNode present, clear body
-    // TODO : This ought to call a function.
-    // It, or something very like it anyway, happens elsewhere too.
-    let canonical_title : Option<String> =
-      pair . mskgnode . as_ref() . map ( |s| s . title . clone () );
-    write_at_node_in_tree (
-      tree, node_id,
-      |np| {
-        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-          else { panic! ( "indefinitize_content_subtree: expected TrueNode" ) };
-        t . indefinitive = true;
-        if let Some ( title ) = canonical_title.clone () {
-          t . title = title; }
-        t . body = None; } ) ?; }
-  for child_treeid in content_child_treeids { // recurse
-    indefinitize_content_subtree (
-      tree, child_treeid, visited ) ?; }
-  Ok (( )) }
-
-/// V2: Tree<OrgNode> + SkgNodeMap version of indefinitize_content_subtree.
-/// Mark a node and its content subtree as indefinitive.
-/// Remove them from visited.
-fn indefinitize_content_subtree_v2 (
   tree    : &mut ego_tree::Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
@@ -289,7 +160,7 @@ fn indefinitize_content_subtree_v2 (
 ) -> Result < (), Box<dyn Error> > {
   let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id )
-    . ok_or ( "indefinitize_content_subtree_v2: NodeId not in tree" ) ?;
+    . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
   let orgnode : &OrgNode =
     node_ref . value ();
   let node_pid_opt : Option < ID > =
@@ -314,90 +185,21 @@ fn indefinitize_content_subtree_v2 (
       tree, node_id,
       |orgnode| {
         let OrgNodeKind::True ( t ) = &mut orgnode.kind
-          else { panic! ( "indefinitize_content_subtree_v2: expected TrueNode" ) };
+          else { panic! ( "indefinitize_content_subtree: expected TrueNode" ) };
         t . indefinitive = true;
         if let Some ( title ) = canonical_title.clone () {
           t . title = title; }
         t . body = None; } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   for child_treeid in content_child_treeids { // recurse
-    indefinitize_content_subtree_v2 (
+    indefinitize_content_subtree (
       tree, map, child_treeid, visited ) ?; }
   Ok (( )) }
 
-/// Expands content for a node using BFS with a node limit.
-///
-/// This is similar to `render_initial_forest_bfs`
-/// but operates on an existing PairTree.
-///
-/// The starting node is already definitive. This function:
-/// - Reads content children from the SkgNode in the tree
-/// - Adds them as children using BFS
-/// - Marks repeats (nodes already in `visited`) as indefinitive
-/// - Adds new definitive nodes to `visited`
-/// - Truncates when the node limit is exceeded:
-///   - Adds children in that last gen up to the limit as indefinitive
-///   - Completes the sibling group of the limit-hitting node
-///   - After limit-hitting node's parent, rewrite nodes in that second-to-last gen as indefinitive
-///
-/// Generations are relative to the effective root (generation 0),
-/// *not* the tree's true root. This way, truncation only affects
-/// nodes within this subtree, not siblings of ancestors.
-///
-/// `hidden_ids` contains IDs to filter from a subscribee's
-/// top-level children (without recursing into grandchildren, etc.)
-/// If the view was requested from a non-subscribee,
-/// 'hidden_ids' will be empty.
-async fn extendDefinitiveSubtreeFromLeaf (
-  tree           : &mut PairTree,
-  effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
-  limit          : usize,
-  visited        : &mut DefinitiveMap,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-  hidden_ids     : &HashSet < ID >,
-) -> Result < (), Box<dyn Error> > {
-  let mut gen_with_children : Vec < (NodeId, // effective root
-                                     ID) > = // one of its children
-    content_ids_if_definitive_else_empty (
-      tree, effective_root ) ?
-    . into_iter ()
-    . filter ( |skgid| ! hidden_ids . contains ( skgid ) )
-    . map ( |child_skgid| (effective_root, child_skgid) )
-    . collect ();
-  let mut nodes_rendered : usize = 0;
-  let mut generation : usize = 1; // children of effective root
-  while ! gen_with_children . is_empty () {
-    if nodes_rendered + gen_with_children . len () >= limit {
-      // Limit hit. Complete this sibling group
-      // and truncate later parents.
-      add_last_generation_and_truncate_some_of_previous (
-        tree, generation, &gen_with_children,
-        limit - nodes_rendered,
-        effective_root,
-        visited, config, driver ). await ?;
-      return Ok (( )); }
-    let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
-    for (parent_treeid, child_skgid) in gen_with_children {
-      let (_tree, new_treeid) =
-        build_node_branch_minus_content (
-          Some((tree, parent_treeid)),
-          &child_skgid, config, driver, visited ). await ?;
-      nodes_rendered += 1;
-      if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
-        // No filtering here; 'hidden_ids' only applies to top-level.
-        let grandchild_skgids : Vec < ID > =
-          content_ids_if_definitive_else_empty (
-            tree, new_treeid ) ?;
-        for grandchild_skgid in grandchild_skgids {
-          next_gen . push ( (new_treeid, grandchild_skgid) ); }} }
-    gen_with_children = next_gen;
-    generation += 1; }
-  Ok (( )) }
 
-/// V2: Tree<OrgNode> + SkgNodeMap version of extendDefinitiveSubtreeFromLeaf.
-/// Expands content using BFS with a node limit.
-async fn extendDefinitiveSubtreeFromLeaf_v2 (
+/// Expands content for a definitive node using BFS with a node limit.
+/// Works with Tree<OrgNode> + SkgNodeMap.
+async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut ego_tree::Tree<OrgNode>,
   map            : &mut SkgNodeMap,
   effective_root : NodeId,
@@ -441,40 +243,10 @@ async fn extendDefinitiveSubtreeFromLeaf_v2 (
     generation += 1; }
   Ok (( )) }
 
-/// Fetches SkgNode from disk.
-/// Updates NodePair's title, body, mskgnode.
-/// Preserves all other OrgNode data.
-fn from_disk_replace_title_body_and_skgnode (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  config  : &SkgConfig,
-) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, String) = {
-    let node_ref : NodeRef<NodePair> = tree . get(node_id) . ok_or(
-      "rebuild_pair_from_disk: node not found") ?;
-    let OrgNodeKind::True ( t )
-    = &node_ref . value () . orgnode . kind
-    else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
-    ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
-      t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk: no source" ) ? ) };
-  let skgnode : SkgNode =
-    skgnode_from_pid_and_source (
-      config, pid.clone (), &src ) ?;
-  let title : String = skgnode . title . clone();
-  if title . is_empty () {
-    return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
-  let body : Option < String > = skgnode . body . clone ();
-  write_at_node_in_tree ( tree, node_id, |np| {
-    let OrgNodeKind::True ( t ) = &mut np . orgnode . kind
-      else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
-    t . title = title;
-    t . body = body;
-    np . mskgnode = Some ( skgnode ); } ) ?;
-  Ok (( )) }
 
-/// V2: Tree<OrgNode> + SkgNodeMap version of from_disk_replace_title_body_and_skgnode.
 /// Fetches SkgNode from disk, updates both tree and map.
-fn from_disk_replace_title_body_and_skgnode_v2 (
+/// Works with Tree<OrgNode> + SkgNodeMap.
+fn from_disk_replace_title_body_and_skgnode (
   tree    : &mut ego_tree::Tree<OrgNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId,
@@ -482,12 +254,12 @@ fn from_disk_replace_title_body_and_skgnode_v2 (
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, String) = {
     let node_ref : NodeRef<OrgNode> = tree . get(node_id) . ok_or(
-      "rebuild_pair_from_disk_v2: node not found") ?;
+      "rebuild_pair_from_disk: node not found") ?;
     let OrgNodeKind::True ( t )
     = &node_ref . value () . kind
-    else { return Err ( "rebuild_pair_from_disk_v2: expected TrueNode" . into () ) };
-    ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk_v2: no ID" ) ?,
-      t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk_v2: no source" ) ? ) };
+    else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
+    ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
+      t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk: no source" ) ? ) };
   let skgnode : SkgNode =
     skgnode_from_pid_and_source (
       config, pid.clone (), &src ) ?;
@@ -500,7 +272,7 @@ fn from_disk_replace_title_body_and_skgnode_v2 (
   // Update tree
   write_at_node_in_tree ( tree, node_id, |orgnode| {
     let OrgNodeKind::True ( t ) = &mut orgnode . kind
-      else { panic! ( "rebuild_pair_from_disk_v2: expected TrueNode" ) };
+      else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
     t . title = title;
     t . body = body; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;

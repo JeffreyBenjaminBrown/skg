@@ -1,17 +1,11 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{
-  DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree,
-  truenode_in_tree_is_indefinitive, truenode_in_orgtree_is_indefinitive,
-  collect_child_treeids, collect_child_treeids_in_orgtree,
-  detect_and_mark_cycle, detect_and_mark_cycle_in_orgtree,
-  make_indef_if_repeat_then_extend_defmap,
+  DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree, truenode_in_orgtree_is_indefinitive, collect_child_treeids_in_orgtree, detect_and_mark_cycle_in_orgtree,
   make_indef_if_repeat_then_extend_defmap_in_orgtree,
 };
-use crate::to_org::complete::aliascol::{completeAliasCol, completeAliasCol_v2};
-use crate::to_org::complete::sharing::{
-  maybe_add_subscribeeCol_branch,
-  maybe_add_subscribeeCol_branch_v2 };
+use crate::to_org::complete::aliascol::completeAliasCol_v2;
+use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch_v2;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};

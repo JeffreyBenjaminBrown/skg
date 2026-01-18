@@ -9,15 +9,14 @@ use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::orgnode::{OrgNode, ViewRequest};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnode::{SkgNodeMap, skgnode_map_from_save_instructions};
 
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{Tree, NodeId};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;

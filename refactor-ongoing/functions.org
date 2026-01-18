@@ -22,7 +22,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous_v2 (
   driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** add_last_generation_and_truncate_some_of_previous
-** build_and_integrate_aliases_v2
+** DONE build_and_integrate_aliases_v2
 pub async fn build_and_integrate_aliases_v2 (
   tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
@@ -30,7 +30,7 @@ pub async fn build_and_integrate_aliases_v2 (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_aliases
-** build_and_integrate_aliases_view_then_drop_request_v2
+** DONE build_and_integrate_aliases_view_then_drop_request_v2
 pub async fn build_and_integrate_aliases_view_then_drop_request_v2 (
   tree          : &mut Tree<OrgNode>,
   _map          : &mut SkgNodeMap,
@@ -136,7 +136,7 @@ pub async fn ensure_source_v2 (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** ensure_source
-** execute_definitive_view_request_v2
+** DONE execute_definitive_view_request_v2
 async fn execute_definitive_view_request_v2 (
   forest        : &mut ego_tree::Tree<OrgNode>,
   map           : &mut SkgNodeMap,
@@ -158,7 +158,7 @@ pub async fn execute_view_requests_v2 (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> >
 *** execute_view_requests
-** extendDefinitiveSubtreeFromLeaf_v2
+** DONE extendDefinitiveSubtreeFromLeaf_v2
 async fn extendDefinitiveSubtreeFromLeaf_v2 (
   tree           : &mut ego_tree::Tree<OrgNode>,
   map            : &mut SkgNodeMap,
