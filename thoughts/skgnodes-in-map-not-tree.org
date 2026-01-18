@@ -680,7 +680,72 @@ The core function =complete_or_restore_each_node_in_branch_v2= is complete! Next
 - Simple transformations like rendering are straightforward to convert
 - The v2 version is cleaner - no need to extract orgnode from NodePair
 
-** Chunk 11+: Next Steps and Summary
+** DONE Chunk 11: Refactor =set_metadata_relationship_viewdata_in_forest= ✅ COMPLETED
+
+*Goal:* Create v2 version of metadata relationship viewdata setting for Tree<OrgNode>.
+
+*Changes:*
+1. Created =collect_ids_from_orgtree= in =server/to_org/util.rs=:
+   - Collects all IDs from a Tree<OrgNode> by traversing the tree
+   - Needed for batch database queries for relationship metadata
+2. Created =set_metadata_relationship_viewdata_in_forest_v2= in =server/viewdata.rs=:
+   - Entry point that takes Tree<OrgNode> instead of PairTree
+   - Calls =mapsFromIdForView_from_orgtree= to fetch relationship data
+   - Uses =set_metadata_relationships_in_node_recursive_v2= to apply metadata
+3. Created =mapsFromIdForView_from_orgtree= in =server/viewdata.rs=:
+   - Uses =collect_ids_from_orgtree= to get all PIDs
+   - Fetches relationship data from TypeDB
+4. Created =set_metadata_relationships_in_node_recursive_v2= in =server/viewdata.rs=:
+   - Recursively walks the tree and sets relationship metadata
+   - Only accesses OrgNode data (doesn't need SkgNode for this operation)
+   - Updates stats like numContainers, numContents, numLinksIn, etc.
+
+*Tests:* All 33 tests passing.
+
+*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
+
+*Learnings:*
+- Metadata viewdata only needs OrgNode data for setting stats
+- ID collection is straightforward with tree traversal
+- The v2 version demonstrates cleaner separation of concerns
+
+** DONE Chunk 12: Refactor =execute_view_requests= (in progress) 🚧
+
+*Goal:* Create v2 versions of view request execution functions.
+
+*Changes Completed:*
+1. Created helper functions in =server/to_org/util.rs=:
+   - =content_ids_if_definitive_else_empty_in_orgtree= - gets content IDs from map
+   - =complete_branch_minus_content_in_orgtree= - completion logic for tree+map
+   - =build_node_branch_minus_content_v2= - builds nodes in tree+map, handling both append and new tree cases
+2. Created =type_and_parent_type_consistent_with_subscribee_in_orgtree= in =server/to_org/complete/sharing.rs=:
+   - Tree<OrgNode> version of subscribee type checking
+   - Only accesses OrgNode.kind, no SkgNode needed
+3. Created v2 functions in =server/to_org/expand/definitive.rs=:
+   - =get_hidden_ids_if_subscribee_v2= - gets hidden IDs from subscriber's SkgNode in map
+   - =indefinitize_content_subtree_v2= - marks nodes as indefinitive, looks up titles from map
+   - =extendDefinitiveSubtreeFromLeaf_v2= - BFS expansion using tree+map
+   - =from_disk_replace_title_body_and_skgnode_v2= - fetches from disk, updates both tree and map
+
+*Remaining Work for Chunk 12:*
+- =ensure_source_v2= in =server/to_org/complete/contents.rs=
+- =maybe_add_hiddenInSubscribeeCol_branch_v2= in =server/to_org/complete/sharing.rs=
+- =execute_definitive_view_request_v2= in =server/to_org/expand/definitive.rs=
+- =execute_view_requests_v2= in =server/to_org/expand/definitive.rs=
+- v2 versions of other view request handlers (aliases, containerward, sourceward)
+
+*Tests:* All 33 tests passing with current changes.
+
+*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
+
+*Learnings:*
+- View request handling requires coordinated tree+map updates
+- BFS expansion naturally works with separated architecture
+- Hidden content filtering accesses SkgNode data from map
+- Indefinitization requires both tree (mark indefinitive) and map (restore title) updates
+- Tree structure building is identical for Tree<OrgNode> and PairTree
+
+** Chunk 12+: Next Steps and Summary
 
 *Current State:*
 
@@ -689,7 +754,9 @@ The core function =complete_or_restore_each_node_in_branch_v2= is complete! Next
 ✅ **COMPLETE**: =maybe_add_subscribeeCol_branch_v2= - works entirely with tree+map
 ✅ **COMPLETE**: =clobberIndefinitiveOrgnode_v2= - looks up from map
 ✅ **COMPLETE**: =orgnode_forest_to_string_v2= - renders Tree<OrgNode>
+✅ **COMPLETE**: =set_metadata_relationship_viewdata_in_forest_v2= - sets metadata in Tree<OrgNode>
 ✅ **COMPLETE**: All helper functions (_in_orgtree versions)
+🚧 **IN PROGRESS**: =execute_view_requests_v2= - partial implementation
 
 *Remaining Work:*
 

@@ -139,6 +139,25 @@ pub async fn complete_branch_minus_content (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 
+/// V2: Tree<OrgNode> + SkgNodeMap version of complete_branch_minus_content.
+pub async fn complete_branch_minus_content_in_orgtree (
+  tree     : &mut Tree<OrgNode>,
+  map      : &mut crate::types::skgnode::SkgNodeMap,
+  node_id  : NodeId,
+  visited  : &mut DefinitiveMap,
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  detect_and_mark_cycle_in_orgtree ( tree, node_id ) ?;
+  make_indef_if_repeat_then_extend_defmap_in_orgtree (
+    tree, node_id, visited ) ?;
+  if truenode_in_orgtree_is_indefinitive ( tree, node_id )?
+  { crate::to_org::complete::contents::clobberIndefinitiveOrgnode_v2 (
+      tree, map, node_id ) ?; }
+  crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch_v2 (
+    tree, map, node_id, config, driver ) . await ?;
+  Ok (( )) }
+
 /// The two jobs in the name of this are inseparable --
 /// we have to interleave extending the defmap
 /// with marking things indefinitive, because the defmap
@@ -248,6 +267,21 @@ pub fn collect_ids_from_pair_tree (
     if let Edge::Open ( node_ref ) = edge {
       let pid_opt : Option<&ID>
       = match &node_ref . value () . orgnode . kind
+      { OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
+        OrgNodeKind::Scaff ( _ ) => None };
+      if let Some ( pid ) = pid_opt {
+        pids . push ( pid . clone( )); }} }
+  pids }
+
+/// Collect all IDs from a Tree<OrgNode>.
+pub fn collect_ids_from_orgtree (
+  tree : &Tree<OrgNode>,
+) -> Vec < ID > {
+  let mut pids : Vec < ID > = Vec::new ();
+  for edge in tree . root () . traverse () {
+    if let Edge::Open ( node_ref ) = edge {
+      let pid_opt : Option<&ID>
+      = match &node_ref . value () . kind
       { OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
         OrgNodeKind::Scaff ( _ ) => None };
       if let Some ( pid ) = pid_opt {
@@ -396,6 +430,56 @@ pub async fn build_node_branch_minus_content (
         config, driver ) . await ?;
       Ok ( (Some(tree), root_treeid) ) }, } }
 
+/// V2: Tree<OrgNode> + SkgNodeMap version of build_node_branch_minus_content.
+/// Builds a node from disk, places it in a tree and map,
+/// completes the branch except for content descendents.
+/// - If tree_map_parent is None:
+///   creates new tree+map, returns (Some(tree), Some(map), branch_root_nodeid)
+/// - If tree_map_parent is Some:
+///   appends to tree+map, returns (None, None, branch_root_nodeid)
+pub async fn build_node_branch_minus_content_v2 (
+  tree_map_parent : Option<(&mut Tree<OrgNode>, &mut crate::types::skgnode::SkgNodeMap, NodeId)>,
+  skgid           : &ID,
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
+  visited         : &mut DefinitiveMap,
+) -> Result < (Option<Tree<OrgNode>>, Option<crate::types::skgnode::SkgNodeMap>, NodeId), Box<dyn Error> > {
+  let (skgnode, orgnode) : (SkgNode, OrgNode) =
+    skgnode_and_orgnode_from_id (
+      config, driver, skgid ) . await ?;
+  let node_id : ID = match &orgnode.kind {
+    OrgNodeKind::True(t) => t . id_opt . clone()
+      . ok_or ( "build_node_branch_minus_content_v2: orgnode has no ID" ) ?,
+    OrgNodeKind::Scaff(_) =>
+      return Err ( "build_node_branch_minus_content_v2: orgnode is Scaffold".into() ),
+  };
+  match tree_map_parent {
+    Some ( (tree, map, parent_treeid) ) => {
+      // Add SkgNode to map
+      map . insert ( node_id, skgnode );
+      // Add OrgNode to tree
+      let child_treeid : NodeId =
+        with_node_mut (
+          tree, parent_treeid,
+          ( |mut parent_mut|
+            parent_mut . append ( orgnode ) . id () ))
+        . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+      complete_branch_minus_content_in_orgtree (
+        tree, map, child_treeid, visited,
+        config, driver ) . await ?;
+      Ok ( (None, None, child_treeid) ) },
+    None => {
+      let mut map : crate::types::skgnode::SkgNodeMap =
+        crate::types::skgnode::SkgNodeMap::new ();
+      map . insert ( node_id, skgnode );
+      let mut tree : Tree<OrgNode> =
+        Tree::new ( orgnode );
+      let root_treeid : NodeId = tree . root () . id ();
+      complete_branch_minus_content_in_orgtree (
+        &mut tree, &mut map, root_treeid, visited,
+        config, driver ) . await ?;
+      Ok ( (Some(tree), Some(map), root_treeid) ) }, } }
+
 /// Collect content child IDs from a node in a PairTree.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
 /// Errors if passed a Scaffold.
@@ -419,6 +503,38 @@ pub(super) fn content_ids_if_definitive_else_empty (
         Some ( skgnode ) =>
           skgnode . contains . unwrap_or_default (),
         None => Vec::new (),  // No SkgNode yet
+      } ) } }}
+
+/// V2: Collect content child IDs from a node in Tree<OrgNode> + SkgNodeMap.
+/// Returns empty vec if the node is indefinitive or has no SkgNode.
+/// Errors if passed a Scaffold.
+pub(super) fn content_ids_if_definitive_else_empty_in_orgtree (
+  tree   : &Tree<OrgNode>,
+  map    : &crate::types::skgnode::SkgNodeMap,
+  treeid : NodeId,
+) -> Result < Vec < ID >, Box<dyn Error> > {
+  let ( node_kind, node_id_opt ) : ( OrgNodeKind, Option<ID> ) =
+    read_at_node_in_tree (
+      tree, treeid,
+      |orgnode| ( orgnode.kind.clone(),
+                  match &orgnode.kind {
+                    OrgNodeKind::True(t) => t . id_opt . clone(),
+                    OrgNodeKind::Scaff(_) => None,
+                  } ) )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  match node_kind {
+    OrgNodeKind::Scaff ( _ ) =>
+      Err ( "content_ids_if_definitive_else_empty_in_orgtree: \
+             caller should not pass a Scaffold".into() ),
+    OrgNodeKind::True ( t ) => {
+      if t.indefinitive {
+        return Ok ( Vec::new () ); }
+      Ok ( match node_id_opt {
+        Some ( node_id ) =>
+          map . get ( &node_id )
+          . map ( |skgnode| skgnode . contains . clone () . unwrap_or_default () )
+          . unwrap_or_default (),
+        None => Vec::new (),  // No ID yet
       } ) } }}
 
 /// Collect ego_tree::NodeIds after

@@ -44,6 +44,25 @@ pub fn type_and_parent_type_consistent_with_subscribee (
     . unwrap_or ( false );
   Ok ( is_truenode && parent_is_subscribee_col ) }
 
+/// V2: Tree<OrgNode> version of type_and_parent_type_consistent_with_subscribee.
+pub fn type_and_parent_type_consistent_with_subscribee_in_orgtree (
+  tree    : &ego_tree::Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result < bool, Box<dyn Error> > {
+  let node_ref : NodeRef < OrgNode > =
+    tree . get ( node_id )
+    . ok_or ( "type_and_parent_type_consistent_with_subscribee_in_orgtree: node not found" ) ?;
+  let is_truenode : bool = matches! (
+    & node_ref . value () . kind,
+    OrgNodeKind::True ( _ ));
+  let parent_is_subscribee_col : bool =
+    node_ref . parent ()
+    . map ( |p| matches! (
+              & p . value () . kind,
+              OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )))
+    . unwrap_or ( false );
+  Ok ( is_truenode && parent_is_subscribee_col ) }
+
 /// If appropriate, prepend a SubscribeeCol child containing:
 /// - for each subscribee, an indefinitive Subscribee child
 /// - if any hidden nodes are outside subscribee content,
