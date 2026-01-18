@@ -320,12 +320,12 @@ Each chunk should:
 - Be independently reviewable
 - Build incrementally toward the goal
 
-** Chunk 1: Add Helper Functions (Non-Breaking)
+** DONE Chunk 1: Add Helper Functions (Non-Breaking)
 
 *Goal:* Introduce new functions that work with maps, without changing any existing code.
 
 *Changes:*
-1. Add to =server/types/tree.rs= (or new =server/types/skgnode_map.rs=):
+1. Added to =server/types/skgnode.rs=:
    #+begin_src rust
    pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
@@ -342,43 +342,59 @@ Each chunk should:
    }
    #+end_src
 
-*Tests:* Write unit tests for =skgnode_for_orgnode= covering:
+*Tests:* Added =tests/types/skgnode.rs= with unit tests covering:
 - TrueNode with ID in map → returns Some
 - TrueNode with ID not in map → returns None
 - Scaffold → returns None
 
-*Verification:* =cargo test= passes, no existing code changed.
+*Verification:* ✅ All tests pass, no existing code changed.
 
-** Chunk 2: Add Map-Building Helper (Non-Breaking)
+*Learnings:*
+- Code was placed in =server/types/skgnode.rs= rather than =tree.rs= (more logical location)
+- Required adding =OrgNode= import alongside existing =OrgNodeKind= import
+- Test module needed declaration in =tests/types.rs=
+
+** DONE Chunk 2: Add Map-Building Helper (Non-Breaking) ✅ COMPLETED
 
 *Goal:* Create function to build SkgNodeMap from SaveInstructions.
 
 *Changes:*
-1. Add to same file as Chunk 1:
+1. Added to =server/types/skgnode.rs=:
    #+begin_src rust
-   /// Build a map from SaveInstructions.
+   /// Build a SkgNodeMap from SaveInstructions.
+   /// Each SkgNode is indexed by its first ID.
    pub fn skgnode_map_from_save_instructions(
-     instructions: &Vec<SaveInstruction>,
+     instructions: &Vec<(SkgNode, crate::types::save::NonMerge_NodeAction)>,
    ) -> SkgNodeMap {
      instructions.iter()
-       .filter_map(|(skgnode, _action)|
-         skgnode.ids.first().map(|id| (id.clone(), skgnode.clone())))
+       .filter_map(|(skgnode, _action)| {
+         skgnode.ids.first()
+           .map(|id| (id.clone(), skgnode.clone()))
+       })
        .collect()
    }
    #+end_src
 
-*Tests:* Unit test verifying the map is built correctly from sample SaveInstructions.
+*Tests:* Added to =tests/types/skgnode.rs=:
+- Normal case with 3 SaveInstructions → map with 3 entries
+- Node with multiple IDs → uses first ID as map key
+- Empty instructions → empty map
 
-*Verification:* =cargo test= passes.
+*Verification:* ✅ All tests pass (29 total), no existing code changed.
 
-** Chunk 3: Refactor One Leaf Utility Function
+*Learnings:*
+- SaveInstruction is a type alias for =(SkgNode, NonMerge_NodeAction)=
+- The action (Save/Delete) doesn't affect map building
+- Need to use fully qualified path =crate::types::save::NonMerge_NodeAction= in signature
+
+** DONE Chunk 3: Refactor One Leaf Utility Function ✅ COMPLETED
 
 *Goal:* Convert one simple utility function from PairTree to Tree<OrgNode>.
 
 *Target:* =get_pid_in_pairtree= (simple, no dependencies)
 
 *Changes:*
-1. Add new version alongside old:
+1. Added new version in =server/to_org/util.rs= alongside old:
    #+begin_src rust
    pub fn get_pid_in_tree(
      tree: &Tree<OrgNode>,
@@ -387,16 +403,26 @@ Each chunk should:
      let node_kind = read_at_node_in_tree(tree, treeid,
        |orgnode| orgnode.kind.clone())?;
      match node_kind {
-       OrgNodeKind::Scaff(_) => Err("...".into()),
-       OrgNodeKind::True(t) => t.id_opt.ok_or_else(|| "...".into())
+       OrgNodeKind::Scaff(_) =>
+         Err("get_pid_in_tree: caller should not pass a Scaffold".into()),
+       OrgNodeKind::True(t) =>
+         t.id_opt.ok_or_else(|| "get_pid_in_tree: node has no ID".into())
      }
    }
    #+end_src
-2. Keep old =get_pid_in_pairtree= for now
+2. Kept old =get_pid_in_pairtree= for now (still used by existing code)
 
-*Tests:* Copy existing tests for =get_pid_in_pairtree=, adapt for new function.
+*Tests:* Created =tests/to_org_util.rs= with tests covering:
+- TrueNode with ID → returns ID successfully
+- TrueNode without ID → returns error
+- Scaffold → returns error
 
-*Verification:* Both old and new functions work, tests pass.
+*Verification:* ✅ All tests pass (32 total), both old and new functions work.
+
+*Learnings:*
+- No existing tests for =get_pid_in_pairtree= existed
+- Changed visibility from =pub(super)= to =pub= for test access
+- The function is simple enough that we can keep both versions side-by-side safely
 
 ** Chunk 4: Refactor =ensure_skgnode= to Work with Map
 

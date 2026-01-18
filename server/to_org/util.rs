@@ -250,6 +250,23 @@ pub(super) fn get_pid_in_pairtree (
       t . id_opt . ok_or_else (
         || "get_pid_in_pairtree: node has no ID" . into( )) }}
 
+/// New version that works with Tree<OrgNode> instead of PairTree.
+/// Errors if the node is a Scaffold, not found, or has no ID.
+pub fn get_pid_in_tree (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < ID, Box<dyn Error> > {
+  let node_kind: OrgNodeKind =
+    read_at_node_in_tree (
+      tree, treeid, |orgnode| orgnode.kind.clone() )?;
+  match node_kind {
+    OrgNodeKind::Scaff ( _ ) =>
+      Err ( "get_pid_in_tree: caller should not pass a Scaffold"
+            . into() ),
+    OrgNodeKind::True ( t ) =>
+      t . id_opt . ok_or_else (
+        || "get_pid_in_tree: node has no ID" . into( )) }}
+
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
 /// Returns the new node's ego_tree::NodeId.

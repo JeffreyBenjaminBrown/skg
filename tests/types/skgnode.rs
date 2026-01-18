@@ -2,8 +2,9 @@
 // Tests for new map-based helpers
 //
 
-use skg::types::skgnode::{skgnode_for_orgnode, SkgNode, SkgNodeMap};
+use skg::types::skgnode::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNode, SkgNodeMap};
 use skg::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
+use skg::types::save::NonMerge_NodeAction;
 use skg::types::misc::ID;
 
 #[test]
@@ -126,4 +127,91 @@ fn test_skgnode_for_orgnode_scaffold() {
     Option<&SkgNode> =
     skgnode_for_orgnode(&orgnode, &map);
   assert!(result.is_none(), "Should return None for Scaffold nodes");
+}
+
+#[test]
+fn test_skgnode_map_from_save_instructions() {
+  // Build map from SaveInstructions
+  let id1 :
+    ID =
+    ID::new("id-001");
+  let id2 :
+    ID =
+    ID::new("id-002");
+  let id3 :
+    ID =
+    ID::new("id-003");
+
+  let skgnode1 :
+    SkgNode =
+    SkgNode {
+      title : "Node 1".to_string(),
+      aliases : None,
+      source : "test-source".to_string(),
+      ids : vec![id1.clone()],
+      body : None,
+      contains : None,
+      subscribes_to : None,
+      hides_from_its_subscriptions : None,
+      overrides_view_of : None,
+    };
+
+  let skgnode2 :
+    SkgNode =
+    SkgNode {
+      title : "Node 2".to_string(),
+      aliases : None,
+      source : "test-source".to_string(),
+      ids : vec![id2.clone(), ID::new("extra-id")], // multiple IDs, should use first
+      body : None,
+      contains : None,
+      subscribes_to : None,
+      hides_from_its_subscriptions : None,
+      overrides_view_of : None,
+    };
+
+  let skgnode3 :
+    SkgNode =
+    SkgNode {
+      title : "Node 3".to_string(),
+      aliases : None,
+      source : "test-source".to_string(),
+      ids : vec![id3.clone()],
+      body : None,
+      contains : None,
+      subscribes_to : None,
+      hides_from_its_subscriptions : None,
+      overrides_view_of : None,
+    };
+
+  let instructions :
+    Vec<(SkgNode, NonMerge_NodeAction)> =
+    vec![
+      (skgnode1.clone(), NonMerge_NodeAction::Save),
+      (skgnode2.clone(), NonMerge_NodeAction::Save),
+      (skgnode3.clone(), NonMerge_NodeAction::Delete), // action shouldn't matter
+    ];
+
+  let map :
+    SkgNodeMap =
+    skgnode_map_from_save_instructions(&instructions);
+
+  assert_eq!(map.len(), 3, "Map should contain 3 entries");
+  assert_eq!(map.get(&id1).unwrap().title, "Node 1");
+  assert_eq!(map.get(&id2).unwrap().title, "Node 2");
+  assert_eq!(map.get(&id3).unwrap().title, "Node 3");
+}
+
+#[test]
+fn test_skgnode_map_from_save_instructions_empty() {
+  // Empty instructions → empty map
+  let instructions :
+    Vec<(SkgNode, NonMerge_NodeAction)> =
+    vec![];
+
+  let map :
+    SkgNodeMap =
+    skgnode_map_from_save_instructions(&instructions);
+
+  assert_eq!(map.len(), 0, "Map should be empty");
 }

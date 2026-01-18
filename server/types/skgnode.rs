@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::save::NonMerge_NodeAction;
 use crate::util::option_vec_is_empty_or_none;
 use super::misc::ID;
 
@@ -106,3 +107,15 @@ pub fn skgnode_for_orgnode<'a> (
     OrgNodeKind::Scaff(_) => None,
   }
 }
+
+/// Build a SkgNodeMap from SaveInstructions.
+/// Each SkgNode is indexed by its first ID.
+pub fn skgnode_map_from_save_instructions (
+  instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
+) -> SkgNodeMap
+{ instructions.iter()
+    . filter_map( |(skgnode, _action)|
+                  { skgnode . ids . first()
+                      . map( |id| (id . clone(),
+                                   skgnode . clone() )) } )
+    . collect() }
