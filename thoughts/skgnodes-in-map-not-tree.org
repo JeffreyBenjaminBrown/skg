@@ -551,22 +551,54 @@ Each chunk should:
 - Significant progress: most of the function now works without conversion
 - Temporary conversion only happens for 2 complex operations
 
-** Chunk 7: Refactor Sub-Functions of Completion (One at a Time)
+** DONE Chunk 7: Refactor Sub-Functions of Completion ✅ COMPLETED
 
-*Goal:* Convert =clobberIndefinitiveOrgnode= to use tree+map.
+*Goal:* Convert helper functions to use tree+map.
 
-*Changes:*
-1. Add =clobberIndefinitiveOrgnode_v2= working with tree+map
-2. Update =complete_or_restore_each_node_in_branch_v2= to use it
+*Note:* This chunk was mostly completed as part of Chunk 6. The functions were:
+- =clobberIndefinitiveOrgnode_v2= ✅ created in Chunk 6
+- =make_indef_if_repeat_then_extend_defmap_in_orgtree= ✅ created in Chunk 6
+- =detect_and_mark_cycle_in_orgtree= ✅ created in Chunk 6
+- =truenode_in_orgtree_is_indefinitive= ✅ created in Chunk 6
+- =collect_child_treeids_in_orgtree= ✅ created in Chunk 6
 
-*Tests:* Verify indefinitive nodes are clobbered correctly.
+*Remaining complex functions still using conversion:*
+- =completeAliasCol= - adds/modifies alias scaffold nodes
+- =maybe_add_subscribeeCol_branch= - adds subscribee branch structure
 
 *Verification:* Tests pass.
 
-*Repeat for:*
-- =make_indef_if_repeat_then_extend_defmap=
-- =content_ids_if_definitive_else_empty=
-- Other completion helpers (one per chunk)
+** DONE Chunk 8: Refactor =completeAliasCol= to Use Tree+Map ✅ COMPLETED
+
+*Goal:* Create v2 version of =completeAliasCol= that works with tree+map.
+
+*Changes:*
+1. Created =insert_scaffold_as_child_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
+   - Tree<OrgNode> version of scaffold insertion
+   - Uses =with_node_mut= to add scaffold nodes to tree
+2. Created =completeAliasCol_v2= in =server/to_org/complete/aliascol.rs=:
+   - Gets parent SkgNode from map instead of fetching from disk
+   - Uses =collect_child_aliases_at_aliascol_in_orgtree= helper
+   - Uses =remove_duplicates_and_false_aliases_handling_focus_v2= helper
+   - Works entirely with Tree<OrgNode>, no conversion needed
+3. Created helper functions in aliascol.rs:
+   - =collect_child_aliases_at_aliascol_in_orgtree= - collects alias titles from children
+   - =remove_duplicates_and_false_aliases_handling_focus_v2= - removes invalid/duplicate aliases
+4. Updated =complete_or_restore_each_node_in_branch_v2= to use =completeAliasCol_v2=:
+   - Eliminated one of the two remaining PairTree conversions!
+   - Now only =maybe_add_subscribeeCol_branch= requires conversion
+
+*Tests:* All tests pass (33 total).
+
+*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
+
+*Learnings:*
+- Tree structure modification (adding/removing nodes) works the same for Tree<OrgNode> as PairTree
+- =with_node_mut= provides access to =NodeMut= for structural changes
+- Reading SkgNode from map is more efficient than fetching from disk
+- Focus handling logic is unchanged - just different tree type
+- Significant progress: only 1 complex operation still requires conversion
+- The v2 version is cleaner because it gets data from map, not disk
 
 ** Chunk 8-12: Similar Pattern for View-Request Functions
 

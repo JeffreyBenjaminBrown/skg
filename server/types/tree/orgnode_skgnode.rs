@@ -223,6 +223,23 @@ pub fn insert_scaffold_as_child (
       else       { parent_mut . append  ( pair ) . id () } } ) ?;
   Ok ( col_id ) }
 
+/// Insert a scaffold node as a child in Tree<OrgNode>.
+pub fn insert_scaffold_as_child_in_orgtree (
+  tree          : &mut Tree<OrgNode>,
+  parent_id     : NodeId,
+  scaffold_kind : Scaffold,
+  prepend       : bool, // otherwise, append
+) -> Result < NodeId, Box<dyn Error> > {
+  let orgnode : OrgNode =
+    orgnode_from_scaffold ( scaffold_kind );
+  let col_id : NodeId = with_node_mut (
+    tree, parent_id,
+    |mut parent_mut| {
+      if prepend { parent_mut . prepend ( orgnode ) . id () }
+      else       { parent_mut . append  ( orgnode ) . id () } } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok ( col_id ) }
+
 /// Fetch a node from disk and append it as an indefinitive child.
 pub async fn append_indefinitive_from_disk_as_child (
   tree           : &mut PairTree,

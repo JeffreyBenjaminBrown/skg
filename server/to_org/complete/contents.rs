@@ -8,7 +8,7 @@ use crate::to_org::util::{
   make_indef_if_repeat_then_extend_defmap,
   make_indef_if_repeat_then_extend_defmap_in_orgtree,
 };
-use crate::to_org::complete::aliascol::completeAliasCol;
+use crate::to_org::complete::aliascol::{completeAliasCol, completeAliasCol_v2};
 use crate::to_org::complete::sharing::{
   maybe_add_subscribeeCol_branch };
 use crate::dbs::filesystem::one_node::skgnode_from_id;
@@ -125,15 +125,9 @@ pub fn complete_or_restore_each_node_in_branch_v2<'a> (
         matches!(&node.kind,
                  OrgNodeKind::Scaff(Scaffold::AliasCol)) })
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
-      // AliasCol: convert to PairTree temporarily
-      let mut pairtree : PairTree =
-        pairtree_from_tree_and_map ( tree, map );
-      completeAliasCol (
-        &mut pairtree, node_id, config, typedb_driver ). await ?;
-      let ( new_tree, new_map ) =
-        tree_and_map_from_pairtree ( &pairtree );
-      *tree = new_tree;
-      *map = new_map;
+      // AliasCol: use v2 version working directly with tree+map
+      completeAliasCol_v2 (
+        tree, map, node_id, config, typedb_driver ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
         matches!( &node.kind, OrgNodeKind::Scaff(_)) } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
