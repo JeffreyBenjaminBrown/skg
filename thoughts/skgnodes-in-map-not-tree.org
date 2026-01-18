@@ -263,36 +263,27 @@ Recommend Option A for simplicity and consistency.
 
 * Pushback: Why This Might Not Be Complete or a Bad Idea
 
-** TODO 1. Complexity of Mutable HashMap Across Async Functions
+** 1. Complexity of Mutable HashMap Across Async Functions
 
 The current approach carries state in the tree structure. Switching to a HashMap means passing it mutably through deep call chains. Rust's borrow checker may complain about:
 - Multiple async function calls that all need mutable access to the map
 - Interleaving access patterns during tree traversal
 
-*Mitigation:* Use =&mut HashMap= or interior mutability (=RefCell=) strategically. Test thoroughly.
-
-*** response
-    Whatever is safest.
-    I don't think there's a lot of parallelism,
-    maybe none, and I consider that good.
-** TODO 2. Coupling Between Maps and Trees
+*Mitigation:* Use =&mut HashMap= or interior mutability (=RefCell=) strategically, prioritizing safety over concurrency. There is minimal parallelism in the codebase currently, which simplifies this concern. Test thoroughly.
+** 2. Coupling Between Maps and Trees
 
 With pairing, there's a 1-to-1 correspondence: every definitive TrueNode has its SkgNode right there. With a separate map:
 - Risk: ID in OrgNode doesn't match any map entry (stale/inconsistent)
 - Risk: Multiple OrgNodes with same ID (repeats) all map to the same SkgNode (is that correct?)
 
-*Mitigation:* Add invariant checks, particularly for repeats. Ensure tests cover map-tree consistency.
-*** response
-    This strategy is important enough to deserve documentation:
-    We build the map of skgnodes from the tree of orgnodes,
-    and every time we extend the tree, we extend the map.
+*Mitigation:* Follow this disciplined strategy: We build the map of SkgNodes from the tree of OrgNodes initially, and every time we extend the tree, we extend the map correspondingly. This invariant should be documented prominently and enforced through code review. Add invariant checks and ensure tests cover map-tree consistency.
 ** 3. Performance
 
 The map adds a hash lookup overhead at every access point. Current direct access via tree is pointer-following. For large trees, this might matter.
 
 *Mitigation:* Profile before and after. Modern HashMap is pretty fast. The indirection cost is probably negligible vs. disk I/O.
 
-** TODO 4. The Repeats Problem
+** 4. The Repeats Problem
 
 When a node appears multiple times in the tree, all instances currently share the same NodePair's mskgnode. With a map, they all look up the same ID:
 
@@ -300,12 +291,8 @@ When a node appears multiple times in the tree, all instances currently share th
 - New: All accesses hit the same HashMap entry
 
 This is probably fine and even cleaner, but worth verifying against repeat test cases.
-*** response
-    Please flag it to me -- "HEY JEFF" --
-    if we do anything creative with the skgnodes.
-    I don't believe we do --
-    after reading one from disk into the map,
-    I don't think it should ever need modification.
+
+*Important constraint:* SkgNodes should be immutable once loaded into the map. After reading one from disk, it should not need modification. If during implementation we discover any code that mutates SkgNodes after loading them, this requires investigation and user notification ("HEY JEFF") to determine if the design assumption is violated.
 ** 5. OrgNode Serialization/Deserialization
 If OrgNodes are ever serialized for caching, you now need to serialize both the tree *and* the map as separate entities. This adds complexity for recovery or debugging.
 
@@ -316,140 +303,262 @@ Scaffolds don't have IDs, so they won't map. This is correct. But code must cons
 
 *Mitigation:* Helper function =skgnode_for_org_node(orgnode, map) -> Option<SkgNode>= that returns None for Scaffolds.
 
-** TODO 7. Lazy Loading Semantics Change
+** 7. Lazy Loading Semantics Change
 
-With =ensure_skgnode=, the function returns =()= and mutates the tree. With a map version, it might return a reference, or it might still return =()= and mutate the map. The calling code pattern changes slightly.
+With =ensure_skgnode=, the function returns =()= and mutates the tree. With a map version, the pattern simplifies to: first check the map for the SkgNode, and if not present, fetch from disk and add to the map.
 
-*Mitigation:* Design the API carefully. Returning =&SkgNode= from the ensure function makes the intent clearer.
-*** response
-    That call to ensure_skgnode can be replaced by
-    a lookup in the map followed by, if needed,
-    a lookup from disk.
-** TODO 8. Metadata Relationship Data
+*Mitigation:* Design the API to make this pattern clear. Returning =&SkgNode= from the ensure function makes the intent clearer and provides immediate access to the loaded data.
+** 8. Metadata Relationship Data
 
-The =set_metadata_relationship_viewdata_in_forest= function may assume SkgNodes are present. Verify it doesn't fail if a node's SkgNode is not yet in the map.
+The =set_metadata_relationship_viewdata_in_forest= function may assume SkgNodes are present. With the new design, this function should look up SkgNodes from the map as needed.
 
-*Mitigation:* Ensure =ensure_skgnode= is called before accessing stats, or make stats-reading defensive.
-*** response
-    If it needs a skgnode for an orgnode,
-    it can fetch the skgnode from the map.
+*Mitigation:* When this function needs a SkgNode for an OrgNode, it simply fetches from the map. Ensure the map is passed as a parameter. If the SkgNode isn't yet in the map, the function should handle this gracefully (either by fetching from disk or skipping that metadata).
 * Path to Get There
 
-** Phase 1: Preliminary Analysis (Planning)
+Each chunk should:
+- Keep the codebase compiling and all tests passing
+- Be independently reviewable
+- Build incrementally toward the goal
 
-1. ✅ Understand current PairTree architecture (done)
-2. Create tests that verify:
-   - Map-tree consistency
-   - Repeats are handled correctly
-   - Lazy loading works
-3. Identify all functions using PairTree and categorize by required changes
+** Chunk 1: Add Helper Functions (Non-Breaking)
 
-** Phase 2: Introduce Helper Functions (No Breaking Changes)
+*Goal:* Introduce new functions that work with maps, without changing any existing code.
 
-1. Create new helper functions in =server/types/tree.rs= or a new file:
+*Changes:*
+1. Add to =server/types/tree.rs= (or new =server/types/skgnode_map.rs=):
    #+begin_src rust
+   pub type SkgNodeMap = HashMap<ID, SkgNode>;
+
    /// Extract SkgNode for an OrgNode from the map, if applicable.
-   pub fn skgnode_for_orgnode(
+   pub fn skgnode_for_orgnode<'a>(
      orgnode: &OrgNode,
-     map: &HashMap<ID, SkgNode>,
-   ) -> Option<&SkgNode> {
+     map: &'a SkgNodeMap,
+   ) -> Option<&'a SkgNode> {
      match &orgnode.kind {
        OrgNodeKind::True(t) => t.id_opt.as_ref()
          .and_then(|id| map.get(id)),
        OrgNodeKind::Scaff(_) => None,
      }
    }
+   #+end_src
 
-   /// Async version for lazy-loading.
-   pub async fn ensure_and_get_skgnode(
+*Tests:* Write unit tests for =skgnode_for_orgnode= covering:
+- TrueNode with ID in map → returns Some
+- TrueNode with ID not in map → returns None
+- Scaffold → returns None
+
+*Verification:* =cargo test= passes, no existing code changed.
+
+** Chunk 2: Add Map-Building Helper (Non-Breaking)
+
+*Goal:* Create function to build SkgNodeMap from SaveInstructions.
+
+*Changes:*
+1. Add to same file as Chunk 1:
+   #+begin_src rust
+   /// Build a map from SaveInstructions.
+   pub fn skgnode_map_from_save_instructions(
+     instructions: &Vec<SaveInstruction>,
+   ) -> SkgNodeMap {
+     instructions.iter()
+       .filter_map(|(skgnode, _action)|
+         skgnode.ids.first().map(|id| (id.clone(), skgnode.clone())))
+       .collect()
+   }
+   #+end_src
+
+*Tests:* Unit test verifying the map is built correctly from sample SaveInstructions.
+
+*Verification:* =cargo test= passes.
+
+** Chunk 3: Refactor One Leaf Utility Function
+
+*Goal:* Convert one simple utility function from PairTree to Tree<OrgNode>.
+
+*Target:* =get_pid_in_pairtree= (simple, no dependencies)
+
+*Changes:*
+1. Add new version alongside old:
+   #+begin_src rust
+   pub fn get_pid_in_tree(
+     tree: &Tree<OrgNode>,
+     treeid: NodeId
+   ) -> Result<ID, Box<dyn Error>> {
+     let node_kind = read_at_node_in_tree(tree, treeid,
+       |orgnode| orgnode.kind.clone())?;
+     match node_kind {
+       OrgNodeKind::Scaff(_) => Err("...".into()),
+       OrgNodeKind::True(t) => t.id_opt.ok_or_else(|| "...".into())
+     }
+   }
+   #+end_src
+2. Keep old =get_pid_in_pairtree= for now
+
+*Tests:* Copy existing tests for =get_pid_in_pairtree=, adapt for new function.
+
+*Verification:* Both old and new functions work, tests pass.
+
+** Chunk 4: Refactor =ensure_skgnode= to Work with Map
+
+*Goal:* Create map-based version of =ensure_skgnode=.
+
+*Changes:*
+1. Add new function (keep old one):
+   #+begin_src rust
+   pub async fn ensure_skgnode_in_map(
      node_id: &ID,
-     map: &mut HashMap<ID, SkgNode>,
+     map: &mut SkgNodeMap,
      config: &SkgConfig,
      driver: &TypeDBDriver,
-   ) -> Result<&SkgNode, Box<dyn Error>> {
+   ) -> Result<(), Box<dyn Error>> {
      if !map.contains_key(node_id) {
        let skgnode = skgnode_from_id(config, driver, node_id).await?;
        map.insert(node_id.clone(), skgnode);
      }
-     Ok(map.get(node_id).unwrap())
+     Ok(())
    }
    #+end_src
 
-2. These functions abstract the map-lookup pattern and can be used by new code before old code is refactored.
+*Tests:* Test that it:
+- Fetches and adds missing SkgNode
+- Doesn't re-fetch if already present
 
-** Phase 3: Refactor Core Completion Logic
+*Verification:* Tests pass, old code unchanged.
 
-1. Start with =complete_or_restore_each_node_in_branch=:
-   - Change signature from =(&mut PairTree, ...)= to =(&mut Tree<OrgNode>, &mut HashMap<ID, SkgNode>, ...)=
-   - Update internal calls to use the helpers
-   - Test thoroughly
+** Chunk 5: Create Dual-Signature Version of =complete_or_restore_each_node_in_branch=
 
-2. Refactor sub-functions called by completion:
-   - =ensure_skgnode= → variant that takes map
-   - =clobberIndefinitiveOrgnode= → takes tree and map
-   - =make_indef_if_repeat_then_extend_defmap= → takes tree and map
-   - =detect_and_mark_cycle= → unchanged (only reads tree)
+*Goal:* Add overload that takes (Tree, Map) instead of PairTree, delegate to old version temporarily.
 
-** Phase 4: Refactor View-Request Execution
+*Changes:*
+1. Add new function that converts inputs to PairTree, calls old function, then extracts results back:
+   #+begin_src rust
+   pub async fn complete_or_restore_each_node_in_branch_v2(
+     tree: &mut Tree<OrgNode>,
+     map: &mut SkgNodeMap,
+     /* other params */
+   ) -> Result<(), Box<dyn Error>> {
+     // Temporarily: build PairTree from tree+map
+     let mut pairtree = /* convert */;
+     complete_or_restore_each_node_in_branch(&mut pairtree, /* ... */).await?;
+     // Extract changes back to tree and map
+     Ok(())
+   }
+   #+end_src
 
-1. Update =execute_view_requests= signature
-2. Update =execute_definitive_view_request=
-3. Update related helpers like =get_hidden_ids_if_subscribee=
+*Tests:* Verify new function produces same results as old.
 
-** Phase 5: Refactor Pair-Building Functions
+*Verification:* Both versions work identically.
 
-1. Delete or repurpose =pair_orgnode_forest_with_skgnodes_from_saveinstructions=
-   - Instead, just build the map directly
-   - Keep the OrgNode tree as-is
+** Chunk 6: Refactor Internals of =complete_or_restore_each_node_in_branch_v2=
 
-2. Update =add_paired_subtree_as_child=:
-   - Return void, modifies tree directly
-   - No pairing step
+*Goal:* Reimplement v2 to work directly with tree+map, not via conversion.
 
-3. Update =make_and_append_child_pair=, =build_node_branch_minus_content=:
-   - Take map parameter
-   - When creating a new node, add its SkgNode to the map, not the tree
+*Changes:*
+1. Rewrite =complete_or_restore_each_node_in_branch_v2= to use:
+   - =ensure_skgnode_in_map= instead of =ensure_skgnode=
+   - =get_pid_in_tree= instead of =get_pid_in_pairtree=
+   - Direct tree/map access
 
-** Phase 6: Update Utility Functions
+*Tests:* Verify behavior unchanged from Chunk 5.
 
-Systematically refactor functions in =server/to_org/util.rs=:
-- =read_at_node_in_tree= → already generic, doesn't change
-- =collect_ids_from_pair_tree= → rename to =collect_ids_from_tree=
-- =get_pid_in_pairtree= → =get_pid_in_tree=
-- =stub_forest_from_root_ids=, =build_node_branch_minus_content=, etc.
+*Verification:* Tests pass, especially repeat and cycle tests.
 
-Each function changes only in:
-- Parameter: =&PairTree= → =&Tree<OrgNode>=
-- Read operations: =|np| np.orgnode.kind.clone()= → =|orgnode| orgnode.kind.clone()=
-- Write operations: =|np| ...= → =|orgnode| ...=
+** Chunk 7: Refactor Sub-Functions of Completion (One at a Time)
 
-** Phase 7: Update Other Modules
+*Goal:* Convert =clobberIndefinitiveOrgnode= to use tree+map.
 
-1. =server/to_org/render.rs=, =initial_bfs.rs=, =truncate_after_node_in_gen.rs=
-2. =server/to_org/expand/aliases.rs=, =backpath.rs=, =collect_view_requests.rs=
-3. =server/to_org/complete/aliascol.rs=, =sharing.rs=
+*Changes:*
+1. Add =clobberIndefinitiveOrgnode_v2= working with tree+map
+2. Update =complete_or_restore_each_node_in_branch_v2= to use it
 
-** Phase 8: Update Entry Point
+*Tests:* Verify indefinitive nodes are clobbered correctly.
 
-Modify =save_buffer.rs:update_from_and_rerender_buffer=:
-1. Remove the call to =pair_orgnode_forest_with_skgnodes_from_saveinstructions=
-2. Build the map directly from SaveInstructions
-3. Pass tree and map to downstream functions
+*Verification:* Tests pass.
 
-** Phase 9: Testing and Verification
+*Repeat for:*
+- =make_indef_if_repeat_then_extend_defmap=
+- =content_ids_if_definitive_else_empty=
+- Other completion helpers (one per chunk)
 
-1. Run existing test suite; fix any failures
-2. Add new tests for map-tree consistency
-3. Verify repeats are still handled correctly
-4. Performance profiling (if needed)
+** Chunk 8-12: Similar Pattern for View-Request Functions
 
-** Estimated Complexity
+Each chunk refactors one function:
+- Chunk 8: =get_hidden_ids_if_subscribee=
+- Chunk 9: =execute_definitive_view_request= (create v2)
+- Chunk 10: Refactor v2 internals
+- Chunk 11: =build_node_branch_minus_content=
+- Chunk 12: Other view-request helpers
 
-- High-impact files to change: ~8-10
-- Medium-impact files to change: ~15-20
-- Functions to refactor: ~40-60
-- Estimated effort: 2-3 days for an experienced Rust developer
-- Testing and debugging: 1-2 additional days
+** Chunk 13: Update Entry Point to Use v2 Functions
+
+*Goal:* Switch =update_from_and_rerender_buffer= to use new functions.
+
+*Changes:*
+1. Build map using =skgnode_map_from_save_instructions=
+2. Keep tree as Tree<OrgNode> (no pairing)
+3. Call =complete_or_restore_each_node_in_branch_v2=
+4. Call v2 versions of other functions
+
+*Tests:* Run full integration tests.
+
+*Verification:* All tests pass, behavior unchanged.
+
+** Chunk 14: Remove Old PairTree Functions
+
+*Goal:* Delete unused old versions.
+
+*Changes:*
+1. Remove =pair_orgnode_forest_with_skgnodes_from_saveinstructions=
+2. Remove old completion functions
+3. Rename v2 functions (drop the v2 suffix)
+4. Remove PairTree type alias if unused
+
+*Tests:* Verify nothing breaks.
+
+*Verification:* Clean compile, all tests pass.
+
+** Chunk 15: Refactor Remaining Utilities in =server/to_org/util.rs=
+
+*Goal:* Convert remaining PairTree utilities (in batches of 2-3 functions per chunk).
+
+*Changes:* Update each function's signature and implementation.
+
+*Tests:* Adapt tests for each function.
+
+*Verification:* Tests pass after each batch.
+
+** Chunk 16-20: Refactor Other Modules (One Module per Chunk)
+
+- Chunk 16: =server/to_org/render.rs=
+- Chunk 17: =server/to_org/expand/aliases.rs=
+- Chunk 18: =server/to_org/expand/backpath.rs=
+- Chunk 19: =server/to_org/complete/aliascol.rs=
+- Chunk 20: =server/to_org/complete/sharing.rs=
+
+** Chunk 21: Final Cleanup and Documentation
+
+*Goal:* Polish and document the new architecture.
+
+*Changes:*
+1. Add comments documenting the map-tree invariant
+2. Add assertions for map-tree consistency if appropriate
+3. Update any architecture documentation
+
+*Tests:* Run full test suite + integration tests.
+
+*Verification:* Everything works, no regressions.
+
+** Estimated Per-Chunk Effort
+
+- Chunks 1-4 (helpers): 15-30 min each
+- Chunks 5-7 (completion refactor): 45-90 min each
+- Chunks 8-12 (view requests): 30-60 min each
+- Chunk 13 (entry point): 60 min
+- Chunk 14 (cleanup): 30 min
+- Chunks 15-20 (remaining modules): 30-45 min each
+- Chunk 21 (documentation): 30 min
+
+*Total: ~20-25 hours of focused work, spread across reviewable increments.*
 
 ---
 
