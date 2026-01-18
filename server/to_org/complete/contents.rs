@@ -10,7 +10,8 @@ use crate::to_org::util::{
 };
 use crate::to_org::complete::aliascol::{completeAliasCol, completeAliasCol_v2};
 use crate::to_org::complete::sharing::{
-  maybe_add_subscribeeCol_branch };
+  maybe_add_subscribeeCol_branch,
+  maybe_add_subscribeeCol_branch_v2 };
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
@@ -154,15 +155,9 @@ pub fn complete_or_restore_each_node_in_branch_v2<'a> (
           clobberIndefinitiveOrgnode_v2 (
             tree, map, node_id ) ?;
         } else {
-          // Definitive: use conversion for complex helper
-          let mut pairtree : PairTree =
-            pairtree_from_tree_and_map ( tree, map );
-          maybe_add_subscribeeCol_branch (
-            &mut pairtree, node_id, config, typedb_driver ) . await ?;
-          let ( new_tree, new_map ) =
-            tree_and_map_from_pairtree ( &pairtree );
-          *tree = new_tree;
-          *map = new_map; }
+          // Definitive: use v2 version working directly with tree+map
+          maybe_add_subscribeeCol_branch_v2 (
+            tree, map, node_id, config, typedb_driver ) . await ?; }
         recurse (
           tree, map, node_id, config, typedb_driver, visited
         ). await ?; }}

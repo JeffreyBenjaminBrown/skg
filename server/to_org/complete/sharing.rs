@@ -3,16 +3,22 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNodeKind, Scaffold};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::{NodePair,PairTree};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  append_indefinitive_from_disk_as_child, insert_scaffold_as_child,
+  append_indefinitive_from_disk_as_child,
+  append_indefinitive_from_disk_as_child_in_orgtree,
+  insert_scaffold_as_child,
+  insert_scaffold_as_child_in_orgtree,
   pid_for_subscribee_and_its_subscriber_grandparent,
   pids_for_subscriber_and_its_subscribees,
-  unique_scaffold_child };
+  pids_for_subscriber_and_its_subscribees_in_orgtree,
+  unique_scaffold_child,
+  unique_orgnode_scaffold_child };
+use crate::types::skgnode::SkgNodeMap;
 
-use ego_tree::{NodeId, NodeRef};
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -97,6 +103,67 @@ pub async fn maybe_add_subscribeeCol_branch (
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
         tree, subscribee_col_nid, & subscribee_id,
+        false, config, driver
+      ). await ?; }}
+  Ok (( )) }
+
+/// V2: Tree<OrgNode> + SkgNodeMap version of maybe_add_subscribeeCol_branch.
+pub async fn maybe_add_subscribeeCol_branch_v2 (
+  tree    : &mut Tree<OrgNode>,
+  map     : &mut SkgNodeMap,
+  node_id : NodeId, // if applicable, this is the subscriber
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  { let node_kind: OrgNodeKind =
+      read_at_node_in_tree (
+        tree, node_id, |orgnode| orgnode.kind.clone() )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+    match node_kind {
+      OrgNodeKind::Scaff ( _ ) =>
+        return Err ( "maybe_add_subscribeeCol_branch_v2: \
+                      caller should not pass a Scaffold".into() ),
+      OrgNodeKind::True ( t ) => // skip indefinitive nodes
+        if t.indefinitive { return Ok(( )) }} }
+  { // Skip if there already is one.
+    if unique_orgnode_scaffold_child (
+      tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
+    { return Ok (( )); }}
+  let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
+    pids_for_subscriber_and_its_subscribees_in_orgtree ( tree, map, node_id ) ?;
+  if subscribee_ids . is_empty () { // Skip because it would be empty.
+    return Ok (( )); }
+
+  let hidden_outside_content : HashSet < ID > = {
+    // hidden IDs that are outside all subscribee content
+    let r_hides : HashSet < ID > =
+      what_node_hides (
+        &config.db_name, driver, & subscriber_pid ) . await ?;
+    let all_subscribee_content : HashSet < ID > =
+      what_nodes_contain (
+        &config.db_name, driver, & subscribee_ids ) . await ?;
+    r_hides . iter ()
+      . filter ( | id | ! all_subscribee_content . contains ( id ) )
+      . cloned () . collect () };
+
+  let subscribee_col_nid : NodeId =
+    insert_scaffold_as_child_in_orgtree ( tree, node_id,
+      Scaffold::SubscribeeCol, true ) ?;
+
+  { // mutate the tree
+    if ! hidden_outside_content . is_empty () {
+      let hidden_outside_col_nid : NodeId =
+        insert_scaffold_as_child_in_orgtree (
+          tree, subscribee_col_nid,
+          Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
+      for hidden_id in hidden_outside_content {
+        append_indefinitive_from_disk_as_child_in_orgtree (
+          tree, map, hidden_outside_col_nid, & hidden_id,
+          false, config, driver
+        ). await ?; }}
+    for subscribee_id in subscribee_ids {
+      append_indefinitive_from_disk_as_child_in_orgtree (
+        tree, map, subscribee_col_nid, & subscribee_id,
         false, config, driver
       ). await ?; }}
   Ok (( )) }

@@ -600,9 +600,49 @@ Each chunk should:
 - Significant progress: only 1 complex operation still requires conversion
 - The v2 version is cleaner because it gets data from map, not disk
 
-** Chunk 8-12: Similar Pattern for View-Request Functions
+** DONE Chunk 9: Refactor =maybe_add_subscribeeCol_branch= ✅ COMPLETED 🎉 MAJOR MILESTONE
 
-Each chunk refactors one function:
+*Goal:* Create v2 version of =maybe_add_subscribeeCol_branch= - the last complex function requiring conversion!
+
+*Changes:*
+1. Created =pids_for_subscriber_and_its_subscribees_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
+   - Gets subscriber and subscribee PIDs from Tree<OrgNode> + SkgNodeMap
+   - Looks up SkgNode in map instead of extracting from PairTree
+2. Created =append_indefinitive_from_disk_as_child_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
+   - Fetches SkgNode from disk
+   - Adds SkgNode to map
+   - Creates indefinitive OrgNode and appends to tree
+   - Maintains map-tree consistency
+3. Created =maybe_add_subscribeeCol_branch_v2= in =server/to_org/complete/sharing.rs=:
+   - Uses =unique_orgnode_scaffold_child= to check for existing SubscribeeCol
+   - Uses =pids_for_subscriber_and_its_subscribees_in_orgtree= to get PIDs from map
+   - Uses =insert_scaffold_as_child_in_orgtree= to add scaffold nodes
+   - Uses =append_indefinitive_from_disk_as_child_in_orgtree= to add children
+   - Works entirely with Tree<OrgNode> + SkgNodeMap, no conversion!
+4. Updated =complete_or_restore_each_node_in_branch_v2= to use =maybe_add_subscribeeCol_branch_v2=:
+   - **Eliminated the LAST PairTree conversion!** 🎉
+   - The entire function now works directly with Tree<OrgNode> + SkgNodeMap!
+
+*Tests:* All tests pass (33 types tests passing).
+
+*Verification:* ✅ Compilation successful, all relevant tests pass, non-breaking.
+
+*Learnings:*
+- Appending nodes from disk requires adding SkgNode to map AND OrgNode to tree
+- Map-tree consistency maintained by both operations happening together
+- Getting PIDs from map is straightforward: look up node ID, get SkgNode, extract PIDs
+- The v2 version is more efficient: gets data from map, not from PairTree
+- **MAJOR MILESTONE**: =complete_or_restore_each_node_in_branch_v2= now works ENTIRELY without PairTree conversion!
+- All tree structure modifications work the same way for Tree<OrgNode> as PairTree
+- The refactoring is complete for this function - no temporary conversions remain!
+
+** Chunk 10+: Next Steps
+
+*Status:* The core refactoring of =complete_or_restore_each_node_in_branch_v2= is complete!
+
+All operations in this critical function now work directly with Tree<OrgNode> + SkgNodeMap. The temporary conversion approach worked perfectly for incremental refactoring.
+
+*Remaining work:*
 - Chunk 8: =get_hidden_ids_if_subscribee=
 - Chunk 9: =execute_definitive_view_request= (create v2)
 - Chunk 10: Refactor v2 internals

@@ -175,6 +175,34 @@ pub fn pids_for_subscriber_and_its_subscribees (
     || "pids_for_subscriber_and_its_subscribees: SkgNode should exist"
     . into () ) }
 
+/// Extract PIDs for subscriber and subscribees from Tree<OrgNode> + SkgNodeMap.
+pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+) -> Result < ( ID, Vec < ID > ),
+              Box<dyn Error> > {
+  // Get the node's ID
+  let pid : ID =
+    read_at_node_in_tree (
+      tree, node_id,
+      |orgnode| match &orgnode.kind {
+        OrgNodeKind::True(t) => t . id_opt . clone()
+          . ok_or("pids_for_subscriber_and_its_subscribees_in_orgtree: node has no ID"),
+        OrgNodeKind::Scaff(_) => Err (
+          "pids_for_subscriber_and_its_subscribees_in_orgtree: expected TrueNode" ),
+      } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
+
+  // Look up SkgNode in map
+  let skgnode : &SkgNode =
+    map . get ( &pid )
+    . ok_or ( "pids_for_subscriber_and_its_subscribees_in_orgtree: SkgNode should exist in map" ) ?;
+
+  Ok (( skgnode . ids [0] . clone (),
+        skgnode . subscribes_to . clone ()
+        . unwrap_or_default () )) }
+
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
@@ -269,6 +297,44 @@ pub async fn append_indefinitive_from_disk_as_child (
       parent_mut . append (
         NodePair { mskgnode : Some ( skgnode ),
                    orgnode  : orgnode } ); } ) ?;
+  Ok (( )) }
+
+/// Fetch a node from disk and append it as an indefinitive child to Tree<OrgNode>.
+/// Also adds the SkgNode to the map.
+pub async fn append_indefinitive_from_disk_as_child_in_orgtree (
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
+  parent_id      : NodeId,
+  node_id        : &ID,
+  parent_ignores : bool,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
+    skgnode_and_orgnode_from_id (
+      config, driver, node_id ) . await ?;
+  let (id, source, title) : (ID, String, String)
+  = match &content_orgnode.kind
+  { OrgNodeKind::True(t) => (
+      t . id_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child_in_orgtree: node has no ID")?
+        . clone(),
+      t . source_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child_in_orgtree: node has no source")?
+        . clone(),
+      t . title . clone( )),
+    OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child_in_orgtree: expected TrueNode".into()) };
+
+  // Add SkgNode to map
+  map . insert ( id.clone(), skgnode );
+
+  // Create indefinitive OrgNode and append to tree
+  let orgnode : OrgNode = mk_indefinitive_orgnode (
+    id, source, title, parent_ignores );
+  with_node_mut (
+    tree, parent_id,
+    |mut parent_mut| {
+      parent_mut . append ( orgnode ); } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+
   Ok (( )) }
 
 /// Reads from disk the SkgNode
