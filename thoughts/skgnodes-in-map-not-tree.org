@@ -1,5 +1,10 @@
 #+title: Refactoring: SkgNodes in Map, not Tree
 
+* Caveat: Maybe this won't have been worth it.
+Why keep the map at all, rather than looking up each skgnode as needed?
+
+This is, I suppose, premature optimization. I don't actually know that the file lookups are hard. But batching them seems like a good idea. If I would only have to look up the skgnode once per orgnode, that would be fine, but I might have to do it numerous times while processing that orgnode.
+
 * The Current State
 
 ** Architecture Overview
@@ -455,47 +460,96 @@ Each chunk should:
 *Verification:* ✅ All tests pass (33 total), old =ensure_skgnode= unchanged.
 
 *Learnings:*
-- Test uses =run_with_test_db= helper which requires Box::pin closure
-- Need fixtures directory even if empty for test DB setup
+- Function was renamed to =add_v_to_map_if_absent= and moved to =server/types/maps.rs=
+- Made generic over key type K, value type V, and fetch function F
+- Generic version is much more reusable - works with any HashMap and async fetch
+- Test simplified to use =#[tokio::test]= instead of =run_with_test_db= (no DB needed)
+- Using =empty_skgnode()= helper makes test SkgNode creation much more concise
 - Function is simpler than PairTree version - just check map, fetch if missing
 
-** Chunk 5: Create Dual-Signature Version of =complete_or_restore_each_node_in_branch=
+** DONE Chunk 5: Create Dual-Signature Version of =complete_or_restore_each_node_in_branch= ✅ COMPLETED
 
 *Goal:* Add overload that takes (Tree, Map) instead of PairTree, delegate to old version temporarily.
 
 *Changes:*
-1. Add new function that converts inputs to PairTree, calls old function, then extracts results back:
+1. Added conversion helpers in =server/types/tree/orgnode_skgnode.rs=:
+   - =pairtree_from_tree_and_map= - builds PairTree from Tree<OrgNode> and map
+   - =tree_and_map_from_pairtree= - extracts tree and map from PairTree
+   - Both functions recursively clone tree structure
+2. Added =complete_or_restore_each_node_in_branch_v2= in =server/to_org/complete/contents.rs=:
    #+begin_src rust
    pub async fn complete_or_restore_each_node_in_branch_v2(
      tree: &mut Tree<OrgNode>,
      map: &mut SkgNodeMap,
-     /* other params */
+     node_id: NodeId,
+     config: &SkgConfig,
+     typedb_driver: &TypeDBDriver,
+     visited: &mut DefinitiveMap,
    ) -> Result<(), Box<dyn Error>> {
-     // Temporarily: build PairTree from tree+map
-     let mut pairtree = /* convert */;
-     complete_or_restore_each_node_in_branch(&mut pairtree, /* ... */).await?;
-     // Extract changes back to tree and map
+     // Convert to PairTree
+     let mut pairtree = pairtree_from_tree_and_map(tree, map);
+     // Call original function
+     complete_or_restore_each_node_in_branch(
+       &mut pairtree, node_id, config, typedb_driver, visited
+     ).await?;
+     // Extract changes back
+     let (new_tree, new_map) = tree_and_map_from_pairtree(&pairtree);
+     *tree = new_tree;
+     *map = new_map;
      Ok(())
    }
    #+end_src
 
-*Tests:* Verify new function produces same results as old.
+*Tests:* Created =tests/types/tree/orgnode_skgnode.rs= with 4 tests:
+- =test_pairtree_from_tree_and_map_single_node= - single node with SkgNode in map
+- =test_pairtree_from_tree_and_map_node_not_in_map= - node ID not in map
+- =test_tree_and_map_from_pairtree_single_node= - extract from PairTree
+- =test_roundtrip_conversion= - verify tree+map → pairtree → tree+map preserves data
 
-*Verification:* Both versions work identically.
+*Verification:* ✅ All tests pass (33 total), old function unchanged, non-breaking.
 
-** Chunk 6: Refactor Internals of =complete_or_restore_each_node_in_branch_v2=
+*Learnings:*
+- ego_tree::Tree doesn't have a map function, so conversion requires manual reconstruction
+- Conversion is inefficient (clones entire tree structure twice) but safe for temporary use
+- The conversion approach lets us delegate to fully-tested PairTree code
+- Later chunks will eliminate this conversion by refactoring internals
+- Need to import =NodeMut= from ego_tree for building trees
+- Roundtrip testing is important to verify no data loss in conversion
+- Test file mirrors source structure: =tests/types/tree/orgnode_skgnode.rs=
+
+** DONE Chunk 6: Refactor Internals of =complete_or_restore_each_node_in_branch_v2= ✅ COMPLETED
 
 *Goal:* Reimplement v2 to work directly with tree+map, not via conversion.
 
 *Changes:*
-1. Rewrite =complete_or_restore_each_node_in_branch_v2= to use:
-   - =add_v_to_map_if_absent= instead of =ensure_skgnode=
-   - =get_pid_in_tree= instead of =get_pid_in_pairtree=
-   - Direct tree/map access
+1. Created Tree<OrgNode> versions of helper functions in =server/to_org/util.rs=:
+   - =collect_child_treeids_in_orgtree= - collects child IDs
+   - =truenode_in_orgtree_is_indefinitive= - checks indefinitive flag
+   - =detect_and_mark_cycle_in_orgtree= - detects and marks cycles
+   - =make_indef_if_repeat_then_extend_defmap_in_orgtree= - marks repeats
+   - =is_ancestor_id_in_orgtree= - helper for cycle detection
+2. Created =clobberIndefinitiveOrgnode_v2= in =server/to_org/complete/contents.rs=:
+   - Looks up SkgNode in map by ID
+   - Updates OrgNode with title/source from SkgNode
+3. Rewrote =complete_or_restore_each_node_in_branch_v2= to work directly with tree+map:
+   - Uses =add_v_to_map_if_absent= instead of =ensure_skgnode=
+   - Uses =get_pid_in_tree= and other orgtree helpers
+   - Only converts to PairTree temporarily for complex functions (=completeAliasCol=, =maybe_add_subscribeeCol_branch=)
+   - Most operations now work directly on tree+map
 
-*Tests:* Verify behavior unchanged from Chunk 5.
+*Tests:* All tests pass (33 total).
 
-*Verification:* Tests pass, especially repeat and cycle tests.
+*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
+
+*Learnings:*
+- Generic tree functions (=read_at_node_in_tree=, =write_at_node_in_tree=) work with any tree type
+- Helper functions only need conversion for parts that modify tree structure (add/remove nodes)
+- Reading SkgNode data is straightforward: look up by ID in map
+- Writing OrgNode data uses same tree functions, just different closure parameter type
+- Closure lifetimes tricky: need to clone ID before =async move= block
+- Complex helpers (=completeAliasCol=, =maybe_add_subscribeeCol_branch=) deferred to later chunks
+- Significant progress: most of the function now works without conversion
+- Temporary conversion only happens for 2 complex operations
 
 ** Chunk 7: Refactor Sub-Functions of Completion (One at a Time)
 

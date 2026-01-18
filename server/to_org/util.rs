@@ -163,6 +163,29 @@ pub fn make_indef_if_repeat_then_extend_defmap (
     defMap . insert ( pid, node_id ); }
   Ok (( )) }
 
+/// Mark repeat nodes as indefinitive and track definitive nodes in defMap.
+/// Tree<OrgNode> version.
+pub fn make_indef_if_repeat_then_extend_defmap_in_orgtree (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  defMap  : &mut DefinitiveMap,
+) -> Result<(), Box<dyn Error>> {
+  let pid : ID = // Will error if node is a Scaffold.
+    get_pid_in_tree ( tree, node_id ) ?;
+  let is_indefinitive : bool =
+    write_at_node_in_tree (
+      tree, node_id,
+      |orgnode| { let OrgNodeKind::True ( t ) = &mut orgnode.kind
+             else { unreachable!( "In make_indef_if_repeat_then_extend_defmap_in_orgtree, get_pid_in_tree already verified TrueNode"); };
+             if defMap . contains_key ( &pid )
+             { // It's a repeat, so it should be indefinitive.
+               t . indefinitive = true; }
+             t . indefinitive } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  if !is_indefinitive {
+    defMap . insert ( pid, node_id ); }
+  Ok (( )) }
+
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
 pub fn detect_and_mark_cycle (
@@ -176,6 +199,22 @@ pub fn detect_and_mark_cycle (
     let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
       else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
     t . cycle = is_cycle; } ) ?;
+  Ok (( )) }
+
+/// Check if the node's PID appears in its ancestors in Tree<OrgNode>,
+/// and if so, mark viewData.cycle = true.
+pub fn detect_and_mark_cycle_in_orgtree (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let is_cycle : bool = {
+    let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
+    is_ancestor_id_in_orgtree ( tree, node_id, &pid ) ? };
+  write_at_node_in_tree ( tree, node_id, |orgnode| {
+    let OrgNodeKind::True ( t ) = &mut orgnode.kind
+      else { panic! ( "detect_and_mark_cycle_in_orgtree: expected TrueNode" ) };
+    t . cycle = is_cycle; } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 
 
@@ -228,6 +267,27 @@ fn is_ancestor_id (
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
       |np| match &np . orgnode . kind {
+        OrgNodeKind::True ( t ) => t . id_opt . clone (),
+        OrgNodeKind::Scaff ( _ ) => None } )
+    { Ok(Some(id)) if &id == target_skgid
+        => return Ok(true),
+      Ok(_) => continue,
+      Err(_) => return Ok(false), }}
+  unreachable!() }
+
+/// Check if `target_skgid` appears in the ancestor path of `treeid` in Tree<OrgNode>.
+/// Used for cycle detection.
+fn is_ancestor_id_in_orgtree (
+  tree          : &Tree<OrgNode>,
+  origin_treeid : NodeId,
+  target_skgid  : &ID,
+) -> Result<bool, Box<dyn Error>> {
+  read_at_node_in_tree(tree, origin_treeid, |_| ())
+    .map_err(|_| "is_ancestor_id_in_orgtree: NodeId not in tree")?;
+  for generation in 1.. {
+    match read_at_ancestor_in_tree(
+      tree, origin_treeid, generation,
+      |orgnode| match &orgnode . kind {
         OrgNodeKind::True ( t ) => t . id_opt . clone (),
         OrgNodeKind::Scaff ( _ ) => None } )
     { Ok(Some(id)) if &id == target_skgid
@@ -404,6 +464,19 @@ pub fn truenode_in_tree_is_indefinitive (
     OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
     OrgNodeKind::True (t)  => Ok (t.indefinitive) }}
 
+/// Check if a TrueNode in Tree<OrgNode> is indefinitive.
+/// Errs if given a Scaffold.
+pub fn truenode_in_orgtree_is_indefinitive (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < bool, Box<dyn Error> > {
+  let node_kind: OrgNodeKind =
+    read_at_node_in_tree ( tree, treeid, |orgnode| orgnode.kind.clone() )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  match node_kind {
+    OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
+    OrgNodeKind::True (t)  => Ok (t.indefinitive) }}
+
 /// Collect all child tree NodeIds from a node in a PairTree.
 /// Returns an error if the node is not found.
 pub(super) fn collect_child_treeids (
@@ -413,6 +486,17 @@ pub(super) fn collect_child_treeids (
   let node_ref : NodeRef < NodePair > =
     tree . get ( treeid )
     . ok_or ( "collect_child_treeids: NodeId not in tree" ) ?;
+  Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
+
+/// Collect all child tree NodeIds from a node in a Tree<OrgNode>.
+/// Returns an error if the node is not found.
+pub fn collect_child_treeids_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < Vec < NodeId >, Box<dyn Error> > {
+  let node_ref : NodeRef < OrgNode > =
+    tree . get ( treeid )
+    . ok_or ( "collect_child_treeids_in_orgtree: NodeId not in tree" ) ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
 
 
