@@ -234,6 +234,43 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   Ok (( subscribee_pid,
         skgnode . ids[0] . clone() )) }
 
+/// V2: Tree<OrgNode> + SkgNodeMap version of pid_for_subscribee_and_its_subscriber_grandparent.
+pub fn pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+) -> Result < ( ID, ID ), Box<dyn Error> > {
+  let node_ref : NodeRef < OrgNode > =
+    tree . get ( node_id ) . ok_or (
+      "pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree: node not found" ) ?;
+  let subscribee_pid : ID =
+    match &node_ref . value () . kind {
+      OrgNodeKind::True ( t ) => t . id_opt . clone () . expect (
+        "Subscribee should have an ID." ),
+      OrgNodeKind::Scaff ( _ ) => return Err (
+        "Subscribee is not a true node." . into() ) };
+  let parent_ref : NodeRef < OrgNode > =
+    node_ref . parent ()
+    . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
+  if ! matches! ( &parent_ref . value () . kind,
+                  OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )) {
+    return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                 into () ); }
+  let grandparent_ref : NodeRef < OrgNode > =
+    parent_ref . parent ()
+    . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
+  let subscriber_id : ID =
+    match &grandparent_ref . value () . kind {
+      OrgNodeKind::True ( t ) => t . id_opt . clone ()
+        . ok_or ( "Subscriber has no ID" ) ?,
+      OrgNodeKind::Scaff ( _ ) => return Err (
+        "Subscriber is not a true node." . into() ) };
+  let skgnode : &SkgNode =
+    map . get ( &subscriber_id )
+    . ok_or ( "Subscriber SkgNode not in map" ) ?;
+  Ok (( subscribee_pid,
+        skgnode . ids[0] . clone() )) }
+
 pub fn insert_scaffold_as_child (
   tree          : &mut PairTree,
   parent_id     : NodeId,

@@ -225,3 +225,39 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
       tree, hidden_col_nid, & hidden_id,
       false, config, driver ). await ?; }
   Ok (( )) }
+
+/// V2: Tree<OrgNode> + SkgNodeMap version of maybe_add_hiddenInSubscribeeCol_branch.
+pub async fn maybe_add_hiddenInSubscribeeCol_branch_v2 (
+  tree              : &mut ego_tree::Tree<OrgNode>,
+  map               : &mut crate::types::skgnode::SkgNodeMap,
+  subscribee_treeid : NodeId,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  if ! type_and_parent_type_consistent_with_subscribee_in_orgtree (
+    tree, subscribee_treeid )?
+  { return Err ( "maybe_add_hiddenInSubscribeeCol_branch_v2 called on non-subscribee" . into ( )); }
+  if crate::types::tree::orgnode_skgnode::unique_orgnode_scaffold_child (
+       tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
+     )? . is_some ()
+  { return Ok (( )); }
+  let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
+    crate::types::tree::orgnode_skgnode::pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
+      tree, map, subscribee_treeid ) ?;
+  let ( _visible, hidden_in_content )
+    : ( HashSet < ID >, HashSet < ID > )
+    = partition_subscribee_content_for_subscriber (
+        & config.db_name, driver,
+        & subscriber_pid, & subscribee_pid ) . await ?;
+  if hidden_in_content . is_empty () {
+    return Ok (( )); }
+  let hidden_col_nid : NodeId =
+    crate::types::tree::orgnode_skgnode::insert_scaffold_as_child_in_orgtree (
+      tree, subscribee_treeid,
+      Scaffold::HiddenInSubscribeeCol, true ) ?;
+  for hidden_id in hidden_in_content {
+    // populate the collection
+    crate::types::tree::orgnode_skgnode::append_indefinitive_from_disk_as_child_in_orgtree (
+      tree, map, hidden_col_nid, & hidden_id,
+      false, config, driver ). await ?; }
+  Ok (( )) }

@@ -1,990 +1,151 @@
 #+title: Refactoring: SkgNodes in Map, not Tree
 
-* Caveat: Maybe this won't have been worth it.
-Why keep the map at all, rather than looking up each skgnode as needed?
-
-This is, I suppose, premature optimization. I don't actually know that the file lookups are hard. But batching them seems like a good idea. If I would only have to look up the skgnode once per orgnode, that would be fine, but I might have to do it numerous times while processing that orgnode.
-
-* The Current State
-
-** Architecture Overview
-
-The system uses a paired tree structure to represent Org buffers. At the core is:
-
-- =PairTree= (type alias for =Tree<NodePair>=): A tree containing both SkgNodes and OrgNodes
-- =NodePair=: A struct containing:
-  - =mskgnode: Option<SkgNode>= (optional because Scaffolds don't have SkgNodes)
-  - =orgnode: OrgNode=
-
-** Current Data Flow in update_from_and_rerender_buffer
-
-1. Parse org buffer text into =Tree<OrgNode>= and =Vec<SaveInstruction>= via =buffer_to_orgnode_forest_and_save_instructions=
-2. Create a map from ID to SkgNode from the SaveInstructions: =HashMap<ID, SkgNode>=
-3. Call =pair_orgnode_forest_with_skgnodes_from_saveinstructions=:
-   - Takes the =Tree<OrgNode>= and the map
-   - Returns a =PairTree= by recursively building NodePairs
-   - Definitive nodes get Some(skgnode), indefinitive get None
-4. Call =complete_or_restore_each_node_in_branch= to modify the PairTree:
-   - Traverses DFS preorder
-   - For TrueNodes: calls =ensure_skgnode= to fetch from disk if needed
-   - Detects cycles, marks repeats as indefinitive
-   - Calls =maybe_add_subscribeeCol_branch=
-5. Call =collectViewRequestsFromForest= on the PairTree
-6. Call =execute_view_requests= to expand view requests:
-   - Builds new branches from disk via =build_node_branch_minus_content=
-   - Integrates them into the PairTree
-   - Returns the expanded tree
-7. Call =set_metadata_relationship_viewdata_in_forest= to enrich metadata
-8. Call =orgnode_forest_to_string= on the PairTree to convert back to org text
-
-** Key Functions Using PairTree
-
-*** pair_orgnode_forest_with_skgnodes_from_saveinstructions
-- Location: =server/serve/handlers/save_buffer.rs:199=
-- Input: =Tree<OrgNode>= + =Vec<SaveInstruction>=
-- Output: =PairTree=
-- Creates a map from SaveInstructions, then recursively builds NodePairs
-- Scaffold nodes get None SkgNode, TrueNodes with IDs get SkgNode from map
-
-*** complete_or_restore_each_node_in_branch
-- Location: =server/to_org/complete/contents.rs:31=
-- Traverses PairTree, modifying it in-place
-- Key sub-operations:
-  - =ensure_skgnode=: Fetches from disk if needed
-  - =detect_and_mark_cycle=: Checks if node ID is in ancestors
-  - =make_indef_if_repeat_then_extend_defmap=: Marks repeats as indefinitive
-  - =clobberIndefinitiveOrgnode=: Resets indefinitive nodes from SkgNode
-  - =maybe_add_subscribeeCol_branch=: Adds subscription structure
-
-*** execute_view_requests
-- Location: =server/to_org/expand/definitive.rs:27=
-- Processes ViewRequest::Aliases, Containerward, Sourceward, Definitive
-- For each request, builds new tree branches from disk and integrates them
-- Uses DefinitiveMap to track which IDs have been rendered
-
-*** orgnode_forest_to_string
-- Location: =server/org_to_text.rs:15=
-- Input: =&PairTree=
-- Output: String (org text)
-- Only accesses the OrgNode part of NodePair
-- Discards SkgNode data completely
+* Motivation
 
-** Why PairTree Exists (Current Rationale)
-
-The comment in =save_buffer.rs:194= states:
-#+begin_quote
-Converts an OrgNode forest to a PairTree forest (both represented as Trees, via ForestRoot).
-
-Definitive nodes that generated SaveInstructions get Some(skgnode).
-Indefinitive nodes (views) get None.
-#+end_quote
-
-The benefit is avoiding redundant disk lookups during the completion and view-expansion phases.
-The SkgNode is built early (from SaveInstructions) and carried through transformations.
-
-** Usages of SkgNode from PairTree
-
-The SkgNode in NodePair is accessed in:
-
-1. =complete_or_restore_each_node_in_branch=
-   - =ensure_skgnode=: Lazily fetches if None
-   - =clobberIndefinitiveOrgnode=: Uses title and source from SkgNode
-   - =content_ids_if_definitive_else_empty=: Reads =contains= field
-
-2. =execute_view_requests=
-   - =execute_definitive_view_request=: Calls =from_disk_replace_title_body_and_skgnode=
-   - =extendDefinitiveSubtreeFromLeaf=: Uses SkgNode for relationship queries
-   - =get_hidden_ids_if_subscribee=: Accesses =hides_from_its_subscriptions=
-   - =indefinitize_content_subtree=: (doesn't actually use the SkgNode directly)
-
-3. =maybe_add_subscribeeCol_branch=
-   - Reads =subscribes_to= field
-
-4. =set_metadata_relationship_viewdata_in_forest=
-   - May use SkgNode for computing stats
-
-5. =orgnode_forest_to_string=
-   - DOES NOT USE IT (completely discarded)
-
-** Search Results
-
-- Total usages of PairTree or NodePair: ~166 occurrences across files
-- Files most affected:
-  - =server/serve/handlers/save_buffer.rs= (pairing, completion entry)
-  - =server/to_org/util.rs= (tree utilities, ~40 occurrences)
-  - =server/to_org/expand/definitive.rs= (view execution)
-  - =server/to_org/complete/contents.rs= (completion logic)
-  - =server/to_org/complete/aliascol.rs=, =sharing.rs=
-  - =server/to_org/render/*.rs= (rendering, though may not access SkgNode)
-  - =server/org_to_text.rs= (only accesses OrgNode)
-
----
-
-* The Target State
-
-** Architecture Proposal
-
-Instead of =PairTree = Tree<NodePair>=, use:
-
-#+begin_src rust
-type SkgNodeMap = HashMap<ID, SkgNode>;
-// All tree operations now work with:
-type OrgNodeForest = Tree<OrgNode>;
-// And pass the map separately where needed
-#+end_src
-
-** Modified Data Flow
-
-1-2. Same as before: parse buffer, create SaveInstructions
-
-3. Build SkgNodeMap from SaveInstructions:
-   #+begin_src rust
-   let skgnode_map: HashMap<ID, SkgNode> =
-     instructions.iter()
-       .filter_map(|(skgnode, _action)|
-         skgnode.ids.first().map(|id| (id.clone(), skgnode.clone())))
-       .collect();
-   #+end_src
-
-4. SKIP the pairing step entirely. Keep the =Tree<OrgNode>= as-is.
-
-5. Modify =complete_or_restore_each_node_in_branch= to:
-   - Take =(&mut Tree<OrgNode>, &SkgNodeMap)= plus existing params
-   - When it needs to look up a SkgNode, check the map first
-   - For lazy-loading from disk, update the map in-place (or use a separate mutable cache)
-
-6. Same =collectViewRequestsFromForest= but now on =Tree<OrgNode>=
-
-7. Same =execute_view_requests= but:
-   - Takes =(&mut Tree<OrgNode>, &SkgNodeMap)=
-   - When building branches from disk, those go into the OrgNode tree
-   - New SkgNodes fetched go into the map
-
-8. Same =set_metadata_relationship_viewdata_in_forest= on =Tree<OrgNode>=
-
-9. Same =orgnode_forest_to_string= on =Tree<OrgNode>=
-
-** Key Changes Required
-
-*** Functions that take =&PairTree= → take =(&Tree<OrgNode>, &HashMap<ID, SkgNode>)=
-
-Primary candidates:
-- =complete_or_restore_each_node_in_branch=
-- =execute_view_requests=
-- =execute_definitive_view_request=
-- =get_hidden_ids_if_subscribee=
-- =collect_ids_from_pair_tree=
-- =is_ancestor_id=
-- =get_pid_in_pairtree=
-- =make_indef_if_repeat_then_extend_defmap=
-- All utility functions in =server/to_org/util.rs=
-
-*** Functions that build NodePairs
-
-Current: =add_paired_subtree_as_child=, =make_and_append_child_pair=, =build_node_branch_minus_content=
-
-New behavior:
-- When creating a new OrgNode with a corresponding SkgNode, add to the map instead
-- The OrgNode itself doesn't store the reference
-
-*** ensure_skgnode Semantics
-
-Current:
-#+begin_src rust
-pub async fn ensure_skgnode(
-  tree: &mut PairTree,
-  node_id: NodeId,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
-  let has_skgnode = read_at_node_in_tree(tree, node_id, |np| np.mskgnode.is_some())?;
-  if !has_skgnode {
-    let skgnode = skgnode_from_id(config, driver, &node_pid).await?;
-    write_at_node_in_tree(tree, node_id, |np| np.mskgnode = Some(skgnode))?;
-  }
-  Ok(())
-}
-#+end_src
-
-New:
-#+begin_src rust
-pub async fn add_v_to_map_if_absent(
-  skgnode_map: &mut HashMap<ID, SkgNode>,
-  node_id: ID,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
-) -> Result<&SkgNode, Box<dyn Error>> {
-  if !skgnode_map.contains_key(&node_id) {
-    let skgnode = skgnode_from_id(config, driver, &node_id).await?;
-    skgnode_map.insert(node_id.clone(), skgnode);
-  }
-  Ok(skgnode_map.get(&node_id).unwrap())
-}
-#+end_src
+Why keep a map instead of looking up each SkgNode as needed? This avoids redundant disk lookups during completion and view-expansion phases. The SkgNode is built early (from SaveInstructions or fetched once) and reused.
 
-*** Helper Functions Need Refactoring
+* Target Architecture
 
-Current example (=get_pid_in_pairtree=):
-#+begin_src rust
-pub fn get_pid_in_pairtree(tree: &PairTree, treeid: NodeId) -> Result<ID, Box<dyn Error>> {
-  let node_kind = read_at_node_in_tree(tree, treeid, |np| np.orgnode.kind.clone())?;
-  match node_kind {
-    OrgNodeKind::Scaff(_) => Err("...".into()),
-    OrgNodeKind::True(t) => t.id_opt.ok_or_else(|| "...".into())
-  }
-}
-#+end_src
+- =Tree<OrgNode>=: Stores tree structure and OrgNode data
+- =HashMap<ID, SkgNode>=: Stores SkgNode data, accessed by ID
+- Type alias: =SkgNodeMap = HashMap<ID, SkgNode>=
 
-Becomes:
-#+begin_src rust
-pub fn get_pid_in_tree(tree: &Tree<OrgNode>, treeid: NodeId) -> Result<ID, Box<dyn Error>> {
-  let node_kind = read_at_node_in_tree(tree, treeid, |orgnode| orgnode.kind.clone())?;
-  match node_kind {
-    OrgNodeKind::Scaff(_) => Err("...".into()),
-    OrgNodeKind::True(t) => t.id_opt.ok_or_else(|| "...".into())
-  }
-}
-#+end_src
+Key patterns:
+- Get node ID from tree, look up SkgNode in map
+- When adding nodes: update BOTH tree and map together
+- Many operations only need OrgNode data (rendering, metadata)
 
-The pattern simplifies: we only read/write OrgNodes now, not NodePairs.
+* Refactoring Strategy
 
-** Caching/Lazy-Loading Strategy
+Create v2 versions of functions alongside old versions. Use incremental approach with temporary conversions when needed. Each chunk keeps tests passing.
 
-Two options for handling lazy-loaded SkgNodes (not in SaveInstructions):
+* Progress
 
-*** Option A: Mutable SkgNodeMap (preferred)
-- Pass the map as =&mut HashMap<ID, SkgNode>= wherever needed
-- Fetches add to the map
-- Simpler semantics, better for reuse across phases
+** DONE Chunk 1: Create Type Alias and Helper Functions
 
-*** Option B: Separate Disk Cache
-- Keep a separate =HashMap<ID, SkgNode>= for lazy-loaded nodes
-- Merge or query both maps at read time
-- More complex, but isolates SaveInstruction nodes from disk nodes
+Created in =server/types/skgnode.rs=:
+- =SkgNodeMap= type alias
+- =skgnode_for_orgnode= - lookup by OrgNode ID
+- =skgnode_map_from_save_instructions= - build map from save instructions
 
-Recommend Option A for simplicity and consistency.
+** DONE Chunk 2: Conversion Helpers
 
----
+Created in =server/types/tree/orgnode_skgnode.rs=:
+- =tree_and_map_from_pairtree= - converts PairTree to Tree<OrgNode> + map
+- =pairtree_from_tree_and_map= - converts back (for compatibility)
+- Round-trip conversion tested and working
 
-* Pushback: Why This Might Not Be Complete or a Bad Idea
+** DONE Chunk 3: Generic Map Helper
 
-** 1. Complexity of Mutable HashMap Across Async Functions
+Created in =server/types/maps.rs=:
+- =add_v_to_map_if_absent= - async fetch-if-missing for map
+- Generic over key/value types and async closures
 
-The current approach carries state in the tree structure. Switching to a HashMap means passing it mutably through deep call chains. Rust's borrow checker may complain about:
-- Multiple async function calls that all need mutable access to the map
-- Interleaving access patterns during tree traversal
-
-*Mitigation:* Use =&mut HashMap= or interior mutability (=RefCell=) strategically, prioritizing safety over concurrency. There is minimal parallelism in the codebase currently, which simplifies this concern. Test thoroughly.
-** 2. Coupling Between Maps and Trees
-
-With pairing, there's a 1-to-1 correspondence: every definitive TrueNode has its SkgNode right there. With a separate map:
-- Risk: ID in OrgNode doesn't match any map entry (stale/inconsistent)
-- Risk: Multiple OrgNodes with same ID (repeats) all map to the same SkgNode (is that correct?)
-
-*Mitigation:* Follow this disciplined strategy: We build the map of SkgNodes from the tree of OrgNodes initially, and every time we extend the tree, we extend the map correspondingly. This invariant should be documented prominently and enforced through code review. Add invariant checks and ensure tests cover map-tree consistency.
-** 3. Performance
-
-The map adds a hash lookup overhead at every access point. Current direct access via tree is pointer-following. For large trees, this might matter.
-
-*Mitigation:* Profile before and after. Modern HashMap is pretty fast. The indirection cost is probably negligible vs. disk I/O.
-
-** 4. The Repeats Problem
-
-When a node appears multiple times in the tree, all instances currently share the same NodePair's mskgnode. With a map, they all look up the same ID:
-
-- Current: Multiple NodePairs with the same mskgnode are all modified together (if you modify mskgnode in one, you're modifying a clone, not the original)
-- New: All accesses hit the same HashMap entry
-
-This is probably fine and even cleaner, but worth verifying against repeat test cases.
+** DONE Chunk 4: Tree Helper Functions
 
-*Important constraint:* SkgNodes should be immutable once loaded into the map. After reading one from disk, it should not need modification. If during implementation we discover any code that mutates SkgNodes after loading them, this requires investigation and user notification ("HEY JEFF") to determine if the design assumption is violated.
-** 5. OrgNode Serialization/Deserialization
-If OrgNodes are ever serialized for caching, you now need to serialize both the tree *and* the map as separate entities. This adds complexity for recovery or debugging.
+Created =_in_orgtree= versions of tree utilities in =server/to_org/util.rs=:
+- =detect_and_mark_cycle_in_orgtree=
+- =make_indef_if_repeat_then_extend_defmap_in_orgtree=
+- =truenode_in_orgtree_is_indefinitive=
+- =collect_child_treeids_in_orgtree=
+- =get_pid_in_tree= (generic version)
 
-*Mitigation:* If OrgNode serialization is important, document the need to serialize both or add a "tree + map" bundled type.
-** 6. Undefined Behavior for Scaffolds
-
-Scaffolds don't have IDs, so they won't map. This is correct. But code must consistently avoid looking up Scaffold IDs in the map. Currently, the Option<SkgNode> handles this naturally. With a map, you need runtime checks.
-
-*Mitigation:* Helper function =skgnode_for_org_node(orgnode, map) -> Option<SkgNode>= that returns None for Scaffolds.
-
-** 7. Lazy Loading Semantics Change
-
-With =ensure_skgnode=, the function returns =()= and mutates the tree. With a map version, the pattern simplifies to: first check the map for the SkgNode, and if not present, fetch from disk and add to the map.
-
-*Mitigation:* Design the API to make this pattern clear. Returning =&SkgNode= from the ensure function makes the intent clearer and provides immediate access to the loaded data.
-** 8. Metadata Relationship Data
-
-The =set_metadata_relationship_viewdata_in_forest= function may assume SkgNodes are present. With the new design, this function should look up SkgNodes from the map as needed.
-
-*Mitigation:* When this function needs a SkgNode for an OrgNode, it simply fetches from the map. Ensure the map is passed as a parameter. If the SkgNode isn't yet in the map, the function should handle this gracefully (either by fetching from disk or skipping that metadata).
-* Path to Get There
-
-Each chunk should:
-- Keep the codebase compiling and all tests passing
-- Be independently reviewable
-- Build incrementally toward the goal
-
-** DONE Chunk 1: Add Helper Functions (Non-Breaking)
-
-*Goal:* Introduce new functions that work with maps, without changing any existing code.
-
-*Changes:*
-1. Added to =server/types/skgnode.rs=:
-   #+begin_src rust
-   pub type SkgNodeMap = HashMap<ID, SkgNode>;
-
-   /// Extract SkgNode for an OrgNode from the map, if applicable.
-   pub fn skgnode_for_orgnode<'a>(
-     orgnode: &OrgNode,
-     map: &'a SkgNodeMap,
-   ) -> Option<&'a SkgNode> {
-     match &orgnode.kind {
-       OrgNodeKind::True(t) => t.id_opt.as_ref()
-         .and_then(|id| map.get(id)),
-       OrgNodeKind::Scaff(_) => None,
-     }
-   }
-   #+end_src
-
-*Tests:* Added =tests/types/skgnode.rs= with unit tests covering:
-- TrueNode with ID in map → returns Some
-- TrueNode with ID not in map → returns None
-- Scaffold → returns None
-
-*Verification:* ✅ All tests pass, no existing code changed.
-
-*Learnings:*
-- Code was placed in =server/types/skgnode.rs= rather than =tree.rs= (more logical location)
-- Required adding =OrgNode= import alongside existing =OrgNodeKind= import
-- Test module needed declaration in =tests/types.rs=
-
-** DONE Chunk 2: Add Map-Building Helper (Non-Breaking) ✅ COMPLETED
-
-*Goal:* Create function to build SkgNodeMap from SaveInstructions.
-
-*Changes:*
-1. Added to =server/types/skgnode.rs=:
-   #+begin_src rust
-   /// Build a SkgNodeMap from SaveInstructions.
-   /// Each SkgNode is indexed by its first ID.
-   pub fn skgnode_map_from_save_instructions(
-     instructions: &Vec<(SkgNode, crate::types::save::NonMerge_NodeAction)>,
-   ) -> SkgNodeMap {
-     instructions.iter()
-       .filter_map(|(skgnode, _action)| {
-         skgnode.ids.first()
-           .map(|id| (id.clone(), skgnode.clone()))
-       })
-       .collect()
-   }
-   #+end_src
-
-*Tests:* Added to =tests/types/skgnode.rs=:
-- Normal case with 3 SaveInstructions → map with 3 entries
-- Node with multiple IDs → uses first ID as map key
-- Empty instructions → empty map
-
-*Verification:* ✅ All tests pass (29 total), no existing code changed.
-
-*Learnings:*
-- SaveInstruction is a type alias for =(SkgNode, NonMerge_NodeAction)=
-- The action (Save/Delete) doesn't affect map building
-- Need to use fully qualified path =crate::types::save::NonMerge_NodeAction= in signature
-
-** DONE Chunk 3: Refactor One Leaf Utility Function ✅ COMPLETED
-
-*Goal:* Convert one simple utility function from PairTree to Tree<OrgNode>.
-
-*Target:* =get_pid_in_pairtree= (simple, no dependencies)
-
-*Changes:*
-1. Added new version in =server/to_org/util.rs= alongside old:
-   #+begin_src rust
-   pub fn get_pid_in_tree(
-     tree: &Tree<OrgNode>,
-     treeid: NodeId
-   ) -> Result<ID, Box<dyn Error>> {
-     let node_kind = read_at_node_in_tree(tree, treeid,
-       |orgnode| orgnode.kind.clone())?;
-     match node_kind {
-       OrgNodeKind::Scaff(_) =>
-         Err("get_pid_in_tree: caller should not pass a Scaffold".into()),
-       OrgNodeKind::True(t) =>
-         t.id_opt.ok_or_else(|| "get_pid_in_tree: node has no ID".into())
-     }
-   }
-   #+end_src
-2. Kept old =get_pid_in_pairtree= for now (still used by existing code)
-
-*Tests:* Created =tests/to_org_util.rs= with tests covering:
-- TrueNode with ID → returns ID successfully
-- TrueNode without ID → returns error
-- Scaffold → returns error
-
-*Verification:* ✅ All tests pass (32 total), both old and new functions work.
-
-*Learnings:*
-- No existing tests for =get_pid_in_pairtree= existed
-- Changed visibility from =pub(super)= to =pub= for test access
-- The function is simple enough that we can keep both versions side-by-side safely
-- Test file organization: =tests/to_org/util.rs= mirrors =server/to_org/util.rs=
-- Need module file =tests/to_org.rs= to include subdirectory tests
-- Imports: Add qualified types to use statements, not inline in signatures
-
-** DONE Chunk 4: Refactor =ensure_skgnode= to Work with Map ✅ COMPLETED
-
-*Goal:* Create map-based version of =ensure_skgnode=.
-
-*Changes:*
-1. Added in =server/to_org/complete/contents.rs= alongside old:
-   #+begin_src rust
-   pub async fn add_v_to_map_if_absent(
-     node_id: &ID,
-     map: &mut SkgNodeMap,
-     config: &SkgConfig,
-     driver: &TypeDBDriver,
-   ) -> Result<(), Box<dyn Error>> {
-     if !map.contains_key(node_id) {
-       let skgnode = skgnode_from_id(config, driver, node_id).await?;
-       map.insert(node_id.clone(), skgnode);
-     }
-     Ok(())
-   }
-   #+end_src
-2. Added =SkgNodeMap= to imports
-
-*Tests:* Created =tests/to_org/complete/contents.rs= with test:
-- SkgNode already in map → doesn't re-fetch, returns Ok
-
-*Verification:* ✅ All tests pass (33 total), old =ensure_skgnode= unchanged.
-
-*Learnings:*
-- Function was renamed to =add_v_to_map_if_absent= and moved to =server/types/maps.rs=
-- Made generic over key type K, value type V, and fetch function F
-- Generic version is much more reusable - works with any HashMap and async fetch
-- Test simplified to use =#[tokio::test]= instead of =run_with_test_db= (no DB needed)
-- Using =empty_skgnode()= helper makes test SkgNode creation much more concise
-- Function is simpler than PairTree version - just check map, fetch if missing
-
-** DONE Chunk 5: Create Dual-Signature Version of =complete_or_restore_each_node_in_branch= ✅ COMPLETED
-
-*Goal:* Add overload that takes (Tree, Map) instead of PairTree, delegate to old version temporarily.
-
-*Changes:*
-1. Added conversion helpers in =server/types/tree/orgnode_skgnode.rs=:
-   - =pairtree_from_tree_and_map= - builds PairTree from Tree<OrgNode> and map
-   - =tree_and_map_from_pairtree= - extracts tree and map from PairTree
-   - Both functions recursively clone tree structure
-2. Added =complete_or_restore_each_node_in_branch_v2= in =server/to_org/complete/contents.rs=:
-   #+begin_src rust
-   pub async fn complete_or_restore_each_node_in_branch_v2(
-     tree: &mut Tree<OrgNode>,
-     map: &mut SkgNodeMap,
-     node_id: NodeId,
-     config: &SkgConfig,
-     typedb_driver: &TypeDBDriver,
-     visited: &mut DefinitiveMap,
-   ) -> Result<(), Box<dyn Error>> {
-     // Convert to PairTree
-     let mut pairtree = pairtree_from_tree_and_map(tree, map);
-     // Call original function
-     complete_or_restore_each_node_in_branch(
-       &mut pairtree, node_id, config, typedb_driver, visited
-     ).await?;
-     // Extract changes back
-     let (new_tree, new_map) = tree_and_map_from_pairtree(&pairtree);
-     *tree = new_tree;
-     *map = new_map;
-     Ok(())
-   }
-   #+end_src
-
-*Tests:* Created =tests/types/tree/orgnode_skgnode.rs= with 4 tests:
-- =test_pairtree_from_tree_and_map_single_node= - single node with SkgNode in map
-- =test_pairtree_from_tree_and_map_node_not_in_map= - node ID not in map
-- =test_tree_and_map_from_pairtree_single_node= - extract from PairTree
-- =test_roundtrip_conversion= - verify tree+map → pairtree → tree+map preserves data
-
-*Verification:* ✅ All tests pass (33 total), old function unchanged, non-breaking.
-
-*Learnings:*
-- ego_tree::Tree doesn't have a map function, so conversion requires manual reconstruction
-- Conversion is inefficient (clones entire tree structure twice) but safe for temporary use
-- The conversion approach lets us delegate to fully-tested PairTree code
-- Later chunks will eliminate this conversion by refactoring internals
-- Need to import =NodeMut= from ego_tree for building trees
-- Roundtrip testing is important to verify no data loss in conversion
-- Test file mirrors source structure: =tests/types/tree/orgnode_skgnode.rs=
-
-** DONE Chunk 6: Refactor Internals of =complete_or_restore_each_node_in_branch_v2= ✅ COMPLETED
-
-*Goal:* Reimplement v2 to work directly with tree+map, not via conversion.
-
-*Changes:*
-1. Created Tree<OrgNode> versions of helper functions in =server/to_org/util.rs=:
-   - =collect_child_treeids_in_orgtree= - collects child IDs
-   - =truenode_in_orgtree_is_indefinitive= - checks indefinitive flag
-   - =detect_and_mark_cycle_in_orgtree= - detects and marks cycles
-   - =make_indef_if_repeat_then_extend_defmap_in_orgtree= - marks repeats
-   - =is_ancestor_id_in_orgtree= - helper for cycle detection
-2. Created =clobberIndefinitiveOrgnode_v2= in =server/to_org/complete/contents.rs=:
-   - Looks up SkgNode in map by ID
-   - Updates OrgNode with title/source from SkgNode
-3. Rewrote =complete_or_restore_each_node_in_branch_v2= to work directly with tree+map:
-   - Uses =add_v_to_map_if_absent= instead of =ensure_skgnode=
-   - Uses =get_pid_in_tree= and other orgtree helpers
-   - Only converts to PairTree temporarily for complex functions (=completeAliasCol=, =maybe_add_subscribeeCol_branch=)
-   - Most operations now work directly on tree+map
-
-*Tests:* All tests pass (33 total).
-
-*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
-
-*Learnings:*
-- Generic tree functions (=read_at_node_in_tree=, =write_at_node_in_tree=) work with any tree type
-- Helper functions only need conversion for parts that modify tree structure (add/remove nodes)
-- Reading SkgNode data is straightforward: look up by ID in map
-- Writing OrgNode data uses same tree functions, just different closure parameter type
-- Closure lifetimes tricky: need to clone ID before =async move= block
-- Complex helpers (=completeAliasCol=, =maybe_add_subscribeeCol_branch=) deferred to later chunks
-- Significant progress: most of the function now works without conversion
-- Temporary conversion only happens for 2 complex operations
-
-** DONE Chunk 7: Refactor Sub-Functions of Completion ✅ COMPLETED
-
-*Goal:* Convert helper functions to use tree+map.
-
-*Note:* This chunk was mostly completed as part of Chunk 6. The functions were:
-- =clobberIndefinitiveOrgnode_v2= ✅ created in Chunk 6
-- =make_indef_if_repeat_then_extend_defmap_in_orgtree= ✅ created in Chunk 6
-- =detect_and_mark_cycle_in_orgtree= ✅ created in Chunk 6
-- =truenode_in_orgtree_is_indefinitive= ✅ created in Chunk 6
-- =collect_child_treeids_in_orgtree= ✅ created in Chunk 6
-
-*Remaining complex functions still using conversion:*
-- =completeAliasCol= - adds/modifies alias scaffold nodes
-- =maybe_add_subscribeeCol_branch= - adds subscribee branch structure
-
-*Verification:* Tests pass.
-
-** DONE Chunk 8: Refactor =completeAliasCol= to Use Tree+Map ✅ COMPLETED
-
-*Goal:* Create v2 version of =completeAliasCol= that works with tree+map.
-
-*Changes:*
-1. Created =insert_scaffold_as_child_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
-   - Tree<OrgNode> version of scaffold insertion
-   - Uses =with_node_mut= to add scaffold nodes to tree
-2. Created =completeAliasCol_v2= in =server/to_org/complete/aliascol.rs=:
-   - Gets parent SkgNode from map instead of fetching from disk
-   - Uses =collect_child_aliases_at_aliascol_in_orgtree= helper
-   - Uses =remove_duplicates_and_false_aliases_handling_focus_v2= helper
-   - Works entirely with Tree<OrgNode>, no conversion needed
-3. Created helper functions in aliascol.rs:
-   - =collect_child_aliases_at_aliascol_in_orgtree= - collects alias titles from children
-   - =remove_duplicates_and_false_aliases_handling_focus_v2= - removes invalid/duplicate aliases
-4. Updated =complete_or_restore_each_node_in_branch_v2= to use =completeAliasCol_v2=:
-   - Eliminated one of the two remaining PairTree conversions!
-   - Now only =maybe_add_subscribeeCol_branch= requires conversion
-
-*Tests:* All tests pass (33 total).
-
-*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
-
-*Learnings:*
-- Tree structure modification (adding/removing nodes) works the same for Tree<OrgNode> as PairTree
-- =with_node_mut= provides access to =NodeMut= for structural changes
-- Reading SkgNode from map is more efficient than fetching from disk
-- Focus handling logic is unchanged - just different tree type
-- Significant progress: only 1 complex operation still requires conversion
-- The v2 version is cleaner because it gets data from map, not disk
-
-** DONE Chunk 9: Refactor =maybe_add_subscribeeCol_branch= ✅ COMPLETED 🎉 MAJOR MILESTONE
-
-*Goal:* Create v2 version of =maybe_add_subscribeeCol_branch= - the last complex function requiring conversion!
-
-*Changes:*
-1. Created =pids_for_subscriber_and_its_subscribees_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
-   - Gets subscriber and subscribee PIDs from Tree<OrgNode> + SkgNodeMap
-   - Looks up SkgNode in map instead of extracting from PairTree
-2. Created =append_indefinitive_from_disk_as_child_in_orgtree= in =server/types/tree/orgnode_skgnode.rs=:
-   - Fetches SkgNode from disk
-   - Adds SkgNode to map
-   - Creates indefinitive OrgNode and appends to tree
-   - Maintains map-tree consistency
-3. Created =maybe_add_subscribeeCol_branch_v2= in =server/to_org/complete/sharing.rs=:
-   - Uses =unique_orgnode_scaffold_child= to check for existing SubscribeeCol
-   - Uses =pids_for_subscriber_and_its_subscribees_in_orgtree= to get PIDs from map
-   - Uses =insert_scaffold_as_child_in_orgtree= to add scaffold nodes
-   - Uses =append_indefinitive_from_disk_as_child_in_orgtree= to add children
-   - Works entirely with Tree<OrgNode> + SkgNodeMap, no conversion!
-4. Updated =complete_or_restore_each_node_in_branch_v2= to use =maybe_add_subscribeeCol_branch_v2=:
-   - **Eliminated the LAST PairTree conversion!** 🎉
-   - The entire function now works directly with Tree<OrgNode> + SkgNodeMap!
-
-*Tests:* All tests pass (33 types tests passing).
-
-*Verification:* ✅ Compilation successful, all relevant tests pass, non-breaking.
-
-*Learnings:*
-- Appending nodes from disk requires adding SkgNode to map AND OrgNode to tree
-- Map-tree consistency maintained by both operations happening together
-- Getting PIDs from map is straightforward: look up node ID, get SkgNode, extract PIDs
-- The v2 version is more efficient: gets data from map, not from PairTree
-- **MAJOR MILESTONE**: =complete_or_restore_each_node_in_branch_v2= now works ENTIRELY without PairTree conversion!
-- All tree structure modifications work the same way for Tree<OrgNode> as PairTree
-- The refactoring is complete for this function - no temporary conversions remain!
-
-** Chunk 10+: Next Steps
-
-*Status:* The core refactoring of =complete_or_restore_each_node_in_branch_v2= is complete!
-
-All operations in this critical function now work directly with Tree<OrgNode> + SkgNodeMap. The temporary conversion approach worked perfectly for incremental refactoring.
-
-*Remaining work:*
-The core function =complete_or_restore_each_node_in_branch_v2= is complete! Next steps:
-1. Find other entry points that use PairTree and refactor them to use Tree<OrgNode> + SkgNodeMap
-2. Eventually switch callers to use v2 versions
-3. Remove old PairTree code once no longer needed
-
-*Key Insights from Chunks 1-9:*
-- Incremental refactoring with temporary conversions works perfectly for large changes
-- Generic tree functions (=read_at_node_in_tree=, =write_at_node_in_tree=) work with any tree type
-- Tree structure modifications are identical for Tree<OrgNode> and PairTree
-- Reading from map is more efficient than extracting from PairTree or fetching from disk
-- Map-tree consistency: when adding nodes, update BOTH map and tree together
-- Helper functions are the key: create _v2 versions alongside old ones
-- Each chunk kept tests passing and was independently reviewable
-- The most complex part (complete_or_restore_each_node_in_branch) is now fully refactored!
-
-** DONE Chunk 10: Create =orgnode_forest_to_string_v2= ✅ COMPLETED
-
-*Goal:* Create a v2 version of the string renderer that works with Tree<OrgNode>.
-
-*Changes:*
-1. Created =orgnode_forest_to_string_v2= in =server/org_to_text.rs=:
-   - Takes Tree<OrgNode> instead of PairTree
-   - Only accesses OrgNode data (doesn't need SkgNode for rendering)
-   - Identical logic to original, just different tree type
-2. Removed unused imports from =complete/contents.rs=:
-   - Removed =pairtree_from_tree_and_map= and =tree_and_map_from_pairtree=
-   - These are no longer needed since v2 doesn't use conversions!
-
-*Tests:* Compilation successful with warnings only.
-
-*Verification:* ✅ Code compiles, unused imports removed.
-
-*Learnings:*
-- String rendering only needs OrgNode data, not SkgNode
-- Simple transformations like rendering are straightforward to convert
-- The v2 version is cleaner - no need to extract orgnode from NodePair
-
-** DONE Chunk 11: Refactor =set_metadata_relationship_viewdata_in_forest= ✅ COMPLETED
-
-*Goal:* Create v2 version of metadata relationship viewdata setting for Tree<OrgNode>.
-
-*Changes:*
-1. Created =collect_ids_from_orgtree= in =server/to_org/util.rs=:
-   - Collects all IDs from a Tree<OrgNode> by traversing the tree
-   - Needed for batch database queries for relationship metadata
-2. Created =set_metadata_relationship_viewdata_in_forest_v2= in =server/viewdata.rs=:
-   - Entry point that takes Tree<OrgNode> instead of PairTree
-   - Calls =mapsFromIdForView_from_orgtree= to fetch relationship data
-   - Uses =set_metadata_relationships_in_node_recursive_v2= to apply metadata
-3. Created =mapsFromIdForView_from_orgtree= in =server/viewdata.rs=:
-   - Uses =collect_ids_from_orgtree= to get all PIDs
-   - Fetches relationship data from TypeDB
-4. Created =set_metadata_relationships_in_node_recursive_v2= in =server/viewdata.rs=:
-   - Recursively walks the tree and sets relationship metadata
-   - Only accesses OrgNode data (doesn't need SkgNode for this operation)
-   - Updates stats like numContainers, numContents, numLinksIn, etc.
-
-*Tests:* All 33 tests passing.
-
-*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
-
-*Learnings:*
-- Metadata viewdata only needs OrgNode data for setting stats
-- ID collection is straightforward with tree traversal
-- The v2 version demonstrates cleaner separation of concerns
-
-** DONE Chunk 12: Refactor =execute_view_requests= (in progress) 🚧
-
-*Goal:* Create v2 versions of view request execution functions.
-
-*Changes Completed:*
-1. Created helper functions in =server/to_org/util.rs=:
-   - =content_ids_if_definitive_else_empty_in_orgtree= - gets content IDs from map
-   - =complete_branch_minus_content_in_orgtree= - completion logic for tree+map
-   - =build_node_branch_minus_content_v2= - builds nodes in tree+map, handling both append and new tree cases
-2. Created =type_and_parent_type_consistent_with_subscribee_in_orgtree= in =server/to_org/complete/sharing.rs=:
-   - Tree<OrgNode> version of subscribee type checking
-   - Only accesses OrgNode.kind, no SkgNode needed
-3. Created v2 functions in =server/to_org/expand/definitive.rs=:
-   - =get_hidden_ids_if_subscribee_v2= - gets hidden IDs from subscriber's SkgNode in map
-   - =indefinitize_content_subtree_v2= - marks nodes as indefinitive, looks up titles from map
-   - =extendDefinitiveSubtreeFromLeaf_v2= - BFS expansion using tree+map
-   - =from_disk_replace_title_body_and_skgnode_v2= - fetches from disk, updates both tree and map
-
-*Remaining Work for Chunk 12:*
-- =ensure_source_v2= in =server/to_org/complete/contents.rs=
-- =maybe_add_hiddenInSubscribeeCol_branch_v2= in =server/to_org/complete/sharing.rs=
-- =execute_definitive_view_request_v2= in =server/to_org/expand/definitive.rs=
-- =execute_view_requests_v2= in =server/to_org/expand/definitive.rs=
-- v2 versions of other view request handlers (aliases, containerward, sourceward)
-
-*Tests:* All 33 tests passing with current changes.
-
-*Verification:* ✅ Compilation successful, all tests pass, non-breaking.
-
-*Learnings:*
-- View request handling requires coordinated tree+map updates
-- BFS expansion naturally works with separated architecture
-- Hidden content filtering accesses SkgNode data from map
-- Indefinitization requires both tree (mark indefinitive) and map (restore title) updates
-- Tree structure building is identical for Tree<OrgNode> and PairTree
-
-** Chunk 12+: Next Steps and Summary
-
-*Current State:*
-
-✅ **COMPLETE**: =complete_or_restore_each_node_in_branch_v2= - fully refactored!
-✅ **COMPLETE**: =completeAliasCol_v2= - works entirely with tree+map
-✅ **COMPLETE**: =maybe_add_subscribeeCol_branch_v2= - works entirely with tree+map
-✅ **COMPLETE**: =clobberIndefinitiveOrgnode_v2= - looks up from map
-✅ **COMPLETE**: =orgnode_forest_to_string_v2= - renders Tree<OrgNode>
-✅ **COMPLETE**: =set_metadata_relationship_viewdata_in_forest_v2= - sets metadata in Tree<OrgNode>
-✅ **COMPLETE**: All helper functions (_in_orgtree versions)
-🚧 **IN PROGRESS**: =execute_view_requests_v2= - partial implementation
-
-*Remaining Work:*
-
-To fully switch the codebase:
-1. **Entry point refactoring**: Update =update_from_and_rerender_buffer= to use:
-   - =skgnode_map_from_save_instructions= instead of pairing
-   - =complete_or_restore_each_node_in_branch_v2= instead of old version
-   - Will need v2 versions of: =execute_view_requests=, =set_metadata_relationship_viewdata_in_forest=
-2. **Other entry points**: Refactor =render_initial_forest_bfs= and related functions
-3. **View request handling**: Create v2 versions of view request functions
-4. **Cleanup**: Remove old PairTree code once all callers switched
-
-*What We've Built:*
-
-The refactoring infrastructure is complete! We have:
-- ✅ Type alias =SkgNodeMap= for HashMap<ID, SkgNode>
-- ✅ Helper =skgnode_for_orgnode= - lookup SkgNode from map by OrgNode ID
-- ✅ Helper =skgnode_map_from_save_instructions= - build map from save instructions
-- ✅ Generic =add_v_to_map_if_absent= - ensure map has value, fetch if needed
-- ✅ All tree helper functions (_in_orgtree versions)
-- ✅ Tree structure modification helpers (insert_scaffold, append_indefinitive)
-- ✅ Complete refactored v2 of the most complex function
-- ✅ Conversion helpers (for backwards compatibility during transition)
-
-*Architecture Achievement:*
-
-We've successfully demonstrated that the separated architecture works:
-- **Tree<OrgNode>**: Stores the tree structure and OrgNode data
-- **HashMap<ID, SkgNode>**: Stores SkgNode data, accessed by ID
-- **Consistency**: Map and tree extended together, no data loss
-- **Performance**: Map lookups more efficient than tree traversals
-- **Clarity**: Clearer than Optional SkgNodes in tree nodes
-
-** Chunk 12+: Future Work (Not Yet Started)
-
-*Goal:* Switch =update_from_and_rerender_buffer= to use new functions.
-
-*Changes:*
-1. Build map using =skgnode_map_from_save_instructions=
-2. Keep tree as Tree<OrgNode> (no pairing)
-3. Call =complete_or_restore_each_node_in_branch_v2=
-4. Call v2 versions of other functions
-
-*Tests:* Run full integration tests.
-
-*Verification:* All tests pass, behavior unchanged.
-
-** Chunk 14: Remove Old PairTree Functions
-
-*Goal:* Delete unused old versions.
-
-*Changes:*
-1. Remove =pair_orgnode_forest_with_skgnodes_from_saveinstructions=
-2. Remove old completion functions
-3. Rename v2 functions (drop the v2 suffix)
-4. Remove PairTree type alias if unused
-
-*Tests:* Verify nothing breaks.
-
-*Verification:* Clean compile, all tests pass.
-
-** Chunk 15: Refactor Remaining Utilities in =server/to_org/util.rs=
-
-*Goal:* Convert remaining PairTree utilities (in batches of 2-3 functions per chunk).
-
-*Changes:* Update each function's signature and implementation.
-
-*Tests:* Adapt tests for each function.
-
-*Verification:* Tests pass after each batch.
-
-** Chunk 16-20: Refactor Other Modules (One Module per Chunk)
-
-- Chunk 16: =server/to_org/render.rs=
-- Chunk 17: =server/to_org/expand/aliases.rs=
-- Chunk 18: =server/to_org/expand/backpath.rs=
-- Chunk 19: =server/to_org/complete/aliascol.rs=
-- Chunk 20: =server/to_org/complete/sharing.rs=
-
-** Chunk 21: Final Cleanup and Documentation
-
-*Goal:* Polish and document the new architecture.
-
-*Changes:*
-1. Add comments documenting the map-tree invariant
-2. Add assertions for map-tree consistency if appropriate
-3. Update any architecture documentation
-
-*Tests:* Run full test suite + integration tests.
-
-*Verification:* Everything works, no regressions.
-
-** Estimated Per-Chunk Effort
-
-- Chunks 1-4 (helpers): 15-30 min each
-- Chunks 5-7 (completion refactor): 45-90 min each
-- Chunks 8-12 (view requests): 30-60 min each
-- Chunk 13 (entry point): 60 min
-- Chunk 14 (cleanup): 30 min
-- Chunks 15-20 (remaining modules): 30-45 min each
-- Chunk 21 (documentation): 30 min
-
-*Total: ~20-25 hours of focused work, spread across reviewable increments.*
-
----
-
-* Tricky Things: What Could Be Hard About It
-
-** 1. Async Mutable State
-
-Many functions are async and need to mutate the map. Rust doesn't allow simultaneous mutable borrows across await points easily.
-
-*Solution:*
-- Use =RefCell<HashMap<...>>= with interior mutability if needed
-- Or refactor to pass mutable borrows carefully, grouping operations that don't conflict
-- Test thoroughly with mutable borrow scenarios
-
-** 2. Lifetime Inference
-
-References returned from =ensure_and_get_skgnode= have lifetimes tied to the map. If code chains multiple lookups, lifetime annotations may become complex.
-
-*Solution:*
-- Keep lifetimes simple by having functions take ownership or return clones where necessary
-- Document lifetime assumptions clearly
-
-** 3. Tree Traversal Patterns
-
-Some code traverses the PairTree while modifying it. With a separate map, you need to be careful about:
-- Modifying the tree while holding a reference to map data
-- Mutable/immutable borrow conflicts
-
-*Solution:*
-- Use =ego_tree::Tree= methods that support safe interior mutation (if they exist)
-- Or refactor traversals to be two-phase: first collect IDs, then modify based on those
-
-** 4. Backward Compatibility
-
-Tests or integration points that assume PairTree structure will break. Some may be deep in test code.
-
-*Solution:*
-- Inventory all test files that use PairTree or NodePair
-- Update tests in phases, starting with unit tests, then integration tests
-
-** 5. The Rendering Step
-
-=orgnode_forest_to_string= currently takes a =&PairTree=. Changing to =&Tree<OrgNode>= is trivial, but any hidden assumptions about NodePair structure could break.
-
-*Solution:*
-- Review =orgnode_forest_to_string= and related code carefully
-- Run rendering tests early and often
-
-** 6. Metadata Enrichment
-
-=set_metadata_relationship_viewdata_in_forest= may need both tree and map. Ensure it can access SkgNodes from the map without ownership issues.
-
-*Solution:*
-- Pass both tree and map to this function
-- Make sure the map is fully populated before calling it
-
-** 7. Error Handling for Missing SkgNodes
-
-If a node ID exists in the tree but not in the map, what should happen?
-
-*Solution:*
-- Define and document the expected invariant: every definitive TrueNode's ID should have a SkgNode in the map by the time it's used
-- Add assertions or returns-Err checks to catch violations
-- Make the errors informative (include node title, ID)
-
-** 8. Repeat Node Semantics
-
-If node N appears twice, and you lazy-load its SkgNode via one occurrence, both see the same map entry. This is correct, but needs careful testing:
-- Repeats scenario: node appears at depth 1 and depth 3
-- Fetch order: which occurrence's code path runs first?
-- Result: both should see the same SkgNode, be marked indefinitive together
-
-*Solution:*
-- Add a test case with repeats and lazy loading combined
-- Ensure make_indef_if_repeat_then_extend_defmap still works correctly
-
-** 9. ViewRequest Expansion Building Branches
-
-When expanding a Definitive view request, new branches are built from disk and added to the tree. Each comes with an SkgNode that should go in the map.
-
-*Solution:*
-- Ensure =build_node_branch_minus_content= and related functions add SkgNodes to the map
-- Use a consistent pattern (maybe a helper =add_to_tree_and_map=)
-
-** 10. Aliasing and Subscribee Cols
-
-These scaffold types have complex construction logic. Verify they still work when SkgNode data isn't in the tree:
-- =completeAliasCol= must still resolve aliases
-- =maybe_add_subscribeeCol_branch= must still read relationship data
-
-*Solution:*
-- Test these components early
-- Ensure map is passed and accessed correctly in these branches
-
----
-
-* Summary: Recommendation
-
-** Go Ahead With the Refactor Because:
-
-1. ✅ Cleaner separation of concerns: OrgNode tree is pure structure; SkgNode map is data
-2. ✅ No duplication: Two OrgNodes with the same ID don't accidentally diverge in their SkgNode copies
-3. ✅ Easier to reason about: IDs map to a single SkgNode consistently
-4. ✅ OrgNode becomes the "real" tree, SkgNode is lookups only
-5. ✅ Rendering doesn't need to carry SkgNodes at all
-
-** Execute in Small Phases:
-
-- Start with helper functions (Phase 2)
-- Refactor one major function at a time (Phase 3-5)
-- Test incrementally
-- Focus on high-impact functions first (completion, view execution)
-
-** Risk Mitigation:
-
-- Add invariant checks for map-tree consistency
-- Extensive repeat-node tests
-- Careful review of async mutable borrow patterns
-- Run full test suite after each phase
-- Profile performance before concluding
-
-** Estimated Payoff:
-
-- Code clarity: Medium (better structure, but more parameters)
-- Maintainability: High (single source of truth per SkgNode)
-- Memory efficiency: Neutral to positive (no duplication)
-- Performance: Neutral (hash lookups vs. pointer deref, roughly equivalent)
-- Correctness: Positive (reduces divergence risk)
+** DONE Chunk 5: Start Refactoring =complete_or_restore_each_node_in_branch=
+
+Created =complete_or_restore_each_node_in_branch_v2= in =server/to_org/complete/contents.rs=:
+- Initially delegated to old version via temporary conversions
+- Established pattern for incremental refactoring
+
+** DONE Chunk 6: Refactor v2 Internals
+
+Updated =complete_or_restore_each_node_in_branch_v2= to work directly with tree+map:
+- Uses =add_v_to_map_if_absent= instead of =ensure_skgnode=
+- Uses all =_in_orgtree= helper functions
+- No more internal PairTree usage
+
+** DONE Chunk 7: Additional Helpers
+
+Created in =server/types/tree/orgnode_skgnode.rs=:
+- =unique_orgnode_scaffold_child= - find scaffold child in Tree<OrgNode>
+- =insert_scaffold_as_child_in_orgtree= - add scaffold nodes
+- =append_indefinitive_from_disk_as_child_in_orgtree= - fetch and add nodes
+
+** DONE Chunk 8: Refactor =completeAliasCol=
+
+Created =completeAliasCol_v2= in =server/to_org/complete/aliascol.rs=:
+- Works entirely with Tree<OrgNode> + SkgNodeMap
+- Uses helper functions from Chunk 7
+
+** DONE Chunk 9: Refactor =maybe_add_subscribeeCol_branch=
+
+Created in =server/to_org/complete/sharing.rs=:
+- =maybe_add_subscribeeCol_branch_v2= - works with tree+map
+- Supporting helpers in =server/types/tree/orgnode_skgnode.rs=:
+  - =pids_for_subscriber_and_its_subscribees_in_orgtree=
+  - Uses =append_indefinitive_from_disk_as_child_in_orgtree=
+
+Updated =complete_or_restore_each_node_in_branch_v2=:
+- Eliminated LAST PairTree conversion
+- Now works entirely with Tree<OrgNode> + SkgNodeMap
+
+** DONE Chunk 10: Refactor String Rendering
+
+Created =orgnode_forest_to_string_v2= in =server/org_to_text.rs=:
+- Takes Tree<OrgNode> instead of PairTree
+- Only needs OrgNode data for rendering
+
+** DONE Chunk 11: Refactor Metadata Viewdata
+
+Created in =server/viewdata.rs=:
+- =set_metadata_relationship_viewdata_in_forest_v2=
+- =mapsFromIdForView_from_orgtree=
+- =set_metadata_relationships_in_node_recursive_v2=
+
+Created =collect_ids_from_orgtree= in =server/to_org/util.rs=.
+
+** DONE Chunk 12: Refactor View Request Execution
+
+Created in =server/to_org/util.rs=:
+- =content_ids_if_definitive_else_empty_in_orgtree=
+- =complete_branch_minus_content_in_orgtree=
+- =build_node_branch_minus_content_v2=
+
+Created in =server/to_org/complete/contents.rs=:
+- =ensure_source_v2=
+
+Created in =server/to_org/complete/sharing.rs=:
+- =type_and_parent_type_consistent_with_subscribee_in_orgtree=
+- =maybe_add_hiddenInSubscribeeCol_branch_v2=
+
+Created in =server/types/tree/orgnode_skgnode.rs=:
+- =pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree=
+
+Created in =server/to_org/expand/definitive.rs=:
+- =get_hidden_ids_if_subscribee_v2=
+- =indefinitize_content_subtree_v2=
+- =extendDefinitiveSubtreeFromLeaf_v2=
+- =from_disk_replace_title_body_and_skgnode_v2=
+- =execute_definitive_view_request_v2=
+- =execute_view_requests_v2= (uses temporary conversions for Aliases/Containerward/Sourceward)
+
+* Remaining Work
+
+** Entry Point Refactoring
+
+Update =update_from_and_rerender_buffer= to use v2 functions:
+- Use =skgnode_map_from_save_instructions= instead of pairing
+- Call v2 versions of completion, view requests, metadata setting
+- Remove old pairing step
+
+** Other Modules to Refactor
+
+- =server/to_org/expand/aliases.rs= - create v2 for aliases view requests
+- =server/to_org/expand/backpath.rs= - create v2 for containerward/sourceward
+- =server/to_org/render/initial_bfs.rs= - initial forest rendering
+
+** Cleanup
+
+Once all callers use v2 versions:
+- Remove old PairTree functions
+- Rename v2 functions (drop suffix)
+- Remove PairTree type alias if unused

@@ -4,9 +4,10 @@ use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request };
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::to_org::complete::contents::ensure_source;
+use crate::to_org::complete::contents::{ensure_source, ensure_source_v2};
 use crate::to_org::complete::sharing::{
   maybe_add_hiddenInSubscribeeCol_branch,
+  maybe_add_hiddenInSubscribeeCol_branch_v2,
   type_and_parent_type_consistent_with_subscribee,
   type_and_parent_type_consistent_with_subscribee_in_orgtree };
 use crate::to_org::util::{
@@ -447,4 +448,100 @@ fn from_disk_replace_title_body_and_skgnode_v2 (
     t . title = title;
     t . body = body; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok (( )) }
+
+/// V2: Tree<OrgNode> + SkgNodeMap version of execute_definitive_view_request.
+/// Expands a definitive view request using separated tree and map.
+async fn execute_definitive_view_request_v2 (
+  forest        : &mut ego_tree::Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  visited       : &mut DefinitiveMap,
+  _errors       : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  let node_pid : ID = get_pid_in_tree (
+    forest, node_id ) ?;
+  let hidden_ids : HashSet < ID > =
+    get_hidden_ids_if_subscribee_v2 ( forest, map, node_id ) ?;
+  if let Some ( &preexisting_node_id ) =
+    visited . get ( & node_pid )
+  { if preexisting_node_id != node_id {
+    indefinitize_content_subtree_v2 ( forest, map,
+                                     preexisting_node_id,
+                                     visited ) ?; }}
+  // Ensure node has a source
+  ensure_source_v2 (
+    forest, node_id, &config.db_name, typedb_driver ) . await ?;
+  { // Mutate the root of the definitive view request:
+    from_disk_replace_title_body_and_skgnode_v2 (
+      forest, map, node_id, config ) ?;
+    write_at_node_in_tree (
+      forest, node_id,
+      |orgnode| {
+        let OrgNodeKind::True ( t ) = &mut orgnode.kind
+          else { panic! ( "execute_definitive_view_request_v2: expected TrueNode" ) };
+        t . view_requests . remove ( & ViewRequest::Definitive );
+        t . indefinitive = false; } )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
+  visited . insert ( node_pid.clone(), node_id );
+  extendDefinitiveSubtreeFromLeaf_v2 (
+    forest, map, node_id,
+    config.initial_node_limit, visited, config, typedb_driver,
+    &hidden_ids,
+  ) . await ?;
+  // If this is a subscribee with hidden content, add HiddenInSubscribeeCol
+  if type_and_parent_type_consistent_with_subscribee_in_orgtree (
+    forest, node_id )?
+  { maybe_add_hiddenInSubscribeeCol_branch_v2 (
+      forest, map, node_id, config, typedb_driver
+    ). await ?; }
+  Ok (( )) }
+
+/// V2: Tree<OrgNode> + SkgNodeMap version of execute_view_requests.
+/// Note: Uses temporary conversions for non-Definitive requests
+/// until those modules are refactored.
+pub async fn execute_view_requests_v2 (
+  forest        : &mut ego_tree::Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  requests      : Vec < (NodeId, ViewRequest) >,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  visited       : &mut DefinitiveMap,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  for (node_id, request) in requests {
+    match request {
+      ViewRequest::Aliases | ViewRequest::Containerward | ViewRequest::Sourceward => {
+        // Temporary conversion until these modules are refactored
+        let mut pairtree : PairTree =
+          crate::types::tree::orgnode_skgnode::pairtree_from_tree_and_map (
+            forest, map );
+        match request {
+          ViewRequest::Aliases => {
+            build_and_integrate_aliases_view_then_drop_request (
+              &mut pairtree, node_id, config, typedb_driver, errors )
+              . await ?; },
+          ViewRequest::Containerward => {
+            build_and_integrate_containerward_view_then_drop_request (
+              &mut pairtree, node_id, config, typedb_driver, errors )
+              . await ?; },
+          ViewRequest::Sourceward => {
+            build_and_integrate_sourceward_view_then_drop_request (
+              &mut pairtree, node_id, config, typedb_driver, errors )
+              . await ?; },
+          _ => unreachable!(),
+        }
+        // Convert back
+        let (new_tree, new_map) =
+          crate::types::tree::orgnode_skgnode::tree_and_map_from_pairtree (
+            &pairtree );
+        *forest = new_tree;
+        *map = new_map;
+      },
+      ViewRequest::Definitive => {
+        execute_definitive_view_request_v2 (
+          forest, map, node_id, config, typedb_driver,
+          visited, errors ) . await ?; }, } }
   Ok (( )) }

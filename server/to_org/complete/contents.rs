@@ -279,3 +279,35 @@ pub async fn ensure_source (
           else { panic! ( "ensure_source: expected TrueNode" ) };
         t . source_opt = Some ( source ); } ) ?; }
   Ok (( )) }
+
+/// V2: Tree<OrgNode> version of ensure_source.
+pub async fn ensure_source_v2 (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let needs_source : bool =
+    read_at_node_in_tree (
+      tree, node_id,
+      |orgnode| matches! ( &orgnode . kind,
+                      OrgNodeKind::True(t)
+                      if t . source_opt . is_none () ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  if needs_source {
+    let node_pid : ID =
+      get_pid_in_tree ( tree, node_id ) ?;
+    let (_pid, source) : (ID, String) =
+      pid_and_source_from_id (
+        db_name, driver, &node_pid ) . await ?
+      . ok_or_else ( || format! (
+        "ensure_source_v2: could not find source for ID {:?}",
+        node_pid ) ) ?;
+    write_at_node_in_tree (
+      tree, node_id,
+      |orgnode| {
+        let OrgNodeKind::True ( t ) = &mut orgnode.kind
+          else { panic! ( "ensure_source_v2: expected TrueNode" ) };
+        t . source_opt = Some ( source ); } )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
+  Ok (( )) }
