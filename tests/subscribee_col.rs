@@ -6,7 +6,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::to_org::render::content_view::single_root_view;
+use skg::to_org::render::content_view::single_root_view_v2;
 use skg::types::misc::{SkgConfig, ID};
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
@@ -57,7 +57,7 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test(db_name).await?;
-    let result: String = single_root_view(
+    let result: String = single_root_view_v2(
       &driver,
       &config,
       &ID("1".to_string()),

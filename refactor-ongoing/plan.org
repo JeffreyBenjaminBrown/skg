@@ -149,19 +149,46 @@ In =server/serve/handlers/save_buffer.rs=:
 
 * Remaining Work
 
-** Convert tests.
+** DONE Convert tests.
    Every test for a function that has a new version
    should be converted to use the new version,
    in a way that minimizes the resulting diff.
-** Other Modules to Refactor (Optional)
 
-- =server/to_org/expand/aliases.rs= - create v2 for aliases view requests
-- =server/to_org/expand/backpath.rs= - create v2 for containerward/sourceward
-- =server/to_org/render/initial_bfs.rs= - initial forest rendering
+   Converted =tests/rebuild/integrate_backpath.rs= to use v2 functions.
+   All other tests already using v2 or testing conversion utilities.
 
-** Cleanup
+** DONE Other Modules to Refactor (Optional)
+
+- DONE =server/to_org/expand/aliases.rs= - created v2 for aliases view requests
+- DONE =server/to_org/expand/backpath.rs= - created v2 for containerward/sourceward
+- DONE =server/to_org/render/initial_bfs.rs= - created v2 for initial forest rendering
+- DONE =server/to_org/render/truncate_after_node_in_gen.rs= - created v2 for BFS node truncation
+
+** DONE Additional Content View Functions
+
+Created in =server/to_org/util.rs=:
+- =stub_forest_from_root_ids_v2=
+
+Created in =server/to_org/render/initial_bfs.rs=:
+- =render_initial_forest_bfs_v2=
+- =render_generation_and_recurse_v2=
+- =add_children_and_collect_their_ids_v2=
+- =collect_rels_to_children_from_generation_v2=
+
+Created in =server/to_org/render/content_view.rs=:
+- =single_root_view_v2=
+- =multi_root_view_v2=
+
+Updated =server/serve/handlers/single_root_view.rs= to use v2.
+
+All production code paths now use Tree<OrgNode> + SkgNodeMap (v2 architecture).
+
+** TODO Cleanup
 
 Once all callers use v2 versions:
-- Remove old PairTree functions
-- Rename v2 functions (drop suffix)
+- Remove old PairTree functions (v1 versions)
+- Rename v2 functions (drop =_v2= suffix)
 - Remove PairTree type alias if unused
+- Remove conversion helper functions (=tree_and_map_from_pairtree=, =pairtree_from_tree_and_map=)
+
+NOTE: All production code is now using v2. Only test files and conversion utilities use v1/PairTree.

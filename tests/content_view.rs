@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::render::content_view::{multi_root_view, single_root_view};
+use skg::to_org::render::content_view::{multi_root_view_v2, single_root_view_v2};
 use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::climb_containerward_and_fetch_rootish_context;
 use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
@@ -111,7 +111,7 @@ async fn test_multi_root_view_logic (
     ID("2".to_string()),
     ID("1".to_string())
   ];
-  let result : String = multi_root_view (
+  let result : String = multi_root_view_v2 (
     & driver,
     & config,
     & focii
@@ -138,7 +138,7 @@ fn test_single_root_view_with_cycle
     "/tmp/tantivy-test-single-root-view-cycle",
     |config, driver, _tantivy| Box::pin ( async move {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
-      let result : String = single_root_view (
+      let result : String = single_root_view_v2 (
         driver,
         config,
         &ID ( "a".to_string () )
@@ -170,7 +170,7 @@ fn test_multi_root_view_with_shared_nodes
         ID ( "1".to_string () ),
         ID ( "2".to_string () )
       ];
-      let result : String = multi_root_view (
+      let result : String = multi_root_view_v2 (
         driver,
         config,
         & focii
@@ -222,7 +222,7 @@ fn test_multi_root_view_with_node_limit
         ID ( "1".to_string () ),
         ID ( "2".to_string () )
       ];
-      let result : String = multi_root_view (
+      let result : String = multi_root_view_v2 (
         driver,
         &test_config,
         & focii
@@ -283,7 +283,7 @@ fn test_limit_with_multiple_sibling_groups
       let mut test_config = config.clone();
       test_config.initial_node_limit = 4;
 
-      let result : String = single_root_view (
+      let result : String = single_root_view_v2 (
         driver,
         &test_config,
         &ID ( "1".to_string () )

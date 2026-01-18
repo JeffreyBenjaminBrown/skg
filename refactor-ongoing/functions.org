@@ -1,4 +1,14 @@
 * new-functions-with-correspondences
+** add_children_and_collect_their_ids_v2
+async fn add_children_and_collect_their_ids_v2 (
+  forest      : &mut Tree<OrgNode>,
+  map         : &mut SkgNodeMap,
+  rels_to_add : Vec < (NodeId, ID) >,
+  visited     : &mut DefinitiveMap,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result < Vec < NodeId >, Box<dyn Error> >
+*** add_children_and_collect_their_ids
 ** add_last_generation_and_truncate_some_of_previous_v2
 pub async fn add_last_generation_and_truncate_some_of_previous_v2 (
   tree           : &mut Tree<OrgNode>,
@@ -101,6 +111,13 @@ pub async fn complete_branch_minus_content_in_orgtree (
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>>
 *** complete_branch_minus_content
+** collect_rels_to_children_from_generation_v2
+fn collect_rels_to_children_from_generation_v2 (
+  forest       : &Tree<OrgNode>,
+  map          : &SkgNodeMap,
+  nodes_in_gen : &[NodeId],
+) -> Vec < (NodeId, ID) >
+*** collect_rels_to_children_from_generation
 ** complete_or_restore_each_node_in_branch_v2
 pub fn complete_or_restore_each_node_in_branch_v2<'a> (
   tree          : &'a mut Tree<OrgNode>,
@@ -225,6 +242,13 @@ pub async fn maybe_add_subscribeeCol_branch_v2 (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** maybe_add_subscribeeCol_branch
+** multi_root_view_v2
+pub async fn multi_root_view_v2 (
+  driver   : &TypeDBDriver,
+  config   : &SkgConfig,
+  root_ids : &[ID],
+) -> Result < String, Box<dyn Error> >
+*** multi_root_view
 ** nodes_after_in_generation_v2
 pub(super) fn nodes_after_in_generation_v2 (
   tree                     : &Tree<OrgNode>,
@@ -247,6 +271,27 @@ async fn prepend_indefinitive_child_with_parent_ignores_v2 (
   driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> >
 *** prepend_indefinitive_child_with_parent_ignores
+** render_generation_and_recurse_v2
+fn render_generation_and_recurse_v2<'a> (
+  forest         : &'a mut Tree<OrgNode>,
+  map            : &'a mut SkgNodeMap,
+  gen_nodeids    : Vec < NodeId >,
+  gen_int        : usize,
+  rendered_count : usize,
+  limit          : usize,
+  effective_root : NodeId,
+  visited        : &'a mut DefinitiveMap,
+  config         : &'a SkgConfig,
+  driver         : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+*** render_generation_and_recurse
+** render_initial_forest_bfs_v2
+pub async fn render_initial_forest_bfs_v2 (
+  root_ids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> >
+*** render_initial_forest_bfs
 ** set_metadata_relationship_viewdata_in_forest_v2
 pub async fn set_metadata_relationship_viewdata_in_forest_v2 (
   forest : &mut Tree<OrgNode>,
@@ -254,6 +299,21 @@ pub async fn set_metadata_relationship_viewdata_in_forest_v2 (
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** set_metadata_relationship_viewdata_in_forest
+** single_root_view_v2
+pub async fn single_root_view_v2 (
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig,
+  root_id : &ID,
+) -> Result < String, Box<dyn Error> >
+*** single_root_view
+** stub_forest_from_root_ids_v2
+pub async fn stub_forest_from_root_ids_v2 (
+  root_skgids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+  visited  : &mut DefinitiveMap,
+) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> >
+*** stub_forest_from_root_ids
 ** truncate_after_node_in_generation_in_tree_v2
 fn truncate_after_node_in_generation_in_tree_v2 (
   tree           : &mut Tree<OrgNode>,

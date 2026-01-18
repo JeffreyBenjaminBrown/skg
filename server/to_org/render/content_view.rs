@@ -6,12 +6,15 @@
 /// - set_metadata_relationship_viewdata_in_forest
 /// - render to string
 
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
-use crate::org_to_text::orgnode_forest_to_string;
-use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
+use crate::viewdata::{set_metadata_relationship_viewdata_in_forest, set_metadata_relationship_viewdata_in_forest_v2};
+use crate::org_to_text::{orgnode_forest_to_string, orgnode_forest_to_string_v2};
+use crate::to_org::render::initial_bfs::{render_initial_forest_bfs, render_initial_forest_bfs_v2};
 use crate::types::misc::{ID, SkgConfig};
+use crate::types::orgnode::OrgNode;
+use crate::types::skgnode::SkgNodeMap;
 use crate::types::tree::PairTree;
 
+use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -23,6 +26,17 @@ pub async fn single_root_view (
   root_id : &ID,
 ) -> Result < String, Box<dyn Error> > {
   multi_root_view (
+    driver,
+    config,
+    & [ root_id . clone () ] ) . await }
+
+/// V2: See file header comment.
+pub async fn single_root_view_v2 (
+  driver  : &TypeDBDriver,
+  config  : &SkgConfig,
+  root_id : &ID,
+) -> Result < String, Box<dyn Error> > {
+  multi_root_view_v2 (
     driver,
     config,
     & [ root_id . clone () ] ) . await }
@@ -40,4 +54,19 @@ pub async fn multi_root_view (
     &mut forest, config, driver ) . await ?;
   let buffer_content : String =
     orgnode_forest_to_string ( & forest ) ?;
+  Ok ( buffer_content ) }
+
+/// V2: See file header comment.
+pub async fn multi_root_view_v2 (
+  driver   : &TypeDBDriver,
+  config   : &SkgConfig,
+  root_ids : &[ID],
+) -> Result < String, Box<dyn Error> > {
+  let (mut forest, _map) : (Tree<OrgNode>, SkgNodeMap) =
+    render_initial_forest_bfs_v2 (
+      root_ids, config, driver ) . await ?;
+  set_metadata_relationship_viewdata_in_forest_v2 (
+    &mut forest, config, driver ) . await ?;
+  let buffer_content : String =
+    orgnode_forest_to_string_v2 ( & forest ) ?;
   Ok ( buffer_content ) }

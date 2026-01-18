@@ -9,7 +9,7 @@ use crate::types::orgnode::{
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::SkgNode;
+use crate::types::skgnode::{SkgNode, SkgNodeMap};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use ego_tree::iter::Edge;
@@ -271,6 +271,27 @@ pub async fn stub_forest_from_root_ids (
       root_skgid, config, driver, visited
     ) . await ?; }
   Ok ( forest ) }
+
+/// V2: Tree<OrgNode> + SkgNodeMap version of stub_forest_from_root_ids.
+pub async fn stub_forest_from_root_ids_v2 (
+  root_skgids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+  visited  : &mut DefinitiveMap,
+) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> > {
+  use ego_tree::Tree;
+  use crate::types::orgnode::{OrgNode, forest_root_orgnode};
+  use crate::types::skgnode::SkgNodeMap;
+
+  let mut forest : Tree<OrgNode> = Tree::new ( forest_root_orgnode () );
+  let mut map : SkgNodeMap = SkgNodeMap::new ();
+  let forest_root_treeid : NodeId = forest . root () . id ();
+  for root_skgid in root_skgids {
+    build_node_branch_minus_content_v2 (
+      Some ( (&mut forest, &mut map, forest_root_treeid) ),
+      root_skgid, config, driver, visited
+    ) . await ?; }
+  Ok ( (forest, map) ) }
 
 pub fn collect_ids_from_pair_tree (
   tree : &PairTree,

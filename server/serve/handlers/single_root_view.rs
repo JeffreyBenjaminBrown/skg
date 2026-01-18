@@ -1,4 +1,4 @@
-use crate::to_org::render::content_view::single_root_view;
+use crate::to_org::render::content_view::single_root_view_v2;
 use crate::serve::util::{
   send_response,
   send_response_with_length_prefix,
@@ -25,7 +25,7 @@ pub fn handle_single_root_view_request (
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
       let response_sexp : String = block_on ( async {
-        match single_root_view (
+        match single_root_view_v2 (
           typedb_driver,
           config,
           &node_id ) . await
