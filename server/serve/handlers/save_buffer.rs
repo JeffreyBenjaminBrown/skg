@@ -1,18 +1,18 @@
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
+use crate::viewdata::{set_metadata_relationship_viewdata_in_forest, set_metadata_relationship_viewdata_in_forest_v2};
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use crate::merge::merge_nodes;
-use crate::org_to_text::orgnode_forest_to_string;
+use crate::org_to_text::{orgnode_forest_to_string, orgnode_forest_to_string_v2};
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
+use crate::to_org::complete::contents::{complete_or_restore_each_node_in_branch, complete_or_restore_each_node_in_branch_v2};
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
-use crate::to_org::expand::definitive::execute_view_requests;
+use crate::to_org::expand::definitive::{execute_view_requests, execute_view_requests_v2};
 use crate::to_org::util::{forest_root_pair, DefinitiveMap};
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest, forest_root_orgnode};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
-use crate::types::skgnode::SkgNode;
+use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::{NodePair, PairTree};
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -250,3 +250,71 @@ fn add_paired_subtree_as_child (
         parent_tree, new_treeid,
         orgnode_tree, child_treeid,
         skgnode_map ); }} }
+
+/// V2: Same as update_from_and_rerender_buffer but uses Tree<OrgNode> + SkgNodeMap
+/// instead of PairTree throughout.
+pub async fn update_from_and_rerender_buffer_v2 (
+  org_buffer_text : &str,
+  typedb_driver   : &TypeDBDriver,
+  config          : &SkgConfig,
+  tantivy_index   : &TantivyIndex
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let (orgnode_forest, save_instructions, mergeInstructions)
+    : ( Tree<OrgNode>,
+        Vec<SaveInstruction>,
+        Vec<MergeInstructionTriple> )
+    = buffer_to_orgnode_forest_and_save_instructions (
+      org_buffer_text, config, typedb_driver )
+    . await . map_err (
+      |e| Box::new(e) as Box<dyn Error> ) ?;
+  if orgnode_forest.root().children().next().is_none() { return Err (
+    "Nothing to save found in org_buffer_text" . into( )); }
+
+  { // update the graph
+    update_graph_minus_merges (
+      save_instructions.clone(),
+      config.clone(),
+      tantivy_index,
+      typedb_driver ) . await ?;
+    merge_nodes (
+      mergeInstructions,
+      config.clone(),
+      tantivy_index,
+      typedb_driver ) . await ?; }
+
+  { // update the view and return it to the client
+    let mut errors : Vec < String > = Vec::new ();
+    // Build map from save instructions
+    let mut skgnode_map : SkgNodeMap =
+      skgnode_map_from_save_instructions ( & save_instructions );
+    // Keep orgnode_forest as Tree<OrgNode>, don't convert to PairTree
+    let mut forest : Tree<OrgNode> = orgnode_forest;
+    { // modify the forest before re-rendering it
+      let mut visited : DefinitiveMap = DefinitiveMap::new();
+      let forest_root_id : NodeId = forest.root().id();
+      complete_or_restore_each_node_in_branch_v2 (
+        &mut forest,
+        &mut skgnode_map,
+        forest_root_id,
+        config,
+        typedb_driver,
+        &mut visited ). await ?;
+      let view_requests : Vec < (NodeId, ViewRequest) > =
+        collectViewRequestsFromForest (
+          // Uses generic tree function - works with both tree types
+          & forest ) ?;
+      execute_view_requests_v2 (
+        &mut forest,
+        &mut skgnode_map,
+        view_requests,
+        config,
+        typedb_driver,
+        &mut visited,
+        &mut errors ). await ?;
+      set_metadata_relationship_viewdata_in_forest_v2 (
+        &mut forest,
+        config,
+        typedb_driver ). await ?; }
+    let buffer_content : String =
+      orgnode_forest_to_string_v2 ( & forest ) ?;
+    Ok ( SaveResponse { buffer_content, errors } ) }}

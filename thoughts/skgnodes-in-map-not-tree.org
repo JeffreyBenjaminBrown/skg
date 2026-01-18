@@ -128,16 +128,28 @@ Created in =server/to_org/expand/definitive.rs=:
 - =execute_definitive_view_request_v2=
 - =execute_view_requests_v2= (uses temporary conversions for Aliases/Containerward/Sourceward)
 
+** DONE Chunk 13: Refactor Entry Point
+
+Created =update_from_and_rerender_buffer_v2= in =server/serve/handlers/save_buffer.rs=:
+- Uses =skgnode_map_from_save_instructions= to build map
+- Keeps forest as =Tree<OrgNode>= (no pairing step)
+- Calls v2 versions of all functions
+- No PairTree usage throughout
+
+Made =collectViewRequestsFromForest= generic in =server/to_org/expand/collect_view_requests.rs=:
+- Works with both =PairTree= and =Tree<OrgNode>=
+- Added =AsRef<OrgNode>= trait implementations for =NodePair= and =OrgNode=
+
 * Remaining Work
 
-** Entry Point Refactoring
+** Switch Entry Point to v2
 
-Update =update_from_and_rerender_buffer= to use v2 functions:
-- Use =skgnode_map_from_save_instructions= instead of pairing
-- Call v2 versions of completion, view requests, metadata setting
-- Remove old pairing step
+In =server/serve/handlers/save_buffer.rs=:
+- Change =handle_save_buffer_request= to call =update_from_and_rerender_buffer_v2=
+- Or add flag/config to choose between old and new implementations
+- Test with real usage to verify behavior matches
 
-** Other Modules to Refactor
+** Other Modules to Refactor (Optional)
 
 - =server/to_org/expand/aliases.rs= - create v2 for aliases view requests
 - =server/to_org/expand/backpath.rs= - create v2 for containerward/sourceward
