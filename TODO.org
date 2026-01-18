@@ -1,7 +1,29 @@
+* ONGOING refactor for skgnodemap
+** missed some
+   remove_completed_view_request
+** keep this up to date
+   refactor-ongoing/functions.org
+* two kinds of stats
+** the idea
+   One regards the view, the other the graph.
+   Graph stats can be computed after save, before updating the view.
+   These would include link, alias, subscribe and override rels.
+** these should be graph stats
+   pub numContainers: Option<usize>,
+   pub numContents: Option<usize>,
+   pub numLinksIn: Option<usize>,
+** these should be view stats
+   pub cyycle : bool
+   pub parentIsContainer: bool,
+   pub parentIsContent: bool,
 * understand it
-** TODO What's the logic behind this comment?
-   pair_orgnode_forest_with_skgnodes_from_saveinstructions (
-     // Definitive nodes get Some(skgnode), indefinitive get None.
+** AWAITS What's the logic behind this comment?
+*** dunno, but it will be done
+    once I've finished refactoring to use (org tree, skgnodemap)
+    rather than pairtree.
+*** this comment
+    pair_orgnode_forest_with_skgnodes_from_saveinstructions (
+      // Definitive nodes get Some(skgnode), indefinitive get None.
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 ** Do de-novo and save reuse enough code?
 *** De-novo is similar to execute definitive view request
@@ -9,20 +31,35 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
+** TODO most natural
+*** for subscribee cols
+    would be the following rule:
+
+    If there could be a subscribee col and isn't,
+    the herald just says that.
+    when fetched it is included,
+    but if the user deletes that from the view, fine.
+*** alias, subscription, overrides, links
+    Bools for whether it has
+**** subscription action of any kind
+**** aliases
+**** overrides action of any kind
+**** any links in
 ** TODO complete_or_restore_each_node_in_branch
 *** When is it needed?
 **** An AliasCol under an indefinitive parent could need updating.
      completeAliasCol
-**** 'cycle' can need updating
-     detect_and_mark_cycle
+**** in a TrueNode
+***** 'cycle' can need updating
+      detect_and_mark_cycle
+***** make_indef_if_repeat_then_extend_defmap
+***** an indefinitive node can need updating
+      Not really.
 *** it could be called update_view
+*** that it adds a subscribee col feels wrong
 *** TODO ?
     Unbundle those two ideas.
     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
-**** the ensure_skgnode call is a wart
-     but it would require changing a lot of functions
-     to earlier build a map from ID to skgnode for the whole tree,
-     and not keep skgnode in the tree at all
 ** AWAITS Are there more unnecessary mid-functions?
    as in midparent in a tree
 *** DONE flatten add_missing_info_to_forest

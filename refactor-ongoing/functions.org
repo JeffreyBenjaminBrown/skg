@@ -118,7 +118,7 @@ fn collect_rels_to_children_from_generation_v2 (
   nodes_in_gen : &[NodeId],
 ) -> Vec < (NodeId, ID) >
 *** collect_rels_to_children_from_generation
-** complete_or_restore_each_node_in_branch_v2
+** DONE complete_or_restore_each_node_in_branch_v2
 pub fn complete_or_restore_each_node_in_branch_v2<'a> (
   tree          : &'a mut Tree<OrgNode>,
   map           : &'a mut SkgNodeMap,
@@ -147,7 +147,7 @@ async fn execute_definitive_view_request_v2 (
   _errors       : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> >
 *** execute_definitive_view_request
-** execute_view_requests_v2
+** DONE execute_view_requests_v2
 pub async fn execute_view_requests_v2 (
   forest        : &mut ego_tree::Tree<OrgNode>,
   map           : &mut SkgNodeMap,
@@ -292,7 +292,7 @@ pub async fn render_initial_forest_bfs_v2 (
   driver   : &TypeDBDriver,
 ) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> >
 *** render_initial_forest_bfs
-** set_metadata_relationship_viewdata_in_forest_v2
+** DONE set_metadata_relationship_viewdata_in_forest_v2
 pub async fn set_metadata_relationship_viewdata_in_forest_v2 (
   forest : &mut Tree<OrgNode>,
   config : &SkgConfig,

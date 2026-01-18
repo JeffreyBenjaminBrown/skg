@@ -38,62 +38,6 @@ use typedb_driver::TypeDBDriver;
 /// - "restore": Because indefinitive nodes may have had their titles or bodies edited.
 ///   TODO ? Maybe look for edits to indefinitive nodes and throw an error, as is done for foreign nodes.
 pub fn complete_or_restore_each_node_in_branch<'a> (
-  tree          : &'a mut PairTree,
-  node_id       : NodeId,
-  config        : &'a SkgConfig,
-  typedb_driver : &'a TypeDBDriver,
-  visited       : &'a mut DefinitiveMap,
-) -> Pin<Box<dyn Future<Output =
-                        Result<(), Box<dyn Error>>> + 'a>> {
-  fn recurse<'b> (
-    tree          : &'b mut PairTree,
-    node_id       : NodeId,
-    config        : &'b SkgConfig,
-    typedb_driver : &'b TypeDBDriver,
-    visited       : &'b mut DefinitiveMap,
-  ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>>
-  { Box::pin(async move {
-      let child_treeids : Vec < NodeId > =
-        collect_child_treeids ( tree, node_id ) ?;
-      for child_treeid in child_treeids {
-        complete_or_restore_each_node_in_branch (
-          tree, child_treeid, config, typedb_driver,
-          visited ) . await ?; }
-      Ok (( )) } ) }
-  Box::pin(async move {
-    if read_at_node_in_tree(tree, node_id, |node| {
-        matches!(&node.orgnode.kind,
-                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })? {
-      // Don't recurse; completeAliasCol handles the whole subtree.
-      completeAliasCol (
-        tree, node_id, config, typedb_driver ). await ?;
-    } else if read_at_node_in_tree(tree, node_id, |node| {
-        matches!( &node.orgnode.kind,
-                  OrgNodeKind::Scaff(_)) } )? {
-      // Skip, but recurse into children.
-      recurse ( tree, node_id, config, typedb_driver, visited
-              ) . await ?;
-    } else {
-      ensure_skgnode (
-        tree, node_id, config, typedb_driver ). await ?;
-      detect_and_mark_cycle ( tree, node_id ) ?;
-      make_indef_if_repeat_then_extend_defmap (
-        tree, node_id, visited ) ?;
-      { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
-          clobberIndefinitiveOrgnode (
-            tree, node_id ) ?;
-        } else { // futz with the orgnode and its content children
-          maybe_add_subscribeeCol_branch (
-            tree, node_id, config, typedb_driver ) . await ?; }
-        recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
-          tree, node_id, config, typedb_driver, visited
-        ). await ?; }}
-    Ok (( )) } ) }
-
-/// V2: Same as complete_or_restore_each_node_in_branch,
-/// but works with separate Tree<OrgNode> and SkgNodeMap.
-/// Refactored to work directly with tree+map for most operations.
-pub fn complete_or_restore_each_node_in_branch_v2<'a> (
   tree          : &'a mut Tree<OrgNode>,
   map           : &'a mut SkgNodeMap,
   node_id       : NodeId,
@@ -114,7 +58,7 @@ pub fn complete_or_restore_each_node_in_branch_v2<'a> (
       let child_treeids : Vec < NodeId > =
         collect_child_treeids_in_orgtree ( tree, node_id ) ?;
       for child_treeid in child_treeids {
-        complete_or_restore_each_node_in_branch_v2 (
+        complete_or_restore_each_node_in_branch (
           tree, map, child_treeid, config, typedb_driver,
           visited ) . await ?; }
       Ok (( )) } ) }

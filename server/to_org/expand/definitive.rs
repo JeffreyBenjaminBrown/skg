@@ -35,35 +35,6 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  forest        : &mut PairTree,
-  requests      : Vec < (NodeId, ViewRequest) >,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  visited       : &mut DefinitiveMap,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  for (node_id, request) in requests {
-    match request {
-      ViewRequest::Aliases => {
-        build_and_integrate_aliases_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
-          . await ?; },
-      ViewRequest::Containerward => {
-        build_and_integrate_containerward_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
-          . await ?; },
-      ViewRequest::Sourceward => {
-        build_and_integrate_sourceward_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
-          . await ?; },
-      ViewRequest::Definitive => {
-        execute_definitive_view_request (
-          forest, node_id, config, typedb_driver,
-          visited, errors ) . await ?; }, } }
-  Ok (( )) }
-
-/// V2: Tree<OrgNode> + SkgNodeMap version of execute_view_requests.
-pub async fn execute_view_requests_v2 (
   forest        : &mut ego_tree::Tree<OrgNode>,
   map           : &mut SkgNodeMap,
   requests      : Vec < (NodeId, ViewRequest) >,

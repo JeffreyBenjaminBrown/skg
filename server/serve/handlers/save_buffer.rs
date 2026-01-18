@@ -1,12 +1,12 @@
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest_v2;
+use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch_v2;
+use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
-use crate::to_org::expand::definitive::execute_view_requests_v2;
+use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -165,7 +165,7 @@ pub async fn update_from_and_rerender_buffer (
     { // modify the forest before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
       let forest_root_id : NodeId = forest.root().id();
-      complete_or_restore_each_node_in_branch_v2 (
+      complete_or_restore_each_node_in_branch (
         &mut forest,
         &mut skgnode_map,
         forest_root_id,
@@ -176,7 +176,7 @@ pub async fn update_from_and_rerender_buffer (
         collectViewRequestsFromForest (
           // Uses generic tree function - works with both tree types
           & forest ) ?;
-      execute_view_requests_v2 (
+      execute_view_requests (
         &mut forest,
         &mut skgnode_map,
         view_requests,
@@ -184,7 +184,7 @@ pub async fn update_from_and_rerender_buffer (
         typedb_driver,
         &mut visited,
         &mut errors ). await ?;
-      set_metadata_relationship_viewdata_in_forest_v2 (
+      set_metadata_relationship_viewdata_in_forest (
         &mut forest,
         config,
         typedb_driver ). await ?; }

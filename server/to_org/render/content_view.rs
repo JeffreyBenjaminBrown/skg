@@ -6,7 +6,7 @@
 /// - set_metadata_relationship_viewdata_in_forest
 /// - render to string
 
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest_v2;
+use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig};
@@ -38,7 +38,7 @@ pub async fn multi_root_view (
   let (mut forest, _map) : (Tree<OrgNode>, SkgNodeMap) =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
-  set_metadata_relationship_viewdata_in_forest_v2 (
+  set_metadata_relationship_viewdata_in_forest (
     &mut forest, config, driver ) . await ?;
   let buffer_content : String =
     orgnode_forest_to_string ( & forest ) ?;
