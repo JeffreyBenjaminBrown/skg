@@ -9,44 +9,45 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
-** ONGOING There seem to be unnecessary mid-functions.
+** TODO complete_or_restore_each_node_in_branch
+*** When is it needed?
+**** An AliasCol under an indefinitive parent could need updating.
+     completeAliasCol
+**** 'cycle' can need updating
+     detect_and_mark_cycle
+*** it could be called update_view
+*** TODO ?
+    Unbundle those two ideas.
+    I think the completion is unnecessary. All it does is add a subscribeecol if it can.
+**** the ensure_skgnode call is a wart
+     but it would require changing a lot of functions
+     to earlier build a map from ID to skgnode for the whole tree,
+     and not keep skgnode in the tree at all
+** AWAITS Are there more unnecessary mid-functions?
    as in midparent in a tree
-*** instances
-**** DONE flatten add_missing_info_to_forest
-**** TODO mark_repeats_and_extend_defmap
-***** two call chains lead to it
-****** de novo
-  * main
-  ** serve
-  *** handle_emacs
-  **** handle_single_root_view_request
-  ***** single_root_view
-  ****** multi_root_view
-  ******* render_initial_forest_bfs
-  ******** stub_forest_from_root_ids
-  ********* build_node_branch_minus_content
-  ********** complete_branch_minus_content
-  *********** mark_repeats_and_extend_defmap
-****** save
-  * main
-  ** serve
-  *** handle_emacs
-  **** handle_save_buffer_request
-  ***** update_from_and_rerender_buffer
-  ****** complete_or_restore_each_node_in_branch
-  ******* DUP mark_repeats_and_extend_defmap
-**** TODO flatten the call to mark_repeats_and_extend_defmap
-***** detect_and_mark_cycle
-      implemented
-***** the rest
-      Get the node's PID.
-      If that PID is in the defMap, mark this one indefinitive.
-        No need to recurse.
-      If this one is (still, because the last line ran)
-        definitive, insert it into defMap.
-**** complete_or_restore_each_node_in_branch
-     Unbundle those two ideas.
-     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
+*** DONE flatten add_missing_info_to_forest
+*** DONE mark_repeats_and_extend_defmap
+**** two call chains lead to it
+***** de novo
+ * main
+ ** serve
+ *** handle_emacs
+ **** handle_single_root_view_request
+ ***** single_root_view
+ ****** multi_root_view
+ ******* render_initial_forest_bfs
+ ******** stub_forest_from_root_ids
+ ********* build_node_branch_minus_content
+ ********** complete_branch_minus_content
+ *********** mark_repeats_and_extend_defmap
+***** save
+ * main
+ ** serve
+ *** handle_emacs
+ **** handle_save_buffer_request
+ ***** update_from_and_rerender_buffer
+ ****** complete_or_restore_each_node_in_branch
+ ******* DUP mark_repeats_and_extend_defmap
 ** Search for other places to use do_everywhere_in_tree_dfs.
 ** Write how each piece, if inelegant, at least fits into an elegant scheme.
 ** ? validate ancestry, not descendents
