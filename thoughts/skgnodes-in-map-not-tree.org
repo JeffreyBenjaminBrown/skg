@@ -140,15 +140,19 @@ Made =collectViewRequestsFromForest= generic in =server/to_org/expand/collect_vi
 - Works with both =PairTree= and =Tree<OrgNode>=
 - Added =AsRef<OrgNode>= trait implementations for =NodePair= and =OrgNode=
 
-* Remaining Work
-
-** Switch Entry Point to v2
+** DONE Chunk 14: Switch Entry Point to v2
 
 In =server/serve/handlers/save_buffer.rs=:
-- Change =handle_save_buffer_request= to call =update_from_and_rerender_buffer_v2=
-- Or add flag/config to choose between old and new implementations
-- Test with real usage to verify behavior matches
+- Changed =handle_save_buffer_request= to call =update_from_and_rerender_buffer_v2=
+- All 33 tests pass
+- Production code now uses Tree<OrgNode> + SkgNodeMap throughout
 
+* Remaining Work
+
+** Convert tests.
+   Every test for a function that has a new version
+   should be converted to use the new version,
+   in a way that minimizes the resulting diff.
 ** Other Modules to Refactor (Optional)
 
 - =server/to_org/expand/aliases.rs= - create v2 for aliases view requests

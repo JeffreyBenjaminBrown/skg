@@ -54,7 +54,7 @@ pub fn handle_save_buffer_request (
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       match block_on(
-        update_from_and_rerender_buffer (
+        update_from_and_rerender_buffer_v2 (
           // Most of the work happens here.
           & initial_buffer_content,
           typedb_driver, config, tantivy_index ))
