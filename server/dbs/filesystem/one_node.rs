@@ -23,6 +23,18 @@ pub async fn skgnode_from_id (
   Ok ( skgnode_from_pid_and_source (
     config, pid, &source )? ) }
 
+/// Fetch multiple SkgNodes from disk given a list of IDs.
+pub async fn skgnodes_from_ids (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  ids    : &[ID],
+) -> Result<Vec<SkgNode>, Box<dyn Error>> {
+  let mut nodes : Vec<SkgNode> = Vec::new();
+  for id in ids {
+    let node = skgnode_from_id ( config, driver, id ). await ?;
+    nodes . push ( node ); }
+  Ok ( nodes ) }
+
 /// Reads a SkgNode from disk given its PID and source.
 pub fn skgnode_from_pid_and_source (
   config : &SkgConfig,
