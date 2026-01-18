@@ -5,7 +5,7 @@ use ego_tree::{Tree, NodeId};
 use crate::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::test_utils::{ run_with_test_db, orgnode_forest_to_paired};
-use crate::to_org::util::{DefinitiveMap, mark_if_visited_or_repeat_or_cycle, truenode_in_tree_is_indefinitive};
+use crate::to_org::util::{DefinitiveMap, detect_and_mark_cycle, make_indef_if_repeat_then_extend_defmap, truenode_in_tree_is_indefinitive};
 use super::content_children::completeAndReorder_childrenOf_definitiveOrgnode;
 use crate::to_org::complete::contents::{clobberIndefinitiveOrgnode, ensure_skgnode};
 use crate::types::tree::PairTree;
@@ -16,7 +16,7 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind};
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
   forest . root () . first_child () . unwrap () . id () }
 
-/// Helper to call ensure_skgnode, mark_if_visited_or_repeat_or_cycle,
+/// Helper to call ensure_skgnode, make_indef_if_repeat_then_extend_defmap_or_cycle,
 /// and then clobberIndefinitiveOrgnode or completeAndReorder_childrenOf_definitiveOrgnode.
 /// (matches the pattern used in complete_or_restore_each_node_in_branch).
 /// TODO: Unify with complete_or_restore_each_node_in_branch.
@@ -34,9 +34,9 @@ async fn check_and_complete_if_truenode (
       else { return Ok (( )); }; } // Skip Scaffolds.
   ensure_skgnode (
     tree, node_id, config, driver ) . await ?;
-  mark_if_visited_or_repeat_or_cycle (
+  make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  // 'mark_if_visited_or_repeat_or_cycle' may have changed 'indefinitive'.
+  // 'make_indef_if_repeat_then_extend_defmap_or_cycle' may have changed 'indefinitive'.
   if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
     clobberIndefinitiveOrgnode (
       tree, node_id ) ?;

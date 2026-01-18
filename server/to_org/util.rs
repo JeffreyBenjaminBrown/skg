@@ -129,7 +129,8 @@ pub async fn complete_branch_minus_content (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  mark_if_visited_or_repeat_or_cycle (
+  detect_and_mark_cycle ( tree, node_id ) ?;
+  make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveOrgnode (
@@ -138,30 +139,33 @@ pub async fn complete_branch_minus_content (
     tree, node_id, config, driver ) . await ?;
   Ok (( )) }
 
-pub fn mark_if_visited_or_repeat_or_cycle (
-  tree     : &mut PairTree,
-  node_id  : NodeId,
-  visited  : &mut DefinitiveMap,
+/// The two jobs in the name of this are inseparable --
+/// we have to interleave extending the defmap
+/// with marking things indefinitive, because the defmap
+/// is how we know whether to mark something indefinitive.
+pub fn make_indef_if_repeat_then_extend_defmap (
+  tree    : &mut PairTree,
+  node_id : NodeId,
+  defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Scaffold.
     get_pid_in_pairtree ( tree, node_id ) ?;
-  detect_and_mark_cycle ( tree, node_id ) ?;
-  { let is_indefinitive : bool =
-      write_at_node_in_tree (
-        tree, node_id,
-        |np| { let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
-               else { unreachable!( "In mark_if_visited_or_repeat_or_cycle, get_pid_in_pairtree already verified TrueNode"); };
-               if visited . contains_key ( &pid )
-               { // It's a repeat, so it should be indefinitive.
-                 t . indefinitive = true; }
-               t . indefinitive } ) ?;
-    if !is_indefinitive {
-      visited . insert ( pid, node_id ); }}
+  let is_indefinitive : bool =
+    write_at_node_in_tree (
+      tree, node_id,
+      |np| { let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+             else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_pid_in_pairtree already verified TrueNode"); };
+             if defMap . contains_key ( &pid )
+             { // It's a repeat, so it should be indefinitive.
+               t . indefinitive = true; }
+             t . indefinitive } ) ?;
+  if !is_indefinitive {
+    defMap . insert ( pid, node_id ); }
   Ok (( )) }
 
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
-fn detect_and_mark_cycle (
+pub fn detect_and_mark_cycle (
   tree    : &mut PairTree,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {

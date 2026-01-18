@@ -1,6 +1,6 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
-use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, mark_if_visited_or_repeat_or_cycle };
+use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle, make_indef_if_repeat_then_extend_defmap };
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::{
   maybe_add_subscribeeCol_branch };
@@ -67,7 +67,8 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
     } else {
       ensure_skgnode (
         tree, node_id, config, typedb_driver ). await ?;
-      mark_if_visited_or_repeat_or_cycle (
+      detect_and_mark_cycle ( tree, node_id ) ?;
+      make_indef_if_repeat_then_extend_defmap (
         tree, node_id, visited ) ?;
       { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (

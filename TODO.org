@@ -1,7 +1,58 @@
-* flatten mark_if_visited_or_repeat_or_cycle
 * understand it
+** TODO What's the logic behind this comment?
+   pair_orgnode_forest_with_skgnodes_from_saveinstructions (
+     // Definitive nodes get Some(skgnode), indefinitive get None.
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
-** Why is show not reusable in save?
+** Do de-novo and save reuse enough code?
+*** De-novo is similar to execute definitive view request
+    But do they share all the logic they ought to?
+*** maybe see this document
+    thoughts/saving-builds-tree-a-different-way.org
+* refactor it
+** ONGOING There seem to be unnecessary mid-functions.
+   as in midparent in a tree
+*** instances
+**** DONE flatten add_missing_info_to_forest
+**** TODO mark_repeats_and_extend_defmap
+***** two call chains lead to it
+****** de novo
+  * main
+  ** serve
+  *** handle_emacs
+  **** handle_single_root_view_request
+  ***** single_root_view
+  ****** multi_root_view
+  ******* render_initial_forest_bfs
+  ******** stub_forest_from_root_ids
+  ********* build_node_branch_minus_content
+  ********** complete_branch_minus_content
+  *********** mark_repeats_and_extend_defmap
+****** save
+  * main
+  ** serve
+  *** handle_emacs
+  **** handle_save_buffer_request
+  ***** update_from_and_rerender_buffer
+  ****** complete_or_restore_each_node_in_branch
+  ******* DUP mark_repeats_and_extend_defmap
+**** TODO flatten the call to mark_repeats_and_extend_defmap
+***** detect_and_mark_cycle
+      implemented
+***** the rest
+      Get the node's PID.
+      If that PID is in the defMap, mark this one indefinitive.
+        No need to recurse.
+      If this one is (still, because the last line ran)
+        definitive, insert it into defMap.
+**** complete_or_restore_each_node_in_branch
+     Unbundle those two ideas.
+     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
+** Search for other places to use do_everywhere_in_tree_dfs.
+** Write how each piece, if inelegant, at least fits into an elegant scheme.
+** ? validate ancestry, not descendents
+   This seems like it might prevent combinatorial explosion.
+   For instance, "an alias should have an aliascol parent"
+   is easier to say than "an aliascol's children can only be aliases".
 * extend it
 ** save subscribees
 *** the subscribee tree format
@@ -61,23 +112,6 @@
      Editing one of those is an edit to E, i.e. doesn't make sense.
      To lens onto one, copy it elsewhere and edit that.
 ** show subscribees
-* refactor it
-** ONGOING There seem to be unnecessary mid-functions.
-   as in midparent in a tree
-*** instances
-**** TODO flatten add_missing_info_to_forest
-** Write how each piece, if inelegant, at least fits into an elegant scheme.
-** complete_or_restore_each_node_in_branch
-   Unbundle those two ideas.
-   I think the completion is unnecessary. All it does is add a subscribeecol if it can.
-** ? validate ancestry, not descendents
-   This seems like it might prevent combinatorial explosion.
-   For instance, "an alias should have an aliascol parent"
-   is easier to say than "an aliascol's children can only be aliases".
-** ? could initial buffer creation be rewritten in terms of save
-*** root or roots each with a definitive view request
-*** but maybe definitive view requests are in terms of de novo creation
-** thoughts/saving-builds-tree-a-different-way.org
 * u
 ** DOGFOOD IT
 ** sourceward view ? ugly
@@ -181,7 +215,7 @@ makeIndefinitiveAndClobber
 **** as of this commit
      dce37c085b5457953fa076dd2500a05e8635c87b
 **** this passage
-     mark_if_visited_or_repeat_or_cycle (
+     mark_repeats_and_extend_defmap_or_cycle (
        tree, node_id, visited ) ?;
      { if is_indefinitive ( tree, node_id ) ? {
          clobberIndefinitiveOrgnode (
@@ -191,7 +225,7 @@ makeIndefinitiveAndClobber
      because we're rewriting the node as indefinitive twice.
 **** solution
      Don't call makeIndefinitiveAndClobber in
-       mark_if_visited_or_repeat_or_cycle.
+       mark_repeats_and_extend_defmap_or_cycle.
      Instead do it only in clobberIndefinitiveOrgnode.
      And in clobberIndefinitiveOrgnode, call makeIndefinitiveAndClobber,
      instead of essentially restating its definition.
@@ -292,7 +326,7 @@ makeIndefinitiveAndClobber
 **** TODO RESUME around merge/ in tools/introspect/code-map/code-map.org
      reading downward
 *** look for helpers to simplify egotree boilerplate
-*** add an error possibility to 'mark_if_visited_or_repeat_or_cycle'
+*** add an error possibility to 'mark_repeats_and_extend_defmap_or_cycle'
    if is_indefinitive {
      makeIndefinitiveAndClobber ( tree, node_id ) ?;
    } else { // here, it might already be in visited, which would be bad
