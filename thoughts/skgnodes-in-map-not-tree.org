@@ -203,7 +203,7 @@ pub async fn ensure_skgnode(
 
 New:
 #+begin_src rust
-pub async fn ensure_skgnode_in_map(
+pub async fn add_v_to_map_if_absent(
   skgnode_map: &mut HashMap<ID, SkgNode>,
   node_id: ID,
   config: &SkgConfig,
@@ -423,15 +423,18 @@ Each chunk should:
 - No existing tests for =get_pid_in_pairtree= existed
 - Changed visibility from =pub(super)= to =pub= for test access
 - The function is simple enough that we can keep both versions side-by-side safely
+- Test file organization: =tests/to_org/util.rs= mirrors =server/to_org/util.rs=
+- Need module file =tests/to_org.rs= to include subdirectory tests
+- Imports: Add qualified types to use statements, not inline in signatures
 
-** Chunk 4: Refactor =ensure_skgnode= to Work with Map
+** DONE Chunk 4: Refactor =ensure_skgnode= to Work with Map ✅ COMPLETED
 
 *Goal:* Create map-based version of =ensure_skgnode=.
 
 *Changes:*
-1. Add new function (keep old one):
+1. Added in =server/to_org/complete/contents.rs= alongside old:
    #+begin_src rust
-   pub async fn ensure_skgnode_in_map(
+   pub async fn add_v_to_map_if_absent(
      node_id: &ID,
      map: &mut SkgNodeMap,
      config: &SkgConfig,
@@ -444,12 +447,17 @@ Each chunk should:
      Ok(())
    }
    #+end_src
+2. Added =SkgNodeMap= to imports
 
-*Tests:* Test that it:
-- Fetches and adds missing SkgNode
-- Doesn't re-fetch if already present
+*Tests:* Created =tests/to_org/complete/contents.rs= with test:
+- SkgNode already in map → doesn't re-fetch, returns Ok
 
-*Verification:* Tests pass, old code unchanged.
+*Verification:* ✅ All tests pass (33 total), old =ensure_skgnode= unchanged.
+
+*Learnings:*
+- Test uses =run_with_test_db= helper which requires Box::pin closure
+- Need fixtures directory even if empty for test DB setup
+- Function is simpler than PairTree version - just check map, fetch if missing
 
 ** Chunk 5: Create Dual-Signature Version of =complete_or_restore_each_node_in_branch=
 
@@ -481,7 +489,7 @@ Each chunk should:
 
 *Changes:*
 1. Rewrite =complete_or_restore_each_node_in_branch_v2= to use:
-   - =ensure_skgnode_in_map= instead of =ensure_skgnode=
+   - =add_v_to_map_if_absent= instead of =ensure_skgnode=
    - =get_pid_in_tree= instead of =get_pid_in_pairtree=
    - Direct tree/map access
 

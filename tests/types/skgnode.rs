@@ -2,7 +2,7 @@
 // Tests for new map-based helpers
 //
 
-use skg::types::skgnode::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNode, SkgNodeMap};
+use skg::types::skgnode::{skgnode_for_orgnode, skgnode_map_from_save_instructions, empty_skgnode, SkgNode, SkgNodeMap};
 use skg::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use skg::types::save::NonMerge_NodeAction;
 use skg::types::misc::ID;
@@ -17,14 +17,8 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     SkgNode =
     SkgNode {
       title : "Test Node".to_string(),
-      aliases : None,
-      source : "test-source".to_string(),
       ids : vec![id.clone()],
-      body : None,
-      contains : None,
-      subscribes_to : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of : None,
+      .. empty_skgnode()
     };
 
   let mut map :
@@ -100,14 +94,8 @@ fn test_skgnode_for_orgnode_scaffold() {
     SkgNode =
     SkgNode {
       title : "Test Node".to_string(),
-      aliases : None,
-      source : "test-source".to_string(),
       ids : vec![ID::new("test-id-789")],
-      body : None,
-      contains : None,
-      subscribes_to : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of : None,
+      .. empty_skgnode()
     };
 
   let mut map :
@@ -146,42 +134,24 @@ fn test_skgnode_map_from_save_instructions() {
     SkgNode =
     SkgNode {
       title : "Node 1".to_string(),
-      aliases : None,
-      source : "test-source".to_string(),
       ids : vec![id1.clone()],
-      body : None,
-      contains : None,
-      subscribes_to : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of : None,
+      .. empty_skgnode()
     };
 
   let skgnode2 :
     SkgNode =
     SkgNode {
       title : "Node 2".to_string(),
-      aliases : None,
-      source : "test-source".to_string(),
       ids : vec![id2.clone(), ID::new("extra-id")], // multiple IDs, should use first
-      body : None,
-      contains : None,
-      subscribes_to : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of : None,
+      .. empty_skgnode()
     };
 
   let skgnode3 :
     SkgNode =
     SkgNode {
       title : "Node 3".to_string(),
-      aliases : None,
-      source : "test-source".to_string(),
       ids : vec![id3.clone()],
-      body : None,
-      contains : None,
-      subscribes_to : None,
-      hides_from_its_subscriptions : None,
-      overrides_view_of : None,
+      .. empty_skgnode()
     };
 
   let instructions :

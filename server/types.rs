@@ -6,3 +6,4 @@ pub mod orgnode;
 pub mod skgnode;
 pub mod save;
 pub mod tree;
+pub mod maps;
