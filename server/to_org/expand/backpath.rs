@@ -206,7 +206,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
       tree, last_node_id, cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
-async fn integrate_path_that_might_fork_or_cycle_v2 (
+pub async fn integrate_path_that_might_fork_or_cycle_v2 (
   tree        : &mut Tree<OrgNode>,
   node_id     : ego_tree::NodeId,
   mut path    : Vec < ID >,

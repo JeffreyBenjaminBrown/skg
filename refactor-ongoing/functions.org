@@ -1,82 +1,473 @@
 * new-functions-with-correspondences
 ** add_last_generation_and_truncate_some_of_previous_v2
+pub async fn add_last_generation_and_truncate_some_of_previous_v2 (
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
+  generation     : usize,
+  children       : &[(NodeId, ID)],
+  space_left     : usize,
+  effective_root : NodeId,
+  visited        : &mut DefinitiveMap,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** add_last_generation_and_truncate_some_of_previous
 ** build_and_integrate_aliases_v2
+pub async fn build_and_integrate_aliases_v2 (
+  tree      : &mut Tree<OrgNode>,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_aliases
 ** build_and_integrate_aliases_view_then_drop_request_v2
+pub async fn build_and_integrate_aliases_view_then_drop_request_v2 (
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_aliases_view_then_drop_request
 ** build_and_integrate_containerward_path_v2
+pub async fn build_and_integrate_containerward_path_v2 (
+  tree      : &mut Tree<OrgNode>,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_containerward_path
 ** build_and_integrate_containerward_view_then_drop_request_v2
+pub async fn build_and_integrate_containerward_view_then_drop_request_v2 (
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_containerward_view_then_drop_request
 ** build_and_integrate_sourceward_path_v2
+pub async fn build_and_integrate_sourceward_path_v2 (
+  tree      : &mut Tree<OrgNode>,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_sourceward_path
 ** build_and_integrate_sourceward_view_then_drop_request_v2
+pub async fn build_and_integrate_sourceward_view_then_drop_request_v2 (
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_sourceward_view_then_drop_request
 ** build_node_branch_minus_content_v2
+pub async fn build_node_branch_minus_content_v2 (
+  tree_map_parent : Option<(&mut Tree<OrgNode>, &mut crate::types::skgnode::SkgNodeMap, NodeId)>,
+  skgid           : &ID,
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
+  visited         : &mut DefinitiveMap,
+) -> Result < (Option<Tree<OrgNode>>, Option<crate::types::skgnode::SkgNodeMap>, NodeId), Box<dyn Error> >
 *** build_node_branch_minus_content
 ** clobberIndefinitiveOrgnode_v2
+pub fn clobberIndefinitiveOrgnode_v2 (
+  tree    : &mut Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  treeid  : NodeId,
+) -> Result < (), Box<dyn Error> >
 *** clobberIndefinitiveOrgnode
 ** completeAliasCol_v2
+pub async fn completeAliasCol_v2 (
+  tree             : &mut Tree<OrgNode>,
+  map              : &SkgNodeMap,
+  aliascol_node_id : NodeId,
+  _config          : &SkgConfig,
+  _driver          : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** completeAliasCol
 ** complete_branch_minus_content_in_orgtree
+pub async fn complete_branch_minus_content_in_orgtree (
+  tree     : &mut Tree<OrgNode>,
+  map      : &mut crate::types::skgnode::SkgNodeMap,
+  node_id  : NodeId,
+  visited  : &mut DefinitiveMap,
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>>
 *** complete_branch_minus_content
 ** complete_or_restore_each_node_in_branch_v2
+pub fn complete_or_restore_each_node_in_branch_v2<'a> (
+  tree          : &'a mut Tree<OrgNode>,
+  map           : &'a mut SkgNodeMap,
+  node_id       : NodeId,
+  config        : &'a SkgConfig,
+  typedb_driver : &'a TypeDBDriver,
+  visited       : &'a mut DefinitiveMap,
+) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 *** complete_or_restore_each_node_in_branch
 ** ensure_source_v2
+pub async fn ensure_source_v2 (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** ensure_source
 ** execute_definitive_view_request_v2
+async fn execute_definitive_view_request_v2 (
+  forest        : &mut ego_tree::Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  visited       : &mut DefinitiveMap,
+  _errors       : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> >
 *** execute_definitive_view_request
 ** execute_view_requests_v2
+pub async fn execute_view_requests_v2 (
+  forest        : &mut ego_tree::Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  requests      : Vec < (NodeId, ViewRequest) >,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  visited       : &mut DefinitiveMap,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> >
 *** execute_view_requests
 ** extendDefinitiveSubtreeFromLeaf_v2
+async fn extendDefinitiveSubtreeFromLeaf_v2 (
+  tree           : &mut ego_tree::Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
+  effective_root : NodeId,
+  limit          : usize,
+  visited        : &mut DefinitiveMap,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+  hidden_ids     : &HashSet < ID >,
+) -> Result < (), Box<dyn Error> >
 *** extendDefinitiveSubtreeFromLeaf
 ** integrate_branches_in_node_v2
+async fn integrate_branches_in_node_v2 (
+  tree       : &mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  branches   : HashSet < ID >,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** integrate_branches_in_node
 ** integrate_cycle_in_node_v2
+async fn integrate_cycle_in_node_v2 (
+  tree       : &mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  cycle_id   : ID,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** integrate_cycle_in_node
 ** integrate_linear_portion_of_path_v2
+fn integrate_linear_portion_of_path_v2<'a> (
+  tree       : &'a mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  path       : &'a [ID],
+  config     : &'a SkgConfig,
+  driver     : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<Output = Result<ego_tree::NodeId, Box<dyn Error>>> + 'a>>
 *** integrate_linear_portion_of_path
 ** integrate_path_that_might_fork_or_cycle_v2
+pub async fn integrate_path_that_might_fork_or_cycle_v2 (
+  tree        : &mut Tree<OrgNode>,
+  node_id     : ego_tree::NodeId,
+  mut path    : Vec < ID >,
+  branches    : HashSet < ID >,
+  cycle_node  : Option < ID >,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** integrate_path_that_might_fork_or_cycle
 ** make_and_append_child_pair_v2
+pub async fn make_and_append_child_pair_v2 (
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut crate::types::skgnode::SkgNodeMap,
+  parent_treeid : NodeId,
+  child_skgid   : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < NodeId, Box<dyn Error> >
 *** make_and_append_child_pair
 ** makeIndefinitiveAndClobber_v2
+pub(super) fn makeIndefinitiveAndClobber_v2 (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result < (), Box<dyn Error> >
 *** makeIndefinitiveAndClobber
 ** maybe_add_hiddenInSubscribeeCol_branch_v2
+pub async fn maybe_add_hiddenInSubscribeeCol_branch_v2 (
+  tree              : &mut ego_tree::Tree<OrgNode>,
+  map               : &mut crate::types::skgnode::SkgNodeMap,
+  subscribee_treeid : NodeId,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** maybe_add_hiddenInSubscribeeCol_branch
 ** maybe_add_subscribeeCol_branch_v2
+pub async fn maybe_add_subscribeeCol_branch_v2 (
+  tree    : &mut Tree<OrgNode>,
+  map     : &mut SkgNodeMap,
+  node_id : NodeId,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** maybe_add_subscribeeCol_branch
 ** nodes_after_in_generation_v2
+pub(super) fn nodes_after_in_generation_v2 (
+  tree                     : &Tree<OrgNode>,
+  generation               : usize,
+  generation_member_treeid : NodeId,
+  effective_root           : Option < NodeId >,
+) -> Result < Vec < NodeId >, Box<dyn Error> >
 *** nodes_after_in_generation
 ** orgnode_forest_to_string_v2
+pub fn orgnode_forest_to_string_v2 (
+  forest : &Tree<OrgNode>,
+) -> Result < String, Box<dyn Error> >
 *** orgnode_forest_to_string
 ** prepend_indefinitive_child_with_parent_ignores_v2
+async fn prepend_indefinitive_child_with_parent_ignores_v2 (
+  tree           : &mut Tree<OrgNode>,
+  parent_treeid  : ego_tree::NodeId,
+  child_skgid    : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < ego_tree::NodeId, Box<dyn Error> >
 *** prepend_indefinitive_child_with_parent_ignores
 ** set_metadata_relationship_viewdata_in_forest_v2
+pub async fn set_metadata_relationship_viewdata_in_forest_v2 (
+  forest : &mut Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 *** set_metadata_relationship_viewdata_in_forest
 ** truncate_after_node_in_generation_in_tree_v2
+fn truncate_after_node_in_generation_in_tree_v2 (
+  tree           : &mut Tree<OrgNode>,
+  generation     : usize,
+  node_id        : NodeId,
+  effective_root : NodeId,
+  visited        : &mut DefinitiveMap,
+) -> Result < (), Box<dyn Error> >
 *** truncate_after_node_in_generation_in_tree
 ** update_from_and_rerender_buffer_v2
+pub async fn update_from_and_rerender_buffer_v2 (
+  org_buffer_text : &str,
+  typedb_driver   : &TypeDBDriver,
+  config          : &SkgConfig,
+  tantivy_index   : &TantivyIndex
+) -> Result<SaveResponse, Box<dyn Error>>
 *** update_from_and_rerender_buffer
 * new-functions-without-correspondences
+** append_indefinitive_from_disk_as_child_in_orgtree
+pub async fn append_indefinitive_from_disk_as_child_in_orgtree (
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
+  parent_id      : NodeId,
+  node_id        : &ID,
+  parent_ignores : bool,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
+** collect_child_aliases_at_aliascol_in_orgtree
+fn collect_child_aliases_at_aliascol_in_orgtree (
+  tree             : &Tree<OrgNode>,
+  aliascol_node_id : NodeId,
+) -> Result < Vec < String >, Box<dyn Error> >
 ** collect_child_treeids_in_orgtree
+pub fn collect_child_treeids_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < Vec < NodeId >, Box<dyn Error> >
 ** collect_ids_from_orgtree
+pub fn collect_ids_from_orgtree (
+  tree : &Tree<OrgNode>,
+) -> Vec < ID >
+** collectViewRequestsFromForest
+pub fn collectViewRequestsFromForest<T> (
+  forest : &ego_tree::Tree<T>,
+) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
+where  T: AsRef<OrgNode>
 ** content_ids_if_definitive_else_empty_in_orgtree
+pub(super) fn content_ids_if_definitive_else_empty_in_orgtree (
+  tree   : &Tree<OrgNode>,
+  map    : &crate::types::skgnode::SkgNodeMap,
+  treeid : NodeId,
+) -> Result < Vec < ID >, Box<dyn Error> >
 ** detect_and_mark_cycle_in_orgtree
+pub fn detect_and_mark_cycle_in_orgtree (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result<(), Box<dyn Error>>
+** ensure_skgnode_in_map
+pub async fn ensure_skgnode_in_map (
+  node_id : &ID,
+  map     : &mut SkgNodeMap,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 ** find_child_by_id_in_orgtree
+pub fn find_child_by_id_in_orgtree (
+  tree          : & Tree<OrgNode>,
+  parent_treeid : ego_tree::NodeId,
+  target_skgid  : & ID,
+) -> Option < ego_tree::NodeId >
 ** find_children_by_ids_in_orgtree
+pub fn find_children_by_ids_in_orgtree (
+  tree          : & Tree<OrgNode>,
+  parent_treeid : ego_tree::NodeId,
+  target_skgids : & HashSet < ID >,
+) -> HashMap < ID, ego_tree::NodeId >
+** from_disk_replace_title_body_and_skgnode_v2
+fn from_disk_replace_title_body_and_skgnode_v2 (
+  tree    : &mut ego_tree::Tree<OrgNode>,
+  map     : &mut SkgNodeMap,
+  node_id : NodeId,
+  config  : &SkgConfig,
+) -> Result < (), Box<dyn Error> >
+** get_hidden_ids_if_subscribee_v2
+fn get_hidden_ids_if_subscribee_v2 (
+  tree    : &ego_tree::Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+) -> Result < HashSet < ID >, Box<dyn Error> >
 ** get_pid_in_tree
+pub fn get_pid_in_tree (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < ID, Box<dyn Error> >
+** indefinitize_content_subtree_v2
+fn indefinitize_content_subtree_v2 (
+  tree    : &mut ego_tree::Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+  visited : &mut DefinitiveMap,
+) -> Result < (), Box<dyn Error> >
 ** insert_scaffold_as_child_in_orgtree
+pub fn insert_scaffold_as_child_in_orgtree (
+  tree          : &mut Tree<OrgNode>,
+  parent_id     : NodeId,
+  scaffold_kind : Scaffold,
+  prepend       : bool,
+) -> Result < NodeId, Box<dyn Error> >
 ** is_ancestor_id_in_orgtree
+fn is_ancestor_id_in_orgtree (
+  tree          : &Tree<OrgNode>,
+  origin_treeid : NodeId,
+  target_skgid  : &ID,
+) -> Result<bool, Box<dyn Error>>
 ** make_indef_if_repeat_then_extend_defmap_in_orgtree
+pub fn make_indef_if_repeat_then_extend_defmap_in_orgtree (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  defMap  : &mut DefinitiveMap,
+) -> Result<(), Box<dyn Error>>
+** mapsFromIdForView_from_orgtree
+async fn mapsFromIdForView_from_orgtree (
+  forest : &Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < MapsFromIdForView, Box<dyn Error> >
+** pairtree_from_tree_and_map
+pub fn pairtree_from_tree_and_map (
+  tree : &Tree<OrgNode>,
+  map  : &SkgNodeMap,
+) -> PairTree
+** pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree
+pub fn pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+) -> Result < ( ID, ID ), Box<dyn Error> >
+** pids_for_subscriber_and_its_subscribees_in_orgtree
+pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
+  tree    : &Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+) -> Result < ( ID, Vec < ID > ), Box<dyn Error> >
+** remove_duplicates_and_false_aliases_handling_focus_v2
+fn remove_duplicates_and_false_aliases_handling_focus_v2 (
+  tree             : &mut Tree<OrgNode>,
+  aliascol_node_id : NodeId,
+  good_aliases     : &HashSet < String >,
+) -> Result < (), Box<dyn Error> >
+** set_metadata_relationships_in_node_recursive_v2
+fn set_metadata_relationships_in_node_recursive_v2 (
+  tree       : &mut Tree<OrgNode>,
+  treeid    : NodeId,
+  parent_pid : Option < &ID >,
+  rel_data   : &MapsFromIdForView,
+)
 ** skgnode_map_from_forest
+pub async fn skgnode_map_from_forest (
+  forest : &Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<SkgNodeMap, Box<dyn Error>>
+** skgnode_map_from_save_instructions
+pub fn skgnode_map_from_save_instructions (
+  instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
+) -> SkgNodeMap
 ** skgnodes_from_ids
+pub async fn skgnodes_from_ids (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  ids    : &[ID],
+) -> Result<Vec<SkgNode>, Box<dyn Error>>
+** tree_and_map_from_pairtree
+pub fn tree_and_map_from_pairtree (
+  pairtree : &PairTree,
+) -> (Tree<OrgNode>, SkgNodeMap)
 ** truenode_in_orgtree_is_indefinitive
+pub fn truenode_in_orgtree_is_indefinitive (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < bool, Box<dyn Error> >
 ** type_and_parent_type_consistent_with_subscribee_in_orgtree
+pub fn type_and_parent_type_consistent_with_subscribee_in_orgtree (
+  tree    : &ego_tree::Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result < bool, Box<dyn Error> >
 ** unique_orgnode_scaffold_child
+pub fn unique_orgnode_scaffold_child (
+  tree          : &Tree<OrgNode>,
+  node_id       : NodeId,
+  scaffold_kind : &Scaffold,
+) -> Result<Option<NodeId>, Box<dyn Error>>
 * new-helper-functions
+** add_v_to_map_if_absent
+pub async fn add_v_to_map_if_absent<K, V, F, Fut> (
+  key      : &K,
+  map      : &mut HashMap<K, V>,
+  fetch_fn : F,
+) -> Result < (), Box<dyn Error> >
+where
+  K: Eq + Hash + Clone,
+  V: Clone,
+  F: FnOnce(&K) -> Fut,
+  Fut: Future<Output = Result<V, Box<dyn Error>>>
 ** collect_ids_from_subtree
+fn collect_ids_from_subtree (
+  tree    : &Tree<OrgNode>,
+  node_id : NodeId,
+  ids_out : &mut Vec<ID>,
+)
+** AsRef<OrgNode> trait implementations
+impl AsRef<OrgNode> for NodePair
+impl AsRef<OrgNode> for OrgNode
 * old-functions-gone
 (none - all v1 functions remain for backward compatibility)
 * old-functions-transformed
