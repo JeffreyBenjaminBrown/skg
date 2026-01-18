@@ -1,5 +1,5 @@
 * new-functions-with-correspondences
-** add_children_and_collect_their_ids_v2
+** DONE add_children_and_collect_their_ids_v2
 async fn add_children_and_collect_their_ids_v2 (
   forest      : &mut Tree<OrgNode>,
   map         : &mut SkgNodeMap,
@@ -111,7 +111,7 @@ pub async fn complete_branch_minus_content_in_orgtree (
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>>
 *** complete_branch_minus_content
-** collect_rels_to_children_from_generation_v2
+** DONE collect_rels_to_children_from_generation_v2
 fn collect_rels_to_children_from_generation_v2 (
   forest       : &Tree<OrgNode>,
   map          : &SkgNodeMap,
@@ -242,7 +242,7 @@ pub async fn maybe_add_subscribeeCol_branch_v2 (
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** maybe_add_subscribeeCol_branch
-** multi_root_view_v2
+** DONE multi_root_view_v2
 pub async fn multi_root_view_v2 (
   driver   : &TypeDBDriver,
   config   : &SkgConfig,
@@ -257,7 +257,7 @@ pub(super) fn nodes_after_in_generation_v2 (
   effective_root           : Option < NodeId >,
 ) -> Result < Vec < NodeId >, Box<dyn Error> >
 *** nodes_after_in_generation
-** orgnode_forest_to_string_v2
+** DONE orgnode_forest_to_string_v2
 pub fn orgnode_forest_to_string_v2 (
   forest : &Tree<OrgNode>,
 ) -> Result < String, Box<dyn Error> >
@@ -271,7 +271,7 @@ async fn prepend_indefinitive_child_with_parent_ignores_v2 (
   driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> >
 *** prepend_indefinitive_child_with_parent_ignores
-** render_generation_and_recurse_v2
+** DONE render_generation_and_recurse_v2
 fn render_generation_and_recurse_v2<'a> (
   forest         : &'a mut Tree<OrgNode>,
   map            : &'a mut SkgNodeMap,
@@ -285,7 +285,7 @@ fn render_generation_and_recurse_v2<'a> (
   driver         : &'a TypeDBDriver,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 *** render_generation_and_recurse
-** render_initial_forest_bfs_v2
+** DONE render_initial_forest_bfs_v2
 pub async fn render_initial_forest_bfs_v2 (
   root_ids : &[ID],
   config   : &SkgConfig,
@@ -299,14 +299,14 @@ pub async fn set_metadata_relationship_viewdata_in_forest_v2 (
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** set_metadata_relationship_viewdata_in_forest
-** single_root_view_v2
+** DONE single_root_view_v2
 pub async fn single_root_view_v2 (
   driver  : &TypeDBDriver,
   config  : &SkgConfig,
   root_id : &ID,
 ) -> Result < String, Box<dyn Error> >
 *** single_root_view
-** stub_forest_from_root_ids_v2
+** DONE stub_forest_from_root_ids_v2
 pub async fn stub_forest_from_root_ids_v2 (
   root_skgids : &[ID],
   config   : &SkgConfig,
@@ -323,7 +323,7 @@ fn truncate_after_node_in_generation_in_tree_v2 (
   visited        : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> >
 *** truncate_after_node_in_generation_in_tree
-** update_from_and_rerender_buffer_v2
+** DONE update_from_and_rerender_buffer_v2
 pub async fn update_from_and_rerender_buffer_v2 (
   org_buffer_text : &str,
   typedb_driver   : &TypeDBDriver,

@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode};
-use skg::org_to_text::orgnode_forest_to_string_v2;
+use skg::org_to_text::orgnode_forest_to_string;
 
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -72,8 +72,8 @@ async fn test_path_with_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  let actual_str = orgnode_forest_to_string_v2(&forest)?;
-  let expected_str = orgnode_forest_to_string_v2(&expected_trees)?;
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
@@ -155,8 +155,8 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  let actual_str = orgnode_forest_to_string_v2(&forest)?;
-  let expected_str = orgnode_forest_to_string_v2(&expected_trees)?;
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
@@ -238,8 +238,8 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  let actual_str = orgnode_forest_to_string_v2(&forest)?;
-  let expected_str = orgnode_forest_to_string_v2(&expected_trees)?;
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"

@@ -12,7 +12,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::single_root_view_v2;
+use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
@@ -102,7 +102,7 @@ fn test_every_kind_of_col(
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
     ).await?;
 
-    let initial_view: String = single_root_view_v2(
+    let initial_view: String = single_root_view(
       &driver,
       &config,
       &ID("R".to_string()), // Initial view from R ("subscribeR")
@@ -172,7 +172,7 @@ fn test_hidden_within_but_none_without(
     let db_name = "skg-test-hidden-within-but-none-without";
     let (config, driver, tantivy) = setup_test(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ). await?;
-    let initial_view: String = single_root_view_v2(
+    let initial_view: String = single_root_view(
       &driver,
       &config,
       &ID("R".to_string()), // the root
@@ -239,7 +239,7 @@ fn test_hidden_without_but_none_within(
     let (config, driver, tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml").await?;
-    let initial_view: String = single_root_view_v2(
+    let initial_view: String = single_root_view(
       &driver,
       &config,
       &ID("R".to_string()), // origin of the view
@@ -305,7 +305,7 @@ fn test_overlapping_hidden_within(
     let (config, driver, tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml").await?;
-    let initial_view: String = single_root_view_v2(
+    let initial_view: String = single_root_view(
       &driver,
       &config,
       &ID("R".to_string()), // root of the view

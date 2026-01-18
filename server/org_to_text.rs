@@ -1,7 +1,6 @@
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode, EditRequest,
 };
-use crate::types::tree::{NodePair, PairTree};
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -13,42 +12,6 @@ use std::error::Error;
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a ForestRoot.
 pub fn orgnode_forest_to_string (
-  forest : &PairTree,
-) -> Result < String, Box<dyn Error> > {
-  fn render_node_subtree_to_org (
-    node_ref : NodeRef < NodePair >,
-    level    : usize,
-  ) -> Result < String, Box<dyn Error> > {
-    let orgnode : &OrgNode =
-      &node_ref . value () .orgnode;
-    let mut out : String =
-      orgnode_to_text ( level, orgnode )?;
-    for child in node_ref . children () {
-      out . push_str (
-        & render_node_subtree_to_org (
-          child,
-          level + 1 )? ); }
-    Ok ( out ) }
-  let root_ref = forest . root ();
-  let is_forest_root : bool = {
-    let root_orgnode : &OrgNode =
-      &root_ref . value () .orgnode;
-    matches! (
-      & root_orgnode . kind,
-      OrgNodeKind::Scaff ( Scaffold::ForestRoot )) };
-  if ! is_forest_root {
-    return Err (
-      "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
-  let mut result : String =
-    String::new ();
-  for child in root_ref . children () {
-    result . push_str (
-      & render_node_subtree_to_org ( child, 1 )? ); }
-  Ok ( result ) }
-
-/// V2: Render a Tree<OrgNode> forest to org-mode text.
-/// ForestRoot is not rendered; its children start at level 1.
-pub fn orgnode_forest_to_string_v2 (
   forest : &Tree<OrgNode>,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
@@ -71,7 +34,7 @@ pub fn orgnode_forest_to_string_v2 (
       OrgNodeKind::Scaff ( Scaffold::ForestRoot ));
   if ! is_forest_root {
     return Err (
-      "orgnode_forest_to_string_v2: root is not a ForestRoot".into() ); }
+      "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {

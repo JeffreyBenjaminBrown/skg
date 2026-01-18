@@ -10,7 +10,7 @@ mod util {
   pub mod search;
 }
 
-use skg::to_org::render::content_view::single_root_view_v2;
+use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::orgnode::{OrgNode, OrgNodeKind};
 use skg::test_utils::run_with_test_db;
@@ -352,7 +352,7 @@ async fn test_recursive_document (
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let result_org_text : String =
-    single_root_view_v2 (
+    single_root_view (
       driver,
       config,
       &ID ( "a".to_string () )

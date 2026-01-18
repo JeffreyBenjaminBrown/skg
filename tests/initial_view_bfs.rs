@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::render::content_view::multi_root_view_v2;
+use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 
@@ -63,7 +63,7 @@ fn test_bfs_limit_across_multiple_trees
         ID ( "3".to_string () )
       ];
 
-      let result : String = multi_root_view_v2 (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii
@@ -120,7 +120,7 @@ fn test_bfs_limit_9_three_branches
         ID ( "3".to_string () )
       ];
 
-      let result : String = multi_root_view_v2 (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii
@@ -171,7 +171,7 @@ fn test_bfs_limit_8_two_branches
         // Note: node 3 and its descendants not included
       ];
 
-      let result : String = multi_root_view_v2 (
+      let result : String = multi_root_view (
         driver,
         &test_config,
         & focii

@@ -1,19 +1,18 @@
-use crate::viewdata::{set_metadata_relationship_viewdata_in_forest, set_metadata_relationship_viewdata_in_forest_v2};
+use crate::viewdata::set_metadata_relationship_viewdata_in_forest_v2;
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use crate::merge::merge_nodes;
-use crate::org_to_text::{orgnode_forest_to_string, orgnode_forest_to_string_v2};
+use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::{complete_or_restore_each_node_in_branch, complete_or_restore_each_node_in_branch_v2};
+use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch_v2;
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
-use crate::to_org::expand::definitive::{execute_view_requests, execute_view_requests_v2};
-use crate::to_org::util::{forest_root_pair, DefinitiveMap};
+use crate::to_org::expand::definitive::execute_view_requests_v2;
+use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest, forest_root_orgnode};
+use crate::types::orgnode::{OrgNode, ViewRequest};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
-use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_map_from_save_instructions};
-use crate::types::tree::{NodePair, PairTree};
+use crate::types::skgnode::{SkgNodeMap, skgnode_map_from_save_instructions};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use futures::executor::block_on;
@@ -54,7 +53,7 @@ pub fn handle_save_buffer_request (
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       match block_on(
-        update_from_and_rerender_buffer_v2 (
+        update_from_and_rerender_buffer (
           // Most of the work happens here.
           & initial_buffer_content,
           typedb_driver, config, tantivy_index ))
@@ -158,132 +157,6 @@ pub async fn update_from_and_rerender_buffer (
 
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
-    let mut paired_forest : PairTree =
-      pair_orgnode_forest_with_skgnodes_from_saveinstructions (
-        // Definitive nodes get Some(skgnode), indefinitive get None.
-        & orgnode_forest,
-        & save_instructions );
-    { // modify the paired forest before re-rendering it
-      let mut visited : DefinitiveMap = DefinitiveMap::new();
-      let forest_root_id : NodeId = paired_forest.root().id();
-      complete_or_restore_each_node_in_branch (
-        &mut paired_forest,
-        forest_root_id,
-        config,
-        typedb_driver,
-        &mut visited ). await ?;
-      let view_requests : Vec < (NodeId, ViewRequest) > =
-        collectViewRequestsFromForest (
-          & paired_forest ) ?;
-      execute_view_requests ( // PITFALL: Must follow completion.
-        // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
-        &mut paired_forest,
-        view_requests,
-        config,
-        typedb_driver,
-        &mut visited,
-        &mut errors ). await ?;
-      set_metadata_relationship_viewdata_in_forest (
-        &mut paired_forest,
-        config,
-        typedb_driver ). await ?; }
-    let buffer_content : String =
-      orgnode_forest_to_string ( & paired_forest ) ?;
-    Ok ( SaveResponse { buffer_content, errors } ) }}
-
-/// Converts an OrgNode forest to a PairTree forest
-/// (both represented as Trees, via ForestRoot).
-///
-/// Definitive nodes that generated SaveInstructions get Some(skgnode).
-/// Indefinitive nodes (views) get None.
-fn pair_orgnode_forest_with_skgnodes_from_saveinstructions (
-  orgnode_tree : &Tree<OrgNode>,
-  instructions : &[SaveInstruction],
-) -> PairTree {
-  let skgnode_map : HashMap<ID, SkgNode> =
-    instructions . iter ()
-    . filter_map ( |(skgnode, _action)| {
-      skgnode . ids . first ()
-        . map ( |pid| (pid.clone(), skgnode.clone()) ) } )
-    . collect ();
-  let mut pair_tree : PairTree = Tree::new (
-    // PITFALL: Discards the forest's root OrgNode.
-    forest_root_pair () );
-  let forest_root_treeid : NodeId = pair_tree . root () . id ();
-  for tree_root in orgnode_tree.root().children() {
-    add_paired_subtree_as_child (
-      &mut pair_tree,
-      forest_root_treeid,
-      orgnode_tree, tree_root . id (),
-      &skgnode_map ); }
-  pair_tree }
-
-/// Add an OrgNode subtree as a child of a parent in the PairTree,
-/// pairing each node with its SkgNode from the map.
-fn add_paired_subtree_as_child (
-  parent_tree    : &mut PairTree,
-  parent_treeid  : NodeId,
-  orgnode_tree   : &Tree<OrgNode>,
-  orgnode_treeid : NodeId,
-  skgnode_map    : &HashMap<ID, SkgNode>,
-) {
-  let orgnode : OrgNode =
-    orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-    . value () . clone ();
-  let mskgnode : Option<SkgNode> =
-    match &orgnode . kind {
-      OrgNodeKind::True ( t ) =>
-        t . id_opt . as_ref ()
-        . and_then ( |id| skgnode_map . get (id) . cloned () ),
-      OrgNodeKind::Scaff ( _ ) => None };
-  let new_treeid : NodeId = {
-    let mut parent_mut : NodeMut < _ > =
-      parent_tree . get_mut ( parent_treeid ) . unwrap ();
-    parent_mut . append ( // add new node
-      NodePair { mskgnode, orgnode } ) . id () };
-  { // recurse in new node
-    let child_treeids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      add_paired_subtree_as_child (
-        parent_tree, new_treeid,
-        orgnode_tree, child_treeid,
-        skgnode_map ); }} }
-
-/// V2: Same as update_from_and_rerender_buffer but uses Tree<OrgNode> + SkgNodeMap
-/// instead of PairTree throughout.
-pub async fn update_from_and_rerender_buffer_v2 (
-  org_buffer_text : &str,
-  typedb_driver   : &TypeDBDriver,
-  config          : &SkgConfig,
-  tantivy_index   : &TantivyIndex
-) -> Result<SaveResponse, Box<dyn Error>> {
-  let (orgnode_forest, save_instructions, mergeInstructions)
-    : ( Tree<OrgNode>,
-        Vec<SaveInstruction>,
-        Vec<MergeInstructionTriple> )
-    = buffer_to_orgnode_forest_and_save_instructions (
-      org_buffer_text, config, typedb_driver )
-    . await . map_err (
-      |e| Box::new(e) as Box<dyn Error> ) ?;
-  if orgnode_forest.root().children().next().is_none() { return Err (
-    "Nothing to save found in org_buffer_text" . into( )); }
-
-  { // update the graph
-    update_graph_minus_merges (
-      save_instructions.clone(),
-      config.clone(),
-      tantivy_index,
-      typedb_driver ) . await ?;
-    merge_nodes (
-      mergeInstructions,
-      config.clone(),
-      tantivy_index,
-      typedb_driver ) . await ?; }
-
-  { // update the view and return it to the client
-    let mut errors : Vec < String > = Vec::new ();
     // Build map from save instructions
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
@@ -316,5 +189,5 @@ pub async fn update_from_and_rerender_buffer_v2 (
         config,
         typedb_driver ). await ?; }
     let buffer_content : String =
-      orgnode_forest_to_string_v2 ( & forest ) ?;
+      orgnode_forest_to_string ( & forest ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}
