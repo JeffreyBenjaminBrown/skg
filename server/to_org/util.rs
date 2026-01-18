@@ -115,6 +115,19 @@ pub(super) fn makeIndefinitiveAndClobber (
     t . body = None; } ) ?;
   Ok (( )) }
 
+/// V2: Set 'indefinitive' to true and set body to None in Tree<OrgNode>.
+pub(super) fn makeIndefinitiveAndClobber_v2 (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result < (), Box<dyn Error> > {
+  write_at_node_in_tree ( tree, node_id, |orgnode| {
+    let OrgNodeKind::True ( t ) = &mut orgnode.kind
+      else { panic! ( "makeIndefinitiveAndClobber_v2: expected TrueNode" ) };
+    t . indefinitive = true;
+    t . body = None; } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok (( )) }
+
 /// This function's callers add a pristine, out-of-context
 /// (skgnode, orgnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
@@ -390,6 +403,30 @@ pub async fn make_and_append_child_pair (
         . id () )) ?;
   Ok ( child_treeid ) }
 
+/// V2: Build a node from disk and append it to Tree<OrgNode> + SkgNodeMap.
+/// Returns the new node's ego_tree::NodeId.
+pub async fn make_and_append_child_pair_v2 (
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut crate::types::skgnode::SkgNodeMap,
+  parent_treeid : NodeId,
+  child_skgid   : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+    skgnode_and_orgnode_from_id (
+      config, driver, child_skgid ) . await ?;
+  // Add SkgNode to map
+  map . insert ( child_skgid . clone (), child_skgnode );
+  // Add OrgNode to tree
+  let child_treeid : NodeId =
+    with_node_mut (
+      tree, parent_treeid,
+      ( |mut parent_mut|
+        parent_mut . append ( child_orgnode ) . id () ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok ( child_treeid ) }
+
 /// Builds a pair from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
 /// and return the root of the new branch, but in its tree context:
@@ -562,6 +599,24 @@ pub(super) fn nodes_after_in_generation (
       found_target = true; } }
   Ok ( result ) }
 
+/// V2: Collect NodeIds after some member of a generation in Tree<OrgNode>.
+pub(super) fn nodes_after_in_generation_v2 (
+  tree                     : &Tree<OrgNode>,
+  generation               : usize,
+  generation_member_treeid : NodeId,
+  effective_root           : Option < NodeId >,
+) -> Result < Vec < NodeId >, Box<dyn Error> > {
+  let treeids_in_gen : Vec < NodeId > =
+    collect_generation_ids ( tree, generation, effective_root ) ?;
+  let mut result : Vec < NodeId > = Vec::new ();
+  let mut found_target : bool = false;
+  for treeid in treeids_in_gen {
+    if found_target {
+      result . push ( treeid );
+    } else if treeid == generation_member_treeid {
+      found_target = true; } }
+  Ok ( result ) }
+
 
 // ==============================================
 // Reading from SkgNodes and OrgNodes, esp. in trees
@@ -623,19 +678,21 @@ pub fn collect_child_treeids_in_orgtree (
 /// Log any error and remove the request from the node.
 /// Does *not* verify that the request was completed;
 /// that's just the only situation in which it would be used.
-pub(super) fn remove_completed_view_request (
-  tree         : &mut PairTree,
+pub(super) fn remove_completed_view_request<T> (
+  tree         : &mut ego_tree::Tree<T>,
   node_id      : NodeId,
   view_request : ViewRequest,
   error_msg    : &str,
   errors       : &mut Vec < String >,
   result       : Result < (), Box<dyn Error> >,
-) -> Result < (), Box<dyn Error> > {
+) -> Result < (), Box<dyn Error> >
+where T: AsMut<OrgNode>,
+{
   if let Err ( e ) = result {
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut = tree . get_mut ( node_id )
     . ok_or ( "remove_completed_view_request: node not found" ) ?;
   if let OrgNodeKind::True ( t )
-  = &mut node_mut . value () . orgnode . kind
+  = &mut node_mut . value () . as_mut () . kind
   { t . view_requests . remove ( &view_request ); }
   Ok (()) }

@@ -1,8 +1,14 @@
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
-use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
+use crate::to_org::render::truncate_after_node_in_gen::{
+  add_last_generation_and_truncate_some_of_previous,
+  add_last_generation_and_truncate_some_of_previous_v2};
+use crate::to_org::expand::aliases::{
+  build_and_integrate_aliases_view_then_drop_request,
+  build_and_integrate_aliases_view_then_drop_request_v2};
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
-  build_and_integrate_sourceward_view_then_drop_request };
+  build_and_integrate_containerward_view_then_drop_request_v2,
+  build_and_integrate_sourceward_view_then_drop_request,
+  build_and_integrate_sourceward_view_then_drop_request_v2};
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::to_org::complete::contents::{ensure_source, ensure_source_v2};
 use crate::to_org::complete::sharing::{
@@ -364,9 +370,11 @@ async fn extendDefinitiveSubtreeFromLeaf_v2 (
   let mut generation : usize = 1;
   while ! gen_with_children . is_empty () {
     if nodes_rendered + gen_with_children . len () >= limit {
-      // Limit hit - need v2 version of add_last_generation_and_truncate_some_of_previous
-      // For now, just truncate simply by not adding more nodes
-      // TODO: Implement proper truncation with v2 version
+      // Limit hit - add final generation as indefinitive and truncate
+      let space_left : usize = limit - nodes_rendered;
+      add_last_generation_and_truncate_some_of_previous_v2 (
+        tree, map, generation, &gen_with_children,
+        space_left, effective_root, visited, config, driver ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
@@ -513,33 +521,18 @@ pub async fn execute_view_requests_v2 (
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
-      ViewRequest::Aliases | ViewRequest::Containerward | ViewRequest::Sourceward => {
-        // Temporary conversion until these modules are refactored
-        let mut pairtree : PairTree =
-          crate::types::tree::orgnode_skgnode::pairtree_from_tree_and_map (
-            forest, map );
-        match request {
-          ViewRequest::Aliases => {
-            build_and_integrate_aliases_view_then_drop_request (
-              &mut pairtree, node_id, config, typedb_driver, errors )
-              . await ?; },
-          ViewRequest::Containerward => {
-            build_and_integrate_containerward_view_then_drop_request (
-              &mut pairtree, node_id, config, typedb_driver, errors )
-              . await ?; },
-          ViewRequest::Sourceward => {
-            build_and_integrate_sourceward_view_then_drop_request (
-              &mut pairtree, node_id, config, typedb_driver, errors )
-              . await ?; },
-          _ => unreachable!(),
-        }
-        // Convert back
-        let (new_tree, new_map) =
-          crate::types::tree::orgnode_skgnode::tree_and_map_from_pairtree (
-            &pairtree );
-        *forest = new_tree;
-        *map = new_map;
-      },
+      ViewRequest::Aliases => {
+        build_and_integrate_aliases_view_then_drop_request_v2 (
+          forest, map, node_id, config, typedb_driver, errors )
+          . await ?; },
+      ViewRequest::Containerward => {
+        build_and_integrate_containerward_view_then_drop_request_v2 (
+          forest, map, node_id, config, typedb_driver, errors )
+          . await ?; },
+      ViewRequest::Sourceward => {
+        build_and_integrate_sourceward_view_then_drop_request_v2 (
+          forest, map, node_id, config, typedb_driver, errors )
+          . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request_v2 (
           forest, map, node_id, config, typedb_driver,

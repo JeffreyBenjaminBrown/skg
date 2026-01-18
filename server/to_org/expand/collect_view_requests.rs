@@ -56,3 +56,11 @@ impl AsRef<OrgNode> for NodePair {
 impl AsRef<OrgNode> for OrgNode {
   fn as_ref(&self) -> &OrgNode {
     self }}
+
+impl AsMut<OrgNode> for NodePair {
+  fn as_mut(&mut self) -> &mut OrgNode {
+    &mut self.orgnode }}
+
+impl AsMut<OrgNode> for OrgNode {
+  fn as_mut(&mut self) -> &mut OrgNode {
+    self }}

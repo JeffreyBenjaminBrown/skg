@@ -8,7 +8,7 @@
 ///   maybe even all of it, might already be there.
 
 use crate::to_org::util::{
-  get_pid_in_pairtree, skgnode_and_orgnode_from_id,
+  get_pid_in_pairtree, get_pid_in_tree, skgnode_and_orgnode_from_id,
   remove_completed_view_request};
 use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
@@ -17,10 +17,13 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
+use crate::types::skgnode::SkgNodeMap;
 use crate::types::tree::{PairTree, NodePair};
 use crate::types::tree::orgnode_skgnode::{
-  find_child_by_id, find_children_by_ids};
+  find_child_by_id, find_child_by_id_in_orgtree,
+  find_children_by_ids, find_children_by_ids_in_orgtree};
 
+use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
@@ -35,6 +38,22 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result = build_and_integrate_containerward_path (
+    tree, node_id, config, typedb_driver ) . await;
+  remove_completed_view_request (
+    tree, node_id,
+    ViewRequest::Containerward,
+    "Failed to integrate containerward path",
+    errors, result ) }
+
+pub async fn build_and_integrate_containerward_view_then_drop_request_v2 (
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  let result = build_and_integrate_containerward_path_v2 (
     tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
@@ -63,6 +82,24 @@ pub async fn build_and_integrate_containerward_path (
     tree, node_id, path, branches, cycle_node, config, driver
   ). await }
 
+pub async fn build_and_integrate_containerward_path_v2 (
+  tree      : &mut Tree<OrgNode>,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let terminus_pid : ID =
+    get_pid_in_tree ( tree, node_id ) ?;
+  let ( path, cycle_node, branches )
+    : ( Vec < ID >, Option < ID >, HashSet < ID > )
+    = path_containerward_to_end_cycle_and_or_branches (
+      & config . db_name,
+      driver,
+      & terminus_pid ) . await ?;
+  integrate_path_that_might_fork_or_cycle_v2 (
+    tree, node_id, path, branches, cycle_node, config, driver
+  ). await }
+
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut PairTree,
   node_id       : ego_tree::NodeId,
@@ -71,6 +108,22 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result = build_and_integrate_sourceward_path (
+    tree, node_id, config, typedb_driver ) . await;
+  remove_completed_view_request (
+    tree, node_id,
+    ViewRequest::Sourceward,
+    "Failed to integrate sourceward path",
+    errors, result ) }
+
+pub async fn build_and_integrate_sourceward_view_then_drop_request_v2 (
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
+  node_id       : ego_tree::NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+) -> Result < (), Box<dyn Error> > {
+  let result = build_and_integrate_sourceward_path_v2 (
     tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
@@ -98,6 +151,24 @@ pub async fn build_and_integrate_sourceward_path (
       driver,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
+    tree, node_id, path, branches, cycle_node, config, driver
+  ). await }
+
+pub async fn build_and_integrate_sourceward_path_v2 (
+  tree      : &mut Tree<OrgNode>,
+  node_id   : ego_tree::NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let terminus_pid : ID =
+    get_pid_in_tree ( tree, node_id ) ?;
+  let ( path, cycle_node, branches )
+    : ( Vec < ID >, Option < ID >, HashSet < ID > )
+    = path_sourceward_to_end_cycle_and_or_branches (
+      & config . db_name,
+      driver,
+      & terminus_pid ) . await ?;
+  integrate_path_that_might_fork_or_cycle_v2 (
     tree, node_id, path, branches, cycle_node, config, driver
   ). await }
 
@@ -135,6 +206,36 @@ pub async fn integrate_path_that_might_fork_or_cycle (
       tree, last_node_id, cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
+async fn integrate_path_that_might_fork_or_cycle_v2 (
+  tree        : &mut Tree<OrgNode>,
+  node_id     : ego_tree::NodeId,
+  mut path    : Vec < ID >,
+  branches    : HashSet < ID >,
+  cycle_node  : Option < ID >,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let terminus_pid : ID =
+    get_pid_in_tree ( tree, node_id ) ?;
+  if ! path . is_empty () {
+    if path[0] != terminus_pid {
+      return Err (
+        format! (
+          "Path head {:?} does not match terminus {:?}",
+          path[0], terminus_pid
+        ) . into () ); }
+    path . remove ( 0 ); }
+  let last_node_id : ego_tree::NodeId =
+    integrate_linear_portion_of_path_v2 (
+      tree, node_id, &path, config, driver ) . await ?;
+  if ! branches . is_empty () {
+    integrate_branches_in_node_v2 (
+      tree, last_node_id, branches, config, driver ) . await ?;
+  } else if let Some ( cycle_id ) = cycle_node {
+    integrate_cycle_in_node_v2 (
+      tree, last_node_id, cycle_id, config, driver ) . await ?; }
+  Ok (( )) }
+
 /// Recursively integrate the remaining path into the tree.
 /// Operates on a specific node and the remaining path.
 /// Returns the NodeId of the last node in the path.
@@ -164,6 +265,32 @@ fn integrate_linear_portion_of_path<'a> (
       config,
       driver ) . await } ) }
 
+fn integrate_linear_portion_of_path_v2<'a> (
+  tree       : &'a mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  path       : &'a [ID],
+  config     : &'a SkgConfig,
+  driver     : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<Output = Result<ego_tree::NodeId,
+                                        Box<dyn Error>>> + 'a>> {
+  Box::pin(async move {
+    if path . is_empty () {
+      return Ok ( node_id ); }
+    let path_head : &ID = &path[0];
+    let path_tail : &[ID] = &path[1..];
+    let next_node_id : ego_tree::NodeId =
+      match find_child_by_id_in_orgtree ( tree, node_id, path_head ) {
+        Some ( child_treeid ) => child_treeid,
+        None => {
+          prepend_indefinitive_child_with_parent_ignores_v2 (
+            tree, node_id, path_head, config, driver ) . await ? } };
+    integrate_linear_portion_of_path_v2 (
+      tree,
+      next_node_id,
+      path_tail,
+      config,
+      driver ) . await } ) }
+
 /// Add branch nodes as children of the specified node.
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
@@ -189,6 +316,27 @@ async fn integrate_branches_in_node (
       tree, node_id, &branch_id, config, driver ) . await ?; }
   Ok (( )) }
 
+async fn integrate_branches_in_node_v2 (
+  tree       : &mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  branches   : HashSet < ID >,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let found_children : HashMap < ID, ego_tree::NodeId > =
+    find_children_by_ids_in_orgtree ( tree, node_id, &branches );
+  let mut branches_to_add : Vec < ID > =
+    branches . into_iter ()
+    . filter ( | b |
+                 ! found_children . contains_key ( b ) )
+    . collect ();
+  { branches_to_add . sort ();
+    branches_to_add . reverse (); }
+  for branch_id in branches_to_add {
+    prepend_indefinitive_child_with_parent_ignores_v2 (
+      tree, node_id, &branch_id, config, driver ) . await ?; }
+  Ok (( )) }
+
 /// Add a cycle node as a child of the specified node.
 /// The cycle node is only added if it's not already a child.
 async fn integrate_cycle_in_node (
@@ -200,6 +348,18 @@ async fn integrate_cycle_in_node (
 ) -> Result < (), Box<dyn Error> > {
   if find_child_by_id ( tree, node_id, &cycle_id ) . is_none () {
     prepend_indefinitive_child_with_parent_ignores (
+      tree, node_id, &cycle_id, config, driver ) . await ?; }
+  Ok (( )) }
+
+async fn integrate_cycle_in_node_v2 (
+  tree       : &mut Tree<OrgNode>,
+  node_id    : ego_tree::NodeId,
+  cycle_id   : ID,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  if find_child_by_id_in_orgtree ( tree, node_id, &cycle_id ) . is_none () {
+    prepend_indefinitive_child_with_parent_ignores_v2 (
       tree, node_id, &cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
@@ -232,4 +392,30 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( NodePair { mskgnode : None,
                            orgnode  : orgnode } ) . id ();
+  Ok ( new_child_treeid ) }
+
+async fn prepend_indefinitive_child_with_parent_ignores_v2 (
+  tree           : &mut Tree<OrgNode>,
+  parent_treeid  : ego_tree::NodeId,
+  child_skgid    : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result < ego_tree::NodeId, Box<dyn Error> > {
+  let ( _, child_orgnode ) : ( _, OrgNode ) =
+    skgnode_and_orgnode_from_id (
+      config, driver, child_skgid
+    ). await ?;
+  let (id, source, title) : (ID, String, String)
+  = match &child_orgnode.kind
+  { OrgNodeKind::True(t) => (
+      t . id_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores_v2: node has no ID")? . clone(),
+      t . source_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores_v2: node has no source")? . clone(),
+      t . title . clone() ),
+    OrgNodeKind::Scaff(_) =>
+      return Err("prepend_indefinitive_child_with_parent_ignores_v2: expected TrueNode".into()) };
+  let orgnode = mk_indefinitive_orgnode (
+    id, source, title, true );
+  let new_child_treeid : ego_tree::NodeId =
+    tree . get_mut ( parent_treeid ) . unwrap ()
+    . prepend ( orgnode ) . id ();
   Ok ( new_child_treeid ) }

@@ -481,6 +481,32 @@ pub fn find_children_by_ids (
           result.insert(child_id.clone(), child.id()); }}}}
   result }
 
+/// V2: Find a child node by ID in Tree<OrgNode>.
+pub fn find_child_by_id_in_orgtree (
+  tree          : & Tree<OrgNode>,
+  parent_treeid : ego_tree::NodeId,
+  target_skgid  : & ID,
+) -> Option < ego_tree::NodeId > {
+  let singleton : HashSet<ID> =
+    std::iter::once( target_skgid.clone() )
+    . collect();
+  find_children_by_ids_in_orgtree( tree, parent_treeid, &singleton)
+    . remove(target_skgid) }
+
+/// V2: Find child nodes by their IDs in Tree<OrgNode>.
+pub fn find_children_by_ids_in_orgtree (
+  tree          : & Tree<OrgNode>,
+  parent_treeid : ego_tree::NodeId,
+  target_skgids : & HashSet < ID >,
+) -> HashMap < ID, ego_tree::NodeId > {
+  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
+  for child in tree.get(parent_treeid).unwrap().children() {
+    if let OrgNodeKind::True(t) = &child.value().kind {
+      if let Some(child_id) = &t.id_opt {
+        if target_skgids.contains(child_id) {
+          result.insert(child_id.clone(), child.id()); }}}}
+  result }
+
 /// Reorder children of a parent node.
 /// Takes two vectors of NodeIds: first and second.
 /// All children in 'first' will be placed before all children in 'second'.
