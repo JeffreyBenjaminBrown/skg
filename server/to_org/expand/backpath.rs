@@ -18,10 +18,8 @@ use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
 use crate::types::skgnode::SkgNodeMap;
-use crate::types::tree::{PairTree, NodePair};
 use crate::types::tree::orgnode_skgnode::{
-  find_child_by_id, find_child_by_id_in_orgtree,
-  find_children_by_ids, find_children_by_ids_in_orgtree};
+  find_child_by_id, find_children_by_ids};
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
@@ -128,13 +126,13 @@ pub async fn integrate_path_that_might_fork_or_cycle (
         ) . into () ); }
     path . remove ( 0 ); }
   let last_node_id : ego_tree::NodeId =
-    integrate_linear_portion_of_path_v2 (
+    integrate_linear_portion_of_path (
       tree, node_id, &path, config, driver ) . await ?;
   if ! branches . is_empty () {
-    integrate_branches_in_node_v2 (
+    integrate_branches_in_node (
       tree, last_node_id, branches, config, driver ) . await ?;
   } else if let Some ( cycle_id ) = cycle_node {
-    integrate_cycle_in_node_v2 (
+    integrate_cycle_in_node (
       tree, last_node_id, cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
@@ -142,7 +140,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
 /// Operates on a specific node and the remaining path.
 /// Returns the NodeId of the last node in the path.
 fn integrate_linear_portion_of_path<'a> (
-  tree       : &'a mut PairTree,
+  tree       : &'a mut Tree<OrgNode>,
   node_id    : ego_tree::NodeId,
   path       : &'a [ID],
   config     : &'a SkgConfig,
@@ -160,33 +158,7 @@ fn integrate_linear_portion_of_path<'a> (
         None => {
           prepend_indefinitive_child_with_parent_ignores (
             tree, node_id, path_head, config, driver ) . await ? } };
-    integrate_linear_portion_of_path ( // recurse
-      tree,
-      next_node_id, // we just found or inserted this
-      path_tail,
-      config,
-      driver ) . await } ) }
-
-fn integrate_linear_portion_of_path_v2<'a> (
-  tree       : &'a mut Tree<OrgNode>,
-  node_id    : ego_tree::NodeId,
-  path       : &'a [ID],
-  config     : &'a SkgConfig,
-  driver     : &'a TypeDBDriver,
-) -> Pin<Box<dyn Future<Output = Result<ego_tree::NodeId,
-                                        Box<dyn Error>>> + 'a>> {
-  Box::pin(async move {
-    if path . is_empty () {
-      return Ok ( node_id ); }
-    let path_head : &ID = &path[0];
-    let path_tail : &[ID] = &path[1..];
-    let next_node_id : ego_tree::NodeId =
-      match find_child_by_id_in_orgtree ( tree, node_id, path_head ) {
-        Some ( child_treeid ) => child_treeid,
-        None => {
-          prepend_indefinitive_child_with_parent_ignores_v2 (
-            tree, node_id, path_head, config, driver ) . await ? } };
-    integrate_linear_portion_of_path_v2 (
+    integrate_linear_portion_of_path (
       tree,
       next_node_id,
       path_tail,
@@ -197,7 +169,7 @@ fn integrate_linear_portion_of_path_v2<'a> (
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
 async fn integrate_branches_in_node (
-  tree       : &mut PairTree,
+  tree       : &mut Tree<OrgNode>,
   node_id    : ego_tree::NodeId,
   branches   : HashSet < ID >,
   config     : &SkgConfig,
@@ -210,39 +182,17 @@ async fn integrate_branches_in_node (
     . filter ( | b |
                  ! found_children . contains_key ( b ) )
     . collect ();
-  { // TODO : This should not be necessary. It must be for testing?
-    branches_to_add . sort ();
+  { branches_to_add . sort ();
     branches_to_add . reverse (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
       tree, node_id, &branch_id, config, driver ) . await ?; }
   Ok (( )) }
 
-async fn integrate_branches_in_node_v2 (
-  tree       : &mut Tree<OrgNode>,
-  node_id    : ego_tree::NodeId,
-  branches   : HashSet < ID >,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let found_children : HashMap < ID, ego_tree::NodeId > =
-    find_children_by_ids_in_orgtree ( tree, node_id, &branches );
-  let mut branches_to_add : Vec < ID > =
-    branches . into_iter ()
-    . filter ( | b |
-                 ! found_children . contains_key ( b ) )
-    . collect ();
-  { branches_to_add . sort ();
-    branches_to_add . reverse (); }
-  for branch_id in branches_to_add {
-    prepend_indefinitive_child_with_parent_ignores_v2 (
-      tree, node_id, &branch_id, config, driver ) . await ?; }
-  Ok (( )) }
-
 /// Add a cycle node as a child of the specified node.
 /// The cycle node is only added if it's not already a child.
 async fn integrate_cycle_in_node (
-  tree       : &mut PairTree,
+  tree       : &mut Tree<OrgNode>,
   node_id    : ego_tree::NodeId,
   cycle_id   : ID,
   config     : &SkgConfig,
@@ -253,24 +203,12 @@ async fn integrate_cycle_in_node (
       tree, node_id, &cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
-async fn integrate_cycle_in_node_v2 (
-  tree       : &mut Tree<OrgNode>,
-  node_id    : ego_tree::NodeId,
-  cycle_id   : ID,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  if find_child_by_id_in_orgtree ( tree, node_id, &cycle_id ) . is_none () {
-    prepend_indefinitive_child_with_parent_ignores_v2 (
-      tree, node_id, &cycle_id, config, driver ) . await ?; }
-  Ok (( )) }
-
 /// Helper function to prepend a new child to a node in a tree.
 /// The new child has treatment=ParentIgnores and indefinitive=true.
 /// TODO: This procedure could later be improved to
 /// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
-  tree           : &mut PairTree,
+  tree           : &mut Tree<OrgNode>,
   parent_treeid  : ego_tree::NodeId,
   child_skgid    : &ID,
   config         : &SkgConfig,
@@ -288,33 +226,6 @@ async fn prepend_indefinitive_child_with_parent_ignores (
       t . title . clone() ),
     OrgNodeKind::Scaff(_) =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
-  let orgnode = mk_indefinitive_orgnode (
-    id, source, title, true );
-  let new_child_treeid : ego_tree::NodeId =
-    tree . get_mut ( parent_treeid ) . unwrap ()
-    . prepend ( NodePair { mskgnode : None,
-                           orgnode  : orgnode } ) . id ();
-  Ok ( new_child_treeid ) }
-
-async fn prepend_indefinitive_child_with_parent_ignores_v2 (
-  tree           : &mut Tree<OrgNode>,
-  parent_treeid  : ego_tree::NodeId,
-  child_skgid    : &ID,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-) -> Result < ego_tree::NodeId, Box<dyn Error> > {
-  let ( _, child_orgnode ) : ( _, OrgNode ) =
-    skgnode_and_orgnode_from_id (
-      config, driver, child_skgid
-    ). await ?;
-  let (id, source, title) : (ID, String, String)
-  = match &child_orgnode.kind
-  { OrgNodeKind::True(t) => (
-      t . id_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores_v2: node has no ID")? . clone(),
-      t . source_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores_v2: node has no source")? . clone(),
-      t . title . clone() ),
-    OrgNodeKind::Scaff(_) =>
-      return Err("prepend_indefinitive_child_with_parent_ignores_v2: expected TrueNode".into()) };
   let orgnode = mk_indefinitive_orgnode (
     id, source, title, true );
   let new_child_treeid : ego_tree::NodeId =

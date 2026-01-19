@@ -6,9 +6,10 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  append_indefinitive_from_disk_as_child_in_orgtree,
-  insert_scaffold_as_child_in_orgtree,
-  pids_for_subscriber_and_its_subscribees_in_orgtree,
+  append_indefinitive_from_disk_as_child,
+  insert_scaffold_as_child,
+  pids_for_subscriber_and_its_subscribees,
+  pid_for_subscribee_and_its_subscriber_grandparent,
   unique_orgnode_scaffold_child };
 use crate::types::skgnode::SkgNodeMap;
 
@@ -64,7 +65,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    pids_for_subscriber_and_its_subscribees_in_orgtree ( tree, map, node_id ) ?;
+    pids_for_subscriber_and_its_subscribees ( tree, map, node_id ) ?;
   if subscribee_ids . is_empty () { // Skip because it would be empty.
     return Ok (( )); }
 
@@ -81,22 +82,22 @@ pub async fn maybe_add_subscribeeCol_branch (
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId =
-    insert_scaffold_as_child_in_orgtree ( tree, node_id,
+    insert_scaffold_as_child ( tree, node_id,
       Scaffold::SubscribeeCol, true ) ?;
 
   { // mutate the tree
     if ! hidden_outside_content . is_empty () {
       let hidden_outside_col_nid : NodeId =
-        insert_scaffold_as_child_in_orgtree (
+        insert_scaffold_as_child (
           tree, subscribee_col_nid,
           Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
       for hidden_id in hidden_outside_content {
-        append_indefinitive_from_disk_as_child_in_orgtree (
+        append_indefinitive_from_disk_as_child (
           tree, map, hidden_outside_col_nid, & hidden_id,
           false, config, driver
         ). await ?; }}
     for subscribee_id in subscribee_ids {
-      append_indefinitive_from_disk_as_child_in_orgtree (
+      append_indefinitive_from_disk_as_child (
         tree, map, subscribee_col_nid, & subscribee_id,
         false, config, driver
       ). await ?; }}
@@ -122,7 +123,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
-    crate::types::tree::orgnode_skgnode::pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
+    pid_for_subscribee_and_its_subscriber_grandparent (
       tree, map, subscribee_treeid ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
@@ -132,12 +133,12 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   if hidden_in_content . is_empty () {
     return Ok (( )); }
   let hidden_col_nid : NodeId =
-    crate::types::tree::orgnode_skgnode::insert_scaffold_as_child_in_orgtree (
+    insert_scaffold_as_child (
       tree, subscribee_treeid,
       Scaffold::HiddenInSubscribeeCol, true ) ?;
   for hidden_id in hidden_in_content {
     // populate the collection
-    crate::types::tree::orgnode_skgnode::append_indefinitive_from_disk_as_child_in_orgtree (
+    append_indefinitive_from_disk_as_child (
       tree, map, hidden_col_nid, & hidden_id,
       false, config, driver ). await ?; }
   Ok (( )) }

@@ -114,7 +114,7 @@ pub fn unique_scaffold_child (
   node_id       : NodeId,
   scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : ego_tree::NodeRef<super::NodePair> =
+  let node_ref : NodeRef<super::NodePair> =
     tree.get(node_id)
     .ok_or("unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
@@ -140,7 +140,7 @@ pub fn unique_orgnode_scaffold_child (
   node_id       : NodeId,
   scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : ego_tree::NodeRef<OrgNode> =
+  let node_ref : NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
       "unique_orgnode_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
@@ -159,24 +159,8 @@ pub fn unique_orgnode_scaffold_child (
 
 /// Extract PIDs for the subscriber and its subscribees.
 /// Returns an error if the node has no SkgNode.
-pub fn pids_for_subscriber_and_its_subscribees (
-  tree    : &PairTree,
-  node_id : NodeId,
-) -> Result < ( ID, Vec < ID > ),
-              Box<dyn Error> > {
-  read_at_node_in_tree (
-    tree, node_id,
-    |np| np . mskgnode . as_ref ()
-      . map ( |skgnode|
-              ( skgnode . ids [0] . clone (),
-                skgnode . subscribes_to . clone ()
-                . unwrap_or_default () ))
-  )? . ok_or_else (
-    || "pids_for_subscriber_and_its_subscribees: SkgNode should exist"
-    . into () ) }
-
 /// Extract PIDs for subscriber and subscribees from Tree<OrgNode> + SkgNodeMap.
-pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
+pub fn pids_for_subscriber_and_its_subscribees (
   tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
@@ -188,16 +172,16 @@ pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
       tree, node_id,
       |orgnode| match &orgnode.kind {
         OrgNodeKind::True(t) => t . id_opt . clone()
-          . ok_or("pids_for_subscriber_and_its_subscribees_in_orgtree: node has no ID"),
+          . ok_or("pids_for_subscriber_and_its_subscribees: node has no ID"),
         OrgNodeKind::Scaff(_) => Err (
-          "pids_for_subscriber_and_its_subscribees_in_orgtree: expected TrueNode" ),
+          "pids_for_subscriber_and_its_subscribees: expected TrueNode" ),
       } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
 
   // Look up SkgNode in map
   let skgnode : &SkgNode =
     map . get ( &pid )
-    . ok_or ( "pids_for_subscriber_and_its_subscribees_in_orgtree: SkgNode should exist in map" ) ?;
+    . ok_or ( "pids_for_subscriber_and_its_subscribees: SkgNode should exist in map" ) ?;
 
   Ok (( skgnode . ids [0] . clone (),
         skgnode . subscribes_to . clone ()
@@ -205,44 +189,15 @@ pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
+/// V2: Tree<OrgNode> + SkgNodeMap version.
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
-  tree    : &PairTree,
-  node_id : NodeId,
-) -> Result < ( ID, ID ), Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
-    tree . get ( node_id ) . ok_or (
-      "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
-  let subscribee_pid : ID =
-    match &node_ref . value () .orgnode . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . clone () . expect (
-        "Subscribee should have an ID." ),
-      OrgNodeKind::Scaff ( _ ) => return Err (
-        "Subscribee is not a true node." . into() ) };
-  let parent_ref : NodeRef < NodePair > =
-    node_ref . parent ()
-    . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
-  if ! matches! ( &parent_ref . value () . orgnode . kind,
-                  OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )) {
-    return Err ( "Subscribee's parent is not a SubscribeeCol" .
-                 into () ); }
-  let grandparent_ref : NodeRef < NodePair > =
-    parent_ref . parent ()
-    . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
-  let skgnode : &SkgNode =
-    grandparent_ref . value () . mskgnode . as_ref ()
-    . ok_or ( "Subscriber has no SkgNode" ) ?;
-  Ok (( subscribee_pid,
-        skgnode . ids[0] . clone() )) }
-
-/// V2: Tree<OrgNode> + SkgNodeMap version of pid_for_subscribee_and_its_subscriber_grandparent.
-pub fn pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
   tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
   let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id ) . ok_or (
-      "pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree: node not found" ) ?;
+      "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let subscribee_pid : ID =
     match &node_ref . value () . kind {
       OrgNodeKind::True ( t ) => t . id_opt . clone () . expect (
@@ -271,25 +226,8 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
   Ok (( subscribee_pid,
         skgnode . ids[0] . clone() )) }
 
-pub fn insert_scaffold_as_child (
-  tree          : &mut PairTree,
-  parent_id     : NodeId,
-  scaffold_kind : Scaffold,
-  prepend       : bool, // otherwise, append
-) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode : OrgNode =
-    orgnode_from_scaffold ( scaffold_kind );
-  let col_id : NodeId = with_node_mut (
-    tree, parent_id,
-    |mut parent_mut| {
-      let pair = NodePair { mskgnode : None,
-                            orgnode  : orgnode };
-      if prepend { parent_mut . prepend ( pair ) . id () }
-      else       { parent_mut . append  ( pair ) . id () } } ) ?;
-  Ok ( col_id ) }
-
 /// Insert a scaffold node as a child in Tree<OrgNode>.
-pub fn insert_scaffold_as_child_in_orgtree (
+pub fn insert_scaffold_as_child (
   tree          : &mut Tree<OrgNode>,
   parent_id     : NodeId,
   scaffold_kind : Scaffold,
@@ -305,9 +243,11 @@ pub fn insert_scaffold_as_child_in_orgtree (
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok ( col_id ) }
 
-/// Fetch a node from disk and append it as an indefinitive child.
+/// Fetch a node from disk and append it as an indefinitive child to Tree<OrgNode>.
+/// Also adds the SkgNode to the map.
 pub async fn append_indefinitive_from_disk_as_child (
-  tree           : &mut PairTree,
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
   parent_id      : NodeId,
   node_id        : &ID,
   parent_ignores : bool,
@@ -326,39 +266,6 @@ pub async fn append_indefinitive_from_disk_as_child (
         . clone(),
       t . title . clone( )),
     OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
-  let orgnode : OrgNode = mk_indefinitive_orgnode (
-    id, source, title, parent_ignores );
-  with_node_mut (
-    tree, parent_id,
-    |mut parent_mut| {
-      parent_mut . append (
-        NodePair { mskgnode : Some ( skgnode ),
-                   orgnode  : orgnode } ); } ) ?;
-  Ok (( )) }
-
-/// Fetch a node from disk and append it as an indefinitive child to Tree<OrgNode>.
-/// Also adds the SkgNode to the map.
-pub async fn append_indefinitive_from_disk_as_child_in_orgtree (
-  tree           : &mut Tree<OrgNode>,
-  map            : &mut SkgNodeMap,
-  parent_id      : NodeId,
-  node_id        : &ID,
-  parent_ignores : bool,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
-    skgnode_and_orgnode_from_id (
-      config, driver, node_id ) . await ?;
-  let (id, source, title) : (ID, String, String)
-  = match &content_orgnode.kind
-  { OrgNodeKind::True(t) => (
-      t . id_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child_in_orgtree: node has no ID")?
-        . clone(),
-      t . source_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child_in_orgtree: node has no source")?
-        . clone(),
-      t . title . clone( )),
-    OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child_in_orgtree: expected TrueNode".into()) };
 
   // Add SkgNode to map
   map . insert ( id.clone(), skgnode );
@@ -454,52 +361,27 @@ pub fn collect_grandchild_aliases_for_orgnode (
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
+/// Find a child node by ID in Tree<OrgNode>.
 pub fn find_child_by_id (
-  tree          : & PairTree,
-  parent_treeid : ego_tree::NodeId,
+  tree          : & Tree<OrgNode>,
+  parent_treeid : NodeId,
   target_skgid  : & ID,
-) -> Option < ego_tree::NodeId > {
+) -> Option < NodeId > {
   let singleton : HashSet<ID> =
     std::iter::once( target_skgid.clone() )
     . collect();
   find_children_by_ids( tree, parent_treeid, &singleton)
     . remove(target_skgid) }
 
-/// Find child nodes by their IDs.
+/// Find child nodes by their IDs in Tree<OrgNode>.
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_ids (
-  tree          : & PairTree,
-  parent_treeid : ego_tree::NodeId,
-  target_skgids : & HashSet < ID >,
-) -> HashMap < ID, ego_tree::NodeId > {
-  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
-  for child in tree.get(parent_treeid).unwrap().children() {
-    if let OrgNodeKind::True(t) = &child.value().orgnode.kind {
-      if let Some(child_id) = &t.id_opt {
-        if target_skgids.contains(child_id) {
-          result.insert(child_id.clone(), child.id()); }}}}
-  result }
-
-/// V2: Find a child node by ID in Tree<OrgNode>.
-pub fn find_child_by_id_in_orgtree (
   tree          : & Tree<OrgNode>,
-  parent_treeid : ego_tree::NodeId,
-  target_skgid  : & ID,
-) -> Option < ego_tree::NodeId > {
-  let singleton : HashSet<ID> =
-    std::iter::once( target_skgid.clone() )
-    . collect();
-  find_children_by_ids_in_orgtree( tree, parent_treeid, &singleton)
-    . remove(target_skgid) }
-
-/// V2: Find child nodes by their IDs in Tree<OrgNode>.
-pub fn find_children_by_ids_in_orgtree (
-  tree          : & Tree<OrgNode>,
-  parent_treeid : ego_tree::NodeId,
+  parent_treeid : NodeId,
   target_skgids : & HashSet < ID >,
-) -> HashMap < ID, ego_tree::NodeId > {
-  let mut result : HashMap < ID, ego_tree::NodeId > = HashMap::new();
+) -> HashMap < ID, NodeId > {
+  let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree.get(parent_treeid).unwrap().children() {
     if let OrgNodeKind::True(t) = &child.value().kind {
       if let Some(child_id) = &t.id_opt {

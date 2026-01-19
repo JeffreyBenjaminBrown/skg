@@ -4,7 +4,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, ViewRequest, Scaffold};
 use crate::types::skgnode::SkgNodeMap;
 use crate::types::tree::orgnode_skgnode::{
-  insert_scaffold_as_child_in_orgtree, unique_orgnode_scaffold_child};
+  insert_scaffold_as_child, unique_orgnode_scaffold_child};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -44,9 +44,9 @@ pub async fn build_and_integrate_aliases (
     fetch_aliases_from_file (
       config, driver, node_id_val ). await;
   let aliascol_id : ego_tree::NodeId =
-    insert_scaffold_as_child_in_orgtree ( tree, node_id,
+    insert_scaffold_as_child ( tree, node_id,
       Scaffold::AliasCol, true ) ?;
   for alias in & aliases {
-    insert_scaffold_as_child_in_orgtree ( tree, aliascol_id,
+    insert_scaffold_as_child ( tree, aliascol_id,
       Scaffold::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }

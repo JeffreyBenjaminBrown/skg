@@ -5,14 +5,17 @@
    refactor-ongoing/functions.org
 ** once it's not globally needed, restrict PairTree and NodePair
    via 'super' or, better even if isolated enough, local
-** ONGOING functions miscategorized as pairless
+** DONE use call graph
+   Hey Claude would it help if you could see a text representation of the call graph? I don't know if leafward or rootward functions are easier to convert, but either way you could see where they lie by looking at (for instance) tools/introspect/call-graph/output/main.org. You can regenerate those files with 'cargo run -p call-graph --bin call-graph-regen'. Maybe crossing that data with functions.org would give you a good sense of which is the easiest stuff left.
+   (To do that I think you might want to automate the merge of those two data sets -- write something that determines, for each as-yet-unconverted function in functions.org, the number of its descendents in the call graph that still need conversion, and how many of its ancestors do. But I don't know whether that information would actually be useful to you. So don't do that; just think about the idea and respond, please.)
+** DONE functions miscategorized as pairless
    But also note that,
    Under the headline 'new-functions-without-correspondences'
    in refactor-ongoing/functions.org,
    lots of '{name}_in_orgtree' functions correspond to '{name}' ones.
    That is, they are miscategorized -- they appear to be v2 versions
    to replace v1 versions.
-** ONGOING faster
+** DONE faster
    I feel like this is going slower than normal for you. Do you think there's any way you could organize the plans in refactor-ongoing/ to speed it up? Maybe think harder about plans before doing it? I don't know -- you tell me if something like that is possible. Otherwise continue.
 * two kinds of stats
 ** the idea
