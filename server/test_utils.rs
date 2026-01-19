@@ -20,7 +20,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database};
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher};
 
@@ -191,7 +191,7 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   // Delete TypeDB database
-  let databases = driver.databases();
+  let databases : &DatabaseManager = driver.databases();
   if databases.contains(db_name).await? {
     let database : Arc<Database> = databases.get(db_name).await?;
     database.delete().await?; }
