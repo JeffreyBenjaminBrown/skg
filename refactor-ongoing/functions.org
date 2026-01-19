@@ -110,7 +110,7 @@ pub async fn complete_branch_minus_content_in_orgtree (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>>
-*** complete_branch_minus_content
+*** DONE complete_branch_minus_content
 ** DONE collect_rels_to_children_from_generation_v2
 fn collect_rels_to_children_from_generation_v2 (
   forest       : &Tree<OrgNode>,

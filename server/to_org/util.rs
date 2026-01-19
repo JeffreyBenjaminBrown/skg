@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
-use crate::to_org::complete::contents::clobberIndefinitiveOrgnode_v2;
+use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
@@ -122,8 +122,9 @@ pub(super) fn makeIndefinitiveAndClobber (
 /// - handle repeats, cycles and the visited map
 /// - build a subscribee branch if needed
 
-/// V2: Tree<OrgNode> + SkgNodeMap version of complete_branch_minus_content.
-pub async fn complete_branch_minus_content_in_orgtree (
+/// Complete a branch (minus content descendants) in Tree<OrgNode> + SkgNodeMap.
+/// Handles repeats, cycles, visited map, and builds subscribee branch if needed.
+pub async fn complete_branch_minus_content (
   tree     : &mut Tree<OrgNode>,
   map      : &mut crate::types::skgnode::SkgNodeMap,
   node_id  : NodeId,
@@ -135,7 +136,7 @@ pub async fn complete_branch_minus_content_in_orgtree (
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
   if truenode_is_indefinitive ( tree, node_id )?
-  { clobberIndefinitiveOrgnode_v2 (
+  { clobberIndefinitiveOrgnode (
       tree, map, node_id ) ?; }
   maybe_add_subscribeeCol_branch (
     tree, map, node_id, config, driver ) . await ?;
@@ -368,7 +369,7 @@ pub async fn build_node_branch_minus_content (
           ( |mut parent_mut|
             parent_mut . append ( orgnode ) . id () ))
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-      complete_branch_minus_content_in_orgtree (
+      complete_branch_minus_content (
         tree, map, child_treeid, visited,
         config, driver ) . await ?;
       Ok ( (None, None, child_treeid) ) },
@@ -379,7 +380,7 @@ pub async fn build_node_branch_minus_content (
       let mut tree : Tree<OrgNode> =
         Tree::new ( orgnode );
       let root_treeid : NodeId = tree . root () . id ();
-      complete_branch_minus_content_in_orgtree (
+      complete_branch_minus_content (
         &mut tree, &mut map, root_treeid, visited,
         config, driver ) . await ?;
       Ok ( (Some(tree), Some(map), root_treeid) ) }, } }

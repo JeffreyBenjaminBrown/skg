@@ -88,7 +88,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
         tree, node_id, visited ) ?;
 
       { if truenode_is_indefinitive ( tree, node_id ) ? {
-          clobberIndefinitiveOrgnode_v2 (
+          clobberIndefinitiveOrgnode (
             tree, map, node_id ) ?;
         } else {
           // Definitive: use v2 version working directly with tree+map
@@ -99,36 +99,9 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
         ). await ?; }}
     Ok (( )) } ) }
 
-/// PURPOSE: Given an indefinitive node N:
-/// - Reset title.
-/// - Reset source.
-/// - Set body to None.
-///
-/// ASSUMES: The SkgNode at that tree node is accurate.
-/// ASSUMES: The input is indefinitive.
+/// Clobber an indefinitive OrgNode with data from the map.
+/// Resets title, source, and sets body to None.
 pub fn clobberIndefinitiveOrgnode (
-  tree    : &mut PairTree,
-  treeid : NodeId,
-) -> Result < (), Box<dyn Error> > {
-  write_at_node_in_tree ( tree, treeid, |pair| {
-    let (title, source) : (String, String) = {
-      let skgnode : &SkgNode =
-        pair . mskgnode . as_ref ()
-          . ok_or ("SkgNode should exist after fetch" . to_string() )?;
-      ( skgnode . title . clone (),
-        skgnode . source . clone () ) };
-    let OrgNodeKind::True ( t ) = &mut pair.orgnode.kind
-      else { return Err ( "clobberIndefinitiveOrgnode: expected TrueNode" . into () ) };
-    t . title = title;
-    t . source_opt = Some ( source );
-    t . body = None;
-    Ok::<(), String>(( ))
-  } )? // before the '?' it's a nested Result: R<R<(),String>,String>
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) }
-
-/// V2: clobber an indefinitive OrgNode with data from the map.
-/// Tree<OrgNode> + SkgNodeMap version.
-pub fn clobberIndefinitiveOrgnode_v2 (
   tree    : &mut Tree<OrgNode>,
   map     : &SkgNodeMap,
   treeid  : NodeId,
@@ -138,9 +111,9 @@ pub fn clobberIndefinitiveOrgnode_v2 (
     read_at_node_in_tree ( tree, treeid, |orgnode| {
       match &orgnode.kind {
         OrgNodeKind::True(t) => t . id_opt . clone()
-          . ok_or("clobberIndefinitiveOrgnode_v2: node has no ID"),
+          . ok_or("clobberIndefinitiveOrgnode: node has no ID"),
         OrgNodeKind::Scaff(_) => Err (
-          "clobberIndefinitiveOrgnode_v2: expected TrueNode" ),
+          "clobberIndefinitiveOrgnode: expected TrueNode" ),
       }
     } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
@@ -148,14 +121,14 @@ pub fn clobberIndefinitiveOrgnode_v2 (
   // Look up SkgNode in map
   let skgnode : &SkgNode =
     map . get ( &node_id )
-    . ok_or ( "clobberIndefinitiveOrgnode_v2: SkgNode should exist in map" ) ?;
+    . ok_or ( "clobberIndefinitiveOrgnode: SkgNode should exist in map" ) ?;
   let title : String = skgnode . title . clone();
   let source : String = skgnode . source . clone();
 
   // Update the OrgNode
   write_at_node_in_tree ( tree, treeid, |orgnode| {
     let OrgNodeKind::True ( t ) = &mut orgnode.kind
-      else { panic! ( "clobberIndefinitiveOrgnode_v2: expected TrueNode" ) };
+      else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
     t . source_opt = Some ( source );
     t . body = None;

@@ -7,7 +7,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::{
   maybe_add_hiddenInSubscribeeCol_branch,
-  type_and_parent_type_consistent_with_subscribee_in_orgtree };
+  type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::util::{
   build_node_branch_minus_content, get_pid_in_tree,
   DefinitiveMap,
@@ -102,7 +102,7 @@ async fn execute_definitive_view_request (
     &hidden_ids,
   ) . await ?;
   // If this is a subscribee with hidden content, add HiddenInSubscribeeCol
-  if type_and_parent_type_consistent_with_subscribee_in_orgtree (
+  if type_and_parent_type_consistent_with_subscribee (
     forest, node_id )?
   { maybe_add_hiddenInSubscribeeCol_branch (
       forest, map, node_id, config, typedb_driver
@@ -121,7 +121,7 @@ fn get_hidden_ids_if_subscribee (
   let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
-  if !type_and_parent_type_consistent_with_subscribee_in_orgtree (
+  if !type_and_parent_type_consistent_with_subscribee (
        tree, node_id )?
   { // PITFALL \ TODO: Maybe this should return an error rather than the empty set. The empty set says 'the subscriber hides none of its content', which is technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
     return Ok ( HashSet::new () ); }
