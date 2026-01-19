@@ -1,4 +1,4 @@
-/// Utilities for working with ego_tree::Tree<OrgNode>.
+/// Utilities for working with ego_tree::Tree<T>.
 
 pub mod orgnode_skgnode;
 pub mod generic;
