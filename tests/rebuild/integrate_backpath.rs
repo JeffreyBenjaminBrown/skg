@@ -3,10 +3,11 @@
 use indoc::indoc;
 use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::{compare_orgnode_portions_of_pairforest_and_orgnodeforest, run_with_test_db, orgnode_forest_to_paired};
+use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode};
-use skg::types::tree::PairTree;
+use skg::types::skgnodemap::SkgNodeMap;
+use skg::org_to_text::orgnode_forest_to_string;
 
 use ego_tree::Tree;
 use std::collections::HashSet;
@@ -36,13 +37,11 @@ async fn test_path_with_cycle_impl(
     *** (skg (node (id off-path))) off-path
   "};
 
-  let orgnode_trees: Tree<OrgNode> =
+  let mut forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?.0;
-  assert_eq!(orgnode_trees.root().children().count(), 1,
+  assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
-  let mut forest: PairTree =
-    orgnode_forest_to_paired(orgnode_trees);
   let tree_root_id =
     forest . root () . first_child () . unwrap () . id ();
   let root_id = tree_root_id;
@@ -58,8 +57,9 @@ async fn test_path_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, root_id, path, branches,
+    &mut forest, &mut map, root_id, path, branches,
     cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
@@ -74,9 +74,10 @@ async fn test_path_with_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
-      &forest, &expected_trees),
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  assert_eq!(
+    actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
   );
 
@@ -106,19 +107,16 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (node (id off-path))) off-path
   "};
 
-  let orgnode_trees: Tree<OrgNode> =
+  let mut forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?.0;
-  assert_eq!(orgnode_trees.root().children().count(), 1,
+  assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
-
-  let mut forest: PairTree =
-    orgnode_forest_to_paired(orgnode_trees);
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().orgnode.id_opt() {
+      if let Some(id) = node_ref.value().id_opt() {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -141,8 +139,9 @@ async fn test_path_with_branches_no_cycle_impl(
   let cycle_node = None;
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut forest, &mut map, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
@@ -159,9 +158,10 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
-      &forest, &expected_trees),
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  assert_eq!(
+    actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
   );
 
@@ -191,19 +191,16 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (node (id off-path))) off-path
   "};
 
-  let orgnode_trees: Tree<OrgNode> =
+  let mut forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input)?.0;
-  assert_eq!(orgnode_trees.root().children().count(), 1,
+  assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
-
-  let mut forest: PairTree =
-    orgnode_forest_to_paired(orgnode_trees);
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().orgnode.id_opt() {
+      if let Some(id) = node_ref.value().id_opt() {
         if id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break;
@@ -226,8 +223,9 @@ async fn test_path_with_branches_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut forest, &mut map, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
@@ -244,9 +242,10 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_trees: Tree<OrgNode> =
     org_to_uninterpreted_nodes(expected)?.0;
 
-  assert!(
-    compare_orgnode_portions_of_pairforest_and_orgnodeforest(
-      &forest, &expected_trees),
+  let actual_str = orgnode_forest_to_string(&forest)?;
+  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  assert_eq!(
+    actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"
   );
 

@@ -1,23 +1,26 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
-use crate::to_org::util::{get_pid_in_pairtree, remove_completed_view_request};
+use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::Scaffold;
-use crate::types::tree::PairTree;
-use crate::types::tree::orgnode_skgnode::{insert_scaffold_as_child, unique_scaffold_child};
+use crate::types::orgnode::{OrgNode, ViewRequest, Scaffold};
+use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::tree::orgnode_skgnode::{
+  insert_scaffold_as_child, unique_scaffold_child};
 
+use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
-  tree          : &mut PairTree,
+  tree          : &mut Tree<OrgNode>,
+  _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_aliases (
-    tree, node_id, config, typedb_driver ) . await;
+  let result : Result<(), Box<dyn Error>> =
+    build_and_integrate_aliases (
+      tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Aliases,
@@ -36,13 +39,13 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// so any newly-created empty AliasCol
 /// would not be visited in the same save cycle.
 pub async fn build_and_integrate_aliases (
-  tree      : &mut PairTree,
+  tree      : &mut Tree<OrgNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
-    get_pid_in_pairtree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   if unique_scaffold_child (
     tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,

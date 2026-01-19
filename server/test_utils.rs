@@ -5,14 +5,12 @@ use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::skgnode::SkgNode;
-use crate::types::tree::{PairTree, NodePair};
 
-use ego_tree::{Tree, NodeId, NodeRef};
+use ego_tree::{Tree, NodeRef};
 use futures::StreamExt;
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
@@ -21,8 +19,10 @@ use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::answer::QueryAnswer;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType};
+use typedb_driver::answer::{QueryAnswer, ConceptRow};
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
+use std::sync::Arc;
+use tantivy::{DocAddress, Searcher};
 
 
 /// Run tests with automatic database setup and cleanup.
@@ -63,7 +63,7 @@ where
                                <(), Box<dyn Error>>> + 'a>>,
 {
   // Copy fixtures to temp so saves don't corrupt originals
-  let temp_fixtures = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
+  let temp_fixtures : PathBuf = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
   if temp_fixtures.exists() {
     fs::remove_dir_all(&temp_fixtures)?;
   }
@@ -71,13 +71,13 @@ where
     &PathBuf::from(fixtures_folder),
     &temp_fixtures)?;
 
-  let result = block_on(async {
+  let result : Result<(), Box<dyn Error>> = block_on(async {
     let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
       setup_test_tantivy_and_typedb_dbs(
         db_name,
         temp_fixtures.to_str().unwrap(),
         tantivy_folder ). await?;
-    let result = test_fn(&config, &driver, &tantivy).await;
+    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy).await;
     cleanup_test_tantivy_and_typedb_dbs(
       db_name,
       &driver,
@@ -98,10 +98,10 @@ where
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
   fs::create_dir_all(dst)?;
   for entry in fs::read_dir(src)? {
-    let entry = entry?;
-    let ty = entry.file_type()?;
-    let src_path = entry.path();
-    let dst_path = dst.join(entry.file_name());
+    let entry : fs::DirEntry = entry?;
+    let ty : fs::FileType = entry.file_type()?;
+    let src_path : PathBuf = entry.path();
+    let dst_path : PathBuf = dst.join(entry.file_name());
     if ty.is_dir() {
       copy_dir_all(&src_path, &dst_path)?;
     } else {
@@ -191,9 +191,9 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   // Delete TypeDB database
-  let databases = driver.databases();
+  let databases : &DatabaseManager = driver.databases();
   if databases.contains(db_name).await? {
-    let database = databases.get(db_name).await?;
+    let database : Arc<Database> = databases.get(db_name).await?;
     database.delete().await?; }
 
   // Delete Tantivy index if path provided and exists
@@ -315,41 +315,6 @@ fn compare_two_orgnode_branches_recursively_modulo_id (
              compare_two_orgnode_branches_recursively_modulo_id(
                *c1, *c2)) ) }}
 
-/// Compare a PairTree forest (with ForestRoot) against a Vec of OrgNode trees.
-/// This compares just the OrgNode portions, ignoring the SkgNode Option.
-pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
-  forest : &PairTree,
-  forest2 : & Tree<OrgNode>,
-) -> bool {
-  let tree_roots1 : Vec < _ > =
-    forest . root () . children () . collect ();
-  let tree_roots2 : Vec < _ > =
-    forest2 . root () . children () . collect ();
-  if tree_roots1 . len () != tree_roots2 . len () {
-    return false; }
-  fn compare_nodes (
-    node1 : NodeRef < NodePair >,
-    node2 : NodeRef < OrgNode >
-  ) -> bool {
-    // Compare the OrgNode values directly
-    let n1 : & OrgNode = &node1 . value () .orgnode;
-    let n2 : & OrgNode = node2 . value ();
-    // Compare the OrgNode values
-    if n1 != n2 { return false; }
-    // Compare children recursively
-    let children1 : Vec < _ > = node1 . children () . collect ();
-    let children2 : Vec < _ > = node2 . children () . collect ();
-    children1 . len () == children2 . len () &&
-      children1 . iter () . zip ( children2 . iter () )
-      . all ( | ( c1, c2 ) | compare_nodes ( *c1, *c2 ) ) }
-  for ( tree_root1, tree_root2 )
-    in tree_roots1 . iter ()
-    . zip ( tree_roots2 . iter () ) {
-      if ! compare_nodes (
-        *tree_root1, *tree_root2 )
-      { return false; }}
-  true }
-
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
   metadata: Option<OrgnodeMetadata>
@@ -374,7 +339,7 @@ pub async fn all_pids_from_typedb(
   let mut node_ids: HashSet<ID> = HashSet::new();
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
-    let row = row_result?;
+    let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("node_id")? {
       let node_id_str: String =
         extract_payload_from_typedb_string_rep(
@@ -391,7 +356,7 @@ pub async fn extra_ids_from_pid(
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let tx: Transaction = driver.transaction(
     db_name, TransactionType::Read ). await?;
-  let query = format!(
+  let query : String = format!(
     r#"match $node isa node, has id "{}";
        $e isa extra_id;
        $rel isa has_extra_id (node: $node, extra_id: $e);
@@ -399,13 +364,14 @@ pub async fn extra_ids_from_pid(
        select $extra_id_value;"#,
     skgid.0 );
   let answer: QueryAnswer = tx.query(query).await?;
-  let mut extra_ids = Vec::new();
+  let mut extra_ids : Vec<ID> = Vec::new();
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
-    let row = row_result?;
+    let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_str = extract_payload_from_typedb_string_rep(
-        &concept.to_string());
+      let extra_id_str : String =
+        extract_payload_from_typedb_string_rep(
+          &concept.to_string());
       extra_ids.push(
         ID(extra_id_str)); }}
   Ok(extra_ids) }
@@ -417,7 +383,9 @@ pub fn tantivy_contains_id(
   query: &str,
   expected_id: &str,
 ) -> Result<bool, Box<dyn Error>> {
-  let (matches, searcher) = search_index(tantivy_index, query)?;
+  let (matches, searcher)
+    : (Vec<(f32, DocAddress)>, Searcher)
+    = search_index(tantivy_index, query)?;
   for (_score, doc_address) in matches {
     let doc: tantivy::Document = searcher.doc(doc_address)?;
     let id_value: Option<String> =
@@ -448,39 +416,3 @@ pub fn strip_org_comments(s: &str) -> String {
       } else { line . to_string() }} )
     .collect::<Vec<String>>()
     .join("\n") }
-
-/// Convert an OrgNode "forest" (tree with ForestRoot)
-/// to a paired forest, *with None for all SkgNodes*.
-/// Used in tests where we don't have save instructions.
-pub fn orgnode_forest_to_paired (
-  forest : Tree < OrgNode >,
-) -> PairTree {
-  fn add_orgnode_tree_as_child_of_forest_root (
-    paired_forest   : &mut PairTree,
-    parent_treeid   : NodeId,
-    orgnode_tree    : &Tree < OrgNode >,
-    orgnode_treeid  : NodeId,
-  ) {
-    let orgnode : OrgNode =
-      orgnode_tree . get ( orgnode_treeid )
-      . unwrap () . value () . clone ();
-    let new_treeid : NodeId = {
-      let mut parent_mut =
-        paired_forest . get_mut ( parent_treeid ) . unwrap ();
-      parent_mut
-        . append ( NodePair { mskgnode : None,
-                              orgnode } )
-        . id () };
-    let child_treeids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      add_orgnode_tree_as_child_of_forest_root (
-        paired_forest, new_treeid, orgnode_tree, child_treeid ); } }
-  let mut result : PairTree = Tree::new ( forest_root_pair () );
-  let forest_root_treeid : NodeId = result . root () . id ();
-  // Iterate over tree roots (children of ForestRoot)
-  for tree_root in forest . root () . children () {
-    add_orgnode_tree_as_child_of_forest_root (
-      &mut result, forest_root_treeid, &forest, tree_root . id () ); }
-  result }

@@ -5,10 +5,10 @@ use std::error::Error;
 
 use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::{run_with_test_db, orgnode_forest_to_paired};
-use skg::types::orgnode::{OrgNode};
+use skg::test_utils::run_with_test_db;
+use skg::types::orgnode::OrgNode;
 use skg::types::misc::SkgConfig;
-use skg::types::tree::PairTree;
+use skg::types::skgnodemap::{SkgNodeMap, skgnode_map_from_forest};
 
 use ego_tree::{Tree, NodeId};
 
@@ -44,10 +44,10 @@ async fn test_completeAliasCol_logic (
       ** (skg alias) the above should break
     " };
 
-  let orgnode_forest : Tree < OrgNode > =
+  let mut forest : Tree < OrgNode > =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
-  let mut forest : PairTree =
-    orgnode_forest_to_paired ( orgnode_forest );
+  let mut map : SkgNodeMap =
+    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_id : NodeId =
@@ -69,9 +69,8 @@ async fn test_completeAliasCol_logic (
   // Test 1: First AliasCol should have c and b (deduped, valid only)
   completeAliasCol (
     &mut forest,
-    aliascol_1_id,
-    & config,
-    driver
+    &mut map,
+    aliascol_1_id
   ) .await?;
 
   {
@@ -79,7 +78,7 @@ async fn test_completeAliasCol_logic (
       forest . get ( aliascol_1_id ) . unwrap ();
     let children : Vec < String > =
       aliascol_1_ref . children () . map (
-        |n| n . value() . orgnode . title() . to_string() )
+        |n| n . value() . title() . to_string() )
       . collect();
 
     assert_eq! (
@@ -102,18 +101,17 @@ async fn test_completeAliasCol_logic (
   // Test 2: Second AliasCol should have b and c, and gain focus
   completeAliasCol (
     &mut forest,
-    aliascol_2_id,
-    & config,
-    driver
+    &mut map,
+    aliascol_2_id
   ) .await?;
 
   {
     let aliascol_2_ref =
       forest . get ( aliascol_2_id ) . unwrap ();
-    let aliascol_2_new : &OrgNode = &aliascol_2_ref . value () .orgnode;
+    let aliascol_2_new : &OrgNode = aliascol_2_ref . value ();
     let children : Vec < String > =
       aliascol_2_ref . children () . map (
-        |n| n . value() . orgnode . title() . to_string() )
+        |n| n . value() . title() . to_string() )
       . collect();
 
     assert_eq! (
@@ -147,9 +145,8 @@ async fn test_completeAliasCol_logic (
   let result : Result < (), Box<dyn Error> > =
     completeAliasCol (
       &mut forest,
-      aliascol_3_id,
-      & config,
-      driver
+      &mut map,
+      aliascol_3_id
     ).await;
 
   assert! (
@@ -186,10 +183,10 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       *** (skg alias) b
     " };
 
-  let orgnode_forest : Tree < OrgNode > =
+  let mut forest : Tree < OrgNode > =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
-  let mut forest : PairTree =
-    orgnode_forest_to_paired ( orgnode_forest );
+  let mut map : SkgNodeMap =
+    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
   let tree_root_id : NodeId =
     forest . root () . first_child () . unwrap () . id ();
@@ -210,9 +207,8 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   // Test first AliasCol
   completeAliasCol (
     &mut forest,
-    first_aliascol_id,
-    & config,
-    driver
+    &mut map,
+    first_aliascol_id
   ) .await?;
 
   {
@@ -220,7 +216,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       forest . get ( first_aliascol_id ) . unwrap ();
     let children_new : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| &n . value () .orgnode )
+      . map ( |n| n . value () )
       . collect ();
 
     assert_eq! (
@@ -251,9 +247,8 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   // Test second AliasCol
   completeAliasCol (
     &mut forest,
-    second_aliascol_id,
-    & config,
-    driver
+    &mut map,
+    second_aliascol_id
   ) .await?;
 
   {
@@ -261,7 +256,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       forest . get ( second_aliascol_id ) . unwrap ();
     let children : Vec < &OrgNode > =
       aliascol_ref . children ()
-      . map ( |n| &n . value () .orgnode )
+      . map ( |n| n . value () )
       . collect ();
 
     assert_eq! (

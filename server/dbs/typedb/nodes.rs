@@ -12,7 +12,7 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver,
 };
-use typedb_driver::answer::QueryAnswer;
+use typedb_driver::answer::{QueryAnswer, ConceptRow};
 
 pub async fn create_all_nodes (
   // Maps `create_node` over `nodes`, creating:
@@ -105,7 +105,7 @@ pub async fn which_ids_exist (
   let mut found : HashSet < String > =
     HashSet::new ();
   while let Some ( row_res ) = rows . next () . await {
-    let row = row_res ?;
+    let row : ConceptRow = row_res ?;
     if let Some ( concept ) =
       row . get ( "found" ) ? {
         found.insert ( {
@@ -190,7 +190,7 @@ pub async fn delete_nodes_from_pids (
     Vec::new();
   let mut rows = answer.into_rows();
   while let Some(row_res) = rows.next().await {
-    let row = row_res?;
+    let row : ConceptRow = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {
       extra_id_values.push ( {
         let extra_id_value : String =

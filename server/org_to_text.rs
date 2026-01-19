@@ -1,9 +1,8 @@
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode, EditRequest,
 };
-use crate::types::tree::{NodePair, PairTree};
 
-use ego_tree::NodeRef;
+use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
 /// PURPOSE: Render a "forest" -- a tree with ForestRoot at root
@@ -13,14 +12,13 @@ use std::error::Error;
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a ForestRoot.
 pub fn orgnode_forest_to_string (
-  forest : &PairTree,
+  forest : &Tree<OrgNode>,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
-    node_ref : NodeRef < NodePair >,
+    node_ref : NodeRef < OrgNode >,
     level    : usize,
   ) -> Result < String, Box<dyn Error> > {
-    let orgnode : &OrgNode =
-      &node_ref . value () .orgnode;
+    let orgnode : &OrgNode = node_ref . value ();
     let mut out : String =
       orgnode_to_text ( level, orgnode )?;
     for child in node_ref . children () {
@@ -29,13 +27,11 @@ pub fn orgnode_forest_to_string (
           child,
           level + 1 )? ); }
     Ok ( out ) }
-  let root_ref = forest . root ();
-  let is_forest_root : bool = {
-    let root_orgnode : &OrgNode =
-      &root_ref . value () .orgnode;
+  let root_ref : NodeRef<OrgNode> = forest . root ();
+  let is_forest_root : bool =
     matches! (
-      & root_orgnode . kind,
-      OrgNodeKind::Scaff ( Scaffold::ForestRoot )) };
+      & root_ref . value () . kind,
+      OrgNodeKind::Scaff ( Scaffold::ForestRoot ));
   if ! is_forest_root {
     return Err (
       "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
@@ -152,7 +148,7 @@ fn true_node_metadata_to_string (
       else { Some ( format! ( "(stats {})", parts . join ( " " ))) }}
     fn edit_request ( true_node : & TrueNode ) -> Option < String > {
       true_node . edit_request . as_ref () . map ( | edit_req | {
-        let edit_str = match edit_req {
+        let edit_str : String = match edit_req {
           EditRequest::Merge ( id ) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
         format! ( "(editRequest {})", edit_str ) })}

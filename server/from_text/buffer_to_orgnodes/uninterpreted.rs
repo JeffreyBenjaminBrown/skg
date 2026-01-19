@@ -6,7 +6,7 @@ use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_orgnodemd, default_metadata, orgnode_from_metadata, OrgnodeMetadata };
 use crate::types::orgnode::{forest_root_orgnode, OrgNode};
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -70,7 +70,8 @@ pub fn org_to_uninterpreted_nodes(
     treeid_stack.push( {
       let parent_treeid: NodeId = *treeid_stack.last().unwrap();
       let new_treeid: NodeId = {
-        let mut parent_mut = forest.get_mut(parent_treeid).unwrap();
+        let mut parent_mut : NodeMut<OrgNode> =
+          forest.get_mut(parent_treeid).unwrap();
         parent_mut.append(orgnode).id() };
       new_treeid } ); }
   Ok ( ( forest, parsing_errors ) ) }

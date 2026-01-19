@@ -21,7 +21,8 @@ use std::error::Error;
 /// - "title_or_alias": TEXT | STORED - searchable titles and aliases
 /// - "source": STRING | STORED - the source nickname
 pub(super) fn mk_tantivy_schema() -> schema::Schema {
-  let mut schema_builder = schema::Schema::builder();
+  let mut schema_builder : schema::SchemaBuilder =
+    schema::Schema::builder();
   schema_builder.add_text_field(
     "id", schema::STRING | schema::STORED);
   schema_builder.add_text_field(

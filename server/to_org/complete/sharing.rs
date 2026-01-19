@@ -3,16 +3,17 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNodeKind, Scaffold};
-use crate::types::tree::{NodePair,PairTree};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  append_indefinitive_from_disk_as_child, insert_scaffold_as_child,
-  pid_for_subscribee_and_its_subscriber_grandparent,
+  append_indefinitive_from_disk_as_child,
+  insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
+  pid_for_subscribee_and_its_subscriber_grandparent,
   unique_scaffold_child };
+use crate::types::skgnodemap::SkgNodeMap;
 
-use ego_tree::{NodeId, NodeRef};
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -21,19 +22,19 @@ use typedb_driver::TypeDBDriver;
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
 /// TODO ? Also check that the grandparent is a TrueNode.
 pub fn type_and_parent_type_consistent_with_subscribee (
-  tree    : &PairTree,
+  tree    : &Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < NodePair > =
+  let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id )
     . ok_or ( "type_and_parent_type_consistent_with_subscribee: node not found" ) ?;
   let is_truenode : bool = matches! (
-    & node_ref . value () . orgnode . kind,
+    & node_ref . value () . kind,
     OrgNodeKind::True ( _ ));
   let parent_is_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
-              & p . value () . orgnode . kind,
+              & p . value () . kind,
               OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )))
     . unwrap_or ( false );
   Ok ( is_truenode && parent_is_subscribee_col ) }
@@ -43,14 +44,16 @@ pub fn type_and_parent_type_consistent_with_subscribee (
 /// - if any hidden nodes are outside subscribee content,
 ///   a HiddenOutsideOfSubscribeeCol
 pub async fn maybe_add_subscribeeCol_branch (
-  tree    : &mut PairTree,
+  tree    : &mut Tree<OrgNode>,
+  map     : &mut SkgNodeMap,
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { let node_kind: OrgNodeKind =
       read_at_node_in_tree (
-        tree, node_id, |np| np.orgnode.kind.clone() )?;
+        tree, node_id, |orgnode| orgnode.kind.clone() )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
     match node_kind {
       OrgNodeKind::Scaff ( _ ) =>
         return Err ( "maybe_add_subscribeeCol_branch: \
@@ -63,7 +66,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    pids_for_subscriber_and_its_subscribees ( tree, node_id ) ?;
+    pids_for_subscriber_and_its_subscribees ( tree, map, node_id ) ?;
   if subscribee_ids . is_empty () { // Skip because it would be empty.
     return Ok (( )); }
 
@@ -91,12 +94,12 @@ pub async fn maybe_add_subscribeeCol_branch (
           Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
-          tree, hidden_outside_col_nid, & hidden_id,
+          tree, map, hidden_outside_col_nid, & hidden_id,
           false, config, driver
         ). await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
-        tree, subscribee_col_nid, & subscribee_id,
+        tree, map, subscribee_col_nid, & subscribee_id,
         false, config, driver
       ). await ?; }}
   Ok (( )) }
@@ -107,7 +110,8 @@ pub async fn maybe_add_subscribeeCol_branch (
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubsribeeCol -> Subscribee
 pub async fn maybe_add_hiddenInSubscribeeCol_branch (
-  tree              : &mut PairTree,
+  tree              : &mut Tree<OrgNode>,
+  map               : &mut SkgNodeMap,
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
@@ -122,7 +126,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
     pid_for_subscribee_and_its_subscriber_grandparent (
-      tree, subscribee_treeid ) ?;
+      tree, map, subscribee_treeid ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
@@ -131,11 +135,12 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   if hidden_in_content . is_empty () {
     return Ok (( )); }
   let hidden_col_nid : NodeId =
-    insert_scaffold_as_child ( tree, subscribee_treeid,
+    insert_scaffold_as_child (
+      tree, subscribee_treeid,
       Scaffold::HiddenInSubscribeeCol, true ) ?;
   for hidden_id in hidden_in_content {
     // populate the collection
     append_indefinitive_from_disk_as_child (
-      tree, hidden_col_nid, & hidden_id,
+      tree, map, hidden_col_nid, & hidden_id,
       false, config, driver ). await ?; }
   Ok (( )) }

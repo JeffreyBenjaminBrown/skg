@@ -6,7 +6,7 @@ use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer,
+  answer::{ConceptRow, QueryAnswer, ConceptDocument,
            concept_document::{Node, Leaf}},
   Transaction,
   TransactionType,
@@ -276,7 +276,7 @@ pub async fn pid_and_source_from_id (
       query } ). await ?;
     answer } {
       if let Some (doc_result) = stream . next () . await {
-        let doc = doc_result ?;
+        let doc : ConceptDocument = doc_result ?;
         if let Some ( Node::Map ( ref map ) ) = doc . root {
           let primary_id_opt : Option < ID > =
             map . get ( "primary_id" )

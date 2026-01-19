@@ -27,18 +27,17 @@ pub fn validate_source_paths_creating_owned_ones_if_needed (
 pub fn load_config (
   path: &str )
   -> Result <SkgConfig,
-             Box<dyn std::error::Error>> {
-
-    if !Path::new(path).exists() {
-      return Err(format!("Config file not found: {}",
-                         path)
-                 . into( )); }
-    let config: SkgConfig = {
-      let contents: String = fs::read_to_string (path) ?;
-      toml::from_str (&contents) ? };
-    validate_source_paths_creating_owned_ones_if_needed(
-      &config.sources)?;
-    Ok (config) }
+             Box<dyn std::error::Error>>
+{ if !Path::new(path).exists() {
+    return Err(format!("Config file not found: {}",
+                       path)
+               . into( )); }
+  let config: SkgConfig = {
+    let contents: String = fs::read_to_string (path) ?;
+    toml::from_str (&contents) ? };
+  validate_source_paths_creating_owned_ones_if_needed(
+    &config.sources)?;
+  Ok (config) }
 
 /// Load config from TOML file with optional overrides for testing.
 ///
@@ -88,5 +87,6 @@ pub fn load_config_with_overrides (
     } else {
       return Err(format!(
         "Source '{}' not found in config", nickname).into()); }}
-  validate_source_paths_creating_owned_ones_if_needed(&config.sources)?;
+  validate_source_paths_creating_owned_ones_if_needed(
+    &config.sources)?;
   Ok(config) }

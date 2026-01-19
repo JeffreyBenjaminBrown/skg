@@ -17,8 +17,8 @@ pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
   stream   : &mut TcpStream,
   response : &str)
-{ let payload = response.as_bytes ();
-  let header  = format! ( "Content-Length: {}\r\n\r\n",
+{ let payload : &[u8] = response.as_bytes ();
+  let header : String = format! ( "Content-Length: {}\r\n\r\n",
                            payload.len () );
   use std::io::Write as _;
   stream . write_all ( header.as_bytes () ) . unwrap ();

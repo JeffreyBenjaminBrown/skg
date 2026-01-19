@@ -2,13 +2,13 @@ pub mod pids_from_ids;
 pub mod concept_document;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use typedb_driver::{TypeDBDriver, DatabaseManager};
 
 pub async fn delete_database (
   driver  : &TypeDBDriver,
   db_name : &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let databases = driver . databases ();
+  let databases : &DatabaseManager = driver . databases ();
   if databases . contains ( db_name ) . await ? {
     databases . get ( db_name ) . await ? . delete () . await ?;
     println! ( "Database '{}' deleted successfully", db_name ); }

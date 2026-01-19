@@ -14,8 +14,9 @@
 /// Each line becomes a node, with depth determined by the number of asterisks.
 /// The title (text after asterisks and spaces) becomes the node's value.
 
-use ego_tree::Tree;
+use ego_tree::{Tree, NodeId};
 use std::error::Error;
+use std::str::Chars;
 
 /// Parse org-mode text into a Tree<String>.
 /// Returns a tree where the root is the first line (typically "* Root").
@@ -33,17 +34,18 @@ pub fn tree_from_org_text(
   }
 
   // Parse first line as root
-  let (root_level, root_title) = parse_line(lines[0])?;
+  let (root_level, root_title) : (usize, String) =
+    parse_line(lines[0])?;
   if root_level != 1 {
-    return Err("First line must be level 1 (single *)".into());
-  }
+    return Err("First line must be level 1 (single *)".into( )); }
 
-  let mut tree = Tree::new(root_title);
-  let mut stack: Vec<(usize, ego_tree::NodeId)> = vec![(1, tree.root().id())];
+  let mut tree : Tree<String> = Tree::new(root_title);
+  let mut stack: Vec<(usize, NodeId)> =
+    vec![(1, tree.root().id())];
 
   // Parse remaining lines
   for line in &lines[1..] {
-    let (level, title) = parse_line(line)?;
+    let (level, title) : (usize, String) = parse_line(line)?;
 
     // Pop stack until we find the parent level
     while !stack.is_empty() && stack.last().unwrap().0 >= level {
@@ -54,8 +56,9 @@ pub fn tree_from_org_text(
       return Err(format!("Invalid nesting at line: {}", line).into());
     }
 
-    let parent_id = stack.last().unwrap().1;
-    let new_id = tree.get_mut(parent_id).unwrap().append(title).id();
+    let parent_id : NodeId = stack.last().unwrap().1;
+    let new_id : NodeId =
+      tree.get_mut(parent_id).unwrap().append(title).id();
     stack.push((level, new_id));
   }
 
@@ -67,8 +70,8 @@ pub fn tree_from_org_text(
 fn parse_line(
   line: &str
 ) -> Result<(usize, String), Box<dyn Error>> {
-  let mut level = 0;
-  let mut chars = line.chars();
+  let mut level : usize = 0;
+  let mut chars : Chars = line.chars();
 
   // Count leading asterisks
   while let Some(c) = chars.next() {
@@ -85,7 +88,7 @@ fn parse_line(
     return Err(format!("No asterisks found: {}", line).into());
   }
 
-  let title = chars.as_str().trim().to_string();
+  let title : String = chars.as_str().trim().to_string();
   if title.is_empty() {
     return Err(format!("Empty title: {}", line).into());
   }

@@ -1,4 +1,4 @@
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 
 /// Read a value from an ancestor of a node in a tree, applying a function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -11,7 +11,7 @@ pub fn read_at_ancestor_in_tree<T, F, R>(
   f: F
 ) -> Result<R, String>
 where F: FnOnce(&T) -> R, {
-  let mut node_ref = tree.get(treeid)
+  let mut node_ref : NodeRef<T> = tree.get(treeid)
     .ok_or("node not found")?;
   for _ in 0..generation {
     node_ref = node_ref.parent()
@@ -29,15 +29,15 @@ fn write_at_ancestor_in_tree<T, F, R>(
   f: F
 ) -> Result<R, String>
 where F: FnOnce(&mut T) -> R, {
-  let target_id = {
+  let target_id : NodeId = {
     // Climb to target node via immutable reference
-    let mut node_ref = tree.get(treeid)
+    let mut node_ref : NodeRef<T> = tree.get(treeid)
       .ok_or("node not found")?;
     for _ in 0..generation {
       node_ref = node_ref.parent()
         .ok_or("cannot climb that many generations")?; }
     node_ref.id() };
-  let mut node_mut = tree.get_mut(target_id)
+  let mut node_mut : NodeMut<T> = tree.get_mut(target_id)
     .ok_or("target node not found")?;
   Ok(f(node_mut.value() )) }
 
@@ -104,13 +104,13 @@ pub fn do_everywhere_in_tree_dfs<T, F>(
 where F: FnMut(NodeMut<T>) -> Result<(), String> {
   let child_ids : Vec<NodeId> = {
     // Collect early so no borrow conflicts
-    let node_ref = tree . get ( start_node_id )
-      . ok_or ( "do_everywhere_in_tree_dfs: start node not found" ) ?;
+    let node_ref : NodeRef<T> =
+      tree . get ( start_node_id ) . ok_or ( "do_everywhere_in_tree_dfs: start node not found" ) ?;
     node_ref . children ()
       . map ( |c| c . id( ))
       . collect () };
   { // do F here
-    let node_mut = tree . get_mut ( start_node_id )
+    let node_mut : NodeMut<T> = tree . get_mut ( start_node_id )
       . ok_or ( "do_everywhere_in_tree_dfs: node not found" ) ?;
     f ( node_mut ) ?; }
   for child_id in child_ids { // recurse

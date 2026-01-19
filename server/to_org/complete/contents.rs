@@ -1,19 +1,22 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
-use crate::to_org::util::{ DefinitiveMap, get_pid_in_pairtree, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle, make_indef_if_repeat_then_extend_defmap };
+use crate::to_org::util::{
+  DefinitiveMap, get_id_from_treenode, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
+  make_indef_if_repeat_then_extend_defmap,
+};
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::to_org::complete::sharing::{
-  maybe_add_subscribeeCol_branch };
+use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNodeKind, Scaffold};
-use crate::types::tree::PairTree;
+use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::maps::add_v_to_map_if_absent;
+use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree };
 
-use ego_tree::NodeId;
+use ego_tree::{NodeId, Tree};
 use std::error::Error;
 use std::pin::Pin;
 use std::future::Future;
@@ -29,7 +32,8 @@ use typedb_driver::TypeDBDriver;
 /// - "restore": Because indefinitive nodes may have had their titles or bodies edited.
 ///   TODO ? Maybe look for edits to indefinitive nodes and throw an error, as is done for foreign nodes.
 pub fn complete_or_restore_each_node_in_branch<'a> (
-  tree          : &'a mut PairTree,
+  tree          : &'a mut Tree<OrgNode>,
+  map           : &'a mut SkgNodeMap,
   node_id       : NodeId,
   config        : &'a SkgConfig,
   typedb_driver : &'a TypeDBDriver,
@@ -37,7 +41,8 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   fn recurse<'b> (
-    tree          : &'b mut PairTree,
+    tree          : &'b mut Tree<OrgNode>,
+    map           : &'b mut SkgNodeMap,
     node_id       : NodeId,
     config        : &'b SkgConfig,
     typedb_driver : &'b TypeDBDriver,
@@ -48,40 +53,50 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
         collect_child_treeids ( tree, node_id ) ?;
       for child_treeid in child_treeids {
         complete_or_restore_each_node_in_branch (
-          tree, child_treeid, config, typedb_driver,
+          tree, map, child_treeid, config, typedb_driver,
           visited ) . await ?; }
       Ok (( )) } ) }
+
   Box::pin(async move {
     if read_at_node_in_tree(tree, node_id, |node| {
-        matches!(&node.orgnode.kind,
-                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })? {
+        matches!(&node.kind,
+                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })
+        . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
-        tree, node_id, config, typedb_driver ). await ?;
+        tree, map, node_id ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
-        matches!( &node.orgnode.kind,
-                  OrgNodeKind::Scaff(_)) } )? {
+        matches!( &node.kind, OrgNodeKind::Scaff(_)) } )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // Skip, but recurse into children.
-      recurse ( tree, node_id, config, typedb_driver, visited
+      recurse ( tree, map, node_id, config, typedb_driver, visited
               ) . await ?;
-    } else {
-      ensure_skgnode (
-        tree, node_id, config, typedb_driver ). await ?;
+    } else { // it's a TrueNode
+      let node_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
+      add_v_to_map_if_absent (
+        &node_pid, map,
+        |id| { let id : ID = id.clone();
+               async move {
+               skgnode_from_id ( config, typedb_driver, &id
+                               ). await }} ). await ?;
+
       detect_and_mark_cycle ( tree, node_id ) ?;
       make_indef_if_repeat_then_extend_defmap (
         tree, node_id, visited ) ?;
+
       { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
-            tree, node_id ) ?;
+            tree, map, node_id ) ?;
         } else { // futz with the orgnode and its content children
           maybe_add_subscribeeCol_branch (
-            tree, node_id, config, typedb_driver ) . await ?; }
+            tree, map, node_id, config, typedb_driver ) . await ?; }
         recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
-          tree, node_id, config, typedb_driver, visited
+          tree, map, node_id, config, typedb_driver, visited
         ). await ?; }}
     Ok (( )) } ) }
 
-/// PURPOSE: Given an indefinitive node N:
+/// PURPOSE: Given an indefinitive node N,
+/// uses SkgNodeMap or lookup on disk to:
 /// - Reset title.
 /// - Reset source.
 /// - Set body to None.
@@ -89,52 +104,37 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 /// ASSUMES: The SkgNode at that tree node is accurate.
 /// ASSUMES: The input is indefinitive.
 pub fn clobberIndefinitiveOrgnode (
-  tree    : &mut PairTree,
-  treeid : NodeId,
+  tree    : &mut Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  treeid  : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_node_in_tree ( tree, treeid, |pair| {
-    let (title, source) : (String, String) = {
-      let skgnode : &SkgNode =
-        pair . mskgnode . as_ref ()
-          . ok_or ("SkgNode should exist after fetch" . to_string() )?;
-      ( skgnode . title . clone (),
-        skgnode . source . clone () ) };
-    let OrgNodeKind::True ( t ) = &mut pair.orgnode.kind
-      else { return Err ( "clobberIndefinitiveOrgnode: expected TrueNode" . into () ) };
+  let node_id : ID =
+    read_at_node_in_tree ( tree, treeid, |orgnode| {
+      match &orgnode.kind {
+        OrgNodeKind::True(t) => t . id_opt . clone()
+          . ok_or("clobberIndefinitiveOrgnode: node has no ID"),
+        OrgNodeKind::Scaff(_) => Err (
+          "clobberIndefinitiveOrgnode: expected TrueNode" ), }} )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
+  let skgnode : &SkgNode =
+    map . get ( &node_id ). ok_or ( "clobberIndefinitiveOrgnode: SkgNode should exist in map" ) ?;
+  let title : String = skgnode . title . clone();
+  let source : String = skgnode . source . clone();
+  write_at_node_in_tree ( tree, treeid, |orgnode| {
+    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+      &mut orgnode.kind
+      else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
     t . source_opt = Some ( source );
-    t . body = None;
-    Ok::<(), String>(( ))
-  } )? // before the '?' it's a nested Result: R<R<(),String>,String>
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) }
+    t . body = None; }
+  ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
 
-/// Ensure a node in a PairTree has a SkgNode.
-/// If the node already has Some(skgnode), does nothing.
-/// Otherwise fetches from disk and stores it.
-pub async fn ensure_skgnode (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  let has_skgnode : bool =
-    read_at_node_in_tree (
-      tree, node_id,
-      |np| np . mskgnode . is_some () ) ?;
-  if ! has_skgnode {
-    let skgnode : SkgNode =
-      skgnode_from_id (
-        config, driver, &node_pid ) . await ?;
-    write_at_node_in_tree (
-      tree, node_id,
-      |np| np . mskgnode = Some ( skgnode ) ) ?; }
   Ok (( )) }
 
 /// Noop for Scaffolds. Otherwise, ensures the node has a source.
 /// If needed, fetches the data from TypeDB.
 pub async fn ensure_source (
-  tree    : &mut PairTree,
+  tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -142,12 +142,13 @@ pub async fn ensure_source (
   let needs_source : bool =
     read_at_node_in_tree (
       tree, node_id,
-      |np| matches! ( &np . orgnode . kind,
+      |orgnode| matches! ( &orgnode . kind,
                       OrgNodeKind::True(t)
-                      if t . source_opt . is_none () )) ?;
+                      if t . source_opt . is_none () ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   if needs_source {
     let node_pid : ID =
-      get_pid_in_pairtree ( tree, node_id ) ?;
+      get_id_from_treenode ( tree, node_id ) ?;
     let (_pid, source) : (ID, String) =
       pid_and_source_from_id (
         db_name, driver, &node_pid ) . await ?
@@ -156,8 +157,10 @@ pub async fn ensure_source (
         node_pid ) ) ?;
     write_at_node_in_tree (
       tree, node_id,
-      |np| {
-        let OrgNodeKind::True ( t ) = &mut np.orgnode.kind
+      |orgnode| {
+        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+          &mut orgnode.kind
           else { panic! ( "ensure_source: expected TrueNode" ) };
-        t . source_opt = Some ( source ); } ) ?; }
+        t . source_opt = Some ( source ); } )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   Ok (( )) }

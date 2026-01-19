@@ -99,7 +99,7 @@ async fn insert_relationship_from_list (
 ) -> Result<(), Box<dyn Error>> {
 
   for target_id in id_list {
-    let query = format! ( r#"
+    let query : String = format! ( r#"
                 match
                   $from isa node, has id "{}";
                   {{ $to isa node, has id "{}"; }} or

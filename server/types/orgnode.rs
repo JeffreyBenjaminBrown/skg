@@ -131,7 +131,7 @@ impl Scaffold {
 
   /// String representation as used in Emacs metadata sexps.
   pub fn repr_in_client ( &self ) -> String {
-    let kind = self.kind();
+    let kind : ScaffoldKind = self.kind();
     Self::REPRS_IN_CLIENT.iter()
       .find ( |(_, k)| *k == kind )
       .map ( |(s, _)| s.to_string() )

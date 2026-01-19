@@ -1,0 +1,11 @@
+[package]
+name = "auto_populate_functions_org"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+walkdir = "2"
+
+[[bin]]
+name = "auto_populate_functions_org"
+path = "auto_populate_functions_org.rs"

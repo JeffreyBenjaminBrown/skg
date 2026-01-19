@@ -3,14 +3,13 @@ use crate::dbs::typedb::search::count_relationships::{
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::util::collect_ids_from_pair_tree;
+use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::OrgNodeKind;
-use crate::types::tree::PairTree;
+use crate::types::orgnode::{OrgNode, OrgNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
-use ego_tree::NodeId;
+use ego_tree::{NodeId, Tree, NodeMut};
 use typedb_driver::TypeDBDriver;
 
 /// Each of these describes some kind of relationship,
@@ -27,7 +26,7 @@ struct MapsFromIdForView {
 /// Fetches relationship data from TypeDB and applies it to the forest.
 /// Forest is a single tree with ForestRoot at root.
 pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut PairTree,
+  forest : &mut Tree<OrgNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -47,15 +46,12 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
 async fn mapsFromIdForView_from_forest (
-  forest : &PairTree,
+  forest : &Tree<OrgNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
-  let pids : Vec < ID > = (
-    // This function just collects IDs,
-    // but in this context we know they are specifically PIDs,
-    // because they all came from 'forest_from_root_ids'.
-    collect_ids_from_pair_tree ( forest ));
+  let pids : Vec < ID > =
+    collect_ids_from_tree ( forest );
   fetch_relationship_data (
     driver,
     & config . db_name,
@@ -89,14 +85,14 @@ async fn fetch_relationship_data (
   }) }
 
 fn set_metadata_relationships_in_node_recursive (
-  tree       : &mut PairTree,
+  tree       : &mut Tree<OrgNode>,
   treeid    : NodeId,
   parent_pid : Option < &ID >,
   rel_data   : &MapsFromIdForView,
 ) {
   let node_pid_opt : Option < ID > =
     tree . get ( treeid ) . unwrap ()
-    . value () . orgnode . id_opt () . cloned ();
+    . value () . id_opt () . cloned ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
     let num_containers : Option<usize> = rel_data . num_containers . get ( node_pid ) . copied ();
@@ -113,8 +109,8 @@ fn set_metadata_relationships_in_node_recursive (
             . map_or ( false, | contents |
                        contents . contains ( parent_skgid )) )
       } else { (true, false) }; // default if no parent
-    let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
-    if let OrgNodeKind::True ( t ) = &mut node_mut . value () .orgnode . kind {
+    let mut node_mut : NodeMut<OrgNode> = tree . get_mut ( treeid ) . unwrap ();
+    if let OrgNodeKind::True ( t ) = &mut node_mut . value () . kind {
       t . stats . numContainers = num_containers;
       t . stats . numContents = num_contents;
       t . stats . numLinksIn = num_links_in;

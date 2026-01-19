@@ -1,13 +1,14 @@
 use crate::to_org::util::{
   DefinitiveMap,
-  get_pid_in_pairtree,
+  get_id_from_treenode,
   makeIndefinitiveAndClobber,
   make_and_append_child_pair,
   nodes_after_in_generation };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::tree::PairTree;
+use crate::types::orgnode::OrgNode;
+use crate::types::skgnodemap::SkgNodeMap;
 
-use ego_tree::NodeId;
+use ego_tree::{Tree, NodeId};
 use std::cmp::min;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -19,14 +20,13 @@ use typedb_driver::TypeDBDriver;
 /// - complete the sibling group of the limit node
 ///   - but omit rest of generation (later would-be sibling groups)
 /// - truncate the preceding generation after the limit-hitting node's parent
-///
-/// effective_root is generation 0.
 pub async fn add_last_generation_and_truncate_some_of_previous (
-  tree           : &mut PairTree,
+  tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
   generation     : usize,
   children       : &[(NodeId, ID)],
   space_left     : usize,
-  effective_root : NodeId, // it had the definitive view request
+  effective_root : NodeId, // gen 0; had the definitive view req
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
@@ -45,7 +45,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
       else {
         let new_treeid : NodeId =
           make_and_append_child_pair (
-            tree, *parent_treeid, child_skgid, config, driver ) . await ?;
+            tree, map, *parent_treeid, child_skgid, config, driver ) . await ?;
         makeIndefinitiveAndClobber ( tree, new_treeid ) ?; }}
   truncate_after_node_in_generation_in_tree (
     tree, generation - 1, limit_parent_treeid,
@@ -56,19 +56,18 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
 /// Truncate after a node in a generation of a tree or forest,
 /// possibly limiting scope to an effective branch of a tree.
 /// Truncated nodes are re-rendered using 'makeIndefinitiveAndClobber'.
-/// Effective_root is generation 0.
 fn truncate_after_node_in_generation_in_tree (
-  tree           : &mut PairTree,
+  tree           : &mut Tree<OrgNode>,
   generation     : usize,
   node_id        : NodeId, // truncate after this one
-  effective_root : NodeId,
+  effective_root : NodeId, // gen 0
   visited        : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> > {
   let nodes_to_truncate : Vec < NodeId > =
     nodes_after_in_generation (
       tree, generation, node_id, Some ( effective_root ) ) ?;
   for id in nodes_to_truncate {
-    if let Ok ( pid ) = get_pid_in_pairtree ( tree, id ) {
+    if let Ok ( pid ) = get_id_from_treenode ( tree, id ) {
       visited . remove ( &pid ); }
     makeIndefinitiveAndClobber ( tree, id ) ?; }
   Ok (( )) }

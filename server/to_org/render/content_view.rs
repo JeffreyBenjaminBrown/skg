@@ -10,8 +10,10 @@ use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::tree::PairTree;
+use crate::types::orgnode::OrgNode;
+use crate::types::skgnodemap::SkgNodeMap;
 
+use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -33,7 +35,7 @@ pub async fn multi_root_view (
   config   : &SkgConfig,
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> > {
-  let mut forest : PairTree =
+  let (mut forest, _map) : (Tree<OrgNode>, SkgNodeMap) =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
   set_metadata_relationship_viewdata_in_forest (

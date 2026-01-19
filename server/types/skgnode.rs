@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 
-use super::misc::ID;
 use crate::util::option_vec_is_empty_or_none;
+use super::misc::ID;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SkgNode {
@@ -79,3 +79,4 @@ pub fn empty_skgnode () -> SkgNode {
     hides_from_its_subscriptions : None,
     overrides_view_of            : None,
   }}
+

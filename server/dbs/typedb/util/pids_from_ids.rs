@@ -8,7 +8,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 use futures::StreamExt;
-use ego_tree::{NodeRef, NodeMut, NodeId};
+use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::misc::ID;
@@ -47,7 +47,7 @@ pub fn assign_pids_throughout_orgnode_tree_from_map (
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
-        let tree = node_ref . tree ();
+        let tree : &Tree<OrgNode> = node_ref . tree ();
         tree . get ( treeid ) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };
