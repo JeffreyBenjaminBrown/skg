@@ -18,6 +18,7 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     SkgNode {
       title : "Test Node".to_string(),
       ids : vec![id.clone()],
+      source : "main".to_string(),
       .. empty_skgnode()
     };
 
@@ -35,7 +36,7 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
         title : "Test".to_string(),
         body : None,
         id_opt : Some(id.clone()),
-        source_opt : None,
+        source_opt : Some("main".to_string()),
         parent_ignores : false,
         indefinitive : false,
         cycle : false,
@@ -45,20 +46,29 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
       }),
     };
 
+  let config = skg::types::misc::SkgConfig {
+    db_name : "test-db".to_string(),
+    tantivy_folder : std::path::PathBuf::from("/tmp/tantivy"),
+    sources : std::collections::HashMap::new(),
+    port : 3000,
+    delete_on_quit : false,
+    initial_node_limit : 100,
+  };
+
   let result :
     Option<&SkgNode> =
-    skgnode_for_orgnode(&orgnode, &map);
+    skgnode_for_orgnode(&orgnode, &mut map, &config).unwrap();
   assert!(result.is_some(), "Should find SkgNode for TrueNode with ID in map");
   assert_eq!(result.unwrap().title, "Test Node");
 }
 
 #[test]
 fn test_skgnode_for_orgnode_with_id_not_in_map() {
-  // TrueNode with ID that doesn't exist in map → returns None
+  // TrueNode without source → returns None
   let id :
     ID =
     ID::new("test-id-456");
-  let map :
+  let mut map :
     SkgNodeMap =
     SkgNodeMap::new(); // empty map
 
@@ -71,7 +81,7 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
         title : "Test".to_string(),
         body : None,
         id_opt : Some(id),
-        source_opt : None,
+        source_opt : None,  // No source, so can't fetch from disk
         parent_ignores : false,
         indefinitive : false,
         cycle : false,
@@ -81,10 +91,19 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
       }),
     };
 
+  let config = skg::types::misc::SkgConfig {
+    db_name : "test-db".to_string(),
+    tantivy_folder : std::path::PathBuf::from("/tmp/tantivy"),
+    sources : std::collections::HashMap::new(),
+    port : 3000,
+    delete_on_quit : false,
+    initial_node_limit : 100,
+  };
+
   let result :
     Option<&SkgNode> =
-    skgnode_for_orgnode(&orgnode, &map);
-  assert!(result.is_none(), "Should return None when ID not in map");
+    skgnode_for_orgnode(&orgnode, &mut map, &config).unwrap();
+  assert!(result.is_none(), "Should return None when no source");
 }
 
 #[test]
@@ -111,9 +130,18 @@ fn test_skgnode_for_orgnode_scaffold() {
       kind : OrgNodeKind::Scaff(Scaffold::AliasCol),
     };
 
+  let config = skg::types::misc::SkgConfig {
+    db_name : "test-db".to_string(),
+    tantivy_folder : std::path::PathBuf::from("/tmp/tantivy"),
+    sources : std::collections::HashMap::new(),
+    port : 3000,
+    delete_on_quit : false,
+    initial_node_limit : 100,
+  };
+
   let result :
     Option<&SkgNode> =
-    skgnode_for_orgnode(&orgnode, &map);
+    skgnode_for_orgnode(&orgnode, &mut map, &config).unwrap();
   assert!(result.is_none(), "Should return None for Scaffold nodes");
 }
 

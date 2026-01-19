@@ -97,20 +97,23 @@ pub fn empty_skgnode () -> SkgNode {
     overrides_view_of            : None,
   }}
 
-/// Extract SkgNode for an OrgNode from the map, if applicable.
-/// Returns None for Scaffolds or TrueNodes without IDs.
+/// Extract SkgNode for an OrgNode from the map (tried first) or disk.
+/// Updates the map if needed.
+/// Returns None for Scaffolds, TrueNodes without IDs, or TrueNodes without sources.
 pub fn skgnode_for_orgnode<'a> (
   orgnode : &OrgNode,
-  map     : &'a SkgNodeMap,
-) -> Option<&'a SkgNode>
-{
-  match &orgnode.kind {
-    OrgNodeKind::True(t) =>
-      t.id_opt.as_ref()
-        .and_then(|id| map.get(id)),
-    OrgNodeKind::Scaff(_) => None,
-  }
-}
+  map     : &'a mut SkgNodeMap,
+  config  : &SkgConfig,
+) -> Result<Option<&'a SkgNode>, Box<dyn Error>>
+{ match &orgnode.kind {
+    OrgNodeKind::True(t) => {
+      match (&t.id_opt, &t.source_opt) {
+        (Some(id), Some(source)) => {
+          let skgnode : SkgNode =
+            skgnode_from_map_or_disk(id, map, config, source)?;
+          Ok(Some(skgnode)) },
+        _ => Ok(None) }}, // No ID or no source
+    OrgNodeKind::Scaff(_) => Ok(None), }}
 
 /// Build a SkgNodeMap from SaveInstructions.
 /// Each SkgNode is indexed by its first ID.
