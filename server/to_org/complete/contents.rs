@@ -1,7 +1,7 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{
-  DefinitiveMap, get_pid_in_tree, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
+  DefinitiveMap, get_id_from_treenode, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
   make_indef_if_repeat_then_extend_defmap,
 };
 use crate::to_org::complete::aliascol::completeAliasCol;
@@ -71,7 +71,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
       recurse ( tree, map, node_id, config, typedb_driver, visited
               ) . await ?;
     } else { // it's a TrueNode
-      let node_pid : ID = get_pid_in_tree ( tree, node_id ) ?;
+      let node_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
       add_v_to_map_if_absent (
         &node_pid, map,
         |id| { let id : ID = id.clone();
@@ -147,7 +147,7 @@ pub async fn ensure_source (
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   if needs_source {
     let node_pid : ID =
-      get_pid_in_tree ( tree, node_id ) ?;
+      get_id_from_treenode ( tree, node_id ) ?;
     let (_pid, source) : (ID, String) =
       pid_and_source_from_id (
         db_name, driver, &node_pid ) . await ?

@@ -127,14 +127,14 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Scaffold.
-    get_pid_in_tree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   let is_indefinitive : bool =
     write_at_node_in_tree (
       tree, node_id,
       |orgnode|
         { let OrgNodeKind::True ( t ) : &mut OrgNodeKind
             = &mut orgnode.kind
-            else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_pid_in_tree already verified TrueNode"); };
+            else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_id_from_treenode already verified TrueNode"); };
           if defMap . contains_key ( &pid )
             { // It's a repeat, so it should be indefinitive.
               t . indefinitive = true; }
@@ -151,7 +151,7 @@ pub fn detect_and_mark_cycle (
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let is_cycle : bool = {
-    let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
+    let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
   write_at_node_in_tree ( tree, node_id, |orgnode| {
     let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
@@ -222,7 +222,7 @@ fn is_ancestor_id (
   unreachable!() }
 
 /// Errors if the node is a Scaffold, not found, or has no ID.
-pub fn get_pid_in_tree (
+pub fn get_id_from_treenode (
   tree   : &Tree<OrgNode>,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
@@ -230,10 +230,10 @@ pub fn get_pid_in_tree (
     read_at_node_in_tree (
       tree, treeid, |orgnode| orgnode.kind.clone() )?;
   match node_kind {
-    OrgNodeKind::Scaff ( _ ) => Err ( "get_pid_in_tree: caller should not pass a Scaffold" . into() ),
+    OrgNodeKind::Scaff ( _ ) => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
     OrgNodeKind::True ( t ) =>
       t . id_opt . ok_or_else (
-        || "get_pid_in_tree: node has no ID" . into( )) }}
+        || "get_id_from_treenode: node has no ID" . into( )) }}
 
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
@@ -318,30 +318,15 @@ pub(super) fn content_ids_if_definitive_else_empty (
   map    : &SkgNodeMap,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
-  let ( node_kind, node_id_opt ) : ( OrgNodeKind, Option<ID> ) =
-    read_at_node_in_tree (
-      tree, treeid,
-      |orgnode| ( orgnode.kind.clone(),
-                  match &orgnode.kind {
-                    OrgNodeKind::True(t) => t . id_opt . clone(),
-                    OrgNodeKind::Scaff(_) => None,
-                  } ) )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-  match node_kind {
-    OrgNodeKind::Scaff ( _ ) =>
-      Err ( "content_ids_if_definitive_else_empty: \
-             caller should not pass a Scaffold".into() ),
-    OrgNodeKind::True ( t ) => {
-      if t.indefinitive {
-        return Ok ( Vec::new () ); }
-      Ok ( match node_id_opt {
-        Some ( node_id ) =>
-          map . get (&node_id) . map (
-            |skgnode| skgnode . contains . clone ()
-              . unwrap_or_default ()
-          ). unwrap_or_default (),
-        None => Vec::new (),  // No ID yet
-      } ) } }}
+  if truenode_in_tree_is_indefinitive ( tree, treeid ) ? {
+    return Ok ( Vec::new () ); }
+  let node_id : ID =
+    match get_id_from_treenode ( tree, treeid ) {
+      Ok ( id ) => id,
+      Err ( _ ) => return Ok ( Vec::new () ), };
+  Ok ( map . get ( &node_id )
+    . and_then ( |skgnode| skgnode . contains . clone () )
+    . unwrap_or_default () ) }
 
 /// Collect ego_tree::NodeIds after
 ///   some member of some generation of a tree.

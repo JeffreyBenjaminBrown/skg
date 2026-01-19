@@ -8,7 +8,7 @@
 ///   maybe even all of it, might already be there.
 
 use crate::to_org::util::{
-  get_pid_in_tree, skgnode_and_orgnode_from_id,
+  get_id_from_treenode, skgnode_and_orgnode_from_id,
   remove_completed_view_request};
 use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
@@ -56,7 +56,7 @@ pub async fn build_and_integrate_containerward_path (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    get_pid_in_tree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_containerward_to_end_cycle_and_or_branches (
@@ -97,7 +97,7 @@ pub async fn build_and_integrate_sourceward_path (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    get_pid_in_tree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_sourceward_to_end_cycle_and_or_branches (
@@ -121,7 +121,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
-    get_pid_in_tree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   if ! path . is_empty () {
     // The head of the path should be the terminus. We strip it.
     if path[0] != terminus_pid {

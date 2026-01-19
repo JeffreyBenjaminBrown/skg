@@ -1,12 +1,12 @@
 // Tests for to_org util functions
 
-use skg::to_org::util::get_pid_in_tree;
+use skg::to_org::util::get_id_from_treenode;
 use skg::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use skg::types::misc::ID;
 use ego_tree::Tree;
 
 #[test]
-fn test_get_pid_in_tree_with_id() {
+fn test_get_id_from_treenode_with_id() {
   // TrueNode with ID → returns the ID
   let id :
     ID =
@@ -39,14 +39,14 @@ fn test_get_pid_in_tree_with_id() {
 
   let result :
     Result<ID, Box<dyn std::error::Error>> =
-    get_pid_in_tree(&tree, root_id);
+    get_id_from_treenode(&tree, root_id);
 
   assert!(result.is_ok(), "Should successfully extract ID");
   assert_eq!(result.unwrap(), id);
 }
 
 #[test]
-fn test_get_pid_in_tree_no_id() {
+fn test_get_id_from_treenode_no_id() {
   // TrueNode without ID → returns error
   let orgnode :
     OrgNode =
@@ -76,14 +76,14 @@ fn test_get_pid_in_tree_no_id() {
 
   let result :
     Result<ID, Box<dyn std::error::Error>> =
-    get_pid_in_tree(&tree, root_id);
+    get_id_from_treenode(&tree, root_id);
 
   assert!(result.is_err(), "Should fail for node with no ID");
   assert!(result.unwrap_err().to_string().contains("node has no ID"));
 }
 
 #[test]
-fn test_get_pid_in_tree_scaffold() {
+fn test_get_id_from_treenode_scaffold() {
   // Scaffold → returns error
   let orgnode :
     OrgNode =
@@ -102,7 +102,7 @@ fn test_get_pid_in_tree_scaffold() {
 
   let result :
     Result<ID, Box<dyn std::error::Error>> =
-    get_pid_in_tree(&tree, root_id);
+    get_id_from_treenode(&tree, root_id);
 
   assert!(result.is_err(), "Should fail for Scaffold node");
   assert!(result.unwrap_err().to_string().contains("Scaffold"));

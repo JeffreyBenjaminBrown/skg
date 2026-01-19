@@ -4,7 +4,7 @@ use crate::types::tree::orgnode_skgnode::{
   collect_child_aliases_at_aliascol, insert_scaffold_as_child};
 use crate::types::misc::ID;
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
-use crate::to_org::util::get_pid_in_tree;
+use crate::to_org::util::get_id_from_treenode;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
@@ -39,7 +39,7 @@ pub async fn completeAliasCol (
     let parent_ref : NodeRef<OrgNode> =
       aliascol_ref . parent ()
       . ok_or ( "AliasCol has no parent" ) ?;
-    get_pid_in_tree ( tree, parent_ref . id( ))? };
+    get_id_from_treenode ( tree, parent_ref . id( ))? };
   let parent_skgnode : &SkgNode =
     map . get ( &parent_id )
     . ok_or ( "Parent SkgNode not in map" ) ?;

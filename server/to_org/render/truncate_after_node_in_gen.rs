@@ -1,6 +1,6 @@
 use crate::to_org::util::{
   DefinitiveMap,
-  get_pid_in_tree,
+  get_id_from_treenode,
   makeIndefinitiveAndClobber,
   make_and_append_child_pair,
   nodes_after_in_generation };
@@ -67,7 +67,7 @@ fn truncate_after_node_in_generation_in_tree (
     nodes_after_in_generation (
       tree, generation, node_id, Some ( effective_root ) ) ?;
   for id in nodes_to_truncate {
-    if let Ok ( pid ) = get_pid_in_tree ( tree, id ) {
+    if let Ok ( pid ) = get_id_from_treenode ( tree, id ) {
       visited . remove ( &pid ); }
     makeIndefinitiveAndClobber ( tree, id ) ?; }
   Ok (( )) }

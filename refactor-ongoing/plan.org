@@ -48,7 +48,7 @@ Created =_in_orgtree= versions of tree utilities in =server/to_org/util.rs=:
 - =make_indef_if_repeat_then_extend_defmap_in_orgtree=
 - =truenode_in_orgtree_is_indefinitive=
 - =collect_child_treeids_in_orgtree=
-- =get_pid_in_tree= (generic version)
+- =get_id_from_treenode= (generic version)
 
 ** DONE Chunk 5: Start Refactoring =complete_or_restore_each_node_in_branch=
 

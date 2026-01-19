@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
-use crate::to_org::util::{get_pid_in_tree, remove_completed_view_request};
+use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, ViewRequest, Scaffold};
 use crate::types::skgnode::SkgNodeMap;
@@ -45,7 +45,7 @@ pub async fn build_and_integrate_aliases (
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
-    get_pid_in_tree ( tree, node_id ) ?;
+    get_id_from_treenode ( tree, node_id ) ?;
   if unique_scaffold_child (
     tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,

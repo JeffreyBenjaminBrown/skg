@@ -1,6 +1,6 @@
 /// Node access utilities for ego_tree::Tree<OrgNode>
 
-use crate::to_org::util::{skgnode_and_orgnode_from_id, get_pid_in_tree};
+use crate::to_org::util::{skgnode_and_orgnode_from_id, get_id_from_treenode};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold,
@@ -49,7 +49,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
   node_id : NodeId,
 ) -> Result < ( ID, Vec < ID > ),
               Box<dyn Error> > {
-  let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
+  let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
   let skgnode : &SkgNode =
     map . get ( &pid ) . ok_or ( "pids_for_subscriber_and_its_subscribees: SkgNode should exist in map" ) ?;
   Ok (( skgnode . ids [0] . clone (),
@@ -63,7 +63,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
-  let subscribee_pid : ID = get_pid_in_tree ( tree, node_id ) ?;
+  let subscribee_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
   let node_ref : NodeRef < OrgNode > =
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
@@ -78,7 +78,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     parent_ref . parent ()
     . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
   let subscriber_id : ID =
-    get_pid_in_tree ( tree, grandparent_ref . id () ) ?;
+    get_id_from_treenode ( tree, grandparent_ref . id () ) ?;
   let skgnode : &SkgNode =
     map . get ( &subscriber_id )
     . ok_or ( "Subscriber SkgNode not in map" ) ?;

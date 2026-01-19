@@ -73,4 +73,4 @@
 ** DONE add_last_generation_and_truncate_some_of_previous
 ** DONE add_children_and_collect_their_ids
 ** DONE type_and_parent_type_consistent_with_subscribee
-** get_pid_in_tree
+** get_id_from_treenode

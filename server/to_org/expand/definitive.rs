@@ -8,7 +8,7 @@ use crate::to_org::complete::sharing::{
   maybe_add_hiddenInSubscribeeCol_branch,
   type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::util::{
-  build_node_branch_minus_content, get_pid_in_tree,
+  build_node_branch_minus_content, get_id_from_treenode,
   DefinitiveMap,
   truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
@@ -70,7 +70,7 @@ async fn execute_definitive_view_request (
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID = get_pid_in_tree (
+  let node_pid : ID = get_id_from_treenode (
     forest, node_id ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
