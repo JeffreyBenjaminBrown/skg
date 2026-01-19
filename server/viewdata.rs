@@ -22,6 +22,42 @@ struct MapsFromIdForView {
   content_to_containers : HashMap < ID, HashSet < ID > >, // if the value would be empty, the key is omitted
 }
 
+/// Enrich all nodes in a forest with relationship metadata.
+/// Fetches relationship data from TypeDB and applies it to the forest.
+/// Forest is a single tree with ForestRoot at root.
+pub async fn set_metadata_relationship_viewdata_in_forest (
+  forest : &mut Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let rel_data : MapsFromIdForView =
+    mapsFromIdForView_from_forest (
+      forest, config, driver ) . await ?;
+  let root_treeid : NodeId = forest . root () . id ();
+  set_metadata_relationships_in_node_recursive (
+    forest,
+    root_treeid,
+    None,
+    & rel_data );
+  Ok (( )) }
+
+/// Build MapsFromIdForView from a forest
+/// (a single tree with ForestRoot as root).
+/// Collects all PIDs from the forest and fetches relationship data.
+#[allow(non_snake_case)]
+async fn mapsFromIdForView_from_forest (
+  forest : &Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < MapsFromIdForView, Box<dyn Error> > {
+  let pids : Vec < ID > =
+    collect_ids_from_tree ( forest );
+  fetch_relationship_data (
+    driver,
+    & config . db_name,
+    & pids
+  ) . await }
+
 /// Run four batch queries to fetch all relationship data
 /// for the given PIDs.
 async fn fetch_relationship_data (
@@ -48,41 +84,6 @@ async fn fetch_relationship_data (
     content_to_containers,
   }) }
 
-/// Enrich all nodes in a forest with relationship metadata.
-/// Fetches relationship data from TypeDB and applies it to the forest.
-/// Forest is a single tree with ForestRoot at root.
-pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut Tree<OrgNode>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let rel_data : MapsFromIdForView =
-    mapsFromIdForView_from_orgtree (
-      forest, config, driver ) . await ?;
-  let root_treeid : NodeId = forest . root () . id ();
-  set_metadata_relationships_in_node_recursive (
-    forest,
-    root_treeid,
-    None,
-    & rel_data );
-  Ok (( )) }
-
-/// Build MapsFromIdForView from a Tree<OrgNode> forest.
-/// Collects all PIDs from the forest and fetches relationship data.
-#[allow(non_snake_case)]
-async fn mapsFromIdForView_from_orgtree (
-  forest : &Tree<OrgNode>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result < MapsFromIdForView, Box<dyn Error> > {
-  let pids : Vec < ID > = collect_ids_from_tree ( forest );
-  fetch_relationship_data (
-    driver,
-    & config . db_name,
-    & pids
-  ) . await }
-
-/// Recursively set metadata relationships in Tree<OrgNode>.
 fn set_metadata_relationships_in_node_recursive (
   tree       : &mut Tree<OrgNode>,
   treeid    : NodeId,

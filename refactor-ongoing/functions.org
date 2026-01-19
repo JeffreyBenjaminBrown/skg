@@ -22,7 +22,7 @@
 * new-helper-functions
 ** skgnodes_from_ids
 ** skgnode_map_from_save_instructions
-** mapsFromIdForView_from_orgtree
+** mapsFromIdForView_from_forest
 ** skgnode_map_from_forest
 ** AsRef<OrgNode> trait implementations
 ** collect_ids_from_subtree

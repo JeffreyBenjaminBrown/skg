@@ -98,7 +98,7 @@ Created =orgnode_forest_to_string_v2= in =server/org_to_text.rs=:
 
 Created in =server/viewdata.rs=:
 - =set_metadata_relationship_viewdata_in_forest_v2=
-- =mapsFromIdForView_from_orgtree=
+- =mapsFromIdForView_from_forest=
 - =set_metadata_relationships_in_node_recursive_v2=
 
 Created =collect_ids_from_orgtree= in =server/to_org/util.rs=.

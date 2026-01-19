@@ -78,7 +78,8 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   let grandparent_ref : NodeRef < OrgNode > =
     parent_ref . parent ()
     . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
-  let subscriber_id : ID = get_pid_in_tree ( tree, grandparent_ref . id () ) ?;
+  let subscriber_id : ID =
+    get_pid_in_tree ( tree, grandparent_ref . id () ) ?;
   let skgnode : &SkgNode =
     map . get ( &subscriber_id )
     . ok_or ( "Subscriber SkgNode not in map" ) ?;
@@ -134,42 +135,9 @@ pub async fn append_indefinitive_from_disk_as_child (
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 
-/// Reads from disk the SkgNode
-/// for a node or for one of its tree-ancestors.
-/// Collect aliases for a node:
-/// - find the unique AliasCol child (error if multiple)
-/// - for each Alias child of the AliasCol, collect its title
-/// Duplicates are removed (preserving order of first occurrence).
-/// Returns None ("no opinion") if no AliasCol found.
-/// Returns Some(vec) if AliasCol found, even if empty.
-pub fn collect_grandchild_aliases_for_orgnode (
-  tree: &Tree<OrgNode>,
-  node_id: NodeId,
-) -> Result<Option<Vec<String>>, String> {
-  let alias_col_id : Option<NodeId> =
-    unique_scaffold_child (
-      tree, node_id, &Scaffold::AliasCol )
-    . map_err ( |e| e.to_string() ) ?;
-  match alias_col_id {
-    None => Ok(None),
-    Some(col_id) => {
-      let aliases : Vec<String> = {
-        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect(
-          "collect_grandchild_aliases_for_orgnode: AliasCol not found");
-        let mut aliases : Vec<String> = Vec::new();
-        for alias_child in col_ref.children() {
-          { // check for invalid state
-            if ! matches!(&alias_child.value().kind,
-                          OrgNodeKind::Scaff(Scaffold::Alias(_))) {
-              return Err ( format! (
-                "AliasCol has non-Alias child with kind: {:?}",
-                alias_child.value().kind )); }}
-          aliases . push(
-            alias_child . value() . title() . to_string() ); }
-        aliases };
-      Ok(Some(dedup_vector(aliases))) }} }
-
-/// Collect aliases from Alias children of an AliasCol node.
+/// Collect titles from Alias children of an AliasCol.
+/// Removes Duplicate (preserving order of first occurrence).
+/// Errors if any non-Alias children are found.
 pub(crate) fn collect_child_aliases_at_aliascol (
   tree             : &Tree<OrgNode>,
   aliascol_node_id : NodeId,
@@ -191,9 +159,42 @@ pub(crate) fn collect_child_aliases_at_aliascol (
       child . title () . to_string () ); }
   Ok ( aliases ) }
 
+/// Reads from disk the SkgNode
+/// for a node or for one of its tree-ancestors.
+/// Collect aliases for a node:
+/// - find the unique AliasCol child (error if multiple)
+/// - for each Alias child of the AliasCol, collect its title
+/// Duplicates are removed (preserving order of first occurrence).
+/// Returns None ("no opinion") if no AliasCol found.
+/// Returns Some(vec) if AliasCol found, even if empty.
+pub fn collect_grandchild_aliases_for_orgnode (
+  tree: &Tree<OrgNode>,
+  node_id: NodeId,
+) -> Result<Option<Vec<String>>, String> {
+  let alias_col_id : Option<NodeId> =
+    unique_scaffold_child (
+      tree, node_id, &Scaffold::AliasCol )
+    . map_err ( |e| e.to_string() ) ?;
+  match alias_col_id {
+    None => Ok(None),
+    Some(col_id) => {
+      let aliases : Vec<String> = {
+        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect( "collect_grandchild_aliases_for_orgnode: AliasCol not found");
+        let mut aliases : Vec<String> = Vec::new();
+        for alias_child in col_ref.children() {
+          { // check for invalid state
+            if ! matches!(&alias_child.value().kind,
+                          OrgNodeKind::Scaff(Scaffold::Alias(_))) {
+              return Err ( format! (
+                "AliasCol has non-Alias child with kind: {:?}",
+                alias_child.value().kind )); }}
+          aliases . push(
+            alias_child . value() . title() . to_string() ); }
+        aliases };
+      Ok(Some(dedup_vector(aliases))) }} }
+
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
-/// Find a child node by ID in Tree<OrgNode>.
 pub fn find_child_by_id (
   tree          : & Tree<OrgNode>,
   parent_treeid : NodeId,
