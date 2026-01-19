@@ -30,7 +30,7 @@ use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_containerward_view_then_drop_request (
   tree          : &mut Tree<OrgNode>,
-  _map          : &mut SkgNodeMap,
+  map           : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -38,7 +38,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_containerward_path (
-      tree, node_id, config, typedb_driver ) . await;
+      tree, map, node_id, config, typedb_driver ). await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
@@ -50,6 +50,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
 /// and integrates the containerward path from that node.
 pub async fn build_and_integrate_containerward_path (
   tree      : &mut Tree<OrgNode>,
+  map       : &mut SkgNodeMap,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
@@ -63,12 +64,12 @@ pub async fn build_and_integrate_containerward_path (
       driver,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
-    tree, node_id, path, branches, cycle_node, config, driver
+    tree, map, node_id, path, branches, cycle_node, config, driver
   ). await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut Tree<OrgNode>,
-  _map          : &mut SkgNodeMap,
+  map           : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -76,7 +77,7 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_sourceward_path (
-      tree, node_id, config, typedb_driver ) . await;
+      tree, map, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Sourceward,
@@ -90,6 +91,7 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
 ///   due to async lifetime issues.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<OrgNode>,
+  map       : &mut SkgNodeMap,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
@@ -103,13 +105,14 @@ pub async fn build_and_integrate_sourceward_path (
       driver,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
-    tree, node_id, path, branches, cycle_node, config, driver
+    tree, map, node_id, path, branches, cycle_node, config, driver
   ). await }
 
 /// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
 /// using provided backpath data.
 pub async fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree<OrgNode>,
+  map         : &mut SkgNodeMap,
   node_id     : ego_tree::NodeId,
   mut path    : Vec < ID >,
   branches    : HashSet < ID >,
@@ -130,14 +133,14 @@ pub async fn integrate_path_that_might_fork_or_cycle (
     path . remove ( 0 ); }
   let last_node_id : ego_tree::NodeId =
     integrate_linear_portion_of_path (
-      tree, node_id, &path, config, driver ) . await ?;
+      tree, map, node_id, &path, config, driver ) . await ?;
   if ! branches . is_empty () {
     integrate_branches_in_node (
-      tree, last_node_id, branches, config, driver ) . await ?;
+      tree, map, last_node_id, branches, config, driver ) . await ?;
   } else if let Some ( cycle_id ) = cycle_node {
     // PITFALL: If there are branches, the cycle node is ignored.
     integrate_cycle_in_node (
-      tree, last_node_id, cycle_id, config, driver ) . await ?; }
+      tree, map, last_node_id, cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
 /// Recursively integrate the remaining path into the tree.
@@ -145,6 +148,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
 /// Returns the NodeId of the last node in the path.
 fn integrate_linear_portion_of_path<'a> (
   tree       : &'a mut Tree<OrgNode>,
+  map        : &'a mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   path       : &'a [ID],
   config     : &'a SkgConfig,
@@ -159,11 +163,12 @@ fn integrate_linear_portion_of_path<'a> (
     let next_node_id : ego_tree::NodeId =
       match find_child_by_id ( tree, node_id, path_head ) {
         Some ( child_treeid ) => child_treeid,
-        None => {
-          prepend_indefinitive_child_with_parent_ignores (
-            tree, node_id, path_head, config, driver ) . await ? } };
+        None => { prepend_indefinitive_child_with_parent_ignores (
+                    tree, map, node_id, path_head, config, driver
+                  ). await ? } };
     integrate_linear_portion_of_path ( // recurse
       tree,
+      map,
       next_node_id, // we just found or inserted this
       path_tail,
       config,
@@ -174,6 +179,7 @@ fn integrate_linear_portion_of_path<'a> (
 /// Branches that are already children are skipped.
 async fn integrate_branches_in_node (
   tree       : &mut Tree<OrgNode>,
+  map        : &mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   branches   : HashSet < ID >,
   config     : &SkgConfig,
@@ -191,13 +197,14 @@ async fn integrate_branches_in_node (
     branches_to_add . reverse (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, node_id, &branch_id, config, driver ) . await ?; }
+      tree, map, node_id, &branch_id, config, driver ). await ?; }
   Ok (( )) }
 
 /// Add a cycle node as a child of the specified node.
 /// The cycle node is only added if it's not already a child.
 async fn integrate_cycle_in_node (
   tree       : &mut Tree<OrgNode>,
+  map        : &mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   cycle_id   : ID,
   config     : &SkgConfig,
@@ -205,7 +212,7 @@ async fn integrate_cycle_in_node (
 ) -> Result < (), Box<dyn Error> > {
   if find_child_by_id ( tree, node_id, &cycle_id ) . is_none () {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, node_id, &cycle_id, config, driver ) . await ?; }
+      tree, map, node_id, &cycle_id, config, driver ). await ?; }
   Ok (( )) }
 
 /// Helper function to prepend a new child to a node in a tree.
@@ -214,6 +221,7 @@ async fn integrate_cycle_in_node (
 /// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
   tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
   parent_treeid  : ego_tree::NodeId,
   child_skgid    : &ID,
   config         : &SkgConfig,
@@ -221,7 +229,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
   let ( _, child_orgnode ) : ( _, OrgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_skgid
+      config, driver, child_skgid, map
     ). await ?;
   let (id, source, title) : (ID, String, String)
   = match &child_orgnode.kind

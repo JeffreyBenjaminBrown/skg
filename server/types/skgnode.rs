@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::error::Error;
 
-use crate::dbs::filesystem::one_node::skgnodes_from_ids;
+use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::save::NonMerge_NodeAction;
 use crate::util::option_vec_is_empty_or_none;
@@ -141,6 +141,22 @@ pub async fn skgnode_map_from_forest (
       if let Some ( id ) = node . ids . first () {
         map . insert ( id . clone (), node ); }}
     Ok ( map ) }}
+
+/// Tries to return a SkgNode from the map.
+/// If it's absent, fetches from disk and updates the map.
+pub fn skgnode_from_map_or_disk<'a>(
+  id     : &ID,
+  map    : &'a mut SkgNodeMap,
+  config : &SkgConfig,
+  source : &str,
+) -> Result<&'a SkgNode, Box<dyn Error>> {
+  if !map.contains_key(id) {
+    let skgnode: SkgNode =
+      skgnode_from_pid_and_source(
+        config, id.clone(), source)?;
+    map.insert(id.clone(), skgnode); }
+  map . get(id) . ok_or_else(
+    || "SkgNode should be in map after fetch".into( )) }
 
 fn collect_ids_from_subtree (
   tree    : &Tree<OrgNode>,

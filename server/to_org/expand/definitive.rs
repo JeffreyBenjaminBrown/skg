@@ -3,7 +3,6 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
   build_and_integrate_sourceward_view_then_drop_request};
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::{
   maybe_add_hiddenInSubscribeeCol_branch,
@@ -14,7 +13,7 @@ use crate::to_org::util::{
   truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::{SkgNode, SkgNodeMap};
+use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
 use crate::types::tree::generic::write_at_node_in_tree;
 
@@ -273,7 +272,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   Ok (( )) }
 
 /// Fetches SkgNode from map or disk.
-/// Updates title, body, mskgnode.
+/// Updates title and body.
 /// Preserves all other OrgNode data.
 fn from_disk_replace_title_body_and_skgnode (
   tree    : &mut Tree<OrgNode>,
@@ -289,14 +288,12 @@ fn from_disk_replace_title_body_and_skgnode (
       else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
     ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
       t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk: no source" ) ? ) };
-  let skgnode : SkgNode =
-    skgnode_from_pid_and_source (
-      config, pid.clone (), &src ) ?;
+  let skgnode : &SkgNode = skgnode_from_map_or_disk (
+    &pid, map, config, &src ) ?;
   let title : String = skgnode . title . clone();
   if title . is_empty () {
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
-  map . insert ( pid, skgnode ); // Update map
   write_at_node_in_tree ( tree, node_id, |orgnode| { // Update orgnode
     let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
       &mut orgnode . kind

@@ -1,4 +1,3 @@
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
@@ -8,7 +7,7 @@ use crate::types::orgnode::{
     mk_definitive_orgnode, OrgNode, OrgNodeKind, forest_root_orgnode };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::{SkgNode, SkgNodeMap};
+use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_from_map_or_disk};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -40,7 +39,8 @@ pub type DefinitiveMap =
 pub async fn skgnode_and_orgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  skgid : &ID,
+  skgid  : &ID,
+  map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, String) =
     pid_and_source_from_id( // Query TypeDB for them
@@ -48,7 +48,7 @@ pub async fn skgnode_and_orgnode_from_id (
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
   skgnode_and_orgnode_from_pid_and_source (
-    config, &pid_resolved, &source ) }
+    config, &pid_resolved, &source, map ) }
 
 /// Fetch a SkgNode from disk given PID and source.
 /// Make an OrgNode from it, with validated title.
@@ -57,9 +57,10 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &str,
+  map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
-  let skgnode : SkgNode =
-    skgnode_from_pid_and_source( config, pid.clone(), source )?;
+  let skgnode : &SkgNode =
+    skgnode_from_map_or_disk( pid, map, config, source )?;
   let title : String = skgnode . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -71,7 +72,7 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
     source . to_string (),
     title,
     skgnode . body . clone () );
-  Ok (( skgnode, orgnode )) }
+  Ok (( skgnode . clone (), orgnode )) }
 
 /// Set 'indefinitive' to true,
 /// reset title and source,
@@ -252,11 +253,9 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
+  let (_child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
-      config, driver, child_skgid ) . await ?;
-  map . insert ( child_skgid . clone (),
-                 child_skgnode );
+      config, driver, child_skgid, map ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
       tree, parent_treeid,
@@ -280,16 +279,11 @@ pub async fn build_node_branch_minus_content (
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
 ) -> Result < (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId), Box<dyn Error> > {
-  let (skgnode, orgnode) : (SkgNode, OrgNode) =
-    skgnode_and_orgnode_from_id (
-      config, driver, skgid ) . await ?;
-  let node_id : ID = match &orgnode.kind {
-    OrgNodeKind::True(t) => t . id_opt . clone() . ok_or ( "build_node_branch_minus_content: orgnode has no ID" ) ?,
-    OrgNodeKind::Scaff(_) =>
-      return Err ( "build_node_branch_minus_content: orgnode is Scaffold".into() ), };
   match (tree_and_parent, map) {
     (Some ( (tree, parent_treeid) ), Some(map)) => {
-      map . insert ( node_id, skgnode ); // Add SkgNode to map
+      let (_skgnode, orgnode) : (SkgNode, OrgNode) =
+        skgnode_and_orgnode_from_id (
+          config, driver, skgid, map ) . await ?;
       let child_treeid : NodeId = // Add OrgNode to tree
         with_node_mut (
           tree, parent_treeid,
@@ -303,7 +297,9 @@ pub async fn build_node_branch_minus_content (
     (None, None) => {
       let mut map : SkgNodeMap =
         SkgNodeMap::new ();
-      map . insert ( node_id, skgnode );
+      let (_skgnode, orgnode) : (SkgNode, OrgNode) =
+        skgnode_and_orgnode_from_id (
+          config, driver, skgid, &mut map ) . await ?;
       let mut tree : Tree<OrgNode> =
         Tree::new ( orgnode );
       let root_treeid : NodeId = tree . root () . id ();

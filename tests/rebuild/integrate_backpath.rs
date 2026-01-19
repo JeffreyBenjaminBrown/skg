@@ -6,6 +6,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode};
+use skg::types::skgnode::SkgNodeMap;
 use skg::org_to_text::orgnode_forest_to_string;
 
 use ego_tree::Tree;
@@ -56,8 +57,9 @@ async fn test_path_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, root_id, path, branches,
+    &mut forest, &mut map, root_id, path, branches,
     cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
@@ -137,8 +139,9 @@ async fn test_path_with_branches_no_cycle_impl(
   let cycle_node = None;
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut forest, &mut map, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
@@ -220,8 +223,9 @@ async fn test_path_with_branches_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
+  let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut forest, &mut map, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"

@@ -8,7 +8,7 @@ use crate::types::orgnode::{
     orgnode_from_scaffold };
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::util::dedup_vector;
-use super::generic::{read_at_node_in_tree, with_node_mut};
+use super::generic::with_node_mut;
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -51,11 +51,10 @@ pub fn pids_for_subscriber_and_its_subscribees (
               Box<dyn Error> > {
   let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
   let skgnode : &SkgNode =
-    map . get ( &pid )
-    . ok_or ( "pids_for_subscriber_and_its_subscribees: SkgNode should exist in map" ) ?;
+    map . get ( &pid ) . ok_or ( "pids_for_subscriber_and_its_subscribees: SkgNode should exist in map" ) ?;
   Ok (( skgnode . ids [0] . clone (),
-        skgnode . subscribes_to . clone ()
-        . unwrap_or_default () )) }
+        ( skgnode . subscribes_to . clone ()
+          . unwrap_or_default () )) ) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
@@ -113,9 +112,9 @@ pub async fn append_indefinitive_from_disk_as_child (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
+  let ( _skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
-      config, driver, node_id ) . await ?;
+      config, driver, node_id, map ) . await ?;
   let (id, source, title) : (ID, String, String)
   = match &content_orgnode.kind
   { OrgNodeKind::True(t) => (
@@ -125,7 +124,6 @@ pub async fn append_indefinitive_from_disk_as_child (
         . clone(),
       t . title . clone( )),
     OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
-  map . insert ( id.clone(), skgnode ); // update map
   let orgnode : OrgNode = mk_indefinitive_orgnode (
     id, source, title, parent_ignores );
   with_node_mut (

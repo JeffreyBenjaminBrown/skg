@@ -31,7 +31,7 @@ pub async fn completeAliasCol (
       read_at_node_in_tree(
         tree, aliascol_node_id,
         |orgnode| matches!( &orgnode.kind,
-                       OrgNodeKind::Scaff(Scaffold::AliasCol)) )
+                            OrgNodeKind::Scaff(Scaffold::AliasCol)) )
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
     if ! is_aliascol {
       return Err( "Node is not an AliasCol" . into () ); }}
