@@ -1,11 +1,10 @@
 use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
-use crate::types::tree::NodePair;
 use crate::types::tree::generic::read_at_node_in_tree;
 
 use ego_tree::NodeId;
 use std::error::Error;
 
-/// Generic version that works with both PairTree and Tree<OrgNode>.
+/// Generic version that works with Tree<OrgNode>.
 pub fn collectViewRequestsFromForest<T> (
   forest : &ego_tree::Tree<T>,
 ) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
@@ -49,17 +48,9 @@ where T: AsRef<OrgNode>,
       tree, child_id, view_requests_out ) ?; }
   Ok (( )) }
 
-impl AsRef<OrgNode> for NodePair {
-  fn as_ref(&self) -> &OrgNode {
-    &self.orgnode }}
-
 impl AsRef<OrgNode> for OrgNode {
   fn as_ref(&self) -> &OrgNode {
     self }}
-
-impl AsMut<OrgNode> for NodePair {
-  fn as_mut(&mut self) -> &mut OrgNode {
-    &mut self.orgnode }}
 
 impl AsMut<OrgNode> for OrgNode {
   fn as_mut(&mut self) -> &mut OrgNode {

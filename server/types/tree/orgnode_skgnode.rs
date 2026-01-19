@@ -1,6 +1,5 @@
-/// Node access utilities for ego_tree::Tree<OrgNode|NodePair>
+/// Node access utilities for ego_tree::Tree<OrgNode>
 
-use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::to_org::util::skgnode_and_orgnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{
@@ -9,140 +8,25 @@ use crate::types::orgnode::{
     orgnode_from_scaffold };
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::util::dedup_vector;
-use super::{NodePair, PairTree};
-use super::generic::{read_at_ancestor_in_tree, read_at_node_in_tree, with_node_mut};
+use super::generic::{read_at_node_in_tree, with_node_mut};
 
-use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
+use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-///
-/// Conversion between PairTree and (Tree<OrgNode>, SkgNodeMap)
-///
-
-/// Convert Tree<OrgNode> and SkgNodeMap into a PairTree.
-/// For each OrgNode, looks up the SkgNode in the map by ID.
-pub fn pairtree_from_tree_and_map (
-  tree : &Tree<OrgNode>,
-  map  : &SkgNodeMap,
-) -> PairTree {
-  fn clone_subtree (
-    node_ref   : NodeRef<OrgNode>,
-    map        : &SkgNodeMap,
-    parent_mut : &mut NodeMut<NodePair>,
-  ) {
-    for child_ref in node_ref . children() {
-      let orgnode : OrgNode = child_ref . value() . clone();
-      let mskgnode : Option<SkgNode> = match &orgnode.kind {
-        OrgNodeKind::True(t) =>
-          t . id_opt . as_ref() . and_then( |id| map.get(id) . cloned() ),
-        OrgNodeKind::Scaff(_) => None,
-      };
-      let pair : NodePair = NodePair { mskgnode, orgnode };
-      let mut child_mut : NodeMut<NodePair> = parent_mut . append ( pair );
-      clone_subtree ( child_ref, map, &mut child_mut ); } }
-
-  // Start with root
-  let root_ref : NodeRef<OrgNode> = tree . root();
-  let root_orgnode : OrgNode = root_ref . value() . clone();
-  let root_mskgnode : Option<SkgNode> = match &root_orgnode.kind {
-    OrgNodeKind::True(t) =>
-      t . id_opt . as_ref() . and_then( |id| map.get(id) . cloned() ),
-    OrgNodeKind::Scaff(_) => None,
-  };
-  let root_pair : NodePair = NodePair {
-    mskgnode : root_mskgnode,
-    orgnode  : root_orgnode,
-  };
-  let mut result : PairTree = Tree::new ( root_pair );
-  { let mut root_mut : NodeMut<NodePair> = result . root_mut();
-    clone_subtree ( tree.root(), map, &mut root_mut ); }
-  result }
-
-/// Extract Tree<OrgNode> and SkgNodeMap from a PairTree.
-/// Returns a new tree and map built from the PairTree.
-pub fn tree_and_map_from_pairtree (
-  pairtree : &PairTree,
-) -> (Tree<OrgNode>, SkgNodeMap) {
-  fn clone_subtree (
-    node_ref   : NodeRef<NodePair>,
-    parent_mut : &mut NodeMut<OrgNode>,
-    map        : &mut SkgNodeMap,
-  ) {
-    for child_ref in node_ref . children() {
-      let pair : &NodePair = child_ref . value();
-      let orgnode : OrgNode = pair . orgnode . clone();
-
-      // Add SkgNode to map if present
-      if let Some(skgnode) = &pair.mskgnode {
-        if let Some(id) = skgnode . ids . first() {
-          map . insert ( id . clone(), skgnode . clone() ); }}
-
-      let mut child_mut : NodeMut<OrgNode> =
-        parent_mut . append ( orgnode );
-      clone_subtree ( child_ref, &mut child_mut, map ); } }
-
-  let mut map : SkgNodeMap = SkgNodeMap::new();
-
-  // Start with root
-  let root_ref : NodeRef<NodePair> = pairtree . root();
-  let root_pair : &NodePair = root_ref . value();
-  let root_orgnode : OrgNode = root_pair . orgnode . clone();
-
-  // Add root SkgNode to map if present
-  if let Some(skgnode) = &root_pair.mskgnode {
-    if let Some(id) = skgnode . ids . first() {
-      map . insert ( id . clone(), skgnode . clone() ); }}
-
-  let mut tree : Tree<OrgNode> = Tree::new ( root_orgnode );
-  { let mut root_mut : NodeMut<OrgNode> = tree . root_mut();
-    clone_subtree ( pairtree.root(), &mut root_mut, &mut map ); }
-
-  ( tree, map ) }
-
-///
-/// accessors specific to trees of OrgNodes and (maybe) SkgNodes
-///
-
-/// Find the unique child of a node with a given Scaffold (for PairTree).
+/// Find the unique child of a node with a given Scaffold.
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
 pub fn unique_scaffold_child (
-  tree          : &PairTree,
-  node_id       : NodeId,
-  scaffold_kind : &Scaffold,
-) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : NodeRef<super::NodePair> =
-    tree.get(node_id)
-    .ok_or("unique_scaffold_child: node not found")?;
-  let matches : Vec<NodeId> = node_ref.children()
-    .filter(|c| matches!(&c.value().orgnode.kind,
-                         OrgNodeKind::Scaff(s)
-                         if s.matches_kind(scaffold_kind)) )
-    .map(|c| c.id())
-    .collect();
-  match matches.len() {
-    0 => Ok(None),
-    1 => Ok(Some(matches[0])),
-    n => Err(format!(
-      "Expected at most one {:?} child, found {}", scaffold_kind, n).into()),
-  }
-}
-
-/// Find the unique child of a node with a given Scaffold (for Tree<OrgNode>).
-/// Returns None if no child has the kind,
-/// Some(child_id) if exactly one does,
-/// or an error if multiple children have it.
-pub fn unique_orgnode_scaffold_child (
   tree          : &Tree<OrgNode>,
   node_id       : NodeId,
   scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   let node_ref : NodeRef<OrgNode> =
     tree . get(node_id) . ok_or(
-      "unique_orgnode_scaffold_child: node not found")?;
+      "unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
     .filter(|c| matches!(&c.value().kind,
                          OrgNodeKind::Scaff(s)
@@ -283,50 +167,7 @@ pub async fn append_indefinitive_from_disk_as_child (
 
 /// Reads from disk the SkgNode
 /// for a node or for one of its tree-ancestors.
-pub async fn ancestor_skgnode_from_disk (
-  tree       : &PairTree,
-  treeid     : NodeId,
-  generation : usize, // 0 = self, 1 = parent, etc.
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
-) -> Result < SkgNode, Box<dyn Error> > {
-  let ancestor_skgid : ID =
-    read_at_ancestor_in_tree(
-      tree, treeid, generation,
-      |np| match &np.orgnode.kind {
-        OrgNodeKind::True(t) => t.id_opt.clone()
-          .ok_or("Ancestor TrueNode has no ID"),
-        OrgNodeKind::Scaff(_) => Err(
-          "Ancestor  is a Scaffold, not a TrueNode") } )??;
-  let skgnode : SkgNode =
-    skgnode_from_id( config, driver, &ancestor_skgid ) . await?;
-  Ok ( skgnode ) }
-
-/// Collect titles from Alias children of an AliasCol node (for PairTree).
-/// Duplicates are removed (preserving order of first occurrence).
-/// Errors if any non-Alias children are found.
-pub fn collect_child_aliases_at_nodepair_aliascol (
-  tree             : &PairTree,
-  aliascol_node_id : NodeId,
-) -> Result < Vec < String >, Box<dyn Error> > {
-  let mut aliases : Vec < String > =
-    Vec::new ();
-  let aliascol_ref : NodeRef < NodePair > =
-    tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found" ) ?;
-  for child_ref in aliascol_ref . children() {
-    let child : &OrgNode = &child_ref . value() . orgnode;
-    if ! matches! ( &child . kind,
-                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
-      return Err (
-        format! ( "AliasCol has non-Alias child with kind: {:?}",
-                  child . kind )
-        . into () ); }
-    aliases . push (
-      child . title () . to_string () ); }
-  Ok ( dedup_vector ( aliases ) ) }
-
-/// Collect aliases for a node (for Tree<OrgNode>):
+/// Collect aliases for a node:
 /// - find the unique AliasCol child (error if multiple)
 /// - for each Alias child of the AliasCol, collect its title
 /// Duplicates are removed (preserving order of first occurrence).
@@ -337,7 +178,7 @@ pub fn collect_grandchild_aliases_for_orgnode (
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
-    unique_orgnode_scaffold_child (
+    unique_scaffold_child (
       tree, node_id, &Scaffold::AliasCol )
     . map_err ( |e| e.to_string() ) ?;
   match alias_col_id {
@@ -389,30 +230,3 @@ pub fn find_children_by_ids (
           result.insert(child_id.clone(), child.id()); }}}}
   result }
 
-/// Reorder children of a parent node.
-/// Takes two vectors of NodeIds: first and second.
-/// All children in 'first' will be placed before all children in 'second'.
-pub fn reorder_children (
-  tree          : &mut PairTree,
-  parent_treeid : NodeId,
-  first         : &Vec < NodeId >,
-  second        : &Vec < NodeId >,
-) -> Result < (), Box<dyn Error> > {
-  let mut desired_order : Vec < NodeId > =
-    Vec::new ();
-  desired_order . extend ( first );
-  desired_order . extend ( second );
-
-  for child_treeid in & desired_order {
-    // Detach all children
-    with_node_mut ( tree, *child_treeid,
-                    |mut child_mut| child_mut . detach () ) ?; }
-
-  for child_treeid in & desired_order {
-    // Re-append in desired order.
-    // ('append_id' preserves entire subtrees.)
-    with_node_mut (
-      tree, parent_treeid,
-      |mut parent_mut| {
-        parent_mut . append_id ( *child_treeid ); } ) ?; }
-  Ok (( )) }

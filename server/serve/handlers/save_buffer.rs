@@ -124,7 +124,7 @@ fn empty_response_sexp (
 /// - Validation must happen at many stages.
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
 /// - completeAndRestoreForest_collectingViewRequests is complex.
-/// - execute_view_requests is complex, because it attempts to integrate existing NodePair branches before generating new ones
+/// - execute_view_requests is complex, because it attempts to integrate existing branches before generating new ones
 pub async fn update_from_and_rerender_buffer (
   org_buffer_text : &str,
   typedb_driver   : &TypeDBDriver,
@@ -159,7 +159,7 @@ pub async fn update_from_and_rerender_buffer (
     // Build map from save instructions
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
-    // Keep orgnode_forest as Tree<OrgNode>, don't convert to PairTree
+    // Use orgnode_forest as Tree<OrgNode>
     let mut forest : Tree<OrgNode> = orgnode_forest;
     { // modify the forest before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();

@@ -5,7 +5,7 @@ use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
-  collect_grandchild_aliases_for_orgnode, unique_orgnode_scaffold_child };
+  collect_grandchild_aliases_for_orgnode, unique_scaffold_child };
 use crate::util::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -121,7 +121,7 @@ fn collect_subscribees (
   node_id: NodeId,
 ) -> Result<Option<Vec<ID>>, String> {
   let subscribee_col_id : Option<NodeId> =
-    unique_orgnode_scaffold_child (
+    unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )
     . map_err ( |e| e.to_string() ) ?;
   match subscribee_col_id {

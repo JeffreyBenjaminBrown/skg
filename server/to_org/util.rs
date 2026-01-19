@@ -5,8 +5,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    mk_definitive_orgnode, OrgNode, OrgNodeKind, Scaffold, forest_root_orgnode };
-use crate::types::tree::{NodePair, PairTree};
+    mk_definitive_orgnode, OrgNode, OrgNodeKind };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
@@ -29,33 +28,6 @@ use typedb_driver::TypeDBDriver;
 ///   conflicts with a new definitive view request
 pub type DefinitiveMap =
   HashMap < ID, NodeId >;
-
-
-// ======================================================
-// ForestRoot utilities
-// ======================================================
-
-/// Create a NodePair representing a ForestRoot.
-/// It is never rendered; it just makes forests easier to process.
-pub fn forest_root_pair () -> NodePair {
-  NodePair { mskgnode : None,
-             orgnode  : forest_root_orgnode() } }
-
-/// Create a new forest (a tree with a ForestRoot root).
-/// The "tree roots" will be children of this root.
-fn new_forest () -> PairTree {
-  Tree::new ( forest_root_pair () ) }
-
-/// Check if a node is a ForestRoot.
-fn is_forest_root (
-  tree    : &PairTree,
-  node_id : NodeId,
-) -> bool {
-  tree . get ( node_id )
-    . map ( |node_ref|
-             matches! ( &node_ref . value () . orgnode . kind,
-                        OrgNodeKind::Scaff ( Scaffold::ForestRoot ) ) )
-    . unwrap_or ( false ) }
 
 
 // ======================================================
@@ -210,22 +182,8 @@ pub async fn stub_forest_from_root_ids (
     ) . await ?; }
   Ok ( (forest, map) ) }
 
-pub fn collect_ids_from_pair_tree (
-  tree : &PairTree,
-) -> Vec < ID > {
-  let mut pids : Vec < ID > = Vec::new ();
-  for edge in tree . root () . traverse () {
-    if let Edge::Open ( node_ref ) = edge {
-      let pid_opt : Option<&ID>
-      = match &node_ref . value () . orgnode . kind
-      { OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
-        OrgNodeKind::Scaff ( _ ) => None };
-      if let Some ( pid ) = pid_opt {
-        pids . push ( pid . clone( )); }} }
-  pids }
-
 /// Collect all IDs from a Tree<OrgNode>.
-pub fn collect_ids_from_orgtree (
+pub fn collect_ids_from_tree (
   tree : &Tree<OrgNode>,
 ) -> Vec < ID > {
   let mut pids : Vec < ID > = Vec::new ();
@@ -260,21 +218,6 @@ fn is_ancestor_id (
       Err(_) => return Ok(false), }}
   unreachable!() }
 
-/// Errors if the node is a Scaffold, not found, or has no ID.
-pub(super) fn get_pid_in_pairtree (
-  tree   : &PairTree,
-  treeid : NodeId,
-) -> Result < ID, Box<dyn Error> > {
-  let node_kind: OrgNodeKind =
-    read_at_node_in_tree (
-      tree, treeid, |np| np.orgnode.kind.clone() )?;
-  match node_kind {
-    OrgNodeKind::Scaff ( _ ) => Err ( "get_pid_in_pairtree: caller should not pass a Scaffold".into() ),
-    OrgNodeKind::True ( t ) =>
-      t . id_opt . ok_or_else (
-        || "get_pid_in_pairtree: node has no ID" . into( )) }}
-
-/// New version that works with Tree<OrgNode> instead of PairTree.
 /// Errors if the node is a Scaffold, not found, or has no ID.
 pub fn get_pid_in_tree (
   tree   : &Tree<OrgNode>,

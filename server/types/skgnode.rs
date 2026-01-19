@@ -54,7 +54,7 @@ impl SkgNode {
 
 
 //
-// New map-based helpers for refactoring away from PairTree
+// Map-based helpers for Tree<OrgNode> + SkgNodeMap architecture
 //
 
 /// Type alias for the new map-based approach.

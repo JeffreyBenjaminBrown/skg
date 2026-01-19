@@ -4,9 +4,6 @@ mod generic;
 #[path = "tree/from_org_text.rs"]
 mod from_org_text;
 
-#[path = "tree/orgnode_skgnode.rs"]
-mod orgnode_skgnode;
-
 use ego_tree::Tree;
 use skg::types::tree::generations::{
   first_in_generation,

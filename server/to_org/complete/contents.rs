@@ -1,7 +1,7 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{
-  DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree, truenode_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
+  DefinitiveMap, get_pid_in_tree, truenode_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
   make_indef_if_repeat_then_extend_defmap,
 };
 use crate::to_org::complete::aliascol::completeAliasCol;
@@ -12,7 +12,6 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::types::maps::add_v_to_map_if_absent;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
-use crate::types::tree::PairTree;
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree };
 
@@ -135,29 +134,6 @@ pub fn clobberIndefinitiveOrgnode (
   } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
 
-  Ok (( )) }
-
-/// Ensure a node in a PairTree has a SkgNode.
-/// If the node already has Some(skgnode), does nothing.
-/// Otherwise fetches from disk and stores it.
-pub async fn ensure_skgnode (
-  tree    : &mut PairTree,
-  node_id : NodeId,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let node_pid : ID = get_pid_in_pairtree ( tree, node_id ) ?;
-  let has_skgnode : bool =
-    read_at_node_in_tree (
-      tree, node_id,
-      |np| np . mskgnode . is_some () ) ?;
-  if ! has_skgnode {
-    let skgnode : SkgNode =
-      skgnode_from_id (
-        config, driver, &node_pid ) . await ?;
-    write_at_node_in_tree (
-      tree, node_id,
-      |np| np . mskgnode = Some ( skgnode ) ) ?; }
   Ok (( )) }
 
 /// Noop for Scaffolds. Otherwise, ensures the node has a source.

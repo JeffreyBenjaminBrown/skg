@@ -4,7 +4,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, ViewRequest, Scaffold};
 use crate::types::skgnode::SkgNodeMap;
 use crate::types::tree::orgnode_skgnode::{
-  insert_scaffold_as_child, unique_orgnode_scaffold_child};
+  insert_scaffold_as_child, unique_scaffold_child};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -37,7 +37,7 @@ pub async fn build_and_integrate_aliases (
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_pid_in_tree ( tree, node_id ) ?;
-  if unique_orgnode_scaffold_child (
+  if unique_scaffold_child (
     tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { return Ok (( )); }
   let aliases : Vec < String > =

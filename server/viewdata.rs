@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::count_relationships::{
   count_containers,
   count_contents,
   count_link_sources};
-use crate::to_org::util::collect_ids_from_orgtree;
+use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 
@@ -75,7 +75,7 @@ async fn mapsFromIdForView_from_orgtree (
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
-  let pids : Vec < ID > = collect_ids_from_orgtree ( forest );
+  let pids : Vec < ID > = collect_ids_from_tree ( forest );
   fetch_relationship_data (
     driver,
     & config . db_name,

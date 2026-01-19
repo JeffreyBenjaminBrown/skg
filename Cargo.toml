@@ -1,5 +1,5 @@
 [workspace]
-members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/scope-reducer"]
+members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/scope-reducer", "tools"]
 
 [package]
 name = "skg"

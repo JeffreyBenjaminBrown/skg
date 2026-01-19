@@ -10,7 +10,7 @@ use crate::types::tree::orgnode_skgnode::{
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
-  unique_orgnode_scaffold_child };
+  unique_scaffold_child };
 use crate::types::skgnode::SkgNodeMap;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -22,7 +22,7 @@ use typedb_driver::TypeDBDriver;
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
 /// TODO ? Also check that the grandparent is a TrueNode.
 pub fn type_and_parent_type_consistent_with_subscribee (
-  tree    : &ego_tree::Tree<OrgNode>,
+  tree    : &Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   let node_ref : NodeRef < OrgNode > =
@@ -61,7 +61,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       OrgNodeKind::True ( t ) => // skip indefinitive nodes
         if t.indefinitive { return Ok(( )) }} }
   { // Skip if there already is one.
-    if unique_orgnode_scaffold_child (
+    if unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
@@ -109,8 +109,8 @@ pub async fn maybe_add_subscribeeCol_branch (
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubsribeeCol -> Subscribee
 pub async fn maybe_add_hiddenInSubscribeeCol_branch (
-  tree              : &mut ego_tree::Tree<OrgNode>,
-  map               : &mut crate::types::skgnode::SkgNodeMap,
+  tree              : &mut Tree<OrgNode>,
+  map               : &mut SkgNodeMap,
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
@@ -118,7 +118,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
-  if crate::types::tree::orgnode_skgnode::unique_orgnode_scaffold_child (
+  if unique_scaffold_child (
        tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }

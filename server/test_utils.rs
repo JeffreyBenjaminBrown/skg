@@ -5,14 +5,12 @@ use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::to_org::util::forest_root_pair;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::skgnode::SkgNode;
-use crate::types::tree::{PairTree, NodePair};
 
-use ego_tree::{Tree, NodeId, NodeRef};
+use ego_tree::{Tree, NodeRef};
 use futures::StreamExt;
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
@@ -315,41 +313,6 @@ fn compare_two_orgnode_branches_recursively_modulo_id (
              compare_two_orgnode_branches_recursively_modulo_id(
                *c1, *c2)) ) }}
 
-/// Compare a PairTree forest (with ForestRoot) against a Vec of OrgNode trees.
-/// This compares just the OrgNode portions, ignoring the SkgNode Option.
-pub fn compare_orgnode_portions_of_pairforest_and_orgnodeforest (
-  forest : &PairTree,
-  forest2 : & Tree<OrgNode>,
-) -> bool {
-  let tree_roots1 : Vec < _ > =
-    forest . root () . children () . collect ();
-  let tree_roots2 : Vec < _ > =
-    forest2 . root () . children () . collect ();
-  if tree_roots1 . len () != tree_roots2 . len () {
-    return false; }
-  fn compare_nodes (
-    node1 : NodeRef < NodePair >,
-    node2 : NodeRef < OrgNode >
-  ) -> bool {
-    // Compare the OrgNode values directly
-    let n1 : & OrgNode = &node1 . value () .orgnode;
-    let n2 : & OrgNode = node2 . value ();
-    // Compare the OrgNode values
-    if n1 != n2 { return false; }
-    // Compare children recursively
-    let children1 : Vec < _ > = node1 . children () . collect ();
-    let children2 : Vec < _ > = node2 . children () . collect ();
-    children1 . len () == children2 . len () &&
-      children1 . iter () . zip ( children2 . iter () )
-      . all ( | ( c1, c2 ) | compare_nodes ( *c1, *c2 ) ) }
-  for ( tree_root1, tree_root2 )
-    in tree_roots1 . iter ()
-    . zip ( tree_roots2 . iter () ) {
-      if ! compare_nodes (
-        *tree_root1, *tree_root2 )
-      { return false; }}
-  true }
-
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
   metadata: Option<OrgnodeMetadata>
@@ -449,38 +412,3 @@ pub fn strip_org_comments(s: &str) -> String {
     .collect::<Vec<String>>()
     .join("\n") }
 
-/// Convert an OrgNode "forest" (tree with ForestRoot)
-/// to a paired forest, *with None for all SkgNodes*.
-/// Used in tests where we don't have save instructions.
-pub fn orgnode_forest_to_paired (
-  forest : Tree < OrgNode >,
-) -> PairTree {
-  fn add_orgnode_tree_as_child_of_forest_root (
-    paired_forest   : &mut PairTree,
-    parent_treeid   : NodeId,
-    orgnode_tree    : &Tree < OrgNode >,
-    orgnode_treeid  : NodeId,
-  ) {
-    let orgnode : OrgNode =
-      orgnode_tree . get ( orgnode_treeid )
-      . unwrap () . value () . clone ();
-    let new_treeid : NodeId = {
-      let mut parent_mut =
-        paired_forest . get_mut ( parent_treeid ) . unwrap ();
-      parent_mut
-        . append ( NodePair { mskgnode : None,
-                              orgnode } )
-        . id () };
-    let child_treeids : Vec < NodeId > =
-      orgnode_tree . get ( orgnode_treeid ) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      add_orgnode_tree_as_child_of_forest_root (
-        paired_forest, new_treeid, orgnode_tree, child_treeid ); } }
-  let mut result : PairTree = Tree::new ( forest_root_pair () );
-  let forest_root_treeid : NodeId = result . root () . id ();
-  // Iterate over tree roots (children of ForestRoot)
-  for tree_root in forest . root () . children () {
-    add_orgnode_tree_as_child_of_forest_root (
-      &mut result, forest_root_treeid, &forest, tree_root . id () ); }
-  result }
