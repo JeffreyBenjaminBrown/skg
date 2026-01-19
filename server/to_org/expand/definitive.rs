@@ -18,13 +18,13 @@ use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
 use crate::types::tree::generic::write_at_node_in_tree;
 
-use ego_tree::{NodeId, NodeRef};
+use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  forest        : &mut ego_tree::Tree<OrgNode>,
+  forest        : &mut Tree<OrgNode>,
   map           : &mut SkgNodeMap,
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
@@ -63,7 +63,7 @@ pub async fn execute_view_requests (
 /// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
 /// list is used to filter out content that should be hidden.
 async fn execute_definitive_view_request (
-  forest        : &mut ego_tree::Tree<OrgNode>, // "forest" = tree with ForestRoot
+  forest        : &mut Tree<OrgNode>, // "forest" = tree with ForestRoot
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
@@ -115,7 +115,7 @@ async fn execute_definitive_view_request (
 /// Otherwise return an empty set (which might be dangerous --
 /// see the PITFALL | TODO comment in the function body.
 fn get_hidden_ids_if_subscribee (
-  tree    : &ego_tree::Tree<OrgNode>,
+  tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < HashSet < ID >, Box<dyn Error> > {
@@ -153,7 +153,7 @@ fn get_hidden_ids_if_subscribee (
 ///   Non-content children (AliasCol, ParentIgnores, etc.)
 ///   persist unchanged.
 fn indefinitize_content_subtree (
-  tree    : &mut ego_tree::Tree<OrgNode>,
+  tree    : &mut Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
@@ -222,7 +222,7 @@ fn indefinitize_content_subtree (
 /// If the view was requested from a non-subscribee,
 /// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
-  tree           : &mut ego_tree::Tree<OrgNode>,
+  tree           : &mut Tree<OrgNode>,
   map            : &mut SkgNodeMap,
   effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
@@ -272,7 +272,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
 /// Updates title, body, mskgnode.
 /// Preserves all other OrgNode data.
 fn from_disk_replace_title_body_and_skgnode (
-  tree    : &mut ego_tree::Tree<OrgNode>,
+  tree    : &mut Tree<OrgNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId,
   config  : &SkgConfig,

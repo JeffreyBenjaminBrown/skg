@@ -1,6 +1,7 @@
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
-use crate::types::tree::orgnode_skgnode::insert_scaffold_as_child;
+use crate::types::tree::orgnode_skgnode::{
+  collect_child_aliases_at_aliascol, insert_scaffold_as_child};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::to_org::util::get_pid_in_tree;
@@ -73,7 +74,9 @@ pub async fn completeAliasCol (
       Scaffold::Alias ( alias . clone () ), false ) ?; }
   Ok (( )) }
 
-/// Remove duplicates and invalid aliases. Works with Tree<OrgNode>.
+/// Removes duplicate and invalid Alias children from an AliasCol,
+/// preserving focus information,
+/// where 'invalid' means not found on disk.
 fn remove_duplicates_and_false_aliases_handling_focus (
   tree             : &mut Tree<OrgNode>,
   aliascol_node_id : NodeId,

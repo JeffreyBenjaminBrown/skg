@@ -1,4 +1,28 @@
 * ONGOING refactor for skgnodemap
+** TODO reviewing the diff against main
+*** RESUME AT
+    a call to
+      ??
+    in
+      server/to_org/util.rs
+*** new functions
++pub async fn skgnodes_from_ids (
++  config : &SkgConfig,
++  driver : &TypeDBDriver,
++  ids    : &[ID],
++) -> Result<Vec<SkgNode>, Box<dyn Error>> {
+** AWAITS
+*** simplify completeAliasCol using helpers
+*** remove unused arguments from functions
+    e.g. pub async fn completeAliasCol
+*** fix internal imports
+I'm finding more internal imports, like this:
+```
++  forest        : &mut ego_tree::Tree<OrgNode>, // "forest" = tree with ForestRoot
+```
+Please restrict that kind of notation to the 'use' statements at the top of each
+file. (I suggest going through the git diff to find those -- again taking the diff
+against main.)
 ** missed some
    remove_completed_view_request
 ** keep this up to date
@@ -17,6 +41,11 @@
    to replace v1 versions.
 ** DONE faster
    I feel like this is going slower than normal for you. Do you think there's any way you could organize the plans in refactor-ongoing/ to speed it up? Maybe think harder about plans before doing it? I don't know -- you tell me if something like that is possible. Otherwise continue.
+* instructions when asking for a refactor
+** Name _v2 functions consistently.
+** Duplicate comments from _v1 functions
+   (which keep their original names)
+   into the _v2 functions.
 * two kinds of stats
 ** the idea
    One regards the view, the other the graph.

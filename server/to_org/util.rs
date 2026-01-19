@@ -93,9 +93,6 @@ pub(super) fn makeIndefinitiveAndClobber (
 /// which this function does:
 /// - handle repeats, cycles and the visited map
 /// - build a subscribee branch if needed
-
-/// Complete a branch (minus content descendants) in Tree<OrgNode> + SkgNodeMap.
-/// Handles repeats, cycles, visited map, and builds subscribee branch if needed.
 pub async fn complete_branch_minus_content (
   tree     : &mut Tree<OrgNode>,
   map      : &mut crate::types::skgnode::SkgNodeMap,
@@ -116,7 +113,8 @@ pub async fn complete_branch_minus_content (
 
 /// The two jobs in the name of this are inseparable --
 /// we have to interleave extending the defmap
-/// Mark repeat nodes as indefinitive and track definitive nodes in defMap.
+/// with marking things indefinitive, because the defmap
+/// is how we know whether to mark something indefinitive.
 pub fn make_indef_if_repeat_then_extend_defmap (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
@@ -182,7 +180,7 @@ pub async fn stub_forest_from_root_ids (
     ) . await ?; }
   Ok ( (forest, map) ) }
 
-/// Collect all IDs from a Tree<OrgNode>.
+/// Collect all IDs from a tree.
 pub fn collect_ids_from_tree (
   tree : &Tree<OrgNode>,
 ) -> Vec < ID > {
@@ -197,7 +195,7 @@ pub fn collect_ids_from_tree (
         pids . push ( pid . clone( )); }} }
   pids }
 
-/// Check if `target_skgid` appears in the ancestor path of `treeid` in Tree<OrgNode>.
+/// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
 fn is_ancestor_id (
   tree          : &Tree<OrgNode>,
@@ -234,8 +232,15 @@ pub fn get_pid_in_tree (
       t . id_opt . ok_or_else (
         || "get_pid_in_tree: node has no ID" . into( )) }}
 
-/// Build a node from disk and append it to Tree<OrgNode> + SkgNodeMap.
+/// Build a node from disk and
+/// append it at 'parent_treeid' as a child.
 /// Returns the new node's ego_tree::NodeId.
+///
+/// Does *not* take its ancestors into account,
+/// and does *not* build any of its descendents.
+/// Those can be done later via 'complete_branch_minus_content',
+/// or they can all be done at once via
+/// 'build_node_branch_minus_content.
 pub async fn make_and_append_child_pair (
   tree           : &mut Tree<OrgNode>,
   map            : &mut crate::types::skgnode::SkgNodeMap,
@@ -258,12 +263,13 @@ pub async fn make_and_append_child_pair (
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok ( child_treeid ) }
 
-/// Builds a node from disk, places it in a tree and map,
-/// completes the branch except for content descendents.
+/// Builds a node from disk, place it in a tree,
+/// complete the branch it implies except for 'content' descendents,
+/// and return the root of the new branch, but in its tree context:
 /// - If tree_map_parent is None:
-///   creates new tree+map, returns (Some(tree), Some(map), branch_root_nodeid)
+///   creates new tree, returns (Some(tree), Some(map), branch_root_nodeid)
 /// - If tree_map_parent is Some:
-///   appends to tree+map, returns (None, None, branch_root_nodeid)
+///   appends to tree, returns (None, None, branch_root_nodeid)
 pub async fn build_node_branch_minus_content (
   tree_map_parent : Option<(&mut Tree<OrgNode>, &mut crate::types::skgnode::SkgNodeMap, NodeId)>,
   skgid           : &ID,
@@ -307,7 +313,7 @@ pub async fn build_node_branch_minus_content (
         config, driver ) . await ?;
       Ok ( (Some(tree), Some(map), root_treeid) ) }, } }
 
-/// Collect content child IDs from a node in Tree<OrgNode> + SkgNodeMap.
+/// Collect content child IDs from a node.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
 /// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
@@ -339,10 +345,14 @@ pub(super) fn content_ids_if_definitive_else_empty (
         None => Vec::new (),  // No ID yet
       } ) } }}
 
-/// Collect NodeIds after some member of a generation.
-/// 'effective_root' should be some ancestor. It affects both the meaning
-/// of generation numbers and the scope of which nodes are collected.
-/// If effective root is None, the true root is used.
+/// Collect ego_tree::NodeIds after
+///   some member of some generation of a tree.
+/// 'effective_root' should be some ancestor.
+/// It affects both the meaning of generation numbers,
+/// and the scope of which nodes are collected
+/// (only its descendents are collected).
+/// If effective root is None,
+/// the true root is used as the effective root.
 pub(super) fn nodes_after_in_generation (
   tree                     : &Tree<OrgNode>,
   generation               : usize,
@@ -378,7 +388,7 @@ pub fn truenode_is_indefinitive (
     OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
     OrgNodeKind::True (t)  => Ok (t.indefinitive) }}
 
-/// Collect all child tree NodeIds from a node in a Tree<OrgNode>.
+/// Collect all child tree NodeIds from a node.
 /// Returns an error if the node is not found.
 pub fn collect_child_treeids (
   tree    : &Tree<OrgNode>,

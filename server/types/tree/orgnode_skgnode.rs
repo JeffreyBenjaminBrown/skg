@@ -43,7 +43,6 @@ pub fn unique_scaffold_child (
 
 /// Extract PIDs for the subscriber and its subscribees.
 /// Returns an error if the node has no SkgNode.
-/// Extract PIDs for subscriber and subscribees from Tree<OrgNode> + SkgNodeMap.
 pub fn pids_for_subscriber_and_its_subscribees (
   tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
@@ -200,8 +199,8 @@ pub fn collect_grandchild_aliases_for_orgnode (
         aliases };
       Ok(Some(dedup_vector(aliases))) }} }
 
-/// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
-fn collect_child_aliases_at_aliascol (
+/// Collect aliases from Alias children of an AliasCol node.
+pub(crate) fn collect_child_aliases_at_aliascol (
   tree             : &Tree<OrgNode>,
   aliascol_node_id : NodeId,
 ) -> Result < Vec < String >, Box<dyn Error> > {
@@ -236,7 +235,7 @@ pub fn find_child_by_id (
   find_children_by_ids( tree, parent_treeid, &singleton)
     . remove(target_skgid) }
 
-/// Find child nodes by their IDs in Tree<OrgNode>.
+/// Find child nodes by their IDs.
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_ids (
