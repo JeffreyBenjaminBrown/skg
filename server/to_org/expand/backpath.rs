@@ -36,8 +36,9 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_containerward_path (
-    tree, node_id, config, typedb_driver ) . await;
+  let result : Result<(), Box<dyn Error>> =
+    build_and_integrate_containerward_path (
+      tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
@@ -73,8 +74,9 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_sourceward_path (
-    tree, node_id, config, typedb_driver ) . await;
+  let result : Result<(), Box<dyn Error>> =
+    build_and_integrate_sourceward_path (
+      tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Sourceward,
@@ -229,7 +231,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
       t . title . clone() ),
     OrgNodeKind::Scaff(_) =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
-  let orgnode = mk_indefinitive_orgnode (
+  let orgnode : OrgNode = mk_indefinitive_orgnode (
     id, source, title, true );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()

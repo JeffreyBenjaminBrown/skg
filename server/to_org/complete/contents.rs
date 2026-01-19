@@ -74,12 +74,10 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
       let node_pid : ID = get_pid_in_tree ( tree, node_id ) ?;
       add_v_to_map_if_absent (
         &node_pid, map,
-        |id| {
-          let id = id.clone();
-          async move {
-            skgnode_from_id ( config, typedb_driver, &id ) . await
-          }
-        } ) . await ?;
+        |id| { let id : ID = id.clone();
+               async move {
+               skgnode_from_id ( config, typedb_driver, &id
+                               ). await }} ). await ?;
 
       detect_and_mark_cycle ( tree, node_id ) ?;
       make_indef_if_repeat_then_extend_defmap (
@@ -122,7 +120,8 @@ pub fn clobberIndefinitiveOrgnode (
   let title : String = skgnode . title . clone();
   let source : String = skgnode . source . clone();
   write_at_node_in_tree ( tree, treeid, |orgnode| {
-    let OrgNodeKind::True ( t ) = &mut orgnode.kind
+    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+      &mut orgnode.kind
       else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
     t . source_opt = Some ( source );
@@ -158,7 +157,8 @@ pub async fn ensure_source (
     write_at_node_in_tree (
       tree, node_id,
       |orgnode| {
-        let OrgNodeKind::True ( t ) = &mut orgnode.kind
+        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+          &mut orgnode.kind
           else { panic! ( "ensure_source: expected TrueNode" ) };
         t . source_opt = Some ( source ); } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }

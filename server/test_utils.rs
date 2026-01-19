@@ -19,8 +19,10 @@ use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::answer::QueryAnswer;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType};
+use typedb_driver::answer::{QueryAnswer, ConceptRow};
+use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database};
+use std::sync::Arc;
+use tantivy::{DocAddress, Searcher};
 
 
 /// Run tests with automatic database setup and cleanup.
@@ -61,7 +63,7 @@ where
                                <(), Box<dyn Error>>> + 'a>>,
 {
   // Copy fixtures to temp so saves don't corrupt originals
-  let temp_fixtures = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
+  let temp_fixtures : PathBuf = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
   if temp_fixtures.exists() {
     fs::remove_dir_all(&temp_fixtures)?;
   }
@@ -69,13 +71,13 @@ where
     &PathBuf::from(fixtures_folder),
     &temp_fixtures)?;
 
-  let result = block_on(async {
+  let result : Result<(), Box<dyn Error>> = block_on(async {
     let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
       setup_test_tantivy_and_typedb_dbs(
         db_name,
         temp_fixtures.to_str().unwrap(),
         tantivy_folder ). await?;
-    let result = test_fn(&config, &driver, &tantivy).await;
+    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy).await;
     cleanup_test_tantivy_and_typedb_dbs(
       db_name,
       &driver,
@@ -96,10 +98,10 @@ where
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
   fs::create_dir_all(dst)?;
   for entry in fs::read_dir(src)? {
-    let entry = entry?;
-    let ty = entry.file_type()?;
-    let src_path = entry.path();
-    let dst_path = dst.join(entry.file_name());
+    let entry : fs::DirEntry = entry?;
+    let ty : fs::FileType = entry.file_type()?;
+    let src_path : PathBuf = entry.path();
+    let dst_path : PathBuf = dst.join(entry.file_name());
     if ty.is_dir() {
       copy_dir_all(&src_path, &dst_path)?;
     } else {
@@ -191,7 +193,7 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   // Delete TypeDB database
   let databases = driver.databases();
   if databases.contains(db_name).await? {
-    let database = databases.get(db_name).await?;
+    let database : Arc<Database> = databases.get(db_name).await?;
     database.delete().await?; }
 
   // Delete Tantivy index if path provided and exists
@@ -337,7 +339,7 @@ pub async fn all_pids_from_typedb(
   let mut node_ids: HashSet<ID> = HashSet::new();
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
-    let row = row_result?;
+    let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("node_id")? {
       let node_id_str: String =
         extract_payload_from_typedb_string_rep(
@@ -354,7 +356,7 @@ pub async fn extra_ids_from_pid(
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let tx: Transaction = driver.transaction(
     db_name, TransactionType::Read ). await?;
-  let query = format!(
+  let query : String = format!(
     r#"match $node isa node, has id "{}";
        $e isa extra_id;
        $rel isa has_extra_id (node: $node, extra_id: $e);
@@ -362,13 +364,14 @@ pub async fn extra_ids_from_pid(
        select $extra_id_value;"#,
     skgid.0 );
   let answer: QueryAnswer = tx.query(query).await?;
-  let mut extra_ids = Vec::new();
+  let mut extra_ids : Vec<ID> = Vec::new();
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
-    let row = row_result?;
+    let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_str = extract_payload_from_typedb_string_rep(
-        &concept.to_string());
+      let extra_id_str : String =
+        extract_payload_from_typedb_string_rep(
+          &concept.to_string());
       extra_ids.push(
         ID(extra_id_str)); }}
   Ok(extra_ids) }
@@ -380,7 +383,9 @@ pub fn tantivy_contains_id(
   query: &str,
   expected_id: &str,
 ) -> Result<bool, Box<dyn Error>> {
-  let (matches, searcher) = search_index(tantivy_index, query)?;
+  let (matches, searcher)
+    : (Vec<(f32, DocAddress)>, Searcher)
+    = search_index(tantivy_index, query)?;
   for (_score, doc_address) in matches {
     let doc: tantivy::Document = searcher.doc(doc_address)?;
     let id_value: Option<String> =
@@ -411,4 +416,3 @@ pub fn strip_org_comments(s: &str) -> String {
       } else { line . to_string() }} )
     .collect::<Vec<String>>()
     .join("\n") }
-

@@ -150,7 +150,7 @@ fn format_matches_as_org_mode (
     ). unwrap () } );
   for (id, matches) in id_entries {
     // First (best) match becomes level-2 headline
-    let (score, title) = &matches[0];
+    let (score, title) : &(f32, String) = &matches[0];
     result.push_str (
       & orgnode_to_text (
         2,

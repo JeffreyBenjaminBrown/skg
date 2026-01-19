@@ -26,8 +26,8 @@ pub fn serve (
 
   { // Set up signal handler for Ctrl+C and SIGTERM,
     // for graceful shutdown with database cleanup.
-    let driver_for_signal = Arc::clone ( &typedb_driver );
-    let config_for_signal = config . clone ();
+    let driver_for_signal : Arc<TypeDBDriver> = Arc::clone ( &typedb_driver );
+    let config_for_signal : SkgConfig = config . clone ();
     ctrlc::set_handler ( move || {
       println! ( "\nReceived shutdown signal..." );
       cleanup_and_shutdown (
@@ -80,7 +80,7 @@ fn handle_emacs (
     : BufReader<TcpStream> // the underlying stream, but buffered
     = BufReader::new (
       stream . try_clone() . unwrap() );
-  let mut request = String::new();
+  let mut request : String = String::new();
   while let Ok(n) =
     reader.read_line( &mut request ) { // reads until a newline
       if n == 0 { break; } // emacs disconnected

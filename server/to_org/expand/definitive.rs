@@ -91,7 +91,8 @@ async fn execute_definitive_view_request (
     write_at_node_in_tree (
       forest, node_id,
       |orgnode| { // remove ViewRequest and mark definitive
-        let OrgNodeKind::True ( t ) = &mut orgnode.kind
+        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+          &mut orgnode.kind
           else { panic! ( "execute_definitive_view_request_v2: expected TrueNode" ) };
         t . view_requests . remove ( & ViewRequest::Definitive );
         t . indefinitive = false; } )
@@ -186,7 +187,8 @@ fn indefinitize_content_subtree (
     write_at_node_in_tree (
       tree, node_id,
       |orgnode| {
-        let OrgNodeKind::True ( t ) = &mut orgnode.kind
+        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+          &mut orgnode.kind
           else { panic! ( "indefinitize_content_subtree: expected TrueNode" ) };
         t . indefinitive = true;
         if let Some ( title ) = canonical_title.clone () {
@@ -252,11 +254,12 @@ async fn extendDefinitiveSubtreeFromLeaf (
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
-      let (_tree_opt, _map_opt, new_treeid) =
-        build_node_branch_minus_content (
-          Some((tree, parent_treeid)),
-          Some(map),
-          &child_skgid, config, driver, visited ). await ?;
+      let (_tree_opt, _map_opt, new_treeid)
+        : (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId)
+        = build_node_branch_minus_content (
+            Some((tree, parent_treeid)),
+            Some(map),
+            &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
@@ -281,7 +284,7 @@ fn from_disk_replace_title_body_and_skgnode (
   let (pid, src) : (ID, String) = {
     let node_ref : NodeRef<OrgNode> = tree . get(node_id) . ok_or(
       "rebuild_pair_from_disk: node not found") ?;
-    let OrgNodeKind::True ( t )
+    let OrgNodeKind::True ( t ) : &OrgNodeKind
       = &node_ref . value () . kind
       else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
     ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
@@ -295,7 +298,8 @@ fn from_disk_replace_title_body_and_skgnode (
   let body : Option < String > = skgnode . body . clone ();
   map . insert ( pid, skgnode ); // Update map
   write_at_node_in_tree ( tree, node_id, |orgnode| { // Update orgnode
-    let OrgNodeKind::True ( t ) = &mut orgnode . kind
+    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+      &mut orgnode . kind
       else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
     t . title = title;
     t . body = body; } )

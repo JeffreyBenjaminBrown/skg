@@ -83,7 +83,7 @@ pub fn textlinks_from_text (
   let textlink_pattern : Regex = Regex::new (
     // non-greedy .*? pattern avoids capturing too much.
     r"\[\[id:(.*?)\]\[(.*?)\]\]").unwrap();
-  let mut textlinks = Vec::new ();
+  let mut textlinks : Vec<TextLink> = Vec::new ();
   for capture in textlink_pattern.captures_iter ( text ) {
     if capture.len () >= 3 { // capture group 0 is the entire match
       let skgid : String = capture [1] . to_string ();
@@ -100,8 +100,8 @@ pub fn replace_each_link_with_its_label (
 
   let textlink_re : Regex = Regex::new (
     r"\[\[.*?\]\[(.*?)\]\]") . unwrap (); // capture the label but not the ID
-  let mut result = String::from ( text );
-  let mut input_offset = 0; // offset in the input string
+  let mut result : String = String::from ( text );
+  let mut input_offset : usize = 0; // offset in the input string
   for cap in textlink_re.captures_iter ( text ) {
     let whole_match : Match =
       cap . get (0) . unwrap ();

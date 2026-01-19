@@ -9,7 +9,7 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, Tree, NodeMut};
 use typedb_driver::TypeDBDriver;
 
 /// Each of these describes some kind of relationship,
@@ -109,7 +109,7 @@ fn set_metadata_relationships_in_node_recursive (
             . map_or ( false, | contents |
                        contents . contains ( parent_skgid )) )
       } else { (true, false) }; // default if no parent
-    let mut node_mut = tree . get_mut ( treeid ) . unwrap ();
+    let mut node_mut : NodeMut<OrgNode> = tree . get_mut ( treeid ) . unwrap ();
     if let OrgNodeKind::True ( t ) = &mut node_mut . value () . kind {
       t . stats . numContainers = num_containers;
       t . stats . numContents = num_contents;

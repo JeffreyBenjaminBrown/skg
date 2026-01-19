@@ -73,15 +73,15 @@ pub fn orgnode_from_metadata (
   title    : String,
   body     : Option < String >,
 ) -> ( OrgNode, Option < BufferValidationError > ) {
-  let (kind, error) =
+  let (kind, error) : (OrgNodeKind, Option<BufferValidationError>) =
     if let Some ( ref scaffold ) = metadata . scaffold {
-      let error = if body . is_some () {
+      let error : Option<BufferValidationError> = if body . is_some () {
         Some ( BufferValidationError::Body_of_Scaffold (
           title . clone (),
           scaffold . repr_in_client () ))
       } else { None };
       // For Alias, use the headline title as the alias string
-      let scaffold_with_title = match scaffold {
+      let scaffold_with_title : Scaffold = match scaffold {
         Scaffold::Alias ( _ ) => Scaffold::Alias ( title . clone () ),
         other => other . clone (),
       };

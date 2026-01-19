@@ -1,5 +1,5 @@
 * ONGOING refactor for skgnodemap
-** TODO reviewing the diff against main
+** ONGOING reviewing the diff against main
 *** RESUME AT
     a call to
       ??
@@ -13,9 +13,6 @@
 **** collect_child_aliases_at_nodepair_aliascol
 **** reorder_children
 ** AWAITS
-*** add type signatures everywhere
-    this makes it easy to search for types,
-    for more refactors
 *** everything that inserts into a SkgNodeMap
     should first try looking that thing up in it
 *** simplify completeAliasCol using helpers

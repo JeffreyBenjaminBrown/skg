@@ -18,8 +18,9 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
-  let result = build_and_integrate_aliases (
-    tree, node_id, config, typedb_driver ) . await;
+  let result : Result<(), Box<dyn Error>> =
+    build_and_integrate_aliases (
+      tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Aliases,

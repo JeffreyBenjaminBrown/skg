@@ -7,7 +7,7 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::save::NonMerge_NodeAction;
 use crate::util::option_vec_is_empty_or_none;
 use super::misc::{ID, SkgConfig};
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeRef};
 use typedb_driver::TypeDBDriver;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -147,7 +147,7 @@ fn collect_ids_from_subtree (
   node_id : NodeId,
   ids_out : &mut Vec<ID>,
 ) {
-  let node_ref =
+  let node_ref : NodeRef<OrgNode> =
     tree . get ( node_id ) . unwrap ();
   if let OrgNodeKind::True ( t ) = &node_ref . value () . kind
   { if let Some ( id ) = &t . id_opt { // collect one

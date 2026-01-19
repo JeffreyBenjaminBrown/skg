@@ -10,7 +10,7 @@ use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 
-use ego_tree::{Tree, NodeId, NodeRef};
+use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
 use std::collections::HashMap;
 use std::error::Error;
@@ -83,7 +83,8 @@ pub(super) fn makeIndefinitiveAndClobber (
   write_at_node_in_tree (
     tree, node_id,
     |orgnode| {
-      let OrgNodeKind::True ( t ) = &mut orgnode.kind
+      let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+        &mut orgnode.kind
         else { panic! ( "makeIndefinitiveAndClobber: expected TrueNode" ) };
       t . indefinitive = true;
       t . body = None; }
@@ -129,12 +130,14 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let is_indefinitive : bool =
     write_at_node_in_tree (
       tree, node_id,
-      |orgnode| { let OrgNodeKind::True ( t ) = &mut orgnode.kind
-             else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_pid_in_tree already verified TrueNode"); };
-             if defMap . contains_key ( &pid )
-             { // It's a repeat, so it should be indefinitive.
-               t . indefinitive = true; }
-             t . indefinitive } )
+      |orgnode|
+        { let OrgNodeKind::True ( t ) : &mut OrgNodeKind
+            = &mut orgnode.kind
+            else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_pid_in_tree already verified TrueNode"); };
+          if defMap . contains_key ( &pid )
+            { // It's a repeat, so it should be indefinitive.
+              t . indefinitive = true; }
+            t . indefinitive } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   if !is_indefinitive {
     defMap . insert ( pid, node_id ); }
@@ -150,7 +153,8 @@ pub fn detect_and_mark_cycle (
     let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
   write_at_node_in_tree ( tree, node_id, |orgnode| {
-    let OrgNodeKind::True ( t ) = &mut orgnode.kind
+    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+      &mut orgnode.kind
       else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
     t . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
@@ -417,9 +421,9 @@ where T: AsMut<OrgNode>,
 {
   if let Err ( e ) = result {
     errors . push ( format! ( "{}: {}", error_msg, e )); }
-  let mut node_mut = tree . get_mut ( node_id )
-    . ok_or ( "remove_completed_view_request: node not found" ) ?;
+  let mut node_mut : NodeMut<T> =
+    tree . get_mut (node_id) . ok_or ( "remove_completed_view_request: node not found" ) ?;
   if let OrgNodeKind::True ( t )
-  = &mut node_mut . value () . as_mut () . kind
-  { t . view_requests . remove ( &view_request ); }
+    = &mut node_mut . value () . as_mut () . kind
+    { t . view_requests . remove ( &view_request ); }
   Ok (()) }

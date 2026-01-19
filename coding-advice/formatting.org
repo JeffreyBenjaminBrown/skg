@@ -10,6 +10,12 @@ but if you are an AI, it's pretty much costless, so please do.
 *** There should be a type signature.
 *** After the equals sign should follow a newline.
 ** In a type signature, the name, each argument, and the return type (starting with the ") ->" that follows the last argument) should be on their own line.
+* no "internal imports"
+  In Rust it is valid to use 'use' statements in a function,
+  or to qualify a long name in a type signature
+  using the double-colon notation: _::_::_::_...
+  I find that hard to read, and prefer to limit such notation
+  to the initial, 'use' preamble of each file.
 * comments
 ** If a comment applies to a block of code, put it inside the block.
    Sometimes I use unnecessary braces, just so I can stick a comment inside them, making it clear that the comment applies only to the encolsed code.

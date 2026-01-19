@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SkgfileSource};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
@@ -15,7 +15,7 @@ pub fn path_from_pid_and_source (
   source : &str,
   pid    : ID,
 ) -> String {
-  let source_config =
+  let source_config : &SkgfileSource =
     config . sources . get ( source )
     . expect ( &format!("Source '{}' not found in config",
                         source) );

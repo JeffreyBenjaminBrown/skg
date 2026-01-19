@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tantivy::{schema, Index};
 use typedb_driver::{
   Credentials,
+  Database,
   DriverOptions,
   Transaction,
   TransactionType,
@@ -169,7 +170,8 @@ pub async fn overwrite_new_empty_db (
   if databases.contains (db_name) . await ? {
     println! ( "Deleting existing database '{}'...",
                 db_name );
-    { let database = databases.get (db_name) . await ?;
+    { let database : Arc<Database> =
+        databases.get (db_name) . await ?;
       database } . delete () . await ?; }
   println! ( "Creating empty database '{}'...", db_name );
   databases.create (db_name) . await ?;
