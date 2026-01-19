@@ -60,8 +60,8 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
     if read_at_node_in_tree(tree, node_id, |node| {
         matches!(&node.kind,
                  OrgNodeKind::Scaff(Scaffold::AliasCol)) })
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
-      // AliasCol: use v2 version working directly with tree+map
+        . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
+      // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
         tree, map, node_id, config, typedb_driver ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
@@ -70,8 +70,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
       // Skip, but recurse into children.
       recurse ( tree, map, node_id, config, typedb_driver, visited
               ) . await ?;
-    } else {
-      // TrueNode: work directly with tree+map
+    } else { // it's a TrueNode
       let node_pid : ID = get_pid_in_tree ( tree, node_id ) ?;
       add_v_to_map_if_absent (
         &node_pid, map,
@@ -89,50 +88,46 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
       { if truenode_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, map, node_id ) ?;
-        } else {
-          // Definitive: use v2 version working directly with tree+map
+        } else { // futz with the orgnode and its content children
           maybe_add_subscribeeCol_branch (
             tree, map, node_id, config, typedb_driver ) . await ?; }
-        recurse (
+        recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
           tree, map, node_id, config, typedb_driver, visited
         ). await ?; }}
     Ok (( )) } ) }
 
-/// Clobber an indefinitive OrgNode with data from the map.
-/// Resets title, source, and sets body to None.
+/// PURPOSE: Given an indefinitive node N,
+/// uses SkgNodeMap or lookup on disk to:
+/// - Reset title.
+/// - Reset source.
+/// - Set body to None.
+///
+/// ASSUMES: The SkgNode at that tree node is accurate.
+/// ASSUMES: The input is indefinitive.
 pub fn clobberIndefinitiveOrgnode (
   tree    : &mut Tree<OrgNode>,
   map     : &SkgNodeMap,
   treeid  : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  // First get the ID from the node
   let node_id : ID =
     read_at_node_in_tree ( tree, treeid, |orgnode| {
       match &orgnode.kind {
         OrgNodeKind::True(t) => t . id_opt . clone()
           . ok_or("clobberIndefinitiveOrgnode: node has no ID"),
         OrgNodeKind::Scaff(_) => Err (
-          "clobberIndefinitiveOrgnode: expected TrueNode" ),
-      }
-    } )
+          "clobberIndefinitiveOrgnode: expected TrueNode" ), }} )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
-
-  // Look up SkgNode in map
   let skgnode : &SkgNode =
-    map . get ( &node_id )
-    . ok_or ( "clobberIndefinitiveOrgnode: SkgNode should exist in map" ) ?;
+    map . get ( &node_id ). ok_or ( "clobberIndefinitiveOrgnode: SkgNode should exist in map" ) ?;
   let title : String = skgnode . title . clone();
   let source : String = skgnode . source . clone();
-
-  // Update the OrgNode
   write_at_node_in_tree ( tree, treeid, |orgnode| {
     let OrgNodeKind::True ( t ) = &mut orgnode.kind
       else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
     t . source_opt = Some ( source );
-    t . body = None;
-  } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+    t . body = None; }
+  ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
 
   Ok (( )) }
 

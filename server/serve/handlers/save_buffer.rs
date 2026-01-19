@@ -131,7 +131,7 @@ pub async fn update_from_and_rerender_buffer (
   config          : &SkgConfig,
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (orgnode_forest, save_instructions, mergeInstructions)
+  let (forest, save_instructions, mergeInstructions)
     : ( Tree<OrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
@@ -139,7 +139,7 @@ pub async fn update_from_and_rerender_buffer (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;
-  if orgnode_forest.root().children().next().is_none() { return Err (
+  if forest.root().children().next().is_none() { return Err (
     "Nothing to save found in org_buffer_text" . into( )); }
 
   { // update the graph
@@ -156,16 +156,14 @@ pub async fn update_from_and_rerender_buffer (
 
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
-    // Build map from save instructions
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
-    // Use orgnode_forest as Tree<OrgNode>
-    let mut forest : Tree<OrgNode> = orgnode_forest;
-    { // modify the forest before re-rendering it
+    let mut forest_mut : Tree<OrgNode> = forest;
+    { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
-      let forest_root_id : NodeId = forest.root().id();
+      let forest_root_id : NodeId = forest_mut.root().id();
       complete_or_restore_each_node_in_branch (
-        &mut forest,
+        &mut forest_mut,
         &mut skgnode_map,
         forest_root_id,
         config,
@@ -173,10 +171,10 @@ pub async fn update_from_and_rerender_buffer (
         &mut visited ). await ?;
       let view_requests : Vec < (NodeId, ViewRequest) > =
         collectViewRequestsFromForest (
-          // Uses generic tree function - works with both tree types
-          & forest ) ?;
-      execute_view_requests (
-        &mut forest,
+          & forest_mut ) ?;
+      execute_view_requests ( // PITFALL: Must follow completion.
+        // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
+        &mut forest_mut,
         &mut skgnode_map,
         view_requests,
         config,
@@ -184,9 +182,9 @@ pub async fn update_from_and_rerender_buffer (
         &mut visited,
         &mut errors ). await ?;
       set_metadata_relationship_viewdata_in_forest (
-        &mut forest,
+        &mut forest_mut,
         config,
         typedb_driver ). await ?; }
     let buffer_content : String =
-      orgnode_forest_to_string ( & forest ) ?;
+      orgnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}

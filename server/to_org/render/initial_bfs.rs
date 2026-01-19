@@ -102,7 +102,8 @@ fn render_generation_and_recurse<'a> (
       return Ok(( )); }
   } ) }
 
-/// Add children to the forest. Return their NodeIds.
+/// Add children to the forest.
+/// Return their NodeIds.
 async fn add_children_and_collect_their_ids (
   forest      : &mut Tree<OrgNode>,
   map         : &mut SkgNodeMap,
@@ -120,8 +121,9 @@ async fn add_children_and_collect_their_ids (
     child_treeids . push ( child_treeid ); }
   Ok ( child_treeids ) }
 
-/// Collect all children IDs from definitive nodes in the input generation.
-/// (Indefinitive nodes' contents do not need rendering.)
+/// Collect all children IDs
+///   from definitive nodes in the input generation.
+///   (Indefinitive nodes' contents do not need rendering.)
 /// Returns (parent_treeid, child_skgid) tuples.
 fn collect_rels_to_children_from_generation (
   forest       : &Tree<OrgNode>,

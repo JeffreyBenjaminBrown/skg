@@ -63,7 +63,7 @@ pub async fn execute_view_requests (
 /// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
 /// list is used to filter out content that should be hidden.
 async fn execute_definitive_view_request (
-  forest        : &mut ego_tree::Tree<OrgNode>,
+  forest        : &mut ego_tree::Tree<OrgNode>, // "forest" = tree with ForestRoot
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
@@ -74,34 +74,35 @@ async fn execute_definitive_view_request (
   let node_pid : ID = get_pid_in_tree (
     forest, node_id ) ?;
   let hidden_ids : HashSet < ID > =
+    // If node is a subscribee, we may need to hide some content.
     get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;
   if let Some ( &preexisting_node_id ) =
     visited . get ( & node_pid )
   { if preexisting_node_id != node_id {
     indefinitize_content_subtree ( forest, map,
-                                     preexisting_node_id,
-                                     visited ) ?; }}
-  // Ensure node has a source
-  ensure_source (
+                                   preexisting_node_id,
+                                   visited ) ?; }}
+  ensure_source ( // Subscribee nodes may not have one yet.
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
     from_disk_replace_title_body_and_skgnode (
+      // preserves relevant orgnode fields
       forest, map, node_id, config ) ?;
     write_at_node_in_tree (
       forest, node_id,
-      |orgnode| {
+      |orgnode| { // remove ViewRequest and mark definitive
         let OrgNodeKind::True ( t ) = &mut orgnode.kind
           else { panic! ( "execute_definitive_view_request_v2: expected TrueNode" ) };
         t . view_requests . remove ( & ViewRequest::Definitive );
         t . indefinitive = false; } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   visited . insert ( node_pid.clone(), node_id );
-  extendDefinitiveSubtreeFromLeaf (
+  extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
     forest, map, node_id,
     config.initial_node_limit, visited, config, typedb_driver,
     &hidden_ids,
   ) . await ?;
-  // If this is a subscribee with hidden content, add HiddenInSubscribeeCol
+  // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
   if type_and_parent_type_consistent_with_subscribee (
     forest, node_id )?
   { maybe_add_hiddenInSubscribeeCol_branch (
@@ -132,16 +133,15 @@ fn get_hidden_ids_if_subscribee (
     let subscriber : NodeRef < OrgNode > =
       subscribee_col . parent ()
       . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
-    // Get subscriber ID from the node
-    let subscriber_id : Option<ID> = match &subscriber . value () . kind {
-      OrgNodeKind::True(t) => t . id_opt . clone(),
-      OrgNodeKind::Scaff(_) => None,
-    };
+    let subscriber_id : Option<ID>
+      = match &subscriber . value () . kind
+      { OrgNodeKind::True(t) => t . id_opt . clone(),
+        OrgNodeKind::Scaff(_) => None, };
     let hidden_ids : HashSet < ID > =
       match subscriber_id {
         Some ( id ) =>
-          map . get ( &id )
-          . and_then ( |skgnode| skgnode . hides_from_its_subscriptions . clone () )
+          map . get ( &id ) . and_then (
+            |skgnode| skgnode .hides_from_its_subscriptions .clone ( ))
           . unwrap_or_default () . into_iter () . collect (),
         None => HashSet::new (), };
     Ok ( hidden_ids ) }}
@@ -177,9 +177,11 @@ fn indefinitize_content_subtree (
   if let Some(ref pid) = node_pid_opt { // remove from visited
     visited . remove ( pid ); }
   { // mark indefinitive, restore title if SkgNode present, clear body
+    // TODO : This ought to call a function.
+    // It, or something very like it anyway, happens elsewhere too.
     let canonical_title : Option<String> =
-      node_pid_opt . as_ref ()
-      . and_then ( |pid| map . get ( pid ) )
+      node_pid_opt . as_ref () . and_then (
+        |pid| map . get (pid) )
       . map ( |s| s . title . clone () );
     write_at_node_in_tree (
       tree, node_id,
@@ -196,20 +198,41 @@ fn indefinitize_content_subtree (
       tree, map, child_treeid, visited ) ?; }
   Ok (( )) }
 
-
-/// Expands content for a definitive node using BFS with a node limit.
-/// Works with Tree<OrgNode> + SkgNodeMap.
+/// Expands content for a node using BFS with a node limit.
+///
+/// This is similar to `render_initial_forest_bfs`
+/// but operates on an existing PairTree.
+///
+/// The starting node is already definitive. This function:
+/// - Reads content children from the SkgNode in the tree
+/// - Adds them as children using BFS
+/// - Marks repeats (nodes already in `visited`) as indefinitive
+/// - Adds new definitive nodes to `visited`
+/// - Truncates when the node limit is exceeded:
+///   - Adds children in that last gen up to the limit as indefinitive
+///   - Completes the sibling group of the limit-hitting node
+///   - After limit-hitting node's parent, rewrite nodes in that second-to-last gen as indefinitive
+///
+/// Generations are relative to the effective root (generation 0),
+/// *not* the tree's true root. This way, truncation only affects
+/// nodes within this subtree, not siblings of ancestors.
+///
+/// `hidden_ids` contains IDs to filter from a subscribee's
+/// top-level children (without recursing into grandchildren, etc.)
+/// If the view was requested from a non-subscribee,
+/// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut ego_tree::Tree<OrgNode>,
   map            : &mut SkgNodeMap,
-  effective_root : NodeId,
+  effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
   hidden_ids     : &HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
-  let mut gen_with_children : Vec < (NodeId, ID) > =
+  let mut gen_with_children : Vec < (NodeId, // effective root
+                                     ID) > = // one of its children
     content_ids_if_definitive_else_empty (
       tree, map, effective_root ) ?
     . into_iter ()
@@ -217,10 +240,11 @@ async fn extendDefinitiveSubtreeFromLeaf (
     . map ( |child_skgid| (effective_root, child_skgid) )
     . collect ();
   let mut nodes_rendered : usize = 0;
-  let mut generation : usize = 1;
+  let mut generation : usize = 1; // children of effective root
   while ! gen_with_children . is_empty () {
     if nodes_rendered + gen_with_children . len () >= limit {
-      // Limit hit - add final generation as indefinitive and truncate
+      // Limit hit. Complete this sibling group
+      // and truncate later parents.
       let space_left : usize = limit - nodes_rendered;
       add_last_generation_and_truncate_some_of_previous (
         tree, map, generation, &gen_with_children,
@@ -234,6 +258,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
           &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! truenode_is_indefinitive ( tree, new_treeid ) ? {
+        // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (
             tree, map, new_treeid ) ?;
@@ -243,9 +268,9 @@ async fn extendDefinitiveSubtreeFromLeaf (
     generation += 1; }
   Ok (( )) }
 
-
-/// Fetches SkgNode from disk, updates both tree and map.
-/// Works with Tree<OrgNode> + SkgNodeMap.
+/// Fetches SkgNode from map or disk.
+/// Updates title, body, mskgnode.
+/// Preserves all other OrgNode data.
 fn from_disk_replace_title_body_and_skgnode (
   tree    : &mut ego_tree::Tree<OrgNode>,
   map     : &mut SkgNodeMap,
@@ -256,8 +281,8 @@ fn from_disk_replace_title_body_and_skgnode (
     let node_ref : NodeRef<OrgNode> = tree . get(node_id) . ok_or(
       "rebuild_pair_from_disk: node not found") ?;
     let OrgNodeKind::True ( t )
-    = &node_ref . value () . kind
-    else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
+      = &node_ref . value () . kind
+      else { return Err ( "rebuild_pair_from_disk: expected TrueNode" . into () ) };
     ( t .id_opt     .clone() .ok_or ( "rebuild_pair_from_disk: no ID" ) ?,
       t .source_opt .clone() .ok_or ( "rebuild_pair_from_disk: no source" ) ? ) };
   let skgnode : SkgNode =
@@ -267,10 +292,8 @@ fn from_disk_replace_title_body_and_skgnode (
   if title . is_empty () {
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
-  // Update map
-  map . insert ( pid, skgnode );
-  // Update tree
-  write_at_node_in_tree ( tree, node_id, |orgnode| {
+  map . insert ( pid, skgnode ); // Update map
+  write_at_node_in_tree ( tree, node_id, |orgnode| { // Update orgnode
     let OrgNodeKind::True ( t ) = &mut orgnode . kind
       else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
     t . title = title;

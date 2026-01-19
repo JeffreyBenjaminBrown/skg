@@ -61,6 +61,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       OrgNodeKind::True ( t ) => // skip indefinitive nodes
         if t.indefinitive { return Ok(( )) }} }
   { // Skip if there already is one.
+    // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     if unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
@@ -119,6 +120,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
   if unique_scaffold_child (
+       // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
        tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }

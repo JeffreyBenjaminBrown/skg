@@ -9,7 +9,15 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Reconciles Alias children with aliases from the map.
+/// Reconciles its Alias children with
+///   the aliases on disk (in the map) for its parent node.
+/// Might add and remove aliases.
+/// Might transfer focus.
+///
+/// ASSUMES the buffer that generated this tree was already saved,
+/// so the disk state is the source of truth.
+/// ASSUMES the parent node P has been normalized
+/// so that its 'id' field is the PID.
 pub async fn completeAliasCol (
   tree             : &mut Tree<OrgNode>,
   map              : &SkgNodeMap,
@@ -26,8 +34,6 @@ pub async fn completeAliasCol (
       . map_err( |e| -> Box<dyn Error> { e . into () })?;
     if ! is_aliascol {
       return Err( "Node is not an AliasCol" . into () ); }}
-
-  // Get parent node's ID (AliasCol's parent)
   let parent_id : ID = {
     let aliascol_ref : NodeRef<OrgNode> =
       tree . get ( aliascol_node_id )
@@ -35,46 +41,36 @@ pub async fn completeAliasCol (
     let parent_ref : NodeRef<OrgNode> =
       aliascol_ref . parent ()
       . ok_or ( "AliasCol has no parent" ) ?;
-    get_pid_in_tree ( tree, parent_ref . id () ) ?
-  };
-
-  // Get parent SkgNode from map
+    get_pid_in_tree ( tree, parent_ref . id( ))? };
   let parent_skgnode : &SkgNode =
     map . get ( &parent_id )
     . ok_or ( "Parent SkgNode not in map" ) ?;
-
   let aliases_from_disk : HashSet < String > = (
     parent_skgnode . aliases // source of truth
       . clone() . unwrap_or_default () . into_iter () . collect ( ));
-
   let aliases_from_branch : Vec < String > =
     collect_child_aliases_at_aliascol (
       tree, aliascol_node_id )?;
-
   let good_aliases_in_branch : HashSet < String > = (
     // aliases in tree that match aliases on disk
     aliases_from_branch . iter ()
       . filter ( |alias|
                   aliases_from_disk . contains ( *alias ))
       . cloned () . collect ( ));
-
   let missing_aliases_from_disk : HashSet < String > = (
     // aliases on disk but not in tree
     aliases_from_disk
       . difference ( & good_aliases_in_branch )
       . cloned ()
       . collect ( ));
-
   remove_duplicates_and_false_aliases_handling_focus (
     tree, // PITFALL: Gets modified.
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
-
   for alias in missing_aliases_from_disk {
     insert_scaffold_as_child (
       tree, aliascol_node_id,
       Scaffold::Alias ( alias . clone () ), false ) ?; }
-
   Ok (( )) }
 
 /// Remove duplicates and invalid aliases. Works with Tree<OrgNode>.
@@ -138,25 +134,3 @@ fn remove_duplicates_and_false_aliases_handling_focus (
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }}
 
   Ok (( )) }
-/// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
-fn collect_child_aliases_at_aliascol (
-  tree             : &Tree<OrgNode>,
-  aliascol_node_id : NodeId,
-) -> Result < Vec < String >, Box<dyn Error> > {
-  let mut aliases : Vec < String > =
-    Vec::new ();
-  let aliascol_ref : NodeRef < OrgNode > =
-    tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found" ) ?;
-  for child_ref in aliascol_ref . children() {
-    let child : &OrgNode = child_ref . value();
-    if ! matches! ( &child . kind,
-                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
-      return Err (
-        format! ( "AliasCol has non-Alias child with kind: {:?}",
-                  child . kind )
-        . into () ); }
-    aliases . push (
-      child . title () . to_string () ); }
-  Ok ( aliases ) }
-

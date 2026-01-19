@@ -200,6 +200,28 @@ pub fn collect_grandchild_aliases_for_orgnode (
         aliases };
       Ok(Some(dedup_vector(aliases))) }} }
 
+/// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
+fn collect_child_aliases_at_aliascol (
+  tree             : &Tree<OrgNode>,
+  aliascol_node_id : NodeId,
+) -> Result < Vec < String >, Box<dyn Error> > {
+  let mut aliases : Vec < String > =
+    Vec::new ();
+  let aliascol_ref : NodeRef < OrgNode > =
+    tree . get ( aliascol_node_id )
+    . ok_or ( "AliasCol node not found" ) ?;
+  for child_ref in aliascol_ref . children() {
+    let child : &OrgNode = child_ref . value();
+    if ! matches! ( &child . kind,
+                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
+      return Err (
+        format! ( "AliasCol has non-Alias child with kind: {:?}",
+                  child . kind )
+        . into () ); }
+    aliases . push (
+      child . title () . to_string () ); }
+  Ok ( aliases ) }
+
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
 /// Find a child node by ID in Tree<OrgNode>.
@@ -229,4 +251,3 @@ pub fn find_children_by_ids (
         if target_skgids.contains(child_id) {
           result.insert(child_id.clone(), child.id()); }}}}
   result }
-

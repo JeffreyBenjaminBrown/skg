@@ -4,7 +4,6 @@ use crate::types::tree::generic::read_at_node_in_tree;
 use ego_tree::NodeId;
 use std::error::Error;
 
-/// Generic version that works with Tree<OrgNode>.
 pub fn collectViewRequestsFromForest<T> (
   forest : &ego_tree::Tree<T>,
 ) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
@@ -30,11 +29,10 @@ where T: AsRef<OrgNode>,
     read_at_node_in_tree (
       tree, node_id,
       |value| match &value . as_ref () . kind {
-             OrgNodeKind::True ( t ) =>
-               t . view_requests . iter () . cloned () . collect (),
-             OrgNodeKind::Scaff ( _ ) => Vec::new (),
-      } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+        OrgNodeKind::True ( t ) =>
+          t . view_requests . iter () . cloned () . collect (),
+        OrgNodeKind::Scaff ( _ ) => Vec::new (), }
+    ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   for request in node_view_requests {
     view_requests_out . push ( (node_id, request) ); }
   let child_ids : Vec < NodeId > =

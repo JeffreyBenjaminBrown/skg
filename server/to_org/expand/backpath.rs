@@ -118,6 +118,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   let terminus_pid : ID =
     get_pid_in_tree ( tree, node_id ) ?;
   if ! path . is_empty () {
+    // The head of the path should be the terminus. We strip it.
     if path[0] != terminus_pid {
       return Err (
         format! (
@@ -132,6 +133,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
     integrate_branches_in_node (
       tree, last_node_id, branches, config, driver ) . await ?;
   } else if let Some ( cycle_id ) = cycle_node {
+    // PITFALL: If there are branches, the cycle node is ignored.
     integrate_cycle_in_node (
       tree, last_node_id, cycle_id, config, driver ) . await ?; }
   Ok (( )) }
@@ -158,9 +160,9 @@ fn integrate_linear_portion_of_path<'a> (
         None => {
           prepend_indefinitive_child_with_parent_ignores (
             tree, node_id, path_head, config, driver ) . await ? } };
-    integrate_linear_portion_of_path (
+    integrate_linear_portion_of_path ( // recurse
       tree,
-      next_node_id,
+      next_node_id, // we just found or inserted this
       path_tail,
       config,
       driver ) . await } ) }
@@ -182,7 +184,8 @@ async fn integrate_branches_in_node (
     . filter ( | b |
                  ! found_children . contains_key ( b ) )
     . collect ();
-  { branches_to_add . sort ();
+  { // TODO : This should not be necessary. It must be for testing?
+    branches_to_add . sort ();
     branches_to_add . reverse (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
