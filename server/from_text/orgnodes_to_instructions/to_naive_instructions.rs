@@ -20,7 +20,7 @@ pub fn naive_saveinstructions_from_forest (
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
-  let root_id = forest.root().id();
+  let root_id : NodeId = forest.root().id();
   naive_saveinstructions_from_tree ( &mut forest, root_id,
                                      &mut result )?;
   Ok(result) }

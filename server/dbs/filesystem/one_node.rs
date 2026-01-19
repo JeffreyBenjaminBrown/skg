@@ -31,7 +31,8 @@ pub async fn skgnodes_from_ids (
 ) -> Result<Vec<SkgNode>, Box<dyn Error>> {
   let mut nodes : Vec<SkgNode> = Vec::new();
   for id in ids {
-    let node = skgnode_from_id ( config, driver, id ). await ?;
+    let node : SkgNode =
+      skgnode_from_id ( config, driver, id ). await ?;
     nodes . push ( node ); }
   Ok ( nodes ) }
 

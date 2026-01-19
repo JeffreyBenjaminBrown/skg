@@ -8,7 +8,7 @@ use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, Transaction, TransactionType};
-use typedb_driver::answer::QueryAnswer;
+use typedb_driver::answer::{QueryAnswer, ConceptRow};
 
 /// Merges nodes in TypeDB by applying MergeInstructionTriple.
 /// All merges are batched in a single transaction.
@@ -153,7 +153,7 @@ async fn delete_extra_ids_for_node(
   let mut extra_id_values : Vec<String> = Vec::new();
   let mut rows = answer.into_rows();
   while let Some(row_res) = rows.next().await {
-    let row = row_res?;
+    let row : ConceptRow = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {
       extra_id_values.push( {
         let extra_id_value : String =
@@ -254,7 +254,7 @@ async fn reroute_what_acquiree_hides (
     what_acquiree_hides } ).await?;
   let mut stream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
-    let row = row_result?;
+    let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("hidden_id")? {
       let hidden_id : ID = ID( {
         let hidden_id_str : String =

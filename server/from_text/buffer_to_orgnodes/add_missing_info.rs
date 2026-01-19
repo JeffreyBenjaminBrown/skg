@@ -54,7 +54,7 @@ fn make_alias_if_appropriate(
       .unwrap_or(false);
     if parent_is_aliascol { // Make it an Alias.
       let org : &mut OrgNode = node.value();
-      let OrgNodeKind::True(t) = &org.kind
+      let OrgNodeKind::True(t) : &OrgNodeKind = &org.kind
         else { unreachable!() };
       org.kind = OrgNodeKind::Scaff(
         Scaffold::Alias(t.title.clone() )); }}

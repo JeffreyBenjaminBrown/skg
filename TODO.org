@@ -1,10 +1,9 @@
 * ONGOING refactor for skgnodemap
 ** ONGOING reviewing the diff against main
 *** RESUME AT
-    a call to
-      ??
-    in
-      tools/refactor_conversion_site_prioritizer.py
+    server/to_org/render/content_view.rs
+    using
+    git diff --ignore-all-space main
 *** new functions
 **** pub async fn skgnodes_from_ids (
 **** +pub async fn add_v_to_map_if_absent<K, V, F, Fut> (
@@ -26,6 +25,10 @@ I'm finding more internal imports, like this:
 Please restrict that kind of notation to the 'use' statements at the top of each
 file. (I suggest going through the git diff to find those -- again taking the diff
 against main.)
+*** document new tools
+*** build_node_branch_minus_content
+    the first two of its three return values
+    seem never to be used
 ** missed some
    remove_completed_view_request
 ** keep this up to date

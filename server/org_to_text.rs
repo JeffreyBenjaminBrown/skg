@@ -27,7 +27,7 @@ pub fn orgnode_forest_to_string (
           child,
           level + 1 )? ); }
     Ok ( out ) }
-  let root_ref = forest . root ();
+  let root_ref : NodeRef<OrgNode> = forest . root ();
   let is_forest_root : bool =
     matches! (
       & root_ref . value () . kind,
@@ -148,7 +148,7 @@ fn true_node_metadata_to_string (
       else { Some ( format! ( "(stats {})", parts . join ( " " ))) }}
     fn edit_request ( true_node : & TrueNode ) -> Option < String > {
       true_node . edit_request . as_ref () . map ( | edit_req | {
-        let edit_str = match edit_req {
+        let edit_str : String = match edit_req {
           EditRequest::Merge ( id ) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
         format! ( "(editRequest {})", edit_str ) })}
