@@ -7,7 +7,8 @@ use crate::types::orgnode::{
     mk_definitive_orgnode, OrgNode, OrgNodeKind, forest_root_orgnode };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::skgnode::SkgNode;
+use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;

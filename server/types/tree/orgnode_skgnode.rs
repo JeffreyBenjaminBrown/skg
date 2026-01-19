@@ -6,7 +6,8 @@ use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold,
     mk_indefinitive_orgnode,
     orgnode_from_scaffold };
-use crate::types::skgnode::{SkgNode, SkgNodeMap};
+use crate::types::skgnode::SkgNode;
+use crate::types::skgnodemap::SkgNodeMap;
 use crate::util::dedup_vector;
 use super::generic::with_node_mut;
 

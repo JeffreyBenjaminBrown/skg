@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::orgnode::{OrgNode};
-use skg::types::skgnode::SkgNodeMap;
+use skg::types::skgnodemap::SkgNodeMap;
 use skg::org_to_text::orgnode_forest_to_string;
 
 use ego_tree::Tree;

@@ -9,7 +9,8 @@ use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::{SkgNode, SkgNodeMap};
+use crate::types::skgnode::SkgNode;
+use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::maps::add_v_to_map_if_absent;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{

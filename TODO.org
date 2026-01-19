@@ -1,57 +1,11 @@
-* ONGOING refactor for skgnodemap
-** DONE reviewing the diff against main
-*** RESUME AT
-    server/to_org/render/content_view.rs
-    using
-    git diff --ignore-all-space main
-*** new functions
-**** pub async fn skgnodes_from_ids (
-**** +pub async fn add_v_to_map_if_absent<K, V, F, Fut> (
-*** where did it go?
-**** ancestor_skgnode_from_disk
-**** collect_child_aliases_at_nodepair_aliascol
-**** reorder_children
-** AWAITS
-*** everything that inserts into a SkgNodeMap
-    should first try looking that thing up in it
-*** simplify completeAliasCol using helpers
-*** remove unused arguments from functions
-    e.g. pub async fn completeAliasCol
-*** fix internal imports
-I'm finding more internal imports, like this:
-```
-+  forest        : &mut ego_tree::Tree<OrgNode>, // "forest" = tree with ForestRoot
-```
-Please restrict that kind of notation to the 'use' statements at the top of each
-file. (I suggest going through the git diff to find those -- again taking the diff
-against main.)
-*** document new tools
-*** build_node_branch_minus_content
-    the first two of its three return values
-    seem never to be used
-** missed some
-   remove_completed_view_request
-** keep this up to date
-   refactor-ongoing/functions.org
-** once it's not globally needed, restrict PairTree and NodePair
-   via 'super' or, better even if isolated enough, local
-** DONE use call graph
-   Hey Claude would it help if you could see a text representation of the call graph? I don't know if leafward or rootward functions are easier to convert, but either way you could see where they lie by looking at (for instance) tools/introspect/call-graph/output/main.org. You can regenerate those files with 'cargo run -p call-graph --bin call-graph-regen'. Maybe crossing that data with functions.org would give you a good sense of which is the easiest stuff left.
-   (To do that I think you might want to automate the merge of those two data sets -- write something that determines, for each as-yet-unconverted function in functions.org, the number of its descendents in the call graph that still need conversion, and how many of its ancestors do. But I don't know whether that information would actually be useful to you. So don't do that; just think about the idea and respond, please.)
-** DONE functions miscategorized as pairless
-   But also note that,
-   Under the headline 'new-functions-without-correspondences'
-   in refactor-ongoing/functions.org,
-   lots of '{name}_in_orgtree' functions correspond to '{name}' ones.
-   That is, they are miscategorized -- they appear to be v2 versions
-   to replace v1 versions.
-** DONE faster
-   I feel like this is going slower than normal for you. Do you think there's any way you could organize the plans in refactor-ongoing/ to speed it up? Maybe think harder about plans before doing it? I don't know -- you tell me if something like that is possible. Otherwise continue.
-* instructions when asking for a refactor
-** Name _v2 functions consistently.
-** Duplicate comments from _v1 functions
-   (which keep their original names)
-   into the _v2 functions.
+* how to prompt
+** when asking for a refactor
+*** Name _v2 functions consistently.
+*** Duplicate comments from _v1 functions
+    (which keep their original names)
+    into the _v2 functions.
+** when asking to move code
+   Emphasize leaving whitespace, formatting unchanged.
 * two kinds of stats
 ** the idea
    One regards the view, the other the graph.

@@ -2,7 +2,8 @@
 // Tests for new map-based helpers
 //
 
-use skg::types::skgnode::{skgnode_for_orgnode, skgnode_map_from_save_instructions, empty_skgnode, SkgNode, SkgNodeMap};
+use skg::types::skgnode::{empty_skgnode, SkgNode};
+use skg::types::skgnodemap::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNodeMap};
 use skg::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use skg::types::save::NonMerge_NodeAction;
 use skg::types::misc::ID;

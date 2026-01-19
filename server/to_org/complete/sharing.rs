@@ -11,7 +11,7 @@ use crate::types::tree::orgnode_skgnode::{
   pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
   unique_scaffold_child };
-use crate::types::skgnode::SkgNodeMap;
+use crate::types::skgnodemap::SkgNodeMap;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;

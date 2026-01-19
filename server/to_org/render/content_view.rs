@@ -11,7 +11,7 @@ use crate::org_to_text::orgnode_forest_to_string;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::OrgNode;
-use crate::types::skgnode::SkgNodeMap;
+use crate::types::skgnodemap::SkgNodeMap;
 
 use ego_tree::Tree;
 use std::error::Error;

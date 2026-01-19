@@ -8,7 +8,6 @@
 /// without children under "TODO still two versions",
 /// search for a definition of {name}, and if found add it as a child.
 
-use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -159,10 +158,15 @@ fn write_org_tree(node: &OrgNode, output: &mut String, level: usize) {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-  let functions_org_path = "/home/ubuntu/refactor-ongoing/functions.org";
-  let server_dir = Path::new("/home/ubuntu/server");
+  let project_root = std::env::current_dir()?;
+  let functions_org_path = project_root.join("refactor-ongoing/functions.org");
+  let server_dir = project_root.join("server");
+  let output_dir = project_root.join("tools/function_conversions_for_refactor");
 
-  let content = fs::read_to_string(functions_org_path)?;
+  // Ensure output directory exists
+  fs::create_dir_all(&output_dir)?;
+
+  let content = fs::read_to_string(&functions_org_path)?;
   let mut tree = parse_org_file(&content)?;
 
   // Find "TODO still two versions" node
@@ -181,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if child.children.is_empty() {
       if let Some(v1_name) = get_v1_name(trimmed_title) {
         // Search for v1 function
-        if let Some(_) = search_for_function(&v1_name, server_dir) {
+        if let Some(_) = search_for_function(&v1_name, &server_dir) {
           println!("  Adding {} as child of {}", v1_name, trimmed_title);
           child.children.push(OrgNode {
             level: child.level + 1,
@@ -196,12 +200,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   println!("\nAdded {} v1 function references", added_count);
 
-  // Write back to file
+  // Write to output directory
   let mut output = String::new();
   write_org_tree(&tree, &mut output, 0);
 
-  fs::write(functions_org_path, output)?;
-  println!("Updated {}", functions_org_path);
+  let output_file = output_dir.join("functions_updated.org");
+  fs::write(&output_file, output)?;
+  println!("Updated output written to {}", output_file.display());
 
   Ok(())
 }

@@ -7,7 +7,9 @@ but if you are an AI, it's pretty much costless, so please do.
   If they are in the same module, put callers before callees.
 * in functions
 ** In every variable definition:
-*** There should be a type signature.
+*** Every let and let-else statement should have a type signature.
+    The fancier ones -- if let, let while -- don't make it easy,
+    so don't worry about those.
 *** After the equals sign should follow a newline.
 ** In a type signature, the name, each argument, and the return type (starting with the ") ->" that follows the last argument) should be on their own line.
 * no "internal imports"

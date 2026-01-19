@@ -1,5 +1,5 @@
 [workspace]
-members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/scope-reducer", "tools"]
+members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/scope-reducer"]
 
 [package]
 name = "skg"
@@ -28,6 +28,10 @@ path = "tools/delete-one-db.rs"
 [[bin]]
 name = "smsn-keywords"
 path = "discoveries/smsn/find-keywords.rs"
+
+[[bin]]
+name = "function_conversions_for_refactor"
+path = "tools/function_conversions_for_refactor/function_conversions_for_refactor.rs"
 
 [dependencies]
 async-std = { version = "1.12", features = ["attributes"] }

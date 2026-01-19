@@ -12,7 +12,7 @@ use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::orgnode::{OrgNode, ViewRequest};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
-use crate::types::skgnode::{SkgNodeMap, skgnode_map_from_save_instructions};
+use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 
 use ego_tree::{Tree, NodeId};
 use futures::executor::block_on;

@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
-use crate::types::skgnode::SkgNodeMap;
+use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::tree::orgnode_skgnode::{
   find_child_by_id, find_children_by_ids};
 

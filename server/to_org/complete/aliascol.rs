@@ -3,7 +3,8 @@ use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, w
 use crate::types::tree::orgnode_skgnode::{
   collect_child_aliases_at_aliascol, insert_scaffold_as_child};
 use crate::types::misc::ID;
-use crate::types::skgnode::{SkgNode, SkgNodeMap};
+use crate::types::skgnode::SkgNode;
+use crate::types::skgnodemap::SkgNodeMap;
 use crate::to_org::util::get_id_from_treenode;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;

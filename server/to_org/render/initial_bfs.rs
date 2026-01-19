@@ -21,7 +21,7 @@ use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_e
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::OrgNode;
-use crate::types::skgnode::SkgNodeMap;
+use crate::types::skgnodemap::SkgNodeMap;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;

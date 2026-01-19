@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::test_utils::run_with_test_db;
 use skg::types::orgnode::OrgNode;
 use skg::types::misc::SkgConfig;
-use skg::types::skgnode::{SkgNodeMap, skgnode_map_from_forest};
+use skg::types::skgnodemap::{SkgNodeMap, skgnode_map_from_forest};
 
 use ego_tree::{Tree, NodeId};
 

@@ -13,7 +13,8 @@ use crate::to_org::util::{
   truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnode::{SkgNode, SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::skgnode::SkgNode;
+use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
 use crate::types::tree::generic::write_at_node_in_tree;
 
