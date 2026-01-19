@@ -1,4 +1,4 @@
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous_v2;
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{
   build_and_integrate_containerward_view_then_drop_request,
@@ -6,13 +6,13 @@ use crate::to_org::expand::backpath::{
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::{
-  maybe_add_hiddenInSubscribeeCol_branch_v2,
+  maybe_add_hiddenInSubscribeeCol_branch,
   type_and_parent_type_consistent_with_subscribee_in_orgtree };
 use crate::to_org::util::{
-  build_node_branch_minus_content_v2, get_pid_in_tree,
+  build_node_branch_minus_content, get_pid_in_tree,
   DefinitiveMap,
-  truenode_in_orgtree_is_indefinitive,
-  content_ids_if_definitive_else_empty_in_orgtree };
+  truenode_is_indefinitive,
+  content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
@@ -104,7 +104,7 @@ async fn execute_definitive_view_request (
   // If this is a subscribee with hidden content, add HiddenInSubscribeeCol
   if type_and_parent_type_consistent_with_subscribee_in_orgtree (
     forest, node_id )?
-  { maybe_add_hiddenInSubscribeeCol_branch_v2 (
+  { maybe_add_hiddenInSubscribeeCol_branch (
       forest, map, node_id, config, typedb_driver
     ). await ?; }
   Ok (( )) }
@@ -210,7 +210,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   hidden_ids     : &HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let mut gen_with_children : Vec < (NodeId, ID) > =
-    content_ids_if_definitive_else_empty_in_orgtree (
+    content_ids_if_definitive_else_empty (
       tree, map, effective_root ) ?
     . into_iter ()
     . filter ( |skgid| ! hidden_ids . contains ( skgid ) )
@@ -222,20 +222,20 @@ async fn extendDefinitiveSubtreeFromLeaf (
     if nodes_rendered + gen_with_children . len () >= limit {
       // Limit hit - add final generation as indefinitive and truncate
       let space_left : usize = limit - nodes_rendered;
-      add_last_generation_and_truncate_some_of_previous_v2 (
+      add_last_generation_and_truncate_some_of_previous (
         tree, map, generation, &gen_with_children,
         space_left, effective_root, visited, config, driver ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
       let (_tree_opt, _map_opt, new_treeid) =
-        build_node_branch_minus_content_v2 (
+        build_node_branch_minus_content (
           Some((tree, map, parent_treeid)),
           &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
-      if ! truenode_in_orgtree_is_indefinitive ( tree, new_treeid ) ? {
+      if ! truenode_is_indefinitive ( tree, new_treeid ) ? {
         let grandchild_skgids : Vec < ID > =
-          content_ids_if_definitive_else_empty_in_orgtree (
+          content_ids_if_definitive_else_empty (
             tree, map, new_treeid ) ?;
         for grandchild_skgid in grandchild_skgids {
           next_gen . push ( (new_treeid, grandchild_skgid) ); }} }

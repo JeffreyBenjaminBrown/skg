@@ -1,11 +1,11 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{
-  DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree, truenode_in_orgtree_is_indefinitive, collect_child_treeids_in_orgtree, detect_and_mark_cycle_in_orgtree,
-  make_indef_if_repeat_then_extend_defmap_in_orgtree,
+  DefinitiveMap, get_pid_in_pairtree, get_pid_in_tree, truenode_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
+  make_indef_if_repeat_then_extend_defmap,
 };
 use crate::to_org::complete::aliascol::completeAliasCol;
-use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch_v2;
+use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
@@ -50,7 +50,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
   ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'b>>
   { Box::pin(async move {
       let child_treeids : Vec < NodeId > =
-        collect_child_treeids_in_orgtree ( tree, node_id ) ?;
+        collect_child_treeids ( tree, node_id ) ?;
       for child_treeid in child_treeids {
         complete_or_restore_each_node_in_branch (
           tree, map, child_treeid, config, typedb_driver,
@@ -83,16 +83,16 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
           }
         } ) . await ?;
 
-      detect_and_mark_cycle_in_orgtree ( tree, node_id ) ?;
-      make_indef_if_repeat_then_extend_defmap_in_orgtree (
+      detect_and_mark_cycle ( tree, node_id ) ?;
+      make_indef_if_repeat_then_extend_defmap (
         tree, node_id, visited ) ?;
 
-      { if truenode_in_orgtree_is_indefinitive ( tree, node_id ) ? {
+      { if truenode_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode_v2 (
             tree, map, node_id ) ?;
         } else {
           // Definitive: use v2 version working directly with tree+map
-          maybe_add_subscribeeCol_branch_v2 (
+          maybe_add_subscribeeCol_branch (
             tree, map, node_id, config, typedb_driver ) . await ?; }
         recurse (
           tree, map, node_id, config, typedb_driver, visited

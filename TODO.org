@@ -5,9 +5,15 @@
    refactor-ongoing/functions.org
 ** once it's not globally needed, restrict PairTree and NodePair
    via 'super' or, better even if isolated enough, local
-** functions miscategorized as pairless
-   in 'new-functions-without-correspondences',
+** ONGOING functions miscategorized as pairless
+   But also note that,
+   Under the headline 'new-functions-without-correspondences'
+   in refactor-ongoing/functions.org,
    lots of '{name}_in_orgtree' functions correspond to '{name}' ones.
+   That is, they are miscategorized -- they appear to be v2 versions
+   to replace v1 versions.
+** ONGOING faster
+   I feel like this is going slower than normal for you. Do you think there's any way you could organize the plans in refactor-ongoing/ to speed it up? Maybe think harder about plans before doing it? I don't know -- you tell me if something like that is possible. Otherwise continue.
 * two kinds of stats
 ** the idea
    One regards the view, the other the graph.
@@ -65,6 +71,10 @@
 *** TODO ?
     Unbundle those two ideas.
     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
+** makeIndefinitiveAndClobber doesn't sound right
+   It sets indef and body but not title.
+   Something else does all three.
+   Choose one or the other.
 ** AWAITS Are there more unnecessary mid-functions?
    as in midparent in a tree
 *** DONE flatten add_missing_info_to_forest

@@ -21,7 +21,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous_v2 (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
-*** add_last_generation_and_truncate_some_of_previous
+*** DONE add_last_generation_and_truncate_some_of_previous
 ** DONE build_and_integrate_aliases_v2
 pub async fn build_and_integrate_aliases_v2 (
   tree      : &mut Tree<OrgNode>,
@@ -84,7 +84,7 @@ pub async fn build_node_branch_minus_content_v2 (
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
 ) -> Result < (Option<Tree<OrgNode>>, Option<crate::types::skgnode::SkgNodeMap>, NodeId), Box<dyn Error> >
-*** build_node_branch_minus_content
+*** DONE build_node_branch_minus_content
 ** clobberIndefinitiveOrgnode_v2
 pub fn clobberIndefinitiveOrgnode_v2 (
   tree    : &mut Tree<OrgNode>,
@@ -217,13 +217,13 @@ pub async fn make_and_append_child_pair_v2 (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> >
-*** make_and_append_child_pair
+*** DONE make_and_append_child_pair
 ** makeIndefinitiveAndClobber_v2
 pub(super) fn makeIndefinitiveAndClobber_v2 (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> >
-*** makeIndefinitiveAndClobber
+*** DONE makeIndefinitiveAndClobber
 ** maybe_add_hiddenInSubscribeeCol_branch_v2
 pub async fn maybe_add_hiddenInSubscribeeCol_branch_v2 (
   tree              : &mut ego_tree::Tree<OrgNode>,
@@ -256,7 +256,7 @@ pub(super) fn nodes_after_in_generation_v2 (
   generation_member_treeid : NodeId,
   effective_root           : Option < NodeId >,
 ) -> Result < Vec < NodeId >, Box<dyn Error> >
-*** nodes_after_in_generation
+*** DONE nodes_after_in_generation
 ** DONE orgnode_forest_to_string_v2
 pub fn orgnode_forest_to_string_v2 (
   forest : &Tree<OrgNode>,
@@ -458,7 +458,7 @@ pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, Vec < ID > ), Box<dyn Error> >
-** remove_duplicates_and_false_aliases_handling_focus_v2
+** DONE remove_duplicates_and_false_aliases_handling_focus_v2
 fn remove_duplicates_and_false_aliases_handling_focus_v2 (
   tree             : &mut Tree<OrgNode>,
   aliascol_node_id : NodeId,

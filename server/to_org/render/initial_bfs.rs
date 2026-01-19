@@ -17,8 +17,8 @@
 /// Then navigate up to L's parent P,
 /// and re-render as indefinitive every node in P's generation after P.
 
-use crate::to_org::util::{stub_forest_from_root_ids_v2, content_ids_if_definitive_else_empty_in_orgtree, build_node_branch_minus_content_v2, DefinitiveMap};
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous_v2;
+use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
+use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNodeMap;
@@ -38,7 +38,7 @@ pub async fn render_initial_forest_bfs (
 ) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
   let (mut forest, mut map) : (Tree<OrgNode>, SkgNodeMap) =
-    stub_forest_from_root_ids_v2 (
+    stub_forest_from_root_ids (
       root_ids, config, driver, &mut visited ) . await ?;
   let forest_root_id : NodeId = forest . root () . id ();
   let root_nodes : Vec < NodeId > =
@@ -94,7 +94,7 @@ fn render_generation_and_recurse<'a> (
         visited, config, driver,
       ) . await }
     else {
-      add_last_generation_and_truncate_some_of_previous_v2 (
+      add_last_generation_and_truncate_some_of_previous (
         forest, map, gen_int + 1, &parent_child_rels_to_add,
         limit - rendered_count, effective_root,
         visited, config, driver,
@@ -114,7 +114,7 @@ async fn add_children_and_collect_their_ids_v2 (
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
     let (_, _, child_treeid) =
-      build_node_branch_minus_content_v2 (
+      build_node_branch_minus_content (
         Some ( (&mut *forest, &mut *map, parent_treeid) ),
         &child_skgid, config, driver, visited ) . await ?;
     child_treeids . push ( child_treeid ); }
@@ -131,7 +131,7 @@ fn collect_rels_to_children_from_generation_v2 (
   let mut children : Vec < (NodeId, ID) > = Vec::new ();
   for treeid in nodes_in_gen {
     if let Ok ( child_skgids ) =
-      content_ids_if_definitive_else_empty_in_orgtree (
+      content_ids_if_definitive_else_empty (
         forest, map, *treeid )
     { for child_skgid in child_skgids {
       children . push ( (*treeid, child_skgid) ); }} }

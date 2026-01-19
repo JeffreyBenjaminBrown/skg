@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::to_org::complete::aliascol::completeAliasCol_v2;
+use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::orgnode::OrgNode;
@@ -67,7 +67,7 @@ async fn test_completeAliasCol_logic (
   };
 
   // Test 1: First AliasCol should have c and b (deduped, valid only)
-  completeAliasCol_v2 (
+  completeAliasCol (
     &mut forest,
     &mut map,
     aliascol_1_id,
@@ -101,7 +101,7 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  completeAliasCol_v2 (
+  completeAliasCol (
     &mut forest,
     &mut map,
     aliascol_2_id,
@@ -147,7 +147,7 @@ async fn test_completeAliasCol_logic (
     . id ();
 
   let result : Result < (), Box<dyn Error> > =
-    completeAliasCol_v2 (
+    completeAliasCol (
       &mut forest,
       &mut map,
       aliascol_3_id,
@@ -211,7 +211,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   };
 
   // Test first AliasCol
-  completeAliasCol_v2 (
+  completeAliasCol (
     &mut forest,
     &mut map,
     first_aliascol_id,
@@ -253,7 +253,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   }
 
   // Test second AliasCol
-  completeAliasCol_v2 (
+  completeAliasCol (
     &mut forest,
     &mut map,
     second_aliascol_id,

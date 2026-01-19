@@ -65,7 +65,7 @@ pub async fn completeAliasCol (
       . cloned ()
       . collect ( ));
 
-  remove_duplicates_and_false_aliases_handling_focus_v2 (
+  remove_duplicates_and_false_aliases_handling_focus (
     tree, // PITFALL: Gets modified.
     aliascol_node_id,
     & good_aliases_in_branch ) ?;
@@ -77,30 +77,8 @@ pub async fn completeAliasCol (
 
   Ok (( )) }
 
-/// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
-fn collect_child_aliases_at_aliascol_in_orgtree (
-  tree             : &Tree<OrgNode>,
-  aliascol_node_id : NodeId,
-) -> Result < Vec < String >, Box<dyn Error> > {
-  let mut aliases : Vec < String > =
-    Vec::new ();
-  let aliascol_ref : NodeRef < OrgNode > =
-    tree . get ( aliascol_node_id )
-    . ok_or ( "AliasCol node not found" ) ?;
-  for child_ref in aliascol_ref . children() {
-    let child : &OrgNode = child_ref . value();
-    if ! matches! ( &child . kind,
-                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
-      return Err (
-        format! ( "AliasCol has non-Alias child with kind: {:?}",
-                  child . kind )
-        . into () ); }
-    aliases . push (
-      child . title () . to_string () ); }
-  Ok ( aliases ) }
-
-/// V2: Remove duplicates and invalid aliases for Tree<OrgNode>.
-fn remove_duplicates_and_false_aliases_handling_focus_v2 (
+/// Remove duplicates and invalid aliases. Works with Tree<OrgNode>.
+fn remove_duplicates_and_false_aliases_handling_focus (
   tree             : &mut Tree<OrgNode>,
   aliascol_node_id : NodeId,
   good_aliases     : &HashSet < String >,
@@ -160,3 +138,25 @@ fn remove_duplicates_and_false_aliases_handling_focus_v2 (
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }}
 
   Ok (( )) }
+/// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
+fn collect_child_aliases_at_aliascol_in_orgtree (
+  tree             : &Tree<OrgNode>,
+  aliascol_node_id : NodeId,
+) -> Result < Vec < String >, Box<dyn Error> > {
+  let mut aliases : Vec < String > =
+    Vec::new ();
+  let aliascol_ref : NodeRef < OrgNode > =
+    tree . get ( aliascol_node_id )
+    . ok_or ( "AliasCol node not found" ) ?;
+  for child_ref in aliascol_ref . children() {
+    let child : &OrgNode = child_ref . value();
+    if ! matches! ( &child . kind,
+                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
+      return Err (
+        format! ( "AliasCol has non-Alias child with kind: {:?}",
+                  child . kind )
+        . into () ); }
+    aliases . push (
+      child . title () . to_string () ); }
+  Ok ( aliases ) }
+

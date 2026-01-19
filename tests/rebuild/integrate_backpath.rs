@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- integrate_backpath
 
 use indoc::indoc;
-use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle_v2;
+use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
@@ -56,7 +56,7 @@ async fn test_path_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
-  integrate_path_that_might_fork_or_cycle_v2(
+  integrate_path_that_might_fork_or_cycle(
     &mut forest, root_id, path, branches,
     cycle_node, &config, driver, ).await?;
 
@@ -137,7 +137,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let cycle_node = None;
 
   // Integrate the path
-  integrate_path_that_might_fork_or_cycle_v2(
+  integrate_path_that_might_fork_or_cycle(
     &mut forest, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
@@ -220,7 +220,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let cycle_node = Some(ID::from("1"));
 
   // Integrate the path
-  integrate_path_that_might_fork_or_cycle_v2(
+  integrate_path_that_might_fork_or_cycle(
     &mut forest, node_1_id, path, branches,
     cycle_node, &config, driver ).await?;
 
