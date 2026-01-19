@@ -48,7 +48,7 @@ pub async fn completeAliasCol (
       . clone() . unwrap_or_default () . into_iter () . collect ( ));
 
   let aliases_from_branch : Vec < String > =
-    collect_child_aliases_at_aliascol_in_orgtree (
+    collect_child_aliases_at_aliascol (
       tree, aliascol_node_id )?;
 
   let good_aliases_in_branch : HashSet < String > = (
@@ -139,7 +139,7 @@ fn remove_duplicates_and_false_aliases_handling_focus (
 
   Ok (( )) }
 /// Collect aliases from Alias children of an AliasCol node (for Tree<OrgNode>).
-fn collect_child_aliases_at_aliascol_in_orgtree (
+fn collect_child_aliases_at_aliascol (
   tree             : &Tree<OrgNode>,
   aliascol_node_id : NodeId,
 ) -> Result < Vec < String >, Box<dyn Error> > {

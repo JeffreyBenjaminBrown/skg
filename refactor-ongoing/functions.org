@@ -1,4 +1,4 @@
-* new-functions-with-correspondences
+* DONE
 ** DONE add_children_and_collect_their_ids_v2
 async fn add_children_and_collect_their_ids_v2 (
   forest      : &mut Tree<OrgNode>,
@@ -9,7 +9,7 @@ async fn add_children_and_collect_their_ids_v2 (
   driver      : &TypeDBDriver,
 ) -> Result < Vec < NodeId >, Box<dyn Error> >
 *** add_children_and_collect_their_ids
-** add_last_generation_and_truncate_some_of_previous_v2
+** DONE add_last_generation_and_truncate_some_of_previous_v2
 pub async fn add_last_generation_and_truncate_some_of_previous_v2 (
   tree           : &mut Tree<OrgNode>,
   map            : &mut SkgNodeMap,
@@ -76,7 +76,7 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request_v2 (
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> >
 *** build_and_integrate_sourceward_view_then_drop_request
-** build_node_branch_minus_content_v2
+** DONE build_node_branch_minus_content_v2
 pub async fn build_node_branch_minus_content_v2 (
   tree_map_parent : Option<(&mut Tree<OrgNode>, &mut crate::types::skgnode::SkgNodeMap, NodeId)>,
   skgid           : &ID,
@@ -101,7 +101,7 @@ pub async fn completeAliasCol_v2 (
   _driver          : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** completeAliasCol
-** complete_branch_minus_content_in_orgtree
+** DONE complete_branch_minus_content_in_orgtree
 pub async fn complete_branch_minus_content_in_orgtree (
   tree     : &mut Tree<OrgNode>,
   map      : &mut crate::types::skgnode::SkgNodeMap,
@@ -208,7 +208,7 @@ pub async fn integrate_path_that_might_fork_or_cycle_v2 (
   driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> >
 *** integrate_path_that_might_fork_or_cycle
-** make_and_append_child_pair_v2
+** DONE make_and_append_child_pair_v2
 pub async fn make_and_append_child_pair_v2 (
   tree           : &mut Tree<OrgNode>,
   map            : &mut crate::types::skgnode::SkgNodeMap,
@@ -218,7 +218,7 @@ pub async fn make_and_append_child_pair_v2 (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> >
 *** DONE make_and_append_child_pair
-** makeIndefinitiveAndClobber_v2
+** DONE makeIndefinitiveAndClobber_v2
 pub(super) fn makeIndefinitiveAndClobber_v2 (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
@@ -249,7 +249,7 @@ pub async fn multi_root_view_v2 (
   root_ids : &[ID],
 ) -> Result < String, Box<dyn Error> >
 *** multi_root_view
-** nodes_after_in_generation_v2
+** DONE nodes_after_in_generation_v2
 pub(super) fn nodes_after_in_generation_v2 (
   tree                     : &Tree<OrgNode>,
   generation               : usize,
@@ -331,8 +331,20 @@ pub async fn update_from_and_rerender_buffer_v2 (
   tantivy_index   : &TantivyIndex
 ) -> Result<SaveResponse, Box<dyn Error>>
 *** update_from_and_rerender_buffer
-* new-functions-without-correspondences
-** DONE append_indefinitive_from_disk_as_child_in_orgtree
+** truenode_is_indefinitive
+pub fn truenode_is_indefinitive (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < bool, Box<dyn Error> >
+** DONE collectViewRequestsFromForest
+pub fn collectViewRequestsFromForest<T> (
+  forest : &ego_tree::Tree<T>,
+) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
+where  T: AsRef<OrgNode>
+* TODO still two versions
+** unique_orgnode_scaffold_child
+*** unique_scaffold_child
+** append_indefinitive_from_disk_as_child_in_orgtree
 pub async fn append_indefinitive_from_disk_as_child_in_orgtree (
   tree           : &mut Tree<OrgNode>,
   map            : &mut SkgNodeMap,
@@ -356,11 +368,6 @@ pub fn collect_child_treeids_in_orgtree (
 pub fn collect_ids_from_orgtree (
   tree : &Tree<OrgNode>,
 ) -> Vec < ID >
-** collectViewRequestsFromForest
-pub fn collectViewRequestsFromForest<T> (
-  forest : &ego_tree::Tree<T>,
-) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
-where  T: AsRef<OrgNode>
 ** content_ids_if_definitive_else_empty_in_orgtree
 pub(super) fn content_ids_if_definitive_else_empty_in_orgtree (
   tree   : &Tree<OrgNode>,
@@ -372,20 +379,13 @@ pub fn detect_and_mark_cycle_in_orgtree (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>>
-** ensure_skgnode_in_map
-pub async fn ensure_skgnode_in_map (
-  node_id : &ID,
-  map     : &mut SkgNodeMap,
-  config  : &SkgConfig,
-  driver  : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> >
-** DONE find_child_by_id_in_orgtree
+** find_child_by_id_in_orgtree
 pub fn find_child_by_id_in_orgtree (
   tree          : & Tree<OrgNode>,
   parent_treeid : ego_tree::NodeId,
   target_skgid  : & ID,
 ) -> Option < ego_tree::NodeId >
-** DONE find_children_by_ids_in_orgtree
+** find_children_by_ids_in_orgtree
 pub fn find_children_by_ids_in_orgtree (
   tree          : & Tree<OrgNode>,
   parent_treeid : ego_tree::NodeId,
@@ -404,11 +404,6 @@ fn get_hidden_ids_if_subscribee_v2 (
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < HashSet < ID >, Box<dyn Error> >
-** get_pid_in_tree
-pub fn get_pid_in_tree (
-  tree   : &Tree<OrgNode>,
-  treeid : NodeId,
-) -> Result < ID, Box<dyn Error> >
 ** indefinitize_content_subtree_v2
 fn indefinitize_content_subtree_v2 (
   tree    : &mut ego_tree::Tree<OrgNode>,
@@ -416,7 +411,7 @@ fn indefinitize_content_subtree_v2 (
   node_id : NodeId,
   visited : &mut DefinitiveMap,
 ) -> Result < (), Box<dyn Error> >
-** DONE insert_scaffold_as_child_in_orgtree
+** insert_scaffold_as_child_in_orgtree
 pub fn insert_scaffold_as_child_in_orgtree (
   tree          : &mut Tree<OrgNode>,
   parent_id     : NodeId,
@@ -435,30 +430,19 @@ pub fn make_indef_if_repeat_then_extend_defmap_in_orgtree (
   node_id : NodeId,
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>>
-** mapsFromIdForView_from_orgtree
-async fn mapsFromIdForView_from_orgtree (
-  forest : &Tree<OrgNode>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result < MapsFromIdForView, Box<dyn Error> >
-** pairtree_from_tree_and_map
-pub fn pairtree_from_tree_and_map (
-  tree : &Tree<OrgNode>,
-  map  : &SkgNodeMap,
-) -> PairTree
-** DONE pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree
+** pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree
 pub fn pid_for_subscribee_and_its_subscriber_grandparent_in_orgtree (
   tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, ID ), Box<dyn Error> >
-** DONE pids_for_subscriber_and_its_subscribees_in_orgtree
+** pids_for_subscriber_and_its_subscribees_in_orgtree
 pub fn pids_for_subscriber_and_its_subscribees_in_orgtree (
   tree    : &Tree<OrgNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, Vec < ID > ), Box<dyn Error> >
-** DONE remove_duplicates_and_false_aliases_handling_focus_v2
+** remove_duplicates_and_false_aliases_handling_focus_v2
 fn remove_duplicates_and_false_aliases_handling_focus_v2 (
   tree             : &mut Tree<OrgNode>,
   aliascol_node_id : NodeId,
@@ -471,43 +455,19 @@ fn set_metadata_relationships_in_node_recursive_v2 (
   parent_pid : Option < &ID >,
   rel_data   : &MapsFromIdForView,
 )
-** skgnode_map_from_forest
-pub async fn skgnode_map_from_forest (
-  forest : &Tree<OrgNode>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result<SkgNodeMap, Box<dyn Error>>
-** skgnode_map_from_save_instructions
-pub fn skgnode_map_from_save_instructions (
-  instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
-) -> SkgNodeMap
-** skgnodes_from_ids
-pub async fn skgnodes_from_ids (
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-  ids    : &[ID],
-) -> Result<Vec<SkgNode>, Box<dyn Error>>
-** tree_and_map_from_pairtree
-pub fn tree_and_map_from_pairtree (
-  pairtree : &PairTree,
-) -> (Tree<OrgNode>, SkgNodeMap)
-** truenode_in_orgtree_is_indefinitive
-pub fn truenode_in_orgtree_is_indefinitive (
-  tree   : &Tree<OrgNode>,
-  treeid : NodeId,
-) -> Result < bool, Box<dyn Error> >
 ** type_and_parent_type_consistent_with_subscribee_in_orgtree
 pub fn type_and_parent_type_consistent_with_subscribee_in_orgtree (
   tree    : &ego_tree::Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> >
-** unique_orgnode_scaffold_child
-pub fn unique_orgnode_scaffold_child (
-  tree          : &Tree<OrgNode>,
-  node_id       : NodeId,
-  scaffold_kind : &Scaffold,
-) -> Result<Option<NodeId>, Box<dyn Error>>
 * new-helper-functions
+** ensure_skgnode_in_map
+pub async fn ensure_skgnode_in_map (
+  node_id : &ID,
+  map     : &mut SkgNodeMap,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> >
 ** add_v_to_map_if_absent
 pub async fn add_v_to_map_if_absent<K, V, F, Fut> (
   key      : &K,
@@ -528,7 +488,42 @@ fn collect_ids_from_subtree (
 ** AsRef<OrgNode> trait implementations
 impl AsRef<OrgNode> for NodePair
 impl AsRef<OrgNode> for OrgNode
-* old-functions-gone
-(none - all v1 functions remain for backward compatibility)
-* old-functions-transformed
-(none - v1 functions unchanged, v2 versions created alongside)
+** skgnode_map_from_forest
+pub async fn skgnode_map_from_forest (
+  forest : &Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<SkgNodeMap, Box<dyn Error>>
+** mapsFromIdForView_from_orgtree
+async fn mapsFromIdForView_from_orgtree (
+  forest : &Tree<OrgNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < MapsFromIdForView, Box<dyn Error> >
+** skgnode_map_from_save_instructions
+pub fn skgnode_map_from_save_instructions (
+  instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
+) -> SkgNodeMap
+** skgnodes_from_ids
+pub async fn skgnodes_from_ids (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  ids    : &[ID],
+) -> Result<Vec<SkgNode>, Box<dyn Error>>
+* functions-deleting
+** get_pid_in_tree
+pub fn get_pid_in_tree (
+  tree   : &Tree<OrgNode>,
+  treeid : NodeId,
+) -> Result < ID, Box<dyn Error> >
+** ensure_skgnode
+** pairtree_from_tree_and_map
+pub fn pairtree_from_tree_and_map (
+  tree : &Tree<OrgNode>,
+  map  : &SkgNodeMap,
+) -> PairTree
+** tree_and_map_from_pairtree
+pub fn tree_and_map_from_pairtree (
+  pairtree : &PairTree,
+) -> (Tree<OrgNode>, SkgNodeMap)
+* transforming old functions

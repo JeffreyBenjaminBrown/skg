@@ -174,7 +174,7 @@ pub fn detect_and_mark_cycle (
 ) -> Result<(), Box<dyn Error>> {
   let is_cycle : bool = {
     let pid : ID = get_pid_in_tree ( tree, node_id ) ?;
-    is_ancestor_id_in_orgtree ( tree, node_id, &pid ) ? };
+    is_ancestor_id ( tree, node_id, &pid ) ? };
   write_at_node_in_tree ( tree, node_id, |orgnode| {
     let OrgNodeKind::True ( t ) = &mut orgnode.kind
       else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
@@ -239,36 +239,15 @@ pub fn collect_ids_from_orgtree (
         pids . push ( pid . clone( )); }} }
   pids }
 
-/// Check if `target_skgid` appears in the ancestor path of `treeid`.
-/// Used for cycle detection.
-fn is_ancestor_id (
-  tree          : &PairTree,
-  origin_treeid : NodeId,
-  target_skgid  : &ID,
-) -> Result<bool, Box<dyn Error>> {
-  read_at_node_in_tree(tree, origin_treeid, |_| ())
-    .map_err(|_| "is_ancestor_id: NodeId not in tree")?;
-  for generation in 1.. {
-    match read_at_ancestor_in_tree(
-      tree, origin_treeid, generation,
-      |np| match &np . orgnode . kind {
-        OrgNodeKind::True ( t ) => t . id_opt . clone (),
-        OrgNodeKind::Scaff ( _ ) => None } )
-    { Ok(Some(id)) if &id == target_skgid
-        => return Ok(true),
-      Ok(_) => continue,
-      Err(_) => return Ok(false), }}
-  unreachable!() }
-
 /// Check if `target_skgid` appears in the ancestor path of `treeid` in Tree<OrgNode>.
 /// Used for cycle detection.
-fn is_ancestor_id_in_orgtree (
+fn is_ancestor_id (
   tree          : &Tree<OrgNode>,
   origin_treeid : NodeId,
   target_skgid  : &ID,
 ) -> Result<bool, Box<dyn Error>> {
   read_at_node_in_tree(tree, origin_treeid, |_| ())
-    .map_err(|_| "is_ancestor_id_in_orgtree: NodeId not in tree")?;
+    .map_err(|_| "is_ancestor_id: NodeId not in tree")?;
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,

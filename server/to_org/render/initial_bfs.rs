@@ -79,13 +79,13 @@ fn render_generation_and_recurse<'a> (
     let nodes_in_gen : usize = gen_nodeids . len ();
     let rendered_count : usize = rendered_count + nodes_in_gen;
     let parent_child_rels_to_add : Vec < (NodeId, ID) > =
-      collect_rels_to_children_from_generation_v2 (
+      collect_rels_to_children_from_generation (
         forest, map, &gen_nodeids );
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count < limit {
       let next_gen : Vec < NodeId > =
-        add_children_and_collect_their_ids_v2 (
+        add_children_and_collect_their_ids (
           forest, map, parent_child_rels_to_add, visited, config, driver
         ) . await ?;
       render_generation_and_recurse (
@@ -103,7 +103,7 @@ fn render_generation_and_recurse<'a> (
   } ) }
 
 /// Add children to the forest. Return their NodeIds.
-async fn add_children_and_collect_their_ids_v2 (
+async fn add_children_and_collect_their_ids (
   forest      : &mut Tree<OrgNode>,
   map         : &mut SkgNodeMap,
   rels_to_add : Vec < (NodeId, ID) >,
@@ -123,7 +123,7 @@ async fn add_children_and_collect_their_ids_v2 (
 /// Collect all children IDs from definitive nodes in the input generation.
 /// (Indefinitive nodes' contents do not need rendering.)
 /// Returns (parent_treeid, child_skgid) tuples.
-fn collect_rels_to_children_from_generation_v2 (
+fn collect_rels_to_children_from_generation (
   forest       : &Tree<OrgNode>,
   map          : &SkgNodeMap,
   nodes_in_gen : &[NodeId],
