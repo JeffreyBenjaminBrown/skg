@@ -2,13 +2,12 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::orgnode_skgnode::{
   collect_child_aliases_at_aliascol, insert_scaffold_as_child};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::ID;
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
 use crate::to_org::util::get_pid_in_tree;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// Reconciles its Alias children with
 ///   the aliases on disk (in the map) for its parent node.
@@ -23,8 +22,6 @@ pub async fn completeAliasCol (
   tree             : &mut Tree<OrgNode>,
   map              : &SkgNodeMap,
   aliascol_node_id : NodeId,
-  _config          : &SkgConfig,
-  _driver          : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   { // Validate this is an AliasCol
     let is_aliascol : bool =

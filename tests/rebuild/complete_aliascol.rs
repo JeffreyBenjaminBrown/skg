@@ -70,9 +70,7 @@ async fn test_completeAliasCol_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    aliascol_1_id,
-    & config,
-    driver
+    aliascol_1_id
   ) .await?;
 
   {
@@ -104,9 +102,7 @@ async fn test_completeAliasCol_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    aliascol_2_id,
-    & config,
-    driver
+    aliascol_2_id
   ) .await?;
 
   {
@@ -150,9 +146,7 @@ async fn test_completeAliasCol_logic (
     completeAliasCol (
       &mut forest,
       &mut map,
-      aliascol_3_id,
-      & config,
-      driver
+      aliascol_3_id
     ).await;
 
   assert! (
@@ -214,9 +208,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    first_aliascol_id,
-    & config,
-    driver
+    first_aliascol_id
   ) .await?;
 
   {
@@ -256,9 +248,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    second_aliascol_id,
-    & config,
-    driver
+    second_aliascol_id
   ) .await?;
 
   {

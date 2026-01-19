@@ -63,7 +63,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
-        tree, map, node_id, config, typedb_driver ). await ?;
+        tree, map, node_id ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
         matches!( &node.kind, OrgNodeKind::Scaff(_)) } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
