@@ -1,11 +1,11 @@
 use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
 use crate::types::tree::generic::read_at_node_in_tree;
 
-use ego_tree::NodeId;
+use ego_tree::{Tree, NodeId};
 use std::error::Error;
 
 pub fn collectViewRequestsFromForest<T> (
-  forest : &ego_tree::Tree<T>,
+  forest : &Tree<T>,
 ) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
 where T: AsRef<OrgNode>,
 { let mut view_requests : Vec < (NodeId, ViewRequest) > =
@@ -20,7 +20,7 @@ where T: AsRef<OrgNode>,
   Ok ( view_requests ) }
 
 fn collectViewRequestsFromNode<T> (
-  tree              : &ego_tree::Tree<T>,
+  tree              : &Tree<T>,
   node_id           : NodeId,
   view_requests_out : &mut Vec < (NodeId, ViewRequest) >,
 ) -> Result < (), Box<dyn Error> >

@@ -11,7 +11,7 @@ use crate::to_org::complete::sharing::{
 use crate::to_org::util::{
   build_node_branch_minus_content, get_pid_in_tree,
   DefinitiveMap,
-  truenode_is_indefinitive,
+  truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
@@ -254,10 +254,11 @@ async fn extendDefinitiveSubtreeFromLeaf (
     for (parent_treeid, child_skgid) in gen_with_children {
       let (_tree_opt, _map_opt, new_treeid) =
         build_node_branch_minus_content (
-          Some((tree, map, parent_treeid)),
+          Some((tree, parent_treeid)),
+          Some(map),
           &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
-      if ! truenode_is_indefinitive ( tree, new_treeid ) ? {
+      if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (

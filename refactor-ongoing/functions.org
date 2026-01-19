@@ -34,7 +34,7 @@
 ** ensure_skgnode
 * transforming old functions
 ** DONE collectViewRequestsFromForest
-** DONE truenode_is_indefinitive
+** DONE truenode_in_tree_is_indefinitive
 ** DONE update_from_and_rerender_buffer
 ** DONE truncate_after_node_in_generation_in_tree
 ** DONE stub_forest_from_root_ids

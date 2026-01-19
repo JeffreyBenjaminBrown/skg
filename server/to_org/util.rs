@@ -5,7 +5,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
-    mk_definitive_orgnode, OrgNode, OrgNodeKind };
+    mk_definitive_orgnode, OrgNode, OrgNodeKind, forest_root_orgnode };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::{SkgNode, SkgNodeMap};
@@ -73,17 +73,21 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
     skgnode . body . clone () );
   Ok (( skgnode, orgnode )) }
 
-/// Set 'indefinitive' to true and set body to None.
+/// Set 'indefinitive' to true,
+/// reset title and source,
+/// and set body to None.
 pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_node_in_tree ( tree, node_id, |orgnode| {
-    let OrgNodeKind::True ( t ) = &mut orgnode.kind
-      else { panic! ( "makeIndefinitiveAndClobber: expected TrueNode" ) };
-    t . indefinitive = true;
-    t . body = None; } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  write_at_node_in_tree (
+    tree, node_id,
+    |orgnode| {
+      let OrgNodeKind::True ( t ) = &mut orgnode.kind
+        else { panic! ( "makeIndefinitiveAndClobber: expected TrueNode" ) };
+      t . indefinitive = true;
+      t . body = None; }
+    ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -95,7 +99,7 @@ pub(super) fn makeIndefinitiveAndClobber (
 /// - build a subscribee branch if needed
 pub async fn complete_branch_minus_content (
   tree     : &mut Tree<OrgNode>,
-  map      : &mut crate::types::skgnode::SkgNodeMap,
+  map      : &mut SkgNodeMap,
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
@@ -104,7 +108,7 @@ pub async fn complete_branch_minus_content (
   detect_and_mark_cycle ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if truenode_is_indefinitive ( tree, node_id )?
+  if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveOrgnode (
       tree, map, node_id ) ?; }
   maybe_add_subscribeeCol_branch (
@@ -166,21 +170,17 @@ pub async fn stub_forest_from_root_ids (
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
 ) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> > {
-  use ego_tree::Tree;
-  use crate::types::orgnode::{OrgNode, forest_root_orgnode};
-  use crate::types::skgnode::SkgNodeMap;
-
   let mut forest : Tree<OrgNode> = Tree::new ( forest_root_orgnode () );
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   let forest_root_treeid : NodeId = forest . root () . id ();
   for root_skgid in root_skgids {
     build_node_branch_minus_content (
-      Some ( (&mut forest, &mut map, forest_root_treeid) ),
+      Some ( (&mut forest, forest_root_treeid) ),
+      Some ( &mut map ),
       root_skgid, config, driver, visited
     ) . await ?; }
   Ok ( (forest, map) ) }
 
-/// Collect all IDs from a tree.
 pub fn collect_ids_from_tree (
   tree : &Tree<OrgNode>,
 ) -> Vec < ID > {
@@ -225,9 +225,7 @@ pub fn get_pid_in_tree (
     read_at_node_in_tree (
       tree, treeid, |orgnode| orgnode.kind.clone() )?;
   match node_kind {
-    OrgNodeKind::Scaff ( _ ) =>
-      Err ( "get_pid_in_tree: caller should not pass a Scaffold"
-            . into() ),
+    OrgNodeKind::Scaff ( _ ) => Err ( "get_pid_in_tree: caller should not pass a Scaffold" . into() ),
     OrgNodeKind::True ( t ) =>
       t . id_opt . ok_or_else (
         || "get_pid_in_tree: node has no ID" . into( )) }}
@@ -242,56 +240,53 @@ pub fn get_pid_in_tree (
 /// or they can all be done at once via
 /// 'build_node_branch_minus_content.
 pub async fn make_and_append_child_pair (
-  tree           : &mut Tree<OrgNode>,
-  map            : &mut crate::types::skgnode::SkgNodeMap,
-  parent_treeid : NodeId,
-  child_skgid   : &ID,
+  tree          : &mut Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  parent_treeid : NodeId, // will parent the new node
+  child_skgid   : &ID, // how to find the new node
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
-) -> Result < NodeId, Box<dyn Error> > {
+) -> Result < NodeId, // the new node
+              Box<dyn Error> > {
   let (child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid ) . await ?;
-  // Add SkgNode to map
-  map . insert ( child_skgid . clone (), child_skgnode );
-  // Add OrgNode to tree
+  map . insert ( child_skgid . clone (),
+                 child_skgnode );
   let child_treeid : NodeId =
-    with_node_mut (
+    with_node_mut ( // append child
       tree, parent_treeid,
       ( |mut parent_mut|
-        parent_mut . append ( child_orgnode ) . id () ))
+        parent_mut . append(child_orgnode) . id() ))
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok ( child_treeid ) }
 
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
 /// and return the root of the new branch, but in its tree context:
-/// - If tree_map_parent is None:
+/// - If tree_and_parent is None and map is None:
 ///   creates new tree, returns (Some(tree), Some(map), branch_root_nodeid)
-/// - If tree_map_parent is Some:
+/// - If tree_and_parent is Some and map is Some:
 ///   appends to tree, returns (None, None, branch_root_nodeid)
 pub async fn build_node_branch_minus_content (
-  tree_map_parent : Option<(&mut Tree<OrgNode>, &mut crate::types::skgnode::SkgNodeMap, NodeId)>,
-  skgid           : &ID,
+  tree_and_parent : Option<(&mut Tree<OrgNode>, NodeId)>, // if modifying an existing tree, attach as a child here
+  map             : Option<&mut SkgNodeMap>,
+  skgid           : &ID, // what to fetch
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
-) -> Result < (Option<Tree<OrgNode>>, Option<crate::types::skgnode::SkgNodeMap>, NodeId), Box<dyn Error> > {
+) -> Result < (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId), Box<dyn Error> > {
   let (skgnode, orgnode) : (SkgNode, OrgNode) =
     skgnode_and_orgnode_from_id (
       config, driver, skgid ) . await ?;
   let node_id : ID = match &orgnode.kind {
-    OrgNodeKind::True(t) => t . id_opt . clone()
-      . ok_or ( "build_node_branch_minus_content: orgnode has no ID" ) ?,
+    OrgNodeKind::True(t) => t . id_opt . clone() . ok_or ( "build_node_branch_minus_content: orgnode has no ID" ) ?,
     OrgNodeKind::Scaff(_) =>
-      return Err ( "build_node_branch_minus_content: orgnode is Scaffold".into() ),
-  };
-  match tree_map_parent {
-    Some ( (tree, map, parent_treeid) ) => {
-      // Add SkgNode to map
-      map . insert ( node_id, skgnode );
-      // Add OrgNode to tree
-      let child_treeid : NodeId =
+      return Err ( "build_node_branch_minus_content: orgnode is Scaffold".into() ), };
+  match (tree_and_parent, map) {
+    (Some ( (tree, parent_treeid) ), Some(map)) => {
+      map . insert ( node_id, skgnode ); // Add SkgNode to map
+      let child_treeid : NodeId = // Add OrgNode to tree
         with_node_mut (
           tree, parent_treeid,
           ( |mut parent_mut|
@@ -301,9 +296,9 @@ pub async fn build_node_branch_minus_content (
         tree, map, child_treeid, visited,
         config, driver ) . await ?;
       Ok ( (None, None, child_treeid) ) },
-    None => {
-      let mut map : crate::types::skgnode::SkgNodeMap =
-        crate::types::skgnode::SkgNodeMap::new ();
+    (None, None) => {
+      let mut map : SkgNodeMap =
+        SkgNodeMap::new ();
       map . insert ( node_id, skgnode );
       let mut tree : Tree<OrgNode> =
         Tree::new ( orgnode );
@@ -311,14 +306,16 @@ pub async fn build_node_branch_minus_content (
       complete_branch_minus_content (
         &mut tree, &mut map, root_treeid, visited,
         config, driver ) . await ?;
-      Ok ( (Some(tree), Some(map), root_treeid) ) }, } }
+      Ok ( (Some(tree), Some(map), root_treeid) ) },
+    _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None".into()),
+  } }
 
 /// Collect content child IDs from a node.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
 /// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
   tree   : &Tree<OrgNode>,
-  map    : &crate::types::skgnode::SkgNodeMap,
+  map    : &SkgNodeMap,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   let ( node_kind, node_id_opt ) : ( OrgNodeKind, Option<ID> ) =
@@ -339,9 +336,10 @@ pub(super) fn content_ids_if_definitive_else_empty (
         return Ok ( Vec::new () ); }
       Ok ( match node_id_opt {
         Some ( node_id ) =>
-          map . get ( &node_id )
-          . map ( |skgnode| skgnode . contains . clone () . unwrap_or_default () )
-          . unwrap_or_default (),
+          map . get (&node_id) . map (
+            |skgnode| skgnode . contains . clone ()
+              . unwrap_or_default ()
+          ). unwrap_or_default (),
         None => Vec::new (),  // No ID yet
       } ) } }}
 
@@ -377,7 +375,7 @@ pub(super) fn nodes_after_in_generation (
 
 /// Check if a TrueNode is indefinitive.
 /// Errs if given a Scaffold.
-pub fn truenode_is_indefinitive (
+pub fn truenode_in_tree_is_indefinitive (
   tree   : &Tree<OrgNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
@@ -408,7 +406,7 @@ pub fn collect_child_treeids (
 /// Does *not* verify that the request was completed;
 /// that's just the only situation in which it would be used.
 pub(super) fn remove_completed_view_request<T> (
-  tree         : &mut ego_tree::Tree<T>,
+  tree         : &mut Tree<T>,
   node_id      : NodeId,
   view_request : ViewRequest,
   error_msg    : &str,

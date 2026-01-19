@@ -116,7 +116,8 @@ async fn add_children_and_collect_their_ids (
   for (parent_treeid, child_skgid) in rels_to_add {
     let (_, _, child_treeid) =
       build_node_branch_minus_content (
-        Some ( (&mut *forest, &mut *map, parent_treeid) ),
+        Some ( (&mut *forest, parent_treeid) ),
+        Some ( &mut *map ),
         &child_skgid, config, driver, visited ) . await ?;
     child_treeids . push ( child_treeid ); }
   Ok ( child_treeids ) }

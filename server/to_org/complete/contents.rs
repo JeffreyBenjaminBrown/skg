@@ -1,7 +1,7 @@
 /// SINGLE ENTRY POINT: 'complete_or_restore_each_node_in_branch'.
 
 use crate::to_org::util::{
-  DefinitiveMap, get_pid_in_tree, truenode_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
+  DefinitiveMap, get_pid_in_tree, truenode_in_tree_is_indefinitive, collect_child_treeids, detect_and_mark_cycle,
   make_indef_if_repeat_then_extend_defmap,
 };
 use crate::to_org::complete::aliascol::completeAliasCol;
@@ -85,7 +85,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
       make_indef_if_repeat_then_extend_defmap (
         tree, node_id, visited ) ?;
 
-      { if truenode_is_indefinitive ( tree, node_id ) ? {
+      { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
             tree, map, node_id ) ?;
         } else { // futz with the orgnode and its content children
