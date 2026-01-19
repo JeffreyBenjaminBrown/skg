@@ -114,12 +114,10 @@ async fn add_children_and_collect_their_ids (
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
-    let (_, _, child_treeid)
-      : (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId)
-      = build_node_branch_minus_content (
-          Some ( (&mut *forest, parent_treeid) ),
-          Some ( &mut *map ),
-          &child_skgid, config, driver, visited ) . await ?;
+    let child_treeid : NodeId = build_node_branch_minus_content (
+      Some ( (&mut *forest, parent_treeid) ),
+      Some ( &mut *map ),
+      &child_skgid, config, driver, visited ) . await ?;
     child_treeids . push ( child_treeid ); }
   Ok ( child_treeids ) }
 

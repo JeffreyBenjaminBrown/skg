@@ -266,11 +266,11 @@ pub async fn make_and_append_child_pair (
 
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
-/// and return the root of the new branch, but in its tree context:
+/// and return the NodeId of the branch root.
 /// - If tree_and_parent is None and map is None:
-///   creates new tree, returns (Some(tree), Some(map), branch_root_nodeid)
+///   creates new tree (but doesn't return it)
 /// - If tree_and_parent is Some and map is Some:
-///   appends to tree, returns (None, None, branch_root_nodeid)
+///   appends to tree
 pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut Tree<OrgNode>, NodeId)>, // if modifying an existing tree, attach as a child here
   map             : Option<&mut SkgNodeMap>,
@@ -278,7 +278,7 @@ pub async fn build_node_branch_minus_content (
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
-) -> Result < (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId), Box<dyn Error> > {
+) -> Result < NodeId, Box<dyn Error> > {
   match (tree_and_parent, map) {
     (Some ( (tree, parent_treeid) ), Some(map)) => {
       let (_skgnode, orgnode) : (SkgNode, OrgNode) =
@@ -293,7 +293,7 @@ pub async fn build_node_branch_minus_content (
       complete_branch_minus_content (
         tree, map, child_treeid, visited,
         config, driver ) . await ?;
-      Ok ( (None, None, child_treeid) ) },
+      Ok ( child_treeid ) },
     (None, None) => {
       let mut map : SkgNodeMap =
         SkgNodeMap::new ();
@@ -306,7 +306,7 @@ pub async fn build_node_branch_minus_content (
       complete_branch_minus_content (
         &mut tree, &mut map, root_treeid, visited,
         config, driver ) . await ?;
-      Ok ( (Some(tree), Some(map), root_treeid) ) },
+      Ok ( root_treeid ) },
     _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None".into()),
   } }
 

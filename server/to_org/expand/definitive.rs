@@ -253,12 +253,10 @@ async fn extendDefinitiveSubtreeFromLeaf (
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
-      let (_tree_opt, _map_opt, new_treeid)
-        : (Option<Tree<OrgNode>>, Option<SkgNodeMap>, NodeId)
-        = build_node_branch_minus_content (
-            Some((tree, parent_treeid)),
-            Some(map),
-            &child_skgid, config, driver, visited ). await ?;
+      let new_treeid : NodeId = build_node_branch_minus_content (
+        Some((tree, parent_treeid)),
+        Some(map),
+        &child_skgid, config, driver, visited ). await ?;
       nodes_rendered += 1;
       if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
