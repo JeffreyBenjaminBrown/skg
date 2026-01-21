@@ -14,7 +14,7 @@
 *** Each document has sections, subsections, sub-subsubsections, etc.
     Actually a document doesn't need more than one level.
     In that case it is a 'flat tree', a.k.a. a list.
-*** Each section, subsection, etc. is a 'node' or 'org node'.
+*** Each section, subsection, etc. is an 'org node'.
     :PROPERTIES:
     :ID:       94091f94-5bf7-4296-8509-f9cc3e88cc2e
     :END:
@@ -23,7 +23,7 @@
      title    : string
      body     : optional string
      children : list of other org-nodes, often empty
-**** It is often handy to 'fold' a node.
+**** It is often handy to 'fold' an org node.
      'fold' is Emacs-speak for 'hide the body and children of'.
 *** 'containment'
 **** 'Levels' (the asterisks) imply containment.
@@ -32,17 +32,17 @@
      is said to 'contain' H.
      Equivalently, that headline is H's 'parent',
      and H is its 'child'.
-**** Some nodes are not contained.
-     These are 'roots' or 'top-level nodes'.
+**** Some org nodes are not contained.
+     These are 'roots' or 'top-level org nodes'.
 *** Folding (hiding contents) makes complex trees readable, navigable.
 * terms from org-mode that I use
 ** fold
-   = hide a node's children (and body), showing only the title
+   = hide an org node's children (and body), showing only the title
 ** parent and child
    In the display, the parent-child relationship
      can be used to display multiple kinds of relationship.
    In the Skg graph there are no parents or children --
-     there are more explicit relationships.
+     there are instead explicit named relationships.
 ** [[id:94091f94-5bf7-4296-8509-f9cc3e88cc2e][OrgNode]]
 * client, server and graph
 ** the graph
@@ -63,17 +63,30 @@
   :PROPERTIES:
   :ID:       95e56b22-e337-4f25-8a69-79289cfbbd6a
   :END:
-** consists of 'nodes'
+** consists of 'SkgNode's
 *** what that means
-    Each node has a 'title' (some text that is always shown),
-    a 'body' (some text that can be hidden),
+    Each SkgNode has a 'title' (some text that is always shown),
+    a 'body' (some text that can be hidden via 'folding'),
     and some relationships to other nodes.
-*** PITFALL: Nodes and OrgNodes are different.
-    Nodes are the fundamental unit of knowledge in a Skg graph.
+*** PITFALL: SkgNodes and OrgNodes are different.
+    SkgNodes are the fundamental unit of knowledge in a Skg graph.
     OrgNodes are used to represent some portion of the Skg graph.
     Most OrgNodes correspond directly to a node in the graph,
     but there are important exceptions,
     used to encode other kinds of data.
+    For instances, when a SkgNode N has aliases,
+    they are represented as N's descendents in the org view:
+```
+  * N                                   # true node
+  ** its aliases                        # 'scaffold' node
+  *** alias 1                           # 'scaffold' node
+  *** alias 2                           # 'scaffold' node
+  ** the first SkgNode that N contains  # true node
+  ** the second SkgNode that N contains # true node
+```
+As the comments indicate, some of those org nodes
+correspond to true skg nodes, while others ('scaffold' nodes)
+describe an ancestor -- in this case, the SkgNode N.
 ** two familiar relations
 *** Nodes contain each other.
 **** language
@@ -192,7 +205,7 @@
      if it's already shown in content? -- but harmless.
 * OrgNodes : how client and server communicate
 ** language
-*** 'node' = an element of the graph
+*** 'SkgNode' = an element of the graph
 *** 'OrgNode' = an element of a view (in the client) of the graph
 ** Most orgnodes correspond to nodes in the graph.
    But there can be exceptions.
@@ -255,11 +268,8 @@
    as the last element of the path.
 ** One can request an 'aliases view' at an orgnode.
    Call that orgnode N.
-   Add the metadata (code (viewRequests aliases)) to N and save.
-   After the save completes, N will have a child C entitled 'aliases'
-   (with metadata indicating relToParent=aliasCol),
-   whose children (so N's grandchildren) are the aliases of N
-   (each with metadata indicating relToParent=alias).
+   Doing this inserts into N a child entitled 'aliases',
+   whose children (so N's grandchildren) are the aliases of N.
    This permits the user to edit the aliases of N.
 ** If a node N has subscriptions
    then the orgnode representing N
@@ -274,7 +284,3 @@
    including inside a subscription view.
    (A glyph will indicate the override relationship to the user,
    who can choose to view the original if they wish.)
-* yet to implement
-** most of the sharing functionality
-   That is, anything involving subscription, hiding or overriding.
-** a diff view

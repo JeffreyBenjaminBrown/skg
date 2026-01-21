@@ -6,27 +6,7 @@
     into the _v2 functions.
 ** when asking to move code
    Emphasize leaving whitespace, formatting unchanged.
-* two kinds of stats
-** the idea
-   One regards the view, the other the graph.
-   Graph stats can be computed after save, before updating the view.
-   These would include link, alias, subscribe and override rels.
-** these should be graph stats
-   pub numContainers: Option<usize>,
-   pub numContents: Option<usize>,
-   pub numLinksIn: Option<usize>,
-** these should be view stats
-   pub cyycle : bool
-   pub parentIsContainer: bool,
-   pub parentIsContent: bool,
 * understand it
-** AWAITS What's the logic behind this comment?
-*** dunno, but it will be done
-    once I've finished refactoring to use (org tree, skgnodemap)
-    rather than pairtree.
-*** this comment
-    pair_orgnode_forest_with_skgnodes_from_saveinstructions (
-      // Definitive nodes get Some(skgnode), indefinitive get None.
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 ** Do de-novo and save reuse enough code?
 *** De-novo is similar to execute definitive view request
@@ -34,6 +14,19 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
+** two kinds of stats
+*** the idea
+    One regards the view, the other the graph.
+    Graph stats can be computed after save, before updating the view.
+    These would include link, alias, subscribe and override rels.
+*** these should be graph stats
+    pub numContainers: Option<usize>,
+    pub numContents: Option<usize>,
+    pub numLinksIn: Option<usize>,
+*** these should be view stats
+    pub cyycle : bool
+    pub parentIsContainer: bool,
+    pub parentIsContent: bool,
 ** TODO most natural
 *** for subscribee cols
     would be the following rule:
