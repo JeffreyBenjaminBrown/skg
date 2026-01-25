@@ -46,10 +46,10 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
         let new_treeid : NodeId =
           make_and_append_child_pair (
             tree, map, *parent_treeid, child_skgid, config, driver ) . await ?;
-        makeIndefinitiveAndClobber ( tree, new_treeid ) ?; }}
+        makeIndefinitiveAndClobber ( tree, map, new_treeid, config ) ?; }}
   truncate_after_node_in_generation_in_tree (
-    tree, generation - 1, limit_parent_treeid,
-    effective_root, visited ) ?;
+    tree, map, generation - 1, limit_parent_treeid,
+    effective_root, visited, config ) ?;
   Ok (( )) }
 
 /// PURPOSE:
@@ -58,10 +58,12 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
 /// Truncated nodes are re-rendered using 'makeIndefinitiveAndClobber'.
 fn truncate_after_node_in_generation_in_tree (
   tree           : &mut Tree<OrgNode>,
+  map            : &mut SkgNodeMap,
   generation     : usize,
   node_id        : NodeId, // truncate after this one
   effective_root : NodeId, // gen 0
   visited        : &mut DefinitiveMap,
+  config         : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let nodes_to_truncate : Vec < NodeId > =
     nodes_after_in_generation (
@@ -69,5 +71,5 @@ fn truncate_after_node_in_generation_in_tree (
   for id in nodes_to_truncate {
     if let Ok ( pid ) = get_id_from_treenode ( tree, id ) {
       visited . remove ( &pid ); }
-    makeIndefinitiveAndClobber ( tree, id ) ?; }
+    makeIndefinitiveAndClobber ( tree, map, id, config ) ?; }
   Ok (( )) }

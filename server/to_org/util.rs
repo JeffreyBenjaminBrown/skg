@@ -80,17 +80,20 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
 /// and set body to None.
 pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut Tree<OrgNode>,
+  map     : &mut SkgNodeMap,
   node_id : NodeId,
+  config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree (
     tree, node_id,
     |orgnode| {
       let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
         &mut orgnode.kind
-        else { panic! ( "makeIndefinitiveAndClobber: expected TrueNode" ) };
-      t . indefinitive = true;
-      t . body = None; }
+        else { panic! (
+                 "makeIndefinitiveAndClobber: expected TrueNode" ) };
+      t . indefinitive = true; }
     ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  clobberIndefinitiveOrgnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
