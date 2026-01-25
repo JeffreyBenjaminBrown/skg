@@ -19,7 +19,7 @@
    Something else does all three.
    Choose one or the other.
 *** it and similar functions
-**** makeIndefinitiveAndClobber
+**** DONE makeIndefinitiveAndClobber
 /// Set 'indefinitive' to true,
 /// reset title and source,
 /// and set body to None.
@@ -27,7 +27,7 @@ pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut Tree<OrgNode>,
   node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-**** clobberIndefinitiveOrgnode
+**** DONE clobberIndefinitiveOrgnode
 /// - Reset title.
 /// - Reset source.
 /// - Set body to None.

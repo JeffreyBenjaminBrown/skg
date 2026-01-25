@@ -9,7 +9,7 @@ use crate::to_org::complete::sharing::{
   type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::util::{
   build_node_branch_minus_content, get_id_from_treenode,
-  DefinitiveMap,
+  DefinitiveMap, makeIndefinitiveAndClobber,
   truenode_in_tree_is_indefinitive,
   content_ids_if_definitive_else_empty };
 use crate::types::misc::{ID, SkgConfig};
@@ -81,7 +81,7 @@ async fn execute_definitive_view_request (
   { if preexisting_node_id != node_id {
     indefinitize_content_subtree ( forest, map,
                                    preexisting_node_id,
-                                   visited ) ?; }}
+                                   visited, config ) ?; }}
   ensure_source ( // Subscribee nodes may not have one yet.
     forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
@@ -150,54 +150,43 @@ fn get_hidden_ids_if_subscribee (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
 /// - Remove them from `visited`.
-/// Only recurses into content children (interp == Content).
-///   Non-content children (AliasCol, ParentIgnores, etc.)
-///   persist unchanged.
+/// Only recurses into children into non-ignored TrueNodes;
+///   ignored and scaffold children persist unchanged.
+/// TODO : This will need complication to properly handle
+///   sharing related nodes among the input node's descendents.
 fn indefinitize_content_subtree (
   tree    : &mut Tree<OrgNode>,
-  map     : &SkgNodeMap,
+  map     : &mut SkgNodeMap,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
+  config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let node_ref : NodeRef < OrgNode > =
-    tree . get ( node_id )
-    . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-  let orgnode : &OrgNode =
-    node_ref . value ();
-  let node_pid_opt : Option < ID > =
-    match &orgnode . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . clone (),
-      OrgNodeKind::Scaff ( _ ) => None };
-  let content_child_treeids : Vec < NodeId > =
-    node_ref . children ()
-    . filter ( |c| matches! ( &c . value() . kind,
-                              OrgNodeKind::True(t)
-                              if !t.parent_ignores ))
-    . map ( |c| c . id () )
-    . collect ();
-  if let Some(ref pid) = node_pid_opt { // remove from visited
+  let (node_pid_opt, content_child_treeids)
+    : (Option <ID>  , Vec <NodeId>) =
+  { let node_ref : NodeRef < OrgNode > =
+      tree . get ( node_id )
+      . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
+    let orgnode : &OrgNode =
+      node_ref . value ();
+    let node_pid_opt : Option < ID > =
+      match &orgnode . kind {
+        OrgNodeKind::True ( t ) => t . id_opt . clone (),
+        OrgNodeKind::Scaff ( _ ) => None };
+    let content_child_treeids : Vec < NodeId > =
+      node_ref . children ()
+      . filter ( |c| matches! ( &c . value() . kind,
+                                OrgNodeKind::True(t)
+                                if !t.parent_ignores ))
+      . map ( |c| c . id () )
+      . collect ();
+    (node_pid_opt, content_child_treeids) };
+  if let Some(ref pid) = node_pid_opt
+  { // remove from visited
     visited . remove ( pid ); }
-  { // mark indefinitive, restore title if SkgNode present, clear body
-    // TODO : This ought to call a function.
-    // It, or something very like it anyway, happens elsewhere too.
-    let canonical_title : Option<String> =
-      node_pid_opt . as_ref () . and_then (
-        |pid| map . get (pid) )
-      . map ( |s| s . title . clone () );
-    write_at_node_in_tree (
-      tree, node_id,
-      |orgnode| {
-        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-          &mut orgnode.kind
-          else { panic! ( "indefinitize_content_subtree: expected TrueNode" ) };
-        t . indefinitive = true;
-        if let Some ( title ) = canonical_title.clone () {
-          t . title = title; }
-        t . body = None; } )
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
+  makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?;
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
-      tree, map, child_treeid, visited ) ?; }
+      tree, map, child_treeid, visited, config ) ?; }
   Ok (( )) }
 
 /// Expands content for a node using BFS with a node limit.
