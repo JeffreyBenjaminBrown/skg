@@ -366,7 +366,8 @@ pub fn truenode_in_tree_is_indefinitive (
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   let node_kind: OrgNodeKind =
-    read_at_node_in_tree ( tree, treeid, |orgnode| orgnode.kind.clone() )
+    read_at_node_in_tree ( tree, treeid,
+                           |orgnode| orgnode.kind.clone() )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   match node_kind {
     OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),

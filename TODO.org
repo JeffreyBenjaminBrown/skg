@@ -14,7 +14,54 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
-** TODO ? put parentIgnroes in ViewNodeStats
+** makeIndefinitiveAndClobber doesn't sound right
+   It sets indef and body but not title.
+   Something else does all three.
+   Choose one or the other.
+*** it and similar functions
+**** makeIndefinitiveAndClobber
+/// Set 'indefinitive' to true,
+/// reset title and source,
+/// and set body to None.
+pub(super) fn makeIndefinitiveAndClobber (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result < (), Box<dyn Error> > {
+**** clobberIndefinitiveOrgnode
+/// - Reset title.
+/// - Reset source.
+/// - Set body to None.
+///
+/// ASSUMES: The SkgNode at that tree node is accurate.
+/// ASSUMES: The input is indefinitive.
+pub fn clobberIndefinitiveOrgnode (
+  tree    : &mut Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  treeid  : NodeId,
+) -> Result < (), Box<dyn Error> > {
+**** indefinitize_content_subtree
+/// Does two things:
+/// - Mark a node, and its entire content subtree, as indefinitive.
+/// - Remove them from `visited`.
+/// Only recurses into content children (interp == Content).
+///   Non-content children (AliasCol, ParentIgnores, etc.)
+///   persist unchanged.
+fn indefinitize_content_subtree (
+  tree    : &mut Tree<OrgNode>,
+  map     : &SkgNodeMap,
+  node_id : NodeId,
+  visited : &mut DefinitiveMap,
+) -> Result < (), Box<dyn Error> > {
+**** make_indef_if_repeat_then_extend_defmap
+/// The two jobs in the name of this are inseparable --
+/// we have to interleave extending the defmap
+/// with marking things indefinitive, because the defmap
+/// is how we know whether to mark something indefinitive.
+pub fn make_indef_if_repeat_then_extend_defmap (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  defMap  : &mut DefinitiveMap,
+) -> Result<(), Box<dyn Error>> {
 ** TODO most natural
 *** for subscribee cols
     would be the following rule:
@@ -44,10 +91,6 @@
 *** TODO ?
     Unbundle those two ideas.
     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
-** makeIndefinitiveAndClobber doesn't sound right
-   It sets indef and body but not title.
-   Something else does all three.
-   Choose one or the other.
 ** AWAITS Are there more unnecessary mid-functions?
    as in midparent in a tree
 *** DONE flatten add_missing_info_to_forest
@@ -139,7 +182,7 @@
      To lens onto one, copy it elsewhere and edit that.
 ** show subscribees
 * u
-** DOGFOOD IT
+** dogfood it
 ** sourceward view ? ugly
    Rather than being top-level children,
    maybe they should be under a 'these link to it' scaffold.

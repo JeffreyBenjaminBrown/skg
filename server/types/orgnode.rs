@@ -36,6 +36,8 @@ pub struct TrueNode {
   pub id_opt         : Option < ID >,
   pub source_opt     : Option < String >,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
+  // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
+
   pub indefinitive   : bool,
 
   // The next two *Stats fields only influence how the node is shown.
