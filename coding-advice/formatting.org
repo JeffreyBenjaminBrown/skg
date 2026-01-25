@@ -20,7 +20,7 @@ but if you are an AI, it's pretty much costless, so please do.
   to the initial, 'use' preamble of each file.
 * comments
 ** If a comment applies to a block of code, put it inside the block.
-   Sometimes I use unnecessary braces, just so I can stick a comment inside them, making it clear that the comment applies only to the encolsed code.
+   Sometimes I use unnecessary braces on purpose, just so I can stick a comment inside them, making it clear that the comment applies only to the encolsed code.
 ** Try to make it visibly obvious what code a comment applies to.
    For instance, if the comment applies to a variable definition, put it after the equals sign. This way I know it only applies to that definition, not to following lines of code.
 ** Preserve existing comments.

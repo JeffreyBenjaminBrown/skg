@@ -14,7 +14,7 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
-** two kinds of stats
+** ONGOING two kinds of stats
 *** the idea
     One regards the view, the other the graph.
     Graph stats can be computed after save, before updating the view.
@@ -27,6 +27,29 @@
     pub cyycle : bool
     pub parentIsContainer: bool,
     pub parentIsContent: bool,
+*** prompt
+Currently there are these fields in the TrueNode type:
+```
+  pub cycle          : bool,
+  pub stats          : TrueNodeStats,
+```
+I would like to replace them with these two fields:
+```
+  pub graphStats : GraphNodeStats
+  pub viewStats : ViewNodeStats
+```
+where
+  *** these become graph stats
+      pub numContainers: Option<usize>,
+      pub numContents: Option<usize>,
+      pub numLinksIn: Option<usize>,
+  *** these become view stats
+      pub cyycle : bool
+      pub parentIsContainer: bool,
+      pub parentIsContent: bool,
+
+In thoughts/divide_stats.org, please write a plan for how to refactor the code to do this. The refactor should cover both server/ (the server) and elisp/ (the client).
+** TODO ? put parentIgnroes in ViewNodeStats
 ** TODO most natural
 *** for subscribee cols
     would be the following rule:
