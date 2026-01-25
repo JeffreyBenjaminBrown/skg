@@ -121,6 +121,9 @@ pub async fn complete_branch_minus_content (
     tree, map, node_id, config, driver ) . await ?;
   Ok (( )) }
 
+/// Does only what it says -- in particular,
+/// does not clobber the node after making it indefinitive.
+///
 /// The two jobs in the name of this are inseparable --
 /// we have to interleave extending the defmap
 /// with marking things indefinitive, because the defmap
@@ -133,14 +136,14 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_indefinitive : bool =
-    write_at_node_in_tree (
+    write_at_node_in_tree ( // PITFALL: Does more than read.
       tree, node_id,
       |orgnode|
         { let OrgNodeKind::True ( t ) : &mut OrgNodeKind
             = &mut orgnode.kind
             else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_id_from_treenode already verified TrueNode"); };
           if defMap . contains_key ( &pid )
-            { // It's a repeat, so it should be indefinitive.
+            { // It's a repeat, so make it indefinitive.
               t . indefinitive = true; }
             t . indefinitive } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;

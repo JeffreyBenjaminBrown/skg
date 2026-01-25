@@ -1,0 +1,6 @@
+1. Read the PRD and progress.txt.
+2. Find the next incomplete task and do only that task.
+3. Verify the tests still pass.
+4. Verify your code adheres to the coding guidelines.
+5. Update progress.txt with what you did.
+6. Exit.
