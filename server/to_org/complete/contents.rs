@@ -10,7 +10,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::maps::add_v_to_map_if_absent;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{
@@ -86,7 +86,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 
       { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
           clobberIndefinitiveOrgnode (
-            tree, map, node_id ) ?;
+            tree, map, node_id, config ) ?;
         } else { // futz with the orgnode and its content children
           maybe_add_subscribeeCol_branch (
             tree, map, node_id, config, typedb_driver ) . await ?; }
@@ -101,23 +101,27 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 /// - Reset source.
 /// - Set body to None.
 ///
-/// ASSUMES: The SkgNode at that tree node is accurate.
-/// ASSUMES: The input is indefinitive.
+/// EXPECTS: The input node is indefinitive.
 pub fn clobberIndefinitiveOrgnode (
   tree    : &mut Tree<OrgNode>,
-  map     : &SkgNodeMap,
+  map     : &mut SkgNodeMap,
   treeid  : NodeId,
+  config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let node_id : ID =
+  let (node_id, source) : (ID, String) =
     read_at_node_in_tree ( tree, treeid, |orgnode| {
       match &orgnode.kind {
-        OrgNodeKind::True(t) => t . id_opt . clone()
-          . ok_or("clobberIndefinitiveOrgnode: node has no ID"),
+        OrgNodeKind::True(t) => {
+          let id = t . id_opt . clone()
+            . ok_or("clobberIndefinitiveOrgnode: node has no ID")?;
+          let src = t . source_opt . clone()
+            . ok_or("clobberIndefinitiveOrgnode: node has no source")?;
+          Ok((id, src)) },
         OrgNodeKind::Scaff(_) => Err (
           "clobberIndefinitiveOrgnode: expected TrueNode" ), }} )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
   let skgnode : &SkgNode =
-    map . get ( &node_id ). ok_or ( "clobberIndefinitiveOrgnode: SkgNode should exist in map" ) ?;
+    skgnode_from_map_or_disk ( &node_id, map, config, &source ) ?;
   let title : String = skgnode . title . clone();
   let source : String = skgnode . source . clone();
   write_at_node_in_tree ( tree, treeid, |orgnode| {

@@ -113,7 +113,7 @@ pub async fn complete_branch_minus_content (
     tree, node_id, visited ) ?;
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveOrgnode (
-      tree, map, node_id ) ?; }
+      tree, map, node_id, config ) ?; }
   maybe_add_subscribeeCol_branch (
     tree, map, node_id, config, driver ) . await ?;
   Ok (( )) }
