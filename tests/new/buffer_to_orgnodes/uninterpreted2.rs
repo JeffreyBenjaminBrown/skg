@@ -72,7 +72,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Child1 body
             * (skg (node parentIgnores indefinitive)) parentIgnores node
             ParentIgnores body
-            * (skg (node cycle)) cycling node
+            * (skg (node (viewStats cycle))) cycling node
             This node has cycle flag
         "};
 
@@ -104,7 +104,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
     OrgNodeKind::True(t) => t,
     OrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(cycle_node.title(), "cycling node");
-  assert_eq!(cycle_t.cycle, true);
+  assert_eq!(cycle_t.viewStats.cycle, true);
   assert_eq!(cycle_node.body(),
              Some(&"This node has cycle flag".to_string()));
 }
@@ -132,7 +132,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node.title(), "simple node");
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_t.id_opt.as_ref(), None);
-  assert_eq!(first_t.cycle, false);
+  assert_eq!(first_t.viewStats.cycle, false);
   assert_eq!(first_t.parent_ignores, false);
   assert_eq!(first_node.focused, false);
   assert_eq!(first_node.folded, false);

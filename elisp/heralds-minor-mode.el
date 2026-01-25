@@ -24,13 +24,14 @@
       (source) ;; ignored
       (RED parentIgnores "!{")
       (GREEN indefinitive "indef")
-      (BLUE cycle "⟳")
-      (BLUE stats
-        (RED notInParent "!{")
-        (containsParent "}")
+      (BLUE graphStats
         (containers (ANY IT "{"))
         (contents (ANY "{" IT))
         (linksIn (ANY IT "→")))
+      (BLUE viewStats
+        (BLUE cycle "⟳")
+        (RED notInParent "!{")
+        (containsParent "}"))
       (editRequest
         (RED delete "delete")
         (RED merge (ANY "merge:" IT)))
@@ -200,14 +201,16 @@ Returns nil if parsing fails."
     (herald-string sexp)
   "Some post-processing rules for heralds:
 - Remove ◌ if id present in SEXP
-- Remove ⦿ if stats present in SEXP
+- Remove ⦿ if graphStats or viewStats present in SEXP
 - Remove duplicate '!{' symbol if it appears twice"
   (when herald-string
     (let* ((heralds (split-string herald-string " " t))
            (heralds (heralds--remove-token-if-sexp-matches-structure
                    "◌" heralds sexp '(skg (node (id)) )) )
            (heralds (heralds--remove-token-if-sexp-matches-structure
-                   "⦿" heralds sexp '(skg (node (stats)) )) )
+                   "⦿" heralds sexp '(skg (node (graphStats)) )) )
+           (heralds (heralds--remove-token-if-sexp-matches-structure
+                   "⦿" heralds sexp '(skg (node (viewStats)) )) )
            (joined (mapconcat #'identity heralds " "))
            (first-brace-pos (string-match "!{" joined))
            (second-brace-pos

@@ -181,13 +181,18 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
                   (let ((key (format "%s" (car element)))
                         (val (format "%s" (cadr element))))
                     (push (cons key val) alist)))
-                 (;; Special case: (stats ...) sub-s-expr
+                 (;; Special case: (graphStats ...) sub-s-expr
                   (and (listp element)
-                       (> (length element) 2)
-                       (eq (car element) 'stats))
-                  ;; Store the complete (stats ...) s-expression as a string
-                  (let ((stats-sexp (format "%S" element)))
-                    (push (cons "stats" stats-sexp) alist)))
+                       (> (length element) 1)
+                       (eq (car element) 'graphStats))
+                  (let ((graphstats-sexp (format "%S" element)))
+                    (push (cons "graphStats" graphstats-sexp) alist)))
+                 (;; Special case: (viewStats ...) sub-s-expr
+                  (and (listp element)
+                       (> (length element) 1)
+                       (eq (car element) 'viewStats))
+                  (let ((viewstats-sexp (format "%S" element)))
+                    (push (cons "viewStats" viewstats-sexp) alist)))
                  (t ;; Bare value (symbol or other atom)
                   (let ((bare-val (format "%s" element)))
                     (push bare-val set))))))
@@ -199,11 +204,12 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
   "Reconstruct complete (skg ...) metadata s-expression from ALIST and BARE-VALUES.
 Returns a string containing the complete s-expression.
 Key-value pairs are formatted as (key value),
-except 'stats' which is already a complete s-expression."
+except 'graphStats' and 'viewStats' which are already complete s-expressions."
   (let ((parts '()))
     (dolist (kv alist)
-      (if (string-equal (car kv) "stats")
-          ;; stats value is already a complete (stats ...) sexp string
+      (if (or (string-equal (car kv) "graphStats")
+              (string-equal (car kv) "viewStats"))
+          ;; graphStats/viewStats value is already a complete sexp string
           (push (cdr kv) parts)
         ;; Regular key-value pair
         (push (format "(%s %s)" (car kv) (cdr kv))

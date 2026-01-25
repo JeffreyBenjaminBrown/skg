@@ -18,7 +18,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
-use crate::types::orgnode::{TrueNodeStats, EditRequest, ViewRequest};
+use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode,
 };
@@ -43,8 +43,8 @@ pub struct OrgnodeMetadata {
   pub source: Option<String>,
   pub parent_ignores: bool,
   pub indefinitive: bool,
-  pub cycle: bool,
-  pub stats: TrueNodeStats,
+  pub graphStats: GraphNodeStats,
+  pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
 }
@@ -58,8 +58,8 @@ pub fn default_metadata() -> OrgnodeMetadata {
     source: None,
     parent_ignores: false,
     indefinitive: false,
-    cycle: false,
-    stats: TrueNodeStats::default(),
+    graphStats: GraphNodeStats::default(),
+    viewStats: ViewNodeStats::default(),
     edit_request: None,
     view_requests: HashSet::new(),
   }
@@ -95,8 +95,8 @@ pub fn orgnode_from_metadata (
           source_opt       : metadata . source . clone (),
           parent_ignores   : metadata . parent_ignores,
           indefinitive     : metadata . indefinitive,
-          cycle            : metadata . cycle,
-          stats            : metadata . stats . clone (),
+          graphStats       : metadata . graphStats . clone (),
+          viewStats        : metadata . viewStats . clone (),
           edit_request     : metadata . edit_request . clone (),
           view_requests    : metadata . view_requests . clone (), } ),
         None )
@@ -200,8 +200,10 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . source = Some ( value ); },
-          "stats" => {
-            parse_stats_sexp ( &subitems[1..], &mut metadata . stats ) ?; },
+          "graphStats" => {
+            parse_graphstats_sexp ( &subitems[1..], &mut metadata . graphStats ) ?; },
+          "viewStats" => {
+            parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
             parse_editrequest_sexp ( &subitems[1..], metadata ) ?; },
           "viewRequests" => {
@@ -215,7 +217,6 @@ fn parse_node_sexp (
         match bare_value . as_str () {
           "parentIgnores" => metadata . parent_ignores = true,
           "indefinitive"  => metadata . indefinitive = true,
-          "cycle"         => metadata . cycle = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
@@ -224,10 +225,11 @@ fn parse_node_sexp (
   Ok (( )) }
 
 
-/// Parse the (stats ...) s-expression contents.
-fn parse_stats_sexp (
+/// Parse the (graphStats ...) s-expression contents.
+/// Only handles key-value pairs (containers, contents, linksIn).
+fn parse_graphstats_sexp (
   items : &[Sexp],
-  stats : &mut TrueNodeStats
+  stats : &mut GraphNodeStats
 ) -> Result<(), String> {
   for element in items {
     match element {
@@ -252,18 +254,31 @@ fn parse_stats_sexp (
               value.parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid linksIn value: {}", value )) ? ); },
-          _ => { return Err ( format! ( "Unknown stats key: {}",
+          _ => { return Err ( format! ( "Unknown graphStats key: {}",
                                          key )); }} },
+      _ => { return Err ( "Unexpected element in graphStats (expected key-value pairs)"
+                           . to_string () ); }} }
+  Ok (( )) }
+
+/// Parse the (viewStats ...) s-expression contents.
+/// Only handles bare atoms (cycle, notInParent, containsParent).
+fn parse_viewstats_sexp (
+  items : &[Sexp],
+  stats : &mut ViewNodeStats
+) -> Result<(), String> {
+  for element in items {
+    match element {
       Sexp::Atom ( _ ) => {
         let bare_value : String =
           atom_to_string ( element ) ?;
         match bare_value . as_str () {
+          "cycle"          => stats . cycle = true,
           "notInParent"    => stats . parentIsContainer = false,
           "containsParent" => stats . parentIsContent   = true,
           _ => {
-            return Err ( format! ( "Unknown stats value: {}",
+            return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },
-      _ => { return Err ( "Unexpected element in stats"
+      _ => { return Err ( "Unexpected element in viewStats (expected bare atoms)"
                            . to_string () ); }} }
   Ok (( )) }
 

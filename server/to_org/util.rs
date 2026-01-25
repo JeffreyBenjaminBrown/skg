@@ -158,7 +158,7 @@ pub fn detect_and_mark_cycle (
     let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
       &mut orgnode.kind
       else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
-    t . cycle = is_cycle; } )
+    t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 

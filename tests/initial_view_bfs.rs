@@ -71,15 +71,15 @@ fn test_bfs_limit_across_multiple_trees
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 3)))) 1
                               ** (skg (node (id 11) (source main) indefinitive)) 11
-                              ** (skg (node (id 12) (source main) indefinitive (stats (contents 3)))) 12
+                              ** (skg (node (id 12) (source main) indefinitive (graphStats (contents 3)))) 12
                               ** (skg (node (id 13) (source main) indefinitive)) 13
-                              * (skg (node (id 2) (source main) (stats (containers 0) (contents 3)))) 2
+                              * (skg (node (id 2) (source main) (graphStats (containers 0) (contents 3)))) 2
                               ** (skg (node (id 21) (source main) indefinitive)) 21
-                              ** (skg (node (id 22) (source main) indefinitive (stats (contents 3)))) 22
+                              ** (skg (node (id 22) (source main) indefinitive (graphStats (contents 3)))) 22
                               ** (skg (node (id 23) (source main) indefinitive)) 23
-                              * (skg (node (id 3) (source main) indefinitive (stats (containers 0) (contents 3)))) 3
+                              * (skg (node (id 3) (source main) indefinitive (graphStats (containers 0) (contents 3)))) 3
                               "};
       assert_eq!(result, expected,
                  "BFS should truncate across multiple trees correctly");
@@ -128,15 +128,15 @@ fn test_bfs_limit_9_three_branches
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 3)))) 1
                               ** (skg (node (id 11) (source main) indefinitive)) 11
-                              ** (skg (node (id 12) (source main) indefinitive (stats (contents 3)))) 12
+                              ** (skg (node (id 12) (source main) indefinitive (graphStats (contents 3)))) 12
                               ** (skg (node (id 13) (source main) indefinitive)) 13
-                              * (skg (node (id 2) (source main) (stats (containers 0) (contents 3)))) 2
+                              * (skg (node (id 2) (source main) (graphStats (containers 0) (contents 3)))) 2
                               ** (skg (node (id 21) (source main) indefinitive)) 21
-                              ** (skg (node (id 22) (source main) indefinitive (stats (contents 3)))) 22
+                              ** (skg (node (id 22) (source main) indefinitive (graphStats (contents 3)))) 22
                               ** (skg (node (id 23) (source main) indefinitive)) 23
-                              * (skg (node (id 3) (source main) indefinitive (stats (containers 0) (contents 3)))) 3
+                              * (skg (node (id 3) (source main) indefinitive (graphStats (containers 0) (contents 3)))) 3
                               "};
       assert_eq!(result, expected,
                  "BFS with limit=9 should produce same result as limit=7");
@@ -179,13 +179,13 @@ fn test_bfs_limit_8_two_branches
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (stats (containers 0) (contents 3)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 3)))) 1
                               ** (skg (node (id 11) (source main) indefinitive)) 11
-                              ** (skg (node (id 12) (source main) indefinitive (stats (contents 3)))) 12
+                              ** (skg (node (id 12) (source main) indefinitive (graphStats (contents 3)))) 12
                               ** (skg (node (id 13) (source main) indefinitive)) 13
-                              * (skg (node (id 2) (source main) (stats (containers 0) (contents 3)))) 2
+                              * (skg (node (id 2) (source main) (graphStats (containers 0) (contents 3)))) 2
                               ** (skg (node (id 21) (source main) indefinitive)) 21
-                              ** (skg (node (id 22) (source main) indefinitive (stats (contents 3)))) 22
+                              ** (skg (node (id 22) (source main) indefinitive (graphStats (contents 3)))) 22
                               ** (skg (node (id 23) (source main) indefinitive)) 23
                               "};
       assert_eq!(result, expected,

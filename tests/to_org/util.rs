@@ -11,24 +11,14 @@ fn test_get_id_from_treenode_with_id() {
   let id :
     ID =
     ID::new("test-id-123");
-  let orgnode :
-    OrgNode =
-    OrgNode {
-      focused : false,
-      folded : false,
-      kind : OrgNodeKind::True(TrueNode {
-        title : "Test".to_string(),
-        body : None,
-        id_opt : Some(id.clone()),
-        source_opt : None,
-        parent_ignores : false,
-        indefinitive : false,
-        cycle : false,
-        stats : Default::default(),
-        edit_request : None,
-        view_requests : Default::default(),
-      }),
-    };
+  let orgnode = OrgNode {
+    kind: OrgNodeKind::True(TrueNode {
+      title: "Test".to_string(),
+      id_opt: Some(id.clone()),
+      ..TrueNode::default()
+    }),
+    ..OrgNode::default()
+  };
 
   let tree :
     Tree<OrgNode> =
@@ -48,24 +38,13 @@ fn test_get_id_from_treenode_with_id() {
 #[test]
 fn test_get_id_from_treenode_no_id() {
   // TrueNode without ID → returns error
-  let orgnode :
-    OrgNode =
-    OrgNode {
-      focused : false,
-      folded : false,
-      kind : OrgNodeKind::True(TrueNode {
-        title : "Test".to_string(),
-        body : None,
-        id_opt : None,
-        source_opt : None,
-        parent_ignores : false,
-        indefinitive : false,
-        cycle : false,
-        stats : Default::default(),
-        edit_request : None,
-        view_requests : Default::default(),
-      }),
-    };
+  let orgnode = OrgNode {
+    kind: OrgNodeKind::True(TrueNode {
+      title: "Test".to_string(),
+      ..TrueNode::default()
+    }),
+    ..OrgNode::default()
+  };
 
   let tree :
     Tree<OrgNode> =

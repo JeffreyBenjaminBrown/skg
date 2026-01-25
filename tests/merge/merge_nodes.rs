@@ -4,8 +4,7 @@ use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::orgnode::{EditRequest, TrueNodeStats};
-use skg::types::orgnode::{ OrgNode, OrgNodeKind, TrueNode, forest_root_orgnode };
+use skg::types::orgnode::{EditRequest, OrgNode, OrgNodeKind, TrueNode, forest_root_orgnode};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::MergeInstructionTriple;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
@@ -61,20 +60,15 @@ async fn test_merge_2_into_1_impl(
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 1 requesting to merge node 2
-  let org_node_1: OrgNode = OrgNode {
-    focused: false,
-    folded: false,
+  let org_node_1 = OrgNode {
     kind: OrgNodeKind::True(TrueNode {
       title: "1".to_string(),
-      body: None,
       id_opt: Some(ID::from("1")),
-      source_opt: None,
-      parent_ignores: false,
-      indefinitive: false,
-      cycle: false,
-      stats: TrueNodeStats::default(),
       edit_request: Some(EditRequest::Merge(ID::from("2"))),
-      view_requests: HashSet::new(), } ), };
+      ..TrueNode::default()
+    }),
+    ..OrgNode::default()
+  };
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   forest.root_mut().append(org_node_1);
 
@@ -324,21 +318,14 @@ async fn test_merge_1_into_2_impl(
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create orgnode forest with node 2 requesting to merge node 1
-  let org_node_2: OrgNode = OrgNode {
-    focused: false,
-    folded: false,
+  let org_node_2 = OrgNode {
     kind: OrgNodeKind::True(TrueNode {
       title: "2".to_string(),
-      body: None,
       id_opt: Some(ID::from("2")),
-      source_opt: None,
-      parent_ignores: false,
-      indefinitive: false,
-      cycle: false,
-      stats: TrueNodeStats::default(),
       edit_request: Some(EditRequest::Merge(ID::from("1"))),
-      view_requests: HashSet::new(),
+      ..TrueNode::default()
     }),
+    ..OrgNode::default()
   };
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   forest.root_mut().append(org_node_2);

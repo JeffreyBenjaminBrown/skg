@@ -95,9 +95,12 @@ fn set_metadata_relationships_in_node_recursive (
     . value () . id_opt () . cloned ();
 
   if let Some ( ref node_pid ) = node_pid_opt {
-    let num_containers : Option<usize> = rel_data . num_containers . get ( node_pid ) . copied ();
-    let num_contents : Option<usize> = rel_data . num_contents . get ( node_pid ) . copied ();
-    let num_links_in : Option<usize> = rel_data . num_links_in . get ( node_pid ) . copied ();
+    let num_containers : Option<usize> =
+      rel_data . num_containers . get ( node_pid ) . copied ();
+    let num_contents : Option<usize> =
+      rel_data . num_contents . get ( node_pid ) . copied ();
+    let num_links_in : Option<usize> =
+      rel_data . num_links_in . get ( node_pid ) . copied ();
     let (parent_is_container, parent_is_content) : (bool, bool) =
       if let Some ( parent_skgid ) = parent_pid {
         ( rel_data . content_to_containers
@@ -111,11 +114,11 @@ fn set_metadata_relationships_in_node_recursive (
       } else { (true, false) }; // default if no parent
     let mut node_mut : NodeMut<OrgNode> = tree . get_mut ( treeid ) . unwrap ();
     if let OrgNodeKind::True ( t ) = &mut node_mut . value () . kind {
-      t . stats . numContainers = num_containers;
-      t . stats . numContents = num_contents;
-      t . stats . numLinksIn = num_links_in;
-      t . stats . parentIsContainer = parent_is_container;
-      t . stats . parentIsContent = parent_is_content; }}
+      t . graphStats . numContainers = num_containers;
+      t . graphStats . numContents = num_contents;
+      t . graphStats . numLinksIn = num_links_in;
+      t . viewStats . parentIsContainer = parent_is_container;
+      t . viewStats . parentIsContent = parent_is_content; }}
   { // recurse
     let child_treeids : Vec < NodeId > =
       tree . get ( treeid ) . unwrap ()

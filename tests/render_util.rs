@@ -1,7 +1,7 @@
 // cargo test --test render_util
 
 use skg::org_to_text::orgnode_to_text;
-use skg::types::orgnode::TrueNodeStats;
+use skg::types::orgnode::ViewNodeStats;
 use skg::types::orgnode::{
     OrgNode, OrgNodeKind, TrueNode, Scaffold,
     orgnode_from_scaffold };
@@ -61,13 +61,13 @@ fn test_metadata_ordering () {
     kind: OrgNodeKind::True ( TrueNode {
       title: "Test".to_string(),
       id_opt: Some ( ID::from ( "xyz" )),
-      cycle: true,
-      stats: TrueNodeStats {
+      viewStats: ViewNodeStats {
+        cycle: true,
         parentIsContainer: false,
-        .. TrueNodeStats::default() },
+        .. ViewNodeStats::default() },
       .. TrueNode::default() }),
     .. OrgNode::default() };
   let result : String =
     orgnode_to_text ( 1, &node )
     . expect ( "TrueNode rendering never fails" );
-  assert_eq! ( result, "* (skg (node (id xyz) cycle (stats notInParent))) Test\n" ); }
+  assert_eq! ( result, "* (skg (node (id xyz) (viewStats cycle notInParent))) Test\n" ); }

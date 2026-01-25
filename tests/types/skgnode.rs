@@ -28,24 +28,15 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     SkgNodeMap::new();
   map.insert(id.clone(), skgnode.clone());
 
-  let orgnode :
-    OrgNode =
-    OrgNode {
-      focused : false,
-      folded : false,
-      kind : OrgNodeKind::True(TrueNode {
-        title : "Test".to_string(),
-        body : None,
-        id_opt : Some(id.clone()),
-        source_opt : Some("main".to_string()),
-        parent_ignores : false,
-        indefinitive : false,
-        cycle : false,
-        stats : Default::default(),
-        edit_request : None,
-        view_requests : Default::default(),
-      }),
-    };
+  let orgnode = OrgNode {
+    kind: OrgNodeKind::True(TrueNode {
+      title: "Test".to_string(),
+      id_opt: Some(id.clone()),
+      source_opt: Some("main".to_string()),
+      ..TrueNode::default()
+    }),
+    ..OrgNode::default()
+  };
 
   let config = skg::types::misc::SkgConfig {
     db_name : "test-db".to_string(),
@@ -73,24 +64,15 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
     SkgNodeMap =
     SkgNodeMap::new(); // empty map
 
-  let orgnode :
-    OrgNode =
-    OrgNode {
-      focused : false,
-      folded : false,
-      kind : OrgNodeKind::True(TrueNode {
-        title : "Test".to_string(),
-        body : None,
-        id_opt : Some(id),
-        source_opt : None,  // No source, so can't fetch from disk
-        parent_ignores : false,
-        indefinitive : false,
-        cycle : false,
-        stats : Default::default(),
-        edit_request : None,
-        view_requests : Default::default(),
-      }),
-    };
+  let orgnode = OrgNode {
+    kind: OrgNodeKind::True(TrueNode {
+      // No source, so can't fetch from disk
+      title: "Test".to_string(),
+      id_opt: Some(id),
+      ..TrueNode::default()
+    }),
+    ..OrgNode::default()
+  };
 
   let config = skg::types::misc::SkgConfig {
     db_name : "test-db".to_string(),

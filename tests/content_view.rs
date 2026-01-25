@@ -119,10 +119,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (node (id 1) (source main) (stats (containers 0)))) 1
+  let expected = indoc! {"* (skg (node (id 1) (source main) (graphStats (containers 0)))) 1
                           1 has a body
-                          * (skg (node (id 2) (source main) (stats (containers 0)))) 2
-                          * (skg (node (id 1) (source main) indefinitive (stats (containers 0)))) 1
+                          * (skg (node (id 2) (source main) (graphStats (containers 0)))) 2
+                          * (skg (node (id 1) (source main) indefinitive (graphStats (containers 0)))) 1
                           "};
   assert_eq!(result, expected,
              "Multi-root view should produce exact expected output");
@@ -146,11 +146,11 @@ fn test_single_root_view_with_cycle
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (stats (containers 0) (contents 1)))) a
-                              ** (skg (node (id b) (source main) (stats (containers 2) (contents 1)))) b
+      let expected = indoc! {"* (skg (node (id a) (source main) (graphStats (containers 0) (contents 1)))) a
+                              ** (skg (node (id b) (source main) (graphStats (containers 2) (contents 1)))) b
                               b has a body
-                              *** (skg (node (id c) (source main) (stats containsParent (contents 1)))) c
-                              **** (skg (node (id b) (source main) indefinitive cycle (stats containsParent (containers 2) (contents 1)))) b
+                              *** (skg (node (id c) (source main) (graphStats (contents 1)) (viewStats containsParent))) c
+                              **** (skg (node (id b) (source main) indefinitive (graphStats (containers 2) (contents 1)) (viewStats cycle containsParent))) b
                               "};
       assert_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -183,20 +183,20 @@ fn test_multi_root_view_with_shared_nodes
       // Definitive nodes with subscriptions get SubscribeeCol children,
       // and each SubscribeeCol has Subscribee children with the subscribed IDs.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (stats (containers 0) (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indefinitive (stats (linksIn 1)))) title 2
-         ** (skg (node (id 3) (source main) (stats (linksIn 1)))) title 3
+         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
+         ** (skg (node (id 3) (source main) (graphStats (linksIn 1)))) title 3
          this one string could span pages
          *** (skg subscribeeCol) it subscribes to these
-         **** (skg (node (id 4) (source main) indefinitive (stats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indefinitive (stats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
-         * (skg (node (id 2) (source main) (stats (linksIn 1)))) title 2
+         **** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
+         * (skg (node (id 2) (source main) (graphStats (linksIn 1)))) title 2
          this one string could span pages
          ** (skg subscribeeCol) it subscribes to these
-         *** (skg (node (id 4) (source main) indefinitive (stats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indefinitive (stats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -241,15 +241,15 @@ fn test_multi_root_view_with_node_limit
       // The SubscribeeCol includes Subscribee children created when the node was definitive.
       // For now we accept this behavior.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (stats (containers 0) (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indefinitive (stats (linksIn 1)))) title 2
-         ** (skg (node (id 3) (source main) indefinitive (stats (linksIn 1)))) title 3
-         * (skg (node (id 2) (source main) indefinitive (stats (linksIn 1)))) title 2
+         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
+         ** (skg (node (id 3) (source main) indefinitive (graphStats (linksIn 1)))) title 3
+         * (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
          ** (skg subscribeeCol) it subscribes to these
-         *** (skg (node (id 4) (source main) indefinitive (stats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indefinitive (stats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view with limit=3 should truncate generation 2 sibling group");
@@ -291,13 +291,13 @@ fn test_limit_with_multiple_sibling_groups
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (stats (containers 0) (contents 2)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) 1
                               1 body
-                              ** (skg (node (id 11) (source main) (stats (contents 2)))) 11
+                              ** (skg (node (id 11) (source main) (graphStats (contents 2)))) 11
                               11 body
                               *** (skg (node (id 111) (source main) indefinitive)) 111
                               *** (skg (node (id 112) (source main) indefinitive)) 112
-                              ** (skg (node (id 12) (source main) indefinitive (stats (contents 1)))) 12
+                              ** (skg (node (id 12) (source main) indefinitive (graphStats (contents 1)))) 12
                               "};
       assert_eq!(result, expected,
                  "Truncated nodes should have no children (121 removed)");

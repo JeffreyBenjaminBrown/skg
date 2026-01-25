@@ -129,23 +129,29 @@ fn true_node_metadata_to_string (
   true_node : & TrueNode
 ) -> String {
   fn node_sexp ( true_node : & TrueNode ) -> String {
-    fn stats ( true_node : & TrueNode ) -> Option < String > {
+    fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
-      if ! true_node . stats . parentIsContainer {
-        parts . push ( "notInParent" . to_string () ); }
-      if true_node . stats . parentIsContent {
-        parts . push ( "containsParent" . to_string () ); }
-      if true_node . stats . numContainers != Some ( 1 ) {
-        if let Some ( count ) = true_node . stats . numContainers {
+      if true_node . graphStats . numContainers != Some ( 1 ) {
+        if let Some ( count ) = true_node . graphStats . numContainers {
           parts . push ( format! ( "(containers {})", count )); }}
-      if true_node . stats . numContents != Some ( 0 ) {
-        if let Some ( count ) = true_node . stats . numContents {
+      if true_node . graphStats . numContents != Some ( 0 ) {
+        if let Some ( count ) = true_node . graphStats . numContents {
           parts . push ( format! ( "(contents {})", count )); }}
-      if true_node . stats . numLinksIn != Some ( 0 ) {
-        if let Some ( count ) = true_node . stats . numLinksIn {
+      if true_node . graphStats . numLinksIn != Some ( 0 ) {
+        if let Some ( count ) = true_node . graphStats . numLinksIn {
           parts . push ( format! ( "(linksIn {})", count )); }}
       if parts . is_empty () { None }
-      else { Some ( format! ( "(stats {})", parts . join ( " " ))) }}
+      else { Some ( format! ( "(graphStats {})", parts . join ( " " ))) }}
+    fn view_stats ( true_node : & TrueNode ) -> Option < String > {
+      let mut parts : Vec < String > = Vec::new ();
+      if true_node . viewStats . cycle {
+        parts . push ( "cycle" . to_string () ); }
+      if ! true_node . viewStats . parentIsContainer {
+        parts . push ( "notInParent" . to_string () ); }
+      if true_node . viewStats . parentIsContent {
+        parts . push ( "containsParent" . to_string () ); }
+      if parts . is_empty () { None }
+      else { Some ( format! ( "(viewStats {})", parts . join ( " " ))) }}
     fn edit_request ( true_node : & TrueNode ) -> Option < String > {
       true_node . edit_request . as_ref () . map ( | edit_req | {
         let edit_str : String = match edit_req {
@@ -170,9 +176,9 @@ fn true_node_metadata_to_string (
       parts . push ( "parentIgnores" . to_string () ); }
     if true_node . indefinitive {
       parts . push ( "indefinitive" . to_string () ); }
-    if true_node . cycle {
-      parts . push ( "cycle" . to_string () ); }
-    if let Some ( s ) = stats ( true_node )
+    if let Some ( s ) = graph_stats ( true_node )
+    { parts . push ( s ); }
+    if let Some ( s ) = view_stats ( true_node )
     { parts . push ( s ); }
     if let Some ( s ) = edit_request ( true_node )
     { parts . push ( s ); }

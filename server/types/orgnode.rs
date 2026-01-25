@@ -37,23 +37,36 @@ pub struct TrueNode {
   pub source_opt     : Option < String >,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   pub indefinitive   : bool,
-  pub cycle          : bool,
-  pub stats          : TrueNodeStats,
+
+  // The next two *Stats fields only influence how the node is shown.
+  // Editing them and saving the buffer leaves the graph unchanged,
+  // and those edits will be immediately lost,
+  // as this data is regenerated each time the view is rebuilt.
+  pub graphStats     : GraphNodeStats,
+  pub viewStats      : ViewNodeStats,
+
   pub edit_request   : Option < EditRequest >,
   pub view_requests  : HashSet < ViewRequest >,
 }
 
-/// These data only influence how the node is shown.
-/// Editing them and then saving the buffer leaves the graph unchanged,
-/// and the edits would be immediately lost,
-/// as this data is regenerated each time the view is rebuilt.
+/// Graph-level statistics about a node.
+/// These are derived from the graph database and are the same
+/// regardless of where/how the node appears in a view.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TrueNodeStats {
-  pub parentIsContainer: bool,
-  pub parentIsContent: bool,
-  pub numContainers: Option<usize>,
-  pub numContents: Option<usize>,
-  pub numLinksIn: Option<usize>,
+pub struct GraphNodeStats {
+  pub numContainers : Option<usize>,
+  pub numContents   : Option<usize>,
+  pub numLinksIn    : Option<usize>,
+}
+
+/// View-specific statistics about a node.
+/// These depend on the node's position in the current view tree.
+/// `cycle` depends on ancestors; `parentIs*` depends on the specific parent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewNodeStats {
+  pub cycle             : bool,
+  pub parentIsContainer : bool,
+  pub parentIsContent   : bool,
 }
 
 /// Scaffold nodes are display-only structures
@@ -270,14 +283,20 @@ impl FromStr for ViewRequest {
 // Defaults
 //
 
-impl Default for TrueNodeStats {
+impl Default for GraphNodeStats {
   fn default () -> Self {
-    TrueNodeStats {
-      parentIsContainer : true,
-      parentIsContent   : false,
+    GraphNodeStats {
       numContainers : Some ( 1 ),
       numContents   : Some ( 0 ),
       numLinksIn    : Some ( 0 ),
+    }} }
+
+impl Default for ViewNodeStats {
+  fn default () -> Self {
+    ViewNodeStats {
+      cycle             : false,
+      parentIsContainer : true,
+      parentIsContent   : false,
     }} }
 
 impl Default for TrueNode {
@@ -289,8 +308,8 @@ impl Default for TrueNode {
       source_opt       : None,
       parent_ignores   : false,
       indefinitive     : false,
-      cycle            : false,
-      stats            : TrueNodeStats::default (),
+      graphStats       : GraphNodeStats::default (),
+      viewStats        : ViewNodeStats::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
     }} }
@@ -338,7 +357,7 @@ pub fn mk_indefinitive_orgnode (
                             HashSet::new ( )) } // view_requests
 
 /// Create a OrgNode with *nearly* full metadata control.
-/// The exception is that the 'TrueNodeStats' is intentionally omitted,
+/// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the OrgNode tree.
 pub fn mk_orgnode (
@@ -361,8 +380,8 @@ pub fn mk_orgnode (
       source_opt       : Some ( source ),
       parent_ignores,
       indefinitive,
-      cycle            : false,
-      stats            : TrueNodeStats::default (),
+      graphStats       : GraphNodeStats::default (),
+      viewStats        : ViewNodeStats::default (),
       edit_request,
       view_requests,
     }),
