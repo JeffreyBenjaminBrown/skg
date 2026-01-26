@@ -1,0 +1,319 @@
+#+title: Git Diff View - Implementation Plan
+
+* Overview
+
+Git diff view lets users see, within an Skg content buffer,
+what has changed since the last git commit.
+The comparison is between the current state (uncommitted changes on disk)
+and HEAD (per source repo).
+
+When enabled, diff metadata is added to orgnodes,
+and removed nodes are inserted into the view.
+Users can still edit and save; removed nodes are ignored on save.
+
+* Scope
+
+** In scope (implementation order)
+   1. Content (direct children)
+   2. Aliases
+   3. IDs
+   4. Subscribees
+
+** Deferred
+   - Reverse relationships (containers, subscribers, hiders, hiddens, etc.)
+   - Cross-repo source tracking (if node moves between sources, it appears as "new" -- true in that repo, false and potentially confusing to the user, but not a priority for now)
+
+* Diff values
+
+Two enums capture diff status:
+
+** NodeDiff (for TrueNodes: content, subscribees)
+
+| Value        | Meaning                                           |
+|--------------+---------------------------------------------------|
+| new          | Node did not exist in HEAD                        |
+| new-here     | Node existed in HEAD but not in this relationship |
+| removed      | Node existed in HEAD, no longer exists on disk    |
+| removed-here | Node exists on disk but no longer in this relationship |
+| not-in-git   | Source is not a git repo                          |
+
+** FieldDiff (for Scaffold::Alias, Scaffold::ID)
+
+| Value      | Meaning                            |
+|------------+------------------------------------|
+| new        | Value was not in the list in HEAD  |
+| removed    | Value was in the list in HEAD, now gone |
+| not-in-git | Source is not a git repo           |
+
+Aliases and IDs are strings in a list, not independent entities.
+They cannot be "new-here" or "removed-here" because there is no
+concept of existing "elsewhere" - they are simply in the list or not.
+
+* Text changes
+
+** Detection
+   If a node's title or body differs between disk and HEAD,
+   the node gets a TextChanged scaffold child.
+
+** Comparison method
+   Semantic comparison: parse both versions as YAML,
+   compare the parsed title and body values.
+   YAML formatting differences are ignored.
+
+** TextChanged scaffold
+   - Type: Scaffold::TextChanged
+   - Title: "Text changed. See git diff."
+   - No body, no children
+   - Appears before content (alongside other scaffolds)
+   - Server validates on read: must have no body and no children
+
+* Order changes
+
+When items are reordered within a list (content, subscribees),
+emulate git diff output:
+
+Example: [A, B, C] reordered to [C, B, A]
+#+begin_example
+  A (diff removed-here)   ;; indefinitive, no content shown
+  C (diff new-here)       ;; definitive, content shown
+  B                       ;; unchanged
+  C (diff removed-here)   ;; indefinitive
+  A (diff new-here)       ;; definitive
+#+end_example
+
+The removed-here instance is rendered indefinitive (no content).
+The new-here instance is rendered definitive (with content).
+
+* Git operations
+
+** Library
+   Use the ~git2~ crate (Rust bindings to libgit2)
+   for programmatic access to git repositories.
+   Avoids fragile parsing of git command text output.
+
+** Comparison baseline
+   - Compare uncommitted changes vs HEAD
+   - Per source repo (each source should be a git repo)
+   - No distinction between staged and unstaged changes
+
+** Finding changed files
+   1. Group by source (each source has its own git repo)
+   2. Use git2 to identify which .skg files differ between
+      the working directory and HEAD
+      (this includes modified, added, and deleted files)
+
+** Comparison method
+   Unified semantic comparison for all fields:
+
+   1. For each changed file, get old content from HEAD via git2
+   2. Parse both old and new versions as YAML into SkgNode
+   3. Compare all parsed fields:
+      - title, body: if different, add TextChanged scaffold
+      - contains: compare lists to find additions/removals
+      - subscribes_to: compare lists to find additions/removals
+      - aliases: compare lists to find additions/removals
+      - ids: compare lists to find additions/removals
+   4. For list comparisons, use a diff algorithm (e.g., LCS)
+      to determine the edit script that produces the
+      removed-here/new-here ordering
+
+   This approach is robust to YAML formatting differences
+   and avoids parsing git's text diff output.
+
+** Loading removed nodes
+   When a node exists in HEAD but not on disk:
+   - Use git2 to get the file content from HEAD
+   - Parse as YAML into SkgNode
+   - Use existing .skg parsing code
+
+* Diff mode state
+
+** Per-connection
+   A flag in the connection/session state.
+   All buffers on that connection are affected together.
+
+** Lost on disconnect
+   Reconnecting starts with diff mode off.
+
+** Enabling/disabling
+   New request types:
+   - ~((request . "git diff mode") (value . 'on))~
+   - ~((request . "git diff mode") (value . 'off))~
+
+** When computed
+   Diff info is recomputed on each save.
+   No refresh-without-saving (deferred for later).
+
+* Save behavior
+
+** Pre-save checks
+   For each source, check if HEAD is a merge commit (abort if so).
+
+** Processing
+   1. Strip all orgnodes marked removed/removed-here
+      (along with their recursive contents)
+   2. Strip diff metadata from remaining nodes
+   3. Update graph from the cleaned tree
+   4. Rebuild buffer with fresh diff computation
+
+** Special case: root nodes
+   If an orgnode has no parent or ignores its parent
+   (including ForestRoot children),
+   it is NOT stripped even if marked removed/removed-here.
+   This allows viewing a deleted node's content from git history.
+
+** Edits to removed nodes
+   Ignored. Those orgnodes are stripped and regenerated pristine
+   from git history on save.
+
+* Rendering
+
+** removed / removed-here nodes
+   Rendered indefinitive (no content shown).
+   User can request definitive view via normal mechanism.
+
+** Definitive view of removed node
+   Same interface as normal definitive view request.
+   Server loads node data from git history instead of disk.
+   Children that are also missing from disk are marked 'removed';
+   children that exist on disk are rendered normally.
+   Check disk first; only load from git if truly missing.
+
+** new / new-here nodes
+   Rendered normally (definitive, with recursive content).
+
+** not-in-git nodes
+   Rendered normally. The diff marker just informs the user
+   that diff information is unavailable for this source.
+
+** Empty diff
+   If nothing changed since HEAD, buffer looks normal
+   with no special indication that diff mode is on.
+
+* New types
+
+** Scaffold::TextChanged
+   A new scaffold variant for indicating text changes.
+
+** Scaffold::IDCol
+   A new scaffold variant for showing ID changes.
+   Children are Scaffold::ID, similar to how AliasCol contains Alias scaffolds.
+
+   Diff-mode only: IDCol is only shown when diff mode is enabled
+   and the node's ID list has changed.
+
+   Read-only: The entire IDCol (and its children) is discarded
+   when the server ingests the buffer, then rebuilt fresh
+   in the new buffer. User edits to IDCol are ignored.
+
+** Scaffold::ID
+   A new scaffold variant for individual IDs within an IDCol.
+   Parallel structure to Scaffold::Alias.
+   Serialized as ~(skg id (diff new)) <the-uuid>~ or similar.
+
+** NodeDiff enum
+   #+begin_src rust
+   pub enum NodeDiff {
+     New,
+     NewHere,
+     Removed,
+     RemovedHere,
+     NotInGit,
+   }
+   #+end_src
+
+** FieldDiff enum
+   #+begin_src rust
+   pub enum FieldDiff {
+     New,
+     Removed,
+     NotInGit,
+   }
+   #+end_src
+
+** TrueNode diff field
+   Add ~diff: Option<NodeDiff>~ to TrueNode.
+   Serialized as ~(diff new)~, ~(diff removed-here)~, etc.
+
+** Scaffold::Alias and Scaffold::ID diff field
+   Add ~diff: Option<FieldDiff>~ to these scaffolds.
+   Serialized as ~(diff new)~, ~(diff removed)~, etc.
+
+* Error handling
+
+** Git library unavailable
+   The git2 crate requires libgit2.
+   If unavailable at build time, compilation fails.
+   No runtime check needed.
+
+** Source not a git repo
+   All nodes in that source get ~(diff not-in-git)~.
+   Not an error; diff mode still works for other sources.
+
+** HEAD is a merge commit
+   If any source's HEAD is a merge commit, abort the entire save.
+   Return error to user.
+   Message: "Cannot compute diff: HEAD is a merge commit in source <name>."
+
+** Other git failures
+   (Repo corrupted, file not in history unexpectedly, etc.)
+   Abort the entire save operation.
+   Show NOTHING WAS SAVED buffer with error details.
+
+* Validation
+
+** TextChanged scaffold
+   On read, validate that TextChanged has no body and no children.
+
+** IDCol scaffold
+   should have no body and only Scaffold::ID children.
+** ID scaffold
+   should have no body and no children
+** Diff metadata
+   On read, validate that:
+   - TrueNode diff is one of the five NodeDiff values
+   - Scaffold::Alias/ID diff is one of the three FieldDiff values
+
+* Documentation updates
+
+** api-and-formats.md
+   Add new endpoint for git diff mode toggle:
+   - Request: ~((request . "git diff mode") (value . 'on))~
+   - Request: ~((request . "git diff mode") (value . 'off))~
+   - Response: success/failure indicator
+
+   Document the diff metadata format in the metadata headers section.
+
+* Implementation phases
+
+** Phase 1: Content diff
+   - Add git2 crate dependency
+   - Add NodeDiff and FieldDiff enums
+   - Add diff field to TrueNode
+   - Implement git operations via git2 (find changed files, load from HEAD)
+   - Implement list diff algorithm for ordered comparisons
+   - Compute diff for content (contains) only
+   - Handle removed/removed-here/new/new-here for content
+   - Implement save-time stripping and regeneration
+   - Add diff mode toggle request
+   - Update api-and-formats.md with new request type
+
+** Phase 2: Aliases
+   - Add diff field to Scaffold::Alias
+   - Add support for alias diff (new/removed only)
+   - Handle AliasCol appearing/disappearing based on diff
+
+** Phase 3: IDs
+   - Add Scaffold::IDCol and Scaffold::ID
+   - Add diff field to Scaffold::ID
+   - Add support for ID diff (new/removed only)
+
+** Phase 4: Subscribees
+   - Add support for subscribee diff (all 5 NodeDiff values)
+   - Handle SubscribeeCol appearing/disappearing based on diff
+
+** Phase 5: Polish
+   - TextChanged scaffold
+   - Removed node definitive views from git
+   - Error messages and edge cases
+   - Heralds rules for visual distinction

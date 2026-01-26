@@ -1,0 +1,83 @@
+I want to brainstorm with you for a new feature: a 'git diff view'. I want the user to be able to see from a skg content buffer (but only when they enable the git diff view) information about changes to a node.
+
+There are a lot of potential changes. (See schema.tql for what some of these words mean.)
+
+- its ids
+- its title and body text
+- its content
+- its containers
+- its subscribees
+- its subscribers
+- its replacements
+- its replaceds
+- its hiders
+- its hiddens
+
+Most children of most nodes are content. The only other kind are *Col Scaffolds (see server/types/orgnode.rs) -- so far only AliasCol or SubscribeeCol, but there will be more soon.
+
+First I'll try to work through an example, and then I'll try to draw principles from it. Suppose the following buffer content is reflected in the last git commit:
+
+  * (skg (node (id a))) _
+  ** (skg subscribeeCol)
+  *** (skg (node (id subee))) _
+  *** (skg (node (id subee2))) _
+  ** (skg aliascol)
+  *** (skg alias) a'
+  *** (skg alias) a''
+  ** (skg (node (id a1))) _
+  ** (skg (node (id a2))) _
+  * (skg (node (id b))) _
+  ** (skg (node (id a1))) _
+  ** (skg (node (id a3))) _
+
+but the following is a view of the graph since that commit:
+
+  * (skg (node (id a))) _
+  ** (skg subscribeeCol)
+  *** (skg (node (id subee2))) _
+  *** (skg (node (id subee3))) _ ;; suppose this already existed
+  *** (skg (node (id subee3))) _ ;; suppose this is a new node
+  ** (skg aliascol)
+  *** (skg alias) a'''
+  *** (skg alias) a''
+  ** (skg (node (id a3))) _
+  ** (skg (node (id a2))) _
+  ** (skg (node (id a4))) _ ;; suppose this is a new node
+
+That is, the user has:
+- deleted subee1 and added subee3 as subscribees to a
+- deleted a' and inserted a''' as an alias to a
+- deleted c and inserted d and e as children of a
+
+Under those circumstances, I would like the git diff view to show the following:
+
+  * (skg (node (id a))) _
+  ** (skg subscribeeCol)
+  *** (skg (node (id subee)) (diff removed-here)) _
+  *** (skg (node (id subee2))) _
+  *** (skg (node (id subee3)) (diff new)) _
+  ** (skg aliascol)
+  *** (skg alias (diff removed)) a'
+  *** (skg alias) a''
+  *** (skg alias (diff new)) a'''
+  ** (skg (node (id a1)) (diff removed-here)) _
+  ** (skg (node (id a3)) (diff new-here)) _
+  ** (skg (node (id a2))) _
+  ** (skg (node (id a4)) (diff new)) _
+
+We'll need to add a new kind of col, IDCol, to show changes to a node's list of IDs. That would show similarly to aliases.
+
+The principle/algorithm seems to be something like this:
+
+- Suppose we've already got the Tree<OrgNode>. We just need to supplement it with diff information.
+- For each TrueNode N in the tree, see if the state on disk matches the last commit. If so, don't change it. Otherwise:
+  - If N's ID list has changed, give N an IDCol child, such that its grandchildren via the IDCol are its current IDs. (IDs can only be gained through merge, never lost, but rather than use special logic for these we should try to recycle the same logic we'll be using elsewhere for determining whether an ID is new.)
+  - If N's alias list has changed, ensure that N has an AliasCol. Within that AliasCol, mark any new aliases as 'diff new', and create a child for every deleted alias with 'diff removed'.
+  - If N's subscribees have changed, ensure it has a SubscribeeCol. Within that SubscribeeCol, mark any new subscribees as 'diff new' if they did not exist before, or 'diff new-here' if they existed in the graph but N did not previously subscribe to them. Similarly, mark any removed subscribees as 'diff removed' if they have been deleted entirely from the graph, or 'diff removed-here' if they still exist but N no longer subscribes to them.
+  - If N's content has changed, do simmilarly. This is just like subscribees, except rather than being collected as N's grandchildren under a SubscribeeCol, the content are top-level children of N. The same four cases remain: Content might be new, new-here, removed, or removed-here.
+
+Looking at the graph that way, the user should still be able to edit and save. When they do that, anything marked 'diff removed' or 'diff removed-here' is ignored by the graph updating routine -- i.e. those nodes should not reappear in the graph! But anything marked 'diff new' or 'diff new-here' is saved just as if that 'diff' metadata did not exist.
+
+Please write up a plan for how to do this. Don't start executing the plan. I'm sure there are problems and edge cases I have not thought of. So confront me with all the issues you can think of.
+
+I understand that 'plan mode' makes you put plans in .claude/plans/. That's fine. But since I prefer working in .org to working directly in this terminal interface, please write a document 'questions-for-jeff.org' at the root of the project with all the issues you find.

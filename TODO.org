@@ -1,3 +1,6 @@
+* ONGOING git diff view
+  see
+    git-diff-view/big-plan.org
 * how to prompt
 ** when asking for a refactor
 *** Name _v2 functions consistently.
@@ -14,20 +17,22 @@
 *** maybe see this document
     thoughts/saving-builds-tree-a-different-way.org
 * refactor it
-** TODO most natural
-*** for subscribee cols
-    would be the following rule:
+** for subscribee cols
+   would be the following rule:
 
-    If there could be a subscribee col and isn't,
-    the herald just says that.
-    when fetched it is included,
-    but if the user deletes that from the view, fine.
-*** alias, subscription, overrides, links
-    Bools for whether it has
-**** subscription action of any kind
-**** aliases
-**** overrides action of any kind
-**** any links in
+   If there could be a subscribee col and isn't,
+   the herald just says that.
+   When fetched it is included,
+   but if the user deletes it from the view,
+   it stays deleted until they request it again.
+** TODO a herald for the presence of aliases
+   Otherwise the user won't know whether to ask for them.
+** alias, subscription, overrides, links
+   Bools for whether it has
+*** subscription action of any kind
+*** aliases
+*** overrides action of any kind
+*** any links in
 ** TODO complete_or_restore_each_node_in_branch
 *** When is it needed?
 **** An AliasCol under an indefinitive parent could need updating.
@@ -75,6 +80,12 @@
    For instance, "an alias should have an aliascol parent"
    is easier to say than "an aliascol's children can only be aliases".
 * extend it
+** Why not use Git as the save safety layer?
+   really need these all before releasing
+** {see, edit} {subscribes, overrides, hides} relationships
+** safe save
+   If invalid state is detected in the course of a save,
+   rollback to the previous state.
 ** save subscribees
 *** the subscribee tree format
   - truenode // suppose this is a subscriber
