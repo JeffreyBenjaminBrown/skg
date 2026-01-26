@@ -2,6 +2,11 @@
 
 * Overview
 
+(In case it is helpful, the file
+git-diff-view/initial-sketch.org
+illustrates the initial concept that birthed this plan.
+But wherever that concept contradicts this plan, this plan wins.)
+
 Git diff view lets users see, within an Skg content buffer,
 what has changed since the last git commit.
 The comparison is between the current state (uncommitted changes on disk)
@@ -10,6 +15,37 @@ and HEAD (per source repo).
 When enabled, diff metadata is added to orgnodes,
 and removed nodes are inserted into the view.
 Users can still edit and save; removed nodes are ignored on save.
+
+* Key terminology
+
+This section defines terms used throughout this document.
+See also server/types/orgnode.rs for type definitions.
+
+** source
+   A data folder containing .skg files. Each source is expected to be
+   a git repository. A user may have multiple sources (e.g., their own
+   notes plus subscribed content from other authors). Each source has
+   a nickname configured in skgconfig.toml.
+
+** TrueNode vs Scaffold
+   See server/types/orgnode.rs
+
+** definitive vs indefinitive
+   A TrueNode can be rendered in two ways:
+   - Definitive: Shows the node's full content (title, body, children).
+   - Indefinitive: Shows only the node's title/header, hiding body and children.
+   This is controlled by the ~indefinitive~ boolean field in TrueNode.
+   Users can request a "definitive view" to expand an indefinitive node.
+
+** ForestRoot
+   A special Scaffold that serves as the invisible root of a "forest".
+   In Skg, a buffer's tree structure has ForestRoot at the top;
+   level-1 headlines are its children. ForestRoot is never rendered.
+
+** parent_ignores
+   A boolean field on TrueNode. When true, saving the buffer will not
+   update this node's relationship with its org-parent. The node behaves
+   as if it were a tree root, even if it appears nested in the buffer.
 
 * Scope
 
@@ -70,19 +106,23 @@ concept of existing "elsewhere" - they are simply in the list or not.
 * Order changes
 
 When items are reordered within a list (content, subscribees),
-emulate git diff output:
+emulate git diff output. The display interleaves removed and added items
+at their respective positions, similar to how git shows deletions (-)
+and additions (+) in unified diff format.
 
 Example: [A, B, C] reordered to [C, B, A]
 #+begin_example
-  A (diff removed-here)   ;; indefinitive, no content shown
-  C (diff new-here)       ;; definitive, content shown
-  B                       ;; unchanged
-  C (diff removed-here)   ;; indefinitive
-  A (diff new-here)       ;; definitive
+  A (diff removed-here)   ;; A was here in HEAD, indefinitive
+  C (diff new-here)       ;; C moved here, definitive, content shown
+  B                       ;; unchanged position
+  C (diff removed-here)   ;; C was here in HEAD, indefinitive
+  A (diff new-here)       ;; A moved here, definitive
 #+end_example
 
-The removed-here instance is rendered indefinitive (no content).
-The new-here instance is rendered definitive (with content).
+The removed-here instance marks where an item used to be; it's rendered
+indefinitive (no content shown) because the item still exists elsewhere.
+The new-here instance marks where an item now is; it's rendered
+definitive (with content) because this is the item's current location.
 
 * Git operations
 
@@ -98,9 +138,10 @@ The new-here instance is rendered definitive (with content).
 
 ** Finding changed files
    1. Group by source (each source has its own git repo)
-   2. Use git2 to identify which .skg files differ between
-      the working directory and HEAD
-      (this includes modified, added, and deleted files)
+   2. Use git2's diff functionality to identify which .skg files
+      differ between the working directory and HEAD.
+      This returns modified, added, AND deleted files in one query,
+      without needing to enumerate files on disk first.
 
 ** Comparison method
    Unified semantic comparison for all fields:
@@ -113,9 +154,11 @@ The new-here instance is rendered definitive (with content).
       - subscribes_to: compare lists to find additions/removals
       - aliases: compare lists to find additions/removals
       - ids: compare lists to find additions/removals
-   4. For list comparisons, use a diff algorithm (e.g., LCS)
+   4. For list comparisons, use a diff algorithm (e.g., LCS/Myers)
       to determine the edit script that produces the
-      removed-here/new-here ordering
+      removed-here/new-here ordering.
+      The algorithm identifies which items are unchanged, added, or removed,
+      and preserves their relative positions in the output.
 
    This approach is robust to YAML formatting differences
    and avoids parsing git's text diff output.
@@ -148,6 +191,8 @@ The new-here instance is rendered definitive (with content).
 
 ** Pre-save checks
    For each source, check if HEAD is a merge commit (abort if so).
+   Rationale: Merge commits have multiple parents, making the
+   "diff from HEAD" comparison ambiguous (which parent to compare against?).
 
 ** Processing
    1. Strip all orgnodes marked removed/removed-here
@@ -157,8 +202,8 @@ The new-here instance is rendered definitive (with content).
    4. Rebuild buffer with fresh diff computation
 
 ** Special case: root nodes
-   If an orgnode has no parent or ignores its parent
-   (including ForestRoot children),
+   If an orgnode has no parent, or has parent_ignores=true,
+   or is a direct child of ForestRoot (i.e., a level-1 headline),
    it is NOT stripped even if marked removed/removed-here.
    This allows viewing a deleted node's content from git history.
 
@@ -169,7 +214,7 @@ The new-here instance is rendered definitive (with content).
 * Rendering
 
 ** removed / removed-here nodes
-   Rendered indefinitive (no content shown).
+   Always rendered indefinitive (no content shown).
    User can request definitive view via normal mechanism.
 
 ** Definitive view of removed node
@@ -177,10 +222,19 @@ The new-here instance is rendered definitive (with content).
    Server loads node data from git history instead of disk.
    Children that are also missing from disk are marked 'removed';
    children that exist on disk are rendered normally.
-   Check disk first; only load from git if truly missing.
+
+** Definitive view of removed-here node
+   Same interface as normal definitive view request.
+   Server loads node data from disk (the node exists, just moved).
+   Shows the node's current content, not its content at HEAD.
 
 ** new / new-here nodes
-   Rendered normally (definitive, with recursive content).
+   Follow normal repeated-node logic:
+   - If the node has already been rendered definitively elsewhere,
+     this instance is rendered indefinitive.
+   - Otherwise, the first new/new-here rendering is definitive
+     (with recursive content), and any subsequent renderings
+     are indefinitive.
 
 ** not-in-git nodes
    Rendered normally. The diff marker just informs the user
@@ -289,7 +343,7 @@ The new-here instance is rendered definitive (with content).
 ** Phase 1: Content diff
    - Add git2 crate dependency
    - Add NodeDiff and FieldDiff enums
-   - Add diff field to TrueNode
+   - Add diff fields to TrueNode
    - Implement git operations via git2 (find changed files, load from HEAD)
    - Implement list diff algorithm for ordered comparisons
    - Compute diff for content (contains) only

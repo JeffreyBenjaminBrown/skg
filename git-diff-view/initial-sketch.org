@@ -1,21 +1,31 @@
+NOTE: This is the initial brainstorming prompt that started the git diff view
+feature. For the current, authoritative plan, see big-plan.org.
+Key differences from this sketch:
+- Reverse relationships (containers, subscribers, hiders, hiddens, etc.) are deferred
+- Two separate enums: NodeDiff (for TrueNodes) and FieldDiff (for Alias/ID scaffolds)
+- Added not-in-git case, TextChanged scaffold, and detailed rendering rules
+
+---
+
 I want to brainstorm with you for a new feature: a 'git diff view'. I want the user to be able to see from a skg content buffer (but only when they enable the git diff view) information about changes to a node.
 
 There are a lot of potential changes. (See schema.tql for what some of these words mean.)
 
 - its ids
 - its title and body text
+- its aliases
 - its content
-- its containers
+- its containers (DEFERRED - see big-plan.org)
 - its subscribees
-- its subscribers
-- its replacements
-- its replaceds
-- its hiders
-- its hiddens
+- its subscribers (DEFERRED)
+- its replacements (DEFERRED)
+- its replaceds (DEFERRED)
+- its hiders (DEFERRED)
+- its hiddens (DEFERRED)
 
 Most children of most nodes are content. The only other kind are *Col Scaffolds (see server/types/orgnode.rs) -- so far only AliasCol or SubscribeeCol, but there will be more soon.
 
-First I'll try to work through an example, and then I'll try to draw principles from it. Suppose the following buffer content is reflected in the last git commit:
+First I'll try to work through an example, and then I'll try to draw principles from it. I'll omit titles, writing an underscore instead, since the ID is all we'll need to know which node we're talking about. Suppose the following buffer content is reflected in the last git commit:
 
   * (skg (node (id a))) _
   ** (skg subscribeeCol)
@@ -35,8 +45,7 @@ but the following is a view of the graph since that commit:
   * (skg (node (id a))) _
   ** (skg subscribeeCol)
   *** (skg (node (id subee2))) _
-  *** (skg (node (id subee3))) _ ;; suppose this already existed
-  *** (skg (node (id subee3))) _ ;; suppose this is a new node
+  *** (skg (node (id subee3))) _ ;; suppose this already existed in the graph
   ** (skg aliascol)
   *** (skg alias) a'''
   *** (skg alias) a''
@@ -45,9 +54,9 @@ but the following is a view of the graph since that commit:
   ** (skg (node (id a4))) _ ;; suppose this is a new node
 
 That is, the user has:
-- deleted subee1 and added subee3 as subscribees to a
+- deleted subee (subee1) and added subee3 as subscribees to a
 - deleted a' and inserted a''' as an alias to a
-- deleted c and inserted d and e as children of a
+- deleted a1 and inserted a3 and a4 as children of a
 
 Under those circumstances, I would like the git diff view to show the following:
 

@@ -38,12 +38,9 @@ pub struct TrueNode {
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
-  pub indefinitive   : bool,
+  pub indefinitive   : bool, // When the user saves a buffer, an 'indefinitive' orgnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
 
-  // The next two *Stats fields only influence how the node is shown.
-  // Editing them and saving the buffer leaves the graph unchanged,
-  // and those edits will be immediately lost,
-  // as this data is regenerated each time the view is rebuilt.
+  // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats     : GraphNodeStats,
   pub viewStats      : ViewNodeStats,
 
