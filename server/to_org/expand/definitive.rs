@@ -311,30 +311,6 @@ fn from_disk_replace_title_body_and_skgnode (
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 
-/// Load title and body from git HEAD for a removed node.
-/// This is used when expanding a definitive view
-/// for a node that exists in HEAD but not on disk.
-fn from_git_replace_title_body (
-  tree    : &mut Tree<OrgNode>,
-  node_id : NodeId,
-  config  : &SkgConfig,
-) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, String) =
-    pid_and_source_from_treenode ( tree, node_id,
-      "from_git_replace_title_body" ) ?;
-  let skgnode : SkgNode =
-    skgnode_from_git_head ( &pid, &src, config ) ?;
-  write_at_node_in_tree (
-    tree, node_id,
-    |orgnode| {
-      let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-        &mut orgnode . kind
-        else { panic! ( "from_git_replace_title_body: expected TrueNode" ) };
-      t . title = skgnode.title;
-      t . body = skgnode.body; } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-  Ok (( )) }
-
 /// Expand children for a removed node,
 /// by loading content from git HEAD.
 /// Children that exist in TypeDB are marked as RemovedHere.
@@ -407,4 +383,28 @@ async fn extendDefinitiveSubtree_fromGit (
       tree . get_mut ( effective_root ) . ok_or ( "Parent not found" ) ?;
     parent_mut . append ( child_orgnode );
     visited . insert ( child_id . clone(), effective_root ); }
+  Ok (( )) }
+
+/// Load title and body from git HEAD for a removed node.
+/// This is used when expanding a definitive view
+/// for a node that exists in HEAD but not on disk.
+fn from_git_replace_title_body (
+  tree    : &mut Tree<OrgNode>,
+  node_id : NodeId,
+  config  : &SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+  let (pid, src) : (ID, String) =
+    pid_and_source_from_treenode ( tree, node_id,
+      "from_git_replace_title_body" ) ?;
+  let skgnode : SkgNode =
+    skgnode_from_git_head ( &pid, &src, config ) ?;
+  write_at_node_in_tree (
+    tree, node_id,
+    |orgnode| {
+      let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+        &mut orgnode . kind
+        else { panic! ( "from_git_replace_title_body: expected TrueNode" ) };
+      t . title = skgnode.title;
+      t . body = skgnode.body; } )
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
