@@ -8,6 +8,7 @@ use crate::types::orgnode::{
   orgnode_from_scaffold,
 };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
+use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
 
 use ego_tree::{Tree, NodeMut};
 use std::collections::HashMap;
@@ -22,10 +23,11 @@ pub fn apply_diff_to_forest (
 ) -> Result<(), Box<dyn Error>> {
   let root_id =
     forest . root() . id();
-  do_everywhere_in_tree_dfs ( forest, root_id, &mut |node_mut| {
-    process_node_for_diff ( node_mut, source_diffs )
-  } ) ?;
-  Ok (()) }
+  do_everywhere_in_tree_dfs (
+    forest, root_id,
+    &mut |node_mut| { process_node_for_diff (
+                        node_mut, source_diffs ) } )?;
+  Ok (( )) }
 
 /// Process a single node for diff markers.
 /// Dispatches to specific handlers based on node kind.
@@ -46,48 +48,44 @@ fn process_node_for_diff (
       process_id_diff ( node_mut, source_diffs ),
     _ => Ok (()) }}
 
-/// Process a TrueNode: set diff marker, prepend TextChanged/IDCol if needed.
+/// Process a TrueNode:
+/// - set diff marker
+/// - prepend TextChanged/IDCol child if needed.
 fn process_truenode_diff (
   mut node_mut : NodeMut<OrgNode>,
   source_diffs : &HashMap<String, SourceDiff>,
 ) -> Result<(), String> {
-  let (source_opt, id_opt) : (Option<String>, Option<String>) = {
-    match &node_mut . value() . kind {
-      OrgNodeKind::True ( t ) =>
-        ( t . source_opt . clone(),
-          t . id_opt . as_ref() . map ( |id| id . 0 . clone() ) ),
-      _ => return Ok (()) }};
-  let source : String =
-    match source_opt {
-      Some ( s ) => s,
-      None => return Ok (()) };
+  let tree_node_id = node_mut . id();
+  let (pid, source) =
+    pid_and_source_from_treenode (
+      node_mut . tree(), tree_node_id, "process_truenode_diff"
+    ) . map_err ( |e| e . to_string() ) ?;
   let source_diff : &SourceDiff =
     match source_diffs . get ( &source ) {
       Some ( d ) => d,
       None => return Ok (()) };
   if ! source_diff . is_git_repo { // Mark node as not-in-git
-    if let OrgNodeKind::True ( ref mut t ) = node_mut . value() . kind {
-      t . diff = Some ( NodeDiff::NotInGit ); }
+    if let OrgNodeKind::True ( ref mut t )
+      = node_mut . value() . kind
+      { t . diff = Some ( NodeDiff::NotInGit ); }
     return Ok (()); }
-  let node_id_val : String =
-    match id_opt {
-      Some ( s ) => s,
-      None => return Ok (()) };
   let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", node_id_val ) );
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let file_diff : &FileDiff =
     match source_diff . file_diffs . get ( &file_path ) {
       Some ( d ) => d,
       None => return Ok (()) };
-  let node_diff_status : Option<NodeDiff> = // Set node diff status based on file status
+  let node_diff_status : Option<NodeDiff> =
+    // Set node diff status based on file status
     match file_diff . status {
       DiffStatus::Added => Some ( NodeDiff::New ),
       DiffStatus::Deleted => Some ( NodeDiff::Removed ),
       DiffStatus::Modified => None };
   if let Some ( diff_status ) = node_diff_status {
-    if let OrgNodeKind::True ( ref mut t ) = node_mut . value() . kind {
-      t . diff = Some ( diff_status ); }
-    return Ok (()); }
+    if let OrgNodeKind::True ( ref mut t )
+      = node_mut . value() . kind
+      { t . diff = Some ( diff_status ); }
+    return Ok (( )); }
   if let Some ( ref node_changes ) = file_diff . node_changes { // For modified files, check for text/ID changes
     if node_changes . text_changed { // Prepend TextChanged scaffold
       let scaffold : OrgNode =
@@ -107,7 +105,7 @@ fn process_aliascol_diff (
   source_diffs : &HashMap<String, SourceDiff>,
 ) -> Result<(), String> {
   let file_diff : &FileDiff =
-    match get_parent_file_diff ( &mut node_mut, source_diffs ) {
+    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 1 ) {
       Some ( d ) => d,
       None => return Ok (()) };
   let node_changes =
@@ -134,7 +132,7 @@ fn process_alias_diff (
       OrgNodeKind::Scaff ( Scaffold::Alias { text, .. } ) => text . clone(),
       _ => return Ok (()) };
   let file_diff : &FileDiff = // Grandparent is the TrueNode
-    match get_grandparent_file_diff ( &mut node_mut, source_diffs ) {
+    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 2 ) {
       Some ( d ) => d,
       None => return Ok (()) };
   let node_changes =
@@ -152,7 +150,7 @@ fn process_idcol_diff (
   source_diffs : &HashMap<String, SourceDiff>,
 ) -> Result<(), String> {
   let file_diff : &FileDiff =
-    match get_parent_file_diff ( &mut node_mut, source_diffs ) {
+    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 1 ) {
       Some ( d ) => d,
       None => return Ok (()) };
   let node_changes =
@@ -184,10 +182,11 @@ fn process_id_diff (
 ) -> Result<(), String> {
   let id_value : ID =
     match &node_mut . value() . kind {
-      OrgNodeKind::Scaff ( Scaffold::ID { value, .. } ) => ID ( value . clone() ),
+      OrgNodeKind::Scaff ( Scaffold::ID { value, .. } ) =>
+        ID ( value . clone() ),
       _ => return Ok (()) };
   let file_diff : &FileDiff = // Grandparent is the TrueNode
-    match get_grandparent_file_diff ( &mut node_mut, source_diffs ) {
+    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 2 ) {
       Some ( d ) => d,
       None => return Ok (()) };
   let node_changes =
@@ -199,41 +198,27 @@ fn process_id_diff (
       *diff = Some ( FieldDiff::New ); }}
   Ok (()) }
 
-/// Get the FileDiff for a node's parent TrueNode.
-fn get_parent_file_diff<'a> (
+/// Get the FileDiff for an ancestor TrueNode.
+/// generation: 1 = parent, 2 = grandparent, etc.
+fn get_ancestor_file_diff<'a> (
   node_mut     : &mut NodeMut<OrgNode>,
   source_diffs : &'a HashMap<String, SourceDiff>,
+  generation   : usize,
 ) -> Option<&'a FileDiff> {
-  let mut parent : NodeMut<OrgNode> =
-    node_mut . parent() ?;
-  file_diff_for_truenode_mut ( &mut parent, source_diffs ) }
-
-/// Get the FileDiff for a node's grandparent TrueNode.
-fn get_grandparent_file_diff<'a> (
-  node_mut     : &mut NodeMut<OrgNode>,
-  source_diffs : &'a HashMap<String, SourceDiff>,
-) -> Option<&'a FileDiff> {
-  let mut parent : NodeMut<OrgNode> =
-    node_mut . parent() ?;
-  let mut grandparent : NodeMut<OrgNode> =
-    parent . parent() ?;
-  file_diff_for_truenode_mut ( &mut grandparent, source_diffs ) }
-
-/// Get the FileDiff for a TrueNode (from a NodeMut).
-fn file_diff_for_truenode_mut<'a> (
-  node_mut     : &mut NodeMut<OrgNode>,
-  source_diffs : &'a HashMap<String, SourceDiff>,
-) -> Option<&'a FileDiff> {
-  let (source, id) : (String, String) =
-    match &node_mut . value() . kind {
-      OrgNodeKind::True ( t ) =>
-        ( t . source_opt . clone() ?,
-          t . id_opt . as_ref() ? . 0 . clone() ),
-      _ => return None };
+  let start_id = node_mut . id();
+  let ancestor_id = { // Climb to the ancestor
+    let mut node_ref = node_mut . tree() . get ( start_id ) ?;
+    for _ in 0..generation {
+      node_ref = node_ref . parent() ?; }
+    node_ref . id() };
+  let (pid, source) =
+    pid_and_source_from_treenode (
+      node_mut . tree(), ancestor_id, "get_ancestor_file_diff"
+    ) . ok() ?;
   let source_diff : &SourceDiff =
     source_diffs . get ( &source ) ?;
   if ! source_diff . is_git_repo {
     return None; }
   let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", id ) );
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   source_diff . file_diffs . get ( &file_path ) }
