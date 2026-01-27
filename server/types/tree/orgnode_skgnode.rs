@@ -16,6 +16,29 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
+/// Extract (ID, source) from a TrueNode in the tree.
+/// Returns an error if the node is not found, not a TrueNode,
+/// or missing ID or source.
+pub fn pid_and_source_from_treenode (
+  tree        : &Tree<OrgNode>,
+  treeid      : NodeId,
+  caller_name : &str,
+) -> Result<(ID, String), Box<dyn Error>> {
+  let node_ref : NodeRef<OrgNode> =
+    tree . get ( treeid ) . ok_or_else ( ||
+      format! ( "{}: node not found", caller_name ) ) ?;
+  let OrgNodeKind::True ( t ) : &OrgNodeKind =
+    &node_ref . value() . kind
+    else { return Err ( format! ( "{}: expected TrueNode",
+                                  caller_name ) . into() ) };
+  let pid : ID =
+    t . id_opt . clone() . ok_or_else ( ||
+      format! ( "{}: no ID", caller_name ) ) ?;
+  let source : String =
+    t . source_opt . clone() . ok_or_else ( ||
+      format! ( "{}: no source", caller_name ) ) ?;
+  Ok (( pid, source )) }
+
 /// Find the unique child of a node with a given Scaffold.
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
@@ -149,7 +172,7 @@ pub(crate) fn collect_child_aliases_at_aliascol (
   for child_ref in aliascol_ref . children() {
     let child : &OrgNode = child_ref . value();
     if ! matches! ( &child . kind,
-                    OrgNodeKind::Scaff ( Scaffold::Alias(_) )) {
+                    OrgNodeKind::Scaff ( Scaffold::Alias { .. } )) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",
                   child . kind )
@@ -183,7 +206,7 @@ pub fn collect_grandchild_aliases_for_orgnode (
         for alias_child in col_ref.children() {
           { // check for invalid state
             if ! matches!(&alias_child.value().kind,
-                          OrgNodeKind::Scaff(Scaffold::Alias(_))) {
+                          OrgNodeKind::Scaff(Scaffold::Alias { .. })) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child.value().kind )); }}

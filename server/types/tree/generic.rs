@@ -118,6 +118,33 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
       tree, child_id, f ) ?; }
   Ok (( ))}
 
+/// Like do_everywhere_in_tree_dfs, but the lambda ("f") returns:
+/// - Ok(true) to continue recursing into children, or
+/// - Ok(false) to stop (prune) at this node.
+pub fn do_everywhere_in_tree_dfs_prunable<T, F>(
+  tree          : &mut Tree<T>,
+  start_node_id : NodeId,
+  f             : &mut F
+) -> Result<(), String>
+where F: FnMut(NodeMut<T>) -> Result<bool, String> {
+  let child_ids : Vec<NodeId> = {
+    let node_ref : NodeRef<T> =
+      tree . get ( start_node_id ) . ok_or (
+        "do_everywhere_in_tree_dfs_prunable: start node not found" )?;
+    node_ref . children ()
+      . map ( |c| c . id() )
+      . collect () };
+  let should_continue : bool = {
+    let node_mut : NodeMut<T> =
+      tree . get_mut ( start_node_id ) . ok_or (
+        "do_everywhere_in_tree_dfs_prunable: node not found" )?;
+    f ( node_mut )? };
+  if should_continue {
+    for child_id in child_ids {
+      do_everywhere_in_tree_dfs_prunable (
+        tree, child_id, f )?; }}
+  Ok (( )) }
+
 /// Compare two trees for structural and value equality.
 /// Returns true if both trees have the same structure and all node values are equal.
 pub fn eq_trees<T: PartialEq>(

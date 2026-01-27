@@ -35,6 +35,18 @@ pub fn request_type_from_request (
       "Failed to parse S-expression: {}", e ) ) ?;
   extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
 
+/// Extract a value from a request like
+/// ((request . "type") (key . 'xyz))
+pub fn value_from_request_sexp (
+  key     : &str,
+  request : &str,
+) -> Result<String, String> {
+  let sexp : Sexp =
+    sexp::parse ( request )
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) ) ?;
+  extract_v_from_kv_pair_in_sexp ( &sexp, key ) }
+
 /// Format buffer content and errors as an s-expression.
 /// Format: ((content "...") (errors ("error1" "error2" ...)))
 /// This is shared by save_buffer and single_root_view handlers.

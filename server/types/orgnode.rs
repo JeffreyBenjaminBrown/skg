@@ -5,6 +5,7 @@
 /// Some 'OrgNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
+use super::git::{NodeDiff, FieldDiff};
 use super::misc::ID;
 use std::collections::HashSet;
 use std::fmt;
@@ -38,14 +39,16 @@ pub struct TrueNode {
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
-  pub indefinitive   : bool, // When the user saves a buffer, an 'indefinitive' orgnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
+  pub indefinitive  : bool, // When the user saves a buffer, an 'indefinitive' orgnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
-  pub graphStats     : GraphNodeStats,
-  pub viewStats      : ViewNodeStats,
+  pub graphStats    : GraphNodeStats,
+  pub viewStats     : ViewNodeStats,
 
-  pub edit_request   : Option < EditRequest >,
-  pub view_requests  : HashSet < ViewRequest >,
+  pub edit_request  : Option < EditRequest >,
+  pub view_requests : HashSet < ViewRequest >,
+
+  pub diff          : Option < NodeDiff >,
 }
 
 /// Graph-level statistics about a node.
@@ -73,17 +76,22 @@ pub struct ViewNodeStats {
 /// but encode information about the OrgNodes around them.
 #[derive( Debug, Clone, PartialEq, Eq )]
 pub enum Scaffold {
-  Alias (String), // The string is an alias for the node's grandparent.
+  Alias { text: String, // an alias for the node's grandparent
+          diff: Option<FieldDiff> },
   AliasCol, // The node collects (as children) aliases for its parent.
   ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   SubscribeeCol, // Collects subscribees for its parent.
+  // Git diff view scaffolds:
+  TextChanged, // Indicates title/body changed between disk and HEAD.
+  IDCol, // Collects (as children) ID scaffolds for its parent. Diff-mode only.
+  ID { value: String, diff: Option<FieldDiff> }, // An ID of the node's grandparent. Diff-mode only.
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
 /// (We can't simply use the Scaffold variants themselves,
-/// because of the Alias payload.)
+/// because of the Alias/ID payloads.)
 /// Used for the bijective Emacs string mapping.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ScaffoldKind { Alias,
@@ -91,7 +99,10 @@ pub enum ScaffoldKind { Alias,
                         ForestRoot,
                         HiddenInSubscribeeCol,
                         HiddenOutsideOfSubscribeeCol,
-                        SubscribeeCol, }
+                        SubscribeeCol,
+                        TextChanged,
+                        IDCol,
+                        ID, }
 
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
@@ -111,6 +122,7 @@ pub enum ViewRequest {
   Definitive,
 }
 
+/// Diff status for TrueNodes in git diff view mode.
 //
 // Implementations
 //
@@ -124,20 +136,26 @@ impl Scaffold {
     ("hiddenInSubscribeeCol",        ScaffoldKind::HiddenInSubscribeeCol),
     ("hiddenOutsideOfSubscribeeCol", ScaffoldKind::HiddenOutsideOfSubscribeeCol),
     ("subscribeeCol",                ScaffoldKind::SubscribeeCol),
+    ("textChanged",                  ScaffoldKind::TextChanged),
+    ("idCol",                        ScaffoldKind::IDCol),
+    ("id",                           ScaffoldKind::ID),
   ];
 
   /// Get the kind (discriminant) of this Scaffold.
   pub fn kind ( &self ) -> ScaffoldKind {
     match self {
-      Scaffold::Alias ( _ )                  => ScaffoldKind::Alias,
+      Scaffold::Alias { .. }                 => ScaffoldKind::Alias,
       Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
       Scaffold::ForestRoot                   => ScaffoldKind::ForestRoot,
       Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
       Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
       Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
+      Scaffold::TextChanged                  => ScaffoldKind::TextChanged,
+      Scaffold::IDCol                        => ScaffoldKind::IDCol,
+      Scaffold::ID { .. }                    => ScaffoldKind::ID,
     }}
 
-  /// Compare scaffold kinds. For Alias, compares variant only (ignoring string content).
+  /// Compare scaffold kinds. For Alias/ID, compares variant only (ignoring payload).
   pub fn matches_kind ( &self, other : &Scaffold ) -> bool {
     self.kind() == other.kind() }
 
@@ -149,46 +167,58 @@ impl Scaffold {
       .map ( |(s, _)| s.to_string() )
       .expect ( "REPRS_IN_CLIENT should cover all ScaffoldKinds" ) }
 
-  /// Parse an Emacs string to a Scaffold. For Alias, uses the provided title.
-  pub fn from_repr_in_client ( s: &str, title: &str
-                             ) -> Option<Scaffold>
-  { Self::REPRS_IN_CLIENT.iter()
+  /// Parse an Emacs string to a Scaffold.
+  /// For Alias/ID, uses the provided title.
+  pub fn from_repr_in_client (
+    s: &str, title: &str
+  ) -> Option<Scaffold> {
+    Self::REPRS_IN_CLIENT.iter()
       .find ( |(es, _)| *es == s )
-      .map ( |(_, kind)| kind.to_scaffold ( title ) ) }
+      .map ( |(_, kind)| kind.to_scaffold ( title )) }
 
   pub fn title ( &self ) -> &str {
     match self {
-      Scaffold::Alias ( s ) => s,
+      Scaffold::Alias { text, .. } => text,
       Scaffold::AliasCol => "its aliases",
       Scaffold::ForestRoot => "",
       Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
       Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
       Scaffold::SubscribeeCol => "it subscribes to these",
+      Scaffold::TextChanged => "Text changed. See git diff.",
+      Scaffold::IDCol => "its IDs",
+      Scaffold::ID { value, .. } => value,
     }}
 
   /// For serialization.
   pub fn interp_str ( &self ) -> &str {
     match self {
-      Scaffold::Alias ( _ ) => "alias",
+      Scaffold::Alias { .. } => "alias",
       Scaffold::AliasCol => "aliasCol",
       Scaffold::ForestRoot => "forestRoot",
       Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
       Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
       Scaffold::SubscribeeCol => "subscribeeCol",
+      Scaffold::TextChanged => "textChanged",
+      Scaffold::IDCol => "idCol",
+      Scaffold::ID { .. } => "id",
     }} }
 
 impl ScaffoldKind {
-  /// Construct a Scaffold from this kind. For Alias, uses the provided title.
+  /// Construct a Scaffold from this kind. For Alias/ID, uses the provided title.
   pub fn to_scaffold ( &self, title: &str ) -> Scaffold {
     match self {
-      ScaffoldKind::Alias                     => Scaffold::Alias ( title.to_string() ),
+      ScaffoldKind::Alias => Scaffold::Alias { text: title.to_string(),
+                                               diff: None },
       ScaffoldKind::AliasCol                  => Scaffold::AliasCol,
       ScaffoldKind::ForestRoot                => Scaffold::ForestRoot,
       ScaffoldKind::HiddenInSubscribeeCol     => Scaffold::HiddenInSubscribeeCol,
       ScaffoldKind::HiddenOutsideOfSubscribeeCol => Scaffold::HiddenOutsideOfSubscribeeCol,
-      ScaffoldKind::SubscribeeCol             => Scaffold::SubscribeeCol,
-    }}
-}
+      ScaffoldKind::SubscribeeCol => Scaffold::SubscribeeCol,
+      ScaffoldKind::TextChanged   => Scaffold::TextChanged,
+      ScaffoldKind::IDCol         => Scaffold::IDCol,
+      ScaffoldKind::ID => Scaffold::ID { value: title.to_string(),
+                                         diff: None },
+    }} }
 
 impl ViewRequest {
   /// Single source of truth for ViewRequest <-> client string bijection.
@@ -311,6 +341,7 @@ impl Default for TrueNode {
       viewStats        : ViewNodeStats::default (),
       edit_request     : None,
       view_requests    : HashSet::new (),
+      diff             : None,
     }} }
 
 impl Default for OrgNode {
@@ -383,6 +414,7 @@ pub fn mk_orgnode (
       viewStats        : ViewNodeStats::default (),
       edit_request,
       view_requests,
+      diff             : None,
     }),
   }}
 

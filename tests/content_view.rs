@@ -114,7 +114,8 @@ async fn test_multi_root_view_logic (
   let result : String = multi_root_view (
     & driver,
     & config,
-    & focii
+    & focii,
+    false
   ) . await ?;
 
   println!("Multi-root view result:\n{}", result);
@@ -141,7 +142,8 @@ fn test_single_root_view_with_cycle
       let result : String = single_root_view (
         driver,
         config,
-        &ID ( "a".to_string () )
+        &ID ( "a".to_string () ),
+        false
       ) . await ?;
 
       println!("Single root view with cycle result:\n{}", result);
@@ -173,7 +175,8 @@ fn test_multi_root_view_with_shared_nodes
       let result : String = multi_root_view (
         driver,
         config,
-        & focii
+        & focii,
+        false
       ) . await ?;
 
       println!("Multi root view with shared nodes result:\n{}", result);
@@ -225,7 +228,8 @@ fn test_multi_root_view_with_node_limit
       let result : String = multi_root_view (
         driver,
         &test_config,
-        & focii
+        & focii,
+        false
       ) . await ?;
 
       println!("Multi root view with limit=3 result:\n{}", result);
@@ -286,7 +290,8 @@ fn test_limit_with_multiple_sibling_groups
       let result : String = single_root_view (
         driver,
         &test_config,
-        &ID ( "1".to_string () )
+        &ID ( "1".to_string () ),
+        false
       ) . await ?;
 
       println!("Result with multiple sibling groups:\n{}", result);

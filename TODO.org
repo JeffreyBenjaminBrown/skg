@@ -1,6 +1,14 @@
 * ONGOING git diff view
   see
     git-diff-view/big-plan.org
+** validation
+   We check that each ID has an IDCol parent.
+** not implemented yet
+pub fn handle_save_buffer_request (
+  ...
+  diff_mode_enabled : bool ) {
+  // Note: diff_mode_enabled is not yet used, but will be in Phase 5
+  let _ = diff_mode_enabled;
 * how to prompt
 ** when asking for a refactor
 *** Name _v2 functions consistently.

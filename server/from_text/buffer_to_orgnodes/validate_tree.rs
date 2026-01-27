@@ -90,7 +90,7 @@ fn validate_node_and_children (
     node_ref.parent().map(
       |p| &p.value().kind);
   if matches!(parent_kind,
-              Some(OrgNodeKind::Scaff(Scaffold::Alias(_)) )) {
+              Some(OrgNodeKind::Scaff(Scaffold::Alias { .. })) ) {
     errors.push(
       BufferValidationError::Child_of_Alias(
         orgnode.clone() )); }
@@ -115,11 +115,17 @@ fn validate_scaffold (
   // Note: Body_of_AliasCol and Body_of_Alias are detected during parsing
   // (in orgnode_from_metadata), not here, because Scaffold nodes don't store body data.
   match scaffold {
-    Scaffold::Alias ( _ ) => {
+    Scaffold::Alias { .. } => {
       if ! matches!(parent_kind,
                     Some(OrgNodeKind::Scaff(Scaffold::AliasCol))) {
         errors.push(
           BufferValidationError::Alias_with_no_AliasCol_Parent(
+            orgnode.clone() )); }}
+    Scaffold::ID { .. } => {
+      if ! matches!(parent_kind,
+                    Some(OrgNodeKind::Scaff(Scaffold::IDCol))) {
+        errors.push(
+          BufferValidationError::ID_with_no_IDCol_Parent(
             orgnode.clone() )); }}
     _ => {} }}
 

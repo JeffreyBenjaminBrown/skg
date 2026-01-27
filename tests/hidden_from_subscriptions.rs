@@ -106,6 +106,7 @@ fn test_every_kind_of_col(
       &driver,
       &config,
       &ID("R".to_string()), // Initial view from R ("subscribeR")
+      false,
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
 
@@ -126,7 +127,7 @@ fn test_every_kind_of_col(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy ) . await ?;
+        &modified_view, &driver, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
@@ -176,6 +177,7 @@ fn test_hidden_within_but_none_without(
       &driver,
       &config,
       &ID("R".to_string()), // the root
+      false,
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
 
@@ -193,7 +195,7 @@ fn test_hidden_within_but_none_without(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy ) . await ?;
+        &modified_view, &driver, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
@@ -243,6 +245,7 @@ fn test_hidden_without_but_none_within(
       &driver,
       &config,
       &ID("R".to_string()), // origin of the view
+      false,
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
@@ -261,7 +264,7 @@ fn test_hidden_without_but_none_within(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy ) . await ?;
+        &modified_view, &driver, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
@@ -309,6 +312,7 @@ fn test_overlapping_hidden_within(
       &driver,
       &config,
       &ID("R".to_string()), // root of the view
+      false,
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
@@ -326,7 +330,7 @@ fn test_overlapping_hidden_within(
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy ) . await ?;
+        &modified_view, &driver, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {

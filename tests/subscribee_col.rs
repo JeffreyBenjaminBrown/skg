@@ -61,6 +61,7 @@ fn test_subscribee_col_appears_for_subscribers(
       &driver,
       &config,
       &ID("1".to_string()),
+      false,
     ).await?;
     println!("SubscribeeCol test result:\n{}", result);
 

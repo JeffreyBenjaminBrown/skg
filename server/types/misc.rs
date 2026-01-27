@@ -18,7 +18,7 @@ Collisions are astronomically unlikely but not impossible.
 If there are fewer than 3.3e15 v4 UUIDs --
 equivalent to 9 billion people with 415,000 nodes each --
 the collision probability is less than 1 in 1e6. */
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
 /// Each source has a unique nickname, defined in the SkgConfig,
@@ -93,15 +93,7 @@ fn default_initial_node_limit() -> usize { 1000 }
 
 impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {
-    ID ( s.into () ) }
-  fn as_str ( &self ) -> &str {
-    &self.0 }} // a reference to the first (and only) field
-
-impl SourceNickname {
-  fn new <S : Into<String>> (s: S) -> Self {
-    SourceNickname ( s.into () ) }
-  fn as_str ( &self ) -> &str {
-    &self.0 }}
+    ID ( s.into () ) }}
 
 impl Deref for ID {
   // lets ID be used like a String in (more?) cases

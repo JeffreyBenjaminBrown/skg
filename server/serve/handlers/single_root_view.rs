@@ -16,25 +16,25 @@ use typedb_driver::TypeDBDriver;
 /// and sends the response to Emacs (length-prefixed).
 /// Response format: ((content "...") (errors ("error1" "error2" ...)))
 pub fn handle_single_root_view_request (
-  stream        : &mut TcpStream,
-  request       : &str,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
+  stream            : &mut TcpStream,
+  request           : &str,
+  typedb_driver     : &TypeDBDriver,
+  config            : &SkgConfig,
+  diff_mode_enabled : bool,
 ) {
-
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
       let response_sexp : String = block_on ( async {
         match single_root_view (
           typedb_driver,
           config,
-          &node_id ) . await
+          &node_id,
+          diff_mode_enabled ) . await
         { Ok ( buffer_content ) =>
             format_buffer_response_sexp (
               & buffer_content,
               & vec![] ),
-          Err (e) => {
-            // If we fail to generate the view, return error in content
+          Err (e) => { // If we fail to generate the view, return error in content
             let error_content : String = format!(
               "Error generating document: {}", e);
             format_buffer_response_sexp (

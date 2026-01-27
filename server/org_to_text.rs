@@ -106,8 +106,10 @@ fn scaffold_metadata_to_string (
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
   match scaffold {
-    Scaffold::Alias ( _ ) =>
-      parts . push ( "alias" . to_string () ),
+    Scaffold::Alias { diff, .. } => {
+      parts . push ( "alias" . to_string () );
+      if let Some ( d ) = diff {
+        parts . push ( format! ( "(diff {})", d.repr_in_client() ) ); }}
     Scaffold::AliasCol =>
       parts . push ( "aliasCol" . to_string () ),
     Scaffold::ForestRoot =>
@@ -118,6 +120,14 @@ fn scaffold_metadata_to_string (
       parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
     Scaffold::SubscribeeCol =>
       parts . push ( "subscribeeCol" . to_string () ),
+    Scaffold::TextChanged =>
+      parts . push ( "textChanged" . to_string () ),
+    Scaffold::IDCol =>
+      parts . push ( "idCol" . to_string () ),
+    Scaffold::ID { diff, .. } => {
+      parts . push ( "id" . to_string () );
+      if let Some ( d ) = diff {
+        parts . push ( format! ( "(diff {})", d.repr_in_client() ) ); }}
   }
   Ok ( parts . join ( " " )) }
 
@@ -166,6 +176,9 @@ fn true_node_metadata_to_string (
           . collect ();
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})", request_strings . join ( " " ))) }
+    fn diff_status ( true_node : & TrueNode ) -> Option < String > {
+      true_node . diff . as_ref () . map ( | d |
+        format! ( "(diff {})", d . repr_in_client () )) }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
     if let Some ( ref id ) = true_node . id_opt {
@@ -183,6 +196,8 @@ fn true_node_metadata_to_string (
     if let Some ( s ) = edit_request ( true_node )
     { parts . push ( s ); }
     if let Some ( s ) = view_requests ( true_node )
+    { parts . push ( s ); }
+    if let Some ( s ) = diff_status ( true_node )
     { parts . push ( s ); }
     format! ( "({})", parts . join ( " " )) }
   let mut parts : Vec < String > = Vec::new ();

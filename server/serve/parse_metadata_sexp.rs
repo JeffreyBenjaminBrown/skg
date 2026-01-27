@@ -18,6 +18,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
+use crate::types::git::{NodeDiff, FieldDiff};
 use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode,
@@ -47,6 +48,8 @@ pub struct OrgnodeMetadata {
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
+  pub truenode_diff: Option<NodeDiff>,
+  pub scaffold_diff: Option<FieldDiff>,
 }
 
 pub fn default_metadata() -> OrgnodeMetadata {
@@ -62,8 +65,8 @@ pub fn default_metadata() -> OrgnodeMetadata {
     viewStats: ViewNodeStats::default(),
     edit_request: None,
     view_requests: HashSet::new(),
-  }
-}
+    truenode_diff: None,
+    scaffold_diff: None, }}
 
 /// Create an OrgNode from parsed metadata components.
 /// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
@@ -80,9 +83,14 @@ pub fn orgnode_from_metadata (
           title . clone (),
           scaffold . repr_in_client () ))
       } else { None };
-      // For Alias, use the headline title as the alias string
+      // For Alias/ID, use the headline title as the string value and apply scaffold_diff
       let scaffold_with_title : Scaffold = match scaffold {
-        Scaffold::Alias ( _ ) => Scaffold::Alias ( title . clone () ),
+        Scaffold::Alias { .. } => Scaffold::Alias {
+                            text: title . clone (),
+                            diff: metadata . scaffold_diff },
+        Scaffold::ID    { .. } => Scaffold::ID {
+                            value: title . clone (),
+                            diff: metadata . scaffold_diff },
         other => other . clone (),
       };
       ( OrgNodeKind::Scaff ( scaffold_with_title ), error )
@@ -98,7 +106,8 @@ pub fn orgnode_from_metadata (
           graphStats       : metadata . graphStats . clone (),
           viewStats        : metadata . viewStats . clone (),
           edit_request     : metadata . edit_request . clone (),
-          view_requests    : metadata . view_requests . clone (), } ),
+          view_requests    : metadata . view_requests . clone (),
+          diff             : metadata . truenode_diff, } ),
         None )
     };
   ( OrgNode { focused : metadata.focused,
@@ -141,6 +150,15 @@ pub fn parse_metadata_to_orgnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
+          "diff" => {
+            // (diff <value>) at top level is for Scaffolds (Alias/ID)
+            if items . len () != 2 {
+              return Err ( "diff requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &items[1] ) ?;
+            result . scaffold_diff = Some (
+              FieldDiff::from_client_string ( &value )
+                . ok_or_else ( || format! ( "Invalid FieldDiff value: {}", value ))? ); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -158,8 +176,8 @@ pub fn parse_metadata_to_orgnodemd (
         match bare_value . as_str () {
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
-          // Scaffold kinds as bare atoms (alias string comes from title in orgnode_from_metadata)
-          "alias"    => result . scaffold = Some ( Scaffold::Alias ( String::new () )),
+          // Scaffold kinds as bare atoms (alias/id string comes from title in orgnode_from_metadata)
+          "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), diff: None } ),
           "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
           "forestRoot" => result . scaffold = Some ( Scaffold::ForestRoot ),
           "hiddenInSubscribeeCol" =>
@@ -168,6 +186,12 @@ pub fn parse_metadata_to_orgnodemd (
             result . scaffold = Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
           "subscribeeCol" =>
             result . scaffold = Some ( Scaffold::SubscribeeCol ),
+          "textChanged" =>
+            result . scaffold = Some ( Scaffold::TextChanged ),
+          "idCol" =>
+            result . scaffold = Some ( Scaffold::IDCol ),
+          "id" =>
+            result . scaffold = Some ( Scaffold::ID { value: String::new(), diff: None } ),
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },
@@ -209,6 +233,14 @@ fn parse_node_sexp (
           "viewRequests" => {
             parse_viewrequests_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
+          "diff" => {
+            if subitems . len () != 2 {
+              return Err ( "diff requires exactly one value".to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . truenode_diff = Some (
+              NodeDiff::from_client_string ( &value )
+                . ok_or_else ( || format! ( "Invalid NodeDiff value: {}", value ))? ); },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => {
@@ -333,12 +365,3 @@ fn parse_viewrequests_sexp (
         "Unexpected element in viewRequests (expected atoms)"
           . to_string () ); }} }
   Ok (( )) }
-
-
-/// Parse a string literal like "foo" from an s-expression.
-fn parse_string_literal ( sexp : &Sexp ) -> Result<String, String> {
-  match sexp {
-    Sexp::Atom ( sexp::Atom::S ( s )) => Ok ( s . clone () ),
-    _ => Err ( format! ( "Expected string literal, got: {:?}", sexp )),
-  }
-}

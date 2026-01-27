@@ -28,6 +28,7 @@ pub enum BufferValidationError {
   Child_of_AliasCol_with_ID      (OrgNode),
   Child_of_Alias                 (OrgNode),
   Alias_with_no_AliasCol_Parent  (OrgNode),
+  ID_with_no_IDCol_Parent        (OrgNode),
   Multiple_AliasCols_in_Children (OrgNode),
   Multiple_Defining_Orgnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
@@ -84,6 +85,9 @@ impl std::fmt::Display for BufferValidationError {
                node.id_opt()),
       BufferValidationError::Alias_with_no_AliasCol_Parent(node) =>
         write!(f, "Alias node must have an AliasCol parent. Node: {:?}",
+               node.id_opt()),
+      BufferValidationError::ID_with_no_IDCol_Parent(node) =>
+        write!(f, "ID node must have an IDCol parent. Node: {:?}",
                node.id_opt()),
       BufferValidationError::Multiple_AliasCols_in_Children(node) =>
         write!(f, "Node has multiple AliasCol children (max 1 allowed). Node: {:?}",

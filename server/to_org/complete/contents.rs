@@ -15,6 +15,7 @@ use crate::types::maps::add_v_to_map_if_absent;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree };
+use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -109,17 +110,8 @@ pub fn clobberIndefinitiveOrgnode (
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (node_id, source) : (ID, String) =
-    read_at_node_in_tree ( tree, treeid, |orgnode| {
-      match &orgnode.kind {
-        OrgNodeKind::True(t) => {
-          let id = t . id_opt . clone()
-            . ok_or("clobberIndefinitiveOrgnode: node has no ID")?;
-          let src = t . source_opt . clone()
-            . ok_or("clobberIndefinitiveOrgnode: node has no source")?;
-          Ok((id, src)) },
-        OrgNodeKind::Scaff(_) => Err (
-          "clobberIndefinitiveOrgnode: expected TrueNode" ), }} )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ??;
+    pid_and_source_from_treenode (
+      tree, treeid, "clobberIndefinitiveOrgnode" ) ?;
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk ( &node_id, map, config, &source ) ?;
   let title : String = skgnode . title . clone();

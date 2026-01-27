@@ -99,6 +99,9 @@ fn format_buffer_validation_error (
     BufferValidationError::Alias_with_no_AliasCol_Parent(node) => {
       format!("Alias node must have an AliasCol parent:\n- Title: {}\n",
               node.title()) },
+    BufferValidationError::ID_with_no_IDCol_Parent(node) => {
+      format!("ID node must have an IDCol parent:\n- Title: {}\n",
+              node.title()) },
     BufferValidationError::Multiple_AliasCols_in_Children(node) => {
       format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n",
               node.title()) },

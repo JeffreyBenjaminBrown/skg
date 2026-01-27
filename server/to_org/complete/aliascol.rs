@@ -69,7 +69,9 @@ pub async fn completeAliasCol (
   for alias in missing_aliases_from_disk {
     insert_scaffold_as_child (
       tree, aliascol_node_id,
-      Scaffold::Alias ( alias . clone () ), false ) ?; }
+      Scaffold::Alias { text: alias . clone (),
+                        diff: None },
+      false ) ?; }
   Ok (( )) }
 
 /// Removes duplicate and invalid Alias children from an AliasCol,

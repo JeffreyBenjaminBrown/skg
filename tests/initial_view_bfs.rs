@@ -66,7 +66,8 @@ fn test_bfs_limit_across_multiple_trees
       let result : String = multi_root_view (
         driver,
         &test_config,
-        & focii
+        & focii,
+        false
       ) . await ?;
 
       println!("BFS multi-tree limit result:\n{}", result);
@@ -123,7 +124,8 @@ fn test_bfs_limit_9_three_branches
       let result : String = multi_root_view (
         driver,
         &test_config,
-        & focii
+        & focii,
+        false
       ) . await ?;
 
       println!("BFS limit=9 three branches result:\n{}", result);
@@ -174,7 +176,8 @@ fn test_bfs_limit_8_two_branches
       let result : String = multi_root_view (
         driver,
         &test_config,
-        & focii
+        & focii,
+        false
       ) . await ?;
 
       println!("BFS limit=8 two branches result:\n{}", result);

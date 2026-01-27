@@ -1,5 +1,7 @@
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
+use crate::git_ops::diff::compute_diff_for_every_source;
+use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
+use crate::types::git::{SourceDiff, NodeDiff};
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
@@ -7,19 +9,26 @@ use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_cont
 use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
 use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
 use crate::to_org::expand::definitive::execute_view_requests;
+use crate::to_org::render::diff::apply_diff_to_forest;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::orgnode::{OrgNode, ViewRequest};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, ViewRequest};
 use crate::types::save::{SaveInstruction, MergeInstructionTriple, format_save_error_as_org};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
+use crate::types::tree::generic::{
+  do_everywhere_in_tree_dfs,
+  do_everywhere_in_tree_dfs_prunable };
+use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
+use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
+use std::path::Path;
 use typedb_driver::TypeDBDriver;
 
 /// Rust's response to Emacs for a save operation.
@@ -43,19 +52,20 @@ impl SaveResponse {
 - Puts that text through `update_from_and_rerender_buffer`.
 - Sends that back to Emacs (with a length prefix). */
 pub fn handle_save_buffer_request (
-  reader        : &mut BufReader <TcpStream>,
-  stream        : &mut TcpStream,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  tantivy_index : &TantivyIndex ) {
-
+  reader            : &mut BufReader <TcpStream>,
+  stream            : &mut TcpStream,
+  typedb_driver     : &TypeDBDriver,
+  config            : &SkgConfig,
+  tantivy_index     : &TantivyIndex,
+  diff_mode_enabled : bool ) {
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       match block_on(
         update_from_and_rerender_buffer (
           // Most of the work happens here.
           & initial_buffer_content,
-          typedb_driver, config, tantivy_index ))
+          typedb_driver, config, tantivy_index,
+          diff_mode_enabled ))
       { Ok (save_response) =>
         { // S-exp response format: ((content "...") (errors (...)))
           stream . write_all (
@@ -67,8 +77,7 @@ pub fn handle_save_buffer_request (
                 format! ( "{}{}", header, response_sexp ) }
               . as_bytes() ). unwrap ();
           stream . flush() . unwrap (); }
-        Err (err) => {
-          // Check if this is a SaveError that should be formatted for the client
+        Err (err) => { // Check if this is a SaveError that should be formatted for the client
           if let Some(save_error) = err.downcast_ref::<SaveError>() {
             stream.write_all(
               { let response_sexp : String =
@@ -126,12 +135,18 @@ fn empty_response_sexp (
 /// - completeAndRestoreForest_collectingViewRequests is complex.
 /// - execute_view_requests is complex, because it attempts to integrate existing branches before generating new ones
 pub async fn update_from_and_rerender_buffer (
-  org_buffer_text : &str,
-  typedb_driver   : &TypeDBDriver,
-  config          : &SkgConfig,
-  tantivy_index   : &TantivyIndex
+  org_buffer_text   : &str,
+  typedb_driver     : &TypeDBDriver,
+  config            : &SkgConfig,
+  tantivy_index     : &TantivyIndex,
+  diff_mode_enabled : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (forest, save_instructions, mergeInstructions)
+  if diff_mode_enabled {
+    let sources : Vec<String> =
+      config . sources . keys() . cloned() . collect();
+    validate_no_merge_commits ( &sources, config )
+      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
+  let (mut forest, save_instructions, mergeInstructions)
     : ( Tree<OrgNode>,
         Vec<SaveInstruction>,
         Vec<MergeInstructionTriple> )
@@ -141,6 +156,10 @@ pub async fn update_from_and_rerender_buffer (
       |e| Box::new(e) as Box<dyn Error> ) ?;
   if forest.root().children().next().is_none() { return Err (
     "Nothing to save found in org_buffer_text" . into( )); }
+
+  { // Remove diff data from tree.
+    remove_all_branches_marked_removed ( &mut forest ) ?;
+    clear_diff_metadata ( &mut forest ) ?; }
 
   { // update the graph
     update_graph_minus_merges (
@@ -153,7 +172,6 @@ pub async fn update_from_and_rerender_buffer (
       config.clone(),
       tantivy_index,
       typedb_driver ) . await ?; }
-
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap =
@@ -184,7 +202,95 @@ pub async fn update_from_and_rerender_buffer (
       set_metadata_relationship_viewdata_in_forest (
         &mut forest_mut,
         config,
-        typedb_driver ). await ?; }
+        typedb_driver ). await ?;
+      if diff_mode_enabled {
+        let source_diffs : HashMap<String, SourceDiff> =
+          compute_diff_for_every_source ( config );
+        apply_diff_to_forest (
+          &mut forest_mut, &source_diffs ) ?; }}
     let buffer_content : String =
       orgnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}
+
+/// Strip from the forest every branch whose root
+///   is marked as removed or removed-here.
+/// Exception: Does not strip:
+///   - top-level branches (children of ForestRoot)
+///   - parent_ignores nodes
+/// Uses single-pass DFS: removes branch roots as encountered,
+/// skipping recursion into removed branches.
+pub fn remove_all_branches_marked_removed (
+  forest : &mut Tree<OrgNode>
+) -> Result<(), Box<dyn Error>> {
+  let forest_root_id : NodeId =
+    forest . root() . id();
+  do_everywhere_in_tree_dfs_prunable (
+    forest,
+    forest_root_id,
+    &mut |mut node : NodeMut<OrgNode>| -> Result<bool, String> {
+      let is_forest_root_child : bool = {
+        match node . parent() {
+          Some ( mut p ) =>
+            matches! ( &p . value() . kind,
+                       OrgNodeKind::Scaff ( Scaffold::ForestRoot )),
+          None => false } };
+      let should_remove : bool =
+        match &node . value() . kind {
+          OrgNodeKind::True ( t ) => {
+            matches! ( t . diff,
+                       Some ( NodeDiff::Removed ) |
+                       Some ( NodeDiff::RemovedHere ))
+            && ! is_forest_root_child
+            && ! t . parent_ignores },
+          OrgNodeKind::Scaff ( _ ) => false };
+      if should_remove {
+        node . detach();
+        Ok ( false ) // Prune: branch removed, so don't recurse
+      } else { Ok ( true ) }} )? ; // recurse into children
+  Ok (( )) }
+
+/// Clear diff metadata from all nodes in the forest.
+/// This is called after stripping removed nodes but before saving.
+pub fn clear_diff_metadata (
+  forest : &mut Tree<OrgNode>
+) -> Result<(), Box<dyn Error>> {
+  let forest_root_id : NodeId =
+    forest . root() . id();
+  do_everywhere_in_tree_dfs (
+    forest,
+    forest_root_id,
+    &mut |mut node : NodeMut<OrgNode>| -> Result<(), String> {
+      match &mut node . value() . kind {
+        OrgNodeKind::True ( t ) =>
+          t . diff = None,
+        OrgNodeKind::Scaff ( s ) =>
+          match s {
+            Scaffold::Alias { diff, .. } => *diff = None,
+            Scaffold::ID { diff, .. } => *diff = None,
+            _ => {} }};
+      Ok (()) }
+  ) ?;
+  Ok (()) }
+
+/// Check if any source's HEAD is a merge commit.
+/// Returns an error message if so,
+/// as diff computation is ambiguous for merge commits.
+pub fn validate_no_merge_commits (
+  sources : &[String],
+  config  : &SkgConfig,
+) -> Result<(), String> {
+  for source in sources { // Get the source path from config
+    if let Some ( source_config ) = config . sources . get ( source ) {
+      let source_path : &Path =
+        Path::new ( &source_config . path );
+      if let Some ( repo ) = open_repo ( source_path ) {
+        match head_is_merge_commit ( &repo ) {
+          Ok ( true ) => {
+            return Err ( format! (
+              "Cannot compute diff: HEAD is a merge commit in source '{}'.",
+              source )); },
+          Ok ( false ) => {},
+          Err ( e ) => { // Git error - log but continue
+            eprintln! ( "Warning: Could not check merge commit status for '{}': {}",
+                        source, e ); }} }} }
+  Ok (( )) }

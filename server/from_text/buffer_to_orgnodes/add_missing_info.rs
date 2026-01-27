@@ -57,7 +57,8 @@ fn make_alias_if_appropriate(
       let OrgNodeKind::True(t) : &OrgNodeKind = &org.kind
         else { unreachable!() };
       org.kind = OrgNodeKind::Scaff(
-        Scaffold::Alias(t.title.clone() )); }}
+        Scaffold::Alias { text: t.title.clone(),
+                          diff: None } ); }}
   Ok (( )) }
 
 /// Inherit parent's source

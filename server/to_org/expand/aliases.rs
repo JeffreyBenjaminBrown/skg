@@ -58,6 +58,9 @@ pub async fn build_and_integrate_aliases (
     insert_scaffold_as_child ( tree, node_id,
       Scaffold::AliasCol, true ) ?;
   for alias in & aliases {
-    insert_scaffold_as_child ( tree, aliascol_id,
-      Scaffold::Alias ( alias . clone () ), false ) ?; }
+    insert_scaffold_as_child (
+      tree, aliascol_id,
+      Scaffold::Alias { text: alias . clone (),
+                        diff: None },
+      false ) ?; }
   Ok (( )) }

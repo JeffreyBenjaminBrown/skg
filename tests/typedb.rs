@@ -355,7 +355,8 @@ async fn test_recursive_document (
     single_root_view (
       driver,
       config,
-      &ID ( "a".to_string () )
+      &ID ( "a".to_string () ),
+      false
     ) . await ?;
   let result_forest : Tree<OrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
