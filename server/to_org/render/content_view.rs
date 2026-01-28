@@ -7,7 +7,7 @@
 /// - if diff_mode_enabled, apply diff markers
 /// - render to string
 
-use crate::git_ops::diff::compute_diff_for_every_source;
+use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
 use crate::types::git::SourceDiff;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::to_org::render::diff::apply_diff_to_forest;

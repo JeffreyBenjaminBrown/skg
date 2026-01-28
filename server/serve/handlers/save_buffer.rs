@@ -1,7 +1,8 @@
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
-use crate::git_ops::diff::compute_diff_for_every_source;
+use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
-use crate::types::git::{SourceDiff, NodeDiff};
+use crate::types::git::{SourceDiff, NodeDiff, DiffStatus};
+use crate::types::misc::ID;
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
@@ -177,6 +178,15 @@ pub async fn update_from_and_rerender_buffer (
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
     let mut forest_mut : Tree<OrgNode> = forest;
+    let source_diffs : Option<HashMap<String, SourceDiff>> =
+      // Used for view request execution.
+      if diff_mode_enabled
+      { Some ( compute_diff_for_every_source ( config ) ) }
+      else { None };
+    let deleted_id_src_map : HashMap<ID, String> =
+      source_diffs . as_ref()
+      . map ( |d| deleted_id_src_map_to_source ( d ) )
+      . unwrap_or_default();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
       let forest_root_id : NodeId = forest_mut.root().id();
@@ -198,16 +208,15 @@ pub async fn update_from_and_rerender_buffer (
         config,
         typedb_driver,
         &mut visited,
-        &mut errors ). await ?;
+        &mut errors,
+        &deleted_id_src_map ). await ?;
       set_metadata_relationship_viewdata_in_forest (
         &mut forest_mut,
         config,
         typedb_driver ). await ?;
-      if diff_mode_enabled {
-        let source_diffs : HashMap<String, SourceDiff> =
-          compute_diff_for_every_source ( config );
+      if let Some ( ref diffs ) = source_diffs {
         apply_diff_to_forest (
-          &mut forest_mut, &source_diffs ) ?; }}
+          &mut forest_mut, diffs ) ?; }}
     let buffer_content : String =
       orgnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}
@@ -294,3 +303,38 @@ pub fn validate_no_merge_commits (
             eprintln! ( "Warning: Could not check merge commit status for '{}': {}",
                         source, e ); }} }} }
   Ok (( )) }
+
+pub fn compute_diff_for_every_source (
+  config : &SkgConfig
+) -> HashMap<String, SourceDiff> {
+  let mut source_diffs : HashMap<String, SourceDiff> =
+    HashMap::new();
+  for (source_name, source_config) in &config . sources {
+    let source_path : &Path =
+      Path::new ( &source_config . path );
+    match compute_diff_for_source ( source_path ) {
+      Ok ( diff ) => {
+        source_diffs . insert ( source_name . clone(), diff ); },
+      Err ( e ) => { // Log error but continue with other sources
+        eprintln! (
+          "Warning: Failed to compute diff for source '{}': {}",
+          source_name, e ); }} }
+  source_diffs }
+
+/// Build a map from ID to source for all deleted files.
+/// This is used to determine the source of nodes
+/// that exist in git HEAD but not in the worktree.
+pub fn deleted_ids_to_source (
+  source_diffs : &HashMap<String, SourceDiff>
+) -> HashMap<ID, String> {
+  let mut result : HashMap<ID, String> =
+    HashMap::new();
+  for (source_name, source_diff) in source_diffs {
+    for (path, file_diff) in &source_diff . file_diffs {
+      if file_diff . status == DiffStatus::Deleted {
+        if let Some ( stem ) = path . file_stem() {
+          let id : ID = ID ( stem . to_string_lossy()
+                             . into_owned() );
+          result . insert ( id,
+                            source_name . clone() ); }} }}
+  result }

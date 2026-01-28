@@ -9,14 +9,14 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiff;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest };
+use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest, mk_indefinitive_orgnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
 
-use ego_tree::{Tree, NodeId, NodeRef};
-use std::collections::{BTreeSet,HashSet};
+use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
+use std::collections::{BTreeSet,HashSet,HashMap};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -28,6 +28,7 @@ pub async fn execute_view_requests (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
+  deleted_id_src_map : &std::collections::HashMap<ID, String>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -46,7 +47,7 @@ pub async fn execute_view_requests (
       ViewRequest::Definitive => {
         execute_definitive_view_request (
           forest, map, node_id, config, typedb_driver,
-          visited, errors ) . await ?; }, } }
+          visited, errors, deleted_id_src_map ) . await ?; }, }}
   Ok (( )) }
 
 /// Expands a definitive view request.
@@ -70,6 +71,7 @@ async fn execute_definitive_view_request (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
+  deleted_id_src_map : &std::collections::HashMap<ID, String>,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     forest, node_id ) ?;
@@ -105,35 +107,12 @@ async fn execute_definitive_view_request (
     visited . insert ( node_pid.clone(), node_id );
     extendDefinitiveSubtree_fromGit (
       forest, map, node_id, config.initial_node_limit,
-      visited, config, &hidden_ids, typedb_driver ) . await ?; }
-  else { // git is not needed
-    ensure_source ( // Subscribee nodes may not have one yet.
-      forest, node_id, &config.db_name, typedb_driver ) . await ?;
-    { // Mutate the root of the definitive view request:
-      from_disk_replace_title_body_and_skgnode (
-        // preserves relevant orgnode fields
-        forest, map, node_id, config ) ?;
-      write_at_node_in_tree (
-        forest, node_id,
-        |orgnode| { // remove ViewRequest and mark definitive
-          let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-            &mut orgnode.kind
-            else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
-          t . view_requests . remove ( & ViewRequest::Definitive );
-          t . indefinitive = false; } )
-        . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
-    visited . insert ( node_pid.clone(), node_id );
-    extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
-      forest, map, node_id,
-      config.initial_node_limit, visited, config, typedb_driver,
-      &hidden_ids,
-    ) . await ?;
-    // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
-    if type_and_parent_type_consistent_with_subscribee (
-      forest, node_id )?
-    { maybe_add_hiddenInSubscribeeCol_branch (
-        forest, map, node_id, config, typedb_driver
-      ). await ?; }}
+      visited, config, &hidden_ids, typedb_driver, deleted_id_src_map
+    ). await ?; }
+  else {
+    extendDefinitiveSubtree_fromWorktree (
+      forest, map, node_id, &node_pid, config, typedb_driver,
+      visited, &hidden_ids ) . await ?; }
   Ok (( )) }
 
 /// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
@@ -324,65 +303,125 @@ async fn extendDefinitiveSubtree_fromGit (
   config         : &SkgConfig,
   hidden_ids     : &HashSet<ID>,
   typedb_driver  : &TypeDBDriver,
+  deleted_id_src_map : &HashMap<ID, String>,
 ) -> Result<(), Box<dyn Error>> {
   let (pid, src) : (ID, String) =
     pid_and_source_from_treenode ( tree, effective_root,
       "extendDefinitiveSubtree_fromGit" ) ?;
-  let parent_skgnode : SkgNode =
-    skgnode_from_git_head ( &pid, &src, config ) ?;
-  let contains_ids : Vec<ID> =
-    parent_skgnode . contains . unwrap_or_default();
-  let candidate_ids : BTreeSet<String> = // Filter by hidden and collect for batch lookup
-    contains_ids . iter()
-    . filter ( |id| ! hidden_ids . contains ( id ) )
-    . take ( limit )
-    . map ( |id| id . 0 . clone() )
-    . collect();
-  let existing_ids : HashSet<String> = // Batch check which IDs exist in TypeDB
-    which_ids_exist ( &config . db_name, typedb_driver, &candidate_ids ) . await ?;
-  for child_id in contains_ids . iter() . take ( limit ) {
+  let (contents, contents_in_worktree)
+    : (Vec<ID>, HashSet<String>) =
+    { let skgnode : SkgNode =
+        skgnode_from_git_head ( &pid, &src, config ) ?;
+      let contents : Vec<ID> =
+        skgnode . contains . unwrap_or_default();
+      let not_hidden : BTreeSet<String> =
+        contents . iter()
+        . filter ( |id| ! hidden_ids . contains ( id ) )
+        . take ( limit )
+        . map ( |id| id . 0 . clone() )
+        . collect();
+      let contents_in_worktree : HashSet<String> =
+        which_ids_exist (
+          &config . db_name, typedb_driver, &not_hidden
+        ). await ?;
+      (contents, contents_in_worktree) };
+  for child_id in contents . iter() . take ( limit ) {
     if hidden_ids . contains ( child_id ) { continue; }
-    let child_exists_in_typedb : bool =
-      existing_ids . contains ( &child_id . 0 );
-    let (child_title, child_diff, child_source) : (String, NodeDiff, Option<String>) =
-      if child_exists_in_typedb {
-        // Node exists somewhere on disk - load via TypeDB
-        let opt_skgnode : Option<SkgNode> =
-          optskgnode_from_id ( config, typedb_driver, child_id ) . await ?;
-        let title : String =
-          opt_skgnode . as_ref() . map ( |n| n . title . clone() )
-          . unwrap_or_else ( || child_id . 0 . clone() );
-        let source : Option<String> =
-          opt_skgnode . map ( |n| n . source );
-        ( title, NodeDiff::RemovedHere, source ) }
-      else {
-        // Node doesn't exist in TypeDB - load title from git
-        let title : String =
-          skgnode_from_git_head ( child_id, &src, config )
-          . ok()
-          . map ( |n| n . title )
-          . unwrap_or_else ( || child_id . 0 . clone() );
-        ( title, NodeDiff::Removed, Some ( src . clone() ) ) };
-    let child_orgnode : OrgNode = // Create child OrgNode
-      OrgNode {
-        focused: false,
-        folded: false,
-        kind: OrgNodeKind::True ( crate::types::orgnode::TrueNode {
-          title: child_title,
-          body: None,
-          id_opt: Some ( child_id . clone() ),
-          source_opt: child_source,
-          parent_ignores: false,
-          indefinitive: true, // Removed children are always indefinitive
-          graphStats: Default::default(),
-          viewStats: Default::default(),
-          edit_request: None,
-          view_requests: Default::default(),
-          diff: Some ( child_diff ) }) };
-    let mut parent_mut : ego_tree::NodeMut<OrgNode> = // Add child to tree
-      tree . get_mut ( effective_root ) . ok_or ( "Parent not found" ) ?;
+    let child_orgnode : OrgNode =
+      mk_removed_child_orgnode (
+        child_id, &src, &contents_in_worktree,
+        deleted_id_src_map, config, typedb_driver ) . await ?;
+    let mut parent_mut : NodeMut<OrgNode> = // Add child to tree
+      tree . get_mut ( effective_root ) . ok_or (
+        "Parent not found" ) ?;
     parent_mut . append ( child_orgnode );
     visited . insert ( child_id . clone(), effective_root ); }
+  Ok (( )) }
+
+/// Build an OrgNode for a child of
+/// a removed (in the git diff sense) node.
+/// The child is loaded from the worktree if it exists there,
+/// and otherwise from git HEAD.
+async fn mk_removed_child_orgnode (
+  child_id           : &ID,
+  parent_src         : &str,
+  contents_in_worktree : &HashSet<String>,
+  deleted_id_src_map : &std::collections::HashMap<ID, String>,
+  config             : &SkgConfig,
+  typedb_driver      : &TypeDBDriver,
+) -> Result<OrgNode, Box<dyn Error>> {
+  let in_worktree : bool =
+    contents_in_worktree . contains ( &child_id . 0 );
+  let (child_diff, child_opt_skgnode)
+    : (NodeDiff, Option<SkgNode>)
+    = if in_worktree
+      { ( NodeDiff::RemovedHere,
+          optskgnode_from_id (
+            config, typedb_driver, child_id ) . await ? ) }
+      else
+      { ( NodeDiff::Removed,
+          skgnode_from_git_head ( child_id, parent_src, config
+                                ) . ok() ) };
+  let child_skgnode : &SkgNode =
+    child_opt_skgnode . as_ref()
+    . ok_or_else ( || format! (
+      "mk_removed_child_orgnode: no SkgNode for child {}",
+      child_id ) ) ?;
+  let child_source : Option<String> =
+    if in_worktree { Some ( child_skgnode . source . clone() ) }
+    else           { deleted_id_src_map . get ( child_id )
+                       . cloned() };
+  let mut child_orgnode : OrgNode =
+    mk_indefinitive_orgnode (
+      child_id . clone(),
+      child_skgnode . source . clone(),
+      child_skgnode . title . clone(),
+      false );                // parent_ignores
+  if let OrgNodeKind::True ( ref mut t ) = child_orgnode . kind {
+    t . source_opt = child_source;
+    t . diff = Some ( child_diff ); }
+  Ok ( child_orgnode ) }
+
+/// Extend a definitive subtree by loading content from disk.
+/// This is the usual case
+/// (as opposed to loading from git for removed nodes).
+async fn extendDefinitiveSubtree_fromWorktree (
+  forest        : &mut Tree<OrgNode>,
+  map           : &mut SkgNodeMap,
+  node_id       : NodeId,
+  node_pid      : &ID,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  visited       : &mut DefinitiveMap,
+  hidden_ids    : &HashSet<ID>,
+) -> Result<(), Box<dyn Error>> {
+  ensure_source ( // Subscribee nodes may not have one yet.
+    forest, node_id, &config.db_name, typedb_driver ) . await ?;
+  { // Mutate the root of the definitive view request:
+    from_disk_replace_title_body_and_skgnode (
+      // preserves relevant orgnode fields
+      forest, map, node_id, config ) ?;
+    write_at_node_in_tree (
+      forest, node_id,
+      |orgnode| { // remove ViewRequest and mark definitive
+        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
+          &mut orgnode.kind
+          else { panic! ( "extendDefinitiveSubtree_fromWorktree: expected TrueNode" ) };
+        t . view_requests . remove ( & ViewRequest::Definitive );
+        t . indefinitive = false; } )
+      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
+  visited . insert ( node_pid.clone(), node_id );
+  extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
+    forest, map, node_id,
+    config.initial_node_limit, visited, config, typedb_driver,
+    hidden_ids,
+  ) . await ?;
+  // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
+  if type_and_parent_type_consistent_with_subscribee (
+    forest, node_id )?
+  { maybe_add_hiddenInSubscribeeCol_branch (
+      forest, map, node_id, config, typedb_driver
+    ). await ?; }
   Ok (( )) }
 
 /// Load title and body from git HEAD for a removed node.

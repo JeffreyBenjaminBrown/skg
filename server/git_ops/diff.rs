@@ -1,6 +1,6 @@
 use crate::types::git::{ DiffStatus, PathDiffStatus, SourceDiff, FileDiff, NodeChanges };
 use crate::types::list::{diff_lists, ListDiff};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
 use super::misc::path_relative_to_repo;
@@ -9,23 +9,6 @@ use super::read_repo::{open_repo, get_changed_skg_files, get_file_content_at_hea
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
-
-pub fn compute_diff_for_every_source (
-  config : &SkgConfig
-) -> HashMap<String, SourceDiff> {
-  let mut source_diffs : HashMap<String, SourceDiff> =
-    HashMap::new();
-  for (source_name, source_config) in &config . sources {
-    let source_path : &Path =
-      Path::new ( &source_config . path );
-    match compute_diff_for_source ( source_path ) {
-      Ok ( diff ) => {
-        source_diffs . insert ( source_name . clone(), diff ); },
-      Err ( e ) => { // Log error but continue with other sources
-        eprintln! (
-          "Warning: Failed to compute diff for source '{}': {}",
-          source_name, e ); }} }
-  source_diffs }
 
 /// Compares the current state of .skg files with HEAD.
 pub fn compute_diff_for_source (
