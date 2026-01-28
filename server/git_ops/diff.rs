@@ -1,4 +1,4 @@
-use crate::types::git::{ DiffStatus, PathDiffStatus, SourceDiff, FileDiff, NodeChanges };
+use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, FileDiff, NodeChanges };
 use crate::types::list::{diff_lists, ListDiff};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
@@ -41,12 +41,12 @@ fn compute_file_diff (
       . unwrap_or_else ( || entry . path . clone() );
   let head_node : Option<SkgNode> =
     match entry . status {
-      DiffStatus::Added => None,
+      GitDiffStatus::Added => None,
       _ => get_file_content_at_head ( repo, &rel_path ) ?
              . and_then ( |s| serde_yaml::from_str ( &s ) . ok() ) };
   let worktree_node : Option<SkgNode> =
     match entry . status {
-      DiffStatus::Deleted => None,
+      GitDiffStatus::Deleted => None,
       _ => std::fs::read_to_string ( &abs_path ) . ok()
              . and_then ( |s| serde_yaml::from_str ( &s ) . ok() ) };
   let node_changes : Option<NodeChanges> =

@@ -1,4 +1,4 @@
-use crate::types::git::{DiffStatus, PathDiffStatus};
+use crate::types::git::{GitDiffStatus, PathDiffStatus};
 
 use git2::{DiffDelta, Delta, Repository};
 use std::path::{Path, PathBuf};
@@ -7,16 +7,16 @@ use std::path::{Path, PathBuf};
 pub(super) fn diff_delta_to_entry (
   delta : &DiffDelta
 ) -> Option<PathDiffStatus> {
-  let status : DiffStatus =
+  let status : GitDiffStatus =
     match delta . status() {
-      Delta::Added | Delta::Untracked => DiffStatus::Added,
-      Delta::Modified => DiffStatus::Modified,
-      Delta::Deleted => DiffStatus::Deleted,
-      Delta::Renamed | Delta::Copied => DiffStatus::Modified, // For renamed/copied, the new_file path is what we care about
+      Delta::Added | Delta::Untracked => GitDiffStatus::Added,
+      Delta::Modified => GitDiffStatus::Modified,
+      Delta::Deleted => GitDiffStatus::Deleted,
+      Delta::Renamed | Delta::Copied => GitDiffStatus::Modified, // For renamed/copied, the new_file path is what we care about
       _ => return None, }; // Ignore other status types (Ignored, Typechange, etc.)
   let path : Option<&Path> = // Get the path from the appropriate file based on status
     match status {
-      DiffStatus::Deleted => delta . old_file() . path(),
+      GitDiffStatus::Deleted => delta . old_file() . path(),
       _ => delta . new_file() . path(), };
   path . map ( |p| PathDiffStatus {
     path   : p . to_path_buf(),

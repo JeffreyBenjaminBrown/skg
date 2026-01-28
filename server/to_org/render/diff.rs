@@ -1,7 +1,7 @@
 /// Diff application module for git diff view.
 /// Applies diff information to a forest of OrgNodes.
 
-use crate::types::git::{SourceDiff, FileDiff, DiffStatus, NodeDiff, FieldDiff};
+use crate::types::git::{SourceDiff, FileDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus};
 use crate::types::misc::ID;
 use crate::types::orgnode::{
   OrgNode, OrgNodeKind, Scaffold,
@@ -67,7 +67,7 @@ fn process_truenode_diff (
   if ! source_diff . is_git_repo { // Mark node as not-in-git
     if let OrgNodeKind::True ( ref mut t )
       = node_mut . value() . kind
-      { t . diff = Some ( NodeDiff::NotInGit ); }
+      { t . diff = Some ( NodeDiffStatus::NotInGit ); }
     return Ok (()); }
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
@@ -75,12 +75,12 @@ fn process_truenode_diff (
     match source_diff . file_diffs . get ( &file_path ) {
       Some ( d ) => d,
       None => return Ok (()) };
-  let node_diff_status : Option<NodeDiff> =
+  let node_diff_status : Option<NodeDiffStatus> =
     // Set node diff status based on file status
     match file_diff . status {
-      DiffStatus::Added => Some ( NodeDiff::New ),
-      DiffStatus::Deleted => Some ( NodeDiff::Removed ),
-      DiffStatus::Modified => None };
+      GitDiffStatus::Added => Some ( NodeDiffStatus::New ),
+      GitDiffStatus::Deleted => Some ( NodeDiffStatus::Removed ),
+      GitDiffStatus::Modified => None };
   if let Some ( diff_status ) = node_diff_status {
     if let OrgNodeKind::True ( ref mut t )
       = node_mut . value() . kind
@@ -116,7 +116,7 @@ fn process_aliascol_diff (
     let alias_scaffold : Scaffold =
       Scaffold::Alias {
         text: removed_alias . clone(),
-        diff: Some ( FieldDiff::Removed ) };
+        diff: Some ( FieldDiffStatus::Removed ) };
     let alias_orgnode : OrgNode =
       orgnode_from_scaffold ( alias_scaffold );
     node_mut . append ( alias_orgnode ); }
@@ -141,7 +141,7 @@ fn process_alias_diff (
       None => return Ok (()) };
   if node_changes . aliases_diff . added . contains ( &alias_text ) {
     if let OrgNodeKind::Scaff ( Scaffold::Alias { diff, .. } ) = &mut node_mut . value() . kind {
-      *diff = Some ( FieldDiff::New ); }}
+      *diff = Some ( FieldDiffStatus::New ); }}
   Ok (()) }
 
 /// Process an IDCol: append added/removed ID children.
@@ -161,7 +161,7 @@ fn process_idcol_diff (
     let id_scaffold : Scaffold =
       Scaffold::ID {
         value: added_id . 0 . clone(),
-        diff: Some ( FieldDiff::New ) };
+        diff: Some ( FieldDiffStatus::New ) };
     let id_orgnode : OrgNode =
       orgnode_from_scaffold ( id_scaffold );
     node_mut . append ( id_orgnode ); }
@@ -169,7 +169,7 @@ fn process_idcol_diff (
     let id_scaffold : Scaffold =
       Scaffold::ID {
         value: removed_id . 0 . clone(),
-        diff: Some ( FieldDiff::Removed ) };
+        diff: Some ( FieldDiffStatus::Removed ) };
     let id_orgnode : OrgNode =
       orgnode_from_scaffold ( id_scaffold );
     node_mut . append ( id_orgnode ); }
@@ -195,7 +195,7 @@ fn process_id_diff (
       None => return Ok (()) };
   if node_changes . ids_diff . added . contains ( &id_value ) {
     if let OrgNodeKind::Scaff ( Scaffold::ID { diff, .. } ) = &mut node_mut . value() . kind {
-      *diff = Some ( FieldDiff::New ); }}
+      *diff = Some ( FieldDiffStatus::New ); }}
   Ok (()) }
 
 /// Get the FileDiff for an ancestor TrueNode.

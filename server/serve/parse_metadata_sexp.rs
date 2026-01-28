@@ -18,7 +18,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
-use crate::types::git::{NodeDiff, FieldDiff};
+use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
 use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode,
@@ -48,8 +48,8 @@ pub struct OrgnodeMetadata {
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
-  pub truenode_diff: Option<NodeDiff>,
-  pub scaffold_diff: Option<FieldDiff>,
+  pub truenode_diff: Option<NodeDiffStatus>,
+  pub scaffold_diff: Option<FieldDiffStatus>,
 }
 
 pub fn default_metadata() -> OrgnodeMetadata {
@@ -157,8 +157,8 @@ pub fn parse_metadata_to_orgnodemd (
             let value : String =
               atom_to_string ( &items[1] ) ?;
             result . scaffold_diff = Some (
-              FieldDiff::from_client_string ( &value )
-                . ok_or_else ( || format! ( "Invalid FieldDiff value: {}", value ))? ); },
+              FieldDiffStatus::from_client_string ( &value )
+                . ok_or_else ( || format! ( "Invalid FieldDiffStatus value: {}", value ))? ); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -239,8 +239,8 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . truenode_diff = Some (
-              NodeDiff::from_client_string ( &value )
-                . ok_or_else ( || format! ( "Invalid NodeDiff value: {}", value ))? ); },
+              NodeDiffStatus::from_client_string ( &value )
+                . ok_or_else ( || format! ( "Invalid NodeDiffStatus value: {}", value ))? ); },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom ( _ ) => {

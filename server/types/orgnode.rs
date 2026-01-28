@@ -5,7 +5,7 @@
 /// Some 'OrgNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
-use super::git::{NodeDiff, FieldDiff};
+use super::git::{NodeDiffStatus, FieldDiffStatus};
 use super::misc::ID;
 use std::collections::HashSet;
 use std::fmt;
@@ -48,7 +48,7 @@ pub struct TrueNode {
   pub edit_request  : Option < EditRequest >,
   pub view_requests : HashSet < ViewRequest >,
 
-  pub diff          : Option < NodeDiff >,
+  pub diff          : Option < NodeDiffStatus >,
 }
 
 /// Graph-level statistics about a node.
@@ -77,7 +77,7 @@ pub struct ViewNodeStats {
 #[derive( Debug, Clone, PartialEq, Eq )]
 pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
-          diff: Option<FieldDiff> },
+          diff: Option<FieldDiffStatus> },
   AliasCol, // The node collects (as children) aliases for its parent.
   ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
@@ -86,7 +86,7 @@ pub enum Scaffold {
   // Git diff view scaffolds:
   TextChanged, // Indicates title/body changed between disk and HEAD.
   IDCol, // Collects (as children) ID scaffolds for its parent. Diff-mode only.
-  ID { value: String, diff: Option<FieldDiff> }, // An ID of the node's grandparent. Diff-mode only.
+  ID { value: String, diff: Option<FieldDiffStatus> }, // An ID of the node's grandparent. Diff-mode only.
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.

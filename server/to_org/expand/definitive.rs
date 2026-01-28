@@ -7,7 +7,7 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
-use crate::types::git::NodeDiff;
+use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest, mk_indefinitive_orgnode };
 use crate::types::skgnode::SkgNode;
@@ -79,8 +79,9 @@ async fn execute_definitive_view_request (
     read_at_node_in_tree (
       forest, node_id,
       |n| match &n . kind {
-        OrgNodeKind::True ( t ) => matches! (t . diff,
-                                             Some (NodeDiff::Removed)),
+        OrgNodeKind::True ( t ) =>
+          matches! (t . diff,
+                    Some (NodeDiffStatus::Removed)),
         OrgNodeKind::Scaff ( _ ) => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
@@ -353,13 +354,13 @@ async fn mk_removed_child_orgnode (
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
   let (child_diff, child_opt_skgnode)
-    : (NodeDiff, Option<SkgNode>)
+    : (NodeDiffStatus, Option<SkgNode>)
     = if in_worktree
-      { ( NodeDiff::RemovedHere,
+      { ( NodeDiffStatus::RemovedHere,
           optskgnode_from_id (
             config, typedb_driver, child_id ) . await ? ) }
       else
-      { ( NodeDiff::Removed,
+      { ( NodeDiffStatus::Removed,
           skgnode_from_git_head ( child_id, parent_src, config
                                 ) . ok() ) };
   let child_skgnode : &SkgNode =

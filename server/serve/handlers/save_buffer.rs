@@ -1,7 +1,7 @@
 use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
-use crate::types::git::{SourceDiff, NodeDiff, DiffStatus};
+use crate::types::git::{SourceDiff, NodeDiffStatus, GitDiffStatus};
 use crate::types::misc::ID;
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
@@ -185,7 +185,7 @@ pub async fn update_from_and_rerender_buffer (
       else { None };
     let deleted_id_src_map : HashMap<ID, String> =
       source_diffs . as_ref()
-      . map ( |d| deleted_id_src_map_to_source ( d ) )
+      . map ( |d| deleted_ids_to_source ( d ) )
       . unwrap_or_default();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
@@ -247,8 +247,8 @@ pub fn remove_all_branches_marked_removed (
         match &node . value() . kind {
           OrgNodeKind::True ( t ) => {
             matches! ( t . diff,
-                       Some ( NodeDiff::Removed ) |
-                       Some ( NodeDiff::RemovedHere ))
+                       Some ( NodeDiffStatus::Removed ) |
+                       Some ( NodeDiffStatus::RemovedHere ))
             && ! is_forest_root_child
             && ! t . parent_ignores },
           OrgNodeKind::Scaff ( _ ) => false };
@@ -331,7 +331,7 @@ pub fn deleted_ids_to_source (
     HashMap::new();
   for (source_name, source_diff) in source_diffs {
     for (path, file_diff) in &source_diff . file_diffs {
-      if file_diff . status == DiffStatus::Deleted {
+      if file_diff . status == GitDiffStatus::Deleted {
         if let Some ( stem ) = path . file_stem() {
           let id : ID = ID ( stem . to_string_lossy()
                              . into_owned() );
