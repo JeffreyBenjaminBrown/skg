@@ -2,6 +2,7 @@
 
 use crate::types::list::ListDiff;
 use crate::types::misc::ID;
+use crate::types::skgnode::SkgNode;
 
 use std::collections::HashMap;
 use std::fmt;
@@ -19,13 +20,19 @@ use std::str::FromStr;
 pub struct SourceDiff {
   pub is_git_repo: bool,
   pub file_diffs: HashMap<PathBuf, FileDiff>,
+  /// Nodes that existed in HEAD but not in worktree (deleted files).
+  /// Loaded from git HEAD.
+  pub deleted_nodes: HashMap<ID, SkgNode>,
 }
 
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
 pub struct FileDiff {
+  // TODO ? Since we keep the skgnode around for deleted nodes already,
+  // why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
+  pub head_node: Option<SkgNode>, // only for deleted files
 }
 
 /// A single entry representing a changed file.
@@ -52,6 +59,8 @@ pub struct NodeChanges {
   pub aliases_diff: ListDiff<String>,
   /// Changes to the ids list
   pub ids_diff: ListDiff<ID>,
+  /// Changes to the contains list
+  pub contains_diff: ListDiff<ID>,
 }
 
 /// Indicates how a node differs between the current state and HEAD.
@@ -81,7 +90,8 @@ impl SourceDiff {
   pub fn new_not_git_repo () -> Self {
     SourceDiff {
       is_git_repo: false,
-      file_diffs: HashMap::new() }}}
+      file_diffs: HashMap::new(),
+      deleted_nodes: HashMap::new() }}}
 
 impl NodeDiffStatus {
   /// Single source of truth for NodeDiffStatus <-> client string bijection.

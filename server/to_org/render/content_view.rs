@@ -51,7 +51,7 @@ pub async fn multi_root_view (
   if diff_mode_enabled {
     let source_diffs : HashMap<String, SourceDiff> =
       compute_diff_for_every_source ( config );
-    apply_diff_to_forest ( &mut forest, &source_diffs ) ?; }
+    apply_diff_to_forest ( &mut forest, &source_diffs, config ) ?; }
   let buffer_content : String =
     orgnode_forest_to_string ( & forest ) ?;
   Ok ( buffer_content ) }

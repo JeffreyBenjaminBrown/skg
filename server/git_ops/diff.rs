@@ -9,6 +9,7 @@ use super::read_repo::{open_repo, get_changed_skg_files, get_file_content_at_hea
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
+use std::fs;
 
 /// Compares the current state of .skg files with HEAD.
 pub fn compute_diff_for_source (
@@ -26,8 +27,11 @@ pub fn compute_diff_for_source (
     let file_diff : FileDiff =
       compute_file_diff ( source_path, &repo, &entry ) ?;
     file_diffs . insert ( entry . path . clone(), file_diff ); }
+  let deleted_nodes : HashMap<ID, SkgNode> =
+    collect_deleted_nodes ( &file_diffs );
   Ok ( SourceDiff { is_git_repo: true,
-                    file_diffs }) }
+                    file_diffs,
+                    deleted_nodes }) }
 
 fn compute_file_diff (
   source_path : &Path,
@@ -47,7 +51,7 @@ fn compute_file_diff (
   let worktree_node : Option<SkgNode> =
     match entry . status {
       GitDiffStatus::Deleted => None,
-      _ => std::fs::read_to_string ( &abs_path ) . ok()
+      _ => fs::read_to_string ( &abs_path ) . ok()
              . and_then ( |s| serde_yaml::from_str ( &s ) . ok() ) };
   let node_changes : Option<NodeChanges> =
     match (&head_node, &worktree_node) {
@@ -56,7 +60,21 @@ fn compute_file_diff (
       _ => None };
   Ok ( FileDiff {
     status: entry . status . clone(),
-    node_changes }) }
+    node_changes,
+    head_node }) }
+
+/// Collect SkgNodes for deleted files (exist in HEAD but not worktree).
+fn collect_deleted_nodes (
+  file_diffs : &HashMap<PathBuf, FileDiff>,
+) -> HashMap<ID, SkgNode> {
+  let mut result : HashMap<ID, SkgNode> =
+    HashMap::new();
+  for file_diff in file_diffs . values() {
+    if file_diff . status == GitDiffStatus::Deleted {
+      if let Some ( ref head_node ) = file_diff . head_node {
+        if let Some ( pid ) = head_node . ids . first() {
+          result . insert ( pid . clone(), head_node . clone() ); }} }}
+  result }
 
 /// Compare two SkgNodes and return the differences.
 fn compare_skgnodes (
@@ -72,7 +90,12 @@ fn compare_skgnodes (
       & new . aliases . clone() . unwrap_or_default() );
   let ids_diff : ListDiff<ID> =
     diff_lists ( & old . ids, & new . ids );
+  let contains_diff : ListDiff<ID> =
+    diff_lists (
+      & old . contains . clone() . unwrap_or_default(),
+      & new . contains . clone() . unwrap_or_default() );
   NodeChanges {
     text_changed,
     aliases_diff,
-    ids_diff }}
+    ids_diff,
+    contains_diff }}

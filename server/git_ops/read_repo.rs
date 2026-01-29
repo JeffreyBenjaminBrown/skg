@@ -50,6 +50,7 @@ pub fn get_changed_skg_files (
   let mut opts : DiffOptions =
     DiffOptions::new();
   opts . pathspec ( "*.skg" );
+  opts . include_untracked ( true ); // Include new files not in HEAD
   let diff : Diff = // Compare HEAD to the working directory
     repo . diff_tree_to_workdir_with_index (
       Some ( &head_tree ),

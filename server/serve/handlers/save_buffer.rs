@@ -216,7 +216,7 @@ pub async fn update_from_and_rerender_buffer (
         typedb_driver ). await ?;
       if let Some ( ref diffs ) = source_diffs {
         apply_diff_to_forest (
-          &mut forest_mut, diffs ) ?; }}
+          &mut forest_mut, diffs, config ) ?; }}
     let buffer_content : String =
       orgnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}

@@ -1,3 +1,4 @@
+use crate::types::git::NodeDiffStatus;
 use crate::types::orgnode::EditRequest;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use crate::types::misc::ID;
@@ -157,7 +158,13 @@ fn collect_contents_that_are_not_to_delete<'a> (
   for child_ref in node_ref.children() {
     let child : &OrgNode = child_ref . value();
     if let OrgNodeKind::True(t) = &child.kind {
+      let is_phantom : bool =
+        // In diff view, skip phantom (Removed/RemovedHere) nodes
+        matches!( t . diff,
+                  Some(NodeDiffStatus::Removed) |
+                  Some(NodeDiffStatus::RemovedHere) );
       if !t.parent_ignores
+         && !is_phantom
          && ! matches!( t . edit_request,
                         Some(EditRequest::Delete))
       { if let Some(id) = &t.id_opt

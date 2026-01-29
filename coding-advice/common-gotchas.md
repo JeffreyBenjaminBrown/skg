@@ -1,3 +1,12 @@
+# IDs and titles are not interchangeable.
+
+In the tests, it is convenient to use
+nodes whose titles match their IDs.
+In production, though, that would be terrible.
+If either one is missing,
+and you're considering using the other in its place,
+throw an error instead.
+
 # If 'typedb server' won't start,
 see troubleshooting/.
 
