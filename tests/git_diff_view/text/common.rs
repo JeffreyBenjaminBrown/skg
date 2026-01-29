@@ -1,4 +1,4 @@
-/// Shared definitions for git diff view title/body change tests.
+/// Shared definitions for git diff view text (title/body) change tests.
 
 pub use super::super::common::*;
 
@@ -13,13 +13,13 @@ pub const GIT_DIFF_VIEW: &str = "\
 ** (skg (node (id 12) (source main))) 12
 ";
 
-/// Create a git repo with head->worktree transition from title fixtures.
+/// Create a git repo with head->worktree transition from text fixtures.
 pub fn setup_git_repo_with_fixtures(
   repo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
   super::super::common::setup_git_repo_with_fixtures(
     repo_path,
-    "tests/git_diff_view/title/fixtures/head",
-    "tests/git_diff_view/title/fixtures/worktree",
+    "tests/git_diff_view/text/fixtures/head",
+    "tests/git_diff_view/text/fixtures/worktree",
   )
 }
