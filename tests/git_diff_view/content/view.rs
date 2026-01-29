@@ -1,7 +1,7 @@
 /// Tests for git diff view - content changes.
 /// See fixtures/README.md for the test scenario.
 
-use super::shared_defs::*;
+use super::common::*;
 
 #[test]
 fn test_content_diff_with_moved_and_deleted_nodes()

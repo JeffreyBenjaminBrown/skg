@@ -1,0 +1,30 @@
+* what these tests do
+** test scenario
+   For this test description, most orgnode metadata is omitted.
+   IDs are equal to titles unless otherwise indicated.
+*** head
+    * 1
+    ** 11
+    11 has a body.
+    ** 12
+*** worktree
+    * (skg (truenode (id 1) ..)..) 1 has a new title.
+    ** 11
+    11 has a new body.
+    ** 12
+** expected git-diff view
+    * (skg (truenode (id 1) ..)..) 1 has a new title.
+    ** (skg textChanged) ;; or something; I'm not sure what the exact metadata syntax is for a TextChanged
+    ** 11
+    11 has a new body.
+    *** (skg textChanged) ;; or something; I'm not sure what the exact metadata syntax is for a TextChanged
+    ** 12
+** expectation upon saving
+   Edits to either textChanged are entirely disregarded --
+   they have no effect on disk,
+   and an edited textChanged node will respawn in the buffer.
+   This is true if they are edited,
+   if they are moved, or if they are deleted.
+   Even if one is moved to be a child of a node
+   whose text *was not edited*,
+   the disk state and returned buffer will be unaffected.

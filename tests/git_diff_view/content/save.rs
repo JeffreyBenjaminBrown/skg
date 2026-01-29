@@ -1,7 +1,7 @@
 /// Tests for git diff view - save behavior.
 /// See fixtures/README.md for the test scenario.
 
-use super::shared_defs::*;
+use super::common::*;
 
 /// Deleting a 'removed' node (deleted from disk) should be a no-op.
 /// The node respawns in the returned buffer.
