@@ -11,7 +11,7 @@ TEMP_DIFF=$(mktemp)
 cd "$REPO_ROOT"
 
 # Get tracked changes
-git diff HEAD --unified=0 -- '*.rs' > "$TEMP_DIFF"
+git diff main --unified=0 -- '*.rs' > "$TEMP_DIFF"
 
 # Append untracked .rs files as diffs
 for f in $(git ls-files --others --exclude-standard '*.rs'); do

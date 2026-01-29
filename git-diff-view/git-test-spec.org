@@ -1,0 +1,54 @@
+* tests for the git diff view
+** how to treat content changes
+*** suppose
+    Suppose each one's title is its id.
+    Most (skg ..) metadata is hidden.
+    I might have the order wrong for
+    siblings where some differ from worktree.
+**** in git
+   Suppose only these nodes exist,
+   and only in the 'contains' relationship depicted:
+   * 1
+   ** 11
+   *** gets-removed
+   ** 12
+   *** moves
+**** in worktree
+   Suppose only these nodes exist,
+   and only in the 'contains' relationship depicted:
+   * 1
+   ** 11
+   *** moves
+   ** 12
+   * new
+   [Not that gets-deleted does not exist in the worktree.]
+*** compare the view generated for each
+    In each case, build a content view with two roots: 1 and new.
+**** ordinary view
+   * 1
+   ** 11
+   *** moves
+   ** 12
+   * new
+**** git diff view
+   * 1
+   ** 11
+   *** (skg .. (diff removed)) gets-removed
+   *** (skg .. (diff new-here)) moves
+   ** 12
+   *** (skg .. (diff removed-here)) moves
+   * (skg ... (diff new)) new
+*** what saving should do
+ Try each of these after loading the 'git diff view' described above (in 'test/compare/git diff view/').
+**** edits
+     If you delete one of the 'removed' nodes and save,
+     then nothing changes on disk or in worktree,
+          and it should respawn in the buffer sent back to the client.
+     If you delete the 'new-here- node and save,
+       it disappears from there,
+       both on disk and in the returned buffer.
+     If you add a new node as a child somewhere,
+       it gets created on disk,
+       and its metadata in the returned buffer now says 'diff new'.
+* TODO still left to specify
+** what happens with the various Scaffold nodes
