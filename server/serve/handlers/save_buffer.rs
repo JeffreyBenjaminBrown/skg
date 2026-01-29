@@ -22,7 +22,7 @@ use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs_prunable };
 use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
 
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::HashMap;
@@ -260,6 +260,7 @@ pub fn remove_all_branches_marked_removed (
   Ok (( )) }
 
 /// It's cheaper to regenerate these than to reconcile user edits.
+/// If a deleted branch contains focus, passes it up to the parent.
 pub fn remove_regenerable_scaffolds (
   forest : &mut Tree<OrgNode>
 ) -> Result<(), Box<dyn Error>> {
@@ -277,11 +278,29 @@ pub fn remove_regenerable_scaffolds (
                    OrgNodeKind::Scaff ( Scaffold::AliasCol ) |
                    OrgNodeKind::Scaff ( Scaffold::Alias { .. } ));
       if is_regenerable_scaffold {
+        let node_id : NodeId = node . id();
+        if subtree_has_focus ( node . tree(), node_id )
+        { if let Some ( mut parent ) = node . parent()
+            { parent . value() . focused = true; }}
         node . detach();
-        Ok ( false ) // Prune: detach removes subtree, so don't recurse
-      } else {
-        Ok ( true ) }} ) ?;
+        Ok ( false ) // subtree is gone, so don't recurse
+      } else { Ok ( true ) }} ) ?;
   Ok (( )) }
+
+fn subtree_has_focus (
+  tree    : &Tree<OrgNode>,
+  node_id : NodeId,
+) -> bool {
+  let node_ref : NodeRef<OrgNode> =
+    match tree . get ( node_id ) {
+      Some ( n ) => n,
+      None => return false };
+  if node_ref . value() . focused {
+    return true; }
+  for child in node_ref . children() {
+    if subtree_has_focus ( tree, child . id() ) {
+      return true; }}
+  false }
 
 /// Clear diff metadata from all TrueNodes in the forest.
 /// Scaffolds with diff fields (Alias, ID) are already removed

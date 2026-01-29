@@ -2,6 +2,11 @@
 ** DONE refs
   see
     git-diff-view/big-plan.org
+** test
+*** multiple repos
+*** extending a definitive view from a removed node R
+    one of whose children C is removed too,
+    and such that C has a removed child and a non-removed child
 ** extract common logic from extendDefinitive* functions
    across from-git and from-worktree varieties.
 ** reading : comparing extending definitive from worktree and git
@@ -21,10 +26,13 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
-** integ. test
-   Use multiple sources. Containment relationships should cross them.
-** validation
-   We check that each ID has an IDCol parent.
+** scaffold diff node validation
+   (One of these conditions was already implemented since main.)
+   Check that each ID has an IDCol parent, no body and no children.
+   Check that each IDCol parent has only ID children and no body,
+     and has a TrueNode parent.
+   Check that each TextChanged has no body or children,
+     and has a TrueNode parent.
 ** not implemented yet
 pub fn handle_save_buffer_request (
   ...
