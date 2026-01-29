@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::ListDiff;
+use crate::types::list::{ListDiff, ListDiffEntry};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -59,6 +59,8 @@ pub struct NodeChanges {
   pub aliases_diff: ListDiff<String>,
   /// Changes to the ids list
   pub ids_diff: ListDiff<ID>,
+  /// Interleaved diff for ids, for display in IDCol scaffold
+  pub ids_interleaved: Vec<ListDiffEntry<ID>>,
   /// Changes to the contains list
   pub contains_diff: ListDiff<ID>,
 }

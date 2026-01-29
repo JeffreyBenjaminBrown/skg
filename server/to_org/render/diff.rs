@@ -3,11 +3,9 @@
 
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::git::{SourceDiff, FileDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
+use crate::types::list::ListDiffEntry;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{
-  OrgNode, OrgNodeKind, Scaffold,
-  orgnode_from_scaffold, mk_indefinitive_orgnode,
-};
+use crate::types::orgnode::{ OrgNode, OrgNodeKind, Scaffold, orgnode_from_scaffold, mk_indefinitive_orgnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
 
@@ -34,7 +32,10 @@ pub fn apply_diff_to_forest (
   Ok (( )) }
 
 /// Process a single node for diff markers.
-/// Dispatches to specific handlers based on node kind.
+/// So far, only TrueNodes need processing; scaffolds are regenerated fresh.
+/// TODO : Sharing relationships (hides, overrides, subscribes)
+/// will need processing here. But none of the regenerable scaffolds
+/// (see remove_regenerable_scaffolds) ever will.
 fn process_node_for_diff (
   mut node_mut : NodeMut<OrgNode>,
   source_diffs : &HashMap<String, SourceDiff>,
@@ -43,14 +44,6 @@ fn process_node_for_diff (
   match &node_mut . value() . kind . clone() {
     OrgNodeKind::True ( _ ) =>
       process_truenode_diff ( node_mut, source_diffs, config ),
-    OrgNodeKind::Scaff ( Scaffold::AliasCol ) =>
-      process_aliascol_diff ( node_mut, source_diffs ),
-    OrgNodeKind::Scaff ( Scaffold::Alias { .. } ) =>
-      process_alias_diff ( node_mut, source_diffs ),
-    OrgNodeKind::Scaff ( Scaffold::IDCol ) =>
-      process_idcol_diff ( node_mut, source_diffs ),
-    OrgNodeKind::Scaff ( Scaffold::ID { .. } ) =>
-      process_id_diff ( node_mut, source_diffs ),
     _ => Ok (()) }}
 
 /// Process a TrueNode:
@@ -91,8 +84,8 @@ fn process_truenode_diff (
         orgnode_from_scaffold ( Scaffold::TextChanged )); }
     if ! ( node_changes . ids_diff . added   . is_empty() &&
            node_changes . ids_diff . removed . is_empty() ) {
-      node_mut . prepend (
-        orgnode_from_scaffold ( Scaffold::IDCol )); }
+      prepend_idcol_with_children (
+        &mut node_mut, node_changes ); }
     process_truenode_contains_diff (
       &mut node_mut, tree_node_id,
       node_changes, source_diff, &source, config ) ?; }
@@ -117,6 +110,35 @@ fn maybe_mark_file_level_diff (
         { t . diff = Some ( diff_status ); }
       true },
     None => false }}
+
+/// Prepend an IDCol scaffold to the input's children,
+/// populated with ID scaffold grandchildren.
+/// (The DFS traversal won't visit nodes created mid-traversal,
+/// so we populate ahead of time with this.)
+fn prepend_idcol_with_children (
+  node_mut     : &mut NodeMut<OrgNode>,
+  node_changes : &NodeChanges,
+) {
+  let idcol_node : OrgNode =
+    orgnode_from_scaffold ( Scaffold::IDCol );
+  let idcol_treeid : NodeId =
+    node_mut . prepend ( idcol_node ) . id();
+  let mut idcol_mut : NodeMut<OrgNode> =
+    node_mut . tree() . get_mut ( idcol_treeid ) . unwrap();
+  for entry in &node_changes . ids_interleaved {
+    let (id_str, diff) : (String, Option<FieldDiffStatus>) =
+      match entry {
+        ListDiffEntry::Unchanged ( id ) =>
+          ( id . 0 . clone(), None ),
+        ListDiffEntry::NewHere ( id ) =>
+          ( id . 0 . clone(), Some ( FieldDiffStatus::New )),
+        ListDiffEntry::RemovedHere ( id ) =>
+          ( id . 0 . clone(), Some ( FieldDiffStatus::Removed )), };
+    let id_scaffold : Scaffold =
+      Scaffold::ID { id: id_str, diff };
+    let id_orgnode : OrgNode =
+      orgnode_from_scaffold ( id_scaffold );
+    idcol_mut . append ( id_orgnode ); }}
 
 /// Mark existing children as NewHere if added to contains,
 /// and insert phantom nodes for removed children.
@@ -154,7 +176,7 @@ fn mark_newhere_children (
       if let Some ( ref id ) = t . id_opt {
         if added_ids . contains ( id ) {
           let child_file_path : PathBuf =
-            PathBuf::from ( format! ( "{}.skg", id . 0 ) );
+            PathBuf::from ( format! ( "{}.skg", id . 0 ));
           let is_new_file : bool =
             source_diff . file_diffs . get ( &child_file_path )
               . map ( |fd| fd . status == GitDiffStatus::Added )
@@ -173,7 +195,7 @@ fn insert_phantom_nodes_for_removed_children (
   for removed_child_id in &node_changes . contains_diff . removed {
     let child_file_diff : Option<&FileDiff> = {
       let child_file_path : PathBuf =
-        PathBuf::from ( format! ( "{}.skg", removed_child_id . 0 ) );
+        PathBuf::from ( format! ( "{}.skg", removed_child_id . 0 ));
       source_diff . file_diffs . get ( &child_file_path ) };
     let child_is_deleted : bool =
       child_file_diff
@@ -230,130 +252,3 @@ fn mk_phantom_orgnode (
   if let OrgNodeKind::True ( ref mut t ) = orgnode . kind
     { t . diff = Some ( diff ); }
   orgnode }
-
-/// Process an AliasCol: append removed Alias children.
-fn process_aliascol_diff (
-  mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
-) -> Result<(), String> {
-  let file_diff : &FileDiff =
-    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 1 ) {
-      Some ( d ) => d,
-      None => return Ok (()) };
-  let node_changes : &NodeChanges =
-    match &file_diff . node_changes {
-      Some ( c ) => c,
-      None => return Ok (()) };
-  for removed_alias in &node_changes . aliases_diff . removed {
-    let alias_scaffold : Scaffold =
-      Scaffold::Alias {
-        text: removed_alias . clone(),
-        diff: Some ( FieldDiffStatus::Removed ) };
-    let alias_orgnode : OrgNode =
-      orgnode_from_scaffold ( alias_scaffold );
-    node_mut . append ( alias_orgnode ); }
-  Ok (()) }
-
-/// Process an Alias scaffold: mark as new if in added list.
-fn process_alias_diff (
-  mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
-) -> Result<(), String> {
-  let alias_text : String =
-    match &node_mut . value() . kind {
-      OrgNodeKind::Scaff ( Scaffold::Alias { text, .. } ) => text . clone(),
-      _ => return Ok (()) };
-  let file_diff : &FileDiff = // Grandparent is the TrueNode
-    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 2 ) {
-      Some ( d ) => d,
-      None => return Ok (()) };
-  let node_changes : &NodeChanges =
-    match &file_diff . node_changes {
-      Some ( c ) => c,
-      None => return Ok (()) };
-  if node_changes . aliases_diff . added . contains ( &alias_text ) {
-    if let OrgNodeKind::Scaff ( Scaffold::Alias { diff, .. } ) = &mut node_mut . value() . kind {
-      *diff = Some ( FieldDiffStatus::New ); }}
-  Ok (()) }
-
-/// Process an IDCol: append added/removed ID children.
-fn process_idcol_diff (
-  mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
-) -> Result<(), String> {
-  let file_diff : &FileDiff =
-    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 1 ) {
-      Some ( d ) => d,
-      None => return Ok (()) };
-  let node_changes : &NodeChanges =
-    match &file_diff . node_changes {
-      Some ( c ) => c,
-      None => return Ok (()) };
-  for added_id in &node_changes . ids_diff . added {
-    let id_scaffold : Scaffold =
-      Scaffold::ID {
-        value: added_id . 0 . clone(),
-        diff: Some ( FieldDiffStatus::New ) };
-    let id_orgnode : OrgNode =
-      orgnode_from_scaffold ( id_scaffold );
-    node_mut . append ( id_orgnode ); }
-  for removed_id in &node_changes . ids_diff . removed {
-    let id_scaffold : Scaffold =
-      Scaffold::ID {
-        value: removed_id . 0 . clone(),
-        diff: Some ( FieldDiffStatus::Removed ) };
-    let id_orgnode : OrgNode =
-      orgnode_from_scaffold ( id_scaffold );
-    node_mut . append ( id_orgnode ); }
-  Ok (()) }
-
-/// Process an ID scaffold: mark as new if in added list.
-fn process_id_diff (
-  mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
-) -> Result<(), String> {
-  let id_value : ID =
-    match &node_mut . value() . kind {
-      OrgNodeKind::Scaff ( Scaffold::ID { value, .. } ) =>
-        ID ( value . clone() ),
-      _ => return Ok (()) };
-  let file_diff : &FileDiff = // Grandparent is the TrueNode
-    match get_ancestor_file_diff ( &mut node_mut, source_diffs, 2 ) {
-      Some ( d ) => d,
-      None => return Ok (()) };
-  let node_changes : &NodeChanges =
-    match &file_diff . node_changes {
-      Some ( c ) => c,
-      None => return Ok (()) };
-  if node_changes . ids_diff . added . contains ( &id_value ) {
-    if let OrgNodeKind::Scaff ( Scaffold::ID { diff, .. } ) = &mut node_mut . value() . kind {
-      *diff = Some ( FieldDiffStatus::New ); }}
-  Ok (()) }
-
-/// Get the FileDiff for an ancestor TrueNode.
-/// generation: 1 = parent, 2 = grandparent, etc.
-/// Gen 0 is valid.
-fn get_ancestor_file_diff<'a> (
-  node_mut     : &mut NodeMut<OrgNode>,
-  source_diffs : &'a HashMap<String, SourceDiff>,
-  generation   : usize,
-) -> Option<&'a FileDiff> {
-  let start_id : NodeId =
-    node_mut . id();
-  let ancestor_id : NodeId = { // Climb to the ancestor
-    let mut node_ref : NodeRef<OrgNode> =
-      node_mut . tree() . get ( start_id ) ?;
-    for _ in 0..generation {
-      node_ref = node_ref . parent() ?; }
-    node_ref . id() };
-  let (pid, source) : (ID, String) =
-    pid_and_source_from_treenode (
-      node_mut . tree(), ancestor_id, "get_ancestor_file_diff"
-    ) . ok() ?;
-  let source_diff : &SourceDiff =
-    source_diffs . get ( &source ) ?;
-  if ! source_diff . is_git_repo {
-    return None; }
-  let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  source_diff . file_diffs . get ( &file_path ) }

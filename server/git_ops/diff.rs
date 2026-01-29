@@ -1,5 +1,5 @@
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, FileDiff, NodeChanges };
-use crate::types::list::{diff_lists, ListDiff};
+use crate::types::list::{diff_lists, compute_interleaved_diff, ListDiff, ListDiffEntry};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -90,6 +90,8 @@ fn compare_skgnodes (
       & new . aliases . clone() . unwrap_or_default() );
   let ids_diff : ListDiff<ID> =
     diff_lists ( & old . ids, & new . ids );
+  let ids_interleaved : Vec<ListDiffEntry<ID>> =
+    compute_interleaved_diff ( & old . ids, & new . ids );
   let contains_diff : ListDiff<ID> =
     diff_lists (
       & old . contains . clone() . unwrap_or_default(),
@@ -98,4 +100,5 @@ fn compare_skgnodes (
     text_changed,
     aliases_diff,
     ids_diff,
+    ids_interleaved,
     contains_diff }}

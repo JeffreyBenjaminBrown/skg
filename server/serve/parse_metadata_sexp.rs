@@ -89,7 +89,7 @@ pub fn orgnode_from_metadata (
                             text: title . clone (),
                             diff: metadata . scaffold_diff },
         Scaffold::ID    { .. } => Scaffold::ID {
-                            value: title . clone (),
+                            id: title . clone (),
                             diff: metadata . scaffold_diff },
         other => other . clone (),
       };
@@ -191,7 +191,7 @@ pub fn parse_metadata_to_orgnodemd (
           "idCol" =>
             result . scaffold = Some ( Scaffold::IDCol ),
           "id" =>
-            result . scaffold = Some ( Scaffold::ID { value: String::new(), diff: None } ),
+            result . scaffold = Some ( Scaffold::ID { id: String::new(), diff: None } ),
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },

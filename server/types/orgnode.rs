@@ -86,7 +86,7 @@ pub enum Scaffold {
   // Git diff view scaffolds:
   TextChanged, // Indicates title/body changed between disk and HEAD.
   IDCol, // Collects (as children) ID scaffolds for its parent. Diff-mode only.
-  ID { value: String, diff: Option<FieldDiffStatus> }, // An ID of the node's grandparent. Diff-mode only.
+  ID { id: String, diff: Option<FieldDiffStatus> }, // An ID of the node's grandparent. Diff-mode only.
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
@@ -186,7 +186,7 @@ impl Scaffold {
       Scaffold::SubscribeeCol => "it subscribes to these",
       Scaffold::TextChanged => "Text changed. See git diff.",
       Scaffold::IDCol => "its IDs",
-      Scaffold::ID { value, .. } => value,
+      Scaffold::ID { id, .. } => id,
     }}
 
   /// For serialization.
@@ -216,7 +216,7 @@ impl ScaffoldKind {
       ScaffoldKind::SubscribeeCol => Scaffold::SubscribeeCol,
       ScaffoldKind::TextChanged   => Scaffold::TextChanged,
       ScaffoldKind::IDCol         => Scaffold::IDCol,
-      ScaffoldKind::ID => Scaffold::ID { value: title.to_string(),
+      ScaffoldKind::ID => Scaffold::ID { id: title.to_string(),
                                          diff: None },
     }} }
 

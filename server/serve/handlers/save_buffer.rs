@@ -160,6 +160,7 @@ pub async fn update_from_and_rerender_buffer (
 
   { // Remove diff data from tree.
     remove_all_branches_marked_removed ( &mut forest ) ?;
+    remove_regenerable_scaffolds ( &mut forest ) ?;
     clear_diff_metadata ( &mut forest ) ?; }
 
   { // update the graph
@@ -258,8 +259,33 @@ pub fn remove_all_branches_marked_removed (
       } else { Ok ( true ) }} )? ; // recurse into children
   Ok (( )) }
 
-/// Clear diff metadata from all nodes in the forest.
-/// This is called after stripping removed nodes but before saving.
+/// It's cheaper to regenerate these than to reconcile user edits.
+pub fn remove_regenerable_scaffolds (
+  forest : &mut Tree<OrgNode>
+) -> Result<(), Box<dyn Error>> {
+  let forest_root_id : NodeId =
+    forest . root() . id();
+  do_everywhere_in_tree_dfs_prunable (
+    forest,
+    forest_root_id,
+    &mut |mut node : NodeMut<OrgNode>| -> Result<bool, String> {
+      let is_regenerable_scaffold : bool =
+        matches! ( &node . value() . kind,
+                   OrgNodeKind::Scaff ( Scaffold::IDCol ) |
+                   OrgNodeKind::Scaff ( Scaffold::ID { .. } ) |
+                   OrgNodeKind::Scaff ( Scaffold::TextChanged ) |
+                   OrgNodeKind::Scaff ( Scaffold::AliasCol ) |
+                   OrgNodeKind::Scaff ( Scaffold::Alias { .. } ));
+      if is_regenerable_scaffold {
+        node . detach();
+        Ok ( false ) // Prune: detach removes subtree, so don't recurse
+      } else {
+        Ok ( true ) }} ) ?;
+  Ok (( )) }
+
+/// Clear diff metadata from all TrueNodes in the forest.
+/// Scaffolds with diff fields (Alias, ID) are already removed
+/// by remove_diff_only_scaffolds before this runs.
 pub fn clear_diff_metadata (
   forest : &mut Tree<OrgNode>
 ) -> Result<(), Box<dyn Error>> {
@@ -269,14 +295,9 @@ pub fn clear_diff_metadata (
     forest,
     forest_root_id,
     &mut |mut node : NodeMut<OrgNode>| -> Result<(), String> {
-      match &mut node . value() . kind {
-        OrgNodeKind::True ( t ) =>
-          t . diff = None,
-        OrgNodeKind::Scaff ( s ) =>
-          match s {
-            Scaffold::Alias { diff, .. } => *diff = None,
-            Scaffold::ID { diff, .. } => *diff = None,
-            _ => {} }};
+      // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
+      if let OrgNodeKind::True ( t ) = &mut node . value() . kind {
+        t . diff = None; }
       Ok (()) }
   ) ?;
   Ok (()) }
