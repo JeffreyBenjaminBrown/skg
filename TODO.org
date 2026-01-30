@@ -1,8 +1,19 @@
-* ONGOING git diff view
-** DONE refs
+* AWAITS internalizing
+** Awkward or good ? Exactly some OrgNodes can have diffs.
+   That makes some invalid state unrepresentable.
+** how to prompt
+*** when asking for a refactor
+**** Name _v2 functions consistently.
+**** Duplicate comments from _v1 functions
+     (which keep their original names)
+     into the _v2 functions.
+*** when asking to move code
+    Emphasize leaving whitespace, formatting unchanged.
+* AWAITS NOT FULLY TESTED : git diff view
+** refs
   see
     git-diff-view/big-plan.org
-** test
+** TODO test
 *** multiple repos
 *** extending a definitive view from a removed node R
     one of whose children C is removed too,
@@ -26,27 +37,109 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
-** scaffold diff node validation
-   (One of these conditions was already implemented since main.)
-   Check that each ID has an IDCol parent, no body and no children.
-   Check that each IDCol parent has only ID children and no body,
-     and has a TrueNode parent.
-   Check that each TextChanged has no body or children,
-     and has a TrueNode parent.
-** not implemented yet
-pub fn handle_save_buffer_request (
-  ...
-  diff_mode_enabled : bool ) {
-  // Note: diff_mode_enabled is not yet used, but will be in Phase 5
-  let _ = diff_mode_enabled;
-* how to prompt
-** when asking for a refactor
-*** Name _v2 functions consistently.
-*** Duplicate comments from _v1 functions
-    (which keep their original names)
-    into the _v2 functions.
-** when asking to move code
-   Emphasize leaving whitespace, formatting unchanged.
+* Rename ForestRoot to Buffer.
+  And permit it to have no children.
+* a grammar for describing tree manip
+** some rules to define declaratively
+   Prioritized by when to do it.
+   The orgnode changes seems the most important.
+*** one for how to validate each orgnode kind
+**** the orgnode validation type
+***** has title :< cannot | can | must
+***** has body :< cannot | can | must
+***** acceptable_parents : Acceptablekinds
+      Any would be an unreasonable value here,
+      but None is reasonable -- the forest root (buffer) needs that.
+***** acceptable child kinds : Acceptablekinds
+***** more general, if I need more generations
+****** neighborKindConstraint { generation, acceptable kinds }
+       'Acceptable kinds' is a list of orgnode kind enums.
+       'Generation' negative means ancestor, positive means children.
+         (Will in practice probably only range in [-1,1].)
+**** the acceptableKinds constraint
+     Any (is acceptable), None (is acceptable),
+     List < orgnode kinds >
+**** rules per orgnode kind
+***** any Scaffold
+****** None should have a body.
+****** Add comment: None should have a title but Alias.
+       Encoding this as a blanket statement would be awkward;
+       instead the code should state independent body treatments
+       for each Scaffold.
+***** ForestRoot
+      Should be the root.
+      Add comment: Needs no children!
+***** Alias
+      title, no body, no children, aliasCol parent
+***** AliasCol
+      No title.
+      Only Alias children.
+      Parent is a TrueNode.
+***** HiddenInSubscribeeCol
+      No title, body.
+      Parent is Subscribee.
+      Children are only TrueNodes.
+***** SubscribeeCol
+      Parent is TrueNode.
+      Children are only TrueNodes or HiddenOutsideOfSubscribeeCol.
+***** TextChanged
+      No title. How to display this should be left to Emacs.
+***** TrueNode
+****** ? Does this change over time?
+*** map orgnode kind to orgnode tree change
+**** alias col
+     read your parent, and then
+     order and complete its aliases among your children
+**** alias: nothing to do
+     add comment: for its own correctness, an alias must
+       rely on its parent's having been processed correctly
+**** forestroot: nothing to do
+**** HiddenInSubscribeeCol
+     Read your parent (Subscribee) and grandparent (Subscriber),
+     find everything the subscriber hides that the subscribee contains,
+     and ensure your children are only them, and in order.
+**** ONGOING HiddenOutsideOfSubscribeeCol
+     Read your siblings (subscribees) and parent (subscriber).
+     Ensure that your children are, and in order,
+       only what the subscriber hides that no subscribee contains.
+**** ID: nothing to do
+     Add a comment: For correctness, an ID relies on
+       its parent having been handled correctly.
+**** IDCol
+     Ensure that your children are only and in order
+       the IDs of your parent.
+**** SubscribeeCol
+     read your parent, and then
+     order and complete its subscribees among your children
+**** TODO truenode
+***** complete your content, in order
+***** TODO ? consider whether your parent is a SubscribeeCol
+**** TextChanged
+     nothing to rewrite -- is more easily
+     deleted from the buffer and respawned fresh
+*** one to map each orgnode kind to skgnode changes
+    Keep a set of skgnodes.
+    Different orgnodes can affect the same skgnode.
+*** one for how to build each orgnode kind
+    Functions rather than types seem sufficient here.
+    I don't think they ever need to know about orgnode neighbors.
+** ? meta-rules
+   ? alternatives
+*** rules for how to handle changes to rules
+    For instance, the rules for skgnodes could change:
+    at one stage it is valid for them to lack ids,
+    and later it is not.
+    Act only on what the change requires,
+    not on all rules again.
+*** rules for the selective reinforcement of rules
+    e.g. once the orgnode rules include must have ids,
+    re-enforce that rule, but not the others
+* Most scaffolds need no title. Leave that to Emacs.
+  How to display it should be left to Emacs.
+* Heralds to indicate otherwise-invisible relationships.
+** the 3 sharing relations in either direction
+** aliases
+** extra ids
 * understand it
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 ** Do de-novo and save reuse enough code?

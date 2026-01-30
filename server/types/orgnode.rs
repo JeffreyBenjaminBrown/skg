@@ -82,11 +82,11 @@ pub enum Scaffold {
   ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
+  ID { id: String, // an ID of the node's grandparent.
+       diff: Option<FieldDiffStatus> },
+  IDCol, // Collects (as children) Scaffold::IDs for its parent.
   SubscribeeCol, // Collects subscribees for its parent.
-  // Git diff view scaffolds:
-  TextChanged, // Indicates title/body changed between disk and HEAD.
-  IDCol, // Collects (as children) ID scaffolds for its parent. Diff-mode only.
-  ID { id: String, diff: Option<FieldDiffStatus> }, // An ID of the node's grandparent. Diff-mode only.
+  TextChanged, // Indicates title/body changed between disk and HEAD. Visible in 'git diff mode'.
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
