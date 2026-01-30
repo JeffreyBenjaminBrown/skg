@@ -90,21 +90,6 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_Scaffold(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::Child_of_AliasCol_with_ID(node) => {
-      format!("Child of AliasCol has an ID (not allowed):\n- Title: {}\n",
-              node.title()) },
-    BufferValidationError::Child_of_Alias(node) => {
-      format!("Alias node has children (not allowed):\n- Title: {}\n",
-              node.title()) },
-    BufferValidationError::Alias_with_no_AliasCol_Parent(node) => {
-      format!("Alias node must have an AliasCol parent:\n- Title: {}\n",
-              node.title()) },
-    BufferValidationError::ID_with_no_IDCol_Parent(node) => {
-      format!("ID node must have an IDCol parent:\n- Title: {}\n",
-              node.title()) },
-    BufferValidationError::Multiple_AliasCols_in_Children(node) => {
-      format!("Node has multiple AliasCol children (only one allowed):\n- Title: {}\n",
-              node.title()) },
     BufferValidationError::Multiple_Defining_Orgnodes(id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
               id.0) },
@@ -119,9 +104,6 @@ fn format_buffer_validation_error (
         sources.iter().map(|s| s.0.clone()).collect();
       format!( "Multiple orgnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
               id.0, source_list) },
-    BufferValidationError::RootWithoutSource(node) => {
-      format!("Root node (top-level in forest) must have a source:\n- Title: {}\n- ID: {:?}\n- Please add (source nickname) to the metadata.\n",
-              node.title(), node.id_opt()) },
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
               id.0, source) },
@@ -131,9 +113,6 @@ fn format_buffer_validation_error (
     BufferValidationError::SourceNotInConfig(id, source) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
               id.0, source) },
-    BufferValidationError::IndefinitiveWithEditRequest(node) => {
-      format!("Indefinitive node cannot have an edit request:\n- Title: {}\n- ID: {:?}\n- Indefinitive nodes represent views and should not be edited or deleted.\n",
-              node.title(), node.id_opt()) },
     BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) => {
       format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
               id.0) },

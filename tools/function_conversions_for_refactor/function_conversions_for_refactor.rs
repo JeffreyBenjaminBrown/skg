@@ -22,15 +22,6 @@ struct OrgNode {
 
 fn parse_org_file(content: &str) -> Result<OrgNode, Box<dyn Error>> {
   let lines: Vec<&str> = content.lines().collect();
-  let mut root = OrgNode {
-    level: 0,
-    title: "ROOT".to_string(),
-    children: Vec::new(),
-  };
-
-  let mut stack: Vec<&mut OrgNode> = vec![];
-  // We can't easily use a mutable reference stack in safe Rust,
-  // so we'll rebuild the tree from a flat list instead
 
   #[derive(Debug, Clone)]
   struct FlatNode {
@@ -96,18 +87,6 @@ fn parse_org_file(content: &str) -> Result<OrgNode, Box<dyn Error>> {
   }
 
   Ok(nodes[0].clone())
-}
-
-fn find_node_mut<'a>(node: &'a mut OrgNode, title: &str) -> Option<&'a mut OrgNode> {
-  if node.title == title {
-    return Some(node);
-  }
-  for child in &mut node.children {
-    if let Some(found) = find_node_mut(child, title) {
-      return Some(found);
-    }
-  }
-  None
 }
 
 fn search_for_function(func_name: &str, server_dir: &Path) -> Option<String> {

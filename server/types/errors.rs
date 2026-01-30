@@ -1,5 +1,4 @@
 use super::misc::{ID, SourceNickname};
-use super::orgnode::OrgNode;
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
@@ -18,29 +17,21 @@ pub enum SaveError {
   BufferValidationErrors ( Vec<BufferValidationError> ), }
 
 /// If the user attempts to save a buffer
-/// with any of these properties,, the server should refuse.
-/// TODO : Some of these should probably take a TrueNode rather than an OrgNode.
+/// with any of these properties, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum BufferValidationError {
   Body_of_Scaffold               (String,   // Title from buffer
                                   String),  // Scaffold kind (e.g. "aliasCol", "alias")
-  Child_of_AliasCol_with_ID      (OrgNode),
-  Child_of_Alias                 (OrgNode),
-  Alias_with_no_AliasCol_Parent  (OrgNode),
-  ID_with_no_IDCol_Parent        (OrgNode),
-  Multiple_AliasCols_in_Children (OrgNode),
   Multiple_Defining_Orgnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceNickname>), // Multiple orgnodes with same ID have different sources
-  RootWithoutSource              (OrgNode), // Root node (top-level in forest) has no source
   ModifiedForeignNode            (ID, SourceNickname), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
   DiskSourceBufferSourceConflict (ID,
                                   SourceNickname, // disk source
                                   SourceNickname), // buffer source
   SourceNotInConfig              (ID, SourceNickname),
-  IndefinitiveWithEditRequest    (OrgNode), // Indefinitive node has an edit request (not allowed)
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
@@ -78,21 +69,6 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::Body_of_Scaffold(title, kind) =>
         write!(f, "{} node should not have a body. Node title: '{}'",
                kind, title),
-      BufferValidationError::Child_of_AliasCol_with_ID(node) =>
-        write!(f, "Children of AliasCol should not have IDs. Node: {:?}",
-               node.id_opt()),
-      BufferValidationError::Child_of_Alias(node) =>
-        write!(f, "Alias nodes should not have children. Node: {:?}",
-               node.id_opt()),
-      BufferValidationError::Alias_with_no_AliasCol_Parent(node) =>
-        write!(f, "Alias node must have an AliasCol parent. Node: {:?}",
-               node.id_opt()),
-      BufferValidationError::ID_with_no_IDCol_Parent(node) =>
-        write!(f, "ID node must have an IDCol parent. Node: {:?}",
-               node.id_opt()),
-      BufferValidationError::Multiple_AliasCols_in_Children(node) =>
-        write!(f, "Node has multiple AliasCol children (max 1 allowed). Node: {:?}",
-               node.id_opt()),
       BufferValidationError::Multiple_Defining_Orgnodes(id) =>
         write!(f, "Multiple nodes with ID {:?} are marked as defining (indefinitive=false)", id),
       BufferValidationError::AmbiguousDeletion(id) =>
@@ -102,18 +78,12 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::InconsistentSources(id, sources) => {
         let source_list: Vec<&SourceNickname> = sources.iter().collect();
         write!(f, "Multiple orgnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
-      BufferValidationError::RootWithoutSource(node) =>
-        write!(f, "Root node (top-level in forest) must have a source. Node ID: {:?}, title: '{}'",
-               node.id_opt(), node.title()),
       BufferValidationError::ModifiedForeignNode(id, source) =>
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
       BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) =>
         write!(f, "Source mismatch for node {:?}: disk has '{}', buffer specifies '{}'", id, disk_source, buffer_source),
       BufferValidationError::SourceNotInConfig(id, source) =>
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
-      BufferValidationError::IndefinitiveWithEditRequest(node) =>
-        write!(f, "Indefinitive node cannot have an edit request. Node ID: {:?}, title: '{}'",
-               node.id_opt(), node.title()),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) =>
         write!(f, "Definitive view request on a node that is already definitive (ID {:?}). The node already shows its content; no expansion needed.", id),
       BufferValidationError::DefinitiveRequestOnNodeWithChildren(id) =>
