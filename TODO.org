@@ -37,8 +37,10 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
-* Rename BufferRoot to Buffer.
-  And permit it to have no children.
+* Use two OrgNode types.
+  One 'unchecked' type, where source and id are optional.
+  Another 'checked' type where they are mandatory.
+  UncheckedOrgnode would use the usual Scaffold and a new UncheckedTrueNode type.
 * a grammar for describing tree manip
 ** u : more natural than an OrgnodeValidation data type would be a map from orgnode kinds to lists of functions
    where each function can be represented via a function that produces functions, e.g. one that takes some kinds and a generation and produces a function that only permits neighbors of that kind in that generation
@@ -62,32 +64,44 @@
      Any (is acceptable), None (is acceptable),
      List < orgnode kinds >
 **** rules per orgnode kind
-***** any Scaffold
-****** None should have a body.
-****** Add comment: None should have a title but Alias.
-       Encoding this as a blanket statement would be awkward;
-       instead the code should state independent body treatments
-       for each Scaffold.
+***** AWAITS types don't allow it : verify any Scaffold
+****** what I would verify
+******* None should have a body.
+******* None should have a title but Alias.
+        Encoding this as a blanket statement would be awkward;
+        instead the code should state independent body treatments
+        for each Scaffold.
+****** why I can't
+       Those types have no title or body fields!
+       Verification of this sort would have to happpen earlier.
 ***** BufferRoot
-      Should be the root.
-      Add comment: Needs no children!
+      Must have no parent.
+      Children can only be TrueNodes (but need not exist).
 ***** Alias
-      title, no body, no children, aliasCol parent
+      No children can exist.
+      Aliascol parent must exist.
 ***** AliasCol
-      No title.
-      Only Alias children.
-      Parent is a TrueNode.
+      Only Alias children (but empty is valid).
+      Parent must exist and be  a TrueNode.
+      Can have no sibling AliasCol.
 ***** HiddenInSubscribeeCol
-      No title, body.
-      Parent is Subscribee.
-      Children are only TrueNodes.
+      Parent must exist, must be Subscribee.
+      Children can only be TrueNodes (but need not exist).
+      Can have no sibling HiddenInSubscribeeCol.
 ***** SubscribeeCol
-      Parent is TrueNode.
-      Children are only TrueNodes or HiddenOutsideOfSubscribeeCol.
+      Parent must exist, must be TrueNode.
+      Children are only TrueNodes or HiddenOutsideOfSubscribeeCol
+        but need not exist.
+      TrueNode children cannot be duplicated (same ID).
 ***** TextChanged
-      No title. How to display this should be left to Emacs.
+      Parent must exist, must be TrueNode.
+      Can have no children.
 ***** TrueNode
-****** ? Does this change over time?
+      Must have an id.
+      Must have a source that's present in the config.
+      Children must be in
+        [TrueNode, AliasCol, SubscribeeCol, TextChanged]
+      No two non-ignored TrueNode children can share an ID.
 *** map orgnode kind to orgnode tree change
 **** alias col
      read your parent, and then
@@ -136,6 +150,7 @@
 *** rules for the selective reinforcement of rules
     e.g. once the orgnode rules include must have ids,
     re-enforce that rule, but not the others
+* Permit BufferRoot to have no children.
 * Most scaffolds need no title. Leave that to Emacs.
   How to display it should be left to Emacs.
 * Heralds to indicate otherwise-invisible relationships.

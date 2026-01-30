@@ -243,3 +243,93 @@ pub fn find_children_by_ids (
         if target_skgids.contains(child_id) {
           result.insert(child_id.clone(), child.id()); }}}}
   result }
+
+/// Check if all nodes at the specified generation satisfy the predicate.
+/// Returns true if the generation is empty (vacuously true).
+/// Negative generations = ancestors; positive = descendants.
+pub fn generation_includes_only<F> (
+  tree       : &Tree<OrgNode>,
+  node_id    : NodeId,
+  generation : i32,
+  predicate  : F,
+) -> bool
+where F: Fn(&OrgNode) -> bool
+{ collect_generation( tree, node_id, generation )
+    . iter()
+    . all ( |&id| predicate(
+      tree . get(id) . unwrap() . value() )) }
+
+/// Check if the generation is nonempty and all nodes satisfy the predicate.
+/// Negative generations = ancestors; positive = descendants.
+pub fn generation_must_include<F> (
+  tree       : &Tree<OrgNode>,
+  node_id    : NodeId,
+  generation : i32,
+  predicate  : F,
+) -> bool
+where F: Fn(&OrgNode) -> bool
+{ let nodes = collect_generation(
+    tree, node_id, generation);
+  !nodes.is_empty() &&
+    nodes . iter() . all(
+      |&id| predicate(
+        tree . get(id) . unwrap() . value() )) }
+
+/// Check if the specified generation is empty.
+/// Negative generations = ancestors; positive = descendants.
+pub fn generation_cannot_exist (
+  tree       : &Tree<OrgNode>,
+  node_id    : NodeId,
+  generation : i32,
+) -> bool
+{ collect_generation( tree, node_id, generation
+                    ). is_empty() }
+
+/// Collect NodeIds at a specified generation relative to the given node.
+/// Negative generation = ancestors (-1 = parent, -2 = grandparent, etc.)
+/// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
+/// Generation 0 returns just the node itself.
+fn collect_generation (
+  tree       : &Tree<OrgNode>,
+  node_id    : NodeId,
+  generation : i32,
+) -> Vec<NodeId> {
+  if generation == 0 {
+    return vec![node_id]; }
+  let Some(node_ref) = tree.get(node_id)
+    else { return vec![]; };
+  if generation < 0 {
+    let mut current = node_ref;
+    for _ in 0..(-generation) {
+      match current.parent() {
+        Some(parent) => current = parent,
+        None => return vec![], }}
+    vec![current.id()] }
+  else {
+    let mut current_gen : Vec<NodeId> = vec![node_id];
+    for _ in 0..generation {
+      let mut next_gen : Vec<NodeId> = vec![];
+      for id in current_gen {
+        if let Some(n) = tree.get(id) {
+          next_gen.extend(
+            n.children().map(|c| c.id()) ); }}
+      current_gen = next_gen; }
+    current_gen } }
+
+/// Check that no sibling satisfies the predicate.
+/// Returns true if the node has no siblings,
+/// or if the predicate returns false for all siblings.
+/// Short-circuits on the first sibling where the predicate returns true.
+pub fn siblings_cannot_include<F> (
+  tree      : &Tree<OrgNode>,
+  node_id   : NodeId,
+  predicate : F,
+) -> bool
+where F: Fn(&OrgNode) -> bool
+{ let Some(node_ref) = tree.get(node_id)
+    else { return true; };
+  let Some(parent_ref) = node_ref.parent()
+    else { return true; };
+  ! parent_ref.children()
+      . filter ( |c| c.id() != node_id )
+      . any    ( |c| predicate( c.value() )) }
