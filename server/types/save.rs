@@ -143,6 +143,9 @@ fn format_buffer_validation_error (
     BufferValidationError::MultipleDefinitiveRequestsForSameId(id) => {
       format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
               id.0) },
+    BufferValidationError::LocalStructureViolation(msg, id) => {
+      format!("Local structure violation:\n- ID: {}\n- {}\n",
+              id.0, msg) },
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 

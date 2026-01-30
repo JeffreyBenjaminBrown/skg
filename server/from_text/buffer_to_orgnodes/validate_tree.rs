@@ -6,6 +6,7 @@ use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
+use super::local;
 use ego_tree::Tree;
 use ego_tree::iter::Edge;
 use std::collections::HashSet;

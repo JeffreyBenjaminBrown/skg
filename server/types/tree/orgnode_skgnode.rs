@@ -39,6 +39,22 @@ pub fn pid_and_source_from_treenode (
       format! ( "{}: no source", caller_name ) ) ?;
   Ok (( pid, source )) }
 
+/// Get the ID from this node if it's a TrueNode with an ID,
+/// otherwise recursively try ancestors.
+/// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
+pub fn id_from_self_or_nearest_ancestor (
+  tree    : &Tree<OrgNode>,
+  node_id : NodeId,
+) -> Result<ID, Box<dyn Error>> {
+  let mut current : NodeRef<OrgNode> = tree.get(node_id)
+    .ok_or("id_from_self_or_nearest_ancestor: node not found")?;
+  loop {
+    if let OrgNodeKind::True(t) = &current.value().kind {
+      if let Some(id) = &t.id_opt {
+        return Ok(id.clone()); }}
+    current = current.parent()
+      .ok_or("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
+
 /// Find the unique child of a node with a given Scaffold.
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
@@ -247,29 +263,33 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
+/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_includes_only<F> (
-  tree       : &Tree<OrgNode>,
-  node_id    : NodeId,
-  generation : i32,
-  predicate  : F,
+  tree                : &Tree<OrgNode>,
+  node_id             : NodeId,
+  generation          : i32,
+  skip_parent_ignores : bool,
+  predicate           : F,
 ) -> bool
 where F: Fn(&OrgNode) -> bool
-{ collect_generation( tree, node_id, generation )
+{ collect_generation( tree, node_id, generation, skip_parent_ignores )
     . iter()
     . all ( |&id| predicate(
       tree . get(id) . unwrap() . value() )) }
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-pub fn generation_must_include<F> (
-  tree       : &Tree<OrgNode>,
-  node_id    : NodeId,
-  generation : i32,
-  predicate  : F,
+/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
+pub fn generation_exists_and_includes<F> (
+  tree                : &Tree<OrgNode>,
+  node_id             : NodeId,
+  generation          : i32,
+  skip_parent_ignores : bool,
+  predicate           : F,
 ) -> bool
 where F: Fn(&OrgNode) -> bool
 { let nodes = collect_generation(
-    tree, node_id, generation);
+    tree, node_id, generation, skip_parent_ignores);
   !nodes.is_empty() &&
     nodes . iter() . all(
       |&id| predicate(
@@ -277,28 +297,33 @@ where F: Fn(&OrgNode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-pub fn generation_cannot_exist (
-  tree       : &Tree<OrgNode>,
-  node_id    : NodeId,
-  generation : i32,
+/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
+pub fn generation_does_not_exist (
+  tree                : &Tree<OrgNode>,
+  node_id             : NodeId,
+  generation          : i32,
+  skip_parent_ignores : bool,
 ) -> bool
-{ collect_generation( tree, node_id, generation
+{ collect_generation( tree, node_id, generation, skip_parent_ignores
                     ). is_empty() }
 
 /// Collect NodeIds at a specified generation relative to the given node.
 /// Negative generation = ancestors (-1 = parent, -2 = grandparent, etc.)
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
+/// If 'skip_parent_ignores' is true and generation > 0,
+///   then we exclude TrueNodes with parent_ignores=true.
 fn collect_generation (
-  tree       : &Tree<OrgNode>,
-  node_id    : NodeId,
-  generation : i32,
+  tree               : &Tree<OrgNode>,
+  node_id            : NodeId,
+  generation         : i32,
+  skip_parent_ignores : bool,
 ) -> Vec<NodeId> {
   if generation == 0 {
     return vec![node_id]; }
   let Some(node_ref) = tree.get(node_id)
     else { return vec![]; };
-  if generation < 0 {
+  if generation <= 0 {
     let mut current = node_ref;
     for _ in 0..(-generation) {
       match current.parent() {
@@ -312,9 +337,16 @@ fn collect_generation (
       for id in current_gen {
         if let Some(n) = tree.get(id) {
           next_gen.extend(
-            n.children().map(|c| c.id()) ); }}
+            n.children()
+              .filter(|c| !skip_parent_ignores ||
+                          !is_parent_ignored(c.value() ))
+              .map(|c| c.id()) ); }}
       current_gen = next_gen; }
     current_gen } }
+
+/// Check if a node is a TrueNode with parent_ignores=true.
+fn is_parent_ignored ( node : &OrgNode ) -> bool {
+  matches!(&node.kind, OrgNodeKind::True(t) if t.parent_ignores) }
 
 /// Check that no sibling satisfies the predicate.
 /// Returns true if the node has no siblings,
