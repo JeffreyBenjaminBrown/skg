@@ -227,6 +227,8 @@ fn validate_truenode (
     errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, or TextChanged".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors.push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).".to_string()); }
+  if t.indefinitive && t.edit_request.is_some() {
+    errors.push("Indefinitive node must not have an edit request.".to_string()); }
   errors }
 
 /// Check if a TrueNode has an ID.

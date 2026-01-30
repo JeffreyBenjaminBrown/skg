@@ -37,6 +37,8 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
+* RootWithoutSource is now obsolete; source validation is done via
+  LocalStructureViolation for TrueNodes (Scaffolds like Alias don't need sources)
 * Use two OrgNode types.
   One 'unchecked' type, where source and id are optional.
   Another 'checked' type where they are mandatory.

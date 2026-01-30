@@ -118,6 +118,24 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
       tree, child_id, f ) ?; }
   Ok (( ))}
 
+/// Like do_everywhere_in_tree_dfs, but read-only.
+/// Takes `&Tree<T>` instead of `&mut Tree<T>`,
+/// and provides `NodeRef<T>` instead of `NodeMut<T>`.
+pub fn do_everywhere_in_tree_dfs_readonly<T, F>(
+  tree          : &Tree<T>,
+  start_node_id : NodeId,
+  f             : &mut F
+) -> Result<(), String>
+where F: FnMut(NodeRef<T>) -> Result<(), String> {
+  let node_ref : NodeRef<T> =
+    tree . get ( start_node_id ) . ok_or (
+      "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
+  f ( node_ref ) ?;
+  for child in node_ref.children() {
+    do_everywhere_in_tree_dfs_readonly (
+      tree, child.id(), f ) ?; }
+  Ok (( ))}
+
 /// Like do_everywhere_in_tree_dfs, but the lambda ("f") returns:
 /// - Ok(true) to continue recursing into children, or
 /// - Ok(false) to stop (prune) at this node.

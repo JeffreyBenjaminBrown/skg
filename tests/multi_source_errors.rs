@@ -1,6 +1,7 @@
 // cargo test multi_source_errors
 
 use indoc::indoc;
+use regex::Regex;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -66,30 +67,25 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       find_buffer_errors_for_saving(
         &forest, &config, &driver).await?;
 
-    { let root_without_source_errors: Vec<&BufferValidationError>
+    { // Source validation errors: one for dub-1 (nonexistent source "dub")
+      // and one for pub-1 (no source at all).
+      let source_re = Regex::new(r"(?i)truenod.*must.*source").unwrap();
+      let source_errors: Vec<&BufferValidationError>
       = ( errors.iter()
           . filter(
-            |e| matches!(e, BufferValidationError::RootWithoutSource(_)))
+            |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                         if source_re.is_match(msg)))
           . collect() );
-      assert_eq!(root_without_source_errors.len(), 1,
-                 "Expected exactly 1 RootWithoutSource error for pub-1");
-      if let BufferValidationError::RootWithoutSource(node)
-      = root_without_source_errors[0]
-      { assert_eq!(node.id_opt().map(|id| id.0.as_str()),
-                   Some("pub-1"),
-                   "RootWithoutSource should be for pub-1"); }}
-
-    { let nonexistent_source_errors: Vec<&BufferValidationError>
-      = ( errors.iter()
-          . filter(
-            |e| matches!(e, BufferValidationError::SourceNotInConfig(_, _)))
-          . collect() );
-      assert_eq!(nonexistent_source_errors.len(), 1,
-                 "Expected exactly 1 SourceNotInConfig error for dub-1");
-      if let BufferValidationError::SourceNotInConfig(id, source)
-      = nonexistent_source_errors[0]
-      { assert_eq!(id.0, "dub-1", "SourceNotInConfig should be for dub-1");
-        assert_eq!(source.0, "dub", "SourceNotInConfig should be for source 'dub'"); }}
+      assert_eq!(source_errors.len(), 2,
+                 "Expected 2 source validation errors (pub-1 and dub-1)");
+      let ids: Vec<&str> = source_errors.iter()
+        .filter_map(|e| {
+          if let BufferValidationError::LocalStructureViolation(_, id) = e {
+            Some(id.0.as_str())
+          } else { None } })
+        .collect();
+      assert!(ids.contains(&"dub-1"), "Source error should include dub-1");
+      assert!(ids.contains(&"pub-1"), "Source error should include pub-1"); }
 
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors.iter()
@@ -113,7 +109,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(sources.len(), 2, "Should have 2 different sources for priv-1"); }}
 
     assert_eq!(errors.len(), 4,
-               "Expected exactly 4 errors: 1 RootWithoutSource, 1 SourceNotInConfig, 1 Multiple_Defining_Orgnodes, 1 InconsistentSources");
+               "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Orgnodes, 1 InconsistentSources");
 
     cleanup_test_tantivy_and_typedb_dbs(
       &config.db_name,
