@@ -58,6 +58,8 @@ pub async fn validate_merge_requests(
     monogamy_errors } );
   Ok(errors) }
 
+/// To understand what this function does,
+/// it's easiest to read the definition of its return type.
 fn collect_merge_validation_data<'a>(
   forest: &'a Tree<OrgNode>,
 ) -> MergeValidationData<'a> {

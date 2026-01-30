@@ -21,15 +21,23 @@ use typedb_driver::TypeDBDriver;
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
 /// ASSUMES that in the "forest" (tree with BufferRoot):
-/// - IDs have been replaced with PIDs. Otherwise two org nodes
-///   might refer to the same skg node, yet appear not to.
-/// - Where missing, source has been inherited from an ancestor.
+/// - IDs have been replaced with PIDs, per
+///   'assign_pids_throughout_forest'. (Otherwise two org nodes
+///   might refer to the same skg node, yet appear not to.)
+/// - All nodes have sources, per 'inherit_parent_source_if_possible'.
 pub async fn find_buffer_errors_for_saving (
   forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
-            Box<dyn std::error::Error>> {
+            Box<dyn std::error::Error>>
+{ // Two phases. First, lots of validation of instructions,
+  // many of which global operations -- they need to take
+  // the entire forest into account.
+  // By contrast, the last two function calls,
+  // 'validate_roots_have_sources' and 'validate_node_and_children',
+  // perform only local structural verifications:
+  // each ID belongs to an IDCol, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion, defining containers, and sources)
     let (ambiguous_deletion_ids,

@@ -92,7 +92,8 @@ fn assign_new_id_if_absent(
       t.id_opt = Some(ID(new_id)); }}
   Ok (( )) }
 
-/// Collect IDs from forest, look up PIDs in TypeDB, assign them.
+/// PURPOSE: Replace each ID with, if it exists, the corresponding PID.
+/// METHOD: Collects all IDs, then performs a batch lookup in TypeDB.
 async fn assign_pids_throughout_forest (
   forest        : &mut Tree<OrgNode>,
   tree_root_ids : &[NodeId],
