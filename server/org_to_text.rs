@@ -5,12 +5,12 @@ use crate::types::orgnode::{
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
-/// PURPOSE: Render a "forest" -- a tree with ForestRoot at root
+/// PURPOSE: Render a "forest" -- a tree with BufferRoot at root
 /// -- to org-mode text.
-/// ForestRoot is not rendered; its children start at level 1.
+/// BufferRoot is not rendered; its children start at level 1.
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
-/// ERRORS: if root is not a ForestRoot.
+/// ERRORS: if root is not a BufferRoot.
 pub fn orgnode_forest_to_string (
   forest : &Tree<OrgNode>,
 ) -> Result < String, Box<dyn Error> > {
@@ -31,10 +31,10 @@ pub fn orgnode_forest_to_string (
   let is_forest_root : bool =
     matches! (
       & root_ref . value () . kind,
-      OrgNodeKind::Scaff ( Scaffold::ForestRoot ));
+      OrgNodeKind::Scaff ( Scaffold::BufferRoot ));
   if ! is_forest_root {
     return Err (
-      "orgnode_forest_to_string: root is not a ForestRoot".into() ); }
+      "orgnode_forest_to_string: root is not a BufferRoot".into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {
@@ -44,7 +44,7 @@ pub fn orgnode_forest_to_string (
 
 /// Renders an OrgNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
-/// ERRORS: If orgnode is a ForestRoot.
+/// ERRORS: If orgnode is a BufferRoot.
 pub fn orgnode_to_text (
   level   : usize,
   orgnode : &OrgNode
@@ -96,7 +96,7 @@ pub fn orgnode_to_string (
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
 /// where scaffoldKind is a bare atom.
-/// ERRORS: if scaffold is ForestRoot.
+/// ERRORS: if scaffold is BufferRoot.
 fn scaffold_metadata_to_string (
   focused  : bool,
   folded   : bool,
@@ -112,8 +112,8 @@ fn scaffold_metadata_to_string (
         parts . push ( format! ( "(diff {})", d.repr_in_client() ) ); }}
     Scaffold::AliasCol =>
       parts . push ( "aliasCol" . to_string () ),
-    Scaffold::ForestRoot =>
-      return Err ( "scaffold_metadata_to_string: ForestRoot should never be rendered" . into () ),
+    Scaffold::BufferRoot =>
+      return Err ( "scaffold_metadata_to_string: BufferRoot should never be rendered" . into () ),
     Scaffold::HiddenInSubscribeeCol =>
       parts . push ( "hiddenInSubscribeeCol" . to_string () ),
     Scaffold::HiddenOutsideOfSubscribeeCol =>

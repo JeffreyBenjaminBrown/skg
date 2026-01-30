@@ -22,7 +22,7 @@ use uuid::Uuid;
 /// 'clobber_none_fields_with_data_from_disk' does some of that, too,
 /// although it operates on SaveInstructions, downstream.
 pub async fn add_missing_info_to_forest(
-  forest: &mut Tree<OrgNode>, // has ForestRoot at root
+  forest: &mut Tree<OrgNode>, // has BufferRoot at root
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {

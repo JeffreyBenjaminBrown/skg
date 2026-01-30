@@ -64,7 +64,7 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn traverse_forest_and_collect(
-  forest: &Tree<OrgNode> // "forest" = tree with ForestRoot
+  forest: &Tree<OrgNode> // "forest" = tree with BufferRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // contradictory deletes
       HashMap<ID, usize>, // multiple defining containers
       HashMap<ID, HashSet<SourceNickname>>) { // inconsistent sources

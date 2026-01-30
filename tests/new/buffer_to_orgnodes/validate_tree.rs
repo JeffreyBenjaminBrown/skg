@@ -156,7 +156,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver, _tantivy| Box::pin(async move {
-      // Test empty input (forest with just ForestRoot, no tree roots)
+      // Test empty input (forest with just BufferRoot, no tree roots)
       let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
 

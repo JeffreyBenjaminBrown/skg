@@ -37,10 +37,10 @@ See also server/types/orgnode.rs for type definitions.
    This is controlled by the ~indefinitive~ boolean field in TrueNode.
    Users can request a "definitive view" to expand an indefinitive node.
 
-** ForestRoot
+** BufferRoot
    A special Scaffold that serves as the invisible root of a "forest".
-   In Skg, a buffer's tree structure has ForestRoot at the top;
-   level-1 headlines are its children. ForestRoot is never rendered.
+   In Skg, a buffer's tree structure has BufferRoot at the top;
+   level-1 headlines are its children. BufferRoot is never rendered.
 
 ** parent_ignores
    A boolean field on TrueNode. When true, saving the buffer will not
@@ -203,7 +203,7 @@ definitive (with content) because this is the item's current location.
 
 ** Special case: root nodes
    If an orgnode has no parent, or has parent_ignores=true,
-   or is a direct child of ForestRoot (i.e., a level-1 headline),
+   or is a direct child of BufferRoot (i.e., a level-1 headline),
    it is NOT stripped even if marked removed/removed-here.
    This allows viewing a deleted node's content from git history.
 

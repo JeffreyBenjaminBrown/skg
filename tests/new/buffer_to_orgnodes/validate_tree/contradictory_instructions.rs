@@ -58,7 +58,7 @@ fn test_find_inconsistent_toDelete_instructions() {
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
-  // Test empty forest (just ForestRoot, no tree roots)
+  // Test empty forest (just BufferRoot, no tree roots)
   let empty_forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   let (inconsistent_empty, _, _) = find_inconsistent_instructions(&empty_forest);
   assert_eq!(inconsistent_empty.len(), 0, "Should have no conflicts in empty forest");

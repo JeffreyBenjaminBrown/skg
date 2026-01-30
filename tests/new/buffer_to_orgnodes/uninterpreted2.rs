@@ -79,7 +79,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
-  // Get tree roots (children of ForestRoot)
+  // Get tree roots (children of BufferRoot)
   let tree_roots: Vec<_> = forest.root().children().collect();
   assert_eq!(tree_roots.len(), 3, "Should have exactly 3 trees");
 
@@ -190,7 +190,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
-  // Get tree roots (children of ForestRoot)
+  // Get tree roots (children of BufferRoot)
   let tree_roots: Vec<_> = forest.root().children().collect();
   assert_eq!(tree_roots.len(), 2);
 
@@ -214,7 +214,7 @@ fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
   let forest: Tree<OrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  // ForestRoot should have no children
+  // BufferRoot should have no children
   assert_eq!(forest.root().children().count(), 0);
 
   let input2 = "   \n  \n  ";

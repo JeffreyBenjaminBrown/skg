@@ -20,7 +20,7 @@ use std::error::Error;
 /// ASSUMES indefinitive nodes produced no instructions.
 /// (That filtering is done by 'naive_saveinstructions_from_forest'.)
 pub async fn orgnode_forest_to_nonmerge_save_instructions (
-  forest : &Tree<OrgNode>, // "forest" = tree with ForestRoot
+  forest : &Tree<OrgNode>, // "forest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {

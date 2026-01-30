@@ -152,7 +152,7 @@ struct ConnectionState {
 - In `update_from_and_rerender_buffer()`:
   - After parsing buffer, before `update_graph_minus_merges()`:
   - Walk tree and remove entire branches rooted at nodes marked removed/removed-here
-  - EXCEPT: root nodes (ForestRoot children) and parent_ignores=true nodes
+  - EXCEPT: root nodes (BufferRoot children) and parent_ignores=true nodes
   - After stripping branches, clear diff metadata from remaining nodes
 - Functions `remove_all_branches_marked_removed()` and `clear_diff_metadata()` are called before saving
 

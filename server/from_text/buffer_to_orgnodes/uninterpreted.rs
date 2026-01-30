@@ -23,8 +23,8 @@ struct OrgNodeLineCol {
   body: Vec<String>,
 }
 
-/// Parse org text into a "forest": a tree with a ForestRoot.
-/// Each level-1 headline becomes a child of the ForestRoot.
+/// Parse org text into a "forest": a tree with a BufferRoot.
+/// Each level-1 headline becomes a child of the BufferRoot.
 /// The result takes the org-buffer at face value,
 /// without changing the tree (e.g. without absorbing aliases
 /// into the relevant ancestor) and without supplementing information
@@ -45,7 +45,7 @@ pub fn org_to_uninterpreted_nodes(
               String > {
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
-  // treeid_stack[0] is the ForestRoot, treeid_stack[1] is the current tree root, etc.
+  // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let forest_root_treeid: NodeId = forest.root().id();
     forest_root_treeid } ];
@@ -58,11 +58,11 @@ pub fn org_to_uninterpreted_nodes(
       = linecol_to_orgnode(org_node_line_col)?;
     if let Some ( error ) = error_opt {
       parsing_errors . push ( error ); }
-    // Adjust treeid_stack to proper level (ForestRoot is level 0, tree roots are level 1)
+    // Adjust treeid_stack to proper level (BufferRoot is level 0, tree roots are level 1)
     while treeid_stack.len() > level {
       treeid_stack.pop(); }
     // Check for orphaned headlines (e.g., ** without preceding *)
-    // treeid_stack.len() should equal level (because ForestRoot is at level 0)
+    // treeid_stack.len() should equal level (because BufferRoot is at level 0)
     if treeid_stack.len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",

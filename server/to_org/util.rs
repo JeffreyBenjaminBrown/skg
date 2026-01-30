@@ -173,7 +173,7 @@ pub fn detect_and_mark_cycle (
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
-/// Create a forest (single tree with ForestRoot at root)
+/// Create a forest (single tree with BufferRoot at root)
 /// containing just "tree root" nodes (no grandchildren yet),
 /// and complete each via build_node_branch_minus_content.
 pub async fn stub_forest_from_root_ids (

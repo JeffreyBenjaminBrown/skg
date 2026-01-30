@@ -79,7 +79,7 @@ pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
           diff: Option<FieldDiffStatus> },
   AliasCol, // The node collects (as children) aliases for its parent.
-  ForestRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
+  BufferRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   ID { id: String, // an ID of the node's grandparent.
@@ -96,7 +96,7 @@ pub enum Scaffold {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ScaffoldKind { Alias,
                         AliasCol,
-                        ForestRoot,
+                        BufferRoot,
                         HiddenInSubscribeeCol,
                         HiddenOutsideOfSubscribeeCol,
                         SubscribeeCol,
@@ -132,7 +132,7 @@ impl Scaffold {
   const REPRS_IN_CLIENT: &'static [(&'static str, ScaffoldKind)] = &[
     ("alias",                        ScaffoldKind::Alias),
     ("aliasCol",                     ScaffoldKind::AliasCol),
-    ("forestRoot",                   ScaffoldKind::ForestRoot),
+    ("forestRoot",                   ScaffoldKind::BufferRoot),
     ("hiddenInSubscribeeCol",        ScaffoldKind::HiddenInSubscribeeCol),
     ("hiddenOutsideOfSubscribeeCol", ScaffoldKind::HiddenOutsideOfSubscribeeCol),
     ("subscribeeCol",                ScaffoldKind::SubscribeeCol),
@@ -146,7 +146,7 @@ impl Scaffold {
     match self {
       Scaffold::Alias { .. }                 => ScaffoldKind::Alias,
       Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
-      Scaffold::ForestRoot                   => ScaffoldKind::ForestRoot,
+      Scaffold::BufferRoot                   => ScaffoldKind::BufferRoot,
       Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
       Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
       Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
@@ -180,7 +180,7 @@ impl Scaffold {
     match self {
       Scaffold::Alias { text, .. } => text,
       Scaffold::AliasCol => "its aliases",
-      Scaffold::ForestRoot => "",
+      Scaffold::BufferRoot => "",
       Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
       Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
       Scaffold::SubscribeeCol => "it subscribes to these",
@@ -194,7 +194,7 @@ impl Scaffold {
     match self {
       Scaffold::Alias { .. } => "alias",
       Scaffold::AliasCol => "aliasCol",
-      Scaffold::ForestRoot => "forestRoot",
+      Scaffold::BufferRoot => "forestRoot",
       Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
       Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
       Scaffold::SubscribeeCol => "subscribeeCol",
@@ -210,7 +210,7 @@ impl ScaffoldKind {
       ScaffoldKind::Alias => Scaffold::Alias { text: title.to_string(),
                                                diff: None },
       ScaffoldKind::AliasCol                  => Scaffold::AliasCol,
-      ScaffoldKind::ForestRoot                => Scaffold::ForestRoot,
+      ScaffoldKind::BufferRoot                => Scaffold::BufferRoot,
       ScaffoldKind::HiddenInSubscribeeCol     => Scaffold::HiddenInSubscribeeCol,
       ScaffoldKind::HiddenOutsideOfSubscribeeCol => Scaffold::HiddenOutsideOfSubscribeeCol,
       ScaffoldKind::SubscribeeCol => Scaffold::SubscribeeCol,
@@ -426,10 +426,10 @@ pub fn orgnode_from_scaffold ( scaffold : Scaffold ) -> OrgNode {
     kind    : OrgNodeKind::Scaff ( scaffold ),
   }}
 
-/// Helper to create a ForestRoot OrgNode.
+/// Helper to create a BufferRoot OrgNode.
 pub fn forest_root_orgnode () -> OrgNode {
   OrgNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::Scaff ( Scaffold::ForestRoot ),
+    kind    : OrgNodeKind::Scaff ( Scaffold::BufferRoot ),
   }}

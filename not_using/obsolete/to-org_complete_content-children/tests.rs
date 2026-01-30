@@ -12,7 +12,7 @@ use crate::types::tree::PairTree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 
-/// Get the NodeId of the first "tree root" (child of ForestRoot)
+/// Get the NodeId of the first "tree root" (child of BufferRoot)
 fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
   forest . root () . first_child () . unwrap () . id () }
 

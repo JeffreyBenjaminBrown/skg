@@ -24,7 +24,7 @@ struct MapsFromIdForView {
 
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
-/// Forest is a single tree with ForestRoot at root.
+/// Forest is a single tree with BufferRoot at root.
 pub async fn set_metadata_relationship_viewdata_in_forest (
   forest : &mut Tree<OrgNode>,
   config : &SkgConfig,
@@ -42,7 +42,7 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
   Ok (( )) }
 
 /// Build MapsFromIdForView from a forest
-/// (a single tree with ForestRoot as root).
+/// (a single tree with BufferRoot as root).
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
 async fn mapsFromIdForView_from_forest (

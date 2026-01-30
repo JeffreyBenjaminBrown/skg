@@ -286,8 +286,8 @@ fn test_next_in_generation_with_deleted_node() {
 fn test_next_in_generation_across_forest_roots() {
   // Tree A (depth 2), Tree B (depth 3), Tree C (depth 2)
   let mut forest: Tree<String> =
-    // This 'forest root' is like ForestRoot from types::orgnode
-    Tree::new("ForestRoot".to_string());
+    // This 'forest root' is like BufferRoot from types::orgnode
+    Tree::new("BufferRoot".to_string());
 
   // Add "tree" A with children A1, A2
   let a_id: ego_tree::NodeId =
@@ -311,8 +311,8 @@ fn test_next_in_generation_across_forest_roots() {
   forest.get_mut(c_id).unwrap().append("C1".to_string());
   forest.get_mut(c_id).unwrap().append("C2".to_string());
 
-  // Test: from A2 (generation 2 from ForestRoot), next should be B1
-  // A2 is at depth 2: ForestRoot -> A -> A2
+  // Test: from A2 (generation 2 from BufferRoot), next should be B1
+  // A2 is at depth 2: BufferRoot -> A -> A2
   let node_a2: ego_tree::NodeRef<String> =
     find_node_by_label(&forest, "A2").unwrap();
   let next: ego_tree::NodeRef<String> =
@@ -340,8 +340,8 @@ fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> 
   // Tree B: has depth 4 (B -> B1 -> B11 -> B111)
   // Tree C: has depth 3 (C -> C1 -> C11)
   let mut forest: Tree<String> =
-    // This 'forest root' is like ForestRoot from types::orgnode
-    Tree::new("ForestRoot".to_string());
+    // This 'forest root' is like BufferRoot from types::orgnode
+    Tree::new("BufferRoot".to_string());
 
   // Add "tree" A with child A1
   let a_id: ego_tree::NodeId =
@@ -364,19 +364,19 @@ fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> 
     forest.get_mut(c_id).unwrap().append("C1".to_string()).id();
   forest.get_mut(c1_id).unwrap().append("C11".to_string());
 
-  // Generation 0 = ForestRoot
+  // Generation 0 = BufferRoot
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&forest, 0)?;
-  assert_eq!(result.unwrap().value(), "ForestRoot",
-    "Generation 0 should be ForestRoot");
+  assert_eq!(result.unwrap().value(), "BufferRoot",
+    "Generation 0 should be BufferRoot");
 
-  // Generation 1 = A (first child of ForestRoot)
+  // Generation 1 = A (first child of BufferRoot)
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&forest, 1)?;
   assert_eq!(result.unwrap().value(), "A",
     "Generation 1 should be A");
 
-  // Generation 2 = A1 (first grandchild of ForestRoot)
+  // Generation 2 = A1 (first grandchild of BufferRoot)
   let result: Option<ego_tree::NodeRef<String>> =
     first_in_generation(&forest, 2)?;
   assert_eq!(result.unwrap().value(), "A1",
@@ -384,7 +384,7 @@ fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> 
 
   // Generation 3 - A1 has no children, should find B11 via B -> B1
   // Tree structure:
-  //   ForestRoot (0)
+  //   BufferRoot (0)
   //   ├── A (1) -> A1 (2)
   //   ├── B (1) -> B1 (2) -> B11 (3) -> B111 (4)
   //   └── C (1) -> C1 (2) -> C11 (3)

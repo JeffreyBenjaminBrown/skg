@@ -245,7 +245,7 @@ pub fn compare_orgnode_forests (
 ) -> bool {
   compare_orgnode_trees ( forest1.root(), forest2.root() ) }
 
-/// Compare two OrgNode trees (possibly forests, via ForestRoot)
+/// Compare two OrgNode trees (possibly forests, via BufferRoot)
 /// by traversing them DFS.
 /// Compares all structure and all content including IDs.
 /// Ignores internal NodeId values.
@@ -273,7 +273,7 @@ fn compare_orgnode_trees (
 /// Trees are considered the same if their structure and content match,
 /// ignoring ID values (but not ID presence/absence).
 ///
-/// Input forests have ForestRoot at root; tree roots are their children.
+/// Input forests have BufferRoot at root; tree roots are their children.
 pub fn compare_two_forests_modulo_id(
   forest1: &Tree<OrgNode>,
   forest2: &Tree<OrgNode>

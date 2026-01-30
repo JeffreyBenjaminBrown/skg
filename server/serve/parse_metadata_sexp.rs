@@ -179,7 +179,7 @@ pub fn parse_metadata_to_orgnodemd (
           // Scaffold kinds as bare atoms (alias/id string comes from title in orgnode_from_metadata)
           "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), diff: None } ),
           "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
-          "forestRoot" => result . scaffold = Some ( Scaffold::ForestRoot ),
+          "forestRoot" => result . scaffold = Some ( Scaffold::BufferRoot ),
           "hiddenInSubscribeeCol" =>
             result . scaffold = Some ( Scaffold::HiddenInSubscribeeCol ),
           "hiddenOutsideOfSubscribeeCol" =>

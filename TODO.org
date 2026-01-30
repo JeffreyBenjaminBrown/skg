@@ -37,9 +37,11 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
-* Rename ForestRoot to Buffer.
+* Rename BufferRoot to Buffer.
   And permit it to have no children.
 * a grammar for describing tree manip
+** u : more natural than an OrgnodeValidation data type would be a map from orgnode kinds to lists of functions
+   where each function can be represented via a function that produces functions, e.g. one that takes some kinds and a generation and produces a function that only permits neighbors of that kind in that generation
 ** some rules to define declaratively
    Prioritized by when to do it.
    The orgnode changes seems the most important.
@@ -66,7 +68,7 @@
        Encoding this as a blanket statement would be awkward;
        instead the code should state independent body treatments
        for each Scaffold.
-***** ForestRoot
+***** BufferRoot
       Should be the root.
       Add comment: Needs no children!
 ***** Alias
@@ -353,7 +355,7 @@ makeIndefinitiveAndClobber
 ** DONE restructure types, divide Interp
 *** DONE [[id:c4ac24d8-7a6b-4c09-9bec-64ee051d2703][Skg OrgNode type hierarchy]]
     NewOrgNode now separates TrueNode (Content, Subscribee, ParentIgnores)
-    from Scaffold (ForestRoot, AliasCol, Alias, SubscribeeCol, etc.).
+    from Scaffold (BufferRoot, AliasCol, Alias, SubscribeeCol, etc.).
     Parsing pipeline produces Tree<NewOrgNode> directly.
 *** ? two kinds of TrueNode
     one that might not have an ID, one that must

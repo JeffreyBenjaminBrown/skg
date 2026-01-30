@@ -225,7 +225,7 @@ pub async fn update_from_and_rerender_buffer (
 /// Strip from the forest every branch whose root
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
-///   - top-level branches (children of ForestRoot)
+///   - top-level branches (children of BufferRoot)
 ///   - parent_ignores nodes
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
@@ -242,7 +242,7 @@ pub fn remove_all_branches_marked_removed (
         match node . parent() {
           Some ( mut p ) =>
             matches! ( &p . value() . kind,
-                       OrgNodeKind::Scaff ( Scaffold::ForestRoot )),
+                       OrgNodeKind::Scaff ( Scaffold::BufferRoot )),
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {

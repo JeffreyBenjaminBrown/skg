@@ -64,7 +64,7 @@ pub async fn execute_view_requests (
 /// For nodes with `diff: Some(Removed)`: loads content from git HEAD
 /// instead of disk, and marks children as removed if they don't exist on disk.
 async fn execute_definitive_view_request (
-  forest        : &mut Tree<OrgNode>, // "forest" = tree with ForestRoot
+  forest        : &mut Tree<OrgNode>, // "forest" = tree with BufferRoot
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,

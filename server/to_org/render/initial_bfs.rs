@@ -30,7 +30,7 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 /// See file header comment.
-/// Returns a "forest" (tree with ForestRoot).
+/// Returns a "forest" (tree with BufferRoot).
 pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
@@ -50,7 +50,7 @@ pub async fn render_initial_forest_bfs (
     &mut map,
     root_nodes, // the last complete generation
     1,          // the last complete generation's number
-    0, // nodes_rendered (ForestRoot doesn't count)
+    0, // nodes_rendered (BufferRoot doesn't count)
     config.initial_node_limit,
     forest_root_id, // effective_root for truncation
     &mut visited,
@@ -67,7 +67,7 @@ fn render_generation_and_recurse<'a> (
   gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
   rendered_count : usize,
   limit          : usize,
-  effective_root : NodeId,         // ForestRoot for initial rendering
+  effective_root : NodeId,         // BufferRoot for initial rendering
   visited        : &'a mut DefinitiveMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,

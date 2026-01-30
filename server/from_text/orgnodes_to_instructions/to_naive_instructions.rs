@@ -17,7 +17,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 /// - clobber None fields with data from disk
 /// (Its caller 'orgnode_forest_to_nonmerge_save_instructions' does.)
 pub fn naive_saveinstructions_from_forest (
-  mut forest: Tree<OrgNode> // "forest" = tree with ForestRoot
+  mut forest: Tree<OrgNode> // "forest" = tree with BufferRoot
 ) -> Result<Vec<SaveInstruction>, String> {
   let mut result: Vec<SaveInstruction> =
     Vec::new();
@@ -54,7 +54,7 @@ fn naive_saveinstructions_from_tree(
   let node_kind: OrgNodeKind =
     read_at_node_in_tree(tree, node_id, |node| node.kind.clone())?;
   match node_kind {
-    OrgNodeKind::Scaff ( Scaffold::ForestRoot ) =>
+    OrgNodeKind::Scaff ( Scaffold::BufferRoot ) =>
       recurse( tree, node_id, result )?,
     OrgNodeKind::Scaff ( _ ) => {
       // Other scaffolds currently produce no SaveInstructions.

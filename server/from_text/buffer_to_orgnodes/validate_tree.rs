@@ -20,7 +20,7 @@ use typedb_driver::TypeDBDriver;
 /// because this one acts on a tree of OrgNodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
-/// ASSUMES that in the "forest" (tree with ForestRoot):
+/// ASSUMES that in the "forest" (tree with BufferRoot):
 /// - IDs have been replaced with PIDs. Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.
 /// - Where missing, source has been inherited from an ancestor.
@@ -63,7 +63,7 @@ pub async fn find_buffer_errors_for_saving (
       tree_root, config, &mut errors); }
   Ok(errors) }
 
-/// Validate that all roots of the "forest" (children of ForestRoot)
+/// Validate that all roots of the "forest" (children of BufferRoot)
 /// have sources. After source inheritance,
 /// only tree roots can be without sources.
 fn validate_roots_have_sources(
@@ -184,7 +184,7 @@ fn validate_truenode (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  forest : &Tree<OrgNode>, // "forest" = tree with ForestRoot
+  forest : &Tree<OrgNode>, // "forest" = tree with BufferRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
