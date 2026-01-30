@@ -102,14 +102,14 @@ fn validate_aliascol (
   let mut errors = Vec::new();
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::Alias { .. }))) {
-    errors.push("AliasCol's (non-ignored) children can only be Aliases"
+    errors.push("AliasCol's (non-ignored) children must include only Aliases."
                 . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
        matches!(&node.kind, OrgNodeKind::True(_))) {
     errors.push("AliasCol must have a TrueNode parent.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::AliasCol))) {
-    errors.push("AliasCol must be unique among its siblings".to_string()); }
+    errors.push("AliasCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_hidden_in_subscribee_col (
@@ -122,10 +122,10 @@ fn validate_hidden_in_subscribee_col (
     errors.push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind, OrgNodeKind::True(_))) {
-    errors.push("HiddenInSubscribeeCol's children can only be TrueNodes (they are what's hidden)".to_string()); }
+    errors.push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden).".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::HiddenInSubscribeeCol))) {
-    errors.push("HiddenInSubscribeeCol must be unique among its siblings".to_string()); }
+    errors.push("HiddenInSubscribeeCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_hidden_outside_of_subscribee_col (
@@ -135,13 +135,13 @@ fn validate_hidden_outside_of_subscribee_col (
   let mut errors = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::SubscribeeCol))) {
-    errors.push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent".to_string()); }
+    errors.push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent.".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind, OrgNodeKind::True(_))) {
-    errors.push("HiddenOutsideOfSubscribeeCol's children can only be TrueNodes".to_string()); }
+    errors.push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors.push("HiddenOutsideOfSubscribeeCol must be unique among its siblings".to_string()); }
+    errors.push("HiddenOutsideOfSubscribeeCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_subscribeecol (
@@ -151,14 +151,14 @@ fn validate_subscribeecol (
   let mut errors = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
        matches!(&node.kind, OrgNodeKind::True(_))) {
-    errors.push("SubscribeeCol must have a TrueNode parent".to_string()); }
+    errors.push("SubscribeeCol must have a TrueNode parent.".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind,
          OrgNodeKind::True(_) |
          OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors.push("SubscribeeCol's children can only include TrueNodes or HiddenOutsideOfSubscribeeCol.".to_string()); }
+    errors.push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol.".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors.push("SubscribeeCol should not have duplicate TrueNode children.".to_string()); }
+    errors.push("SubscribeeCol must not have duplicate TrueNode children.".to_string()); }
   errors }
 
 fn validate_text_changed (
@@ -168,12 +168,12 @@ fn validate_text_changed (
   let mut errors = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
        matches!(&node.kind, OrgNodeKind::True(_))) {
-    errors.push("TextChanged must have a TrueNode parent".to_string()); }
+    errors.push("TextChanged must have a TrueNode parent.".to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors.push("TextChanged can have no children".to_string()); }
+    errors.push("TextChanged must have no (non-ignroed) children.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::TextChanged))) {
-    errors.push("TextChanged must be unique among its siblings".to_string()); }
+    errors.push("TextChanged must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_idcol (
@@ -199,10 +199,10 @@ fn validate_idscaffold (
 ) -> Vec<String> {
   let mut errors = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors.push("ID scaffold can have no (non-ignored) children".to_string()); }
+    errors.push("ID scaffold must have no (non-ignored) children.".to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
        matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::IDCol))) {
-    errors.push("ID scaffold must have IDCol parent".to_string()); }
+    errors.push("ID scaffold must have an IDCol parent.".to_string()); }
   errors }
 
 fn validate_truenode (
@@ -224,9 +224,9 @@ fn validate_truenode (
          OrgNodeKind::Scaff(Scaffold::IDCol)         |
          OrgNodeKind::Scaff(Scaffold::SubscribeeCol) |
          OrgNodeKind::Scaff(Scaffold::TextChanged))) {
-    errors.push("TrueNode's children can only be TrueNode, AliasCol, IDCol, SubscribeeCol, or TextChanged".to_string()); }
+    errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, or TextChanged".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors.push("TrueNode's non-ignored children should be unique (no two sharing the same ID).".to_string()); }
+    errors.push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).".to_string()); }
   errors }
 
 /// Check if a TrueNode has an ID.
