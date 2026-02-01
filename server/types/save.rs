@@ -7,25 +7,27 @@ use super::errors::{SaveError, BufferValidationError};
 /// Types
 /////////////////
 
-pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
-
-/// Tells Rust what to do with a node.
-/// PITFALL: What about merges, you ask? Any node saved with a merge request might have other edits, too. So, too, might the acquiree referred to by that merge request. Those edits need to be handled. The NonMerge_NodeAction will be used for that purpose. Only after all "normal" edits are executed do we then execute the merge.
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum NonMerge_NodeAction {
-  /// The default case: the org-node's title, body and content define those of the node.
-  Save,
-  Delete,
+/// Defines what to do with a single node: save it or delete it.
+/// PITFALL: Don't merge the 'Merge' type into this one.
+/// It might seem natural, but there are places where you expect
+/// a save or a delete and do not expect a merge. I tried it anyway.
+/// The resulting pattern-matching and error-guarding was ugly.
+/// (Maybe especially because a Merge naturally consists of
+/// two Saves and a Delete, neither of which it is reasonable
+/// to represent with a Merge.)
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DefineOneNode {
+  Save(SkgNode),
+  Delete(SkgNode),
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
-/// we need three SaveInstructions.
+/// we need three DefineOneNodes.
 #[derive(Debug, Clone)]
-pub struct MergeInstructionTriple {
-  pub acquiree_text_preserver : SaveInstruction, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveInstruction, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
-  pub acquiree_to_delete      : SaveInstruction,
+pub struct Merge {
+  pub acquiree_text_preserver : DefineOneNode, // new node with acquiree's title and body
+  pub updated_acquirer        : DefineOneNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
+  pub acquiree_to_delete      : DefineOneNode,
 }
 
 
@@ -128,10 +130,32 @@ fn format_buffer_validation_error (
     BufferValidationError::Other(msg) => {
       format!("{}\n", msg) }, }}
 
-impl MergeInstructionTriple {
+impl DefineOneNode {
+  pub fn node(&self) -> &SkgNode {
+    match self {
+      DefineOneNode::Save(n) => n,
+      DefineOneNode::Delete(n) => n,
+    } }
+
+  pub fn into_node(self) -> SkgNode {
+    match self {
+      DefineOneNode::Save(n) => n,
+      DefineOneNode::Delete(n) => n,
+    } }
+
+  pub fn is_delete(&self) -> bool {
+    matches!(self, DefineOneNode::Delete(_))
+  }
+
+  pub fn is_save(&self) -> bool {
+    matches!(self, DefineOneNode::Save(_))
+  }
+}
+
+impl Merge {
   pub fn to_vec (
     &self
-  ) -> Vec<SaveInstruction> {
+  ) -> Vec<DefineOneNode> {
     vec![
       self.acquiree_text_preserver.clone(),
       self.updated_acquirer.clone(),
@@ -141,10 +165,10 @@ impl MergeInstructionTriple {
   pub fn acquirer_id (
     &self
   ) -> Result<&ID, String> {
-    self.updated_acquirer.0.primary_id() }
+    self.updated_acquirer.node().primary_id() }
 
   pub fn acquiree_id (
     &self
   ) -> Result<&ID, String> {
-    self.acquiree_to_delete.0.primary_id() }
+    self.acquiree_to_delete.node().primary_id() }
 }

@@ -10,7 +10,7 @@ use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::orgnode::OrgNode;
 use crate::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
-use crate::types::save::{MergeInstructionTriple, SaveInstruction};
+use crate::types::save::{Merge, DefineOneNode};
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
@@ -30,8 +30,8 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
   driver      : &TypeDBDriver
 ) -> Result<
     ( Tree<OrgNode>,
-      Vec<SaveInstruction>,
-      Vec<MergeInstructionTriple>
+      Vec<DefineOneNode>,
+      Vec<Merge>
     ), SaveError> {
   let ( mut unchecked_forest, parsing_errors )
     : ( Tree<UncheckedOrgNode>, Vec<BufferValidationError> )
@@ -55,23 +55,23 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
   let orgnode_forest : Tree<OrgNode> =
     unchecked_to_checked_tree ( unchecked_forest )
       . map_err ( |e| SaveError::ParseError ( e ) ) ?;
-  let nonmerge_instructions : Vec<SaveInstruction> =
+  let nonmerge_instructions : Vec<DefineOneNode> =
     validate_and_filter_foreign_instructions (
-      { let nonmerge_instructions : Vec<SaveInstruction> =
+      { let nonmerge_instructions : Vec<DefineOneNode> =
           orgnode_forest_to_nonmerge_save_instructions (
             & orgnode_forest, config, driver )
           . await . map_err ( SaveError::DatabaseError ) ?;
         nonmerge_instructions },
       config, driver
     ). await . map_err ( SaveError::BufferValidationErrors ) ?;
-  let mergeInstructions : Vec<MergeInstructionTriple> =
+  let merge_instructions : Vec<Merge> =
     instructiontriples_from_the_merges_in_an_orgnode_forest (
       & orgnode_forest, config, driver
     ) . await . map_err ( SaveError::DatabaseError ) ?;
   validate_merges_involve_only_owned_nodes (
-    & mergeInstructions, config )
+    & merge_instructions, config )
     . map_err ( SaveError::BufferValidationErrors ) ?;
 
   Ok ((orgnode_forest,
        nonmerge_instructions,
-       mergeInstructions)) }
+       merge_instructions)) }

@@ -1,15 +1,15 @@
 use crate::save::update_tantivy_from_saveinstructions;
-use crate::types::save::{MergeInstructionTriple, SaveInstruction};
+use crate::types::save::{Merge, DefineOneNode};
 use crate::types::misc::TantivyIndex;
 use std::error::Error;
 
-/// Apply each MergeInstructionTriple to the index.
+/// Apply each Merge to the index.
 pub(super) fn merge_nodes_in_tantivy (
-  merge_instructions : &[MergeInstructionTriple],
+  merge_instructions : &[Merge],
   tantivy_index      : &TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
   update_tantivy_from_saveinstructions(
-    & { let flat_instructions : Vec<SaveInstruction> =
+    & { let flat_instructions : Vec<DefineOneNode> =
           merge_instructions . iter()
           . flat_map( |m| m.to_vec() )
           . collect();

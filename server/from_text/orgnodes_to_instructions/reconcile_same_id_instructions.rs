@@ -24,7 +24,7 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
+use crate::types::save::DefineOneNode;
 use crate::types::skgnode::SkgNode;
 use std::collections::HashMap;
 use std::error::Error;
@@ -32,45 +32,42 @@ use typedb_driver::TypeDBDriver;
 
 
 /// Runs 'collect_dup_instructions' to group same-ID instructions.
-/// Then, on each group of SaveInstructions,
+/// Then, on each group of DefineOneNodes,
 /// runs 'reconcile_same_id_instructions_for_one_id'
-/// to get a single SaveInstruction.
+/// to get a single DefineOneNode.
 pub async fn reconcile_same_id_instructions(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<SaveInstruction>
-) -> Result<Vec<SaveInstruction>, Box<dyn Error>> {
-  let grouped_instructions: HashMap<ID, Vec<SaveInstruction>> =
-    collect_dup_instructions (instructions);
-  let mut result: Vec<SaveInstruction> =
+  instructions: Vec<DefineOneNode>
+) -> Result<Vec<DefineOneNode>, Box<dyn Error>> {
+  let grouped_instructions: HashMap<ID, Vec<DefineOneNode>> =
+    collect_dup_instructions (instructions)?;
+  let mut result: Vec<DefineOneNode> =
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
-    let reduced_instruction: SaveInstruction =
+    let reduced_instruction: DefineOneNode =
       reconcile_same_id_instructions_for_one_id(
         config, driver, instruction_group ). await ?;
     result.push (reduced_instruction); }
   Ok(result) }
 
-/// Group SaveInstructions with the same ID.
+/// Group DefineOneNodes with the same ID.
 pub fn collect_dup_instructions(
-  instructions: Vec<SaveInstruction>
-) -> HashMap<ID, Vec<SaveInstruction>> {
-  let mut grouped: HashMap<ID, Vec<SaveInstruction>> =
+  instructions: Vec<DefineOneNode>
+) -> Result<HashMap<ID, Vec<DefineOneNode>>, Box<dyn Error>> {
+  let mut grouped: HashMap<ID, Vec<DefineOneNode>> =
     HashMap::new();
-  for instruction in instructions {
-    let (skg_node, save_action) // just for the type signature
-      : (SkgNode, NonMerge_NodeAction)
-      = instruction;
-    let primary_id_opt : Option<&ID> =
-      skg_node.ids.first();
-    if let Some(primary_id) = primary_id_opt {
-      grouped
-        . entry (primary_id.clone())
-        . or_insert_with (Vec::new)
-        . push ((skg_node, save_action)); }}
-  grouped }
+  for instr in instructions {
+    let primary_id : &ID =
+      instr.node().ids.first()
+      . ok_or("DefineOneNode has no ID")?;
+    grouped
+      . entry (primary_id.clone())
+      . or_insert_with (Vec::new)
+      . push (instr); }
+  Ok(grouped) }
 
-/// Processes a group of SaveInstructions with the same ID.
+/// Processes a group of DefineOneNodes with the same ID.
 /// After validation, each group contains:
 /// - Exactly 1 Save (validation ensures no duplicates), OR
 /// - 1+ Delete instructions (all equivalent)
@@ -81,20 +78,19 @@ pub fn collect_dup_instructions(
 pub async fn reconcile_same_id_instructions_for_one_id(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<SaveInstruction>
-) -> Result<SaveInstruction, Box<dyn Error>> {
+  instructions: Vec<DefineOneNode>
+) -> Result<DefineOneNode, Box<dyn Error>> {
   if instructions.is_empty() {
     return Err("Cannot process empty instruction list".into()); }
-  let mut save_opt: Option<SaveInstruction> = None;
-  let mut delete_opt: Option<SaveInstruction> = None;
-  for instruction in instructions {
-    let instr: SaveInstruction = instruction;
-    match instr.1 {
-      NonMerge_NodeAction::Save => {
+  let mut save_opt: Option<DefineOneNode> = None;
+  let mut delete_opt: Option<DefineOneNode> = None;
+  for instr in instructions {
+    match &instr {
+      DefineOneNode::Save(_) => {
         if save_opt.is_some() {
           return Err("Multiple save instructions for same ID (should be caught by validation)".into( )); }
         save_opt = Some(instr); }
-      NonMerge_NodeAction::Delete => {
+      DefineOneNode::Delete(_) => {
         // Multiple deletes are harmless; keep either one.
         if delete_opt.is_none() {
           delete_opt = Some(instr); }} }}
@@ -113,11 +109,11 @@ pub async fn reconcile_same_id_instructions_for_one_id(
 async fn build_supplemented_save(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  save: Option<SaveInstruction>
-) -> Result<SaveInstruction, Box<dyn Error>> {
-  let (from_buffer, action)
-    : (SkgNode, NonMerge_NodeAction)
-    = save.ok_or("No delete and no save instruction found. This should not be possible.")?;
+  save: Option<DefineOneNode>
+) -> Result<DefineOneNode, Box<dyn Error>> {
+  let from_buffer : SkgNode =
+    save . ok_or("No delete and no save instruction found. This should not be possible.")?
+    . into_node();
   let pid: ID =
     from_buffer.ids.first()
     .ok_or("No primary ID found")?.clone();
@@ -138,8 +134,7 @@ async fn build_supplemented_save(
         from_disk.as_ref().and_then(
           |node| node.aliases.clone()))),
     source,
-    ids: supplement_ids( &(from_buffer.clone(),
-                           action),
+    ids: supplement_ids( &from_buffer,
                          &from_disk),
     body: from_buffer.body.clone(),
     contains: from_buffer.contains.clone(),
@@ -155,17 +150,16 @@ async fn build_supplemented_save(
       from_buffer.overrides_view_of.clone().or(
         from_disk.as_ref().and_then(
           |node| node.overrides_view_of.clone()))), };
-  Ok((supplemented_node,
-      NonMerge_NodeAction::Save)) }
+  Ok(DefineOneNode::Save(supplemented_node)) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
 /// MOTIVATION: An OrgNode uses only one ID,
 /// while a SkgNode can have many.
 fn supplement_ids(
-  definer: &SaveInstruction,
+  from_buffer: &SkgNode,
   optskgnode_from_disk: &Option<SkgNode>
 ) -> Vec<ID> {
-  let mut return_val: Vec<ID> = definer.0.ids.clone();
+  let mut return_val: Vec<ID> = from_buffer.ids.clone();
   let disk_node_opt: Option<&SkgNode> =
     optskgnode_from_disk.as_ref();
   if let Some(disk_node) = disk_node_opt {

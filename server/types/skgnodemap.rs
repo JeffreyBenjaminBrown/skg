@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
-use crate::types::save::NonMerge_NodeAction;
+use crate::types::save::DefineOneNode;
 use crate::types::skgnode::SkgNode;
 use super::misc::{ID, SkgConfig, SourceName};
 
@@ -30,17 +30,18 @@ pub fn skgnode_for_orgnode<'a> (
     OrgNodeKind::Scaff(_) => Ok(None),
   }}
 
-/// Build a SkgNodeMap from SaveInstructions.
+/// Build a SkgNodeMap from DefineOneNodes.
 /// Each SkgNode is indexed by its first ID.
 /// PITFALL: Does not include every node in the buffer --
 /// just the ones that generated instructions.
 /// Hence the importance of 'skgnode_from_map_or_disk'.
 pub fn skgnode_map_from_save_instructions (
-  instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
+  instructions : &Vec<DefineOneNode>,
 ) -> SkgNodeMap
 { instructions.iter()
-    . filter_map( |(skgnode, _action)|
-                  { skgnode . ids . first()
+    . filter_map( |instr|
+                  { let skgnode = instr.node();
+                    skgnode . ids . first()
                       . map( |id| (id . clone(),
                                    skgnode . clone() )) } )
     . collect() }

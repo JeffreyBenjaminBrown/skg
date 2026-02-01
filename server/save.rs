@@ -5,7 +5,7 @@ use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
+use crate::types::save::DefineOneNode;
 use crate::types::skgnode::SkgNode;
 
 use std::error::Error;
@@ -13,14 +13,14 @@ use std::io;
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
-/// Updates **everything** from the given `SaveInstruction`s, in order:
+/// Updates **everything** from the given `DefineOneNode`s, in order:
 ///   1) TypeDB
 ///   2) Filesystem
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn update_graph_minus_merges (
-  instructions  : Vec<SaveInstruction>,
+  instructions  : Vec<DefineOneNode>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
@@ -58,8 +58,8 @@ pub async fn update_graph_minus_merges (
   println!( "All updates finished successfully." );
   Ok (( )) }
 
-/// Update the DB from a batch of `(SkgNode, NonMerge_NodeAction)` pairs:
-/// 1) Delete all nodes marked 'toDelete', using delete_nodes_from_pids
+/// Update the DB from a batch of `DefineOneNode`s:
+/// 1) Delete all nodes marked Delete, using delete_nodes_from_pids
 /// 2) Remove deleted nodes from further processing
 /// 3) Create only nodes whose IDs are not present, via
 ///      create_only_nodes_with_no_ids_present
@@ -71,7 +71,7 @@ pub async fn update_graph_minus_merges (
 pub async fn update_typedb_from_saveinstructions (
   db_name : &str,
   driver  : &TypeDBDriver,
-  instructions : &Vec<SaveInstruction>
+  instructions : &Vec<DefineOneNode>
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -80,18 +80,16 @@ pub async fn update_typedb_from_saveinstructions (
   // It is simply to turn the Vec<ID> into a bare ID.
 
   let ( to_delete_instructions, to_write_instructions )
-    : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
+    : ( Vec<DefineOneNode>, Vec<DefineOneNode> ) =
     instructions . iter ()
     . cloned ()
-    . partition (
-      |(_, action)| matches!(action,
-                             NonMerge_NodeAction::Delete));
+    . partition ( |instr| instr.is_delete() );
 
   { // delete
     let to_delete_pids : Vec<ID> =
       to_delete_instructions . iter ()
-      . filter_map ( |(node, _)|
-                      node . ids
+      . filter_map ( |instr|
+                      instr . node() . ids
                       . get(0)
                       . cloned() )
       . collect ();
@@ -105,7 +103,7 @@ pub async fn update_typedb_from_saveinstructions (
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
       to_write_instructions . iter ()
-      . map ( |(node, _)| node . clone () )
+      . map ( |instr| instr . node() . clone () )
       . collect ();
     let to_write_pids : Vec<ID> =
       to_write_skgnodes . iter ()
@@ -127,18 +125,17 @@ pub async fn update_typedb_from_saveinstructions (
   Ok (( )) }
 
 pub fn update_fs_from_saveinstructions (
-  instructions : Vec<SaveInstruction>,
+  instructions : Vec<DefineOneNode>,
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_write ) // functional; no IO
-    : ( Vec<SaveInstruction>, Vec<SaveInstruction> ) =
+    : ( Vec<DefineOneNode>, Vec<DefineOneNode> ) =
     instructions . into_iter ()
-    . partition (|(_, action)|
-                 matches!(action, NonMerge_NodeAction::Delete) );
+    . partition ( |instr| instr . is_delete() );
   let deleted : usize = {
     let nodes_to_delete : Vec<SkgNode> =
       to_delete . into_iter ()
-      . map ( |(node, _)| node )
+      . map ( |instr| instr . into_node() )
       . collect ();
     if ! nodes_to_delete . is_empty () {
       delete_all_nodes_from_fs (
@@ -147,7 +144,7 @@ pub fn update_fs_from_saveinstructions (
   let written : usize = {
     let nodes_to_write : Vec<SkgNode> =
       to_write . into_iter ()
-      . map ( |(node, _)| node )
+      . map ( |instr| instr . into_node() )
       . collect ();
     if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
@@ -156,21 +153,21 @@ pub fn update_fs_from_saveinstructions (
   Ok ( (deleted, written) ) }
 
 
-/// Updates the index with the provided SaveInstructions.
+/// Updates the index with the provided DefineOneNodes.
 /// Deletes IDs from the index for every instruction,
-/// but only adds documents for instructions where toDelete is false.
+/// but only adds documents for instructions where is_save.
 /// Returns the number of documents processed.
 pub(super) fn update_tantivy_from_saveinstructions (
-  instructions  : &[SaveInstruction],
+  instructions  : &[DefineOneNode],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
   delete_nodes_from_index(
-    // Delete all IDs in the SaveInstructions from the index.
-    // (Instructions that aren't toDelete are then recreated.)
-    instructions.iter().map(|(node, _)| node),
+    // Delete all IDs in the DefineOneNodes from the index.
+    // (Each DefineOneNode::Save is then recreated.)
+    instructions.iter().map(|instr| instr.node()),
     &mut writer,
     tantivy_index)?;
   let processed_count: usize =
@@ -178,10 +175,9 @@ pub(super) fn update_tantivy_from_saveinstructions (
       { // Add documents only for non-deletion instructions.
         let nodes_to_add: Vec<&SkgNode> =
           instructions . iter()
-          . filter_map( |(node, action)|
-                         if !matches!( action,
-                                       NonMerge_NodeAction::Delete)
-                         { Some (node) } else { None } )
+          . filter_map( |instr|
+                         if instr.is_save()
+                         { Some (instr.node()) } else { None } )
           . collect();
         nodes_to_add },
       &mut writer, tantivy_index )? ;

@@ -1,4 +1,4 @@
-use crate::types::save::MergeInstructionTriple;
+use crate::types::save::Merge;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::ID;
 use crate::dbs::typedb::nodes::create_node;
@@ -10,12 +10,12 @@ use std::error::Error;
 use typedb_driver::{TypeDBDriver, Transaction, TransactionType};
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
 
-/// Merges nodes in TypeDB by applying MergeInstructionTriple.
+/// Merges nodes in TypeDB by applying Merge.
 /// All merges are batched in a single transaction.
 pub(super) async fn merge_nodes_in_typedb (
   db_name            : &str,
   driver             : &TypeDBDriver,
-  merge_instructions : &[MergeInstructionTriple],
+  merge_instructions : &[Merge],
 ) -> Result < (), Box<dyn Error> > {
   if merge_instructions.is_empty() {
     return Ok (( )); }
@@ -24,9 +24,9 @@ pub(super) async fn merge_nodes_in_typedb (
   for merge in merge_instructions {
     merge_one_node_in_typedb (
       &tx,
-      &merge.acquiree_text_preserver.0,
-      &merge.updated_acquirer.0,
-      &merge.acquiree_to_delete.0,
+      merge.acquiree_text_preserver.node(),
+      merge.updated_acquirer.node(),
+      merge.acquiree_to_delete.node(),
     ).await?; }
   tx.commit().await?;
   Ok (( )) }

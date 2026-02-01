@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::types::save::{MergeInstructionTriple, NonMerge_NodeAction};
+use crate::types::save::{Merge, DefineOneNode};
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::EditRequest;
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
@@ -10,7 +10,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 /// PURPOSE: For each OrgNode with a merge instruction,
-/// this creates a MergeInstructionTriple:
+/// this creates a Merge:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - acquiree_to_delete: acquiree marked for deletion
@@ -21,20 +21,20 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
   forest: &Tree<OrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<MergeInstructionTriple>,
+) -> Result<Vec<Merge>,
             Box<dyn Error>> {
-  let mut triples: Vec<MergeInstructionTriple> =
+  let mut merges: Vec<Merge> =
     Vec::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      triples.extend(
-        { let node_triples : Vec<MergeInstructionTriple> =
-            saveinstructions_from_the_merge_in_an_orgnode(
+      merges.extend(
+        { let node_merges : Vec<Merge> =
+            merges_from_the_merge_in_an_orgnode(
               { let orgnode: &OrgNode = node_ref.value();
                 orgnode },
               config, driver ). await?;
-          node_triples } ); } }
-  Ok(triples) }
+          node_merges } ); } }
+  Ok(merges) }
 
 /// PURPOSE: The name and type signature say it all.
 /// .
@@ -43,13 +43,13 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// nothing can merge with more than one other node per save.
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
-async fn saveinstructions_from_the_merge_in_an_orgnode(
+async fn merges_from_the_merge_in_an_orgnode(
   node: &OrgNode,
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<MergeInstructionTriple>,
+) -> Result<Vec<Merge>,
             Box<dyn Error>> {
-  let mut merge_instructions: Vec<MergeInstructionTriple> =
+  let mut merge_instructions: Vec<Merge> =
     Vec::new();
   if let OrgNodeKind::True(t) = &node.kind {
     if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request {
@@ -67,16 +67,13 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
                                &acquiree_from_disk,
                                &acquiree_text_preserver)?;
       { merge_instructions.push(
-          MergeInstructionTriple {
-            acquiree_text_preserver : (
-              acquiree_text_preserver,
-              NonMerge_NodeAction::Save ),
-            updated_acquirer : (
-              updated_acquirer,
-              NonMerge_NodeAction::Save ),
-            acquiree_to_delete : (
-              acquiree_from_disk,
-              NonMerge_NodeAction::Delete ),
+          Merge {
+            acquiree_text_preserver :
+              DefineOneNode::Save(acquiree_text_preserver),
+            updated_acquirer :
+              DefineOneNode::Save(updated_acquirer),
+            acquiree_to_delete :
+              DefineOneNode::Delete(acquiree_from_disk),
           } ); }} }
   Ok(merge_instructions) }
 

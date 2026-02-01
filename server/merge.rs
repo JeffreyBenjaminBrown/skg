@@ -5,11 +5,11 @@ pub mod mergeInstructionTriple;
 pub mod validate_merge;
 
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::save::MergeInstructionTriple;
+use crate::types::save::Merge;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Applies the MergeInstructionTriples to the graph.
+/// Applies the Merges to the graph.
 /// Updates three systems in order:
 ///   1) TypeDB
 ///   2) Filesystem
@@ -17,7 +17,7 @@ use typedb_driver::TypeDBDriver;
 /// PITFALL | TODO: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn merge_nodes (
-  merge_instructions : Vec<MergeInstructionTriple>,
+  merge_instructions : Vec<Merge>,
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
