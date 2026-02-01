@@ -9,7 +9,7 @@ use crate::types::orgnode::OrgNode;
 
 use to_naive_instructions::naive_saveinstructions_from_forest;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
-use none_node_fields_are_noops::clobber_none_fields_with_data_from_disk;
+use none_node_fields_are_noops::noneclobber_skgnode;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
@@ -37,7 +37,7 @@ pub async fn orgnode_forest_to_nonmerge_save_instructions (
       instructions_without_dups }
   { clobbered_instructions.push (
       { let clobbered_node : SkgNode =
-          clobber_none_fields_with_data_from_disk (
+          noneclobber_skgnode (
             config, driver, node ). await ?;
         (clobbered_node, action) } ); }
   Ok (clobbered_instructions) }

@@ -20,7 +20,7 @@ use uuid::Uuid;
 /// .
 /// PITFALL:
 /// Does not add *all* missing info.
-/// 'clobber_none_fields_with_data_from_disk' does some of that, too,
+/// 'noneclobber_skgnode' does some of that, too,
 /// although it operates on SaveInstructions, downstream.
 pub async fn add_missing_info_to_forest(
   forest: &mut Tree<UncheckedOrgNode>, // has BufferRoot at root

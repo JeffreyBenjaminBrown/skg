@@ -9,7 +9,7 @@ pub struct SkgNode {
   // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
   // PITFALL: Some([]) vs. None in the Optional lists:
   // - On disk the distinction is not needed. Both Some([]) and None are both rendered on disk as a missing field.
-  // - When multiple SkgNodes need to be reconciled (as in reconcile_same_id_instructions or clobber_none_fields_with_data_from_disk), the distinction matters. This is because a SkgNode can be built from an OrgNode, which might or might not say something about the relevant field. If the OrgNode intends to convey "this field *should* be empty", then it reads 'Some([])'. If instead the OrgNode did not say anything about that field, we use None -- and later clobber it with whatever was on disk for that field, via 'clobber_none_fields_with_data_from_disk'.
+  // - When multiple SkgNodes need to be reconciled (as in reconcile_same_id_instructions or noneclobber_skgnode), the distinction matters. This is because a SkgNode can be built from an OrgNode, which might or might not say something about the relevant field. If the OrgNode intends to convey "this field *should* be empty", then it reads 'Some([])'. If instead the OrgNode did not say anything about that field, we use None -- and later clobber it with whatever was on disk for that field, via 'noneclobber_skgnode'.
 
   pub title: String,
 
@@ -79,4 +79,3 @@ pub fn empty_skgnode () -> SkgNode {
     hides_from_its_subscriptions : None,
     overrides_view_of            : None,
   }}
-

@@ -1,3 +1,41 @@
+* Why mod files are better.
+  This way, if there is parent code that relies on the code in (name)/,
+  it can be named (name).rs, and a reader is likely to read it.
+  The alternative, that (name).rs is usually a boring mod file,
+  leads at least this reader to likely skip reading (name).rs,
+  which can lead to confusion.
+* rename save types
+** Merge should be three Saves
+** SaveInstruction -> ChangeOneNode
+** MergeInstructionTriple -> Merge
+** aborted
+*** enum save = oneNode | merge
+**** idea
+    SaveInstruction -> Save::OneNode
+    MergeInstruction -> Save::Merge
+**** request
+  Let's replace this definition:
+
+    pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
+
+  and the types it is defined in terms of (maybe recursively)
+  to this:
+
+    Save = Save (skgnode)
+    | Delete (skgnode)
+    | Merge (Merge)
+
+  (which implies we are, in addition to restructuring, renaming MergeInstructionTriple to simply Merge).
+
+  The new Merge type should have the three MergeInstructionTriple fields as before, but now they contain Saves.
+
+  We get rid of NonMerge_NodeAction.
+
+  Preserve all comments in carrying this out.
+* how to review changes
+** If what I asked for led it to make a function that addresses one case among the types badly, I'm probably screwing up.
+   This happened when I asked AI to merge
+   'merge' into the type containing 'save' and 'delete'.
 * internalizing
 ** Awkward or good ? Exactly some OrgNodes can have diffs.
    That makes some invalid state unrepresentable.
@@ -13,7 +51,6 @@
    If a buffer is empty when I don't think it should be,
    don't reload it. Check on disk if it is in fact empty.
    If not, try hitting 'undo' to restore it.
-* enum save = oneNode | merge
 * ONGOING write thoughts/buffer-update.org
 * Should 'SaveInstruction' have smelled bad?
   'Save' was right there.
@@ -583,6 +620,16 @@ fold-preservation
 ** "point" seems a better name than "node"
    But it conflicts with the Emacs 'point'.
 * solutions
+** search for type-oid
+*** solution
+    regex :
+      (struct|enum|type)\s+.*TYPE_NAME
+      (struct|enum|type|trait|union)\s+.*TYPE_NAME
+    \s+ handles whitespace.
+    To avoid matching superstrings, follow type name with \b
+      \b is a word boundary to avoid matching SourceDiffFoo.
+*** problem statement
+    How would I search for the regex 'struct or enum or type followed by the name of it'? To find a typedef where I know the thing's name but not whether it's a sum type, product type or alias.
 ** reduce 4-space indentation to 2-space indentation
    sed -i 's/^\( *\)\1/\1/' THE_FILE
 ** to extract Emacs properties into Rust

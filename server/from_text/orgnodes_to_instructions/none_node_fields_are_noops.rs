@@ -20,7 +20,9 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-pub async fn clobber_none_fields_with_data_from_disk (
+/// To 'none-clobber' a field is to replace None with the disk value,
+/// while leaving Some([]) as is (an instruction to erase).
+pub async fn noneclobber_skgnode (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
   from_user : SkgNode,

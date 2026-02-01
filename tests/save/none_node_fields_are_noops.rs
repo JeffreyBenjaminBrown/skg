@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use skg::from_text::orgnodes_to_instructions::none_node_fields_are_noops::
-  clobber_none_fields_with_data_from_disk;
+  noneclobber_skgnode;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
@@ -30,7 +30,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.aliases = None; }
     let result : SkgNode =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
@@ -43,7 +43,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.aliases = Some ( vec![] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
@@ -55,7 +55,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.aliases = Some ( vec![ "new alias".to_string () ] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.aliases,
@@ -86,7 +86,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.subscribes_to = None; }
     let result : SkgNode =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
@@ -99,7 +99,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.subscribes_to = Some ( vec![] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
@@ -111,7 +111,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.subscribes_to = Some ( vec![ ID::new("new_sub") ] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.subscribes_to,
@@ -142,7 +142,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.hides_from_its_subscriptions = None; }
     let result : SkgNode =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
@@ -154,7 +154,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.hides_from_its_subscriptions = Some ( vec![] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
@@ -166,7 +166,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.hides_from_its_subscriptions = Some ( vec![ ID::new("new_hide") ] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
@@ -197,7 +197,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.overrides_view_of = None; }
     let result : SkgNode =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
@@ -211,7 +211,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.overrides_view_of = Some ( vec![] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
@@ -223,7 +223,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.ids     = vec![ ID::new ("test_node") ];
       user_node.overrides_view_of = Some ( vec![ ID::new("new_override") ] ); }
     let result =
-    clobber_none_fields_with_data_from_disk (
+    noneclobber_skgnode (
       &config, &driver, user_node ) . await ?;
     assert_eq! (
       result.overrides_view_of,
