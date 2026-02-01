@@ -37,6 +37,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
    pub cycle             : bool,
    pub parentIsContainer : bool,
    pub parentIsContent   : bool, }
+** aliases and other 'regenerables' will be corrected instead
 * map orgnode kind to orgnode tree change
 ** alias col
    read your parent, and then
