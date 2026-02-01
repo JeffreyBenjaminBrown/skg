@@ -1,4 +1,4 @@
-* AWAITS internalizing
+* internalizing
 ** Awkward or good ? Exactly some OrgNodes can have diffs.
    That makes some invalid state unrepresentable.
 ** how to prompt
@@ -37,73 +37,8 @@
      server/to_org/render/diff.rs
    reading:
      server/serve/handlers/single_root_view.rs
-* RootWithoutSource is now obsolete; source validation is done via
-  LocalStructureViolation for TrueNodes (Scaffolds like Alias don't need sources)
-* Use two OrgNode types.
-  One 'unchecked' type, where source and id are optional.
-  Another 'checked' type where they are mandatory.
-  UncheckedOrgnode would use the usual Scaffold and a new UncheckedTrueNode type.
 * a grammar for describing tree manip
-** u : more natural than an OrgnodeValidation data type would be a map from orgnode kinds to lists of functions
-   where each function can be represented via a function that produces functions, e.g. one that takes some kinds and a generation and produces a function that only permits neighbors of that kind in that generation
 ** some rules to define declaratively
-   Prioritized by when to do it.
-   The orgnode changes seems the most important.
-*** one for how to validate each orgnode kind
-**** the orgnode validation type
-***** has title :< cannot | can | must
-***** has body :< cannot | can | must
-***** acceptable_parents : Acceptablekinds
-      Any would be an unreasonable value here,
-      but None is reasonable -- the forest root (buffer) needs that.
-***** acceptable child kinds : Acceptablekinds
-***** more general, if I need more generations
-****** neighborKindConstraint { generation, acceptable kinds }
-       'Acceptable kinds' is a list of orgnode kind enums.
-       'Generation' negative means ancestor, positive means children.
-         (Will in practice probably only range in [-1,1].)
-**** the acceptableKinds constraint
-     Any (is acceptable), None (is acceptable),
-     List < orgnode kinds >
-**** rules per orgnode kind
-***** AWAITS types don't allow it : verify any Scaffold
-****** what I would verify
-******* None should have a body.
-******* None should have a title but Alias.
-        Encoding this as a blanket statement would be awkward;
-        instead the code should state independent body treatments
-        for each Scaffold.
-****** why I can't
-       Those types have no title or body fields!
-       Verification of this sort would have to happpen earlier.
-***** BufferRoot
-      Must have no parent.
-      Children can only be TrueNodes (but need not exist).
-***** Alias
-      No children can exist.
-      Aliascol parent must exist.
-***** AliasCol
-      Only Alias children (but empty is valid).
-      Parent must exist and be  a TrueNode.
-      Can have no sibling AliasCol.
-***** HiddenInSubscribeeCol
-      Parent must exist, must be Subscribee.
-      Children can only be TrueNodes (but need not exist).
-      Can have no sibling HiddenInSubscribeeCol.
-***** SubscribeeCol
-      Parent must exist, must be TrueNode.
-      Children are only TrueNodes or HiddenOutsideOfSubscribeeCol
-        but need not exist.
-      TrueNode children cannot be duplicated (same ID).
-***** TextChanged
-      Parent must exist, must be TrueNode.
-      Can have no children.
-***** TrueNode
-      Must have an id.
-      Must have a source that's present in the config.
-      Children must be in
-        [TrueNode, AliasCol, SubscribeeCol, TextChanged]
-      No two non-ignored TrueNode children can share an ID.
 *** map orgnode kind to orgnode tree change
 **** alias col
      read your parent, and then
@@ -153,6 +88,7 @@
     e.g. once the orgnode rules include must have ids,
     re-enforce that rule, but not the others
 * Permit BufferRoot to have no children.
+* Search results should not use TrueNode.
 * Most scaffolds need no title. Leave that to Emacs.
   How to display it should be left to Emacs.
 * Heralds to indicate otherwise-invisible relationships.
@@ -682,6 +618,8 @@ fold-preservation
 ** "point" seems a better name than "node"
    But it conflicts with the Emacs 'point'.
 * solutions
+** reduce 4-space indentation to 2-space indentation
+   sed -i 's/^\( *\)\1/\1/' THE_FILE
 ** to extract Emacs properties into Rust
    use [[~/hodal/emacs/property-dump.el][property-dump]]
 ** If I need to graft a forest's trees onto a false root,

@@ -32,6 +32,9 @@ pub fn skgnode_for_orgnode<'a> (
 
 /// Build a SkgNodeMap from SaveInstructions.
 /// Each SkgNode is indexed by its first ID.
+/// PITFALL: Does not include every node in the buffer --
+/// just the ones that generated instructions.
+/// Hence the importance of 'skgnode_from_map_or_disk'.
 pub fn skgnode_map_from_save_instructions (
   instructions : &Vec<(SkgNode, NonMerge_NodeAction)>,
 ) -> SkgNodeMap

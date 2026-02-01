@@ -174,6 +174,7 @@ pub async fn update_from_and_rerender_buffer (
       config.clone(),
       tantivy_index,
       typedb_driver ) . await ?; }
+
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap =
