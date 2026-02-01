@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::test_utils::{run_with_test_db, compare_two_unchecked_forests_modulo_id, compare_unchecked_orgnode_forests};
+use skg::test_utils::{run_with_test_db, compare_orgnode_trees_modulo_id, compare_orgnode_trees};
 use skg::types::unchecked_orgnode::UncheckedOrgNode;
 use skg::types::misc::{SkgConfig, ID};
 use ego_tree::Tree;
@@ -64,7 +64,7 @@ async fn test_add_missing_info_logic (
     1,
     "Expected exactly one tree in the expected forest" );
   assert!(
-    compare_two_unchecked_forests_modulo_id(
+    compare_orgnode_trees_modulo_id(
       &after_adding_missing_info,
       &expected_forest),
     "add_missing_info_to_forest: Forests not equivalent modulo ID." );
@@ -133,9 +133,9 @@ async fn test_source_inheritance_logic (
     org_to_uninterpreted_nodes( expected ).unwrap().0;
 
   assert!(
-    compare_unchecked_orgnode_forests(
-      &actual_forest,
-      &expected_forest),
+    compare_orgnode_trees(
+      actual_forest.root(),
+      expected_forest.root()),
     "Source inheritance: Forests not equivalent.\n\
      Expected sources to inherit from parent, with explicit sources overriding." );
 

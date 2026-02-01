@@ -176,21 +176,6 @@ impl SkgConfig {
       delete_on_quit     : false,
       initial_node_limit : 1000, }}
 
-  pub fn get_source (
-    &self,
-    nickname : &str
-  ) -> Option<&SkgfileSource> {
-    self . sources . get ( nickname )
-  }
-
-  pub fn get_source_path (
-    &self,
-    nickname : &str
-  ) -> Option<&PathBuf> {
-    self . sources . get ( nickname )
-      . map ( |s| &s.path )
-  }
-
   pub fn user_owns_source (
     &self,
     nickname : &str

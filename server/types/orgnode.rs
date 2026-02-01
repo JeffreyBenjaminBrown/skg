@@ -167,15 +167,6 @@ impl Scaffold {
       .map ( |(s, _)| s.to_string() )
       .expect ( "REPRS_IN_CLIENT should cover all ScaffoldKinds" ) }
 
-  /// Parse an Emacs string to a Scaffold.
-  /// For Alias/ID, uses the provided title.
-  pub fn from_repr_in_client (
-    s: &str, title: &str
-  ) -> Option<Scaffold> {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(es, _)| *es == s )
-      .map ( |(_, kind)| kind.to_scaffold ( title )) }
-
   pub fn title ( &self ) -> &str {
     match self {
       Scaffold::Alias { text, .. } => text,
@@ -187,20 +178,6 @@ impl Scaffold {
       Scaffold::TextChanged => "Text changed. See git diff.",
       Scaffold::IDCol => "its IDs",
       Scaffold::ID { id, .. } => id,
-    }}
-
-  /// For serialization.
-  pub fn interp_str ( &self ) -> &str {
-    match self {
-      Scaffold::Alias { .. } => "alias",
-      Scaffold::AliasCol => "aliasCol",
-      Scaffold::BufferRoot => "forestRoot",
-      Scaffold::HiddenInSubscribeeCol => "hiddenInSubscribeeCol",
-      Scaffold::HiddenOutsideOfSubscribeeCol => "hiddenOutsideOfSubscribeeCol",
-      Scaffold::SubscribeeCol => "subscribeeCol",
-      Scaffold::TextChanged => "textChanged",
-      Scaffold::IDCol => "idCol",
-      Scaffold::ID { .. } => "id",
     }} }
 
 impl ScaffoldKind {

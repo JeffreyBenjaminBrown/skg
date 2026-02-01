@@ -147,9 +147,4 @@ impl MergeInstructionTriple {
     &self
   ) -> Result<&ID, String> {
     self.acquiree_to_delete.0.primary_id() }
-
-  pub fn preserver_id (
-    &self
-  ) -> Result<&ID, String> {
-    self.acquiree_text_preserver.0.primary_id() }
 }
