@@ -1,0 +1,70 @@
+* how it currently works
+tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
+** skgnode_map : SkgNodeMap
+   incomplete, hence the importance of
+     skgnode_from_map_or_disk
+** source_diffs : Option<HashMap<SourceName, SourceDiff>>
+   only for git-diff view
+** deleted_id_src_map : HashMap<ID, SourceName>
+** complete_or_restore_each_node_in_branch
+*** allow indef nodes to be missing content
+*** correct the aliasCol in an indef node
+    it can't be wrong in a def node
+*** correct the SubscribeeCol in an indef node
+    it can't be wrong in a def node
+*** detect_and_mark_cycle
+*** make_indef_if_repeat_then_extend_defmap
+*** clobberIndefinitiveOrgnode
+*** maybe_add_subscribeeCol_branch
+** view_requests : Vec < (NodeId, ViewRequest) >
+   Was just for speed.
+   Should instead interleave with other completion ops.
+** set_metadata_relationship_viewdata_in_forest
+* how to redo it
+** dfs postorder (child-first)
+** do these in the right places
+*** these
+**** set_metadata_relationship_viewdata_in_forest
+**** detect_and_mark_cycle
+     cycle is ViewStats, not GraphNodeStats
+**** make_indef_if_repeat_then_extend_defmap
+*** consider node stat types
+ pub struct GraphNodeStats {
+   pub numContainers : Option<usize>,
+   pub numContents   : Option<usize>,
+   pub numLinksIn    : Option<usize>, }
+ pub struct ViewNodeStats {
+   pub cycle             : bool,
+   pub parentIsContainer : bool,
+   pub parentIsContent   : bool, }
+* map orgnode kind to orgnode tree change
+** alias col
+   read your parent, and then
+   order and complete its aliases among your children
+** alias: nothing to do
+   add comment: for its own correctness, an alias must
+     rely on its parent's having been processed correctly
+** forestroot: nothing to do
+** HiddenInSubscribeeCol
+   Read your parent (Subscribee) and grandparent (Subscriber),
+   find everything the subscriber hides that the subscribee contains,
+   and ensure your children are only them, and in order.
+** ONGOING HiddenOutsideOfSubscribeeCol
+   Read your siblings (subscribees) and parent (subscriber).
+   Ensure that your children are, and in order,
+     only what the subscriber hides that no subscribee contains.
+** ID: nothing to do
+   Add a comment: For correctness, an ID relies on
+     its parent having been handled correctly.
+** IDCol
+   Ensure that your children are only and in order
+     the IDs of your parent.
+** SubscribeeCol
+   read your parent, and then
+   order and complete its subscribees among your children
+** TODO truenode
+*** complete your content, in order
+*** TODO ? consider whether your parent is a SubscribeeCol
+** TextChanged
+   nothing to rewrite -- is more easily
+   deleted from the buffer and respawned fresh

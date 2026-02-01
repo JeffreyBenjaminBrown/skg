@@ -13,6 +13,7 @@
    If a buffer is empty when I don't think it should be,
    don't reload it. Check on disk if it is in fact empty.
    If not, try hitting 'undo' to restore it.
+* ONGOING write thoughts/buffer-update.org
 * AWAITS NOT FULLY TESTED : git diff view
 ** refs
   see
@@ -42,55 +43,12 @@
    reading:
      server/serve/handlers/single_root_view.rs
 * a grammar for describing tree manip
-** some rules to define declaratively
-*** map orgnode kind to orgnode tree change
-**** alias col
-     read your parent, and then
-     order and complete its aliases among your children
-**** alias: nothing to do
-     add comment: for its own correctness, an alias must
-       rely on its parent's having been processed correctly
-**** forestroot: nothing to do
-**** HiddenInSubscribeeCol
-     Read your parent (Subscribee) and grandparent (Subscriber),
-     find everything the subscriber hides that the subscribee contains,
-     and ensure your children are only them, and in order.
-**** ONGOING HiddenOutsideOfSubscribeeCol
-     Read your siblings (subscribees) and parent (subscriber).
-     Ensure that your children are, and in order,
-       only what the subscriber hides that no subscribee contains.
-**** ID: nothing to do
-     Add a comment: For correctness, an ID relies on
-       its parent having been handled correctly.
-**** IDCol
-     Ensure that your children are only and in order
-       the IDs of your parent.
-**** SubscribeeCol
-     read your parent, and then
-     order and complete its subscribees among your children
-**** TODO truenode
-***** complete your content, in order
-***** TODO ? consider whether your parent is a SubscribeeCol
-**** TextChanged
-     nothing to rewrite -- is more easily
-     deleted from the buffer and respawned fresh
-*** one to map each orgnode kind to skgnode changes
-    Keep a set of skgnodes.
-    Different orgnodes can affect the same skgnode.
-*** one for how to build each orgnode kind
-    Functions rather than types seem sufficient here.
-    I don't think they ever need to know about orgnode neighbors.
-** ? meta-rules
-   ? alternatives
-*** rules for how to handle changes to rules
-    For instance, the rules for skgnodes could change:
-    at one stage it is valid for them to lack ids,
-    and later it is not.
-    Act only on what the change requires,
-    not on all rules again.
-*** rules for the selective reinforcement of rules
-    e.g. once the orgnode rules include must have ids,
-    re-enforce that rule, but not the others
+** one to map each orgnode kind to skgnode changes
+   Keep a set of skgnodes.
+   Different orgnodes can affect the same skgnode.
+** one for how to build each orgnode kind
+   Functions rather than types seem sufficient here.
+   I don't think they ever need to know about orgnode neighbors.
 * Permit BufferRoot to have no children.
 * Search results should not use TrueNode.
 * Most scaffolds need no title. Leave that to Emacs.
