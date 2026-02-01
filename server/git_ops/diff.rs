@@ -1,4 +1,4 @@
-use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, FileDiff, NodeChanges };
+use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, SkgnodeDiff, NodeChanges };
 use crate::types::list::{diff_lists, compute_interleaved_diff, ListDiff, ListDiffEntry};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
@@ -21,23 +21,23 @@ pub fn compute_diff_for_source (
       None => return Ok ( SourceDiff::new_not_git_repo() ) };
   let changed_files : Vec<PathDiffStatus> =
     get_changed_skg_files ( &repo ) ?;
-  let mut file_diffs : HashMap<PathBuf, FileDiff> =
+  let mut skgnode_diffs : HashMap<PathBuf, SkgnodeDiff> =
     HashMap::new();
   for entry in changed_files {
-    let file_diff : FileDiff =
-      compute_file_diff ( source_path, &repo, &entry ) ?;
-    file_diffs . insert ( entry . path . clone(), file_diff ); }
+    let skgnode_diff : SkgnodeDiff =
+      compute_skgnode_diff ( source_path, &repo, &entry ) ?;
+    skgnode_diffs . insert ( entry . path . clone(), skgnode_diff ); }
   let deleted_nodes : HashMap<ID, SkgNode> =
-    collect_deleted_nodes ( &file_diffs );
+    collect_deleted_nodes ( &skgnode_diffs );
   Ok ( SourceDiff { is_git_repo: true,
-                    file_diffs,
+                    skgnode_diffs,
                     deleted_nodes }) }
 
-fn compute_file_diff (
+fn compute_skgnode_diff (
   source_path : &Path,
   repo        : &git2::Repository,
   entry       : &PathDiffStatus,
-) -> Result<FileDiff, Box<dyn StdError>> {
+) -> Result<SkgnodeDiff, Box<dyn StdError>> {
   let abs_path : PathBuf =
     source_path . join ( &entry . path );
   let rel_path : PathBuf =
@@ -58,20 +58,20 @@ fn compute_file_diff (
       (Some(old), Some(new)) => {
         Some ( compare_skgnodes ( old, new )) },
       _ => None };
-  Ok ( FileDiff {
+  Ok ( SkgnodeDiff {
     status: entry . status . clone(),
     node_changes,
     head_node }) }
 
 /// Collect SkgNodes for deleted files (exist in HEAD but not worktree).
 fn collect_deleted_nodes (
-  file_diffs : &HashMap<PathBuf, FileDiff>,
+  skgnode_diffs : &HashMap<PathBuf, SkgnodeDiff>,
 ) -> HashMap<ID, SkgNode> {
   let mut result : HashMap<ID, SkgNode> =
     HashMap::new();
-  for file_diff in file_diffs . values() {
-    if file_diff . status == GitDiffStatus::Deleted {
-      if let Some ( ref head_node ) = file_diff . head_node {
+  for skgnode_diff in skgnode_diffs . values() {
+    if skgnode_diff . status == GitDiffStatus::Deleted {
+      if let Some ( ref head_node ) = skgnode_diff . head_node {
         if let Some ( pid ) = head_node . ids . first() {
           result . insert ( pid . clone(), head_node . clone() ); }} }}
   result }

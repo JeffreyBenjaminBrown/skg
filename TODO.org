@@ -9,6 +9,10 @@
      into the _v2 functions.
 *** when asking to move code
     Emphasize leaving whitespace, formatting unchanged.
+** Don't reload without checking!
+   If a buffer is empty when I don't think it should be,
+   don't reload it. Check on disk if it is in fact empty.
+   If not, try hitting 'undo' to restore it.
 * AWAITS NOT FULLY TESTED : git diff view
 ** refs
   see

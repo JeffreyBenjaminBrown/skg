@@ -19,7 +19,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone)]
 pub struct SourceDiff {
   pub is_git_repo: bool,
-  pub file_diffs: HashMap<PathBuf, FileDiff>,
+  pub skgnode_diffs: HashMap<PathBuf, SkgnodeDiff>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD.
   pub deleted_nodes: HashMap<ID, SkgNode>,
@@ -27,7 +27,7 @@ pub struct SourceDiff {
 
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
-pub struct FileDiff {
+pub struct SkgnodeDiff {
   // TODO ? Since we keep the skgnode around for deleted nodes already,
   // why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
@@ -92,7 +92,7 @@ impl SourceDiff {
   pub fn new_not_git_repo () -> Self {
     SourceDiff {
       is_git_repo: false,
-      file_diffs: HashMap::new(),
+      skgnode_diffs: HashMap::new(),
       deleted_nodes: HashMap::new() }}}
 
 impl NodeDiffStatus {

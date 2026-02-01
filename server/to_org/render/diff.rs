@@ -2,7 +2,7 @@
 /// Applies diff information to a forest of OrgNodes.
 
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::types::git::{SourceDiff, FileDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
+use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::ListDiffEntry;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, Scaffold, orgnode_from_scaffold, mk_indefinitive_orgnode, };
@@ -70,15 +70,15 @@ fn process_truenode_diff (
       = node_mut . value() . kind
       { t . diff = Some ( NodeDiffStatus::NotInGit ); }
     return Ok (( )); }
-  let file_diff : &FileDiff = {
+  let skgnode_diff : &SkgnodeDiff = {
     let file_path : PathBuf =
       PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-    match source_diff . file_diffs . get ( &file_path ) {
+    match source_diff . skgnode_diffs . get ( &file_path ) {
       Some ( d ) => d,
       None => return Ok (( )) }};
-  if maybe_mark_file_level_diff ( &mut node_mut, file_diff ) {
+  if maybe_mark_file_level_diff ( &mut node_mut, skgnode_diff ) {
     return Ok (( )); }
-  if let Some ( ref node_changes ) = file_diff . node_changes {
+  if let Some ( ref node_changes ) = skgnode_diff . node_changes {
     if node_changes . text_changed {
       node_mut . prepend (
         orgnode_from_scaffold ( Scaffold::TextChanged )); }
@@ -96,10 +96,10 @@ fn process_truenode_diff (
 ///         - false for Modified files.
 fn maybe_mark_file_level_diff (
   node_mut  : &mut NodeMut<OrgNode>,
-  file_diff : &FileDiff,
+  skgnode_diff : &SkgnodeDiff,
 ) -> bool {
   let node_diff_status : Option<NodeDiffStatus> =
-    match file_diff . status {
+    match skgnode_diff . status {
       GitDiffStatus::Added   => Some ( NodeDiffStatus::New ),
       GitDiffStatus::Deleted => Some ( NodeDiffStatus::Removed ),
       GitDiffStatus::Modified => None };
@@ -177,7 +177,7 @@ fn mark_newhere_children (
         let child_file_path : PathBuf =
           PathBuf::from ( format! ( "{}.skg", t.id . 0 ));
         let is_new_file : bool =
-          source_diff . file_diffs . get ( &child_file_path )
+          source_diff . skgnode_diffs . get ( &child_file_path )
             . map ( |fd| fd . status == GitDiffStatus::Added )
             . unwrap_or ( false );
         if ! is_new_file {
@@ -192,12 +192,12 @@ fn insert_phantom_nodes_for_removed_children (
   config       : &SkgConfig,
 ) -> Result<(), String> {
   for removed_child_id in &node_changes . contains_diff . removed {
-    let child_file_diff : Option<&FileDiff> = {
+    let child_skgnode_diff : Option<&SkgnodeDiff> = {
       let child_file_path : PathBuf =
         PathBuf::from ( format! ( "{}.skg", removed_child_id . 0 ));
-      source_diff . file_diffs . get ( &child_file_path ) };
+      source_diff . skgnode_diffs . get ( &child_file_path ) };
     let child_is_deleted : bool =
-      child_file_diff
+      child_skgnode_diff
         . map ( |fd| fd . status == GitDiffStatus::Deleted )
         . unwrap_or ( false );
     let child_diff_status : NodeDiffStatus =

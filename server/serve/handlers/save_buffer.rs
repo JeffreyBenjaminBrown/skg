@@ -371,8 +371,8 @@ pub fn deleted_ids_to_source (
   let mut result : HashMap<ID, SourceName> =
     HashMap::new();
   for (source_name, source_diff) in source_diffs {
-    for (path, file_diff) in &source_diff . file_diffs {
-      if file_diff . status == GitDiffStatus::Deleted {
+    for (path, skgnode_diff) in &source_diff . skgnode_diffs {
+      if skgnode_diff . status == GitDiffStatus::Deleted {
         if let Some ( stem ) = path . file_stem() {
           let id : ID = ID ( stem . to_string_lossy()
                              . into_owned() );
