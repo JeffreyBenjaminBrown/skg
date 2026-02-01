@@ -5,7 +5,7 @@ use skg::types::orgnode::ViewNodeStats;
 use skg::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold, TrueNode,
     orgnode_from_scaffold, default_truenode };
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SourceName};
 
 #[test]
 fn test_orgnode_to_text_no_metadata () {
@@ -14,7 +14,7 @@ fn test_orgnode_to_text_no_metadata () {
     folded  : false,
     kind    : OrgNodeKind::True (
       default_truenode ( ID::from("test"),
-                         "main".to_string(),
+                         SourceName::from("main"),
                          "Test Title".to_string() )) };
   let result : String =
     orgnode_to_text ( 1, &node )
@@ -26,7 +26,7 @@ fn test_orgnode_to_text_with_body () {
   let t : TrueNode = TrueNode {
     body : Some ( "Test body content".to_string() ),
     .. default_truenode ( ID::from("test"),
-                          "main".to_string(),
+                          SourceName::from("main"),
                           "Test Title".to_string() ) };
   let node : OrgNode = OrgNode {
     focused : false,
@@ -51,7 +51,7 @@ fn test_orgnode_to_text_with_id_metadata () {
   let t : TrueNode = TrueNode {
     indefinitive : true,
     .. default_truenode ( ID::from ( "test123" ),
-                          "main".to_string(),
+                          SourceName::from("main"),
                           "Test Title".to_string() ) };
   let node : OrgNode = OrgNode {
     focused : false,
@@ -70,7 +70,7 @@ fn test_metadata_ordering () {
       parentIsContainer : false,
       .. ViewNodeStats::default() },
     .. default_truenode ( ID::from ( "xyz" ),
-                          "main".to_string(),
+                          SourceName::from("main"),
                           "Test".to_string() ) };
   let node : OrgNode = OrgNode {
     focused : false,

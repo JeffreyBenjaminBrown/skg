@@ -1,6 +1,6 @@
 use crate::types::orgnode::EditRequest;
 use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
-use crate::types::misc::{ID, SourceNickname};
+use crate::types::misc::{ID, SourceName};
 
 use ego_tree::{Tree,NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -36,12 +36,12 @@ pub fn find_inconsistent_instructions(
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, // IDs with inconsistent sources
-           HashSet<SourceNickname>)>)
+           HashSet<SourceName>)>)
 { let (id_toDelete_instructions, id_to_definer_count, id_to_sources) =
     collect_instructions(forest);
   let mut inconsistent_deletion_ids: Vec<ID> = Vec::new();
   let mut problematic_defining_ids: Vec<ID> = Vec::new();
-  let mut inconsistent_source_ids: Vec<(ID, HashSet<SourceNickname>)> =
+  let mut inconsistent_source_ids: Vec<(ID, HashSet<SourceName>)> =
     Vec::new();
   { // filter to problematic instructions
     { // Collect inconsistent deletion instructions
@@ -68,7 +68,7 @@ fn collect_instructions(
   forest: &Tree<UncheckedOrgNode> // "forest" = tree with BufferRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, usize>, // defining containers
-      HashMap<ID, HashSet<SourceNickname>>) { // sources
+      HashMap<ID, HashSet<SourceName>>) { // sources
 
   fn collect_instructions_rec(
     node_ref: NodeRef<UncheckedOrgNode>,
@@ -77,7 +77,7 @@ fn collect_instructions(
     id_defining_count: &mut
       HashMap<ID, usize>,
     id_to_sources: &mut
-      HashMap<ID, HashSet<SourceNickname>>
+      HashMap<ID, HashSet<SourceName>>
   ) {
     let orgnode : &UncheckedOrgNode = node_ref.value();
     if let UncheckedOrgNodeKind::True(t) = &orgnode.kind {
@@ -96,8 +96,8 @@ fn collect_instructions(
             . or_insert(0) += 1; }
         if let Some(source_str) = &t.source_opt {
           // Collect source for this ID
-          let source : SourceNickname =
-            SourceNickname::from(source_str.as_str());
+          let source : SourceName =
+            SourceName::from(source_str.as_str());
           id_to_sources
             . entry(id.clone())
             . or_insert_with(HashSet::new)
@@ -116,7 +116,7 @@ fn collect_instructions(
     : HashMap<ID, usize>
     = HashMap::new();
   let mut id_to_sources
-    : HashMap<ID, HashSet<SourceNickname>>
+    : HashMap<ID, HashSet<SourceName>>
     = HashMap::new();
   collect_instructions_rec(
     forest.root(),

@@ -8,7 +8,7 @@ use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::SkgConfig;
+use skg::types::misc::{SkgConfig, SourceName};
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::error::Error;
@@ -271,7 +271,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
 
     // Verify no foreign nodes in instructions
     for (node, _action) in &instructions {
-      assert_eq!(node.source, "main",
+      assert_eq!(&*node.source, "main",
                  "Only owned (main) nodes should be in instructions");
     }
 

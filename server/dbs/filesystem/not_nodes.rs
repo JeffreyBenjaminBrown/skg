@@ -1,4 +1,4 @@
-use crate::types::misc::{SkgConfig, SkgfileSource};
+use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
 
 use std::collections::HashMap;
 use std::fs;
@@ -9,7 +9,7 @@ use std::path::Path;
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
 pub fn validate_source_paths_creating_owned_ones_if_needed (
-  sources: &HashMap<String, SkgfileSource>
+  sources: &HashMap<SourceName, SkgfileSource>
 ) -> io::Result<()> {
   for (nickname, source) in sources.iter() {
     if !source.path.exists() { // If it doesn't exist
@@ -82,7 +82,8 @@ pub fn load_config_with_overrides (
     config.tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (nickname, new_path) in source_overrides {
-    if let Some(source) = config.sources.get_mut(*nickname) {
+    let key : SourceName = SourceName::from(*nickname);
+    if let Some(source) = config.sources.get_mut(&key) {
       source.path = new_path.clone();
     } else {
       return Err(format!(

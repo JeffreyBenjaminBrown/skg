@@ -6,7 +6,7 @@
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
 use super::git::{NodeDiffStatus, FieldDiffStatus};
-use super::misc::ID;
+use super::misc::{ID, SourceName};
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -35,7 +35,7 @@ pub struct TrueNode {
   pub title          : String,
   pub body           : Option < String >,
   pub id             : ID,
-  pub source         : String,
+  pub source         : SourceName,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
@@ -306,7 +306,7 @@ impl Default for ViewNodeStats {
 /// Useful when you need to customize other fields after construction.
 pub fn default_truenode (
   id     : ID,
-  source : String,
+  source : SourceName,
   title  : String,
 ) -> TrueNode {
   TrueNode {
@@ -325,7 +325,7 @@ pub fn default_truenode (
 
 pub fn mk_definitive_orgnode (
   id     : ID,
-  source : String,
+  source : SourceName,
   title  : String,
   body   : Option < String >,
 ) -> OrgNode { mk_orgnode ( id,
@@ -341,7 +341,7 @@ pub fn mk_definitive_orgnode (
 /// Body is always None since indefinitive nodes don't have editable content.
 pub fn mk_indefinitive_orgnode (
   id             : ID,
-  source         : String,
+  source         : SourceName,
   title          : String,
   parent_ignores : bool,
 ) -> OrgNode { mk_orgnode ( id,
@@ -359,7 +359,7 @@ pub fn mk_indefinitive_orgnode (
 /// without considering the rest of the OrgNode tree.
 pub fn mk_orgnode (
   id             : ID,
-  source         : String,
+  source         : SourceName,
   title          : String,
   body           : Option < String >,
   parent_ignores : bool,

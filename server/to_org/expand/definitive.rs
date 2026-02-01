@@ -7,7 +7,7 @@ use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_th
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiffStatus;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest, mk_indefinitive_orgnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -27,7 +27,7 @@ pub async fn execute_view_requests (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
-  deleted_id_src_map : &std::collections::HashMap<ID, String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -70,7 +70,7 @@ async fn execute_definitive_view_request (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
-  deleted_id_src_map : &std::collections::HashMap<ID, String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     forest, node_id ) ?;
@@ -261,7 +261,7 @@ fn from_disk_replace_title_body_and_skgnode (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, String) =
+  let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_skgnode" ) ?;
   let skgnode : &SkgNode = skgnode_from_map_or_disk (
@@ -292,9 +292,9 @@ async fn extendDefinitiveSubtree_fromGit (
   config         : &SkgConfig,
   hidden_ids     : &HashSet<ID>,
   typedb_driver  : &TypeDBDriver,
-  deleted_id_src_map : &HashMap<ID, String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let (pid, src) : (ID, String) =
+  let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, effective_root,
       "extendDefinitiveSubtree_fromGit" ) ?;
   let (contents, contents_in_worktree)
@@ -333,9 +333,9 @@ async fn extendDefinitiveSubtree_fromGit (
 /// and otherwise from git HEAD.
 async fn mk_removed_child_orgnode (
   child_id           : &ID,
-  parent_src         : &str,
+  parent_src         : &SourceName,
   contents_in_worktree : &HashSet<String>,
-  deleted_id_src_map : &std::collections::HashMap<ID, String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   typedb_driver      : &TypeDBDriver,
 ) -> Result<OrgNode, Box<dyn Error>> {
@@ -356,7 +356,7 @@ async fn mk_removed_child_orgnode (
     . ok_or_else ( || format! (
       "mk_removed_child_orgnode: no SkgNode for child {}",
       child_id ) ) ?;
-  let child_source : Option<String> =
+  let child_source : Option<SourceName> =
     if in_worktree { Some ( child_skgnode . source . clone() ) }
     else           { deleted_id_src_map . get ( child_id )
                        . cloned() };
@@ -420,7 +420,7 @@ fn from_git_replace_title_body (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, String) =
+  let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_git_replace_title_body" ) ?;
   let skgnode : SkgNode =

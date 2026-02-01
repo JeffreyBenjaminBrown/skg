@@ -2,7 +2,7 @@
 
 use skg::to_org::util::get_id_from_treenode;
 use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, TrueNode, default_truenode};
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SourceName};
 use ego_tree::{NodeId,Tree};
 
 #[test]
@@ -11,7 +11,8 @@ fn test_get_id_from_treenode_with_id() {
   let id : ID =
     ID::new("test-id-123");
   let t : TrueNode =
-    default_truenode ( id.clone(), "main".to_string(),
+    default_truenode ( id.clone(),
+                       SourceName::from("main"),
                        "Test".to_string() );
   let orgnode : OrgNode =
     OrgNode { focused : false,

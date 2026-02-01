@@ -1,7 +1,7 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::orgnode::EditRequest;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{NonMerge_NodeAction, SaveInstruction};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -89,16 +89,12 @@ fn skgnode_for_orgnode_in_tree<'a> (
     OrgNodeKind::Scaff(_) => return Err(
       "skgnode_for_orgnode_in_tree: expected TrueNode, got Scaffold"
       . to_string()) };
-  let title : String = t.title.clone();
-  let body : Option<String> = t.body.clone();
-  let ids : Vec<ID> = vec![t.id.clone()];
-  let source : String = t.source.clone();
   Ok ( SkgNode {
-    title,
+    title: t.title.clone(),
     aliases,
-    source,
-    ids,
-    body,
+    source: t.source.clone(),
+    ids: vec![t.id.clone()],
+    body: t.body.clone(),
     contains: Some(collect_contents_that_are_not_to_delete(noderef)),
     subscribes_to: subscribees,
     hides_from_its_subscriptions: None,

@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction, MergeInstructionTriple};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
@@ -37,7 +37,7 @@ pub async fn validate_and_filter_foreign_instructions(
         // Cannot delete foreign nodes
         errors.push(BufferValidationError::ModifiedForeignNode(
           primary_id . clone(),
-          SourceNickname::from ( node.source.clone() )) ); }
+          SourceName::from ( node.source.clone() )) ); }
       NonMerge_NodeAction::Save => {
         // Check if node has been modified.
         // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
@@ -71,14 +71,14 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
                  aliases_matches) {
               errors.push(BufferValidationError::ModifiedForeignNode(
                 primary_id . clone(),
-                SourceNickname::from(node.source.clone() )) ); }
+                SourceName::from(node.source.clone() )) ); }
             // If unchanged, filter out (no need to write)
           }
           Ok(None) => {
             // 'Foreign' node not found on disk.
             errors.push(BufferValidationError::ModifiedForeignNode(
               primary_id . clone(),
-              SourceNickname::from(node.source.clone() )) ); }
+              SourceName::from(node.source.clone() )) ); }
           Err(e) => { // Other error reading from disk
             return Err(vec![BufferValidationError::Other(
               format!("Error reading foreign node {}: {}",
@@ -97,7 +97,7 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
     Vec::new();
   for triple in merge_instructions {
     { // Check if acquirer is from foreign source
-      let acquirer_source: &String =
+      let acquirer_source: &SourceName =
         &triple.updated_acquirer.0.source;
       if { let acquirer_is_foreign: bool =
              config . sources . get(acquirer_source)
@@ -108,11 +108,11 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
         { Ok(id) => errors.push(
             BufferValidationError::ModifiedForeignNode(
                 id . clone(),
-                SourceNickname::from(acquirer_source.clone() )) ),
+                acquirer_source.clone() )),
           Err(e) => errors.push(
             BufferValidationError::Other(e)), }; }}
     { // Check if acquiree is from foreign source
-      let acquiree_source: &String =
+      let acquiree_source: &SourceName =
         &triple.acquiree_to_delete.0.source;
       if { let acquiree_is_foreign: bool =
              config.sources.get(acquiree_source)
@@ -122,7 +122,7 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
       { match triple.acquiree_id() {
           Ok(id) => errors.push(BufferValidationError::ModifiedForeignNode(
             id . clone(),
-            SourceNickname::from(acquiree_source.clone() )) ),
+            acquiree_source.clone() )),
           Err(e) => errors.push(BufferValidationError::Other(e)),
         }; }} }
   if errors.is_empty() { Ok(( ))

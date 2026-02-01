@@ -1,7 +1,7 @@
 /// Node access utilities for ego_tree::Tree<OrgNode> and Tree<UncheckedOrgNode>
 
 use crate::to_org::util::{skgnode_and_orgnode_from_id, get_id_from_treenode};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold,
     mk_indefinitive_orgnode,
@@ -24,7 +24,7 @@ pub fn pid_and_source_from_treenode (
   tree        : &Tree<OrgNode>,
   treeid      : NodeId,
   caller_name : &str,
-) -> Result<(ID, String), Box<dyn Error>> {
+) -> Result<(ID, SourceName), Box<dyn Error>> {
   let node_ref : NodeRef<OrgNode> =
     tree . get ( treeid ) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
@@ -151,7 +151,7 @@ pub async fn append_indefinitive_from_disk_as_child (
   let ( _skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
     skgnode_and_orgnode_from_id (
       config, driver, node_id, map ) . await ?;
-  let (id, source, title) : (ID, String, String)
+  let (id, source, title) : (ID, SourceName, String)
   = match &content_orgnode.kind
   { OrgNodeKind::True(t) => (
       t . id . clone(),

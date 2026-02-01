@@ -2,7 +2,7 @@ use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::types::git::{SourceDiff, NodeDiffStatus, GitDiffStatus};
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::merge::merge_nodes;
 use crate::org_to_text::orgnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
@@ -143,7 +143,7 @@ pub async fn update_from_and_rerender_buffer (
   diff_mode_enabled : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled {
-    let sources : Vec<String> =
+    let sources : Vec<SourceName> =
       config . sources . keys() . cloned() . collect();
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
@@ -180,12 +180,12 @@ pub async fn update_from_and_rerender_buffer (
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
     let mut forest_mut : Tree<OrgNode> = forest;
-    let source_diffs : Option<HashMap<String, SourceDiff>> =
+    let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
       // Used for view request execution.
       if diff_mode_enabled
       { Some ( compute_diff_for_every_source ( config ) ) }
       else { None };
-    let deleted_id_src_map : HashMap<ID, String> =
+    let deleted_id_src_map : HashMap<ID, SourceName> =
       source_diffs . as_ref()
       . map ( |d| deleted_ids_to_source ( d ) )
       . unwrap_or_default();
@@ -326,7 +326,7 @@ pub fn clear_diff_metadata (
 /// Returns an error message if so,
 /// as diff computation is ambiguous for merge commits.
 pub fn validate_no_merge_commits (
-  sources : &[String],
+  sources : &[SourceName],
   config  : &SkgConfig,
 ) -> Result<(), String> {
   for source in sources { // Get the source path from config
@@ -347,8 +347,8 @@ pub fn validate_no_merge_commits (
 
 pub fn compute_diff_for_every_source (
   config : &SkgConfig
-) -> HashMap<String, SourceDiff> {
-  let mut source_diffs : HashMap<String, SourceDiff> =
+) -> HashMap<SourceName, SourceDiff> {
+  let mut source_diffs : HashMap<SourceName, SourceDiff> =
     HashMap::new();
   for (source_name, source_config) in &config . sources {
     let source_path : &Path =
@@ -366,9 +366,9 @@ pub fn compute_diff_for_every_source (
 /// This is used to determine the source of nodes
 /// that exist in git HEAD but not in the worktree.
 pub fn deleted_ids_to_source (
-  source_diffs : &HashMap<String, SourceDiff>
-) -> HashMap<ID, String> {
-  let mut result : HashMap<ID, String> =
+  source_diffs : &HashMap<SourceName, SourceDiff>
+) -> HashMap<ID, SourceName> {
+  let mut result : HashMap<ID, SourceName> =
     HashMap::new();
   for (source_name, source_diff) in source_diffs {
     for (path, file_diff) in &source_diff . file_diffs {

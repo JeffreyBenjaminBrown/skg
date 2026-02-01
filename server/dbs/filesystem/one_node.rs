@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -14,7 +14,7 @@ pub async fn skgnode_from_id (
   driver : &TypeDBDriver,
   skgid  : &ID
 ) -> Result<SkgNode, Box<dyn Error>> {
-  let (pid, source) : (ID, String) =
+  let (pid, source) : (ID, SourceName) =
     pid_and_source_from_id (
       & config.db_name, driver, skgid
     ). await ?
@@ -40,14 +40,14 @@ pub async fn skgnodes_from_ids (
 pub fn skgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : ID,
-  source : &str,
+  source : &SourceName,
 ) -> io::Result<SkgNode> {
   let mut skgnode : SkgNode = {
     let path : String =
       path_from_pid_and_source( config, source, pid );
     read_skgnode( path )? };
   skgnode.source = // needed because it's not serialized
-    source.to_string();
+    source.clone();
   Ok ( skgnode ) }
 
 /// Reads a node from disk, returning None if not found

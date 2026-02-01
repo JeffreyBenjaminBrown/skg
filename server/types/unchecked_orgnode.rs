@@ -7,7 +7,7 @@
 /// to the usual checked type.
 
 use super::git::NodeDiffStatus;
-use super::misc::ID;
+use super::misc::{ID, SourceName};
 use super::orgnode::{
   OrgNode, OrgNodeKind, TrueNode, Scaffold,
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
@@ -38,8 +38,8 @@ pub enum UncheckedOrgNodeKind {
 pub struct UncheckedTrueNode {
   pub title          : String,
   pub body           : Option<String>,
-  pub id_opt         : Option<ID>,       // optional during parsing
-  pub source_opt     : Option<String>,   // optional during parsing
+  pub id_opt         : Option<ID>,
+  pub source_opt     : Option<SourceName>,
   pub parent_ignores : bool,
   pub indefinitive   : bool,
   pub graphStats     : GraphNodeStats,

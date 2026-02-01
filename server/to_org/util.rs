@@ -6,7 +6,7 @@ use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     mk_definitive_orgnode, OrgNode, OrgNodeKind, forest_root_orgnode };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 
@@ -43,7 +43,7 @@ pub async fn skgnode_and_orgnode_from_id (
   skgid  : &ID,
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
-  let (pid_resolved, source) : (ID, String) =
+  let (pid_resolved, source) : (ID, SourceName) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, skgid).await?
     . ok_or_else( || format!(
@@ -57,7 +57,7 @@ pub async fn skgnode_and_orgnode_from_id (
 pub(super) fn skgnode_and_orgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
-  source : &str,
+  source : &SourceName,
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
   let skgnode : &SkgNode =
@@ -70,7 +70,7 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
                  pid ), )) ); }
   let orgnode : OrgNode = mk_definitive_orgnode (
     pid . clone (),
-    source . to_string (),
+    source . clone (),
     title,
     skgnode . body . clone () );
   Ok (( skgnode . clone (), orgnode )) }

@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_s
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
 use crate::types::save::NonMerge_NodeAction;
 use crate::types::skgnode::SkgNode;
-use super::misc::{ID, SkgConfig};
+use super::misc::{ID, SkgConfig, SourceName};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -68,7 +68,7 @@ pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
   map: &'a mut SkgNodeMap,
   config: &SkgConfig,
-  source: &str,
+  source: &SourceName,
 ) -> Result<&'a SkgNode, Box<dyn Error>> {
   if !map.contains_key(id) {
     let skgnode: SkgNode = skgnode_from_pid_and_source(

@@ -4,7 +4,7 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::git::{SourceDiff, FileDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::ListDiffEntry;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::orgnode::{ OrgNode, OrgNodeKind, Scaffold, orgnode_from_scaffold, mk_indefinitive_orgnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
@@ -20,7 +20,7 @@ use std::path::PathBuf;
 /// - insert removed ('phantom') nodes
 pub fn apply_diff_to_forest (
   forest       : &mut Tree<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
+  source_diffs : &HashMap<SourceName, SourceDiff>,
   config       : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let root_id : NodeId =
@@ -38,7 +38,7 @@ pub fn apply_diff_to_forest (
 /// (see remove_regenerable_scaffolds) ever will.
 fn process_node_for_diff (
   mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
+  source_diffs : &HashMap<SourceName, SourceDiff>,
   config       : &SkgConfig,
 ) -> Result<(), String> {
   match &node_mut . value() . kind . clone() {
@@ -52,12 +52,12 @@ fn process_node_for_diff (
 /// - mark NewHere children and insert phantoms for removed children.
 fn process_truenode_diff (
   mut node_mut : NodeMut<OrgNode>,
-  source_diffs : &HashMap<String, SourceDiff>,
+  source_diffs : &HashMap<SourceName, SourceDiff>,
   config       : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
     node_mut . id();
-  let (pid, source) : (ID, String) =
+  let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       node_mut . tree(), tree_node_id, "process_truenode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
@@ -147,7 +147,7 @@ fn process_truenode_contains_diff (
   tree_node_id : NodeId,
   node_changes : &NodeChanges,
   source_diff  : &SourceDiff,
-  source       : &str,
+  source       : &SourceName,
   config       : &SkgConfig,
 ) -> Result<(), String> {
   let added_ids : HashSet<&ID> =
@@ -188,7 +188,7 @@ fn insert_phantom_nodes_for_removed_children (
   node_mut     : &mut NodeMut<OrgNode>,
   node_changes : &NodeChanges,
   source_diff  : &SourceDiff,
-  source       : &str,
+  source       : &SourceName,
   config       : &SkgConfig,
 ) -> Result<(), String> {
   for removed_child_id in &node_changes . contains_diff . removed {
@@ -209,7 +209,7 @@ fn insert_phantom_nodes_for_removed_children (
     node_mut . prepend (
       mk_phantom_orgnode (
         removed_child_id . clone(),
-        source . to_string(),
+        source . clone(),
         child_title,
         child_diff_status )); }
   Ok (()) }
@@ -221,7 +221,7 @@ fn title_for_phantom (
   removed_child_id : &ID,
   child_is_deleted : bool, // gone from worktree, not just here
   source_diff      : &SourceDiff,
-  source           : &str,
+  source           : &SourceName,
   config           : &SkgConfig,
 ) -> Result<String, String> {
   if child_is_deleted {
@@ -242,7 +242,7 @@ fn title_for_phantom (
 /// Create an indefinitive phantom OrgNode with a diff status.
 fn mk_phantom_orgnode (
   id     : ID,
-  source : String,
+  source : SourceName,
   title  : String,
   diff   : NodeDiffStatus,
 ) -> OrgNode {

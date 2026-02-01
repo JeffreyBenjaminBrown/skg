@@ -21,14 +21,9 @@ the collision probability is less than 1 in 1e6. */
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
-/// Each source has a unique nickname, defined in the SkgConfig,
-/// used in OrgNode metadata to track provenance.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SourceNickname ( pub String );
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
-  pub nickname     : String,
+  pub nickname     : SourceName,
   pub path         : PathBuf,
   pub user_owns_it : bool,
 }
@@ -39,7 +34,7 @@ pub struct SkgConfig {
   pub tantivy_folder : PathBuf,
 
   #[serde ( deserialize_with = "deserialize_sources" )]
-  pub sources        : HashMap<String, SkgfileSource>,
+  pub sources        : HashMap<SourceName, SkgfileSource>,
 
   #[serde(default = "default_port")]
   pub port           : u16,  // TCP port for Rust-Emacs comms.
@@ -51,6 +46,11 @@ pub struct SkgConfig {
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 }
 
+/// Each source has a unique nickname, defined in the SkgConfig,
+/// used in OrgNode metadata to track provenance.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SourceName ( pub String );
+
 #[derive(Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
@@ -60,20 +60,19 @@ pub struct TantivyIndex {
   pub source_field         : Field,
 }
 
-
 //
 // Helper Functions
 //
 
 fn deserialize_sources<'de, D> (
   deserializer : D
-) -> Result <HashMap<String, SkgfileSource>, D::Error>
+) -> Result <HashMap<SourceName, SkgfileSource>, D::Error>
 where
   D : Deserializer<'de>
 {
   let sources_vec : Vec<SkgfileSource> =
     Vec::deserialize ( deserializer ) ?;
-  let mut map : HashMap<String, SkgfileSource> =
+  let mut map : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
   for source in sources_vec {
     map.insert (
@@ -105,8 +104,8 @@ impl AsRef<str> for ID {
   fn as_ref(&self) -> &str {
     &self.0 }}
 
-impl Deref for SourceNickname {
-  // lets SourceNickname be used like a String in (more?) cases
+impl Deref for SourceName {
+  // lets SourceName be used like a String
   type Target = String;
   fn deref ( &self ) -> &Self::Target {
     &self.0 }}
@@ -117,7 +116,7 @@ impl fmt::Display for ID {
          -> fmt::Result {
     write! ( f, "{}", self.0 ) }}
 
-impl fmt::Display for SourceNickname {
+impl fmt::Display for SourceName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
@@ -131,27 +130,27 @@ impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
     ID ( s.clone () ) }}
 
-impl From<String> for SourceNickname {
+impl From<String> for SourceName {
   fn from ( s : String ) -> Self {
-    SourceNickname (s) }}
+    SourceName (s) }}
 
-impl From<&String> for SourceNickname {
+impl From<&String> for SourceName {
   fn from ( s : &String ) -> Self {
-    SourceNickname ( s.clone () ) }}
+    SourceName ( s.clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s.to_string () ) }}
 
-impl From <&str> for SourceNickname {
+impl From <&str> for SourceName {
   fn from(s: &str) -> Self {
-    SourceNickname ( s.to_string () ) }}
+    SourceName ( s.to_string () ) }}
 
 impl SkgConfig {
   /// Creates a SkgConfig with dummy values for everything except sources.
   /// Useful for tests that only need to read .skg files.
   pub fn dummyFromSources (
-    sources : HashMap<String, SkgfileSource>
+    sources : HashMap<SourceName, SkgfileSource>
   ) -> Self {
     SkgConfig {
       db_name            : "unused".to_string(),
@@ -164,7 +163,7 @@ impl SkgConfig {
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
   /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
   pub fn fromSourcesAndDbName (
-    sources        : HashMap<String, SkgfileSource>,
+    sources        : HashMap<SourceName, SkgfileSource>,
     db_name        : &str,
     tantivy_folder : &str,
   ) -> Self {
@@ -178,7 +177,7 @@ impl SkgConfig {
 
   pub fn user_owns_source (
     &self,
-    nickname : &str
+    nickname : &SourceName
   ) -> bool {
     self . sources . get ( nickname )
       . map ( |s| s.user_owns_it )

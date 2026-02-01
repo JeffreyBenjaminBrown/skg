@@ -3,7 +3,7 @@
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 use skg::types::orgnode::{EditRequest, OrgNode, OrgNodeKind, TrueNode, forest_root_orgnode, default_truenode};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::MergeInstructionTriple;
@@ -27,7 +27,7 @@ fn mk_test_orgnode (
   let t : TrueNode = TrueNode {
     edit_request,
     .. default_truenode ( ID::from(id),
-                          "main".to_string(),
+                          SourceName::from("main"),
                           title.to_string() ) };
   OrgNode { focused : false,
             folded  : false,
@@ -167,14 +167,16 @@ fn verify_filesystem_after_merge_2_into_1(
   config: &SkgConfig,
   merge_instructions: &[MergeInstructionTriple],
 ) -> Result<(), Box<dyn Error>> {
-  let node_2_path: String = path_from_pid_and_source ( config, "main",
-                                            ID::from("2"));
+  let node_2_path: String =
+    path_from_pid_and_source ( config,
+                               &SourceName::from("main"),
+                               ID::from("2"));
   assert!( !Path::new(&node_2_path).exists(),
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
   let node_1: SkgNode = skgnode_from_pid_and_source(
-    config, ID::from("1"), "main" )?;
+    config, ID::from("1"), &SourceName::from("main") )?;
   assert_eq!(node_1.ids.len(), 3, "Node 1 should have 3 ids");
   assert_eq!(&node_1.ids[0], &ID::from("1"));
   assert_eq!(&node_1.ids[1], &ID::from("2"));
@@ -230,13 +232,16 @@ fn verify_filesystem_after_merge_2_into_1(
              &ID::from("1-overrides-view-of"));
 
   let acquiree_text_preserver_path: String =
-    path_from_pid_and_source ( config, "main",
-                    acquiree_text_preserver_id . clone() );
+    path_from_pid_and_source ( config,
+                               &SourceName::from("main"),
+                               acquiree_text_preserver_id . clone() );
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: SkgNode = skgnode_from_pid_and_source(
-    config, acquiree_text_preserver_id.clone(), "main" )?;
+  let acquiree_text_preserver: SkgNode =
+    skgnode_from_pid_and_source( config,
+                                 acquiree_text_preserver_id.clone(),
+                                 &SourceName::from("main") )?;
   assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
   assert_eq!(acquiree_text_preserver.title, "MERGED: 2");
   assert_eq!(acquiree_text_preserver.body, Some("2 body".to_string()));
@@ -496,13 +501,15 @@ fn verify_filesystem_after_merge_1_into_2(
   merge_instructions: &[MergeInstructionTriple],
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String =
-    path_from_pid_and_source ( config, "main", ID::from("1") );
+    path_from_pid_and_source ( config,
+                               &SourceName::from("main"),
+                               ID::from("1"));
   assert!( !Path::new(&node_1_path).exists(),
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
   let node_2: SkgNode = skgnode_from_pid_and_source(
-    config, ID::from("2"), "main" )?;
+    config, ID::from("2"), &SourceName::from("main") )?;
 
   // Should have 3 ids: [2, 2-extra-id, 1]
   assert_eq!(node_2.ids.len(), 3, "Node 2 should have 3 ids");
@@ -558,13 +565,17 @@ fn verify_filesystem_after_merge_1_into_2(
              &ID::from("1-overrides-view-of"),
              "Node 2 should override view of 1-overrides-view-of");
 
-  let acquiree_text_preserver_path: String = path_from_pid_and_source(
-    config, "main", acquiree_text_preserver_id.clone() );
+  let acquiree_text_preserver_path: String =
+    path_from_pid_and_source( config,
+                              &SourceName::from("main"),
+                              acquiree_text_preserver_id.clone() );
   assert!( Path::new(&acquiree_text_preserver_path).exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: SkgNode = skgnode_from_pid_and_source(
-    config, acquiree_text_preserver_id.clone(), "main" )?;
+  let acquiree_text_preserver: SkgNode =
+    skgnode_from_pid_and_source( config,
+                                 acquiree_text_preserver_id.clone(),
+                                 &SourceName::from("main") )?;
   assert!(acquiree_text_preserver.title.starts_with("MERGED: "));
   assert_eq!(acquiree_text_preserver.title, "MERGED: 1");
   assert_eq!(acquiree_text_preserver.body,

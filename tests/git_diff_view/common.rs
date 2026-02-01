@@ -17,7 +17,7 @@ pub use skg::dbs::typedb::nodes::create_all_nodes;
 pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
-pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex};
+pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
 pub use skg::types::skgnode::SkgNode;
 
 //
@@ -73,10 +73,10 @@ pub async fn setup_test_dbs(
   source_path: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
-  let config = {
-    let mut sources = HashMap::new();
-    sources.insert("main".to_string(), SkgfileSource {
-      nickname: "main".to_string(),
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
+    sources.insert(SourceName::from("main"), SkgfileSource {
+      nickname: SourceName::from("main"),
       path: PathBuf::from(source_path),
       user_owns_it: true,
     });
@@ -89,15 +89,15 @@ pub async fn setup_test_dbs(
     DriverOptions::new(false, None)?
   ).await?;
 
-  let nodes: Vec<SkgNode> = {
-    let mut sources = HashMap::new();
-    sources.insert("main".to_string(), SkgfileSource {
-      nickname: "main".to_string(),
-      path: PathBuf::from(source_path),
-      user_owns_it: true,
-    });
-    read_all_skg_files_from_sources(&SkgConfig::dummyFromSources(sources))?
-  };
+  let nodes : Vec<SkgNode> = {
+    let mut sources : HashMap<SourceName, SkgfileSource> =
+      HashMap::new();
+    sources.insert(SourceName::from("main"),
+                   SkgfileSource { nickname: SourceName::from("main"),
+                                   path: PathBuf::from(source_path),
+                                   user_owns_it: true, });
+    read_all_skg_files_from_sources(
+      &SkgConfig::dummyFromSources(sources))? };
 
   overwrite_new_empty_db(db_name, &driver).await?;
   define_schema(db_name, &driver).await?;

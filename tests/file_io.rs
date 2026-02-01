@@ -10,7 +10,7 @@ use skg::dbs::filesystem::one_node::{
   skgnode_from_pid_and_source, write_skgnode_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::skgnode::{SkgNode, skgnode_example, empty_skgnode};
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::test_utils::run_with_test_db;
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -32,15 +32,15 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : SkgNode = skgnode_example();
-  example.source = "output".to_string();
+  example.source = SourceName::from("output");
   write_skgnode_to_source ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
   let read_node : SkgNode = skgnode_from_pid_and_source (
-    &config, example.ids[0].clone(), "output" ). unwrap ();
+    &config, example.ids[0].clone(), &SourceName::from("output") ). unwrap ();
   let mut reversed = reverse_some_of_node(&read_node);
-  reversed.source = "output".to_string();
+  reversed.source = SourceName::from("output");
   reversed . ids = // match pid to filename
     vec![ ID::new("reversed") ];
 
@@ -50,16 +50,16 @@ fn test_node_io() {
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
 
-  let expected_example_path = "tests/file_io/fixtures/example.skg";
-  let expected_reversed_path = "tests/file_io/fixtures/reversed.skg";
+  let expected_example_path : &str = "tests/file_io/fixtures/example.skg";
+  let expected_reversed_path : &str = "tests/file_io/fixtures/reversed.skg";
 
-  let generated_example =
+  let generated_example : String =
     fs::read_to_string(out_filename).unwrap();
-  let expected_example =
+  let expected_example : String =
     fs::read_to_string(expected_example_path).unwrap();
-  let generated_reversed =
+  let generated_reversed : String =
     fs::read_to_string(reversed_filename).unwrap();
-  let expected_reversed =
+  let expected_reversed : String =
     fs::read_to_string(expected_reversed_path).unwrap();
 
   let parsed_generated_example: serde_yaml::Value =
@@ -91,8 +91,8 @@ fn verify_body_not_needed() {
   ).unwrap();
 
   let mut node = skgnode_from_pid_and_source (
-    &config, ID::new("example"), "fixtures" ) . unwrap();
-  node.source = "output".to_string();
+    &config, ID::new("example"), &SourceName::from("fixtures") ) . unwrap();
+  node.source = SourceName::from("output");
   node.body = None; // mutate it
   node.ids = vec![ID::new("no_unindexed")]; // match pid to filename
   write_skgnode_to_source(
@@ -150,13 +150,13 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   use tempfile::tempdir;
 
   // Create a temporary directory
-  let dir = tempdir()?;
+  let dir : tempfile::TempDir = tempdir()?;
 
   // Create a config with the temp directory as a source
   let config: SkgConfig = {
-    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
-    sources.insert("temp".to_string(), SkgfileSource {
-      nickname: "temp".to_string(),
+    let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
+    sources.insert(SourceName::from("temp"), SkgfileSource {
+      nickname: SourceName::from("temp"),
       path: dir.path().to_path_buf(),
       user_owns_it: true, });
     SkgConfig::dummyFromSources(sources) };
@@ -167,13 +167,13 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
     test_node.aliases = Some(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
     test_node.ids = vec![ID::new("test123")];
-    test_node.source = "temp".to_string();
+    test_node.source = SourceName::from("temp");
     test_node.body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]".to_string()); }
 
   { // Write to a file and read it back.
     write_skgnode_to_source(&test_node, &config)?;
-    let read_node = skgnode_from_pid_and_source(
-      &config, ID::new("test123"), "temp")?;
+    let read_node : SkgNode = skgnode_from_pid_and_source(
+      &config, ID::new("test123"), &SourceName::from("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }
   Ok (( ))

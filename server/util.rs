@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig, SkgfileSource};
+use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ pub fn option_vec_is_empty_or_none<T> (
 
 pub fn path_from_pid_and_source (
   config : &SkgConfig,
-  source : &str,
+  source : &SourceName,
   pid    : ID,
 ) -> String {
   let source_config : &SkgfileSource =

@@ -6,7 +6,7 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
+use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_orgnode::{ UncheckedOrgNode, UncheckedOrgNodeKind, checked_to_unchecked_tree };
@@ -119,11 +119,11 @@ pub async fn populate_test_db_from_fixtures (
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
   let nodes: Vec<SkgNode> = {
-    let mut sources: HashMap<String, SkgfileSource> = HashMap::new();
+    let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources.insert(
-      "main".to_string(),
+      SourceName::from("main"),
       SkgfileSource {
-        nickname: "main".to_string(),
+        nickname: SourceName::from("main"),
         path: PathBuf::from(data_folder),
         user_owns_it: true, } );
     read_all_skg_files_from_sources(
@@ -156,11 +156,11 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
   // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs,
   // not via delete_on_quit, because there's no server to quit.
   let config: SkgConfig = {
-    let mut sources : HashMap<String, SkgfileSource> = HashMap::new();
+    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources.insert (
-      "main".to_string (),
+      SourceName::from("main"),
       SkgfileSource {
-        nickname     : "main".to_string (),
+        nickname     : SourceName::from("main"),
         path         : PathBuf::from ( fixtures_folder ),
         user_owns_it : true, });
     SkgConfig::fromSourcesAndDbName (

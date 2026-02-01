@@ -13,7 +13,7 @@ use crate::to_org::util::{
 use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::orgnode::ViewRequest;
 use crate::types::orgnode::{
     OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
@@ -231,7 +231,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     skgnode_and_orgnode_from_id (
       config, driver, child_skgid, map
     ). await ?;
-  let (id, source, title) : (ID, String, String)
+  let (id, source, title) : (ID, SourceName, String)
   = match &child_orgnode.kind
   { OrgNodeKind::True(t) => (
       t . id . clone(),

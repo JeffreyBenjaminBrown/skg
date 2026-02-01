@@ -1,7 +1,7 @@
 use crate::dbs::tantivy::search_index;
 use crate::org_to_text::orgnode_to_text;
 use crate::serve::util::send_response;
-use crate::types::misc::{TantivyIndex, ID};
+use crate::types::misc::{TantivyIndex, ID, SourceName};
 use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, default_truenode};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 
@@ -122,7 +122,7 @@ fn format_matches_as_org_mode (
             parent_ignores : true,
             .. default_truenode (
               ID::from("search-results"),
-              "search".to_string(),
+              SourceName::from("search"),
               search_terms.to_string() ) } ), } )
     . expect ( "TrueNode rendering never fails" ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
@@ -161,7 +161,7 @@ fn format_matches_as_org_mode (
               indefinitive : true,
               .. default_truenode (
                 ID::from(id.clone()),
-                "search".to_string(),
+                SourceName::from("search"),
                 format! ( "score: {:.2}, [[id:{}][{}]]",
                           score, id, title )) } ), } )
       . expect ( "TrueNode rendering never fails" ));
@@ -178,7 +178,7 @@ fn format_matches_as_org_mode (
                 indefinitive : true,
                 .. default_truenode (
                   ID::from(id.clone()),
-                  "search".to_string(),
+                  SourceName::from("search"),
                   format! ( "score: {:.2}, [[id:{}][{}]]",
                             score, id, title )) } ), } )
         . expect ( "TrueNode rendering never fails" )); }}

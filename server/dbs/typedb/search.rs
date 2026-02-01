@@ -15,7 +15,7 @@ use typedb_driver::{
 
 use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_id_from_node};
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 
 /// Searches containerward recursively until reaching the first node
 /// which is either uncontained or multiply contained.
@@ -249,9 +249,7 @@ pub async fn pid_and_source_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
   skgid  : &ID
-) -> Result < Option<(ID, String)>, Box<dyn Error> > {
-  use Node;
-
+) -> Result < Option<(ID, SourceName)>, Box<dyn Error> > {
   let tx : Transaction =
     driver.transaction (
       db_name, TransactionType::Read
@@ -281,14 +279,14 @@ pub async fn pid_and_source_from_id (
           let primary_id_opt : Option < ID > =
             map . get ( "primary_id" )
             . and_then ( extract_id_from_node );
-          let source_opt : Option < String > =
+          let source_opt : Option < SourceName > =
             map . get ( "source" )
             . and_then ( | node : & Node | {
               if let Node::Leaf ( Some ( leaf ) ) = node {
                 if let Leaf::Concept ( concept ) = leaf {
-                  return Some (
+                  return Some ( SourceName::from (
                     extract_payload_from_typedb_string_rep (
-                      & concept . to_string () ) ); }}
+                      & concept . to_string () ) ) ); }}
               None } );
           if let ( Some ( pid ), Some ( source ) )
             = ( primary_id_opt, source_opt )

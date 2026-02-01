@@ -2,7 +2,7 @@
 // Testing the logic for collecting and reducing duplicate instructions
 
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SourceName};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::NonMerge_NodeAction;
 
@@ -17,7 +17,7 @@ fn create_test_node(
     SkgNode {
         title: title.to_string(),
         aliases,
-        source: "main".to_string(),
+        source: SourceName::from("main"),
         ids: vec![ID::from(id)],
         body,
         contains: Some(contains),

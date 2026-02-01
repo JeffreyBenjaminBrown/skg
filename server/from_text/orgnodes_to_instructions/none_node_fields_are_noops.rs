@@ -13,7 +13,7 @@
 
 use std::io;
 
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::typedb::search::pid_and_source_from_id;
@@ -34,7 +34,7 @@ pub async fn clobber_none_fields_with_data_from_disk (
         "SkgNode has no IDs" ))?
     . clone ();
   // Query TypeDB for PID and source
-  let (pid_resolved, source) : (ID, String) =
+  let (pid_resolved, source) : (ID, SourceName) =
     ( match pid_and_source_from_id(
       &config.db_name, driver, &pid).await?
       { Some(result) => result,

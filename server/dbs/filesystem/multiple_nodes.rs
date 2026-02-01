@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::{read_skgnode, write_skgnode};
-use crate::types::misc::{SkgConfig, SkgfileSource, ID};
+use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
 
@@ -34,11 +34,11 @@ pub fn read_all_skg_files_from_sources (
             let id_str: String = id.as_str().to_string();
             seen_ids.entry(id_str)
               .or_insert_with(Vec::new)
-              .push(nickname.clone()); }}
+              .push(nickname.to_string()); }}
         all_nodes.append(&mut nodes); }
       Err(e) => {
         load_errors.push((
-          nickname.clone(),
+          nickname.to_string(),
           source.path.display().to_string(),
           e.to_string()
         )); }} }
@@ -79,7 +79,7 @@ pub fn read_all_skg_files_from_sources (
   Ok(all_nodes) }
 
 fn read_skg_files_from_folder (
-  source_nickname : &str,
+  source_nickname : &SourceName,
   config          : &SkgConfig,
 ) -> io::Result < Vec<SkgNode> > {
   let source : &SkgfileSource =
@@ -99,7 +99,7 @@ fn read_skg_files_from_folder (
            |ext| ext == "skg") ) { // Some
       let mut skgnode: SkgNode =
         read_skgnode (&path) ?;
-      skgnode.source = source_nickname.to_string();
+      skgnode.source = source_nickname.clone();
       nodes.push (skgnode); }}
   Ok (nodes) }
 
@@ -188,9 +188,9 @@ pub fn write_all_nodes_to_fs (
   // Collect unique source directories and ensure they exist
   use std::collections::HashSet;
   for source_name in {
-    let unique_sources : HashSet<&str> =
+    let unique_sources : HashSet<&SourceName> =
       nodes . iter()
-      . map( |node| node.source.as_str() )
+      . map( |node| &node.source )
       . collect();
     unique_sources } {
     let source_config: &SkgfileSource =

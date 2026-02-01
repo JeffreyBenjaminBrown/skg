@@ -1,4 +1,4 @@
-use super::misc::{ID, SourceNickname};
+use super::misc::{ID, SourceName};
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
@@ -26,12 +26,12 @@ pub enum BufferValidationError {
   Multiple_Defining_Orgnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  InconsistentSources            (ID, HashSet<SourceNickname>), // Multiple orgnodes with same ID have different sources
-  ModifiedForeignNode            (ID, SourceNickname), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
+  InconsistentSources            (ID, HashSet<SourceName>), // Multiple orgnodes with same ID have different sources
+  ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
   DiskSourceBufferSourceConflict (ID,
-                                  SourceNickname, // disk source
-                                  SourceNickname), // buffer source
-  SourceNotInConfig              (ID, SourceNickname),
+                                  SourceName, // disk source
+                                  SourceName), // buffer source
+  SourceNotInConfig              (ID, SourceName),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
@@ -76,7 +76,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::DuplicatedContent(id) =>
         write!(f, "Node has multiple Content children with the same ID {:?}", id),
       BufferValidationError::InconsistentSources(id, sources) => {
-        let source_list: Vec<&SourceNickname> = sources.iter().collect();
+        let source_list: Vec<&SourceName> = sources.iter().collect();
         write!(f, "Multiple orgnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
       BufferValidationError::ModifiedForeignNode(id, source) =>
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),

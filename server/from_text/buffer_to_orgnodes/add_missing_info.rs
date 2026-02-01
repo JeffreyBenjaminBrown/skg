@@ -5,7 +5,7 @@
 
 use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
 use crate::types::orgnode::Scaffold;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -73,7 +73,7 @@ fn inherit_parent_source_if_possible(
       UncheckedOrgNodeKind::True(t) => t.source_opt.is_none(),
       UncheckedOrgNodeKind::Scaff(_) => false, };
   if needs_source {
-    let parent_source : Option<String> =
+    let parent_source : Option<SourceName> =
       node.parent().and_then(|mut p| {
         match &p.value().kind {
           UncheckedOrgNodeKind::True(pt) => pt.source_opt.clone(),

@@ -7,7 +7,7 @@ use crate::to_org::util::{
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::maps::add_v_to_map_if_absent;
@@ -108,17 +108,18 @@ pub fn clobberIndefinitiveOrgnode (
   treeid  : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (node_id, source) : (ID, String) =
+  let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveOrgnode" ) ?;
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk ( &node_id, map, config, &source ) ?;
   let title : String = skgnode . title . clone();
-  let source : String = skgnode . source . clone();
+  let source : SourceName = skgnode . source . clone();
   write_at_node_in_tree ( tree, treeid, |orgnode| {
     let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
       &mut orgnode.kind
-      else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
+      else { panic! (
+             "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
     t . source = source;
     t . body = None; }

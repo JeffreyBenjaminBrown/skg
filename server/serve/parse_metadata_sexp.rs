@@ -16,7 +16,7 @@
 ///                                            [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
 use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold};
@@ -41,7 +41,7 @@ pub struct OrgnodeMetadata {
   pub scaffold: Option<Scaffold>,
   // TrueNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
-  pub source: Option<String>,
+  pub source: Option<SourceName>,
   pub parent_ignores: bool,
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
@@ -76,25 +76,26 @@ pub fn orgnode_from_metadata (
   title    : String,
   body     : Option < String >,
 ) -> ( UncheckedOrgNode, Option < BufferValidationError > ) {
-  let (kind, error) : (UncheckedOrgNodeKind, Option<BufferValidationError>) =
-    if let Some ( ref scaffold ) = metadata . scaffold {
-      let error : Option<BufferValidationError> = if body . is_some () {
-        Some ( BufferValidationError::Body_of_Scaffold (
-          title . clone (),
-          scaffold . repr_in_client () ))
-      } else { None };
-      // For Alias/ID, use the headline title as the string value and apply scaffold_diff
-      let scaffold_with_title : Scaffold = match scaffold {
-        Scaffold::Alias { .. } => Scaffold::Alias {
-                            text: title . clone (),
-                            diff: metadata . scaffold_diff },
-        Scaffold::ID    { .. } => Scaffold::ID {
-                            id: title . clone (),
-                            diff: metadata . scaffold_diff },
-        other => other . clone (),
-      };
-      ( UncheckedOrgNodeKind::Scaff ( scaffold_with_title ), error )
-    } else {
+  let (kind, error)
+    : (UncheckedOrgNodeKind, Option<BufferValidationError>)
+    = if let Some ( ref scaffold ) = metadata . scaffold {
+        let error : Option<BufferValidationError> =
+          if body . is_some () {
+            Some ( BufferValidationError::Body_of_Scaffold (
+              title . clone (),
+              scaffold . repr_in_client () ))
+          } else { None };
+        let scaffold_with_title : Scaffold = match scaffold {
+          // Use headline title for string and apply scaffold_diff
+          Scaffold::Alias { .. } => Scaffold::Alias {
+                              text: title . clone (),
+                              diff: metadata . scaffold_diff },
+          Scaffold::ID    { .. } => Scaffold::ID {
+                              id: title . clone (),
+                              diff: metadata . scaffold_diff },
+          other => other . clone () };
+        ( UncheckedOrgNodeKind::Scaff ( scaffold_with_title ), error )
+      } else {
       // UncheckedTrueNode
       ( UncheckedOrgNodeKind::True ( UncheckedTrueNode {
           title,
@@ -223,7 +224,7 @@ fn parse_node_sexp (
               return Err ( "source requires exactly one value".to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . source = Some ( value ); },
+            metadata . source = Some ( SourceName::from ( value ) ); },
           "graphStats" => {
             parse_graphstats_sexp ( &subitems[1..], &mut metadata . graphStats ) ?; },
           "viewStats" => {

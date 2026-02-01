@@ -6,7 +6,7 @@ use skg::types::skgnode::{empty_skgnode, SkgNode};
 use skg::types::skgnodemap::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNodeMap};
 use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, TrueNode, default_truenode};
 use skg::types::save::NonMerge_NodeAction;
-use skg::types::misc::{ID, SkgConfig, SkgfileSource};
+use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -21,7 +21,7 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     SkgNode {
       title : "Test Node".to_string(),
       ids : vec![id.clone()],
-      source : "main".to_string(),
+      source : SourceName::from("main"),
       .. empty_skgnode()
     };
   let mut map : SkgNodeMap = SkgNodeMap::new();
@@ -31,7 +31,7 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     folded  : false,
     kind    : OrgNodeKind::True (
       default_truenode ( id.clone(),
-                         "main".to_string(),
+                         SourceName::from("main"),
                          "Test".to_string() )) };
   let config : SkgConfig = SkgConfig {
     db_name : "test-db".to_string(),
@@ -64,15 +64,15 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
     folded  : false,
     kind    : OrgNodeKind::True (
       default_truenode ( id,
-                         "main".to_string(),
+                         SourceName::from("main"),
                          "Test".to_string() )) };
-  let sources : HashMap<String, SkgfileSource> = {
+  let sources : HashMap<SourceName, SkgfileSource> = {
     // Config with "main" source pointing to a temp directory
-    let mut s : HashMap<String, SkgfileSource> = HashMap::new();
+    let mut s : HashMap<SourceName, SkgfileSource> = HashMap::new();
     s.insert(
-      "main".to_string(),
+      SourceName::from("main"),
       SkgfileSource {
-        nickname : "main".to_string(),
+        nickname : SourceName::from("main"),
         path     : PathBuf::from("/tmp/nonexistent-skg-dir"),
         user_owns_it : true,
       });

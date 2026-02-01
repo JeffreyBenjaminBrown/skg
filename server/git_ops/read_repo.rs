@@ -1,5 +1,5 @@
 use crate::types::git::PathDiffStatus;
-use crate::types::misc::{ID, SkgConfig, SkgfileSource};
+use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use crate::types::skgnode::SkgNode;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};
@@ -12,7 +12,7 @@ use super::misc::{diff_delta_to_entry, path_relative_to_repo};
 /// Load a SkgNode from git HEAD given its ID and source.
 pub fn skgnode_from_git_head (
   pid    : &ID,
-  src    : &str,
+  src    : &SourceName,
   config : &SkgConfig,
 ) -> Result<SkgNode, Box<dyn StdError>> {
   let source_config : &SkgfileSource =

@@ -4,7 +4,7 @@ use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::pid_and_source_from_id;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::dbs::typedb::util::pids_from_ids::pids_from_ids;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SourceName};
 
 use std::error::Error;
 
@@ -40,8 +40,8 @@ fn test_pid_from_id (
       ) . await ? . unwrap ();
       assert_eq!(pid_for_4,  ID("4" . to_string () ));
       assert_eq!(pid_for_44, ID("4" . to_string () ));
-      assert_eq!(source_for_4,  "main".to_string() );
-      assert_eq!(source_for_44, "main".to_string() );
+      assert_eq!(source_for_4,  SourceName::from("main") );
+      assert_eq!(source_for_44, SourceName::from("main") );
       Ok (( )) } )) }
 
 #[test]

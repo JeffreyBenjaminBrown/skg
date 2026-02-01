@@ -23,7 +23,7 @@
 
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SkgConfig, SourceNickname};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::save::{SaveInstruction, NonMerge_NodeAction};
 use crate::types::skgnode::SkgNode;
 use std::collections::HashMap;
@@ -121,23 +121,23 @@ async fn build_supplemented_save(
   let pid: ID =
     from_buffer.ids.first()
     .ok_or("No primary ID found")?.clone();
-  let source: String = from_buffer.source.clone();
-  let from_disk: Option<SkgNode> =
+  let source : SourceName = from_buffer.source.clone();
+  let from_disk : Option<SkgNode> =
     optskgnode_from_id(config, driver, &pid).await?;
   if let Some(ref disk_node) = from_disk {
     if source != disk_node.source { // sources don't match
       return Err(Box::new(
         BufferValidationError::DiskSourceBufferSourceConflict(
           pid.clone(),
-          SourceNickname::from(disk_node.source.clone()),
-          SourceNickname::from(source.clone())))); }}
-  let supplemented_node: SkgNode = SkgNode {
+          disk_node.source.clone(),
+          source.clone() )) ); }}
+  let supplemented_node : SkgNode = SkgNode {
     title: from_buffer.title.clone(),
     aliases: (
       from_buffer.aliases.clone().or(
         from_disk.as_ref().and_then(
           |node| node.aliases.clone()))),
-    source: source,
+    source,
     ids: supplement_ids( &(from_buffer.clone(),
                            action),
                          &from_disk),
