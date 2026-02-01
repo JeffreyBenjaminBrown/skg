@@ -53,9 +53,7 @@ async fn saveinstructions_from_the_merge_in_an_orgnode(
     Vec::new();
   if let OrgNodeKind::True(t) = &node.kind {
     if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request {
-      let acquirer_id : &ID =
-        t.id_opt.as_ref()
-        .ok_or("Node with merge request must have an ID")?;
+      let acquirer_id : &ID = &t.id;
       let acquirer_from_disk : SkgNode =
         skgnode_from_id(
           config, driver, acquirer_id ). await?;

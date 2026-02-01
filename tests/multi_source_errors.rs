@@ -7,7 +7,7 @@ use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::types::orgnode::{OrgNode};
+use skg::types::unchecked_orgnode::UncheckedOrgNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
@@ -59,7 +59,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut forest: Tree<OrgNode> =
+    let mut forest: Tree<UncheckedOrgNode> =
       org_to_uninterpreted_nodes (&buffer_text)?.0;
     add_missing_info_to_forest(
       &mut forest, &config.db_name, &driver).await?;

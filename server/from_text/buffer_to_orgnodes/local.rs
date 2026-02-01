@@ -2,7 +2,8 @@
 /// These check structural properties of individual nodes
 /// without requiring global context.
 
-use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind, UncheckedTrueNode};
+use crate::types::orgnode::Scaffold;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::orgnode_skgnode::{
   generation_includes_only,
@@ -25,7 +26,7 @@ pub struct LocalStructureError {
 /// Validate the local structure of a node.
 /// Returns Ok(()) if valid, or Err with the error details.
 pub fn validate_local_structure (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result<(), LocalStructureError> {
@@ -35,10 +36,11 @@ pub fn validate_local_structure (
       id: ID::from("<unknown>"),
     }); };
 
-  let errors : Vec<String> = match &node_ref.value().kind {
-    OrgNodeKind::True(t) =>
+  let errors : Vec<String> =
+    match &node_ref.value().kind {
+    UncheckedOrgNodeKind::True(t) =>
       validate_truenode(tree, node_id, t, config),
-    OrgNodeKind::Scaff(s) => match s {
+    UncheckedOrgNodeKind::Scaff(s) => match s {
       Scaffold::BufferRoot =>
         validate_buffer_root(tree, node_id),
       Scaffold::Alias { .. } =>
@@ -60,158 +62,161 @@ pub fn validate_local_structure (
     }};
 
   if errors.is_empty() {
-    Ok(())
+    Ok (( ))
   } else {
-    let id = id_from_self_or_nearest_ancestor(tree, node_id)
-      .unwrap_or_else(|_| ID::from("<no ancestor ID>"));
+    let id : ID =
+      id_from_self_or_nearest_ancestor(tree, node_id)
+      . unwrap_or_else(|_| ID::from("<no ancestor ID>"));
     Err(LocalStructureError {
       message: errors.join("; "),
       id,
-    })
-  }
-}
+    } ) }}
 
 fn validate_buffer_root (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
-  if !generation_does_not_exist(tree, node_id, -1, false) {
-    errors.push("BufferRoot must have no parent.".to_string()); }
-  if !generation_includes_only(tree, node_id, 1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
-    errors.push("BufferRoot's children must be TrueNodes.".to_string()); }
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_does_not_exist(
+    tree, node_id, -1, false)
+  { errors.push("BufferRoot must have no parent.".to_string() ); }
+  if !generation_includes_only(
+    tree, node_id, 1, false,
+    |node| matches!(&node.kind,
+                    UncheckedOrgNodeKind::True(_) ))
+ { errors.push("BufferRoot's children must be TrueNodes."
+                . to_string() ); }
   errors }
 
 fn validate_alias (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors.push("Alias must have no (non-ignored) children.".to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::AliasCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::AliasCol))) {
     errors.push("Alias must have an AliasCol parent.".to_string()); }
   errors }
 
 fn validate_aliascol (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::Alias { .. }))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::Alias { .. }))) {
     errors.push("AliasCol's (non-ignored) children must include only Aliases."
                 . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("AliasCol must have a TrueNode parent.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::AliasCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::AliasCol))) {
     errors.push("AliasCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_hidden_in_subscribee_col (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden).".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::HiddenInSubscribeeCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::HiddenInSubscribeeCol))) {
     errors.push("HiddenInSubscribeeCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_hidden_outside_of_subscribee_col (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::SubscribeeCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::SubscribeeCol))) {
     errors.push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent.".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
     errors.push("HiddenOutsideOfSubscribeeCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_subscribeecol (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("SubscribeeCol must have a TrueNode parent.".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind,
-         OrgNodeKind::True(_) |
-         OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
+         UncheckedOrgNodeKind::True(_) |
+         UncheckedOrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
     errors.push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol.".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors.push("SubscribeeCol must not have duplicate TrueNode children.".to_string()); }
   errors }
 
 fn validate_text_changed (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("TextChanged must have a TrueNode parent.".to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors.push("TextChanged must have no (non-ignroed) children.".to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::TextChanged))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::TextChanged))) {
     errors.push("TextChanged must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_idcol (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::True(_))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::True(_))) {
     errors.push("IDCol must have a TrueNode parent.".to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::ID { .. } )) ) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::ID { .. } )) ) {
     errors.push("IDCol's (non-ignored) children can only be ID scaffolds."
                 . to_string() ); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::IDCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::IDCol))) {
     errors.push("IDCol must be unique among its siblings.".to_string()); }
   errors }
 
 fn validate_idscaffold (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors.push("ID scaffold must have no (non-ignored) children.".to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, OrgNodeKind::Scaff(Scaffold::IDCol))) {
+       matches!(&node.kind, UncheckedOrgNodeKind::Scaff(Scaffold::IDCol))) {
     errors.push("ID scaffold must have an IDCol parent.".to_string()); }
   errors }
 
 fn validate_truenode (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
-  t       : &TrueNode,
+  t       : &UncheckedTrueNode,
   config  : &SkgConfig,
 ) -> Vec<String> {
-  let mut errors = Vec::new();
+  let mut errors : Vec<String> = Vec::new();
   if !has_id(t) {
     errors.push("TrueNode must have an ID.".to_string()); }
   if !has_valid_source(t, config) {
@@ -219,11 +224,11 @@ fn validate_truenode (
                 . to_string() ); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node.kind,
-         OrgNodeKind::True(_)                        |
-         OrgNodeKind::Scaff(Scaffold::AliasCol)      |
-         OrgNodeKind::Scaff(Scaffold::IDCol)         |
-         OrgNodeKind::Scaff(Scaffold::SubscribeeCol) |
-         OrgNodeKind::Scaff(Scaffold::TextChanged))) {
+         UncheckedOrgNodeKind::True(_)                        |
+         UncheckedOrgNodeKind::Scaff(Scaffold::AliasCol)      |
+         UncheckedOrgNodeKind::Scaff(Scaffold::IDCol)         |
+         UncheckedOrgNodeKind::Scaff(Scaffold::SubscribeeCol) |
+         UncheckedOrgNodeKind::Scaff(Scaffold::TextChanged))) {
     errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, or TextChanged".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors.push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).".to_string()); }
@@ -231,13 +236,13 @@ fn validate_truenode (
     errors.push("Indefinitive node must not have an edit request.".to_string()); }
   errors }
 
-/// Check if a TrueNode has an ID.
-pub fn has_id ( t : &TrueNode ) -> bool {
+/// Check if an UncheckedTrueNode has an ID.
+pub fn has_id ( t : &UncheckedTrueNode ) -> bool {
   t.id_opt.is_some() }
 
-/// Check if a TrueNode has a source and it exists in the config.
+/// Check if an UncheckedTrueNode has a source and it exists in the config.
 pub fn has_valid_source (
-  t      : &TrueNode,
+  t      : &UncheckedTrueNode,
   config : &SkgConfig,
 ) -> bool {
   t.source_opt.as_ref()
@@ -248,14 +253,14 @@ pub fn has_valid_source (
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
 pub fn nonignored_children_have_distinct_ids (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
 ) -> bool {
   let Some(node_ref) = tree.get(node_id)
     else { return true; };
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref.children() {
-    if let OrgNodeKind::True(t) = &child.value().kind {
+    if let UncheckedOrgNodeKind::True(t) = &child.value().kind {
       if !t.parent_ignores {
         if let Some(id) = &t.id_opt {
           if !seen.insert(id.clone()) {

@@ -91,14 +91,8 @@ fn skgnode_for_orgnode_in_tree<'a> (
       . to_string()) };
   let title : String = t.title.clone();
   let body : Option<String> = t.body.clone();
-  let ids : Vec<ID> = match &t.id_opt {
-    Some(id) => vec![id.clone()],
-    None => return Err(format!(
-      "Node entitled '{}' has no ID", title)) };
-  let source : String = match &t.source_opt {
-    Some(s) => s.clone(),
-    None => return Err(format!(
-      "Node entitled '{}' has no source", title)) };
+  let ids : Vec<ID> = vec![t.id.clone()];
+  let source : String = t.source.clone();
   Ok ( SkgNode {
     title,
     aliases,
@@ -137,10 +131,7 @@ fn collect_subscribees (
           match &child_node.kind {
             OrgNodeKind::True(t) => {
               if !t.parent_ignores {
-                match &t.id_opt {
-                  Some(id) => subscribees.push(id.clone()),
-                  None => return Err(format!(
-                    "Subscribee '{}' has no ID", t.title)), }}},
+                subscribees.push(t.id.clone()); }},
             OrgNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
             OrgNodeKind::Scaff(s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
@@ -167,6 +158,5 @@ fn collect_contents_that_are_not_to_delete<'a> (
          && !is_phantom
          && ! matches!( t . edit_request,
                         Some(EditRequest::Delete))
-      { if let Some(id) = &t.id_opt
-          { contents.push(id.clone()); }} } }
+      { contents.push(t.id.clone()); } } }
   contents }

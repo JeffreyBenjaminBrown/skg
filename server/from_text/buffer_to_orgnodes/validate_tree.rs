@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
@@ -19,7 +19,7 @@ use typedb_driver::TypeDBDriver;
 /// SHARES RESPONSIBILITY for error detection
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
-/// because this one acts on a tree of OrgNodes rather than raw text.
+/// because this one acts on a tree of UncheckedOrgNodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
 /// ASSUMES that in the "forest" (tree with BufferRoot):
@@ -28,7 +28,7 @@ use typedb_driver::TypeDBDriver;
 ///   might refer to the same skg node, yet appear not to.)
 /// - All nodes have sources, per 'inherit_parent_source_if_possible'.
 pub async fn find_buffer_errors_for_saving (
-  forest: &Tree<OrgNode>,
+  forest: &Tree<UncheckedOrgNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -83,16 +83,16 @@ pub async fn find_buffer_errors_for_saving (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  forest : &Tree<OrgNode>, // "forest" = tree with BufferRoot
+  forest : &Tree<UncheckedOrgNode>, // "forest" = tree with BufferRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
   for edge in forest.root().traverse()
   { if let Edge::Open(node_ref) = edge
-    { let orgnode : &OrgNode =
+    { let orgnode : &UncheckedOrgNode =
         node_ref.value();
-      if let OrgNodeKind::True(t) = &orgnode.kind
+      if let UncheckedOrgNodeKind::True(t) = &orgnode.kind
       { if t.view_requests.contains( &ViewRequest::Definitive )
         { if let Some(id) = &t.id_opt {
           { // Error: must be indefinitive

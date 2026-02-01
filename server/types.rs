@@ -5,6 +5,7 @@ pub mod errors;
 pub mod git;
 pub mod list;
 pub mod orgnode;
+pub mod unchecked_orgnode;
 pub mod skgnode;
 pub mod skgnodemap;
 pub mod save;

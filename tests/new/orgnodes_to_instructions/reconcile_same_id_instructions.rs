@@ -11,6 +11,7 @@ use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::re
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 use skg::types::save::NonMerge_NodeAction;
+use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use std::error::Error;
 
 #[test]
@@ -20,11 +21,12 @@ fn test_inconsistent_delete() {
         * (skg (node (id 1) (source main) (editRequest delete))) 2
     "};
 
-  let forest = org_to_uninterpreted_nodes(input).unwrap().0;
-  let (inconsistent_deletes, _, _) = find_inconsistent_instructions(&forest);
+  let unchecked_forest = org_to_uninterpreted_nodes(input).unwrap().0;
+  let (inconsistent_deletes, _, _) = find_inconsistent_instructions(&unchecked_forest);
   assert!(!inconsistent_deletes.is_empty(),
           "Should detect inconsistent toDelete");
 
+  let forest = unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions =
     naive_saveinstructions_from_forest(forest)
     . unwrap();
@@ -54,7 +56,8 @@ fn test_deletions_excluded (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let forest = org_to_uninterpreted_nodes(input)?.0;
+      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+      let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
@@ -90,7 +93,8 @@ fn test_defining_node_defines (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let forest = org_to_uninterpreted_nodes(input)?.0;
+      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+      let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
@@ -120,7 +124,8 @@ fn test_adding_without_definer (
             ** (skg (node (id 4) (source main))) 4
             ** (skg (node (id 4) (source main) indefinitive)) 4 again
         "};
-      let forest = org_to_uninterpreted_nodes(input)?.0;
+      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+      let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_forest(forest)?;
       let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;

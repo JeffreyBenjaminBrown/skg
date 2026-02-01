@@ -7,7 +7,6 @@ use crate::to_org::util::{
 use crate::to_org::complete::aliascol::completeAliasCol;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -121,42 +120,8 @@ pub fn clobberIndefinitiveOrgnode (
       &mut orgnode.kind
       else { panic! ( "clobberIndefinitiveOrgnode: expected TrueNode" ) };
     t . title = title;
-    t . source_opt = Some ( source );
+    t . source = source;
     t . body = None; }
   ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
 
-  Ok (( )) }
-
-/// Noop for Scaffolds. Otherwise, ensures the node has a source.
-/// If needed, fetches the data from TypeDB.
-pub async fn ensure_source (
-  tree    : &mut Tree<OrgNode>,
-  node_id : NodeId,
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let needs_source : bool =
-    read_at_node_in_tree (
-      tree, node_id,
-      |orgnode| matches! ( &orgnode . kind,
-                      OrgNodeKind::True(t)
-                      if t . source_opt . is_none () ))
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-  if needs_source {
-    let node_pid : ID =
-      get_id_from_treenode ( tree, node_id ) ?;
-    let (_pid, source) : (ID, String) =
-      pid_and_source_from_id (
-        db_name, driver, &node_pid ) . await ?
-      . ok_or_else ( || format! (
-        "ensure_source: could not find source for ID {:?}",
-        node_pid ) ) ?;
-    write_at_node_in_tree (
-      tree, node_id,
-      |orgnode| {
-        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-          &mut orgnode.kind
-          else { panic! ( "ensure_source: expected TrueNode" ) };
-        t . source_opt = Some ( source ); } )
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
   Ok (( )) }

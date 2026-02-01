@@ -5,6 +5,7 @@ use std::error::Error;
 
 use skg::to_org::complete::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::orgnode::OrgNode;
 use skg::types::misc::SkgConfig;
@@ -31,7 +32,7 @@ async fn test_completeAliasCol_logic (
   // Create org text with three AliasCol scenarios
   let org_text : &str =
     indoc! { "
-      * (skg (node (id a))) a
+      * (skg (node (id a) (source main))) a
       ** (skg aliasCol) aliases 1
       *** (skg alias) c
       *** (skg alias) d
@@ -44,8 +45,10 @@ async fn test_completeAliasCol_logic (
       ** (skg alias) the above should break
     " };
 
-  let mut forest : Tree < OrgNode > =
+  let unchecked_forest =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
+  let mut forest : Tree < OrgNode > =
+    unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
@@ -174,7 +177,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   let org_text : &str =
     indoc! { "
-      * (skg (node (id a))) a
+      * (skg (node (id a) (source main))) a
       ** (skg aliasCol) aliases
       *** (skg alias) b
       *** (skg focused alias) b
@@ -183,8 +186,10 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       *** (skg alias) b
     " };
 
-  let mut forest : Tree < OrgNode > =
+  let unchecked_forest =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
+  let mut forest : Tree < OrgNode > =
+    unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 

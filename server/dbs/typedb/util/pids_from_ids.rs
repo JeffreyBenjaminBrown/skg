@@ -10,33 +10,32 @@ use typedb_driver::{
 use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
   extract_id_from_map,
   build_id_disjunction};
 
-
 /// Collect IDs for bulk PID lookup
-pub fn collect_ids_in_orgnode_tree (
-  node_ref : NodeRef < OrgNode >,
+pub fn collect_ids_in_tree (
+  node_ref : NodeRef < UncheckedOrgNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let OrgNodeKind::True ( t ) =
+  if let UncheckedOrgNodeKind::True ( t ) =
     &node_ref . value () . kind
   { if let Some ( id ) = &t . id_opt
     { ids_to_lookup . push ( id . clone () ); }}
   for child in node_ref . children () { // Recurse
-    collect_ids_in_orgnode_tree (
+    collect_ids_in_tree (
       child,
       ids_to_lookup ); } }
 
-pub fn assign_pids_throughout_orgnode_tree_from_map (
-  mut node_ref : NodeMut < OrgNode >,
+pub fn assign_pids_throughout_tree_from_map (
+  mut node_ref : NodeMut < UncheckedOrgNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let OrgNodeKind::True(t)
+  if let UncheckedOrgNodeKind::True(t)
   = &mut node_ref . value() . kind
   { let pid_opt : Option < ID > = t . id_opt . as_ref ()
       . and_then ( |id| pid_map . get ( id ) )
@@ -47,14 +46,14 @@ pub fn assign_pids_throughout_orgnode_tree_from_map (
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
-        let tree : &Tree<OrgNode> = node_ref . tree ();
+        let tree : &Tree<UncheckedOrgNode> = node_ref . tree ();
         tree . get ( treeid ) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };
       child_treeids } {
       if let Some ( child_mut )
         = node_ref . tree () . get_mut ( child_treeid )
-      { assign_pids_throughout_orgnode_tree_from_map (
+      { assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// PURPOSE: Run one TypeDB query, using nested subqueries,

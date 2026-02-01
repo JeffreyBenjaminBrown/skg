@@ -15,7 +15,7 @@ pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
 /// Extract SkgNode for an OrgNode from the map (tried first) or disk.
 /// Updates the map if needed.
-/// Returns None for Scaffolds, TrueNodes without IDs, or TrueNodes without sources.
+/// Returns None for Scaffolds.
 pub fn skgnode_for_orgnode<'a> (
   orgnode : &OrgNode,
   map     : &'a mut SkgNodeMap,
@@ -23,13 +23,10 @@ pub fn skgnode_for_orgnode<'a> (
 ) -> Result<Option<&'a SkgNode>, Box<dyn Error>>
 { match &orgnode.kind {
     OrgNodeKind::True(t) => {
-      match (&t.id_opt, &t.source_opt) {
-        (Some(id), Some(source)) => {
-          let skgnode : &SkgNode =
-            skgnode_from_map_or_disk(
-              id, map, config, source)?;
-          Ok(Some(skgnode)) },
-        _ => Ok(None) }},  // No ID or no source
+      let skgnode : &SkgNode =
+        skgnode_from_map_or_disk(
+          &t.id, map, config, &t.source)?;
+      Ok(Some(skgnode)) },
     OrgNodeKind::Scaff(_) => Ok(None),
   }}
 
@@ -85,8 +82,7 @@ fn collect_ids_from_subtree (
     tree . get ( node_id ) . unwrap ();
   if let OrgNodeKind::True ( t )
     = &node_ref . value () . kind
-    { if let Some ( id ) = &t . id_opt {
-        ids_out . push ( id . clone () ); }}
+    { ids_out . push ( t . id . clone () ); }
   for child in node_ref . children () {
     collect_ids_from_subtree (
       tree, child . id (), ids_out ); }}

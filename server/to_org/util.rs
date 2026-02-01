@@ -199,12 +199,8 @@ pub fn collect_ids_from_tree (
   let mut pids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open ( node_ref ) = edge {
-      let pid_opt : Option<&ID>
-      = match &node_ref . value () . kind
-      { OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
-        OrgNodeKind::Scaff ( _ ) => None };
-      if let Some ( pid ) = pid_opt {
-        pids . push ( pid . clone( )); }} }
+      if let OrgNodeKind::True ( t ) = &node_ref . value () . kind {
+        pids . push ( t . id . clone( )); }} }
   pids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
@@ -220,7 +216,7 @@ fn is_ancestor_id (
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
       |orgnode| match &orgnode . kind {
-        OrgNodeKind::True ( t ) => t . id_opt . clone (),
+        OrgNodeKind::True ( t ) => Some ( t . id . clone () ),
         OrgNodeKind::Scaff ( _ ) => None } )
     { Ok(Some(id)) if &id == target_skgid
         => return Ok(true),
@@ -228,7 +224,7 @@ fn is_ancestor_id (
       Err(_) => return Ok(false), }}
   unreachable!() }
 
-/// Errors if the node is a Scaffold, not found, or has no ID.
+/// Errors if the node is a Scaffold or not found.
 pub fn get_id_from_treenode (
   tree   : &Tree<OrgNode>,
   treeid : NodeId,
@@ -238,9 +234,7 @@ pub fn get_id_from_treenode (
       tree, treeid, |orgnode| orgnode.kind.clone() )?;
   match node_kind {
     OrgNodeKind::Scaff ( _ ) => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
-    OrgNodeKind::True ( t ) =>
-      t . id_opt . ok_or_else (
-        || "get_id_from_treenode: node has no ID" . into( )) }}
+    OrgNodeKind::True ( t ) => Ok ( t . id ) }}
 
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.

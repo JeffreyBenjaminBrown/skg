@@ -9,6 +9,7 @@ use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::orgnode::OrgNode;
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
 use crate::types::save::{MergeInstructionTriple, SaveInstruction};
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -32,27 +33,28 @@ pub async fn buffer_to_orgnode_forest_and_save_instructions (
       Vec<SaveInstruction>,
       Vec<MergeInstructionTriple>
     ), SaveError> {
-  let ( mut orgnode_forest, parsing_errors )
-    : ( Tree<OrgNode>, Vec<BufferValidationError> )
+  let ( mut unchecked_forest, parsing_errors )
+    : ( Tree<UncheckedOrgNode>, Vec<BufferValidationError> )
     = org_to_uninterpreted_nodes ( buffer_text )
       . map_err ( SaveError::ParseError ) ?;
   add_missing_info_to_forest (
     // Precedes all validation functions.
     // For why, see the header comment of one of them,
     // 'find_buffer_errors_for_saving'.
-    & mut orgnode_forest, & config . db_name, driver
+    & mut unchecked_forest, & config . db_name, driver
   ). await . map_err ( SaveError::DatabaseError ) ?;
-
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
       find_buffer_errors_for_saving (
-        & orgnode_forest, config, driver
+        & unchecked_forest, config, driver
       ) . await . map_err ( SaveError::DatabaseError ) ?;
     validation_errors . extend ( parsing_errors );
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
-
+  let orgnode_forest : Tree<OrgNode> =
+    unchecked_to_checked_tree ( unchecked_forest )
+      . map_err ( |e| SaveError::ParseError ( e ) ) ?;
   let nonmerge_instructions : Vec<SaveInstruction> =
     validate_and_filter_foreign_instructions (
       { let nonmerge_instructions : Vec<SaveInstruction> =

@@ -4,7 +4,7 @@
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_orgnodemd, default_metadata, orgnode_from_metadata, OrgnodeMetadata };
-use crate::types::orgnode::{forest_root_orgnode, OrgNode};
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_forest_root_orgnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
@@ -35,15 +35,15 @@ struct OrgNodeLineCol {
 /// SHARES RESPONSIBILITY for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
 /// That function detects the majority of possible errors,
-/// but it can't detect them all because it uses a tree of OrgNodes,
+/// but it can't detect them all because it uses a tree of UncheckedOrgNodes,
 /// which permit fewer kinds of invalid state than the raw text.
 /// (For instance, Alias and AliasCol cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result < ( Tree<OrgNode>, Vec<BufferValidationError> ),
+) -> Result < ( Tree<UncheckedOrgNode>, Vec<BufferValidationError> ),
               String > {
-  let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+  let mut forest: Tree<UncheckedOrgNode> = Tree::new(unchecked_forest_root_orgnode());
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
@@ -54,7 +54,7 @@ pub fn org_to_uninterpreted_nodes(
       divide_into_orgNodeLineCols(input)?;
     org_node_line_cols } {
     let (level, orgnode, error_opt)
-      : (usize, OrgNode, Option<BufferValidationError>)
+      : (usize, UncheckedOrgNode, Option<BufferValidationError>)
       = linecol_to_orgnode(org_node_line_col)?;
     if let Some ( error ) = error_opt {
       parsing_errors . push ( error ); }
@@ -70,7 +70,7 @@ pub fn org_to_uninterpreted_nodes(
     treeid_stack.push( {
       let parent_treeid: NodeId = *treeid_stack.last().unwrap();
       let new_treeid: NodeId = {
-        let mut parent_mut : NodeMut<OrgNode> =
+        let mut parent_mut : NodeMut<UncheckedOrgNode> =
           forest.get_mut(parent_treeid).unwrap();
         parent_mut.append(orgnode).id() };
       new_treeid } ); }
@@ -115,12 +115,12 @@ fn divide_into_orgNodeLineCols (
   }
   Ok (result) }
 
-/// Create a OrgNode from an OrgNodeLineCol.
+/// Create an UncheckedOrgNode from an OrgNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns (level, OrgNode, Option<BufferValidationError>).
+/// Returns (level, UncheckedOrgNode, Option<BufferValidationError>).
 fn linecol_to_orgnode(
   org_node_line_col: &OrgNodeLineCol
-) -> Result < ( usize, OrgNode, Option<BufferValidationError> ),
+) -> Result < ( usize, UncheckedOrgNode, Option<BufferValidationError> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
     org_node_line_col.headline.clone();
@@ -134,7 +134,7 @@ fn linecol_to_orgnode(
     } else { // No metadata, so use defaults.
       default_metadata () };
   let ( orgnode, error_opt )
-    : ( OrgNode, Option<BufferValidationError> )
+    : ( UncheckedOrgNode, Option<BufferValidationError> )
     = orgnode_from_metadata ( &metadata, title, body_text );
   Ok ( ( level, orgnode, error_opt ) ) }
 

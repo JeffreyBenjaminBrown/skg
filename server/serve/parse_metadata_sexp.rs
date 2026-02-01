@@ -19,9 +19,9 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::ID;
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest};
-use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, TrueNode,
+use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold};
+use crate::types::unchecked_orgnode::{
+    UncheckedOrgNode, UncheckedOrgNodeKind, UncheckedTrueNode,
 };
 
 use sexp::Sexp;
@@ -68,15 +68,15 @@ pub fn default_metadata() -> OrgnodeMetadata {
     truenode_diff: None,
     scaffold_diff: None, }}
 
-/// Create an OrgNode from parsed metadata components.
-/// This is the bridge between parsing (OrgnodeMetadata) and runtime (OrgNode).
-/// Returns (OrgNode, Option<BufferValidationError>) - error if Scaffold has body.
+/// Create an UncheckedOrgNode from parsed metadata components.
+/// This is the bridge between parsing (OrgnodeMetadata) and runtime (UncheckedOrgNode).
+/// Returns (UncheckedOrgNode, Option<BufferValidationError>) - error if Scaffold has body.
 pub fn orgnode_from_metadata (
   metadata : &OrgnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( OrgNode, Option < BufferValidationError > ) {
-  let (kind, error) : (OrgNodeKind, Option<BufferValidationError>) =
+) -> ( UncheckedOrgNode, Option < BufferValidationError > ) {
+  let (kind, error) : (UncheckedOrgNodeKind, Option<BufferValidationError>) =
     if let Some ( ref scaffold ) = metadata . scaffold {
       let error : Option<BufferValidationError> = if body . is_some () {
         Some ( BufferValidationError::Body_of_Scaffold (
@@ -93,10 +93,10 @@ pub fn orgnode_from_metadata (
                             diff: metadata . scaffold_diff },
         other => other . clone (),
       };
-      ( OrgNodeKind::Scaff ( scaffold_with_title ), error )
+      ( UncheckedOrgNodeKind::Scaff ( scaffold_with_title ), error )
     } else {
-      // TrueNode
-      ( OrgNodeKind::True ( TrueNode {
+      // UncheckedTrueNode
+      ( UncheckedOrgNodeKind::True ( UncheckedTrueNode {
           title,
           body,
           id_opt           : metadata . id . clone (),
@@ -110,9 +110,9 @@ pub fn orgnode_from_metadata (
           diff             : metadata . truenode_diff, } ),
         None )
     };
-  ( OrgNode { focused : metadata.focused,
-              folded  : metadata.folded,
-              kind },
+  ( UncheckedOrgNode { focused : metadata.focused,
+                       folded  : metadata.folded,
+                       kind },
     error ) }
 
 

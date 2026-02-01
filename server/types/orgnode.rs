@@ -34,8 +34,8 @@ pub enum OrgNodeKind {
 pub struct TrueNode {
   pub title          : String,
   pub body           : Option < String >,
-  pub id_opt         : Option < ID >,
-  pub source_opt     : Option < String >,
+  pub id             : ID,
+  pub source         : String,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
@@ -257,13 +257,6 @@ impl OrgNode {
       OrgNodeKind::True ( t ) => t . body . as_ref (),
       OrgNodeKind::Scaff ( _ ) => None,
     }}
-
-  /// PITFALL: Don't let this convince you a Scaff can have an ID.
-  pub fn id_opt ( &self ) -> Option<&ID> {
-    match &self . kind {
-      OrgNodeKind::True ( t ) => t . id_opt . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
-    }}
 }
 
 impl fmt::Display for EditRequest {
@@ -328,33 +321,30 @@ impl Default for ViewNodeStats {
       parentIsContent   : false,
     }} }
 
-impl Default for TrueNode {
-  fn default () -> Self {
-    TrueNode {
-      title            : String::new (),
-      body             : None,
-      id_opt           : None,
-      source_opt       : None,
-      parent_ignores   : false,
-      indefinitive     : false,
-      graphStats       : GraphNodeStats::default (),
-      viewStats        : ViewNodeStats::default (),
-      edit_request     : None,
-      view_requests    : HashSet::new (),
-      diff             : None,
-    }} }
-
-impl Default for OrgNode {
-  fn default () -> Self {
-    OrgNode {
-      focused : false,
-      folded  : false,
-      kind    : OrgNodeKind::True ( TrueNode::default () ),
-    }} }
-
 //
 // Constructor functions
 //
+
+/// Create a TrueNode with default values for all fields except id, source, and title.
+/// Useful when you need to customize other fields after construction.
+pub fn default_truenode (
+  id     : ID,
+  source : String,
+  title  : String,
+) -> TrueNode {
+  TrueNode {
+    title,
+    body           : None,
+    id,
+    source,
+    parent_ignores : false,
+    indefinitive   : false,
+    graphStats     : GraphNodeStats::default(),
+    viewStats      : ViewNodeStats::default(),
+    edit_request   : None,
+    view_requests  : HashSet::new(),
+    diff           : None,
+  }}
 
 pub fn mk_definitive_orgnode (
   id     : ID,
@@ -400,23 +390,16 @@ pub fn mk_orgnode (
   edit_request   : Option < EditRequest >,
   view_requests  : HashSet < ViewRequest >,
 ) -> OrgNode {
-  OrgNode {
-    focused : false,
-    folded  : false,
-    kind    : OrgNodeKind::True ( TrueNode {
-      title,
-      body,
-      id_opt           : Some ( id ),
-      source_opt       : Some ( source ),
-      parent_ignores,
-      indefinitive,
-      graphStats       : GraphNodeStats::default (),
-      viewStats        : ViewNodeStats::default (),
-      edit_request,
-      view_requests,
-      diff             : None,
-    }),
-  }}
+  OrgNode { focused : false,
+            folded  : false,
+            kind    : OrgNodeKind::True (
+              TrueNode { body,
+                         parent_ignores,
+                         indefinitive,
+                         edit_request,
+                         view_requests,
+                         .. default_truenode (
+                           id, source, title ) } ) }}
 
 /// Create a Scaffold OrgNode from a Scaffold.
 pub fn orgnode_from_scaffold ( scaffold : Scaffold ) -> OrgNode {

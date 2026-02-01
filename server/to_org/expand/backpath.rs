@@ -234,8 +234,8 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   let (id, source, title) : (ID, String, String)
   = match &child_orgnode.kind
   { OrgNodeKind::True(t) => (
-      t . id_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores: node has no ID")? . clone(),
-      t . source_opt . as_ref() . ok_or("prepend_indefinitive_child_with_parent_ignores: node has no source")? . clone(),
+      t . id . clone(),
+      t . source . clone(),
       t . title . clone() ),
     OrgNodeKind::Scaff(_) =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };

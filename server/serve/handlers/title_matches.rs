@@ -1,11 +1,9 @@
-use crate::serve::util::send_response;
-use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::dbs::tantivy::search_index;
-use crate::types::orgnode::{
-  OrgNode, OrgNodeKind, TrueNode,
-};
-use crate::types::misc::TantivyIndex;
 use crate::org_to_text::orgnode_to_text;
+use crate::serve::util::send_response;
+use crate::types::misc::{TantivyIndex, ID};
+use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, default_truenode};
+use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 
 use sexp::Sexp;
 use std::collections::HashMap;
@@ -118,13 +116,14 @@ fn format_matches_as_org_mode (
       & OrgNode {
         focused : false,
         folded  : false,
-        kind    : OrgNodeKind::True ( TrueNode {
-          title :
-          ( // The unique level-1 headline states the search terms.
-            search_terms.to_string ()),
-          parent_ignores : true,
-          ..TrueNode::default ()
-        } ), } )
+        kind    : OrgNodeKind::True (
+          // The unique level-1 headline states the search terms.
+          TrueNode {
+            parent_ignores : true,
+            .. default_truenode (
+              ID::from("search-results"),
+              "search".to_string(),
+              search_terms.to_string() ) } ), } )
     . expect ( "TrueNode rendering never fails" ));
   let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
     : Vec < ( String,               // ID
@@ -157,11 +156,14 @@ fn format_matches_as_org_mode (
         & OrgNode {
           focused : false,
           folded  : false,
-          kind    : OrgNodeKind::True ( TrueNode {
-            title : format! (
-              "score: {:.2}, [[id:{}][{}]]",
-              score, id, title ),
-            ..TrueNode::default () } ), } )
+          kind    : OrgNodeKind::True (
+            TrueNode {
+              indefinitive : true,
+              .. default_truenode (
+                ID::from(id.clone()),
+                "search".to_string(),
+                format! ( "score: {:.2}, [[id:{}][{}]]",
+                          score, id, title )) } ), } )
       . expect ( "TrueNode rendering never fails" ));
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
@@ -171,11 +173,14 @@ fn format_matches_as_org_mode (
           & OrgNode {
             focused : false,
             folded  : false,
-            kind    : OrgNodeKind::True ( TrueNode {
-              title : format! (
-                "score: {:.2}, [[id:{}][{}]]",
-                score, id, title ),
-              ..TrueNode::default () } ), } )
+            kind    : OrgNodeKind::True (
+              TrueNode {
+                indefinitive : true,
+                .. default_truenode (
+                  ID::from(id.clone()),
+                  "search".to_string(),
+                  format! ( "score: {:.2}, [[id:{}][{}]]",
+                            score, id, title )) } ), } )
         . expect ( "TrueNode rendering never fails" )); }}
   result }
 

@@ -173,16 +173,15 @@ fn mark_newhere_children (
     let mut child : NodeMut<OrgNode> =
       node_mut . tree() . get_mut ( child_id ) . unwrap();
     if let OrgNodeKind::True ( ref mut t ) = child . value() . kind {
-      if let Some ( ref id ) = t . id_opt {
-        if added_ids . contains ( id ) {
-          let child_file_path : PathBuf =
-            PathBuf::from ( format! ( "{}.skg", id . 0 ));
-          let is_new_file : bool =
-            source_diff . file_diffs . get ( &child_file_path )
-              . map ( |fd| fd . status == GitDiffStatus::Added )
-              . unwrap_or ( false );
-          if ! is_new_file {
-            t . diff = Some ( NodeDiffStatus::NewHere ); }} }} }}
+      if added_ids . contains ( &t.id ) {
+        let child_file_path : PathBuf =
+          PathBuf::from ( format! ( "{}.skg", t.id . 0 ));
+        let is_new_file : bool =
+          source_diff . file_diffs . get ( &child_file_path )
+            . map ( |fd| fd . status == GitDiffStatus::Added )
+            . unwrap_or ( false );
+        if ! is_new_file {
+          t . diff = Some ( NodeDiffStatus::NewHere ); }} } }}
 
 /// Insert phantom nodes for children removed from contents.
 fn insert_phantom_nodes_for_removed_children (

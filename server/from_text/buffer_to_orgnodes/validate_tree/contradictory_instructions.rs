@@ -1,5 +1,5 @@
 use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
 use crate::types::misc::{ID, SourceNickname};
 
 use ego_tree::{Tree,NodeRef};
@@ -32,7 +32,7 @@ enum WhetherToDelete {
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  forest: &Tree<OrgNode>
+  forest: &Tree<UncheckedOrgNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, // IDs with inconsistent sources
@@ -65,13 +65,13 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn collect_instructions(
-  forest: &Tree<OrgNode> // "forest" = tree with BufferRoot
+  forest: &Tree<UncheckedOrgNode> // "forest" = tree with BufferRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, usize>, // defining containers
       HashMap<ID, HashSet<SourceNickname>>) { // sources
 
   fn collect_instructions_rec(
-    node_ref: NodeRef<OrgNode>,
+    node_ref: NodeRef<UncheckedOrgNode>,
     id_toDelete_instructions: &mut
       HashMap<ID, HashSet<WhetherToDelete>>,
     id_defining_count: &mut
@@ -79,8 +79,8 @@ fn collect_instructions(
     id_to_sources: &mut
       HashMap<ID, HashSet<SourceNickname>>
   ) {
-    let orgnode : &OrgNode = node_ref.value();
-    if let OrgNodeKind::True(t) = &orgnode.kind {
+    let orgnode : &UncheckedOrgNode = node_ref.value();
+    if let UncheckedOrgNodeKind::True(t) = &orgnode.kind {
       if let Some(id) = &t.id_opt {
         let delete_instruction : WhetherToDelete =
           if matches!(t.edit_request, Some(EditRequest::Delete)) {

@@ -1,14 +1,15 @@
-use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
-use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
+use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex};
+use crate::types::orgnode::OrgNode;
 use crate::types::skgnode::SkgNode;
+use crate::types::unchecked_orgnode::{ UncheckedOrgNode, UncheckedOrgNodeKind, checked_to_unchecked_tree };
 
 use ego_tree::{Tree, NodeRef};
 use futures::StreamExt;
@@ -238,82 +239,29 @@ pub fn compare_headlines_modulo_id(
     _ => false,  // One is headline, other is not, or they have different errors
   }}
 
-/// See 'compare_orgnode_trees'.
+/// Compare two OrgNode forests.
+/// Converts to unchecked and uses unchecked comparison.
 pub fn compare_orgnode_forests (
   forest1 : & Tree < OrgNode >,
   forest2 : & Tree < OrgNode >
 ) -> bool {
-  compare_orgnode_trees ( forest1.root(), forest2.root() ) }
+  let unchecked1 : Tree < UncheckedOrgNode > =
+    checked_to_unchecked_tree ( forest1 );
+  let unchecked2 : Tree < UncheckedOrgNode > =
+    checked_to_unchecked_tree ( forest2 );
+  compare_unchecked_orgnode_forests ( & unchecked1, & unchecked2 ) }
 
-/// Compare two OrgNode trees (possibly forests, via BufferRoot)
-/// by traversing them DFS.
-/// Compares all structure and all content including IDs.
-/// Ignores internal NodeId values.
-/// (PITFALL: Naive comparison of trees just compares NodeIds,
-/// which are nearly meaningless.)
-fn compare_orgnode_trees (
-  node1 : NodeRef < OrgNode >,
-  node2 : NodeRef < OrgNode >
-) -> bool {
-  let n1 : & OrgNode = node1 . value ();
-  let n2 : & OrgNode = node2 . value ();
-  // Compare the node values directly
-  if n1 != n2 { return false; }
-  // Compare children recursively
-  let children1 : Vec < _ > =
-    node1 . children () . collect ();
-  let children2 : Vec < _ > =
-    node2 . children () . collect ();
-  children1 . len () == children2 . len () &&
-    children1 . iter () . zip ( children2 . iter () )
-    . all ( | ( c1, c2 ) |
-                compare_orgnode_trees ( *c1, *c2 ) ) }
-
-/// Compare two tree forests modulo ID differences.
-/// Trees are considered the same if their structure and content match,
-/// ignoring ID values (but not ID presence/absence).
-///
-/// Input forests have BufferRoot at root; tree roots are their children.
+/// Compare two OrgNode forests modulo ID differences.
+/// Converts to unchecked and uses unchecked comparison.
 pub fn compare_two_forests_modulo_id(
   forest1: &Tree<OrgNode>,
   forest2: &Tree<OrgNode>
 ) -> bool {
-  let root1 : Vec<_> = forest1.root().children().collect();
-  let root2 : Vec<_> = forest2.root().children().collect();
-  if root1.len() != root2.len() {
-    return false; }
-  for (tree1, tree2) in root1.iter().zip(root2.iter()) {
-    if !compare_two_orgnode_branches_recursively_modulo_id( *tree1, *tree2 )
-    { return false; }}
-  true }
-
-/// Compare two nodes and their subtrees, ignoring ID values
-/// (but requiring ID presence to match).
-fn compare_two_orgnode_branches_recursively_modulo_id (
-  node1: NodeRef<OrgNode>,
-  node2: NodeRef<OrgNode>
-) -> bool {
-  let n1 : &OrgNode = node1.value();
-  let n2 : &OrgNode = node2.value();
-  match (&n1.kind, &n2.kind) {
-    (OrgNodeKind::True(_), OrgNodeKind::True(t2)) => {
-      // Copy the ID from one to the other, then compare.
-      let mut n1_copy : OrgNode = n1.clone();
-      if let OrgNodeKind::True(t) = &mut n1_copy.kind {
-        t.id_opt = t2.id_opt.clone(); }
-      if n1_copy != *n2 { return false; }}
-    (OrgNodeKind::Scaff(_), OrgNodeKind::Scaff(_)) => {
-      if n1 != n2 { return false; }}
-    _ => return false, // mismatched kinds
-  }
-  { // Recurse on children
-    let children1 : Vec<_> = node1.children().collect();
-    let children2 : Vec<_> = node2.children().collect();
-    ( children1.len() == children2.len() &&
-      children1 . iter() . zip(children2.iter())
-      . all (|(c1, c2)|
-             compare_two_orgnode_branches_recursively_modulo_id(
-               *c1, *c2)) ) }}
+  let unchecked1 : Tree < UncheckedOrgNode > =
+    checked_to_unchecked_tree ( forest1 );
+  let unchecked2 : Tree < UncheckedOrgNode > =
+    checked_to_unchecked_tree ( forest2 );
+  compare_two_unchecked_forests_modulo_id ( & unchecked1, & unchecked2 ) }
 
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
@@ -323,6 +271,89 @@ fn strip_id_from_metadata_struct(
     meta.id = None;
     meta
   } ) }
+
+/// Compare two UncheckedOrgNode forests by DFS.
+/// Compares all structure and content including IDs.
+/// Ignores internal NodeId values.
+pub fn compare_unchecked_orgnode_forests (
+  forest1 : & Tree < UncheckedOrgNode >,
+  forest2 : & Tree < UncheckedOrgNode >
+) -> bool {
+  compare_unchecked_orgnode_trees ( forest1.root(), forest2.root() ) }
+
+/// Compare two UncheckedOrgNode trees by DFS.
+/// (PITFALL: Naive comparison of trees just compares NodeIds,
+/// which are nearly meaningless.)
+fn compare_unchecked_orgnode_trees (
+  node1 : NodeRef < UncheckedOrgNode >,
+  node2 : NodeRef < UncheckedOrgNode >
+) -> bool {
+  let n1 : & UncheckedOrgNode =
+    node1 . value ();
+  let n2 : & UncheckedOrgNode =
+    node2 . value ();
+  if n1 != n2 { return false; }
+  let children1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    node1 . children () . collect ();
+  let children2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    node2 . children () . collect ();
+  children1 . len () == children2 . len () &&
+    children1 . iter () . zip ( children2 . iter () )
+    . all ( | ( c1, c2 ) |
+            compare_unchecked_orgnode_trees ( *c1, *c2 ) ) }
+
+/// Compare two unchecked tree forests modulo ID differences.
+/// Trees are considered the same if their structure and content match,
+/// ignoring ID values (but not ID presence/absence).
+///
+/// Input forests have BufferRoot at root; tree roots are their children.
+pub fn compare_two_unchecked_forests_modulo_id(
+  forest1: &Tree<UncheckedOrgNode>,
+  forest2: &Tree<UncheckedOrgNode>
+) -> bool {
+
+  let root1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    forest1.root().children().collect();
+  let root2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    forest2.root().children().collect();
+  if root1.len() != root2.len() {
+    return false; }
+  for (tree1, tree2) in root1.iter().zip(root2.iter()) {
+    if !compare_two_unchecked_branches_recursively_modulo_id( *tree1, *tree2 )
+    { return false; }}
+  true }
+
+/// Compare two UncheckedOrgNode subtrees, ignoring ID values.
+fn compare_two_unchecked_branches_recursively_modulo_id (
+  node1: NodeRef<UncheckedOrgNode>,
+  node2: NodeRef<UncheckedOrgNode>
+) -> bool {
+  let n1 : &UncheckedOrgNode = node1.value();
+  let n2 : &UncheckedOrgNode = node2.value();
+  match (&n1.kind, &n2.kind) {
+    ( UncheckedOrgNodeKind::True(_),
+      UncheckedOrgNodeKind::True(t2)) =>
+    { // Copy the ID from one to the other, then compare.
+      let mut n1_copy : UncheckedOrgNode =
+        n1.clone();
+      if let UncheckedOrgNodeKind::True(t) = &mut n1_copy.kind {
+        t.id_opt = t2.id_opt.clone(); }
+      if n1_copy != *n2 { return false; }}
+    ( UncheckedOrgNodeKind::Scaff(_),
+      UncheckedOrgNodeKind::Scaff(_)) =>
+    { if n1 != n2 { return false; }}
+    _ => return false, // mismatched kinds
+  }
+  { // Recurse on children
+    let children1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+      node1.children().collect();
+    let children2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+      node2.children().collect();
+    ( children1.len() == children2.len() &&
+      children1 . iter() . zip(children2.iter())
+      . all (|(c1, c2)|
+             compare_two_unchecked_branches_recursively_modulo_id(
+               *c1, *c2)) ) }}
 
 /// Query all primary node IDs from TypeDB.
 /// Returns a HashSet of all IDs belonging to primary nodes (not extra_ids).

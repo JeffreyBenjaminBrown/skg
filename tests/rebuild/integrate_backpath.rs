@@ -3,13 +3,14 @@
 use indoc::indoc;
 use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode::{OrgNode};
+use skg::types::orgnode::{OrgNode, OrgNodeKind};
 use skg::types::skgnodemap::SkgNodeMap;
 use skg::org_to_text::orgnode_forest_to_string;
 
-use ego_tree::Tree;
+use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -32,13 +33,13 @@ async fn test_path_with_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (node (id 1))) 1
-    ** (skg folded (node (id 2))) 2
-    *** (skg (node (id off-path))) off-path
+    * (skg (node (id 1) (source main))) 1
+    ** (skg folded (node (id 2) (source main))) 2
+    *** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let mut forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?.0;
+  let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -63,16 +64,16 @@ async fn test_path_with_cycle_impl(
     cycle_node, &config, driver, ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (node (id 1))) 1
-    ** (skg folded (node (id 2))) 2
+    * (skg (node (id 1) (source main))) 1
+    ** (skg folded (node (id 2) (source main))) 2
     *** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
     **** (skg (node (id 4) (source main) parentIgnores indefinitive)) 4
     ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
-    *** (skg (node (id off-path))) off-path
+    *** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?.0;
+  let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
+  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
   let actual_str = orgnode_forest_to_string(&forest)?;
   let expected_str = orgnode_forest_to_string(&expected_trees)?;
@@ -101,30 +102,27 @@ async fn test_path_with_branches_no_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (node (id 0))) 0
-    ** (skg (node (id 1))) 1
-    *** (skg folded (node (id 2))) 2
-    **** (skg (node (id off-path))) off-path
+    * (skg (node (id 0) (source main))) 0
+    ** (skg (node (id 1) (source main))) 1
+    *** (skg folded (node (id 2) (source main))) 2
+    **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let mut forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?.0;
+  let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
-  let mut node_1_id = None;
+  let mut node_1_id : Option<NodeId> = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().id_opt() {
-        if id.0 == "1" {
+      if let OrgNodeKind::True(t) = &node_ref.value().kind {
+        if t.id.0 == "1" {
           node_1_id = Some(node_ref.id());
-          break;
-        }
-      }
-    }
-  }
-  let node_1_id = node_1_id.expect("Should find node with id 1");
+          break; }}}}
+  let node_1_id : NodeId =
+    node_1_id.expect("Should find node with id 1");
 
   // Setup backpath data
   let path = vec![
@@ -145,18 +143,18 @@ async fn test_path_with_branches_no_cycle_impl(
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (node (id 0))) 0
-    ** (skg (node (id 1))) 1
-    *** (skg folded (node (id 2))) 2
+    * (skg (node (id 0) (source main))) 0
+    ** (skg (node (id 1) (source main))) 1
+    *** (skg folded (node (id 2) (source main))) 2
     **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
     ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
     ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
     ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    **** (skg (node (id off-path))) off-path
+    **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?.0;
+  let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
+  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
   let actual_str = orgnode_forest_to_string(&forest)?;
   let expected_str = orgnode_forest_to_string(&expected_trees)?;
@@ -185,30 +183,28 @@ async fn test_path_with_branches_with_cycle_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
-    * (skg (node (id 0))) 0
-    ** (skg (node (id 1))) 1
-    *** (skg folded (node (id 2))) 2
-    **** (skg (node (id off-path))) off-path
+    * (skg (node (id 0) (source main))) 0
+    ** (skg (node (id 1) (source main))) 1
+    *** (skg folded (node (id 2) (source main))) 2
+    **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let mut forest: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(input)?.0;
+  let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
+  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
-  let mut node_1_id = None;
+  let mut node_1_id : Option<NodeId> =
+    None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(id) = node_ref.value().id_opt() {
-        if id.0 == "1" {
+      if let OrgNodeKind::True(t) = &node_ref.value().kind {
+        if t.id.0 == "1" {
           node_1_id = Some(node_ref.id());
-          break;
-        }
-      }
-    }
-  }
-  let node_1_id = node_1_id.expect("Should find node with id 1");
+          break; }}}}
+  let node_1_id : NodeId =
+    node_1_id.expect("Should find node with id 1");
 
   // Setup backpath data
   let path = vec![
@@ -229,18 +225,18 @@ async fn test_path_with_branches_with_cycle_impl(
     cycle_node, &config, driver ).await?;
 
   let expected: &str = indoc! {"
-    * (skg (node (id 0))) 0
-    ** (skg (node (id 1))) 1
-    *** (skg folded (node (id 2))) 2
+    * (skg (node (id 0) (source main))) 0
+    ** (skg (node (id 1) (source main))) 1
+    *** (skg folded (node (id 2) (source main))) 2
     **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
     ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
     ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
     ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    **** (skg (node (id off-path))) off-path
+    **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let expected_trees: Tree<OrgNode> =
-    org_to_uninterpreted_nodes(expected)?.0;
+  let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
+  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
   let actual_str = orgnode_forest_to_string(&forest)?;
   let expected_str = orgnode_forest_to_string(&expected_trees)?;

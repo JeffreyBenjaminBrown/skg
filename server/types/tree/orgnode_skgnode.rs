@@ -1,4 +1,4 @@
-/// Node access utilities for ego_tree::Tree<OrgNode>
+/// Node access utilities for ego_tree::Tree<OrgNode> and Tree<UncheckedOrgNode>
 
 use crate::to_org::util::{skgnode_and_orgnode_from_id, get_id_from_treenode};
 use crate::types::misc::{ID, SkgConfig};
@@ -6,6 +6,8 @@ use crate::types::orgnode::{
     OrgNode, OrgNodeKind, Scaffold,
     mk_indefinitive_orgnode,
     orgnode_from_scaffold };
+use crate::types::unchecked_orgnode::{
+    UncheckedOrgNode, UncheckedOrgNodeKind };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::util::dedup_vector;
@@ -17,8 +19,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 /// Extract (ID, source) from a TrueNode in the tree.
-/// Returns an error if the node is not found, not a TrueNode,
-/// or missing ID or source.
+/// Returns an error if the node is not found or not a TrueNode.
 pub fn pid_and_source_from_treenode (
   tree        : &Tree<OrgNode>,
   treeid      : NodeId,
@@ -31,29 +32,24 @@ pub fn pid_and_source_from_treenode (
     &node_ref . value() . kind
     else { return Err ( format! ( "{}: expected TrueNode",
                                   caller_name ) . into() ) };
-  let pid : ID =
-    t . id_opt . clone() . ok_or_else ( ||
-      format! ( "{}: no ID", caller_name ) ) ?;
-  let source : String =
-    t . source_opt . clone() . ok_or_else ( ||
-      format! ( "{}: no source", caller_name ) ) ?;
-  Ok (( pid, source )) }
+  Ok (( t.id.clone(), t.source.clone() )) }
 
-/// Get the ID from this node if it's a TrueNode with an ID,
+/// Get the ID from this node if it's an UncheckedTrueNode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<UncheckedOrgNode>,
   node_id : NodeId,
-) -> Result<ID, Box<dyn Error>> {
-  let mut current : NodeRef<OrgNode> = tree.get(node_id)
+) -> Result<ID, String> {
+  let mut node : NodeRef<UncheckedOrgNode> =
+    tree.get(node_id)
     .ok_or("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
-    if let OrgNodeKind::True(t) = &current.value().kind {
+    if let UncheckedOrgNodeKind::True(t) = &node.value().kind {
       if let Some(id) = &t.id_opt {
         return Ok(id.clone()); }}
-    current = current.parent()
-      .ok_or("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
+    node = node.parent()
+      . ok_or("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
 
 /// Find the unique child of a node with a given Scaffold.
 /// Returns None if no child has the kind,
@@ -158,10 +154,8 @@ pub async fn append_indefinitive_from_disk_as_child (
   let (id, source, title) : (ID, String, String)
   = match &content_orgnode.kind
   { OrgNodeKind::True(t) => (
-      t . id_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child: node has no ID")?
-        . clone(),
-      t . source_opt . as_ref() . ok_or("append_indefinitive_from_disk_as_child: node has no source")?
-        . clone(),
+      t . id . clone(),
+      t . source . clone(),
       t . title . clone( )),
     OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
   let orgnode : OrgNode = mk_indefinitive_orgnode (
@@ -255,9 +249,8 @@ pub fn find_children_by_ids (
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree.get(parent_treeid).unwrap().children() {
     if let OrgNodeKind::True(t) = &child.value().kind {
-      if let Some(child_id) = &t.id_opt {
-        if target_skgids.contains(child_id) {
-          result.insert(child_id.clone(), child.id()); }}}}
+      if target_skgids.contains(&t.id) {
+        result.insert(t.id.clone(), child.id()); }}}
   result }
 
 /// Check if all nodes at the specified generation satisfy the predicate.
@@ -265,13 +258,13 @@ pub fn find_children_by_ids (
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<OrgNode>,
+  tree                : &Tree<UncheckedOrgNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
   predicate           : F,
 ) -> bool
-where F: Fn(&OrgNode) -> bool
+where F: Fn(&UncheckedOrgNode) -> bool
 { collect_generation( tree, node_id, generation, skip_parent_ignores )
     . iter()
     . all ( |&id| predicate(
@@ -281,13 +274,13 @@ where F: Fn(&OrgNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<OrgNode>,
+  tree                : &Tree<UncheckedOrgNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
   predicate           : F,
 ) -> bool
-where F: Fn(&OrgNode) -> bool
+where F: Fn(&UncheckedOrgNode) -> bool
 { let nodes = collect_generation(
     tree, node_id, generation, skip_parent_ignores);
   !nodes.is_empty() &&
@@ -299,12 +292,12 @@ where F: Fn(&OrgNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_does_not_exist (
-  tree                : &Tree<OrgNode>,
+  tree                : &Tree<UncheckedOrgNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
-) -> bool
-{ collect_generation( tree, node_id, generation, skip_parent_ignores
+) -> bool {
+  collect_generation( tree, node_id, generation, skip_parent_ignores
                     ). is_empty() }
 
 /// Collect NodeIds at a specified generation relative to the given node.
@@ -314,7 +307,7 @@ pub fn generation_does_not_exist (
 /// If 'skip_parent_ignores' is true and generation > 0,
 ///   then we exclude TrueNodes with parent_ignores=true.
 fn collect_generation (
-  tree               : &Tree<OrgNode>,
+  tree               : &Tree<UncheckedOrgNode>,
   node_id            : NodeId,
   generation         : i32,
   skip_parent_ignores : bool,
@@ -324,40 +317,41 @@ fn collect_generation (
   let Some(node_ref) = tree.get(node_id)
     else { return vec![]; };
   if generation <= 0 {
-    let mut current = node_ref;
+    let mut current : NodeRef<'_, UncheckedOrgNode> =
+      node_ref;
     for _ in 0..(-generation) {
       match current.parent() {
         Some(parent) => current = parent,
         None => return vec![], }}
     vec![current.id()] }
   else {
-    let mut current_gen : Vec<NodeId> = vec![node_id];
+    let mut current_gen : Vec<NodeId> =
+      vec![node_id];
     for _ in 0..generation {
-      let mut next_gen : Vec<NodeId> = vec![];
+      let mut next_gen : Vec<NodeId> =
+        vec![];
       for id in current_gen {
         if let Some(n) = tree.get(id) {
           next_gen.extend(
             n.children()
               .filter(|c| !skip_parent_ignores ||
-                          !is_parent_ignored(c.value() ))
+                          !matches!(&c.value().kind,
+                                    UncheckedOrgNodeKind::True(t)
+                                    if t.parent_ignores))
               .map(|c| c.id()) ); }}
       current_gen = next_gen; }
     current_gen } }
-
-/// Check if a node is a TrueNode with parent_ignores=true.
-fn is_parent_ignored ( node : &OrgNode ) -> bool {
-  matches!(&node.kind, OrgNodeKind::True(t) if t.parent_ignores) }
 
 /// Check that no sibling satisfies the predicate.
 /// Returns true if the node has no siblings,
 /// or if the predicate returns false for all siblings.
 /// Short-circuits on the first sibling where the predicate returns true.
 pub fn siblings_cannot_include<F> (
-  tree      : &Tree<OrgNode>,
+  tree      : &Tree<UncheckedOrgNode>,
   node_id   : NodeId,
   predicate : F,
 ) -> bool
-where F: Fn(&OrgNode) -> bool
+where F: Fn(&UncheckedOrgNode) -> bool
 { let Some(node_ref) = tree.get(node_id)
     else { return true; };
   let Some(parent_ref) = node_ref.parent()

@@ -181,10 +181,8 @@ fn true_node_metadata_to_string (
         format! ( "(diff {})", d . repr_in_client () )) }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    if let Some ( ref id ) = true_node . id_opt {
-      parts . push ( format! ( "(id {})", id . 0 )); }
-    if let Some ( ref source ) = true_node . source_opt {
-      parts . push ( format! ( "(source {})", source )); }
+    parts . push ( format! ( "(id {})", true_node . id . 0 ));
+    parts . push ( format! ( "(source {})", true_node . source ));
     if true_node . parent_ignores {
       parts . push ( "parentIgnores" . to_string () ); }
     if true_node . indefinitive {

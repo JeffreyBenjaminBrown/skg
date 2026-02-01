@@ -9,6 +9,7 @@ use skg::from_text::orgnodes_to_instructions::orgnode_forest_to_nonmerge_save_in
 use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::orgnode::OrgNode;
+use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
 use skg::types::save::SaveInstruction;
 use ego_tree::Tree;
 use indoc::indoc;
@@ -32,12 +33,14 @@ fn test_update_nodes_and_relationships2 (
       ** (skg (node (id 1) (source main) indefinitive)) 1
     "};
 
-    let forest : Tree<OrgNode> =
+    let unchecked_forest : Tree<UncheckedOrgNode> =
       org_to_uninterpreted_nodes ( org_text )?.0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
-      find_inconsistent_instructions ( & forest );
+      find_inconsistent_instructions ( & unchecked_forest );
+    let forest : Tree<OrgNode> =
+      unchecked_to_checked_tree ( unchecked_forest )?;
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
              inconsistent_deletions );

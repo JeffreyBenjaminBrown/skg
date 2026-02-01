@@ -3,8 +3,8 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::test_utils::{run_with_test_db, compare_two_forests_modulo_id, compare_orgnode_forests};
-use skg::types::orgnode::{OrgNode};
+use skg::test_utils::{run_with_test_db, compare_two_unchecked_forests_modulo_id, compare_unchecked_orgnode_forests};
+use skg::types::unchecked_orgnode::UncheckedOrgNode;
 use skg::types::misc::{SkgConfig, ID};
 use ego_tree::Tree;
 
@@ -49,14 +49,14 @@ async fn test_add_missing_info_logic (
             ** (skg (node (id unpredictable) (source main))) no id
             *** (skg (node (id unpredictable) (source main))) also no id
         "};
-  let mut after_adding_missing_info: Tree<OrgNode> =
+  let mut after_adding_missing_info: Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(
       with_missing_info).unwrap().0;
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
     &config.db_name,
     driver ).await ?;
-  let expected_forest: Tree<OrgNode> =
+  let expected_forest: Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(
       without_missing_info ). unwrap().0;
   assert_eq!(
@@ -64,12 +64,12 @@ async fn test_add_missing_info_logic (
     1,
     "Expected exactly one tree in the expected forest" );
   assert!(
-    compare_two_forests_modulo_id(
+    compare_two_unchecked_forests_modulo_id(
       &after_adding_missing_info,
       &expected_forest),
     "add_missing_info_to_forest: Forests not equivalent modulo ID." );
 
-  { let actual_root : &OrgNode =
+  { let actual_root : &UncheckedOrgNode =
       after_adding_missing_info.root().first_child().unwrap().value();
     let actual_root_id : &ID =
       actual_root . id_opt() . unwrap();
@@ -123,17 +123,17 @@ async fn test_source_inheritance_logic (
             ** (skg (node (id 22))) _
         "};
 
-  let mut actual_forest: Tree<OrgNode> =
+  let mut actual_forest: Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes( input ).unwrap().0;
   add_missing_info_to_forest(
     &mut actual_forest,
     &config.db_name,
     driver ).await ?;
-  let expected_forest: Tree<OrgNode> =
+  let expected_forest: Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes( expected ).unwrap().0;
 
   assert!(
-    compare_orgnode_forests(
+    compare_unchecked_orgnode_forests(
       &actual_forest,
       &expected_forest),
     "Source inheritance: Forests not equivalent.\n\

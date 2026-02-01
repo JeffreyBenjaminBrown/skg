@@ -1,7 +1,6 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::to_org::complete::contents::ensure_source;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
@@ -139,17 +138,12 @@ fn get_hidden_ids_if_subscribee (
     let subscriber : NodeRef < OrgNode > =
       subscribee_col . parent ()
       . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
-    let subscriber_id : Option<ID>
-      = match &subscriber . value () . kind
-      { OrgNodeKind::True(t) => t . id_opt . clone(),
-        OrgNodeKind::Scaff(_) => None, };
+    let subscriber_id : ID =
+      get_id_from_treenode ( tree, subscriber.id() ) ?;
     let hidden_ids : HashSet < ID > =
-      match subscriber_id {
-        Some ( id ) =>
-          map . get ( &id ) . and_then (
-            |skgnode| skgnode .hides_from_its_subscriptions .clone ( ))
-          . unwrap_or_default () . into_iter () . collect (),
-        None => HashSet::new (), };
+      map . get ( &subscriber_id ) . and_then (
+        |skgnode| skgnode .hides_from_its_subscriptions .clone ( ))
+      . unwrap_or_default () . into_iter () . collect ();
     Ok ( hidden_ids ) }}
 
 /// Does two things:
@@ -166,17 +160,13 @@ fn indefinitize_content_subtree (
   visited : &mut DefinitiveMap,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (node_pid_opt, content_child_treeids)
-    : (Option <ID>  , Vec <NodeId>) =
+  let (node_pid, content_child_treeids)
+    : (ID, Vec <NodeId>) =
   { let node_ref : NodeRef < OrgNode > =
       tree . get ( node_id )
       . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-    let orgnode : &OrgNode =
-      node_ref . value ();
-    let node_pid_opt : Option < ID > =
-      match &orgnode . kind {
-        OrgNodeKind::True ( t ) => t . id_opt . clone (),
-        OrgNodeKind::Scaff ( _ ) => None };
+    let node_pid : ID =
+      get_id_from_treenode ( tree, node_id ) ?;
     let content_child_treeids : Vec < NodeId > =
       node_ref . children ()
       . filter ( |c| matches! ( &c . value() . kind,
@@ -184,10 +174,8 @@ fn indefinitize_content_subtree (
                                 if !t.parent_ignores ))
       . map ( |c| c . id () )
       . collect ();
-    (node_pid_opt, content_child_treeids) };
-  if let Some(ref pid) = node_pid_opt
-  { // remove from visited
-    visited . remove ( pid ); }
+    (node_pid, content_child_treeids) };
+  visited . remove ( &node_pid );
   makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?;
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
@@ -379,7 +367,8 @@ async fn mk_removed_child_orgnode (
       child_skgnode . title . clone(),
       false );                // parent_ignores
   if let OrgNodeKind::True ( ref mut t ) = child_orgnode . kind {
-    t . source_opt = child_source;
+    if let Some ( source ) = child_source {
+      t . source = source; }
     t . diff = Some ( child_diff ); }
   Ok ( child_orgnode ) }
 
@@ -396,8 +385,6 @@ async fn extendDefinitiveSubtree_fromWorktree (
   visited       : &mut DefinitiveMap,
   hidden_ids    : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
-  ensure_source ( // Subscribee nodes may not have one yet.
-    forest, node_id, &config.db_name, typedb_driver ) . await ?;
   { // Mutate the root of the definitive view request:
     from_disk_replace_title_body_and_skgnode (
       // preserves relevant orgnode fields

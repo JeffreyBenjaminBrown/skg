@@ -13,6 +13,7 @@ mod util {
 use skg::to_org::render::content_view::single_root_view;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::orgnode::{OrgNode, OrgNodeKind};
+use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -358,9 +359,12 @@ async fn test_recursive_document (
       &ID ( "a".to_string () ),
       false
     ) . await ?;
-  let result_forest : Tree<OrgNode> =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
+  let result_forest : Tree<OrgNode> =
+    unchecked_to_checked_tree ( unchecked_forest )
+    . map_err ( |e| format! ( "Check error: {}", e ) ) ?;
 
   let tree_roots : Vec<_> =
     result_forest.root().children().collect();
@@ -371,7 +375,11 @@ async fn test_recursive_document (
   let root_node : &OrgNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert_eq! ( root_node.id_opt(), Some ( &ID::from ("a") ),
+  assert! ( matches! ( &root_node.kind, OrgNodeKind::True (_) ),
+    "should be TrueNode" );
+  let OrgNodeKind::True ( root_t ) = &root_node.kind
+    else { unreachable!() };
+  assert_eq! ( &root_t.id, &ID::from ("a"),
     "Root node should have id 'a'" );
   assert_eq! ( root_node.title(), "a",
     "Root node should have title 'a'" );
@@ -382,16 +390,18 @@ async fn test_recursive_document (
     . expect ( "Root should have child 'b'" );
   let b_node : &OrgNode = b_node_ref . value ();
 
-  assert_eq! ( b_node.id_opt(), Some ( &ID::from ("b") ),
+  assert! ( matches! ( &b_node.kind, OrgNodeKind::True (_) ),
+    "should be TrueNode" );
+  let OrgNodeKind::True ( b_t ) = &b_node.kind
+    else { unreachable!() };
+  assert_eq! ( &b_t.id, &ID::from ("b"),
     "First child should have id 'b'" );
   assert_eq! ( b_node.title(), "b",
     "First child should have title 'b'" );
   assert_eq! ( b_node.body(), Some ( &"b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
-  { let OrgNodeKind::True ( t ) = &b_node.kind
-      else { panic!("expected TrueNode for 'b'"); };
-    assert! ( ! t.indefinitive,
-      "First occurrence of 'b' should not be marked as indefinitive" ); }
+  assert! ( ! b_t.indefinitive,
+    "First occurrence of 'b' should not be marked as indefinitive" );
 
   // "b" should have 1 child: "c"
   let mut b_children = b_node_ref . children ();
@@ -399,7 +409,11 @@ async fn test_recursive_document (
     . expect ( "Node 'b' should have child 'c'" );
   let c_node : &OrgNode = c_node_ref . value ();
 
-  assert_eq! ( c_node.id_opt(), Some ( &ID::from ("c") ),
+  assert! ( matches! ( &c_node.kind, OrgNodeKind::True (_) ),
+    "should be TrueNode" );
+  let OrgNodeKind::True ( c_t ) = &c_node.kind
+    else { unreachable!() };
+  assert_eq! ( &c_t.id, &ID::from ("c"),
     "Child of 'b' should have id 'c'" );
   assert_eq! ( c_node.title(), "c",
     "Child of 'b' should have title 'c'" );
@@ -410,14 +424,16 @@ async fn test_recursive_document (
     . expect ( "Node 'c' should have child 'b' (repeated)" );
   let b_repeat : &OrgNode = b_repeat_ref . value ();
 
-  assert_eq! ( b_repeat.id_opt(), Some ( &ID::from ("b") ),
+  assert! ( matches! ( &b_repeat.kind, OrgNodeKind::True (_) ),
+    "should be TrueNode" );
+  let OrgNodeKind::True ( b_repeat_t ) = &b_repeat.kind
+    else { unreachable!() };
+  assert_eq! ( &b_repeat_t.id, &ID::from ("b"),
     "Child of 'c' should have id 'b'" );
   assert_eq! ( b_repeat.title(), "b",
     "Repeated node should have title 'b'" );
-  { let OrgNodeKind::True ( t ) = &b_repeat.kind
-      else { panic!("expected TrueNode for repeated 'b'"); };
-    assert! ( t.indefinitive,
-      "Second occurrence of 'b' should be marked as indefinitive" ); }
+  assert! ( b_repeat_t.indefinitive,
+    "Second occurrence of 'b' should be marked as indefinitive" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)
   assert! ( b_repeat_ref . children () . next () . is_none (),
