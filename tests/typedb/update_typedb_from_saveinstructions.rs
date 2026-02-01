@@ -10,7 +10,7 @@ use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instruction
 use skg::types::misc::ID;
 use skg::types::orgnode::OrgNode;
 use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
-use skg::types::save::SaveInstruction;
+use skg::types::save::DefineOneNode;
 use ego_tree::Tree;
 use indoc::indoc;
 
@@ -52,7 +52,7 @@ fn test_update_nodes_and_relationships2 (
              inconsistent_sources );
 
     // Convert to instructions (adds missing info and reconciles)
-    let reconciled_instructions : Vec<SaveInstruction> =
+    let reconciled_instructions : Vec<DefineOneNode> =
       orgnode_forest_to_nonmerge_save_instructions (
         & forest, & config, & driver ) . await ?;
 

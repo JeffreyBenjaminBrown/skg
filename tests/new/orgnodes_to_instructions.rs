@@ -5,12 +5,12 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
+use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
 use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
 use skg::types::orgnode::{OrgNode, forest_root_orgnode};
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
-use skg::types::save::NonMerge_NodeAction;
+use skg::types::save::DefineOneNode;
 use ego_tree::Tree;
 
 #[test]
@@ -25,40 +25,43 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_basic() {
             Root 2 body
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 3, "Should have 3 instructions");
 
   // Test root1
-  let (root1_skg, root1_action) = &instructions[0];
+  let root1_skg : &SkgNode = instructions[0].node();
+  let root1_action : &DefineOneNode = &instructions[0];
   assert_eq!(root1_skg.title, "root node 1");
   assert_eq!(root1_skg.body, Some("Root body content".to_string()));
   assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
   assert_eq!(root1_skg.contains, Some(vec![ID::from("child1")]));
   assert!(matches!(root1_action,
-                   NonMerge_NodeAction::Save));
+                   DefineOneNode::Save(_)));
 
   // Test child1
-  let (child1_skg, child1_action) = &instructions[1];
+  let child1_skg : &SkgNode = instructions[1].node();
+  let child1_action : &DefineOneNode = &instructions[1];
   assert_eq!(child1_skg.title, "child 1");
   assert_eq!(child1_skg.body, Some("Child body".to_string()));
   assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
   assert_eq!(child1_skg.contains, Some(vec![])); // No children
   assert!(matches!(child1_action,
-                   NonMerge_NodeAction::Save));
+                   DefineOneNode::Save(_)));
 
   // Test root2 with metadata flags
-  let (root2_skg, root2_action) = &instructions[2];
+  let root2_skg : &SkgNode = instructions[2].node();
+  let root2_action : &DefineOneNode = &instructions[2];
   assert_eq!(root2_skg.title, "root node 2");
   assert_eq!(root2_skg.body, Some("Root 2 body".to_string()));
   assert_eq!(root2_skg.ids, vec![ID::from("root2")]);
   assert!(matches!(root2_action,
-                   NonMerge_NodeAction::Delete)); }
+                   DefineOneNode::Delete(_))); }
 
 #[test]
 fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
@@ -73,11 +76,11 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
             Content body
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   // Should have 2 instructions: main node and content_child
@@ -85,7 +88,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
   assert_eq!(instructions.len(), 2, "Should have 2 instructions");
 
   // Test main node
-  let (main_skg, _) = &instructions[0];
+  let main_skg : &SkgNode = instructions[0].node();
   assert_eq!(main_skg.title, "main node");
   assert_eq!(main_skg.ids, vec![ID::from("main")]);
   assert_eq!(main_skg.contains, Some(vec![ID::from("content_child")]));
@@ -94,7 +97,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
   assert_eq!(main_skg.aliases, Some(vec!["first alias".to_string(), "second alias".to_string()]));
 
   // Test content child
-  let (content_skg, _) = &instructions[1];
+  let content_skg : &SkgNode = instructions[1].node();
   assert_eq!(content_skg.title, "content child");
   assert_eq!(content_skg.ids, vec![ID::from("content_child")]);
   assert_eq!(content_skg.aliases, None); // No aliases
@@ -110,16 +113,16 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_no_aliases() {
             Child body
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 2);
 
-  let (node1_skg, _) = &instructions[0];
+  let node1_skg : &SkgNode = instructions[0].node();
   assert_eq!(node1_skg.aliases, None, "Should have no aliases");
   assert_eq!(node1_skg.contains, Some(vec![ID::from("child1")]));
 }
@@ -139,11 +142,11 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
             ** (skg (node (id content1) (source main))) content node
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let result : Result<Vec<(SkgNode, NonMerge_NodeAction)>, String> =
+  let result : Result<Vec<DefineOneNode>, String> =
     naive_saveinstructions_from_forest(forest);
 
   assert!(result.is_err());
@@ -163,18 +166,18 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_mixed_relations() {
             ** (skg (node (id none_rel) (source main) parentIgnores)) parentIgnores relation child
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   // Should have instructions for: root, parentIgnores, content1, content2, none_rel
   // AliasCol and Alias should be skipped
   assert_eq!(instructions.len(), 5);
 
-  let (root_skg, _) = &instructions[0];
+  let root_skg : &SkgNode = instructions[0].node();
   assert_eq!(root_skg.title, "root node");
   assert_eq!(root_skg.aliases, Some(vec!["my alias".to_string()]));
   assert_eq!(root_skg.contains, Some(vec![ID::from("content1"), ID::from("content2")])); // Only Content relations
@@ -191,29 +194,29 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_deep_nesting() {
             ** (skg (node (id level2b) (source main))) level 2b
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 5);
 
   // Check contains relationships
-  let (level1_skg, _) = &instructions[0];
+  let level1_skg : &SkgNode = instructions[0].node();
   assert_eq!(level1_skg.contains, Some(vec![ID::from("level2a"), ID::from("level2b")]));
 
-  let (level2a_skg, _) = &instructions[1];
+  let level2a_skg : &SkgNode = instructions[1].node();
   assert_eq!(level2a_skg.contains, Some(vec![ID::from("level3a")]));
 
-  let (level3a_skg, _) = &instructions[2];
+  let level3a_skg : &SkgNode = instructions[2].node();
   assert_eq!(level3a_skg.contains, Some(vec![ID::from("level4")]));
 
-  let (level4_skg, _) = &instructions[3];
+  let level4_skg : &SkgNode = instructions[3].node();
   assert_eq!(level4_skg.contains, Some(vec![])); // Leaf node
 
-  let (level2b_skg, _) = &instructions[4];
+  let level2b_skg : &SkgNode = instructions[4].node();
   assert_eq!(level2b_skg.contains, Some(vec![])); // Leaf node
 }
 
@@ -225,14 +228,14 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_error_missing_id() {
             * node without ID
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let result =
+  let result : Result<Tree<OrgNode>, String> =
     // This conversion fails because of missing ID
     unchecked_to_checked_tree(unchecked_forest);
 
   assert!(result.is_err(), "Should return error for missing ID");
-  let error_msg = result.unwrap_err();
+  let error_msg : String = result.unwrap_err();
   assert!(error_msg.contains("node without ID") ||
           error_msg.contains("has no ID"));
 }
@@ -240,7 +243,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_error_missing_id() {
 #[test]
 fn test_orgnode_forest_to_nonmerge_save_instructions_empty_input() {
   let forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
@@ -256,16 +259,16 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 1); // Only main node
 
-  let (main_skg, _) = &instructions[0];
+  let main_skg : &SkgNode = instructions[0].node();
   assert_eq!(main_skg.aliases, Some(vec!["alias one".to_string(), "alias two".to_string()]));
   assert_eq!(main_skg.contains, Some(vec![])); // No content children
 }
@@ -287,17 +290,18 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_complex_scenario() {
             * (skg (node (id doc2) (source main))) Document 2
             ** (skg (node (id ref_section) (source main) parentIgnores)) Reference Section
         "};
-  let unchecked_forest =
+  let unchecked_forest : Tree<UncheckedOrgNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let forest: Tree<OrgNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
-  let instructions: Vec<(SkgNode, NonMerge_NodeAction)> =
+  let instructions: Vec<DefineOneNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
   assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
   // Test doc1
-  let (doc1_skg, doc1_action) = &instructions[0];
+  let doc1_skg : &SkgNode = instructions[0].node();
+  let doc1_action : &DefineOneNode = &instructions[0];
   assert_eq!(doc1_skg.title, "Document 1");
   assert_eq!(doc1_skg.aliases,
              Some(vec!["First Document".to_string(),
@@ -306,15 +310,16 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_complex_scenario() {
              Some(vec![ID::from("section1"),
                        ID::from("section3")]));
   assert!(matches!(doc1_action,
-                   NonMerge_NodeAction::Save));
+                   DefineOneNode::Save(_)));
 
   // Test section2 with toDelete
-  let (section2_skg, section2_action) = &instructions[3];
+  let section2_skg : &SkgNode = instructions[3].node();
+  let section2_action : &DefineOneNode = &instructions[3];
   assert_eq!(section2_skg.title, "Section 2");
   assert!(matches!(section2_action,
-                   NonMerge_NodeAction::Delete));
+                   DefineOneNode::Delete(_)));
 
   // Test that subsection1a is child of section1
-  let (section1_skg, _) = &instructions[1];
+  let section1_skg : &SkgNode = instructions[1].node();
   assert_eq!(section1_skg.contains, Some(vec![ID::from("subsection1a")]));
 }

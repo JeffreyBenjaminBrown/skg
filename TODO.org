@@ -1,40 +1,5 @@
-* rename save types
-** rename SaveInstruction -> DefineOneNode
-** redefine DefineOneNode =
-   Save (SkgNode) | Delete (SkgNode)
-** rename MergeInstructionTriple -> Merge
-   should become three DefineOneNodes:
-   two saves and a delete
-** aborted
-*** enum save = oneNode | merge
-**** idea
-    SaveInstruction -> Save::OneNode
-    MergeInstruction -> Save::Merge
-**** request
-  Let's replace this definition:
-
-    pub type SaveInstruction = (SkgNode, NonMerge_NodeAction);
-
-  and the types it is defined in terms of (maybe recursively)
-  to this:
-
-    Save = Save (skgnode)
-    | Delete (skgnode)
-    | Merge (Merge)
-
-  (which implies we are, in addition to restructuring, renaming MergeInstructionTriple to simply Merge).
-
-  The new Merge type should have the three MergeInstructionTriple fields as before, but now they contain Saves.
-
-  We get rid of NonMerge_NodeAction.
-
-  Preserve all comments in carrying this out.
-* Why mod files are better.
-  This way, if there is parent code that relies on the code in (name)/,
-  it can be named (name).rs, and a reader is likely to read it.
-  The alternative, that (name).rs is usually a boring mod file,
-  leads at least this reader to likely skip reading (name).rs,
-  which can lead to confusion.
+* ONGOING I just added a section 'Old style mod files are better' under coding-advice/.
+  Please read that and adjust the module structure in server/ accordingly.
 * how to review changes
 ** If what I asked for led it to make a function that addresses one case among the types badly, I'm probably screwing up.
    This happened when I asked AI to merge

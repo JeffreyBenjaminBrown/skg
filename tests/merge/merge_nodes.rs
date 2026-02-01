@@ -6,7 +6,7 @@ use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_i
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 use skg::types::orgnode::{EditRequest, OrgNode, OrgNodeKind, TrueNode, forest_root_orgnode, default_truenode};
 use skg::types::skgnode::SkgNode;
-use skg::types::save::MergeInstructionTriple;
+use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
 use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
@@ -78,18 +78,18 @@ async fn test_merge_2_into_1_impl(
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   forest.root_mut().append(org_node_1);
 
-  // Generate MergeInstructionTriple from merge request
-  let merge_instructions: Vec<MergeInstructionTriple> =
+  // Generate Merge from merge request
+  let merge_instructions: Vec<Merge> =
     instructiontriples_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
   ).await?;
 
-  // Expect 1 MergeInstructionTriple (containing 3 SaveInstructions)
+  // Expect 1 Merge (containing 3 DefineOneNodes)
   assert_eq!(merge_instructions.len(),
              1,
-             "Should have 1 MergeInstructionTriple");
+             "Should have 1 Merge");
 
   merge_nodes(
     merge_instructions.clone(),
@@ -165,7 +165,7 @@ async fn verify_typedb_after_merge_2_into_1 (
 
 fn verify_filesystem_after_merge_2_into_1(
   config: &SkgConfig,
-  merge_instructions: &[MergeInstructionTriple],
+  merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
   let node_2_path: String =
     path_from_pid_and_source ( config,
@@ -187,7 +187,8 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!( node_1.contains.as_ref().unwrap().len(), 7,
               "Node 1 should contain 7 items (with overlap deduplicated)");
 
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
+  let acquiree_text_preserver_id: &ID =
+    &merge_instructions[0].acquiree_text_preserver.node().ids[0];
   assert_eq!(&node_1.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1.contains.as_ref().unwrap()[1], &ID::from("11"));
@@ -261,7 +262,7 @@ fn verify_filesystem_after_merge_2_into_1(
 
 fn verify_tantivy_after_merge_2_into_1(
   tantivy_index: &TantivyIndex,
-  merge_instructions: &[MergeInstructionTriple],
+  merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 2 - should NOT find it (it was merged and deleted)
@@ -277,7 +278,7 @@ fn verify_tantivy_after_merge_2_into_1(
           "Node 1 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
   let found_acquiree_text_preserver: bool =
     tantivy_contains_id(tantivy_index, "\"MERGED: 2\"", &acquiree_text_preserver_id.0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
@@ -333,18 +334,18 @@ async fn test_merge_1_into_2_impl(
   let mut forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
   forest.root_mut().append(org_node_2);
 
-  // Generate MergeInstructionTriple from merge request
-  let merge_instructions: Vec<MergeInstructionTriple> =
+  // Generate Merge from merge request
+  let merge_instructions: Vec<Merge> =
     instructiontriples_from_the_merges_in_an_orgnode_forest(
       &forest,
       config,
       driver,
   ).await?;
 
-  // Expect 1 MergeInstructionTriple (containing 3 SaveInstructions)
+  // Expect 1 Merge (containing 3 DefineOneNodes)
   assert_eq!(merge_instructions.len(),
              1,
-             "Should have 1 MergeInstructionTriple");
+             "Should have 1 Merge");
 
   merge_nodes(
     merge_instructions.clone(),
@@ -365,7 +366,7 @@ async fn test_merge_1_into_2_impl(
 async fn verify_typedb_after_merge_1_into_2 (
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  merge_instructions: &[MergeInstructionTriple],
+  merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
   let db_name: &String = &config.db_name;
 
@@ -413,7 +414,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // TextLinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
   let acquiree_text_preserver_textlink_dests: HashSet<ID> = find_related_nodes(
     db_name, driver, & [ acquiree_text_preserver_id . clone () ],
     "textlinks_to", "source", "dest" ). await ?;
@@ -498,7 +499,7 @@ async fn verify_typedb_after_merge_1_into_2 (
 
 fn verify_filesystem_after_merge_1_into_2(
   config: &SkgConfig,
-  merge_instructions: &[MergeInstructionTriple],
+  merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String =
     path_from_pid_and_source ( config,
@@ -521,7 +522,7 @@ fn verify_filesystem_after_merge_1_into_2(
   // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
   assert_eq!( node_2.contains.as_ref().unwrap().len(), 7,
               "Node 2 should contain 7 items (with overlap deduplicated)");
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
   assert_eq!(&node_2.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2.contains.as_ref().unwrap()[1], &ID::from("21"));
@@ -598,7 +599,7 @@ fn verify_filesystem_after_merge_1_into_2(
 
 fn verify_tantivy_after_merge_1_into_2(
   tantivy_index: &TantivyIndex,
-  merge_instructions: &[MergeInstructionTriple],
+  merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 1 - should NOT find it (it was merged and deleted)
@@ -614,7 +615,7 @@ fn verify_tantivy_after_merge_1_into_2(
           "Node 2 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.0.ids[0];
+  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
     tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id.0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");

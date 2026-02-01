@@ -270,8 +270,8 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
     assert!(instructions.len() > 0, "Should have owned node instructions");
 
     // Verify no foreign nodes in instructions
-    for (node, _action) in &instructions {
-      assert_eq!(&*node.source, "main",
+    for instr in &instructions {
+      assert_eq!(&*instr.node().source, "main",
                  "Only owned (main) nodes should be in instructions");
     }
 
