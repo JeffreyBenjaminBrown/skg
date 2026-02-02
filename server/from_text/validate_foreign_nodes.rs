@@ -41,43 +41,18 @@ pub async fn validate_and_filter_foreign_instructions(
           Err(e) => {
             errors.push(BufferValidationError::Other(e));
             continue; }};
-        // Check if node has been modified.
-        // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
         match optskgnode_from_id(
           config, driver, primary_id
         ).await {
           Ok(Some(disk_node)) => {
-            /* Compare definitive fields (title, body, contains) and non-definitive fields (aliases).
-For *definitive* fields (title, body, contains):
-Some([]) and None are equivalent, so normalize them for comparison.
-.
-But for *non-definitive* fields -- aliases currently,
-and eventually also overrides_view_of, subscribes_to,
-and hides_from_its_subscriptions -- None means "no opinion"
-(because the user did not mention it in the buffer),
-and therefore does not represent an edit.
-.
-TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare implemented, apply the same "no opinion" logic */
-            let title_matches: bool = node.title == disk_node.title;
-            let body_matches: bool = node.body == disk_node.body;
-            let contains_matches: bool =
-              flatten_opt_vec(&node.contains) ==
-              flatten_opt_vec(&disk_node.contains);
-            let aliases_matches: bool =
-              node.aliases.is_none() ||
-              ( flatten_opt_vec(&node.aliases) ==
-                flatten_opt_vec(&disk_node.aliases) );
-            if !(title_matches &&
-                 body_matches &&
-                 contains_matches &&
-                 aliases_matches) {
+            if buffernode_differs_from_disknode(node, &disk_node) {
+              // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
               errors.push(BufferValidationError::ModifiedForeignNode(
                 primary_id . clone(),
                 node.source.clone() )); }
             // If unchanged, filter out (no need to write)
           }
-          Ok(None) => {
-            // 'Foreign' node not found on disk.
+          Ok(None) => { // 'Foreign' node not found on disk.
             errors.push(BufferValidationError::ModifiedForeignNode(
               primary_id . clone(),
               node.source.clone() )); }
@@ -126,6 +101,44 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
           acquiree_source.clone() )); }} }
   if errors.is_empty() { Ok(( ))
   } else { Err(errors) }}
+
+/// Returns true if the buffer node differs from the disk node
+/// in any definitive field (title, body, contains) or
+/// any non-definitive field that the buffer expresses an opinion on.
+///
+/// For *definitive* fields (title, body, contains):
+/// Some([]) and None are equivalent, so we normalize them for comparison.
+///
+/// For *non-definitive* fields (aliases, overrides_view_of,
+/// subscribes_to, hides_from_its_subscriptions): None means "no opinion"
+/// (because the user did not mention it in the buffer),
+/// and therefore does not represent an edit.
+fn buffernode_differs_from_disknode(
+  buffer_node: &crate::types::skgnode::SkgNode,
+  disk_node: &crate::types::skgnode::SkgNode,
+) -> bool {
+  fn nondefinitive_matches<T: Clone + PartialEq>(
+    // for fields where None means "no opinion", not "should be empty"
+    buffer: &Option<Vec<T>>,
+    disk: &Option<Vec<T>>,
+  ) -> bool { buffer.is_none()
+              || flatten_opt_vec(buffer) == flatten_opt_vec(disk)
+            }
+
+  let title_matches: bool = buffer_node.title == disk_node.title;
+  let body_matches: bool = buffer_node.body == disk_node.body;
+  let contains_matches: bool =
+    flatten_opt_vec(&buffer_node.contains) ==
+    flatten_opt_vec(&disk_node.contains);
+  !( title_matches                                                               &&
+     body_matches                                                                &&
+     contains_matches                                                            &&
+     nondefinitive_matches(&buffer_node.aliases, &disk_node.aliases)             &&
+     nondefinitive_matches(&buffer_node.subscribes_to, &disk_node.subscribes_to) &&
+     nondefinitive_matches(&buffer_node.hides_from_its_subscriptions,
+                           &disk_node.hides_from_its_subscriptions)              &&
+     nondefinitive_matches(&buffer_node.overrides_view_of,
+                           &disk_node.overrides_view_of)) }
 
 /// Lets us treat Some([]) and None as equivalent.
 fn flatten_opt_vec<T: Clone>(

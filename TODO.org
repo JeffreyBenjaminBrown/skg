@@ -1,35 +1,3 @@
-* extract function from validate_and_filter_foreign_instructions
-** this block
-          Ok(Some(disk_node)) => {
-            /* Compare definitive fields (title, body, contains) and non-definitive fields (aliases).
-For *definitive* fields (title, body, contains):
-Some([]) and None are equivalent, so normalize them for comparison.
-.
-But for *non-definitive* fields -- aliases currently,
-and eventually also overrides_view_of, subscribes_to,
-and hides_from_its_subscriptions -- None means "no opinion"
-(because the user did not mention it in the buffer),
-and therefore does not represent an edit.
-.
-TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare implemented, apply the same "no opinion" logic */
-            let title_matches: bool = node.title == disk_node.title;
-            let body_matches: bool = node.body == disk_node.body;
-            let contains_matches: bool =
-              flatten_opt_vec(&node.contains) ==
-              flatten_opt_vec(&disk_node.contains);
-            let aliases_matches: bool =
-              node.aliases.is_none() ||
-              ( flatten_opt_vec(&node.aliases) ==
-                flatten_opt_vec(&disk_node.aliases) );
-            if !(title_matches &&
-                 body_matches &&
-                 contains_matches &&
-                 aliases_matches) {
-              errors.push(BufferValidationError::ModifiedForeignNode(
-                primary_id . clone(),
-                node.source.clone() )); }
-            // If unchanged, filter out (no need to write)
-          }
 * internalizing
    'merge' into the type containing 'save' and 'delete'.
 ** If my request led it to make a function that addresses one case among the types badly, I likely screwed up.
