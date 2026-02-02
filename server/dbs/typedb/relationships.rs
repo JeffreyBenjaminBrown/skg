@@ -88,7 +88,7 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'overrides_view_of' relationships: {}", e))?;
   Ok (()) }
 
-async fn insert_relationship_from_list (
+pub async fn insert_relationship_from_list (
   // Instantiates a relationship in the database. Does not commit.
   primary_id: &str,
   id_list: &Vec<ID>,   // Length = 2. Order matters. Might equal node.contains, node.subscribes_to, etc.

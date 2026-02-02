@@ -2,6 +2,7 @@ use crate::types::save::Merge;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::ID;
 use crate::dbs::typedb::nodes::create_node;
+use crate::dbs::typedb::relationships::insert_relationship_from_list;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -42,7 +43,8 @@ async fn merge_one_node_in_typedb(
   updated_acquirer        : &SkgNode,
   acquiree_id             : &ID,
 ) -> Result<(), Box<dyn Error>> {
-  let acquirer_id : &ID = updated_acquirer . primary_id()?;
+  let acquirer_id  : &ID = updated_acquirer        . primary_id()?;
+  let preserver_id : &ID = acquiree_text_preserver . primary_id()?;
   create_node( // Create the text preserver node before using it.
     // PITFALL: Rerouting to a nonexistent node fails silently.
     acquiree_text_preserver, tx).await?;
@@ -55,8 +57,7 @@ async fn merge_one_node_in_typedb(
       tx, acquiree_id, acquirer_id,
       "contains", "contained", "container" ). await ?;
     reroute_relationships_for_merge ( // Because the preserver has the acquiree's text, it links to everything the acquiree linked to.
-      tx, acquiree_id,
-      acquiree_text_preserver . primary_id()?,
+      tx, acquiree_id, preserver_id,
       "textlinks_to", "source", "dest" ). await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
@@ -98,22 +99,16 @@ async fn merge_one_node_in_typedb(
     reroute_extra_ids_for_merge( // PITFALL: Relies on TypeDB constraints. See the comment above its definition for details.
       tx, acquiree_id, acquirer_id).await?; }
 
-  tx.query(format!( // Delete the acquiree.
-    r#"match $node isa node, has id "{}"; delete $node;"#,
-    acquiree_id.as_str()
-  )).await.map_err(|e| format!(
-    "Failed to delete acquiree node '{}': {}",
-    acquiree_id.as_str(), e))?;
-
-  tx.query(format!( // Add preserver to acquirer's contents.
-    r#"match
-         $acquirer isa node, has id "{}";
-         $preserver isa node, has id "{}";
-       insert
-         $contains_rel isa contains (container: $acquirer, contained: $preserver);"#,
-    acquirer_id.as_str(),
-    acquiree_text_preserver.primary_id()?.as_str()
-  )).await?;
+  tx.query( format!( // Delete the acquiree.
+               r#"match $node isa node, has id "{}"; delete $node;"#,
+               acquiree_id.as_str()
+          )).await.map_err( |e|
+             format!( "Failed to delete acquiree node '{}': {}",
+                      acquiree_id.as_str(), e))?;
+  insert_relationship_from_list( // add preserver to acquirer's content
+    acquirer_id.as_str(), &vec![preserver_id.clone()],
+    "contains", "container", "contained", tx
+  ).await?;
   Ok (( )) }
 
 /// Move extra_ids from old_node to new_node.
