@@ -122,7 +122,6 @@ pub enum ViewRequest {
   Definitive,
 }
 
-/// Diff status for TrueNodes in git diff view mode.
 //
 // Implementations
 //
