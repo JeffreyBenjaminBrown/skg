@@ -3,7 +3,7 @@ use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SourceName};
-use skg::types::save::SaveSkgnode;
+use skg::types::save::SaveNode;
 use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use std::error::Error;
 
@@ -49,8 +49,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
              "acquiree_text_preserver body incorrect" );
        assert!(
         matches!(&merge.acquiree_text_preserver,
-             SaveSkgnode(_)),
-        "acquiree_text_preserver should be SaveSkgnode");
+             SaveNode(_)),
+        "acquiree_text_preserver should be SaveNode");
        assert_eq!(acquiree_text_preserver.contains.as_ref().unwrap().len(),
              0, "acquiree_text_preserver should have no contents");
         assert_eq!(
@@ -82,8 +82,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         );
        assert!(
         matches!(&merge.updated_acquirer,
-             SaveSkgnode(_)),
-        "Node 1 should be SaveSkgnode");
+             SaveNode(_)),
+        "Node 1 should be SaveNode");
 
         // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)

@@ -86,7 +86,7 @@ async fn test_merge_2_into_1_impl(
       driver,
   ).await?;
 
-  // Expect 1 Merge (containing 3 DefineOneNodes)
+  // Expect 1 Merge (containing 3 DefineNodes)
   assert_eq!(merge_instructions.len(),
              1,
              "Should have 1 Merge");
@@ -343,7 +343,7 @@ async fn test_merge_1_into_2_impl(
       driver,
   ).await?;
 
-  // Expect 1 Merge (containing 3 DefineOneNodes)
+  // Expect 1 Merge (containing 3 DefineNodes)
   assert_eq!(merge_instructions.len(),
              1,
              "Should have 1 Merge");

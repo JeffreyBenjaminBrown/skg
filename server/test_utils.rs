@@ -8,7 +8,7 @@ use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, He
 use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::orgnode::OrgNode;
-use crate::types::save::{DefineOneNode, SaveSkgnode};
+use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_orgnode::{ UncheckedOrgNode, UncheckedOrgNodeKind, checked_to_unchecked_tree };
 
@@ -433,8 +433,8 @@ It better be okay with newlines."# . to_string() ),
 
 /// Extract SkgNode from Save variant; panics on Delete.
 pub fn extract_skgnode_if_save_else_error(
-  instr: &DefineOneNode
+  instr: &DefineNode
 ) -> &SkgNode {
   match instr {
-    DefineOneNode::Save(SaveSkgnode(node)) => node,
-    DefineOneNode::Delete(_) => panic!("Expected Save, got Delete") }}
+    DefineNode::Save(SaveNode(node)) => node,
+    DefineNode::Delete(_) => panic!("Expected Save, got Delete") }}

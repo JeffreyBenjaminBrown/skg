@@ -6,7 +6,7 @@ use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::co
 use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::misc::{ID, SourceName};
 use skg::types::skgnode::SkgNode;
-use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
+use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 
 // Helper function to create a basic SkgNode for testing
 fn create_test_node(
@@ -29,21 +29,21 @@ fn create_test_node(
     }
 }
 
-// Helper function to create a DefineOneNode
+// Helper function to create a DefineNode
 fn create_instruction(
   node: SkgNode,
   to_delete: bool
-) -> DefineOneNode {
+) -> DefineNode {
   if to_delete {
-    DefineOneNode::Delete(DeleteSkgnode {
+    DefineNode::Delete(DeleteNode {
       id: node.ids.first().unwrap().clone(),
       source: node.source.clone() })
   } else {
-    DefineOneNode::Save(SaveSkgnode(node)) }}
+    DefineNode::Save(SaveNode(node)) }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
       create_instruction( create_test_node("id1", "Node 1",
                                            None, None, vec![]),
                           false),
@@ -54,7 +54,7 @@ fn test_collect_dup_instructions_no_duplicates() {
                                            None, None, vec![]),
                           false), ];
 
-    let grouped : HashMap<ID, Vec<DefineOneNode>> =
+    let grouped : HashMap<ID, Vec<DefineNode>> =
       collect_dup_instructions(instructions).unwrap();
 
     assert_eq!(grouped.len(), 3,
@@ -71,7 +71,7 @@ fn test_collect_dup_instructions_no_duplicates() {
 
 #[test]
 fn test_collect_dup_instructions_with_duplicates() {
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
         create_instruction( create_test_node("id1", "Node 1 First",
                                              None, None, vec![]),
                             false),
@@ -88,30 +88,30 @@ fn test_collect_dup_instructions_with_duplicates() {
                                             None, None, vec![]),
                            false), ];
 
-    let grouped : HashMap<ID, Vec<DefineOneNode>> =
+    let grouped : HashMap<ID, Vec<DefineNode>> =
       collect_dup_instructions(instructions).unwrap();
 
     assert_eq!(grouped.len(), 3, "Should have 3 unique IDs");
 
     // id1 should have 3 instructions
-    let id1_group : &Vec<DefineOneNode> =
+    let id1_group : &Vec<DefineNode> =
       grouped.get(&ID::from("id1")).unwrap();
     assert_eq!(id1_group.len(), 3, "id1 should have 3 instructions");
 
     // id2 and id3 should have 1 instruction each
-    let id2_group : &Vec<DefineOneNode> =
+    let id2_group : &Vec<DefineNode> =
       grouped.get(&ID::from("id2")).unwrap();
     assert_eq!(id2_group.len(), 1, "id2 should have 1 instruction");
 
-    let id3_group : &Vec<DefineOneNode> =
+    let id3_group : &Vec<DefineNode> =
       grouped.get(&ID::from("id3")).unwrap();
     assert_eq!(id3_group.len(), 1, "id3 should have 1 instruction");
 }
 
 #[test]
 fn test_collect_dup_instructions_empty_input() {
-    let instructions : Vec<DefineOneNode> = vec![];
-    let grouped : HashMap<ID, Vec<DefineOneNode>> =
+    let instructions : Vec<DefineNode> = vec![];
+    let grouped : HashMap<ID, Vec<DefineNode>> =
       collect_dup_instructions(instructions).unwrap();
     assert!(grouped.is_empty(), "Empty input should produce empty output");
 }
@@ -120,7 +120,7 @@ fn test_collect_dup_instructions_empty_input() {
 fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
   // Test that we get the expected error for empty instructions
   // This doesn't require async since we return early
-  let instructions: Vec<DefineOneNode> =
+  let instructions: Vec<DefineNode> =
     vec![];
 
   // The function should return an error for empty instructions
@@ -132,7 +132,7 @@ fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
 #[test]
 fn test_consistent_to_delete_values() {
     // Test the to_delete_if_consistent logic indirectly
-    let instructions_consistent : Vec<DefineOneNode> = vec![
+    let instructions_consistent : Vec<DefineNode> = vec![
         create_instruction(create_test_node("id1", "Node 1", None, None, vec![]), true),
         create_instruction(create_test_node("id1", "Node 1 Again", None, None, vec![]), true),
     ];
@@ -147,7 +147,7 @@ fn test_consistent_to_delete_values() {
 #[test]
 fn test_inconsistent_to_delete_values() {
     // Test inconsistent toDelete values
-    let instructions_inconsistent : Vec<DefineOneNode> = vec![
+    let instructions_inconsistent : Vec<DefineNode> = vec![
         create_instruction(create_test_node("id1", "Node 1", None, None, vec![]), true),
         create_instruction(create_test_node("id1", "Node 1 Again", None, None, vec![]), false),
     ];
@@ -178,7 +178,7 @@ fn test_alias_collection_and_deduplication() {
       Some(vec!["alias1".to_string(), "alias4".to_string() ] ),
       None, vec![]);
 
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
         create_instruction(node1, false),
         create_instruction(node2, false),
         create_instruction(node3, false),
@@ -257,7 +257,7 @@ fn test_last_instruction_defines_title_and_body() {
     // Test that the LAST indefinitive instruction defines title/body
     // when there's no defining instruction
 
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "First Title", None,
                          Some("First Body".to_string()), vec![]),
@@ -292,7 +292,7 @@ fn test_defining_instruction_takes_precedence() {
     // Test that a defining instruction (indefinitive=false)
     // takes precedence over all indefinitive instructions
 
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "First Title", None,
                          Some("First Body".to_string()),
@@ -335,7 +335,7 @@ fn test_initial_content_from_disk_when_no_defining() {
     // Test that initial contents come from disk when there's no defining instruction
     // This tests the logic but doesn't actually call the async function
 
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "Title 1", None, None,
                          vec![ID::from("append1")]),
@@ -363,7 +363,7 @@ fn test_initial_content_from_disk_when_no_defining() {
 fn test_body_from_disk_when_no_instruction_has_body() {
     // Test that body comes from disk when no instruction has a body
 
-    let instructions : Vec<DefineOneNode> = vec![
+    let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "Title 1", None, None, vec![]),
         false),
@@ -394,11 +394,11 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 #[test]
 fn test_save_vs_delete() {
     // Test the distinction between Save and Delete actions
-    let save_instr : DefineOneNode =
+    let save_instr : DefineNode =
       create_instruction(
         create_test_node("id1", "Title", None, None, vec![]),
         false);
-    let delete_instr : DefineOneNode =
+    let delete_instr : DefineNode =
       create_instruction(
         create_test_node("id2", "Title", None, None, vec![]),
         true);

@@ -5,7 +5,7 @@ use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::skgnode::SkgNode;
 
 use itertools::{Itertools, Either};
@@ -14,14 +14,14 @@ use std::io;
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
-/// Updates **everything** from the given `DefineOneNode`s, in order:
+/// Updates **everything** from the given `DefineNode`s, in order:
 ///   1) TypeDB
 ///   2) Filesystem
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
 ///   the resulting system state is invalid.
 pub async fn update_graph_minus_merges (
-  instructions  : Vec<DefineOneNode>,
+  instructions  : Vec<DefineNode>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
@@ -59,7 +59,7 @@ pub async fn update_graph_minus_merges (
   println!( "All updates finished successfully." );
   Ok (( )) }
 
-/// Update the DB from a batch of `DefineOneNode`s:
+/// Update the DB from a batch of `DefineNode`s:
 /// 1) Delete all nodes marked Delete, using delete_nodes_from_pids
 /// 2) Remove deleted nodes from further processing
 /// 3) Create only nodes whose IDs are not present, via
@@ -72,7 +72,7 @@ pub async fn update_graph_minus_merges (
 pub async fn update_typedb_from_saveinstructions (
   db_name : &str,
   driver  : &TypeDBDriver,
-  instructions : &Vec<DefineOneNode>
+  instructions : &Vec<DefineNode>
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -81,16 +81,16 @@ pub async fn update_typedb_from_saveinstructions (
   // It is simply to turn the Vec<ID> into a bare ID.
 
   let ( to_delete, to_save )
-    : ( Vec<DeleteSkgnode>, Vec<SaveSkgnode> )
+    : ( Vec<DeleteNode>, Vec<SaveNode> )
     = instructions . iter() . cloned() . partition_map (
       |instr| match instr {
-        DefineOneNode::Delete(d) => Either::Left(d),
-        DefineOneNode::Save(s)   => Either::Right(s) } );
+        DefineNode::Delete(d) => Either::Left(d),
+        DefineNode::Save(s)   => Either::Right(s) } );
 
   { // delete
     let to_delete_pids : Vec<ID> =
       to_delete . iter ()
-      . map ( |DeleteSkgnode { id, .. }| id.clone() )
+      . map ( |DeleteNode { id, .. }| id.clone() )
       . collect ();
     if ! to_delete_pids . is_empty () {
       println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
@@ -102,7 +102,7 @@ pub async fn update_typedb_from_saveinstructions (
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
       to_save . iter ()
-      . map ( |SaveSkgnode(node)| node.clone() )
+      . map ( |SaveNode(node)| node.clone() )
       . collect ();
     let to_write_pids : Vec<ID> =
       to_write_skgnodes . iter ()
@@ -124,19 +124,19 @@ pub async fn update_typedb_from_saveinstructions (
   Ok (( )) }
 
 pub fn update_fs_from_saveinstructions (
-  instructions : Vec<DefineOneNode>,
+  instructions : Vec<DefineNode>,
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
-    : ( Vec<DeleteSkgnode>, Vec<SaveSkgnode> )
+    : ( Vec<DeleteNode>, Vec<SaveNode> )
     = instructions.into_iter().partition_map(
       |instr| match instr {
-        DefineOneNode::Delete(d) => Either::Left(d),
-        DefineOneNode::Save(s)   => Either::Right(s) } );
+        DefineNode::Delete(d) => Either::Left(d),
+        DefineNode::Save(s)   => Either::Right(s) } );
   let deleted : usize = {
     let delete_targets : Vec<(ID, SourceName)> =
       to_delete . into_iter ()
-      . map ( |DeleteSkgnode { id, source }| (id, source) )
+      . map ( |DeleteNode { id, source }| (id, source) )
       . collect ();
     if ! delete_targets . is_empty () {
       delete_all_nodes_from_fs (
@@ -145,7 +145,7 @@ pub fn update_fs_from_saveinstructions (
   let written : usize = {
     let nodes_to_write : Vec<SkgNode> =
       to_save . into_iter ()
-      . map ( |SaveSkgnode(node)| node )
+      . map ( |SaveNode(node)| node )
       . collect ();
     if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
@@ -154,12 +154,12 @@ pub fn update_fs_from_saveinstructions (
   Ok ( (deleted, written) ) }
 
 
-/// Updates the index with the provided DefineOneNodes.
+/// Updates the index with the provided DefineNodes.
 /// Deletes IDs from the index for every instruction,
 /// but only adds documents for instructions where is_save.
 /// Returns the number of documents processed.
 pub(super) fn update_tantivy_from_saveinstructions (
-  instructions  : &[DefineOneNode],
+  instructions  : &[DefineNode],
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
@@ -169,8 +169,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
     // Delete all IDs, be they from Saves or Deletes.
     // (The entry for each Save is then recreated.)
     instructions.iter().map(|instr| match instr {
-      DefineOneNode::Save(SaveSkgnode(node)) => node.primary_id(),
-      DefineOneNode::Delete(DeleteSkgnode { id, .. }) => Ok(id) }),
+      DefineNode::Save(SaveNode(node)) => node.primary_id(),
+      DefineNode::Delete(DeleteNode { id, .. }) => Ok(id) }),
     &mut writer,
     tantivy_index)?;
   let processed_count: usize =
@@ -179,8 +179,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
         let nodes_to_add: Vec<&SkgNode> =
           instructions . iter()
           . filter_map( |instr| match instr {
-              DefineOneNode::Save(SaveSkgnode(node)) => Some(node),
-              DefineOneNode::Delete(_) => None } )
+              DefineNode::Save(SaveNode(node)) => Some(node),
+              DefineNode::Delete(_) => None } )
           . collect();
         nodes_to_add },
       &mut writer, tantivy_index )? ;

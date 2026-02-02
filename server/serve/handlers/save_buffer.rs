@@ -15,7 +15,7 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, ViewRequest};
-use crate::types::save::{DefineOneNode, Merge, format_save_error_as_org};
+use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
@@ -149,7 +149,7 @@ pub async fn update_from_and_rerender_buffer (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
   let (mut forest, save_instructions, merge_instructions)
     : ( Tree<OrgNode>,
-        Vec<DefineOneNode>,
+        Vec<DefineNode>,
         Vec<Merge> )
     = buffer_to_orgnode_forest_and_save_instructions (
       org_buffer_text, config, typedb_driver )

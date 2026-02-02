@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// PITFALL:
 /// Does not add *all* missing info.
 /// 'noneclobber_skgnode' does some of that, too,
-/// although it operates on DefineOneNodes, downstream.
+/// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_forest(
   forest: &mut Tree<UncheckedOrgNode>, // has BufferRoot at root
   db_name: &str,

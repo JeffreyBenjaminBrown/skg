@@ -10,15 +10,15 @@ use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instruction
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::{run_with_test_db, extract_skgnode_if_save_else_error};
 use skg::types::misc::ID;
-use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
+use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use std::error::Error;
 
-/// Get the primary ID from any DefineOneNode variant.
-fn get_id(instr: &DefineOneNode) -> &ID {
+/// Get the primary ID from any DefineNode variant.
+fn get_id(instr: &DefineNode) -> &ID {
   match instr {
-    DefineOneNode::Save(SaveSkgnode(node)) => &node.ids[0],
-    DefineOneNode::Delete(DeleteSkgnode { id, .. }) => id }}
+    DefineNode::Save(SaveNode(node)) => &node.ids[0],
+    DefineNode::Delete(DeleteNode { id, .. }) => id }}
 
 #[test]
 fn test_inconsistent_delete() {

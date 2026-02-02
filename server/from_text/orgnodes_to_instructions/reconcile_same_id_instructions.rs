@@ -24,7 +24,7 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::skgnode::SkgNode;
 use std::collections::HashMap;
 use std::error::Error;
@@ -32,38 +32,38 @@ use typedb_driver::TypeDBDriver;
 
 
 /// Runs 'collect_dup_instructions' to group same-ID instructions.
-/// Then, on each group of DefineOneNodes,
+/// Then, on each group of DefineNodes,
 /// runs 'reconcile_same_id_instructions_for_one_id'
-/// to get a single DefineOneNode.
+/// to get a single DefineNode.
 pub async fn reconcile_same_id_instructions(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<DefineOneNode>
-) -> Result<Vec<DefineOneNode>, Box<dyn Error>> {
-  let grouped_instructions: HashMap<ID, Vec<DefineOneNode>> =
+  instructions: Vec<DefineNode>
+) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+  let grouped_instructions: HashMap<ID, Vec<DefineNode>> =
     collect_dup_instructions (instructions)?;
-  let mut result: Vec<DefineOneNode> =
+  let mut result: Vec<DefineNode> =
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
-    let reduced_instruction: DefineOneNode =
+    let reduced_instruction: DefineNode =
       reconcile_same_id_instructions_for_one_id(
         config, driver, instruction_group ). await ?;
     result.push (reduced_instruction); }
   Ok(result) }
 
-/// Group DefineOneNodes with the same ID.
+/// Group DefineNodes with the same ID.
 pub fn collect_dup_instructions(
-  instructions: Vec<DefineOneNode>
-) -> Result<HashMap<ID, Vec<DefineOneNode>>, Box<dyn Error>> {
-  let mut grouped: HashMap<ID, Vec<DefineOneNode>> =
+  instructions: Vec<DefineNode>
+) -> Result<HashMap<ID, Vec<DefineNode>>, Box<dyn Error>> {
+  let mut grouped: HashMap<ID, Vec<DefineNode>> =
     HashMap::new();
   for instr in instructions {
     let primary_id : ID = match &instr {
-      DefineOneNode::Save(SaveSkgnode(node)) =>
+      DefineNode::Save(SaveNode(node)) =>
         node.ids.first()
-        . ok_or("DefineOneNode::Save has no ID")?
+        . ok_or("DefineNode::Save has no ID")?
         . clone(),
-      DefineOneNode::Delete(DeleteSkgnode { id, .. }) =>
+      DefineNode::Delete(DeleteNode { id, .. }) =>
         id.clone() };
     grouped
       . entry (primary_id)
@@ -71,7 +71,7 @@ pub fn collect_dup_instructions(
       . push (instr); }
   Ok(grouped) }
 
-/// Processes a group of DefineOneNodes with the same ID.
+/// Processes a group of DefineNodes with the same ID.
 /// After validation, each group contains:
 /// - Exactly 1 Save (validation ensures no duplicates), OR
 /// - 1+ Delete instructions (all equivalent)
@@ -82,19 +82,19 @@ pub fn collect_dup_instructions(
 pub async fn reconcile_same_id_instructions_for_one_id(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  instructions: Vec<DefineOneNode>
-) -> Result<DefineOneNode, Box<dyn Error>> {
+  instructions: Vec<DefineNode>
+) -> Result<DefineNode, Box<dyn Error>> {
   if instructions.is_empty() {
     return Err("Cannot process empty instruction list".into()); }
-  let mut save_opt: Option<SaveSkgnode> = None;
-  let mut delete_opt: Option<DeleteSkgnode> = None;
+  let mut save_opt: Option<SaveNode> = None;
+  let mut delete_opt: Option<DeleteNode> = None;
   for instr in instructions {
     match instr {
-      DefineOneNode::Save(save) => {
+      DefineNode::Save(save) => {
         if save_opt.is_some() {
           return Err("Multiple save instructions for same ID (should be caught by validation)".into( )); }
         save_opt = Some(save); }
-      DefineOneNode::Delete(del) => {
+      DefineNode::Delete(del) => {
         // Multiple deletes are harmless; keep either one.
         if delete_opt.is_none() {
           delete_opt = Some(del); }} }}
@@ -102,13 +102,13 @@ pub async fn reconcile_same_id_instructions_for_one_id(
     if save_opt.is_some() {
       return Err("Cannot have both Delete and Save for same ID"
                  . into() ); }
-    return Ok(DefineOneNode::Delete(delete_instr)); }
-  let save : SaveSkgnode =
+    return Ok(DefineNode::Delete(delete_instr)); }
+  let save : SaveNode =
     save_opt . ok_or("No delete and no save instruction found. This should not be possible.")?;
-  let supplemented : SaveSkgnode =
+  let supplemented : SaveNode =
     // Return a Save. Replace None fields from the skgnode implied by the buffer with whatever was already on disk. (The buffer node can delete the data in such a field by sending Some([]) rather than None.)
     build_supplemented_save ( config, driver, save ). await ?;
-  Ok(DefineOneNode::Save(supplemented)) }
+  Ok(DefineNode::Save(supplemented)) }
 
 /// Build and return a Save instruction supplemented with disk data.
 /// Replaces None fields in the instruction with values from disk,
@@ -116,8 +116,8 @@ pub async fn reconcile_same_id_instructions_for_one_id(
 async fn build_supplemented_save(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  SaveSkgnode(from_buffer): SaveSkgnode,
-) -> Result<SaveSkgnode, Box<dyn Error>> {
+  SaveNode(from_buffer): SaveNode,
+) -> Result<SaveNode, Box<dyn Error>> {
   let pid: ID =
     from_buffer.ids.first()
     .ok_or("No primary ID found")?.clone();
@@ -154,7 +154,7 @@ async fn build_supplemented_save(
       from_buffer.overrides_view_of.clone().or(
         from_disk.as_ref().and_then(
           |node| node.overrides_view_of.clone()))), };
-  Ok(SaveSkgnode(supplemented_node)) }
+  Ok(SaveNode(supplemented_node)) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
 /// MOTIVATION: An OrgNode uses only one ID,

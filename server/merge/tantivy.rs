@@ -1,5 +1,5 @@
 use crate::save::update_tantivy_from_saveinstructions;
-use crate::types::save::{Merge, DefineOneNode};
+use crate::types::save::{Merge, DefineNode};
 use crate::types::misc::TantivyIndex;
 use std::error::Error;
 
@@ -9,7 +9,7 @@ pub(super) fn merge_nodes_in_tantivy (
   tantivy_index      : &TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
   update_tantivy_from_saveinstructions(
-    & { let flat_instructions : Vec<DefineOneNode> =
+    & { let flat_instructions : Vec<DefineNode> =
           merge_instructions . iter()
           . flat_map( |m| m.to_vec() )
           . collect();

@@ -5,7 +5,7 @@
 use skg::types::skgnode::{empty_skgnode, SkgNode};
 use skg::types::skgnodemap::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNodeMap};
 use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, default_truenode};
-use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
+use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
 use std::collections::HashMap;
@@ -159,11 +159,11 @@ fn test_skgnode_map_from_save_instructions() {
       .. empty_skgnode()
     };
 
-  let instructions : Vec<DefineOneNode> =
-    vec![ DefineOneNode::Save(SaveSkgnode(skgnode1.clone())),
-          DefineOneNode::Save(SaveSkgnode(skgnode2.clone())),
-          DefineOneNode::Delete(
-            DeleteSkgnode { id: id3.clone(),
+  let instructions : Vec<DefineNode> =
+    vec![ DefineNode::Save(SaveNode(skgnode1.clone())),
+          DefineNode::Save(SaveNode(skgnode2.clone())),
+          DefineNode::Delete(
+            DeleteNode { id: id3.clone(),
                             source: SourceName::from("main") }), ];
 
   let map :
@@ -181,7 +181,7 @@ fn test_skgnode_map_from_save_instructions() {
 fn test_skgnode_map_from_save_instructions_empty() {
   // Empty instructions → empty map
   let instructions :
-    Vec<DefineOneNode> =
+    Vec<DefineNode> =
     vec![];
 
   let map :

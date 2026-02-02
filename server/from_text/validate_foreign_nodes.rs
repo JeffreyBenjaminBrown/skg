@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::errors::BufferValidationError;
-use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode, Merge};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use typedb_driver::TypeDBDriver;
 
@@ -11,16 +11,16 @@ use typedb_driver::TypeDBDriver;
 /// - Would modify or delete a foreign node
 /// - Would create a node in a foreign source
 pub async fn validate_and_filter_foreign_instructions(
-  instructions: Vec<DefineOneNode>,
+  instructions: Vec<DefineNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
-) -> Result<Vec<DefineOneNode>,
+) -> Result<Vec<DefineNode>,
             Vec<BufferValidationError>> {
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  let mut filtered: Vec<DefineOneNode> = Vec::new();
+  let mut filtered: Vec<DefineNode> = Vec::new();
   for instr in instructions {
     match &instr {
-      DefineOneNode::Delete(DeleteSkgnode { id, source }) => {
+      DefineNode::Delete(DeleteNode { id, source }) => {
         let is_foreign: bool = config . sources . get(source)
                                . map(|s| !s.user_owns_it)
                                . unwrap_or(false);
@@ -29,7 +29,7 @@ pub async fn validate_and_filter_foreign_instructions(
             id . clone(),
             source . clone() ));
         } else { filtered.push(instr); }}
-      DefineOneNode::Save(SaveSkgnode(node)) => {
+      DefineNode::Save(SaveNode(node)) => {
         let is_foreign: bool = config . sources . get(&node.source)
                                . map(|s| !s.user_owns_it)
                                . unwrap_or(false);
