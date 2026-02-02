@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::errors::BufferValidationError;
-use crate::types::save::{DefineOneNode, Merge};
+use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode, Merge};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use typedb_driver::TypeDBDriver;
 
@@ -19,27 +19,28 @@ pub async fn validate_and_filter_foreign_instructions(
   let mut errors: Vec<BufferValidationError> = Vec::new();
   let mut filtered: Vec<DefineOneNode> = Vec::new();
   for instr in instructions {
-    let node = instr.node();
-    if ! { let is_foreign: bool =
-             config . sources . get(&node.source)
-             . map(|s| !s.user_owns_it)
-             . unwrap_or(false);
-           is_foreign }
-    { // nothing to worry about; move on
-      filtered.push(instr);
-      continue; }
-    let primary_id : &ID = match node.primary_id() {
-      Ok(id) => id,
-      Err(e) => {
-        errors.push(BufferValidationError::Other(e));
-        continue; } };
-    match &instr { // maybe worry about it
-      DefineOneNode::Delete(_) => {
-        // Cannot delete foreign nodes
-        errors.push(BufferValidationError::ModifiedForeignNode(
-          primary_id . clone(),
-          SourceName::from ( node.source.clone() )) ); }
-      DefineOneNode::Save(_) => {
+    match &instr {
+      DefineOneNode::Delete(DeleteSkgnode { id, source }) => {
+        let is_foreign: bool = config . sources . get(source)
+                               . map(|s| !s.user_owns_it)
+                               . unwrap_or(false);
+        if is_foreign { // Cannot delete foreign nodes
+          errors.push(BufferValidationError::ModifiedForeignNode(
+            id . clone(),
+            source . clone() ));
+        } else { filtered.push(instr); }}
+      DefineOneNode::Save(SaveSkgnode(node)) => {
+        let is_foreign: bool = config . sources . get(&node.source)
+                               . map(|s| !s.user_owns_it)
+                               . unwrap_or(false);
+        if !is_foreign { // nothing to worry about; move on
+          filtered.push(instr);
+          continue; }
+        let primary_id : &ID = match node.primary_id() {
+          Ok(id) => id,
+          Err(e) => {
+            errors.push(BufferValidationError::Other(e));
+            continue; }};
         // Check if node has been modified.
         // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
         match optskgnode_from_id(
@@ -72,14 +73,14 @@ TODO: When overrides_view_of, subscribes_to, and hides_from_its_subscriptionsare
                  aliases_matches) {
               errors.push(BufferValidationError::ModifiedForeignNode(
                 primary_id . clone(),
-                SourceName::from(node.source.clone() )) ); }
+                node.source.clone() )); }
             // If unchanged, filter out (no need to write)
           }
           Ok(None) => {
             // 'Foreign' node not found on disk.
             errors.push(BufferValidationError::ModifiedForeignNode(
               primary_id . clone(),
-              SourceName::from(node.source.clone() )) ); }
+              node.source.clone() )); }
           Err(e) => { // Other error reading from disk
             return Err(vec![BufferValidationError::Other(
               format!("Error reading foreign node {}: {}",
@@ -99,7 +100,7 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
   for merge in merge_instructions {
     { // Check if acquirer is from foreign source
       let acquirer_source: &SourceName =
-        &merge.updated_acquirer.node().source;
+        &merge.updated_acquirer.0.source;
       if { let acquirer_is_foreign: bool =
              config . sources . get(acquirer_source)
              . map(|s| !s.user_owns_it)
@@ -114,18 +115,15 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
             BufferValidationError::Other(e)), }; }}
     { // Check if acquiree is from foreign source
       let acquiree_source: &SourceName =
-        &merge.acquiree_to_delete.node().source;
-      if { let acquiree_is_foreign: bool =
-             config.sources.get(acquiree_source)
-             . map(|s| !s.user_owns_it)
-             . unwrap_or (false);
-           acquiree_is_foreign }
-      { match merge.acquiree_id() {
-          Ok(id) => errors.push(BufferValidationError::ModifiedForeignNode(
-            id . clone(),
-            acquiree_source.clone() )),
-          Err(e) => errors.push(BufferValidationError::Other(e)),
-        }; }} }
+        &merge.acquiree_to_delete.source;
+      let acquiree_is_foreign: bool =
+        config.sources.get(acquiree_source)
+        . map(|s| !s.user_owns_it)
+        . unwrap_or (false);
+      if acquiree_is_foreign {
+        errors.push(BufferValidationError::ModifiedForeignNode(
+          merge.acquiree_id().clone(),
+          acquiree_source.clone() )); }} }
   if errors.is_empty() { Ok(( ))
   } else { Err(errors) }}
 

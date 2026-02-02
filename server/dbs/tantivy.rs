@@ -97,6 +97,19 @@ where I: Iterator<Item = &'a SkgNode>, {
                                primary_id.as_str() ) ); }}
   Ok (( )) }
 
+pub fn delete_nodes_by_id_from_index<'a, I>(
+  ids_iter: I,
+  writer: &mut IndexWriter,
+  tantivy_index: &TantivyIndex,
+) -> Result<(), Box<dyn Error>>
+where I: Iterator<Item = Result<&'a ID, String>>, {
+  for id_result in ids_iter {
+    let id : &ID = id_result?;
+    writer . delete_term (
+      Term::from_field_text( tantivy_index.id_field,
+                             id.as_str() ) ); }
+  Ok (( )) }
+
 pub fn add_documents_to_tantivy_writer<'a, I> (
   nodes         : I,
   writer        : &mut IndexWriter,

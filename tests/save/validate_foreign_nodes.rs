@@ -8,7 +8,8 @@ use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, SourceName};
+use skg::types::misc::SkgConfig;
+use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::error::Error;
@@ -271,9 +272,12 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
 
     // Verify no foreign nodes in instructions
     for instr in &instructions {
-      assert_eq!(&*instr.node().source, "main",
-                 "Only owned (main) nodes should be in instructions");
-    }
+      let source : &str = match instr {
+        DefineOneNode::Save(SaveSkgnode(node)) =>
+          node.source.as_str(),
+        DefineOneNode::Delete(DeleteSkgnode { source, .. }) =>
+          source.as_str() };
+      assert_eq!( source, "main", "Only owned (in this case from source main) nodes should be in instructions"); }
 
     Ok(())
   })

@@ -1,4 +1,4 @@
-use super::misc::ID;
+use super::misc::{ID, SourceName};
 use super::skgnode::SkgNode;
 use super::errors::{SaveError, BufferValidationError};
 
@@ -17,17 +17,31 @@ use super::errors::{SaveError, BufferValidationError};
 /// to represent with a Merge.)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DefineOneNode {
-  Save(SkgNode),
-  Delete(SkgNode),
+  // PITFALL: Save(SaveSkgnode) might smell funny, but consider that
+  // some functions and type fields require specifically a SaveSkgnode,
+  // not a DefineOneNode.
+  Save(SaveSkgnode),
+  Delete(DeleteSkgnode),
+}
+
+/// A Save instruction: write this SkgNode to disk/databases.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SaveSkgnode(pub SkgNode);
+
+/// A Delete instruction: remove node with this ID from this source.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DeleteSkgnode {
+  pub id: ID,
+  pub source: SourceName,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
-/// we need three DefineOneNodes.
+/// we need two SaveSkgnodes and a DeleteSkgnode.
 #[derive(Debug, Clone)]
 pub struct Merge {
-  pub acquiree_text_preserver : DefineOneNode, // new node with acquiree's title and body
-  pub updated_acquirer        : DefineOneNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
-  pub acquiree_to_delete      : DefineOneNode,
+  pub acquiree_text_preserver : SaveSkgnode, // new node with acquiree's title and body
+  pub updated_acquirer        : SaveSkgnode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
+  pub acquiree_to_delete      : DeleteSkgnode,
 }
 
 
@@ -131,18 +145,6 @@ fn format_buffer_validation_error (
       format!("{}\n", msg) }, }}
 
 impl DefineOneNode {
-  pub fn node(&self) -> &SkgNode {
-    match self {
-      DefineOneNode::Save(n) => n,
-      DefineOneNode::Delete(n) => n,
-    } }
-
-  pub fn into_node(self) -> SkgNode {
-    match self {
-      DefineOneNode::Save(n) => n,
-      DefineOneNode::Delete(n) => n,
-    } }
-
   pub fn is_delete(&self) -> bool {
     matches!(self, DefineOneNode::Delete(_))
   }
@@ -152,23 +154,49 @@ impl DefineOneNode {
   }
 }
 
+impl From<SaveSkgnode> for DefineOneNode {
+  fn from(save: SaveSkgnode) -> Self {
+    DefineOneNode::Save(save)
+  }
+}
+
+impl From<DeleteSkgnode> for DefineOneNode {
+  fn from(del: DeleteSkgnode) -> Self {
+    DefineOneNode::Delete(del)
+  }
+}
+
 impl Merge {
   pub fn to_vec (
     &self
   ) -> Vec<DefineOneNode> {
     vec![
-      self.acquiree_text_preserver.clone(),
-      self.updated_acquirer.clone(),
-      self.acquiree_to_delete.clone(),
+      self.acquiree_text_preserver.clone().into(),
+      self.updated_acquirer.clone().into(),
+      self.acquiree_to_delete.clone().into(),
     ] }
 
   pub fn acquirer_id (
     &self
   ) -> Result<&ID, String> {
-    self.updated_acquirer.node().primary_id() }
+    self.updated_acquirer.0.primary_id()
+  }
 
   pub fn acquiree_id (
     &self
-  ) -> Result<&ID, String> {
-    self.acquiree_to_delete.node().primary_id() }
+  ) -> &ID {
+    &self.acquiree_to_delete.id
+  }
+
+  /// Extracts the three targets from a Merge:
+  /// - acquiree_text_preserver -> &SkgNode
+  /// - updated_acquirer -> &SkgNode
+  /// - acquiree_to_delete -> (&ID, &SourceName)
+  pub fn targets_from_merge (
+    &self
+  ) -> (&SkgNode, &SkgNode, (&ID, &SourceName)) {
+    ( &self.acquiree_text_preserver.0,
+      &self.updated_acquirer.0,
+      (&self.acquiree_to_delete.id, &self.acquiree_to_delete.source) )
+  }
 }

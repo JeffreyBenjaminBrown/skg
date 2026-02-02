@@ -3,9 +3,10 @@
 
 use std::collections::HashMap;
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
+use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::misc::{ID, SourceName};
 use skg::types::skgnode::SkgNode;
-use skg::types::save::DefineOneNode;
+use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 
 // Helper function to create a basic SkgNode for testing
 fn create_test_node(
@@ -34,9 +35,11 @@ fn create_instruction(
   to_delete: bool
 ) -> DefineOneNode {
   if to_delete {
-    DefineOneNode::Delete(node)
+    DefineOneNode::Delete(DeleteSkgnode {
+      id: node.ids.first().unwrap().clone(),
+      source: node.source.clone() })
   } else {
-    DefineOneNode::Save(node) }}
+    DefineOneNode::Save(SaveSkgnode(node)) }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {
@@ -184,10 +187,9 @@ fn test_alias_collection_and_deduplication() {
     // Collect all aliases
     let mut all_aliases : Vec<String> = vec![];
     for instr in &instructions {
-        if let Some(aliases) = &instr.node().aliases {
-            all_aliases.extend(aliases.iter().cloned());
-        }
-    }
+      if let Some(aliases)
+        = &extract_skgnode_if_save_else_error(instr).aliases
+        { all_aliases.extend( aliases.iter() . cloned() ); }}
 
     // Deduplicate
     all_aliases.sort();
@@ -273,7 +275,8 @@ fn test_last_instruction_defines_title_and_body() {
     let mut maybe_body : Option<String> = None;
 
     for instr in &instructions {
-        let skg_node : &SkgNode = instr.node();
+        let skg_node : &SkgNode =
+          extract_skgnode_if_save_else_error(instr);
         maybe_title = Some(skg_node.title.clone());
         if skg_node.body.is_some() {
             maybe_body = skg_node.body.clone();
@@ -313,7 +316,8 @@ fn test_defining_instruction_takes_precedence() {
 
     for instr in &instructions {
         if instr.is_save() {
-            let skg_node : &SkgNode = instr.node();
+            let skg_node : &SkgNode =
+              extract_skgnode_if_save_else_error(instr);
             last_title = Some(skg_node.title.clone());
             last_body = skg_node.body.clone();
             last_content = skg_node.contains.clone();
@@ -345,12 +349,10 @@ fn test_initial_content_from_disk_when_no_defining() {
     let mut all_contents : Vec<ID> = Vec::new();
 
     for instr in &instructions {
-        if instr.is_save() {
-            if let Some(contents) = &instr.node().contains {
-                all_contents.extend(contents.iter().cloned());
-            }
-        }
-    }
+      if instr.is_save() {
+        if let Some(contents)
+          = &extract_skgnode_if_save_else_error(instr).contains
+          { all_contents.extend(contents.iter().cloned()); }} }
 
     // Should collect content from both instructions
     assert_eq!(all_contents,
@@ -372,11 +374,10 @@ fn test_body_from_disk_when_no_instruction_has_body() {
     let mut maybe_body : Option<String> = None;
 
     for instr in &instructions {
-        let skg_node : &SkgNode = instr.node();
-        if skg_node.body.is_some() {
-            maybe_body = skg_node.body.clone();
-        }
-    }
+      let skg_node : &SkgNode =
+        extract_skgnode_if_save_else_error(instr);
+      if skg_node.body.is_some() {
+        maybe_body = skg_node.body.clone(); }}
 
     // No instruction had a body
     assert!(maybe_body.is_none());

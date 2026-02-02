@@ -4,7 +4,7 @@ pub mod none_node_fields_are_noops;
 
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::SkgConfig;
-use crate::types::save::DefineOneNode;
+use crate::types::save::{DefineOneNode, SaveSkgnode};
 use crate::types::orgnode::OrgNode;
 
 use to_naive_instructions::naive_saveinstructions_from_forest;
@@ -35,14 +35,13 @@ pub async fn orgnode_forest_to_nonmerge_save_instructions (
                 forest . clone( )) ?;
             instructions } ) . await ?;
       instructions_without_dups }
-  { let clobbered_node : SkgNode =
-      // TODO ? It is natural to clobber Saves, but Deletes?
-      noneclobber_skgnode (
-        config, driver, instr.node().clone() ). await ?;
-    let clobbered_instr : DefineOneNode =
-      // This is a noisy way to say: Replace instr's node.
-      if instr.is_delete()
-      { DefineOneNode::Delete(clobbered_node) }
-      else { DefineOneNode::Save(clobbered_node) };
+  { let clobbered_instr : DefineOneNode = match instr {
+      DefineOneNode::Delete(_) =>
+        // Deletes need no clobbering; pass through unchanged.
+        instr,
+      DefineOneNode::Save(SaveSkgnode(node)) => {
+        let noneclobbered_node : SkgNode =
+          noneclobber_skgnode ( config, driver, node ). await ?;
+        DefineOneNode::Save(SaveSkgnode(noneclobbered_node)) } };
     clobbered_instructions.push(clobbered_instr); }
   Ok (clobbered_instructions) }

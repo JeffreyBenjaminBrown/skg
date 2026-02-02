@@ -1,9 +1,9 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::orgnode::EditRequest;
 use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, Scaffold};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
-use crate::types::save::DefineOneNode;
+use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::orgnode_skgnode::{
   collect_grandchild_aliases_for_orgnode, unique_scaffold_child };
@@ -62,18 +62,21 @@ fn naive_saveinstructions_from_tree(
     },
     OrgNodeKind::True ( t ) => {
       if ! t.indefinitive {
-        let aliases: Option<Vec<String>> =
-          collect_grandchild_aliases_for_orgnode(tree, node_id)?;
-        let subscribees: Option<Vec<ID>> =
-          collect_subscribees(tree, node_id)?;
-        let node_ref: NodeRef<OrgNode> = tree.get(node_id).ok_or(
-          "saveinstructions_from_tree: node not found")?;
-        let skg_node: SkgNode = skgnode_for_orgnode_in_tree(
-          node_ref.value(), &node_ref, aliases, subscribees)?;
         let instruction: DefineOneNode =
           if t.edit_request == Some(EditRequest::Delete)
-          { DefineOneNode::Delete(skg_node) }
-          else { DefineOneNode::Save(skg_node) };
+          { DefineOneNode::Delete(DeleteSkgnode {
+              id: t.id.clone(),
+              source: t.source.clone() })
+          } else {
+            let aliases: Option<Vec<String>> =
+              collect_grandchild_aliases_for_orgnode(tree, node_id)?;
+            let subscribees: Option<Vec<ID>> =
+              collect_subscribees(tree, node_id)?;
+            let node_ref: NodeRef<OrgNode> = tree.get(node_id).ok_or(
+              "saveinstructions_from_tree: node not found")?;
+            let skg_node: SkgNode = skgnode_for_orgnode_in_tree(
+              node_ref.value(), &node_ref, aliases, subscribees)?;
+            DefineOneNode::Save(SaveSkgnode(skg_node)) };
         result.push(instruction); }
       recurse( tree, node_id, result )?; }}
   Ok(( )) }

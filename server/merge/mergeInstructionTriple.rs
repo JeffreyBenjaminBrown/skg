@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
-use crate::types::save::{Merge, DefineOneNode};
+use crate::types::save::{Merge, SaveSkgnode, DeleteSkgnode};
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::orgnode::EditRequest;
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
@@ -69,11 +69,13 @@ async fn merges_from_the_merge_in_an_orgnode(
       { merge_instructions.push(
           Merge {
             acquiree_text_preserver :
-              DefineOneNode::Save(acquiree_text_preserver),
+              SaveSkgnode(acquiree_text_preserver),
             updated_acquirer :
-              DefineOneNode::Save(updated_acquirer),
+              SaveSkgnode(updated_acquirer),
             acquiree_to_delete :
-              DefineOneNode::Delete(acquiree_from_disk),
+              DeleteSkgnode {
+                id: acquiree_id.clone(),
+                source: acquiree_from_disk.source.clone() },
           } ); }} }
   Ok(merge_instructions) }
 

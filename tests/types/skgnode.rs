@@ -4,8 +4,8 @@
 
 use skg::types::skgnode::{empty_skgnode, SkgNode};
 use skg::types::skgnodemap::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNodeMap};
-use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, TrueNode, default_truenode};
-use skg::types::save::DefineOneNode;
+use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, default_truenode};
+use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
 use std::collections::HashMap;
@@ -159,30 +159,22 @@ fn test_skgnode_map_from_save_instructions() {
       .. empty_skgnode()
     };
 
-  let skgnode3 :
-    SkgNode =
-    SkgNode {
-      title : "Node 3".to_string(),
-      ids : vec![id3.clone()],
-      .. empty_skgnode()
-    };
-
-  let instructions :
-    Vec<DefineOneNode> =
-    vec![
-      DefineOneNode::Save(skgnode1.clone()),
-      DefineOneNode::Save(skgnode2.clone()),
-      DefineOneNode::Delete(skgnode3.clone()), // action shouldn't matter
-    ];
+  let instructions : Vec<DefineOneNode> =
+    vec![ DefineOneNode::Save(SaveSkgnode(skgnode1.clone())),
+          DefineOneNode::Save(SaveSkgnode(skgnode2.clone())),
+          DefineOneNode::Delete(
+            DeleteSkgnode { id: id3.clone(),
+                            source: SourceName::from("main") }), ];
 
   let map :
     SkgNodeMap =
     skgnode_map_from_save_instructions(&instructions);
 
-  assert_eq!(map.len(), 3, "Map should contain 3 entries");
+  // Delete instructions don't contribute to the map (they carry no SkgNode data)
+  assert_eq!(map.len(), 2, "Map should contain 2 entries (Delete doesn't contribute)");
   assert_eq!(map.get(&id1).unwrap().title, "Node 1");
   assert_eq!(map.get(&id2).unwrap().title, "Node 2");
-  assert_eq!(map.get(&id3).unwrap().title, "Node 3");
+  assert!(map.get(&id3).is_none(), "Delete instruction should not be in map");
 }
 
 #[test]

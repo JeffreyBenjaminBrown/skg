@@ -2,9 +2,8 @@ use indoc::indoc;
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
 use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::ID;
-use skg::types::save::DefineOneNode;
-use skg::types::skgnode::SkgNode;
+use skg::types::misc::{ID, SourceName};
+use skg::types::save::SaveSkgnode;
 use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use std::error::Error;
 
@@ -37,10 +36,10 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         // Get the single merge instruction
         let merge = &merge_instructions[0];
-        let acquiree_text_preserver : &SkgNode =
-          merge.acquiree_text_preserver.node();
-        let node1 : &SkgNode = merge.updated_acquirer.node();
-        let node2 : &SkgNode = merge.acquiree_to_delete.node();
+        let ( acquiree_text_preserver,
+              node1,
+              (node2_id, node2_source) )
+          = merge.targets_from_merge();
 
         // Verify acquiree_text_preserver properties
        assert_eq!(acquiree_text_preserver.title,
@@ -50,8 +49,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
              "acquiree_text_preserver body incorrect" );
        assert!(
         matches!(&merge.acquiree_text_preserver,
-             DefineOneNode::Save(_)),
-        "acquiree_text_preserver should be Save");
+             SaveSkgnode(_)),
+        "acquiree_text_preserver should be SaveSkgnode");
        assert_eq!(acquiree_text_preserver.contains.as_ref().unwrap().len(),
              0, "acquiree_text_preserver should have no contents");
         assert_eq!(
@@ -83,8 +82,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         );
        assert!(
         matches!(&merge.updated_acquirer,
-             DefineOneNode::Save(_)),
-        "Node 1 should be Save");
+             SaveSkgnode(_)),
+        "Node 1 should be SaveSkgnode");
 
         // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
@@ -100,23 +99,10 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         );
 
         // Verify node 2 (acquiree) deletion instruction
-        assert!(
-          node2.ids.contains(&ID::from("2")),
-          "Node 2 should have ID '2'"
-        );
-       assert!(
-        matches!(&merge.acquiree_to_delete,
-             DefineOneNode::Delete(_)),
-        "Node 2 should be Delete");
-
-        // Verify node 2 has its original data from disk
-        assert_eq!(node2.title, "2", "Node 2 title should be from disk");
-        assert_eq!(
-          node2.body,
-          Some("2 body".to_string()),
-          "Node 2 body should be from disk"
-        );
-
+        assert_eq!( node2_id, &ID::from("2"),
+                    "Node 2 should have ID '2'" );
+        assert_eq!( node2_source, &SourceName::from("main"),
+                    "Node 2 should have source 'main'" );
         Ok(())
       })
     },

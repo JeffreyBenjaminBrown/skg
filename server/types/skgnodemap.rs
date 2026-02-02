@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
 use crate::types::orgnode::{OrgNode, OrgNodeKind};
-use crate::types::save::DefineOneNode;
+use crate::types::save::{DefineOneNode, SaveSkgnode};
 use crate::types::skgnode::SkgNode;
 use super::misc::{ID, SkgConfig, SourceName};
 
@@ -35,15 +35,18 @@ pub fn skgnode_for_orgnode<'a> (
 /// PITFALL: Does not include every node in the buffer --
 /// just the ones that generated instructions.
 /// Hence the importance of 'skgnode_from_map_or_disk'.
+/// PITFALL: Only Save instructions contribute;
+/// Delete instructions carry no SkgNode data.
 pub fn skgnode_map_from_save_instructions (
   instructions : &Vec<DefineOneNode>,
 ) -> SkgNodeMap
 { instructions.iter()
-    . filter_map( |instr|
-                  { let skgnode = instr.node();
-                    skgnode . ids . first()
-                      . map( |id| (id . clone(),
-                                   skgnode . clone() )) } )
+    . filter_map( |instr| match instr {
+        DefineOneNode::Save(SaveSkgnode(skgnode)) =>
+          skgnode . ids . first()
+            . map( |id : &ID| (id . clone(),
+                               skgnode . clone() )),
+        DefineOneNode::Delete(_) => None } )
     . collect() }
 
 /// Fetches (batched) SkgNodes from disk for all IDs in the tree.

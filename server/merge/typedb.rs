@@ -22,11 +22,16 @@ pub(super) async fn merge_nodes_in_typedb (
   let tx : Transaction = driver.transaction(
     db_name, TransactionType::Write).await?;
   for merge in merge_instructions {
+    let ( acquiree_text_preserver,
+          updated_acquirer,
+          (acquiree_id, _acquiree_source) )
+      : (&SkgNode, &SkgNode, (&ID, _))
+      = merge.targets_from_merge();
     merge_one_node_in_typedb (
       &tx,
-      merge.acquiree_text_preserver.node(),
-      merge.updated_acquirer.node(),
-      merge.acquiree_to_delete.node(),
+      acquiree_text_preserver,
+      updated_acquirer,
+      acquiree_id,
     ).await?; }
   tx.commit().await?;
   Ok (( )) }
@@ -36,10 +41,9 @@ async fn merge_one_node_in_typedb(
   tx: &Transaction,
   acquiree_text_preserver : &SkgNode,
   updated_acquirer        : &SkgNode,
-  acquiree                : &SkgNode,
+  acquiree_id             : &ID,
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id : &ID = updated_acquirer . primary_id()?;
-  let acquiree_id : &ID = acquiree         . primary_id()?;
 
   { // Reroute relationships.
     reroute_relationships_for_merge (

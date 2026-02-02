@@ -1,13 +1,14 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
-use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_from_index};
+use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::save::DefineOneNode;
+use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 use crate::types::skgnode::SkgNode;
 
+use itertools::{Itertools, Either};
 use std::error::Error;
 use std::io;
 use tantivy::IndexWriter;
@@ -79,19 +80,17 @@ pub async fn update_typedb_from_saveinstructions (
   // because (see add_missing_info_to_forest) there are no others.
   // It is simply to turn the Vec<ID> into a bare ID.
 
-  let ( to_delete_instructions, to_write_instructions )
-    : ( Vec<DefineOneNode>, Vec<DefineOneNode> ) =
-    instructions . iter ()
-    . cloned ()
-    . partition ( |instr| instr.is_delete() );
+  let ( to_delete, to_save )
+    : ( Vec<DeleteSkgnode>, Vec<SaveSkgnode> )
+    = instructions . iter() . cloned() . partition_map (
+      |instr| match instr {
+        DefineOneNode::Delete(d) => Either::Left(d),
+        DefineOneNode::Save(s)   => Either::Right(s) } );
 
   { // delete
     let to_delete_pids : Vec<ID> =
-      to_delete_instructions . iter ()
-      . filter_map ( |instr|
-                      instr . node() . ids
-                      . get(0)
-                      . cloned() )
+      to_delete . iter ()
+      . map ( |DeleteSkgnode { id, .. }| id.clone() )
       . collect ();
     if ! to_delete_pids . is_empty () {
       println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
@@ -102,8 +101,8 @@ pub async fn update_typedb_from_saveinstructions (
 
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
-      to_write_instructions . iter ()
-      . map ( |instr| instr . node() . clone () )
+      to_save . iter ()
+      . map ( |SaveSkgnode(node)| node.clone() )
       . collect ();
     let to_write_pids : Vec<ID> =
       to_write_skgnodes . iter ()
@@ -128,23 +127,25 @@ pub fn update_fs_from_saveinstructions (
   instructions : Vec<DefineOneNode>,
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
-  let ( to_delete, to_write ) // functional; no IO
-    : ( Vec<DefineOneNode>, Vec<DefineOneNode> ) =
-    instructions . into_iter ()
-    . partition ( |instr| instr . is_delete() );
+  let ( to_delete, to_save )
+    : ( Vec<DeleteSkgnode>, Vec<SaveSkgnode> )
+    = instructions.into_iter().partition_map(
+      |instr| match instr {
+        DefineOneNode::Delete(d) => Either::Left(d),
+        DefineOneNode::Save(s)   => Either::Right(s) } );
   let deleted : usize = {
-    let nodes_to_delete : Vec<SkgNode> =
+    let delete_targets : Vec<(ID, SourceName)> =
       to_delete . into_iter ()
-      . map ( |instr| instr . into_node() )
+      . map ( |DeleteSkgnode { id, source }| (id, source) )
       . collect ();
-    if ! nodes_to_delete . is_empty () {
+    if ! delete_targets . is_empty () {
       delete_all_nodes_from_fs (
-        nodes_to_delete, config . clone () ) ?
+        delete_targets, config . clone () ) ?
     } else { 0 } };
   let written : usize = {
     let nodes_to_write : Vec<SkgNode> =
-      to_write . into_iter ()
-      . map ( |instr| instr . into_node() )
+      to_save . into_iter ()
+      . map ( |SaveSkgnode(node)| node )
       . collect ();
     if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
@@ -164,10 +165,12 @@ pub(super) fn update_tantivy_from_saveinstructions (
 
   let mut writer: IndexWriter =
     tantivy_index.index.writer(50_000_000)?;
-  delete_nodes_from_index(
-    // Delete all IDs in the DefineOneNodes from the index.
-    // (Each DefineOneNode::Save is then recreated.)
-    instructions.iter().map(|instr| instr.node()),
+  delete_nodes_by_id_from_index(
+    // Delete all IDs, be they from Saves or Deletes.
+    // (The entry for each Save is then recreated.)
+    instructions.iter().map(|instr| match instr {
+      DefineOneNode::Save(SaveSkgnode(node)) => node.primary_id(),
+      DefineOneNode::Delete(DeleteSkgnode { id, .. }) => Ok(id) }),
     &mut writer,
     tantivy_index)?;
   let processed_count: usize =
@@ -175,9 +178,9 @@ pub(super) fn update_tantivy_from_saveinstructions (
       { // Add documents only for non-deletion instructions.
         let nodes_to_add: Vec<&SkgNode> =
           instructions . iter()
-          . filter_map( |instr|
-                         if instr.is_save()
-                         { Some (instr.node()) } else { None } )
+          . filter_map( |instr| match instr {
+              DefineOneNode::Save(SaveSkgnode(node)) => Some(node),
+              DefineOneNode::Delete(_) => None } )
           . collect();
         nodes_to_add },
       &mut writer, tantivy_index )? ;

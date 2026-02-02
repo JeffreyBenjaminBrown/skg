@@ -180,23 +180,6 @@ impl Scaffold {
       Scaffold::ID { id, .. } => id,
     }} }
 
-impl ScaffoldKind {
-  /// Construct a Scaffold from this kind. For Alias/ID, uses the provided title.
-  pub fn to_scaffold ( &self, title: &str ) -> Scaffold {
-    match self {
-      ScaffoldKind::Alias => Scaffold::Alias { text: title.to_string(),
-                                               diff: None },
-      ScaffoldKind::AliasCol                  => Scaffold::AliasCol,
-      ScaffoldKind::BufferRoot                => Scaffold::BufferRoot,
-      ScaffoldKind::HiddenInSubscribeeCol     => Scaffold::HiddenInSubscribeeCol,
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => Scaffold::HiddenOutsideOfSubscribeeCol,
-      ScaffoldKind::SubscribeeCol => Scaffold::SubscribeeCol,
-      ScaffoldKind::TextChanged   => Scaffold::TextChanged,
-      ScaffoldKind::IDCol         => Scaffold::IDCol,
-      ScaffoldKind::ID => Scaffold::ID { id: title.to_string(),
-                                         diff: None },
-    }} }
-
 impl ViewRequest {
   /// Single source of truth for ViewRequest <-> client string bijection.
   const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[

@@ -188,7 +188,7 @@ fn verify_filesystem_after_merge_2_into_1(
               "Node 1 should contain 7 items (with overlap deduplicated)");
 
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0].acquiree_text_preserver.node().ids[0];
+    &merge_instructions[0].targets_from_merge().0.ids[0];
   assert_eq!(&node_1.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1.contains.as_ref().unwrap()[1], &ID::from("11"));
@@ -278,7 +278,8 @@ fn verify_tantivy_after_merge_2_into_1(
           "Node 1 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
+  let acquiree_text_preserver_id: &ID =
+    &merge_instructions[0].targets_from_merge().0.ids[0];
   let found_acquiree_text_preserver: bool =
     tantivy_contains_id(tantivy_index, "\"MERGED: 2\"", &acquiree_text_preserver_id.0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
@@ -414,10 +415,13 @@ async fn verify_typedb_after_merge_1_into_2 (
   // TextLinks should be rerouted
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
-  let acquiree_text_preserver_textlink_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ acquiree_text_preserver_id . clone () ],
-    "textlinks_to", "source", "dest" ). await ?;
+  let acquiree_text_preserver_id: &ID =
+    &merge_instructions[0].targets_from_merge().0.ids[0];
+  let acquiree_text_preserver_textlink_dests: HashSet<ID> =
+    find_related_nodes(
+      db_name, driver, & [ acquiree_text_preserver_id . clone () ],
+      "textlinks_to", "source", "dest"
+    ). await ?;
   assert!(
     acquiree_text_preserver_textlink_dests.contains(&ID::from("1-links-to")),
     "acquiree_text_preserver should textlink to 1-links-to");
@@ -522,7 +526,8 @@ fn verify_filesystem_after_merge_1_into_2(
   // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
   assert_eq!( node_2.contains.as_ref().unwrap().len(), 7,
               "Node 2 should contain 7 items (with overlap deduplicated)");
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
+  let acquiree_text_preserver_id: &ID =
+    &merge_instructions[0].targets_from_merge().0.ids[0];
   assert_eq!(&node_2.contains.as_ref().unwrap()[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2.contains.as_ref().unwrap()[1], &ID::from("21"));
@@ -615,7 +620,8 @@ fn verify_tantivy_after_merge_1_into_2(
           "Node 2 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - SHOULD find it
-  let acquiree_text_preserver_id: &ID = &merge_instructions[0].acquiree_text_preserver.node().ids[0];
+  let acquiree_text_preserver_id: &ID =
+    &merge_instructions[0].targets_from_merge().0.ids[0];
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
     tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id.0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");

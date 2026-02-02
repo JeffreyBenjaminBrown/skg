@@ -218,18 +218,15 @@ pub fn write_all_nodes_to_fs (
   Ok (written) }
 
 pub fn delete_all_nodes_from_fs (
-  nodes  : Vec<SkgNode>,
-  config : SkgConfig,
+  delete_targets : Vec<(ID, SourceName)>,
+  config         : SkgConfig,
 ) -> io::Result<usize> { // number of files deleted
 
   let mut deleted : usize = 0;
-  for node in nodes {
+  for (pid, source) in delete_targets {
     match fs::remove_file ( & {
-      let pid : ID = node . ids . get(0)
-        . unwrap () // Safe because we checked above
-        . clone ();
       path_from_pid_and_source (
-        & config, & node.source, pid ) } )
+        & config, & source, pid ) } )
     {
       Ok ( () ) => {
         deleted += 1; },

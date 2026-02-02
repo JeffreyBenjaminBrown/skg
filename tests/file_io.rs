@@ -9,9 +9,9 @@ use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
   skgnode_from_pid_and_source, write_skgnode_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::types::skgnode::{SkgNode, skgnode_example, empty_skgnode};
+use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, skgnode_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 

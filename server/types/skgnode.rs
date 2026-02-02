@@ -49,23 +49,6 @@ impl SkgNode {
 // Functions
 //
 
-pub fn skgnode_example () -> SkgNode {
-  SkgNode {
-    title: "This text gets indexed.".to_string(),
-    aliases: None,
-    source: SourceName::from("main"),
-    ids: vec![ ID::new("example") ],
-    body: Some( r#"This one string could span pages.
-It better be okay with newlines."# . to_string() ),
-    contains: Some(vec![ ID::new("1"),
-                         ID::new("2"),
-                         ID::new("3")]),
-    subscribes_to: Some(vec![ID::new("11"),
-                             ID::new("12"),
-                             ID::new("13")]),
-    hides_from_its_subscriptions: None,
-    overrides_view_of: None, }}
-
 /// Useful for making tests more readable.
 pub fn empty_skgnode () -> SkgNode {
   SkgNode {

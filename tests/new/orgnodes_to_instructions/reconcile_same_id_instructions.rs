@@ -8,11 +8,17 @@ use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_node
 use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
 use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, extract_skgnode_if_save_else_error};
 use skg::types::misc::ID;
-use skg::types::save::DefineOneNode;
+use skg::types::save::{DefineOneNode, SaveSkgnode, DeleteSkgnode};
 use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
 use std::error::Error;
+
+/// Get the primary ID from any DefineOneNode variant.
+fn get_id(instr: &DefineOneNode) -> &ID {
+  match instr {
+    DefineOneNode::Save(SaveSkgnode(node)) => &node.ids[0],
+    DefineOneNode::Delete(DeleteSkgnode { id, .. }) => id }}
 
 #[test]
 fn test_inconsistent_delete() {
@@ -31,8 +37,8 @@ fn test_inconsistent_delete() {
     naive_saveinstructions_from_forest(forest)
     . unwrap();
   assert_eq!(instructions.len(), 2);
-  assert_eq!(instructions[0].node().ids[0], ID::from("1"));
-  assert_eq!(instructions[1].node().ids[0], ID::from("1"));
+  assert_eq!(get_id(&instructions[0]), &ID::from("1"));
+  assert_eq!(get_id(&instructions[1]), &ID::from("1"));
   // One should be Delete, the other not
   let is_delete_0: bool = instructions[0].is_delete();
   let is_delete_1: bool = instructions[1].is_delete();
@@ -59,16 +65,17 @@ fn test_deletions_excluded (
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
       let id1_instruction = reduced.iter()
-        .find(|instr| instr.node().ids.contains(&ID::from("1")))
+        .find(|instr| get_id(instr) == &ID::from("1"))
         .expect("Should have instruction for id:1");
       let id2_instruction = reduced.iter()
-        .find(|instr| instr.node().ids.contains(&ID::from("2")))
+        .find(|instr| get_id(instr) == &ID::from("2"))
         .expect("Should have instruction for id:2");
       assert!(!id1_instruction.is_delete());
       assert!(id2_instruction.is_delete());
       assert_eq!(
         // id 1 should contain 3 and not 2 (which is being deleted)
-        id1_instruction.node().contains, Some(vec![ID::from("3")]));
+        extract_skgnode_if_save_else_error(id1_instruction).contains,
+        Some(vec![ID::from("3")]));
       Ok (( )) } ) ) }
 
 #[test]
@@ -94,15 +101,17 @@ fn test_defining_node_defines (
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
       let id1_instruction = reduced.iter()
-        .find(|instr| instr.node().ids.contains(&ID::from("1")))
+        .find(|instr| get_id(instr) == &ID::from("1"))
         .unwrap();
-      assert_eq!(id1_instruction.node().title, "1 definer");
+      assert_eq!( extract_skgnode_if_save_else_error(id1_instruction).title,
+                  "1 definer");
       { // Defining instruction should define body completely, even if None
-        assert_eq!(id1_instruction.node().body, None); }
+        assert_eq!(extract_skgnode_if_save_else_error(id1_instruction).body,
+                   None); }
       { // Only definer's contents are used
-        assert_eq!(id1_instruction.node().contains,
+        assert_eq!(extract_skgnode_if_save_else_error(id1_instruction).contains,
                    Some(vec![ID::from("3")])); }
-      Ok (( )) } ) ) }
+      Ok (( )) } )) }
 
 #[test]
 fn test_adding_without_definer (
@@ -126,23 +135,25 @@ fn test_adding_without_definer (
 
       { // id:1 is indefinitive-only, so it should be filtered out
         let id1_instruction = reduced.iter()
-          .find(|instr| instr.node().ids.contains(&ID::from("1")));
+          .find(|instr| get_id(instr) == &ID::from("1"));
         assert!(id1_instruction.is_none(),
                 "Indefinitive-only nodes should be filtered out"); }
 
       { // id:2 has a definitive instruction, so it should be present
         let id2_instruction = reduced.iter()
-          .find(|instr| instr.node().ids.contains(&ID::from("2")))
+          .find(|instr| get_id(instr) == &ID::from("2"))
           .expect("Should have instruction for id:2");
-        assert_eq!(id2_instruction.node().title, "2"); }
+        assert_eq!(extract_skgnode_if_save_else_error(id2_instruction).title,
+                   "2"); }
 
       { // id:4 has one definitive and one indefinitive
         // The indefinitive should be filtered, only definitive kept
         let id4_instruction = reduced.iter()
-          .find(|instr| instr.node().ids.contains(&ID::from("4")))
+          .find(|instr| get_id(instr) == &ID::from("4"))
           .expect("Should have instruction for id:4");
         assert_eq!( // Contains should only have what the definitive specified, and no data from the indefinitive
-          id4_instruction.node().title, "4");
-        assert_eq!(id4_instruction.node().contains, Some(vec![])); }
+          extract_skgnode_if_save_else_error(id4_instruction).title, "4");
+        assert_eq!(extract_skgnode_if_save_else_error(id4_instruction).contains,
+                   Some( vec![] )); }
 
       Ok (( )) } )) }
