@@ -2,7 +2,6 @@ use crate::types::save::Merge;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::ID;
 use crate::dbs::typedb::nodes::create_node;
-use crate::dbs::typedb::relationships::create_relationships_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -44,6 +43,9 @@ async fn merge_one_node_in_typedb(
   acquiree_id             : &ID,
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id : &ID = updated_acquirer . primary_id()?;
+  create_node( // Create the text preserver node before using it.
+    // PITFALL: Rerouting to a nonexistent node fails silently.
+    acquiree_text_preserver, tx).await?;
 
   { // Reroute relationships.
     reroute_relationships_for_merge (
@@ -52,7 +54,7 @@ async fn merge_one_node_in_typedb(
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
       "contains", "contained", "container" ). await ?;
-    reroute_relationships_for_merge (
+    reroute_relationships_for_merge ( // Because the preserver has the acquiree's text, it links to everything the acquiree linked to.
       tx, acquiree_id,
       acquiree_text_preserver . primary_id()?,
       "textlinks_to", "source", "dest" ). await ?;
@@ -90,90 +92,78 @@ async fn merge_one_node_in_typedb(
       tx, acquiree_id,
       "overrides_view_of", "replaced", "replacement" ). await ?; }
 
-  delete_extra_ids_for_node(
-    tx, acquiree_id).await?;
-  tx.query( format!( // Delete acquiree node
-    r#"match
-         $node isa node, has id "{}";
-       delete $node;"#,
+  { // Give the acquirer more IDs.
+    create_and_connect_extra_id(
+      tx, acquirer_id, acquiree_id).await?;
+    reroute_extra_ids_for_merge( // PITFALL: Relies on TypeDB constraints. See the comment above its definition for details.
+      tx, acquiree_id, acquirer_id).await?; }
+
+  tx.query(format!( // Delete the acquiree.
+    r#"match $node isa node, has id "{}"; delete $node;"#,
     acquiree_id.as_str()
-  )) .await
-    .map_err(|e| format!("Failed to delete acquiree node '{}': {}",
-                         acquiree_id.as_str(), e))?;
+  )).await.map_err(|e| format!(
+    "Failed to delete acquiree node '{}': {}",
+    acquiree_id.as_str(), e))?;
 
-  create_node(acquiree_text_preserver, tx).await?;
-  create_relationships_from_node(
-    acquiree_text_preserver, tx )
-    . await
-    . map_err ( |e| format!("Failed to create relationships for acquiree_text_preserver: {}", e ))?;
-  tx.query( {
-    let contains_query : String = format!(
-      r#"match
-           $acquirer isa node, has id "{}";
-           $preserver isa node, has id "{}";
-         insert
-           $contains_rel isa contains (container: $acquirer,
-                                       contained: $preserver);"#,
-      acquirer_id.as_str(),
-      acquiree_text_preserver.primary_id()? . as_str() );
-    contains_query } ).await?;
-
-  for extra_id_value in &acquiree.ids {
-    // Add extra_ids to acquirer.
-    // PITFALL: Even the acquiree's PID becomomes an acquirer extra_id.
-    // PITFALL: Should happen after deleting acquiree's extra_ids.
-    tx.query( { let query : String = format!(
-                  r#"
-                  match
-                    $acquirer isa node, has id "{}";
-                  insert
-                    $e isa extra_id, has id "{}";
-                    $r isa has_extra_id
-                      ( node: $acquirer,
-                        extra_id: $e );"#,
-                  acquirer_id.as_str(),
-                  extra_id_value.as_str() );
-              query }
-    ).await?; }
+  tx.query(format!( // Add preserver to acquirer's contents.
+    r#"match
+         $acquirer isa node, has id "{}";
+         $preserver isa node, has id "{}";
+       insert
+         $contains_rel isa contains (container: $acquirer, contained: $preserver);"#,
+    acquirer_id.as_str(),
+    acquiree_text_preserver.primary_id()?.as_str()
+  )).await?;
   Ok (( )) }
 
-/// Deletes all extra_ids associated with a node.
-async fn delete_extra_ids_for_node(
+/// Move extra_ids from old_node to new_node.
+/// 'extra_id' entities are preserved; only relationships change.
+/// ASSUMES:
+/// - An ID can only belong to one thing (node or extra_id).
+///   It can't be owned by both types, or by two of either type.
+/// - An extra_id can only be in one has_extra_id relationship.
+/// The TypeDB schema enforces both assumptions. Without them,
+/// the acquirer could already have a relationship to one of these
+/// extra_ids, so this could then create a duplicate relationship.
+async fn reroute_extra_ids_for_merge(
   tx: &Transaction,
-  skgid: &ID,
+  old_id: &ID,
+  new_id: &ID,
 ) -> Result<(), Box<dyn Error>> {
-  // Find all extra_ids (as strings) associated with the node.
-  let answer : QueryAnswer =
-    tx.query ( {
-      let extra_ids_query : String = format!(
-        r#"match
-             $node isa node, has id "{}";
-             $e isa extra_id;
-             $rel isa has_extra_id (node: $node, extra_id: $e);
-             $e has id $extra_id_value;
-           select $extra_id_value;"#,
-        skgid.as_str() );
-      extra_ids_query } ). await ?;
-  let mut extra_id_values : Vec<String> = Vec::new();
-  let mut rows = answer.into_rows();
-  while let Some(row_res) = rows.next().await {
-    let row : ConceptRow = row_res?;
-    if let Some(concept) = row.get("extra_id_value")? {
-      extra_id_values.push( {
-        let extra_id_value : String =
-          extract_payload_from_typedb_string_rep(
-            &concept.to_string());
-        extra_id_value } ); }}
-  for extra_id_value in extra_id_values {
-    // Delete each extra_id
-    tx . query( {
-      let delete_extra_id_query : String = format!(
-        r#"match
-             $e isa extra_id, has id "{}";
-           delete $e;"#,
-        extra_id_value );
-      delete_extra_id_query } ) . await?; }
+  tx.query(format!(
+    r#"match
+         $old_node isa node, has id "{}";
+         $new_node isa node, has id "{}";
+         $e isa extra_id;
+         $old_rel isa has_extra_id (node: $old_node,
+                                    extra_id: $e);
+       delete $old_rel;
+       insert
+         $new_rel isa has_extra_id (node: $new_node,
+                                    extra_id: $e);"#,
+    old_id.as_str(),
+    new_id.as_str()
+  )).await?;
   Ok(( )) }
+
+/// Creates an extra_id entity for the given ID value
+/// and links it to the node.
+async fn create_and_connect_extra_id(
+  tx: &Transaction,
+  node_id: &ID,
+  extra_id_value: &ID,
+) -> Result<(), Box<dyn Error>> {
+  tx.query(format!(
+    r#"match
+         $node isa node, has id "{}";
+       insert
+         $e isa extra_id, has id "{}";
+         $r isa has_extra_id (node: $node, extra_id: $e);"#,
+    node_id.as_str(),
+    extra_id_value.as_str()
+  )).await?;
+  Ok(())
+}
 
 /// Drops relationships where old_id plays old_role.
 /// This is used when the old node is being merged and we don't want

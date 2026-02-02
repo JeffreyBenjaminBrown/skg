@@ -59,7 +59,7 @@ define
   entity extra_id,
     # a typical node only has one id, its primary key. but when nodes are merged, `extra_id` is used to associate more than one id with the merge result. the naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field. (if attributes could be members of relationships, the `extra_id` entity would not be needed.)
     owns id @key,
-    plays has_extra_id:extra_id;
+    plays has_extra_id:extra_id @card(1); # The cardinality constraint says it can only be in 1 such relationship. (To permit 0 or 1, replace '1' with '0..1'.)
 
   relation has_extra_id,
     relates node,

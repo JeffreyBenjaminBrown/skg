@@ -1,11 +1,3 @@
-* ONGOING typedb merge complexity question
-** maybe see also
-   tests/experiments.rs
-   tests/experiments/
-** my question
-   experiment-request.org
-** Claude's report
-   typedb-merge-complexity.org
 * extract function from validate_and_filter_foreign_instructions
 ** this block
           Ok(Some(disk_node)) => {
