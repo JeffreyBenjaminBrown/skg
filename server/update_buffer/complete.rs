@@ -3,7 +3,7 @@ use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::update_buffer::util::complete_relevant_children;
+use crate::update_buffer::util::complete_relevant_children_in_orgnodetree;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
@@ -67,11 +67,11 @@ pub fn completeAliasCol (
       kind    : OrgNodeKind::Scaff(
         Scaffold::Alias { text : text.clone(),
                           diff : None } ), };
-  complete_relevant_children(
+  complete_relevant_children_in_orgnodetree(
     tree,
     aliascol_node_id,
     is_alias,
     view_alias_text,
     &aliases,
-    create_alias, )?;
+    create_alias )?;
   Ok( () ) }
