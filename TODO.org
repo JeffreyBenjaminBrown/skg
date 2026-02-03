@@ -20,6 +20,9 @@
    don't reload it. Check on disk if it is in fact empty.
    If not, try hitting 'undo' to restore it.
 * ONGOING complete thoughts/buffer-update.org
+* TODO identify relevant extant tooling when asking for a given task
+  Even if vague, like
+  'this code includes utilities for doing things in trees'.
 * AWAITS NOT FULLY TESTED : git diff view
 ** refs
   see
