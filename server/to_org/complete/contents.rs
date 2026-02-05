@@ -112,7 +112,7 @@ pub fn clobberIndefinitiveViewnode (
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
   let skgnode : &SkgNode =
-    skgnode_from_map_or_disk ( &node_id, map, config, &source ) ?;
+    skgnode_from_map_or_disk ( &node_id, &source, map, config ) ?;
   let title : String = skgnode . title . clone();
   let source : SourceName = skgnode . source . clone();
   write_at_node_in_tree ( tree, treeid, |viewnode| {

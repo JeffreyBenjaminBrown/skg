@@ -25,7 +25,7 @@ pub fn skgnode_for_viewnode<'a> (
     ViewNodeKind::True(t) => {
       let skgnode : &SkgNode =
         skgnode_from_map_or_disk(
-          &t.id, map, config, &t.source)?;
+          &t.id, &t.source, map, config)?;
       Ok(Some(skgnode)) },
     ViewNodeKind::Scaff(_) => Ok(None),
   }}
@@ -70,9 +70,9 @@ pub async fn skgnode_map_from_forest (
 /// Updates the map.
 pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
+  source: &SourceName,
   map: &'a mut SkgNodeMap,
   config: &SkgConfig,
-  source: &SourceName,
 ) -> Result<&'a SkgNode, Box<dyn Error>> {
   if !map.contains_key(id) {
     let skgnode: SkgNode = skgnode_from_pid_and_source(

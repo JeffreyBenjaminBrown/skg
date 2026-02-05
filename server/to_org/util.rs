@@ -61,7 +61,7 @@ pub(super) fn skgnode_and_viewnode_from_pid_and_source (
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
   let skgnode : &SkgNode =
-    skgnode_from_map_or_disk( pid, map, config, source )?;
+    skgnode_from_map_or_disk( pid, source, map, config )?;
   let title : String = skgnode . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (

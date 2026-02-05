@@ -265,7 +265,7 @@ fn from_disk_replace_title_body_and_skgnode (
     pid_and_source_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_skgnode" ) ?;
   let skgnode : &SkgNode = skgnode_from_map_or_disk (
-    &pid, map, config, &src ) ?;
+    &pid, &src, map, config ) ?;
   let title : String = skgnode . title . clone();
   if title . is_empty () {
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
