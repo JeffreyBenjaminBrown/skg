@@ -1,5 +1,5 @@
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::tree::generic::{error_unless_node_satisfies, write_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::{
   collect_child_aliases_at_aliascol, insert_scaffold_as_child};
 use crate::types::misc::ID;
@@ -24,15 +24,11 @@ pub async fn completeAliasCol (
   map              : &SkgNodeMap,
   aliascol_node_id : NodeId,
 ) -> Result < (), Box<dyn Error> > {
-  { // Validate this is an AliasCol
-    let is_aliascol : bool =
-      read_at_node_in_tree(
-        tree, aliascol_node_id,
-        |viewnode| matches!( &viewnode.kind,
-                            ViewNodeKind::Scaff(Scaffold::AliasCol)) )
-      . map_err( |e| -> Box<dyn Error> { e . into () })?;
-    if ! is_aliascol {
-      return Err( "Node is not an AliasCol" . into () ); }}
+  error_unless_node_satisfies(
+    tree, aliascol_node_id,
+    |vn| matches!( &vn.kind,
+                   ViewNodeKind::Scaff( Scaffold::AliasCol )),
+    "completeAliasCol: expected AliasCol" ) ?;
   let parent_id : ID = {
     let aliascol_ref : NodeRef<ViewNode> =
       tree . get ( aliascol_node_id )

@@ -4,7 +4,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::types::tree::generic::read_at_node_in_tree;
+use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
   append_indefinitive_from_disk_as_child,
   insert_scaffold_as_child,
@@ -50,16 +50,17 @@ pub async fn maybe_add_subscribeeCol_branch (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  { let node_kind: ViewNodeKind =
-      read_at_node_in_tree (
-        tree, node_id, |viewnode| viewnode.kind.clone() )
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-    match node_kind {
-      ViewNodeKind::Scaff ( _ ) =>
-        return Err ( "maybe_add_subscribeeCol_branch: \
-                      caller should not pass a Scaffold".into() ),
-      ViewNodeKind::True ( t ) => // skip indefinitive nodes
-        if t.indefinitive { return Ok(( )) }} }
+  error_unless_node_satisfies(
+    tree, node_id,
+    |vn| matches!( &vn.kind, ViewNodeKind::True( _ ) ),
+    "maybe_add_subscribeeCol_branch: expected TrueNode" ) ?;
+  { let is_indefinitive : bool =
+      read_at_node_in_tree(
+        tree, node_id,
+        |vn| matches!( &vn.kind,
+                        ViewNodeKind::True( t ) if t.indefinitive ) )
+      . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+    if is_indefinitive { return Ok(( )); } }
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
     if unique_scaffold_child (
