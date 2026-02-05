@@ -73,8 +73,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 **** move_child_to_end
 *** do these, in serial
 **** DFS preorder (parent-first) completion
-***** TODO a smaller part of the TrueNode function
-***** TODO TrueNode
+***** DONE TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
 ****** if it's definitive
 ******* reorder children and complete content
@@ -108,9 +107,32 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
         It is only needed in the git diff view.
 ****** if it's indefinitive
        Run clobberIndefinitiveOrgnode on it.
-***** SubscribeeCol
-****** If there's a HiddenOutsideOfSubscribeeCol
-       make sure it's last
+***** TODO SubscribeeCol
+****** If its parent has no subscribees
+       Then delete this subscribeecol from the tree,
+       along with its entire recursive content.
+       Before deleting, first check whether anything in it
+       has focus, and if so transfer focus to its parent
+       (the nearest surviving ancestor).
+       For the focus logic, mimic
+         complete_relevant_children_in_viewnodetree.
+       Don't look for focus if it won't be deleted.
+****** If its parent has subscribees
+       If the parent is indefinitive:
+         Use complete_relevant_children to ensure that
+         this subscribeecol's nonignored truenode children
+         are exactly the parent's subscribees.
+         A child is relevant if it is a nonignored truenode.
+         The goal list should be those subscribees.
+         The child creation function should be
+           mk_indefinitive_viewnode.
+       Regardless of whether the parent is definitive,
+         move the HiddenOutsideOfSubscribeeCol (it should be unique)
+         to be the last child, or append one if there is none.
+         Do not populate the HiddenOutsideOfSubscribeeCol
+         with (from the SubscribeeCol's point of view) grandchildren.
+         (The HiddenOutsideOfSubscribeeCol will be visitied soon,
+         and will be processed from there, rather than from here.)
 **** DFS postorder (child-first) completion
 ***** DONE nothing to do : forestroot
 ***** DONE alias col
@@ -127,7 +149,8 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
         its parent having been handled correctly.
 ***** IDCol
       Ensure that your children are only, and in order,
-        the IDs of your parent.
+        the IDs of your parent,
+        or (in the git diff view) the difflist associated with it.
 ***** HiddenInSubscribeeCol
       Read the col's ancestor 1 (Subscribee) and 3 (Subscriber),
       find everything subscriber hides that subscribee contains,

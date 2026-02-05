@@ -37,10 +37,24 @@ struct ChildData {
 }
 
 /// TrueNode completion.
-/// Intended for the first, DFS preorder (parent-first)
+///
+/// INTENDED USE: Use in the first, DFS preorder (parent-first)
 /// buffer-update pass through the tree.
 /// That's because the second, DFS-postorder (child-first)
 /// pass will not be correct if any truenode is missing children.
+///
+/// WHAT IT DOES:
+/// (Beware, this comment could easily go stale.)
+/// - Error unless it's a truenode.
+/// - make_indef_if_repeat_then_extend_defmap
+/// - If it's indefinitive:
+///   - clobberIndefinitiveViewnode.
+/// - If it's definitive, run (in order):
+///   - complete_content_children
+///   - mark_erroneous_content_children_as_parent_ignores
+///   - order_children_as_scaffolds_then_ignored_then_content
+///   - maybe_prepend_subscribee_col
+///   - maybe_prepend_diff_view_scaffolds
 pub fn complete_truenode_preorder (
   node      : NodeId,
   tree         : &mut Tree<ViewNode>,
