@@ -36,14 +36,18 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
     so that they can be integrated with overlapping content.
 *** set_metadata_relationship_viewdata_in_forest
 ** how to redo buffer update
-*** make these changes
-**** AliasCol, SubscribeeCol, IDCol
-     They only need completion if their parent is an indef TrueNode.
-     If it is definitive then they just defined the truth,
+*** notes and complications
+**** Contra previously, we correct aliases and other 'regenerables'.
+     As the code courrently stands, regenerating them.
+     See the function remove_regenerable_scaffolds.
+**** Some viewnodes only need completion if their parent is indef.
+     Namely AliasCol, SubscribeeCol, and IDCol.
+     If their parent is definitive,
+     then they just defined the truth,
      so they don't need to be adjusted toward it.
-     But completion should proceed within them.
-*** write these functions
-**** DONE completeAliasCol
+     (But completion should proceed within their children.)
+*** DONE write these functions
+**** completeAliasCol
      Take a treenode, a tree and a skgnodemap.
      Verify that the node is an AliasCol.
      Visits its parent, verifies it's a truenode,
@@ -63,35 +67,44 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
      Add those new Alias treenodes to its Alias children,
      such that the resulting list of Alias children
      is equal to 'aliases', and in the same order.
-**** DONE complete_relevant_children
-**** DONE partition_children
-**** DONE subtree_has_focus
-**** DONE move_child_to_end
+**** complete_relevant_children
+**** partition_children
+**** subtree_has_focus
+**** move_child_to_end
 *** do these, in serial
 **** DFS preorder (parent-first) completion
-***** TrueNode
+***** TODO TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
 ****** if it's definitive
 ******* reorder children and complete content
-        Ensure your non-ignored truenode children are, and in order,
-        equal to your contents.
+        Ensure its non-ignored truenode children are,
+        and in order, equal to its contents.
+        Do this by running complete_relevant_children
+        on its content (from the skgnode)
+        and its children (from the viewnode tree).
+
         Reorder children to be non-truenodes,
         then parentIgnored truenodes, then content truenodes.
-        In in git diff view, insert phantom nodes
+        Use partition_children for this.
+
+        If in git diff view, insert phantom nodes
         (this is already implemented somewhere)
         into the source of truth for the content list.
 ******* mark its erroneous content children as parent-ignores
         'erroneous content children' are truenode children
-        not marked parentIgnores but not among its content
-******** use another util, 'treat_certain_children'
-******* if a SubscribeeCol is needed and absent, prepend one
-        Don't populate it -- that happens later.
-******* if a TextChanged is needed and absent, prepend one
-        only in the git diff view
-******* if an IDCol is needed and absent, prepend one
-        only in the git diff view
+        not marked parentIgnores but not among its content.
+        Use its skgnode (not its viewnode) to determine its content.
+        Use 'treat_certain_children' and 'skgnode_for_viewnode'.
+******* if a SubscribeeCol is needed and absent, prepend one as a child
+        It is needed if the associated skgnode subscribes to anything.
+        Don't populate the SubscribeCol with grandchildren
+        -- that will happen when processing visits the SubscribeCol.
+******* if a TextChanged is needed and absent, prepend one as a child
+        This is only needed in the git diff view.
+******* if an IDCol is needed and absent, prepend one as a child
+        This is only needed in the git diff view.
 ****** if it's indefinitive
-       clobberIndefinitiveOrgnode
+       Run clobberIndefinitiveOrgnode on it.
 ***** SubscribeeCol
 ****** If there's a HiddenOutsideOfSubscribeeCol
        make sure it's last
@@ -153,9 +166,5 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
        set_viewnodestats_in_forest
 ***** detect_and_mark_cycle
 ***** somewhere else
-*** notes and complications
-**** Contra previously, we correct aliases and other 'regenerables'
-     As the code courrently stands, regenerating them.
-     See the function remove_regenerable_scaffolds.
 ** cleanup
 *** Isn't there already something like subtree_has_focus?

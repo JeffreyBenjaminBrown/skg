@@ -87,7 +87,8 @@ pub fn move_child_to_end<Node> (
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'parent_id'
-pub fn complete_relevant_children_in_viewnodetree<Orderkey, Relevant, View> (
+pub fn complete_relevant_children_in_viewnodetree
+<Orderkey, Relevant, View> (
   tree                : &mut Tree<ViewNode>,
   parent_id           : NodeId,
   relevant            : Relevant,
@@ -95,10 +96,9 @@ pub fn complete_relevant_children_in_viewnodetree<Orderkey, Relevant, View> (
   goal_list           : &[Orderkey],
   create_child        : impl Fn(&Orderkey) -> ViewNode,
 ) -> Result<(), Box<dyn Error>>
-where
-  Relevant : Fn(&ViewNode) -> bool,
-  View     : Fn(&ViewNode) -> Orderkey,
-  Orderkey : Eq + Hash + Clone,
+where Relevant : Fn(&ViewNode) -> bool,
+      View     : Fn(&ViewNode) -> Orderkey,
+      Orderkey : Eq + Hash + Clone,
 {
   let problem_discard =
     |tree: &Tree<ViewNode>, node_id: NodeId| -> Result<bool, String> {
