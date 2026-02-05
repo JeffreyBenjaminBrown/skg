@@ -1,4 +1,4 @@
-use crate::types::orgnode::{OrgNode, OrgNodeKind, ViewRequest};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
 use crate::types::tree::generic::read_at_node_in_tree;
 
 use ego_tree::{Tree, NodeId};
@@ -7,7 +7,7 @@ use std::error::Error;
 pub fn collectViewRequestsFromForest<T> (
   forest : &Tree<T>,
 ) -> Result < Vec < (NodeId, ViewRequest) >, Box<dyn Error> >
-where T: AsRef<OrgNode>,
+where T: AsRef<ViewNode>,
 { let mut view_requests : Vec < (NodeId, ViewRequest) > =
     Vec::new ();
   let tree_root_ids : Vec < NodeId > =
@@ -24,14 +24,14 @@ fn collectViewRequestsFromNode<T> (
   node_id           : NodeId,
   view_requests_out : &mut Vec < (NodeId, ViewRequest) >,
 ) -> Result < (), Box<dyn Error> >
-where T: AsRef<OrgNode>,
+where T: AsRef<ViewNode>,
 { let node_view_requests : Vec < ViewRequest > =
     read_at_node_in_tree (
       tree, node_id,
       |value| match &value . as_ref () . kind {
-        OrgNodeKind::True ( t ) =>
+        ViewNodeKind::True ( t ) =>
           t . view_requests . iter () . cloned () . collect (),
-        OrgNodeKind::Scaff ( _ ) => Vec::new (), }
+        ViewNodeKind::Scaff ( _ ) => Vec::new (), }
     ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   for request in node_view_requests {
     view_requests_out . push ( (node_id, request) ); }
@@ -46,10 +46,10 @@ where T: AsRef<OrgNode>,
       tree, child_id, view_requests_out ) ?; }
   Ok (( )) }
 
-impl AsRef<OrgNode> for OrgNode {
-  fn as_ref(&self) -> &OrgNode {
+impl AsRef<ViewNode> for ViewNode {
+  fn as_ref(&self) -> &ViewNode {
     self }}
 
-impl AsMut<OrgNode> for OrgNode {
-  fn as_mut(&mut self) -> &mut OrgNode {
+impl AsMut<ViewNode> for ViewNode {
+  fn as_mut(&mut self) -> &mut ViewNode {
     self }}

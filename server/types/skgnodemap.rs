@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use super::misc::{ID, SkgConfig, SourceName};
@@ -13,21 +13,21 @@ use typedb_driver::TypeDBDriver;
 /// Maps node IDs to their corresponding SkgNodes.
 pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
-/// Extract SkgNode for an OrgNode from the map (tried first) or disk.
+/// Extract SkgNode for an ViewNode from the map (tried first) or disk.
 /// Updates the map if needed.
 /// Returns None for Scaffolds.
-pub fn skgnode_for_orgnode<'a> (
-  orgnode : &OrgNode,
+pub fn skgnode_for_viewnode<'a> (
+  viewnode : &ViewNode,
   map     : &'a mut SkgNodeMap,
   config  : &SkgConfig,
 ) -> Result<Option<&'a SkgNode>, Box<dyn Error>>
-{ match &orgnode.kind {
-    OrgNodeKind::True(t) => {
+{ match &viewnode.kind {
+    ViewNodeKind::True(t) => {
       let skgnode : &SkgNode =
         skgnode_from_map_or_disk(
           &t.id, map, config, &t.source)?;
       Ok(Some(skgnode)) },
-    OrgNodeKind::Scaff(_) => Ok(None),
+    ViewNodeKind::Scaff(_) => Ok(None),
   }}
 
 /// Build a SkgNodeMap from DefineNodes.
@@ -51,7 +51,7 @@ pub fn skgnode_map_from_save_instructions (
 
 /// Fetches (batched) SkgNodes from disk for all IDs in the tree.
 pub async fn skgnode_map_from_forest (
-  forest : &Tree<OrgNode>,
+  forest : &Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<SkgNodeMap, Box<dyn Error>>
@@ -82,12 +82,12 @@ pub fn skgnode_from_map_or_disk<'a>(
     || "SkgNode should be in map after fetch".into( )) }
 
 fn collect_ids_from_subtree (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   node_id : NodeId,
   ids_out : &mut Vec<ID>, )
-{ let node_ref : NodeRef<OrgNode> =
+{ let node_ref : NodeRef<ViewNode> =
     tree . get ( node_id ) . unwrap ();
-  if let OrgNodeKind::True ( t )
+  if let ViewNodeKind::True ( t )
     = &node_ref . value () . kind
     { ids_out . push ( t . id . clone () ); }
   for child in node_ref . children () {

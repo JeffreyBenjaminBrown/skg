@@ -1,13 +1,13 @@
-/// Node access utilities for ego_tree::Tree<OrgNode> and Tree<UncheckedOrgNode>
+/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
-use crate::to_org::util::{skgnode_and_orgnode_from_id, get_id_from_treenode};
+use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold,
-    mk_indefinitive_orgnode,
-    orgnode_from_scaffold };
-use crate::types::unchecked_orgnode::{
-    UncheckedOrgNode, UncheckedOrgNodeKind };
+use crate::types::viewnode::{
+    ViewNode, ViewNodeKind, Scaffold,
+    mk_indefinitive_viewnode,
+    viewnode_from_scaffold };
+use crate::types::unchecked_viewnode::{
+    UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::util::dedup_vector;
@@ -21,14 +21,14 @@ use typedb_driver::TypeDBDriver;
 /// Extract (ID, source) from a TrueNode in the tree.
 /// Returns an error if the node is not found or not a TrueNode.
 pub fn pid_and_source_from_treenode (
-  tree        : &Tree<OrgNode>,
+  tree        : &Tree<ViewNode>,
   treeid      : NodeId,
   caller_name : &str,
 ) -> Result<(ID, SourceName), Box<dyn Error>> {
-  let node_ref : NodeRef<OrgNode> =
+  let node_ref : NodeRef<ViewNode> =
     tree . get ( treeid ) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
-  let OrgNodeKind::True ( t ) : &OrgNodeKind =
+  let ViewNodeKind::True ( t ) : &ViewNodeKind =
     &node_ref . value() . kind
     else { return Err ( format! ( "{}: expected TrueNode",
                                   caller_name ) . into() ) };
@@ -38,14 +38,14 @@ pub fn pid_and_source_from_treenode (
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
-  tree    : &Tree<UncheckedOrgNode>,
+  tree    : &Tree<UncheckedViewNode>,
   node_id : NodeId,
 ) -> Result<ID, String> {
-  let mut node : NodeRef<UncheckedOrgNode> =
+  let mut node : NodeRef<UncheckedViewNode> =
     tree.get(node_id)
     .ok_or("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
-    if let UncheckedOrgNodeKind::True(t) = &node.value().kind {
+    if let UncheckedViewNodeKind::True(t) = &node.value().kind {
       if let Some(id) = &t.id_opt {
         return Ok(id.clone()); }}
     node = node.parent()
@@ -56,16 +56,16 @@ pub fn id_from_self_or_nearest_ancestor (
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
 pub fn unique_scaffold_child (
-  tree          : &Tree<OrgNode>,
+  tree          : &Tree<ViewNode>,
   node_id       : NodeId,
   scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : NodeRef<OrgNode> =
+  let node_ref : NodeRef<ViewNode> =
     tree . get(node_id) . ok_or(
       "unique_scaffold_child: node not found")?;
   let matches : Vec<NodeId> = node_ref.children()
     .filter(|c| matches!(&c.value().kind,
-                         OrgNodeKind::Scaff(s)
+                         ViewNodeKind::Scaff(s)
                          if s.matches_kind(scaffold_kind)) )
     .map(|c| c.id())
     .collect();
@@ -80,7 +80,7 @@ pub fn unique_scaffold_child (
 /// Extract PIDs for the subscriber and its subscribees.
 /// Returns an error if the node has no SkgNode.
 pub fn pids_for_subscriber_and_its_subscribees (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, Vec < ID > ),
@@ -95,22 +95,22 @@ pub fn pids_for_subscriber_and_its_subscribees (
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
   let subscribee_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
-  let node_ref : NodeRef < OrgNode > =
+  let node_ref : NodeRef < ViewNode > =
     tree . get ( node_id ) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
-  let parent_ref : NodeRef < OrgNode > =
+  let parent_ref : NodeRef < ViewNode > =
     node_ref . parent ()
     . ok_or ( "Subscribee has no parent (SubscribeeCol)" ) ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )) {
+                  ViewNodeKind::Scaff ( Scaffold::SubscribeeCol )) {
     return Err ( "Subscribee's parent is not a SubscribeeCol" .
                  into () ); }
-  let grandparent_ref : NodeRef < OrgNode > =
+  let grandparent_ref : NodeRef < ViewNode > =
     parent_ref . parent ()
     . ok_or ( "SubscribeeCol has no parent (subscriber)" ) ?;
   let subscriber_id : ID =
@@ -122,25 +122,25 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
         skgnode . ids[0] . clone() )) }
 
 pub fn insert_scaffold_as_child (
-  tree          : &mut Tree<OrgNode>,
+  tree          : &mut Tree<ViewNode>,
   parent_id     : NodeId,
   scaffold_kind : Scaffold,
   prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let orgnode : OrgNode =
-    orgnode_from_scaffold ( scaffold_kind );
+  let viewnode : ViewNode =
+    viewnode_from_scaffold ( scaffold_kind );
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
-      if prepend { parent_mut . prepend ( orgnode ) . id () }
-      else       { parent_mut . append  ( orgnode ) . id () } } )
+      if prepend { parent_mut . prepend ( viewnode ) . id () }
+      else       { parent_mut . append  ( viewnode ) . id () } } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok ( col_id ) }
 
 /// Fetch a node from disk and append it as an indefinitive child.
 /// Also adds the SkgNode to the map.
 pub async fn append_indefinitive_from_disk_as_child (
-  tree           : &mut Tree<OrgNode>,
+  tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,
   parent_id      : NodeId,
   node_id        : &ID,
@@ -148,22 +148,22 @@ pub async fn append_indefinitive_from_disk_as_child (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( _skgnode, content_orgnode ) : ( SkgNode, OrgNode ) =
-    skgnode_and_orgnode_from_id (
+  let ( _skgnode, content_viewnode ) : ( SkgNode, ViewNode ) =
+    skgnode_and_viewnode_from_id (
       config, driver, node_id, map ) . await ?;
   let (id, source, title) : (ID, SourceName, String)
-  = match &content_orgnode.kind
-  { OrgNodeKind::True(t) => (
+  = match &content_viewnode.kind
+  { ViewNodeKind::True(t) => (
       t . id . clone(),
       t . source . clone(),
       t . title . clone( )),
-    OrgNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
-  let orgnode : OrgNode = mk_indefinitive_orgnode (
+    ViewNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
+  let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, parent_ignores );
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
-      parent_mut . append ( orgnode ); } )
+      parent_mut . append ( viewnode ); } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }
 
@@ -171,18 +171,18 @@ pub async fn append_indefinitive_from_disk_as_child (
 /// Removes Duplicate (preserving order of first occurrence).
 /// Errors if any non-Alias children are found.
 pub(crate) fn collect_child_aliases_at_aliascol (
-  tree             : &Tree<OrgNode>,
+  tree             : &Tree<ViewNode>,
   aliascol_node_id : NodeId,
 ) -> Result < Vec < String >, Box<dyn Error> > {
   let mut aliases : Vec < String > =
     Vec::new ();
-  let aliascol_ref : NodeRef < OrgNode > =
+  let aliascol_ref : NodeRef < ViewNode > =
     tree . get ( aliascol_node_id )
     . ok_or ( "AliasCol node not found" ) ?;
   for child_ref in aliascol_ref . children() {
-    let child : &OrgNode = child_ref . value();
+    let child : &ViewNode = child_ref . value();
     if ! matches! ( &child . kind,
-                    OrgNodeKind::Scaff ( Scaffold::Alias { .. } )) {
+                    ViewNodeKind::Scaff ( Scaffold::Alias { .. } )) {
       return Err (
         format! ( "AliasCol has non-Alias child with kind: {:?}",
                   child . kind )
@@ -199,8 +199,8 @@ pub(crate) fn collect_child_aliases_at_aliascol (
 /// Duplicates are removed (preserving order of first occurrence).
 /// Returns None ("no opinion") if no AliasCol found.
 /// Returns Some(vec) if AliasCol found, even if empty.
-pub fn collect_grandchild_aliases_for_orgnode (
-  tree: &Tree<OrgNode>,
+pub fn collect_grandchild_aliases_for_viewnode (
+  tree: &Tree<ViewNode>,
   node_id: NodeId,
 ) -> Result<Option<Vec<String>>, String> {
   let alias_col_id : Option<NodeId> =
@@ -211,12 +211,12 @@ pub fn collect_grandchild_aliases_for_orgnode (
     None => Ok(None),
     Some(col_id) => {
       let aliases : Vec<String> = {
-        let col_ref : NodeRef<OrgNode> = tree.get(col_id).expect( "collect_grandchild_aliases_for_orgnode: AliasCol not found");
+        let col_ref : NodeRef<ViewNode> = tree.get(col_id).expect( "collect_grandchild_aliases_for_viewnode: AliasCol not found");
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in col_ref.children() {
           { // check for invalid state
             if ! matches!(&alias_child.value().kind,
-                          OrgNodeKind::Scaff(Scaffold::Alias { .. })) {
+                          ViewNodeKind::Scaff(Scaffold::Alias { .. })) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child.value().kind )); }}
@@ -228,7 +228,7 @@ pub fn collect_grandchild_aliases_for_orgnode (
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
 pub fn find_child_by_id (
-  tree          : & Tree<OrgNode>,
+  tree          : & Tree<ViewNode>,
   parent_treeid : NodeId,
   target_skgid  : & ID,
 ) -> Option < NodeId > {
@@ -242,13 +242,13 @@ pub fn find_child_by_id (
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_ids (
-  tree          : & Tree<OrgNode>,
+  tree          : & Tree<ViewNode>,
   parent_treeid : NodeId,
   target_skgids : & HashSet < ID >,
 ) -> HashMap < ID, NodeId > {
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree.get(parent_treeid).unwrap().children() {
-    if let OrgNodeKind::True(t) = &child.value().kind {
+    if let ViewNodeKind::True(t) = &child.value().kind {
       if target_skgids.contains(&t.id) {
         result.insert(t.id.clone(), child.id()); }}}
   result }
@@ -258,13 +258,13 @@ pub fn find_children_by_ids (
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<UncheckedOrgNode>,
+  tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
   predicate           : F,
 ) -> bool
-where F: Fn(&UncheckedOrgNode) -> bool
+where F: Fn(&UncheckedViewNode) -> bool
 { collect_generation( tree, node_id, generation, skip_parent_ignores )
     . iter()
     . all ( |&id| predicate(
@@ -274,13 +274,13 @@ where F: Fn(&UncheckedOrgNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<UncheckedOrgNode>,
+  tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
   predicate           : F,
 ) -> bool
-where F: Fn(&UncheckedOrgNode) -> bool
+where F: Fn(&UncheckedViewNode) -> bool
 { let nodes = collect_generation(
     tree, node_id, generation, skip_parent_ignores);
   !nodes.is_empty() &&
@@ -292,7 +292,7 @@ where F: Fn(&UncheckedOrgNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
 pub fn generation_does_not_exist (
-  tree                : &Tree<UncheckedOrgNode>,
+  tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
   skip_parent_ignores : bool,
@@ -307,7 +307,7 @@ pub fn generation_does_not_exist (
 /// If 'skip_parent_ignores' is true and generation > 0,
 ///   then we exclude TrueNodes with parent_ignores=true.
 fn collect_generation (
-  tree               : &Tree<UncheckedOrgNode>,
+  tree               : &Tree<UncheckedViewNode>,
   node_id            : NodeId,
   generation         : i32,
   skip_parent_ignores : bool,
@@ -317,7 +317,7 @@ fn collect_generation (
   let Some(node_ref) = tree.get(node_id)
     else { return vec![]; };
   if generation <= 0 {
-    let mut current : NodeRef<'_, UncheckedOrgNode> =
+    let mut current : NodeRef<'_, UncheckedViewNode> =
       node_ref;
     for _ in 0..(-generation) {
       match current.parent() {
@@ -336,7 +336,7 @@ fn collect_generation (
             n.children()
               .filter(|c| !skip_parent_ignores ||
                           !matches!(&c.value().kind,
-                                    UncheckedOrgNodeKind::True(t)
+                                    UncheckedViewNodeKind::True(t)
                                     if t.parent_ignores))
               .map(|c| c.id()) ); }}
       current_gen = next_gen; }
@@ -347,11 +347,11 @@ fn collect_generation (
 /// or if the predicate returns false for all siblings.
 /// Short-circuits on the first sibling where the predicate returns true.
 pub fn siblings_cannot_include<F> (
-  tree      : &Tree<UncheckedOrgNode>,
+  tree      : &Tree<UncheckedViewNode>,
   node_id   : NodeId,
   predicate : F,
 ) -> bool
-where F: Fn(&UncheckedOrgNode) -> bool
+where F: Fn(&UncheckedViewNode) -> bool
 { let Some(node_ref) = tree.get(node_id)
     else { return true; };
   let Some(parent_ref) = node_ref.parent()

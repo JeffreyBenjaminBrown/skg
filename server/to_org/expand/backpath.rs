@@ -1,4 +1,4 @@
-/// PURPOSE: "Integrate" a "path" into an OrgNode tree.
+/// PURPOSE: "Integrate" a "path" into an ViewNode tree.
 /// PITFALL: Both of those terms are tricky.
 /// - The 'path' is actually more general than that:
 ///   If at the end it forks, it includes the first layer of branches,
@@ -8,17 +8,17 @@
 ///   maybe even all of it, might already be there.
 
 use crate::to_org::util::{
-  get_id_from_treenode, skgnode_and_orgnode_from_id,
+  get_id_from_treenode, skgnode_and_viewnode_from_id,
   remove_completed_view_request};
 use crate::dbs::typedb::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, mk_indefinitive_orgnode };
+use crate::types::viewnode::ViewRequest;
+use crate::types::viewnode::{
+    ViewNode, ViewNodeKind, mk_indefinitive_viewnode };
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::types::tree::orgnode_skgnode::{
+use crate::types::tree::viewnode_skgnode::{
   find_child_by_id, find_children_by_ids};
 
 use ego_tree::Tree;
@@ -29,7 +29,7 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_containerward_view_then_drop_request (
-  tree          : &mut Tree<OrgNode>,
+  tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
@@ -45,11 +45,11 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
     "Failed to integrate containerward path",
     errors, result ) }
 
-/// Integrate a containerward path into an OrgNode tree.
+/// Integrate a containerward path into an ViewNode tree.
 /// This is called on a specific node in the tree,
 /// and integrates the containerward path from that node.
 pub async fn build_and_integrate_containerward_path (
-  tree      : &mut Tree<OrgNode>,
+  tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
@@ -68,7 +68,7 @@ pub async fn build_and_integrate_containerward_path (
   ). await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
-  tree          : &mut Tree<OrgNode>,
+  tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
@@ -84,13 +84,13 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
     "Failed to integrate sourceward path",
     errors, result ) }
 
-/// Integrate a sourceward path into an OrgNode tree.
+/// Integrate a sourceward path into an ViewNode tree.
 /// TODO ? Can this be dedup'd w/r/t
 ///   'build_and_integrate_containerward_path'?
 ///   Claude thought extracting the common logic would be hard,
 ///   due to async lifetime issues.
 pub async fn build_and_integrate_sourceward_path (
-  tree      : &mut Tree<OrgNode>,
+  tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
@@ -108,10 +108,10 @@ pub async fn build_and_integrate_sourceward_path (
     tree, map, node_id, path, branches, cycle_node, config, driver
   ). await }
 
-/// Integrate a (maybe forked or cyclic) path into an OrgNode tree,
+/// Integrate a (maybe forked or cyclic) path into an ViewNode tree,
 /// using provided backpath data.
 pub async fn integrate_path_that_might_fork_or_cycle (
-  tree        : &mut Tree<OrgNode>,
+  tree        : &mut Tree<ViewNode>,
   map         : &mut SkgNodeMap,
   node_id     : ego_tree::NodeId,
   mut path    : Vec < ID >,
@@ -147,7 +147,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
 /// Operates on a specific node and the remaining path.
 /// Returns the NodeId of the last node in the path.
 fn integrate_linear_portion_of_path<'a> (
-  tree       : &'a mut Tree<OrgNode>,
+  tree       : &'a mut Tree<ViewNode>,
   map        : &'a mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   path       : &'a [ID],
@@ -178,7 +178,7 @@ fn integrate_linear_portion_of_path<'a> (
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
 async fn integrate_branches_in_node (
-  tree       : &mut Tree<OrgNode>,
+  tree       : &mut Tree<ViewNode>,
   map        : &mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   branches   : HashSet < ID >,
@@ -203,7 +203,7 @@ async fn integrate_branches_in_node (
 /// Add a cycle node as a child of the specified node.
 /// The cycle node is only added if it's not already a child.
 async fn integrate_cycle_in_node (
-  tree       : &mut Tree<OrgNode>,
+  tree       : &mut Tree<ViewNode>,
   map        : &mut SkgNodeMap,
   node_id    : ego_tree::NodeId,
   cycle_id   : ID,
@@ -220,28 +220,28 @@ async fn integrate_cycle_in_node (
 /// TODO: This procedure could later be improved to
 /// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
-  tree           : &mut Tree<OrgNode>,
+  tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,
   parent_treeid  : ego_tree::NodeId,
   child_skgid    : &ID,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result < ego_tree::NodeId, Box<dyn Error> > {
-  let ( _, child_orgnode ) : ( _, OrgNode ) =
-    skgnode_and_orgnode_from_id (
+  let ( _, child_viewnode ) : ( _, ViewNode ) =
+    skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map
     ). await ?;
   let (id, source, title) : (ID, SourceName, String)
-  = match &child_orgnode.kind
-  { OrgNodeKind::True(t) => (
+  = match &child_viewnode.kind
+  { ViewNodeKind::True(t) => (
       t . id . clone(),
       t . source . clone(),
       t . title . clone() ),
-    OrgNodeKind::Scaff(_) =>
+    ViewNodeKind::Scaff(_) =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
-  let orgnode : OrgNode = mk_indefinitive_orgnode (
+  let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, true );
   let new_child_treeid : ego_tree::NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
-    . prepend ( orgnode ) . id ();
+    . prepend ( viewnode ) . id ();
   Ok ( new_child_treeid ) }

@@ -2,13 +2,13 @@
 
 use indoc::indoc;
 use skg::to_org::expand::backpath::integrate_path_that_might_fork_or_cycle;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::orgnode::{OrgNode, OrgNodeKind};
+use skg::types::viewnode::{ViewNode, ViewNodeKind};
 use skg::types::skgnodemap::SkgNodeMap;
-use skg::org_to_text::orgnode_forest_to_string;
+use skg::org_to_text::viewnode_forest_to_string;
 
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
@@ -39,7 +39,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
+  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -73,10 +73,10 @@ async fn test_path_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
-  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
-  let actual_str = orgnode_forest_to_string(&forest)?;
-  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  let actual_str = viewnode_forest_to_string(&forest)?;
+  let expected_str = viewnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
@@ -109,7 +109,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
+  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -117,7 +117,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut node_1_id : Option<NodeId> = None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let OrgNodeKind::True(t) = &node_ref.value().kind {
+      if let ViewNodeKind::True(t) = &node_ref.value().kind {
         if t.id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break; }}}}
@@ -154,10 +154,10 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
-  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
-  let actual_str = orgnode_forest_to_string(&forest)?;
-  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  let actual_str = viewnode_forest_to_string(&forest)?;
+  let expected_str = viewnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
@@ -190,7 +190,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-  let mut forest: Tree<OrgNode> = unchecked_to_checked_tree(unchecked_forest)?;
+  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree(unchecked_forest)?;
   assert_eq!(forest.root().children().count(), 1,
              "Should have exactly 1 tree");
 
@@ -199,7 +199,7 @@ async fn test_path_with_branches_with_cycle_impl(
     None;
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let OrgNodeKind::True(t) = &node_ref.value().kind {
+      if let ViewNodeKind::True(t) = &node_ref.value().kind {
         if t.id.0 == "1" {
           node_1_id = Some(node_ref.id());
           break; }}}}
@@ -236,10 +236,10 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes(expected)?.0;
-  let expected_trees: Tree<OrgNode> = unchecked_to_checked_tree(expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree(expected_unchecked)?;
 
-  let actual_str = orgnode_forest_to_string(&forest)?;
-  let expected_str = orgnode_forest_to_string(&expected_trees)?;
+  let actual_str = viewnode_forest_to_string(&forest)?;
+  let expected_str = viewnode_forest_to_string(&expected_trees)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"

@@ -3,22 +3,22 @@
 
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::BufferValidationError;
-use crate::serve::parse_metadata_sexp::{ parse_metadata_to_orgnodemd, default_metadata, orgnode_from_metadata, OrgnodeMetadata };
-use crate::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_forest_root_orgnode};
+use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
+use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_forest_root_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
 use std::sync::LazyLock;
 
 /// Type alias for headline information: (level, metadata, title)
-pub type HeadlineInfo = (usize, Option<OrgnodeMetadata>, String);
+pub type HeadlineInfo = (usize, Option<ViewnodeMetadata>, String);
 
 /// Result type for headline parsing with specific error messages
 type HeadlineResult = Result<HeadlineInfo, String>;
 
 /// Represents a parsed org node with its headline and body lines
 #[derive(Debug, Clone)]
-struct OrgNodeLineCol {
+struct ViewNodeLineCol {
   headline: HeadlineInfo,
   body: Vec<String>,
 }
@@ -35,27 +35,27 @@ struct OrgNodeLineCol {
 /// SHARES RESPONSIBILITY for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
 /// That function detects the majority of possible errors,
-/// but it can't detect them all because it uses a tree of UncheckedOrgNodes,
+/// but it can't detect them all because it uses a tree of UncheckedViewNodes,
 /// which permit fewer kinds of invalid state than the raw text.
 /// (For instance, Alias and AliasCol cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result < ( Tree<UncheckedOrgNode>, Vec<BufferValidationError> ),
+) -> Result < ( Tree<UncheckedViewNode>, Vec<BufferValidationError> ),
               String > {
-  let mut forest: Tree<UncheckedOrgNode> = Tree::new(unchecked_forest_root_orgnode());
+  let mut forest: Tree<UncheckedViewNode> = Tree::new(unchecked_forest_root_viewnode());
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let forest_root_treeid: NodeId = forest.root().id();
     forest_root_treeid } ];
-  for org_node_line_col in & {
-    let org_node_line_cols: Vec<OrgNodeLineCol> =
-      divide_into_orgNodeLineCols(input)?;
-    org_node_line_cols } {
-    let (level, orgnode, error_opt)
-      : (usize, UncheckedOrgNode, Option<BufferValidationError>)
-      = linecol_to_orgnode(org_node_line_col)?;
+  for view_node_line_col in & {
+    let view_node_line_cols: Vec<ViewNodeLineCol> =
+      divide_into_viewNodeLineCols(input)?;
+    view_node_line_cols } {
+    let (level, viewnode, error_opt)
+      : (usize, UncheckedViewNode, Option<BufferValidationError>)
+      = linecol_to_viewnode(view_node_line_col)?;
     if let Some ( error ) = error_opt {
       parsing_errors . push ( error ); }
     // Adjust treeid_stack to proper level (BufferRoot is level 0, tree roots are level 1)
@@ -66,24 +66,24 @@ pub fn org_to_uninterpreted_nodes(
     if treeid_stack.len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-        orgnode.title(), level, level - 1)); }
+        viewnode.title(), level, level - 1)); }
     treeid_stack.push( {
       let parent_treeid: NodeId = *treeid_stack.last().unwrap();
       let new_treeid: NodeId = {
-        let mut parent_mut : NodeMut<UncheckedOrgNode> =
+        let mut parent_mut : NodeMut<UncheckedViewNode> =
           forest.get_mut(parent_treeid).unwrap();
-        parent_mut.append(orgnode).id() };
+        parent_mut.append(viewnode).id() };
       new_treeid } ); }
   Ok ( ( forest, parsing_errors ) ) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.
 /// Returns an error if any headline has invalid metadata.
-fn divide_into_orgNodeLineCols (
+fn divide_into_viewNodeLineCols (
   input: &str
-) -> Result<Vec<OrgNodeLineCol>, String> {
+) -> Result<Vec<ViewNodeLineCol>, String> {
   let lines: Vec<&str> = input.lines().collect();
-  let mut result: Vec<OrgNodeLineCol> = Vec::new();
+  let mut result: Vec<ViewNodeLineCol> = Vec::new();
   let mut i: usize = 0;
   while i < lines.len() {
     match headline_to_triple( lines[i] ) {
@@ -102,7 +102,7 @@ fn divide_into_orgNodeLineCols (
             Err(e) => return Err(e), // Invalid metadata
           }
         }
-        result.push ( OrgNodeLineCol {
+        result.push ( ViewNodeLineCol {
           headline: headline_info,
           body: body_lines, } );
       },
@@ -115,28 +115,28 @@ fn divide_into_orgNodeLineCols (
   }
   Ok (result) }
 
-/// Create an UncheckedOrgNode from an OrgNodeLineCol.
+/// Create an UncheckedViewNode from an ViewNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns (level, UncheckedOrgNode, Option<BufferValidationError>).
-fn linecol_to_orgnode(
-  org_node_line_col: &OrgNodeLineCol
-) -> Result < ( usize, UncheckedOrgNode, Option<BufferValidationError> ),
+/// Returns (level, UncheckedViewNode, Option<BufferValidationError>).
+fn linecol_to_viewnode(
+  view_node_line_col: &ViewNodeLineCol
+) -> Result < ( usize, UncheckedViewNode, Option<BufferValidationError> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
-    org_node_line_col.headline.clone();
-  let body_lines: &[String] = &org_node_line_col.body;
+    view_node_line_col.headline.clone();
+  let body_lines: &[String] = &view_node_line_col.body;
   let body_text: Option<String> =
     if body_lines.is_empty() { None
     } else { Some(body_lines.join("\n")) };
-  let metadata : OrgnodeMetadata =
+  let metadata : ViewnodeMetadata =
     if let Some(parsed_metadata) = metadata_option {
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
-  let ( orgnode, error_opt )
-    : ( UncheckedOrgNode, Option<BufferValidationError> )
-    = orgnode_from_metadata ( &metadata, title, body_text );
-  Ok ( ( level, orgnode, error_opt ) ) }
+  let ( viewnode, error_opt )
+    : ( UncheckedViewNode, Option<BufferValidationError> )
+    = viewnode_from_metadata ( &metadata, title, body_text );
+  Ok ( ( level, viewnode, error_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.
 /// Returns Ok(HeadlineInfo) if it's a valid headline with valid metadata.
@@ -170,8 +170,8 @@ pub fn headline_to_triple (
         }
 
         // Parse the metadata from the s-expression
-        let metadata: Option<OrgnodeMetadata> =
-          match parse_metadata_to_orgnodemd(sexp_str) {
+        let metadata: Option<ViewnodeMetadata> =
+          match parse_metadata_to_viewnodemd(sexp_str) {
             Ok(parsed_metadata) => Some(parsed_metadata),
             Err(e) => return Err(e), // Invalid metadata with specific error
           };

@@ -3,8 +3,8 @@
 //
 
 use skg::types::skgnode::{empty_skgnode, SkgNode};
-use skg::types::skgnodemap::{skgnode_for_orgnode, skgnode_map_from_save_instructions, SkgNodeMap};
-use skg::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, default_truenode};
+use skg::types::skgnodemap::{skgnode_for_viewnode, skgnode_map_from_save_instructions, SkgNodeMap};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, default_truenode};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
@@ -13,7 +13,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 #[test]
-fn test_skgnode_for_orgnode_with_id_in_map() {
+fn test_skgnode_for_viewnode_with_id_in_map() {
   // TrueNode with ID that exists in map → returns Some
   let id : ID =
     ID::new("test-id-123");
@@ -26,10 +26,10 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
     };
   let mut map : SkgNodeMap = SkgNodeMap::new();
   map.insert(id.clone(), skgnode.clone());
-  let orgnode : OrgNode = OrgNode {
+  let viewnode : ViewNode = ViewNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::True (
+    kind    : ViewNodeKind::True (
       default_truenode ( id.clone(),
                          SourceName::from("main"),
                          "Test".to_string() )) };
@@ -44,13 +44,13 @@ fn test_skgnode_for_orgnode_with_id_in_map() {
 
   let result :
     Option<&SkgNode> =
-    skgnode_for_orgnode(&orgnode, &mut map, &config).unwrap();
+    skgnode_for_viewnode(&viewnode, &mut map, &config).unwrap();
   assert!(result.is_some(), "Should find SkgNode for TrueNode with ID in map");
   assert_eq!(result.unwrap().title, "Test Node");
 }
 
 #[test]
-fn test_skgnode_for_orgnode_with_id_not_in_map() {
+fn test_skgnode_for_viewnode_with_id_not_in_map() {
   // TrueNode with ID not in map and not on disk → returns error
   let id :
     ID =
@@ -59,10 +59,10 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
     SkgNodeMap =
     SkgNodeMap::new(); // empty map
   // ID is not in map, will try to fetch from disk and fail
-  let orgnode : OrgNode = OrgNode {
+  let viewnode : ViewNode = ViewNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::True (
+    kind    : ViewNodeKind::True (
       default_truenode ( id,
                          SourceName::from("main"),
                          "Test".to_string() )) };
@@ -87,12 +87,12 @@ fn test_skgnode_for_orgnode_with_id_not_in_map() {
   };
   let result : Result<Option<&SkgNode>, Box<dyn Error>> =
     // Should error because the file doesn't exist on disk
-    skgnode_for_orgnode(&orgnode, &mut map, &config);
+    skgnode_for_viewnode(&viewnode, &mut map, &config);
   assert!(result.is_err(), "Should return error when ID not in map and file not on disk");
 }
 
 #[test]
-fn test_skgnode_for_orgnode_scaffold() {
+fn test_skgnode_for_viewnode_scaffold() {
   // Scaffold → returns None
   let skgnode :
     SkgNode =
@@ -107,12 +107,12 @@ fn test_skgnode_for_orgnode_scaffold() {
     SkgNodeMap::new();
   map.insert(ID::new("test-id-789"), skgnode);
 
-  let orgnode :
-    OrgNode =
-    OrgNode {
+  let viewnode :
+    ViewNode =
+    ViewNode {
       focused : false,
       folded : false,
-      kind : OrgNodeKind::Scaff(Scaffold::AliasCol),
+      kind : ViewNodeKind::Scaff(Scaffold::AliasCol),
     };
 
   let config : SkgConfig = SkgConfig {
@@ -126,7 +126,7 @@ fn test_skgnode_for_orgnode_scaffold() {
 
   let result :
     Option<&SkgNode> =
-    skgnode_for_orgnode(&orgnode, &mut map, &config).unwrap();
+    skgnode_for_viewnode(&viewnode, &mut map, &config).unwrap();
   assert!(result.is_none(), "Should return None for Scaffold nodes");
 }
 

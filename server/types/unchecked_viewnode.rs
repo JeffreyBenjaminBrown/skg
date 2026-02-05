@@ -1,6 +1,6 @@
-/// See ./orgnode.rs for what all fields mean.
+/// See ./viewnode.rs for what all fields mean.
 /// This file defines unchecked variants of some of the types
-/// from ./orgnode.rs, where 'unchecked' means
+/// from ./viewnode.rs, where 'unchecked' means
 /// they might not have an ID or a source field.
 /// They are only needed for a little while after reading in
 /// a buffer from the client. After validation, they are converted
@@ -8,8 +8,8 @@
 
 use super::git::NodeDiffStatus;
 use super::misc::{ID, SourceName};
-use super::orgnode::{
-  OrgNode, OrgNodeKind, TrueNode, Scaffold,
+use super::viewnode::{
+  ViewNode, ViewNodeKind, TrueNode, Scaffold,
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
 };
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -19,16 +19,16 @@ use std::collections::HashSet;
 // Type declarations
 //
 
-/// Unchecked version of OrgNode - for parsing/validation phase.
+/// Unchecked version of ViewNode - for parsing/validation phase.
 #[derive(Debug, Clone, PartialEq)]
-pub struct UncheckedOrgNode {
+pub struct UncheckedViewNode {
   pub focused : bool,
   pub folded  : bool,
-  pub kind    : UncheckedOrgNodeKind,
+  pub kind    : UncheckedViewNodeKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UncheckedOrgNodeKind {
+pub enum UncheckedViewNodeKind {
   True  ( UncheckedTrueNode ),
   Scaff ( Scaffold ),  // Scaffold is shared - scaffolds never have IDs
 }
@@ -77,27 +77,27 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
   }
 }
 
-impl TryFrom<UncheckedOrgNodeKind> for OrgNodeKind {
+impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
   type Error = String;
 
-  fn try_from(u: UncheckedOrgNodeKind) -> Result<Self, Self::Error> {
+  fn try_from(u: UncheckedViewNodeKind) -> Result<Self, Self::Error> {
     match u {
-      UncheckedOrgNodeKind::True(t) =>
-        Ok(OrgNodeKind::True(TrueNode::try_from(t)?)),
-      UncheckedOrgNodeKind::Scaff(s) =>
-        Ok(OrgNodeKind::Scaff(s)),
+      UncheckedViewNodeKind::True(t) =>
+        Ok(ViewNodeKind::True(TrueNode::try_from(t)?)),
+      UncheckedViewNodeKind::Scaff(s) =>
+        Ok(ViewNodeKind::Scaff(s)),
     }
   }
 }
 
-impl TryFrom<UncheckedOrgNode> for OrgNode {
+impl TryFrom<UncheckedViewNode> for ViewNode {
   type Error = String;
 
-  fn try_from(u: UncheckedOrgNode) -> Result<Self, Self::Error> {
-    Ok(OrgNode {
+  fn try_from(u: UncheckedViewNode) -> Result<Self, Self::Error> {
+    Ok(ViewNode {
       focused : u.focused,
       folded  : u.folded,
-      kind    : OrgNodeKind::try_from(u.kind)?,
+      kind    : ViewNodeKind::try_from(u.kind)?,
     })
   }
 }
@@ -122,23 +122,23 @@ impl From<TrueNode> for UncheckedTrueNode {
   }
 }
 
-impl From<OrgNodeKind> for UncheckedOrgNodeKind {
-  fn from(k: OrgNodeKind) -> Self {
+impl From<ViewNodeKind> for UncheckedViewNodeKind {
+  fn from(k: ViewNodeKind) -> Self {
     match k {
-      OrgNodeKind::True(t) =>
-        UncheckedOrgNodeKind::True(UncheckedTrueNode::from(t)),
-      OrgNodeKind::Scaff(s) =>
-        UncheckedOrgNodeKind::Scaff(s),
+      ViewNodeKind::True(t) =>
+        UncheckedViewNodeKind::True(UncheckedTrueNode::from(t)),
+      ViewNodeKind::Scaff(s) =>
+        UncheckedViewNodeKind::Scaff(s),
     }
   }
 }
 
-impl From<OrgNode> for UncheckedOrgNode {
-  fn from(o: OrgNode) -> Self {
-    UncheckedOrgNode {
+impl From<ViewNode> for UncheckedViewNode {
+  fn from(o: ViewNode) -> Self {
+    UncheckedViewNode {
       focused : o.focused,
       folded  : o.folded,
-      kind    : UncheckedOrgNodeKind::from(o.kind),
+      kind    : UncheckedViewNodeKind::from(o.kind),
     }
   }
 }
@@ -147,17 +147,17 @@ impl From<OrgNode> for UncheckedOrgNode {
 /// This returns an error if any TrueNode is missing either field.
 /// Validation happens before this, so it should not error.
 pub fn unchecked_to_checked_tree(
-  unchecked: Tree<UncheckedOrgNode>
-) -> Result<Tree<OrgNode>, String> {
+  unchecked: Tree<UncheckedViewNode>
+) -> Result<Tree<ViewNode>, String> {
   // Convert the root node
-  let root_unchecked: &UncheckedOrgNode = unchecked.root().value();
-  let root_checked: OrgNode = OrgNode::try_from(root_unchecked.clone())?;
-  let mut checked: Tree<OrgNode> = Tree::new(root_checked);
+  let root_unchecked: &UncheckedViewNode = unchecked.root().value();
+  let root_checked: ViewNode = ViewNode::try_from(root_unchecked.clone())?;
+  let mut checked: Tree<ViewNode> = Tree::new(root_checked);
 
   // Recursively convert children
   fn convert_children(
-    unchecked_tree : &Tree<UncheckedOrgNode>,
-    checked_tree   : &mut Tree<OrgNode>,
+    unchecked_tree : &Tree<UncheckedViewNode>,
+    checked_tree   : &mut Tree<ViewNode>,
     unchecked_id   : NodeId,
     checked_id     : NodeId,
   ) -> Result<(), String> {
@@ -169,15 +169,15 @@ pub fn unchecked_to_checked_tree(
       .collect();
 
     for unchecked_child_id in child_ids {
-      let unchecked_child: &UncheckedOrgNode = unchecked_tree
+      let unchecked_child: &UncheckedViewNode = unchecked_tree
         .get(unchecked_child_id)
         .unwrap()
         .value();
-      let checked_child: OrgNode =
-        OrgNode::try_from(unchecked_child.clone())?;
+      let checked_child: ViewNode =
+        ViewNode::try_from(unchecked_child.clone())?;
 
       let checked_child_id: NodeId = {
-        let mut parent_mut: NodeMut<OrgNode> =
+        let mut parent_mut: NodeMut<ViewNode> =
           checked_tree.get_mut(checked_id).unwrap();
         parent_mut.append(checked_child).id()
       };
@@ -199,14 +199,14 @@ pub fn unchecked_to_checked_tree(
   Ok(checked)
 }
 
-/// Convert a checked OrgNode tree to an UncheckedOrgNode tree.
+/// Convert a checked ViewNode tree to an UncheckedViewNode tree.
 /// Infallible since checked types always satisfy unchecked requirements.
 pub fn checked_to_unchecked_tree(
-  checked: &Tree<OrgNode>
-) -> Tree<UncheckedOrgNode> {
+  checked: &Tree<ViewNode>
+) -> Tree<UncheckedViewNode> {
   fn convert_children(
-    checked_tree   : &Tree<OrgNode>,
-    unchecked_tree : &mut Tree<UncheckedOrgNode>,
+    checked_tree   : &Tree<ViewNode>,
+    unchecked_tree : &mut Tree<UncheckedViewNode>,
     checked_id     : NodeId,
     unchecked_id   : NodeId,
   ) {
@@ -219,16 +219,16 @@ pub fn checked_to_unchecked_tree(
       .collect();
 
     for checked_child_id in child_ids {
-      let checked_child : &OrgNode =
+      let checked_child : &ViewNode =
         checked_tree
         .get(checked_child_id)
         .unwrap()
         .value();
-      let unchecked_child : UncheckedOrgNode =
-        UncheckedOrgNode::from(checked_child.clone());
+      let unchecked_child : UncheckedViewNode =
+        UncheckedViewNode::from(checked_child.clone());
 
       let unchecked_child_id : NodeId =
-        { let mut parent_mut : NodeMut<UncheckedOrgNode> =
+        { let mut parent_mut : NodeMut<UncheckedViewNode> =
            unchecked_tree.get_mut(unchecked_id).unwrap();
          parent_mut.append(unchecked_child).id() };
 
@@ -240,11 +240,11 @@ pub fn checked_to_unchecked_tree(
     }
   }
 
-  let root_checked : &OrgNode =
+  let root_checked : &ViewNode =
     checked.root().value();
-  let root_unchecked : UncheckedOrgNode =
-    UncheckedOrgNode::from(root_checked.clone());
-  let mut unchecked : Tree<UncheckedOrgNode> =
+  let root_unchecked : UncheckedViewNode =
+    UncheckedViewNode::from(root_checked.clone());
+  let mut unchecked : Tree<UncheckedViewNode> =
     Tree::new(root_unchecked);
 
   let checked_root_id : NodeId =
@@ -278,12 +278,12 @@ impl Default for UncheckedTrueNode {
   }
 }
 
-impl Default for UncheckedOrgNode {
+impl Default for UncheckedViewNode {
   fn default() -> Self {
-    UncheckedOrgNode {
+    UncheckedViewNode {
       focused : false,
       folded  : false,
-      kind    : UncheckedOrgNodeKind::True(UncheckedTrueNode::default()),
+      kind    : UncheckedViewNodeKind::True(UncheckedTrueNode::default()),
     }
   }
 }
@@ -292,28 +292,28 @@ impl Default for UncheckedOrgNode {
 // Helper methods
 //
 
-impl UncheckedOrgNode {
+impl UncheckedViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title(&self) -> &str {
     match &self.kind {
-      UncheckedOrgNodeKind::True(t) => &t.title,
-      UncheckedOrgNodeKind::Scaff(s) => s.title(),
+      UncheckedViewNodeKind::True(t) => &t.title,
+      UncheckedViewNodeKind::Scaff(s) => s.title(),
     }
   }
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body(&self) -> Option<&String> {
     match &self.kind {
-      UncheckedOrgNodeKind::True(t) => t.body.as_ref(),
-      UncheckedOrgNodeKind::Scaff(_) => None,
+      UncheckedViewNodeKind::True(t) => t.body.as_ref(),
+      UncheckedViewNodeKind::Scaff(_) => None,
     }
   }
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt(&self) -> Option<&ID> {
     match &self.kind {
-      UncheckedOrgNodeKind::True(t) => t.id_opt.as_ref(),
-      UncheckedOrgNodeKind::Scaff(_) => None,
+      UncheckedViewNodeKind::True(t) => t.id_opt.as_ref(),
+      UncheckedViewNodeKind::Scaff(_) => None,
     }
   }
 }
@@ -322,18 +322,18 @@ impl UncheckedOrgNode {
 // Constructor functions for unchecked types
 //
 
-pub fn unchecked_forest_root_orgnode() -> UncheckedOrgNode {
-  UncheckedOrgNode {
+pub fn unchecked_forest_root_viewnode() -> UncheckedViewNode {
+  UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedOrgNodeKind::Scaff(Scaffold::BufferRoot),
+    kind    : UncheckedViewNodeKind::Scaff(Scaffold::BufferRoot),
   }
 }
 
-pub fn unchecked_orgnode_from_scaffold(scaffold: Scaffold) -> UncheckedOrgNode {
-  UncheckedOrgNode {
+pub fn unchecked_viewnode_from_scaffold(scaffold: Scaffold) -> UncheckedViewNode {
+  UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedOrgNodeKind::Scaff(scaffold),
+    kind    : UncheckedViewNodeKind::Scaff(scaffold),
   }
 }

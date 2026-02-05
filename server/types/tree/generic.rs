@@ -87,7 +87,7 @@ where F: FnOnce(NodeMut<T>) -> R {
 /// ```ignore
 /// do_everywhere_in_tree_dfs(&mut tree, root_id, |mut node| {
 ///   if let Some(parent) = node.parent() {
-///     if matches!(parent.value(), OrgNode { kind: Scaff(AliasCol), .. }) {
+///     if matches!(parent.value(), ViewNode { kind: Scaff(AliasCol), .. }) {
 ///       // Convert to Alias
 ///       let val = node.value();
 ///       // mutate val

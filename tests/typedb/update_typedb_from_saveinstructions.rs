@@ -4,12 +4,12 @@ use skg::test_utils::run_with_test_db;
 use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::orgnodes_to_instructions::orgnode_forest_to_nonmerge_save_instructions;
-use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
+use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
-use skg::types::orgnode::OrgNode;
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
+use skg::types::viewnode::ViewNode;
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::save::DefineNode;
 use ego_tree::Tree;
 use indoc::indoc;
@@ -33,13 +33,13 @@ fn test_update_nodes_and_relationships2 (
       ** (skg (node (id 1) (source main) indefinitive)) 1
     "};
 
-    let unchecked_forest : Tree<UncheckedOrgNode> =
+    let unchecked_forest : Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes ( org_text )?.0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
       find_inconsistent_instructions ( & unchecked_forest );
-    let forest : Tree<OrgNode> =
+    let forest : Tree<ViewNode> =
       unchecked_to_checked_tree ( unchecked_forest )?;
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
@@ -53,7 +53,7 @@ fn test_update_nodes_and_relationships2 (
 
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<DefineNode> =
-      orgnode_forest_to_nonmerge_save_instructions (
+      viewnode_forest_to_nonmerge_save_instructions (
         & forest, & config, & driver ) . await ?;
 
     // Apply the update

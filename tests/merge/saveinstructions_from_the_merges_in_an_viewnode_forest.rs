@@ -1,17 +1,17 @@
 use indoc::indoc;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_orgnode_forest;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SourceName};
 use skg::types::save::SaveNode;
-use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
+use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use std::error::Error;
 
 #[test]
 fn test_single_merge() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-merge-single",
-    "tests/merge/saveinstructions_from_the_merges_in_an_orgnode_forest/fixtures",
+    "tests/merge/saveinstructions_from_the_merges_in_an_viewnode_forest/fixtures",
     "/tmp/tantivy-test-merge-single",
     |config, driver, _tantivy| {
       Box::pin(async move {
@@ -23,7 +23,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
         let forest = unchecked_to_checked_tree(unchecked_forest)?;
         let merge_instructions =
-        instructiontriples_from_the_merges_in_an_orgnode_forest(
+        instructiontriples_from_the_merges_in_an_viewnode_forest(
          &forest, config, driver)
         .await?;
 

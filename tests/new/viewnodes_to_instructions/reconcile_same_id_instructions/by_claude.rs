@@ -2,7 +2,7 @@
 // Testing the logic for collecting and reducing duplicate instructions
 
 use std::collections::HashMap;
-use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
+use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
 use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::misc::{ID, SourceName};
 use skg::types::skgnode::SkgNode;

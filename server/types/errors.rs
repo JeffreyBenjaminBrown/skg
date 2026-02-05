@@ -23,10 +23,10 @@ pub enum SaveError {
 pub enum BufferValidationError {
   Body_of_Scaffold               (String,   // Title from buffer
                                   String),  // Scaffold kind (e.g. "aliasCol", "alias")
-  Multiple_Defining_Orgnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
+  Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  InconsistentSources            (ID, HashSet<SourceName>), // Multiple orgnodes with same ID have different sources
+  InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
   ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
   DiskSourceBufferSourceConflict (ID,
                                   SourceName, // disk source
@@ -69,7 +69,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::Body_of_Scaffold(title, kind) =>
         write!(f, "{} node should not have a body. Node title: '{}'",
                kind, title),
-      BufferValidationError::Multiple_Defining_Orgnodes(id) =>
+      BufferValidationError::Multiple_Defining_Viewnodes(id) =>
         write!(f, "Multiple nodes with ID {:?} are marked as defining (indefinitive=false)", id),
       BufferValidationError::AmbiguousDeletion(id) =>
         write!(f, "Ambiguous deletion request for ID {:?}", id),
@@ -77,7 +77,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node has multiple Content children with the same ID {:?}", id),
       BufferValidationError::InconsistentSources(id, sources) => {
         let source_list: Vec<&SourceName> = sources.iter().collect();
-        write!(f, "Multiple orgnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
+        write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
       BufferValidationError::ModifiedForeignNode(id, source) =>
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
       BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) =>

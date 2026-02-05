@@ -1,9 +1,9 @@
-use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::update_buffer::util::complete_relevant_children_in_orgnodetree;
+use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
@@ -24,15 +24,15 @@ use std::error::Error;
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
 pub fn completeAliasCol (
-  tree             : &mut Tree<OrgNode>,
+  tree             : &mut Tree<ViewNode>,
   map              : &SkgNodeMap,
   aliascol_node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   { let is_aliascol : bool = // barf if not an aliascol
       read_at_ancestor_in_tree(
         tree, aliascol_node_id, 0,
-        |orgnode| matches!( &orgnode.kind,
-                            OrgNodeKind::Scaff( Scaffold::AliasCol )) )
+        |viewnode| matches!( &viewnode.kind,
+                            ViewNodeKind::Scaff( Scaffold::AliasCol )) )
       .map_err( |e| -> Box<dyn Error> { e.into() } )?;
     if !is_aliascol { return Err(
       "completeAliasCol: Node is not an AliasCol".into() ); }}
@@ -40,9 +40,9 @@ pub fn completeAliasCol (
     read_at_ancestor_in_tree(
       // Verify parent is a TrueNode and get its ID
       tree, aliascol_node_id, 1,
-      |orgnode| match &orgnode.kind {
-        OrgNodeKind::True( t ) => Ok( t.id.clone() ),
-        OrgNodeKind::Scaff( _ ) =>
+      |viewnode| match &viewnode.kind {
+        ViewNodeKind::True( t ) => Ok( t.id.clone() ),
+        ViewNodeKind::Scaff( _ ) =>
           Err( "completeAliasCol: Parent is not a TrueNode" ), } )
     .map_err( |e| -> Box<dyn Error> { e.into() } )?
     .map_err( |e| -> Box<dyn Error> { e.into() } )? ;
@@ -51,23 +51,23 @@ pub fn completeAliasCol (
     .ok_or( "completeAliasCol: Parent SkgNode not in map" )?;
   let aliases : Vec<String> = // Source of truth from disk
     parent_skgnode.aliases.clone().unwrap_or_default();
-  let is_alias : fn(&OrgNode) -> bool =
+  let is_alias : fn(&ViewNode) -> bool =
     // relevance to complete_relevant_children
-    |orgnode| matches!( &orgnode.kind,
-                        OrgNodeKind::Scaff( Scaffold::Alias { .. } ) );
-  let view_alias_text : fn(&OrgNode) -> String =
-    |orgnode| match &orgnode.kind {
-      OrgNodeKind::Scaff( Scaffold::Alias { text, .. } ) =>
+    |viewnode| matches!( &viewnode.kind,
+                        ViewNodeKind::Scaff( Scaffold::Alias { .. } ) );
+  let view_alias_text : fn(&ViewNode) -> String =
+    |viewnode| match &viewnode.kind {
+      ViewNodeKind::Scaff( Scaffold::Alias { text, .. } ) =>
         text.clone(),
       _ => unreachable!(), }; // relevance means Scaffold::Alias
-  let create_alias : fn(&String) -> OrgNode =
-    |text| OrgNode {
+  let create_alias : fn(&String) -> ViewNode =
+    |text| ViewNode {
       focused : false,
       folded  : false,
-      kind    : OrgNodeKind::Scaff(
+      kind    : ViewNodeKind::Scaff(
         Scaffold::Alias { text : text.clone(),
                           diff : None } ), };
-  complete_relevant_children_in_orgnodetree(
+  complete_relevant_children_in_viewnodetree(
     tree,
     aliascol_node_id,
     is_alias,

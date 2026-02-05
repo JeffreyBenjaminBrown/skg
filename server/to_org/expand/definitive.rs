@@ -8,11 +8,11 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::orgnode::{ OrgNode, OrgNodeKind, ViewRequest, mk_indefinitive_orgnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
-use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
+use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
@@ -20,7 +20,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  forest        : &mut Tree<OrgNode>,
+  forest        : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
@@ -52,8 +52,8 @@ pub async fn execute_view_requests (
 /// Expands a definitive view request.
 ///
 /// This function:
-/// 1. 'Indefinitizes' any previously definitive OrgNode with that ID
-/// 2. Marks this OrgNode definitive
+/// 1. 'Indefinitizes' any previously definitive ViewNode with that ID
+/// 2. Marks this ViewNode definitive
 /// 3. Expands (BFS) its content from disk (or from latest git commit for removed nodes), applying the node limit
 /// 4. Removes its ViewRequest::Definitive
 ///
@@ -63,7 +63,7 @@ pub async fn execute_view_requests (
 /// For nodes with `diff: Some(Removed)`: loads content from git HEAD
 /// instead of disk, and marks children as removed if they don't exist on disk.
 async fn execute_definitive_view_request (
-  forest        : &mut Tree<OrgNode>, // "forest" = tree with BufferRoot
+  forest        : &mut Tree<ViewNode>, // "forest" = tree with BufferRoot
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
@@ -78,10 +78,10 @@ async fn execute_definitive_view_request (
     read_at_node_in_tree (
       forest, node_id,
       |n| match &n . kind {
-        OrgNodeKind::True ( t ) =>
+        ViewNodeKind::True ( t ) =>
           matches! (t . diff,
                     Some (NodeDiffStatus::Removed)),
-        OrgNodeKind::Scaff ( _ ) => false } ) ?;
+        ViewNodeKind::Scaff ( _ ) => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
     get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;
@@ -97,9 +97,9 @@ async fn execute_definitive_view_request (
       forest, node_id, config ) ?;
     write_at_node_in_tree (
       forest, node_id,
-      |orgnode| { // remove ViewRequest and mark definitive (but keep removed status)
-        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-          &mut orgnode.kind
+      |viewnode| { // remove ViewRequest and mark definitive (but keep removed status)
+        let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+          &mut viewnode.kind
           else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
         t . view_requests . remove ( & ViewRequest::Definitive );
         t . indefinitive = false; } )
@@ -120,11 +120,11 @@ async fn execute_definitive_view_request (
 /// Otherwise return an empty set (which might be dangerous --
 /// see the PITFALL | TODO comment in the function body.
 fn get_hidden_ids_if_subscribee (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   map     : &SkgNodeMap,
   node_id : NodeId,
 ) -> Result < HashSet < ID >, Box<dyn Error> > {
-  let node_ref : NodeRef < OrgNode > =
+  let node_ref : NodeRef < ViewNode > =
     tree . get ( node_id )
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
   if !type_and_parent_type_consistent_with_subscribee (
@@ -132,10 +132,10 @@ fn get_hidden_ids_if_subscribee (
   { // PITFALL \ TODO: Maybe this should return an error rather than the empty set. The empty set says 'the subscriber hides none of its content', which is technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
     return Ok ( HashSet::new () ); }
   else {
-    let subscribee_col : NodeRef < OrgNode > =
+    let subscribee_col : NodeRef < ViewNode > =
       node_ref . parent ()
       . ok_or ( "get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)" ) ?;
-    let subscriber : NodeRef < OrgNode > =
+    let subscriber : NodeRef < ViewNode > =
       subscribee_col . parent ()
       . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
     let subscriber_id : ID =
@@ -154,7 +154,7 @@ fn get_hidden_ids_if_subscribee (
 /// TODO : This will need complication to properly handle
 ///   sharing related nodes among the input node's descendents.
 fn indefinitize_content_subtree (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
@@ -162,7 +162,7 @@ fn indefinitize_content_subtree (
 ) -> Result < (), Box<dyn Error> > {
   let (node_pid, content_child_treeids)
     : (ID, Vec <NodeId>) =
-  { let node_ref : NodeRef < OrgNode > =
+  { let node_ref : NodeRef < ViewNode > =
       tree . get ( node_id )
       . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
     let node_pid : ID =
@@ -170,7 +170,7 @@ fn indefinitize_content_subtree (
     let content_child_treeids : Vec < NodeId > =
       node_ref . children ()
       . filter ( |c| matches! ( &c . value() . kind,
-                                OrgNodeKind::True(t)
+                                ViewNodeKind::True(t)
                                 if !t.parent_ignores ))
       . map ( |c| c . id () )
       . collect ();
@@ -206,7 +206,7 @@ fn indefinitize_content_subtree (
 /// If the view was requested from a non-subscribee,
 /// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
-  tree           : &mut Tree<OrgNode>,
+  tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,
   effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
@@ -254,9 +254,9 @@ async fn extendDefinitiveSubtreeFromLeaf (
 
 /// Fetches SkgNode from map or disk.
 /// Updates title and body.
-/// Preserves all other OrgNode data.
+/// Preserves all other ViewNode data.
 fn from_disk_replace_title_body_and_skgnode (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId,
   config  : &SkgConfig,
@@ -270,9 +270,9 @@ fn from_disk_replace_title_body_and_skgnode (
   if title . is_empty () {
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
-  write_at_node_in_tree ( tree, node_id, |orgnode| { // Update orgnode
-    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-      &mut orgnode . kind
+  write_at_node_in_tree ( tree, node_id, |viewnode| { // Update viewnode
+    let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+      &mut viewnode . kind
       else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
     t . title = title;
     t . body = body; } )
@@ -284,7 +284,7 @@ fn from_disk_replace_title_body_and_skgnode (
 /// Children that exist in TypeDB are marked as RemovedHere.
 /// Children that don't exist in TypeDB are marked as Removed.
 async fn extendDefinitiveSubtree_fromGit (
-  tree           : &mut Tree<OrgNode>,
+  tree           : &mut Tree<ViewNode>,
   _map           : &mut SkgNodeMap,
   effective_root : NodeId,
   limit          : usize,
@@ -316,29 +316,29 @@ async fn extendDefinitiveSubtree_fromGit (
       (contents, contents_in_worktree) };
   for child_id in contents . iter() . take ( limit ) {
     if hidden_ids . contains ( child_id ) { continue; }
-    let child_orgnode : OrgNode =
-      mk_removed_child_orgnode (
+    let child_viewnode : ViewNode =
+      mk_removed_child_viewnode (
         child_id, &src, &contents_in_worktree,
         deleted_id_src_map, config, typedb_driver ) . await ?;
-    let mut parent_mut : NodeMut<OrgNode> = // Add child to tree
+    let mut parent_mut : NodeMut<ViewNode> = // Add child to tree
       tree . get_mut ( effective_root ) . ok_or (
         "Parent not found" ) ?;
-    parent_mut . append ( child_orgnode );
+    parent_mut . append ( child_viewnode );
     visited . insert ( child_id . clone(), effective_root ); }
   Ok (( )) }
 
-/// Build an OrgNode for a child of
+/// Build an ViewNode for a child of
 /// a removed (in the git diff sense) node.
 /// The child is loaded from the worktree if it exists there,
 /// and otherwise from git HEAD.
-async fn mk_removed_child_orgnode (
+async fn mk_removed_child_viewnode (
   child_id           : &ID,
   parent_src         : &SourceName,
   contents_in_worktree : &HashSet<String>,
   deleted_id_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   typedb_driver      : &TypeDBDriver,
-) -> Result<OrgNode, Box<dyn Error>> {
+) -> Result<ViewNode, Box<dyn Error>> {
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
   let (child_diff, child_opt_skgnode)
@@ -354,29 +354,29 @@ async fn mk_removed_child_orgnode (
   let child_skgnode : &SkgNode =
     child_opt_skgnode . as_ref()
     . ok_or_else ( || format! (
-      "mk_removed_child_orgnode: no SkgNode for child {}",
+      "mk_removed_child_viewnode: no SkgNode for child {}",
       child_id ) ) ?;
   let child_source : Option<SourceName> =
     if in_worktree { Some ( child_skgnode . source . clone() ) }
     else           { deleted_id_src_map . get ( child_id )
                        . cloned() };
-  let mut child_orgnode : OrgNode =
-    mk_indefinitive_orgnode (
+  let mut child_viewnode : ViewNode =
+    mk_indefinitive_viewnode (
       child_id . clone(),
       child_skgnode . source . clone(),
       child_skgnode . title . clone(),
       false );                // parent_ignores
-  if let OrgNodeKind::True ( ref mut t ) = child_orgnode . kind {
+  if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some ( source ) = child_source {
       t . source = source; }
     t . diff = Some ( child_diff ); }
-  Ok ( child_orgnode ) }
+  Ok ( child_viewnode ) }
 
 /// Extend a definitive subtree by loading content from disk.
 /// This is the usual case
 /// (as opposed to loading from git for removed nodes).
 async fn extendDefinitiveSubtree_fromWorktree (
-  forest        : &mut Tree<OrgNode>,
+  forest        : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   node_pid      : &ID,
@@ -387,13 +387,13 @@ async fn extendDefinitiveSubtree_fromWorktree (
 ) -> Result<(), Box<dyn Error>> {
   { // Mutate the root of the definitive view request:
     from_disk_replace_title_body_and_skgnode (
-      // preserves relevant orgnode fields
+      // preserves relevant viewnode fields
       forest, map, node_id, config ) ?;
     write_at_node_in_tree (
       forest, node_id,
-      |orgnode| { // remove ViewRequest and mark definitive
-        let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-          &mut orgnode.kind
+      |viewnode| { // remove ViewRequest and mark definitive
+        let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+          &mut viewnode.kind
           else { panic! ( "extendDefinitiveSubtree_fromWorktree: expected TrueNode" ) };
         t . view_requests . remove ( & ViewRequest::Definitive );
         t . indefinitive = false; } )
@@ -416,7 +416,7 @@ async fn extendDefinitiveSubtree_fromWorktree (
 /// This is used when expanding a definitive view
 /// for a node that exists in HEAD but not on disk.
 fn from_git_replace_title_body (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
@@ -427,9 +427,9 @@ fn from_git_replace_title_body (
     skgnode_from_git_head ( &pid, &src, config ) ?;
   write_at_node_in_tree (
     tree, node_id,
-    |orgnode| {
-      let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-        &mut orgnode . kind
+    |viewnode| {
+      let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+        &mut viewnode . kind
         else { panic! ( "from_git_replace_title_body: expected TrueNode" ) };
       t . title = skgnode.title;
       t . body = skgnode.body; } )

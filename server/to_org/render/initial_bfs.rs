@@ -6,12 +6,12 @@
 ///
 /// THE ALGORITHM:
 /// Start with a list of roots.
-/// Render one generation at a time as definitive orgnodes.
+/// Render one generation at a time as definitive viewnodes.
 /// Once the node limit is hit, stop rendering that generation,
-/// and re-render it as indefinitive orgnodes.
+/// and re-render it as indefinitive viewnodes.
 /// ('Re-rendering' might sound like a lot of work,
 /// but it only changes 2 fields.)
-/// Once the last orgnode L has been re-rendered as indefinitive,
+/// Once the last viewnode L has been re-rendered as indefinitive,
 /// continue rendering any of its remaining siblings the same way,
 /// but ignore (omit, leave unrendered) the rest of its generation.
 /// Then navigate up to L's parent P,
@@ -20,7 +20,7 @@
 use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
-use crate::types::orgnode::OrgNode;
+use crate::types::viewnode::ViewNode;
 use crate::types::skgnodemap::SkgNodeMap;
 
 use ego_tree::{NodeId, Tree};
@@ -35,9 +35,9 @@ pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> > {
+) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
-  let (mut forest, mut map) : (Tree<OrgNode>, SkgNodeMap) =
+  let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     stub_forest_from_root_ids (
       root_ids, config, driver, &mut visited ) . await ?;
   let forest_root_id : NodeId = forest . root () . id ();
@@ -61,7 +61,7 @@ pub async fn render_initial_forest_bfs (
 
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
-  forest         : &'a mut Tree<OrgNode>,
+  forest         : &'a mut Tree<ViewNode>,
   map            : &'a mut SkgNodeMap,
   gen_nodeids    : Vec < NodeId >, // nodes of deepest generation rendered so far
   gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
@@ -105,7 +105,7 @@ fn render_generation_and_recurse<'a> (
 /// Add children to the forest.
 /// Return their NodeIds.
 async fn add_children_and_collect_their_ids (
-  forest      : &mut Tree<OrgNode>,
+  forest      : &mut Tree<ViewNode>,
   map         : &mut SkgNodeMap,
   rels_to_add : Vec < (NodeId, ID) >,
   visited     : &mut DefinitiveMap,
@@ -126,7 +126,7 @@ async fn add_children_and_collect_their_ids (
 ///   (Indefinitive nodes' contents do not need rendering.)
 /// Returns (parent_treeid, child_skgid) tuples.
 fn collect_rels_to_children_from_generation (
-  forest       : &Tree<OrgNode>,
+  forest       : &Tree<ViewNode>,
   map          : &SkgNodeMap,
   nodes_in_gen : &[NodeId],
 ) -> Vec < (NodeId, ID) > {

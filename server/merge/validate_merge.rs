@@ -7,8 +7,8 @@
 ///     - No node can be an acquirer and an acquiree.
 ///     - No node can be involved in more than one merge.
 
-use crate::types::orgnode::EditRequest;
-use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind, UncheckedTrueNode};
+use crate::types::viewnode::EditRequest;
+use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -17,26 +17,26 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 struct MergeValidationData<'a> {
-  acquirer_orgnodes     : Vec<&'a UncheckedOrgNode>,
+  acquirer_viewnodes     : Vec<&'a UncheckedViewNode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
   to_delete_ids         : HashSet<ID>, }
 
-/// Validates merge requests in an orgnode forest.
+/// Validates merge requests in an viewnode forest.
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_merge_requests(
-  forest: &Tree<UncheckedOrgNode>,
+  forest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let merge_validation_data : MergeValidationData =
     collect_merge_validation_data ( forest );
-  for node in merge_validation_data.acquirer_orgnodes {
+  for node in merge_validation_data.acquirer_viewnodes {
     let t : &UncheckedTrueNode = match &node.kind {
-      UncheckedOrgNodeKind::True(t) => t,
-      UncheckedOrgNodeKind::Scaff(s) => {
+      UncheckedViewNodeKind::True(t) => t,
+      UncheckedViewNodeKind::Scaff(s) => {
         errors.push(format!(
           "Acquirer node cannot be a Scaffold: {:?}", s));
         continue; }};
@@ -61,22 +61,22 @@ pub async fn validate_merge_requests(
 /// To understand what this function does,
 /// it's easiest to read the definition of its return type.
 fn collect_merge_validation_data<'a>(
-  forest: &'a Tree<UncheckedOrgNode>,
+  forest: &'a Tree<UncheckedViewNode>,
 ) -> MergeValidationData<'a> {
-  let mut acquirer_orgnodes : Vec<&UncheckedOrgNode> = Vec::new();
+  let mut acquirer_viewnodes : Vec<&UncheckedViewNode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut to_delete_ids : HashSet<ID> = HashSet::new();
   for edge in forest.root().traverse() {
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      let orgnode : &UncheckedOrgNode = node_ref.value();
-      if let UncheckedOrgNodeKind::True(t) = &orgnode.kind {
+      let viewnode : &UncheckedViewNode = node_ref.value();
+      if let UncheckedViewNodeKind::True(t) = &viewnode.kind {
         if let Some(id) = &t.id_opt {
           if matches!(&t.edit_request, Some(EditRequest::Delete)) {
             to_delete_ids.insert(id.clone()); } // mutate!
           if let Some(EditRequest::Merge(acquiree_id))
           = &t.edit_request
-          { acquirer_orgnodes.push(orgnode); // mutate!
+          { acquirer_viewnodes.push(viewnode); // mutate!
             acquirer_to_acquirees // mutate!
               .entry(id.clone())
               .or_insert_with(HashSet::new)
@@ -85,7 +85,7 @@ fn collect_merge_validation_data<'a>(
               .entry(acquiree_id.clone())
               .or_insert_with(HashSet::new)
               .insert(id.clone()); }} }} }
-  MergeValidationData { acquirer_orgnodes,
+  MergeValidationData { acquirer_viewnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,
                         to_delete_ids, }}

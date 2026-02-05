@@ -1,17 +1,17 @@
 // I spec'd these tests by hand.
 // They are much briefer than those by Claude
-// (at tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs),
+// (at tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs),
 // but they catch most of the tricky logic.
 
 use indoc::indoc;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
-use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
-use skg::from_text::orgnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
+use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
+use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::{run_with_test_db, extract_skgnode_if_save_else_error};
 use skg::types::misc::ID;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
+use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use std::error::Error;
 
 /// Get the primary ID from any DefineNode variant.
@@ -49,7 +49,7 @@ fn test_deletions_excluded (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-deletions-excluded",
-    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
+    "tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-deletions-excluded",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
@@ -83,7 +83,7 @@ fn test_defining_node_defines (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-defining-node",
-    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
+    "tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-defining-node",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
@@ -118,7 +118,7 @@ fn test_adding_without_definer (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-adding-without-definer",
-    "tests/new/orgnodes_to_instructions/reconcile_same_id_instructions/fixtures",
+    "tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/fixtures",
     "/tmp/tantivy-test-adding-without-definer",
     |config, driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"

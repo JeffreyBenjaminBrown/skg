@@ -6,7 +6,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
+use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::SkgConfig;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -52,12 +52,12 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
       This is a foreign node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     assert!(result.is_ok(), "Unmodified foreign node should be allowed");
 
-    let (_orgnode_forest, instructions, _merge_instructions) = result?;
+    let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Foreign nodes should be filtered out (no need to write)
     assert_eq!(instructions.len(), 0,
@@ -78,7 +78,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       Original body
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail with ModifiedForeignNode error
@@ -113,7 +113,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
       MODIFIED BODY
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail with ModifiedForeignNode error
@@ -141,13 +141,13 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
       * (skg (node (id foreign3) (source foreign) indefinitive)) Foreign indefinitive node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver).await;
 
     // Should succeed - indefinitive foreign nodes are allowed but filtered
     assert!(result.is_ok(), "Indefinitive foreign node should be allowed");
 
-    let (_orgnode_forest, instructions, _merge_instructions) = result?;
+    let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Indefinitive foreign nodes should be filtered out (no append)
     assert_eq!(instructions.len(), 0,
@@ -169,13 +169,13 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
       ** (skg (node (id child2) (source main))) _
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should succeed - owned nodes can be modified
     assert!(result.is_ok(), "Owned node modification should be allowed");
 
-    let (_orgnode_forest, instructions, _merge_instructions) = result?;
+    let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Owned node should be included in instructions
     assert!(instructions.len() > 0,
@@ -196,7 +196,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       This is a foreign node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail with ModifiedForeignNode error
@@ -226,7 +226,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       This should not be allowed
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail with ModifiedForeignNode error
@@ -259,13 +259,13 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
       This is a foreign node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should succeed
     assert!(result.is_ok(), "Mixed owned and unmodified foreign should be allowed");
 
-    let (_orgnode_forest, instructions, _merge_instructions) = result?;
+    let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Only owned node should be in instructions (foreign filtered out)
     assert!(instructions.len() > 0, "Should have owned node instructions");
@@ -296,7 +296,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
       This is a foreign node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail - can't merge into foreign node (would modify it)
@@ -327,7 +327,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
       * (skg (node (id node1) (source main))) Owned node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should fail - can't merge foreign node (would delete it)
@@ -357,7 +357,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
       * (skg (node (id child1) (source main))) Child node
     "};
 
-    let result = buffer_to_orgnode_forest_and_save_instructions(
+    let result = buffer_to_viewnode_forest_and_save_instructions(
       org_text, &config, &driver ). await;
 
     // Should succeed - both nodes are owned

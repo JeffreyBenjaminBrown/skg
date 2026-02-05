@@ -5,7 +5,7 @@ use crate::dbs::typedb::search::count_relationships::{
   count_link_sources};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -26,7 +26,7 @@ struct MapsFromIdForView {
 /// Fetches relationship data from TypeDB and applies it to the forest.
 /// Forest is a single tree with BufferRoot at root.
 pub async fn set_metadata_relationship_viewdata_in_forest (
-  forest : &mut Tree<OrgNode>,
+  forest : &mut Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -46,7 +46,7 @@ pub async fn set_metadata_relationship_viewdata_in_forest (
 /// Collects all PIDs from the forest and fetches relationship data.
 #[allow(non_snake_case)]
 async fn mapsFromIdForView_from_forest (
-  forest : &Tree<OrgNode>,
+  forest : &Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
@@ -85,13 +85,13 @@ async fn fetch_relationship_data (
   }) }
 
 fn set_metadata_relationships_in_node_recursive (
-  tree       : &mut Tree<OrgNode>,
+  tree       : &mut Tree<ViewNode>,
   treeid     : NodeId,
   parent_pid : Option < &ID >,
   rel_data   : &MapsFromIdForView,
 ) {
   let opt_pid : Option < ID > =
-    if let OrgNodeKind::True ( t ) =
+    if let ViewNodeKind::True ( t ) =
       &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
     { let node_pid : ID = t.id.clone();
       t . graphStats . numContainers =

@@ -4,10 +4,10 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::complete::aliascol::completeAliasCol;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_orgnode::unchecked_to_checked_tree;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
-use skg::types::orgnode::OrgNode;
+use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
 use skg::types::skgnodemap::{SkgNodeMap, skgnode_map_from_forest};
 
@@ -47,7 +47,7 @@ async fn test_completeAliasCol_logic (
 
   let unchecked_forest =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
-  let mut forest : Tree < OrgNode > =
+  let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
@@ -111,7 +111,7 @@ async fn test_completeAliasCol_logic (
   {
     let aliascol_2_ref =
       forest . get ( aliascol_2_id ) . unwrap ();
-    let aliascol_2_new : &OrgNode = aliascol_2_ref . value ();
+    let aliascol_2_new : &ViewNode = aliascol_2_ref . value ();
     let children : Vec < String > =
       aliascol_2_ref . children () . map (
         |n| n . value() . title() . to_string() )
@@ -188,7 +188,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   let unchecked_forest =
     org_to_uninterpreted_nodes ( org_text ) ?.0;
-  let mut forest : Tree < OrgNode > =
+  let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
@@ -219,7 +219,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   {
     let aliascol_ref =
       forest . get ( first_aliascol_id ) . unwrap ();
-    let children_new : Vec < &OrgNode > =
+    let children_new : Vec < &ViewNode > =
       aliascol_ref . children ()
       . map ( |n| n . value () )
       . collect ();
@@ -259,7 +259,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   {
     let aliascol_ref =
       forest . get ( second_aliascol_id ) . unwrap ();
-    let children : Vec < &OrgNode > =
+    let children : Vec < &ViewNode > =
       aliascol_ref . children ()
       . map ( |n| n . value () )
       . collect ();

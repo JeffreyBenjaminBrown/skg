@@ -1,10 +1,10 @@
-use crate::from_text::buffer_to_orgnode_forest_and_save_instructions;
+use crate::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::types::git::{SourceDiff, NodeDiffStatus, GitDiffStatus};
 use crate::types::misc::{ID, SourceName};
 use crate::merge::merge_nodes;
-use crate::org_to_text::orgnode_forest_to_string;
+use crate::org_to_text::viewnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
 use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
@@ -14,7 +14,7 @@ use crate::to_org::render::diff::apply_diff_to_forest;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold, ViewRequest};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ViewRequest};
 use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
@@ -148,10 +148,10 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
   let (mut forest, save_instructions, merge_instructions)
-    : ( Tree<OrgNode>,
+    : ( Tree<ViewNode>,
         Vec<DefineNode>,
         Vec<Merge> )
-    = buffer_to_orgnode_forest_and_save_instructions (
+    = buffer_to_viewnode_forest_and_save_instructions (
       org_buffer_text, config, typedb_driver )
     . await . map_err (
       |e| Box::new(e) as Box<dyn Error> ) ?;
@@ -179,7 +179,7 @@ pub async fn update_from_and_rerender_buffer (
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap =
       skgnode_map_from_save_instructions ( & save_instructions );
-    let mut forest_mut : Tree<OrgNode> = forest;
+    let mut forest_mut : Tree<ViewNode> = forest;
     let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
       // Used for view request execution.
       if diff_mode_enabled
@@ -220,7 +220,7 @@ pub async fn update_from_and_rerender_buffer (
         apply_diff_to_forest (
           &mut forest_mut, diffs, config ) ?; }}
     let buffer_content : String =
-      orgnode_forest_to_string ( & forest_mut ) ?;
+      viewnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}
 
 /// Strip from the forest every branch whose root
@@ -231,29 +231,29 @@ pub async fn update_from_and_rerender_buffer (
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
 pub fn remove_all_branches_marked_removed (
-  forest : &mut Tree<OrgNode>
+  forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
     forest . root() . id();
   do_everywhere_in_tree_dfs_prunable (
     forest,
     forest_root_id,
-    &mut |mut node : NodeMut<OrgNode>| -> Result<bool, String> {
+    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_forest_root_child : bool = {
         match node . parent() {
           Some ( mut p ) =>
             matches! ( &p . value() . kind,
-                       OrgNodeKind::Scaff ( Scaffold::BufferRoot )),
+                       ViewNodeKind::Scaff ( Scaffold::BufferRoot )),
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          OrgNodeKind::True ( t ) => {
+          ViewNodeKind::True ( t ) => {
             matches! ( t . diff,
                        Some ( NodeDiffStatus::Removed ) |
                        Some ( NodeDiffStatus::RemovedHere ))
             && ! is_forest_root_child
             && ! t . parent_ignores },
-          OrgNodeKind::Scaff ( _ ) => false };
+          ViewNodeKind::Scaff ( _ ) => false };
       if should_remove {
         node . detach();
         Ok ( false ) // Prune: branch removed, so don't recurse
@@ -263,21 +263,21 @@ pub fn remove_all_branches_marked_removed (
 /// It's cheaper to regenerate these than to reconcile user edits.
 /// If a deleted branch contains focus, passes it up to the parent.
 pub fn remove_regenerable_scaffolds (
-  forest : &mut Tree<OrgNode>
+  forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
     forest . root() . id();
   do_everywhere_in_tree_dfs_prunable (
     forest,
     forest_root_id,
-    &mut |mut node : NodeMut<OrgNode>| -> Result<bool, String> {
+    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_regenerable_scaffold : bool =
         matches! ( &node . value() . kind,
-                   OrgNodeKind::Scaff ( Scaffold::IDCol ) |
-                   OrgNodeKind::Scaff ( Scaffold::ID { .. } ) |
-                   OrgNodeKind::Scaff ( Scaffold::TextChanged ) |
-                   OrgNodeKind::Scaff ( Scaffold::AliasCol ) |
-                   OrgNodeKind::Scaff ( Scaffold::Alias { .. } ));
+                   ViewNodeKind::Scaff ( Scaffold::IDCol ) |
+                   ViewNodeKind::Scaff ( Scaffold::ID { .. } ) |
+                   ViewNodeKind::Scaff ( Scaffold::TextChanged ) |
+                   ViewNodeKind::Scaff ( Scaffold::AliasCol ) |
+                   ViewNodeKind::Scaff ( Scaffold::Alias { .. } ));
       if is_regenerable_scaffold {
         let node_id : NodeId = node . id();
         if subtree_has_focus ( node . tree(), node_id )
@@ -289,10 +289,10 @@ pub fn remove_regenerable_scaffolds (
   Ok (( )) }
 
 fn subtree_has_focus (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   node_id : NodeId,
 ) -> bool {
-  let node_ref : NodeRef<OrgNode> =
+  let node_ref : NodeRef<ViewNode> =
     match tree . get ( node_id ) {
       Some ( n ) => n,
       None => return false };
@@ -307,16 +307,16 @@ fn subtree_has_focus (
 /// Scaffolds with diff fields (Alias, ID) are already removed
 /// by remove_diff_only_scaffolds before this runs.
 pub fn clear_diff_metadata (
-  forest : &mut Tree<OrgNode>
+  forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
     forest . root() . id();
   do_everywhere_in_tree_dfs (
     forest,
     forest_root_id,
-    &mut |mut node : NodeMut<OrgNode>| -> Result<(), String> {
+    &mut |mut node : NodeMut<ViewNode>| -> Result<(), String> {
       // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
-      if let OrgNodeKind::True ( t ) = &mut node . value() . kind {
+      if let ViewNodeKind::True ( t ) = &mut node . value() . kind {
         t . diff = None; }
       Ok (()) }
   ) ?;

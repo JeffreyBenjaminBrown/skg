@@ -47,7 +47,7 @@ pub struct SkgConfig {
 }
 
 /// Each source has a unique nickname, defined in the SkgConfig,
-/// used in OrgNode metadata to track provenance.
+/// used in ViewNode metadata to track provenance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SourceName ( pub String );
 

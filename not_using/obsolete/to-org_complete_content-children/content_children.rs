@@ -1,13 +1,13 @@
 // Was at crate::to_org::complete::content_children
 
-use crate::to_org::util::skgnode_and_orgnode_from_id;
+use crate::to_org::util::skgnode_and_viewnode_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnode::SkgNode;
-use crate::types::orgnode::{OrgNodeKind, OrgNode};
+use crate::types::viewnode::{ViewNodeKind, ViewNode};
 use crate::types::tree::{NodePair, PairTree};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree, with_node_mut };
-use crate::types::tree::orgnode_skgnode::reorder_children;
+use crate::types::tree::viewnode_skgnode::reorder_children;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{HashSet, HashMap};
@@ -19,7 +19,7 @@ use typedb_driver::TypeDBDriver;
 /// maintaining the correct order and creating any that need it.
 ///
 /// ASSUMES: The node's "id" field is its PID.
-pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
+pub async fn completeAndReorder_childrenOf_definitiveViewnode (
   tree    : &mut PairTree,
   node_id : NodeId,
   config  : &SkgConfig,
@@ -86,7 +86,7 @@ pub async fn completeAndReorder_childrenOf_definitiveOrgnode (
 ///
 /// SOME TERMS:
 /// - "False" content would look like content based on
-/// the orgnode tree, but without corresponding content relationships
+/// the viewnode tree, but without corresponding content relationships
 /// in the dbs. Maybe it can't happen, but the types don't prevent it.
 /// - 'Non-intentional' content would be nodes that the parent *does*
 /// contain, but marked as parentIgnores. We assume such nodes
@@ -109,8 +109,8 @@ fn partition_nonignored_true_content_from_other_children (
     tree . get ( node_id )
     . ok_or ( "Node not found in tree" ) ?;
   for child in node_ref . children () {
-    if matches! ( &child . value () . orgnode . kind,
-                  OrgNodeKind::True(t)
+    if matches! ( &child . value () . viewnode . kind,
+                  ViewNodeKind::True(t)
                   if !t.parent_ignores )
     { content_child_ids . push ( child . id () );
     } else {
@@ -131,9 +131,9 @@ fn map_skgid_to_treeid (
   for child_treeid in child_treeids {
     let child_pid : ID =
       read_at_node_in_tree ( tree, *child_treeid, |np|
-        match &np . orgnode . kind
-        { OrgNodeKind::True(t) => t.id_opt.clone(),
-          OrgNodeKind::Scaff(_) => None }
+        match &np . viewnode . kind
+        { ViewNodeKind::True(t) => t.id_opt.clone(),
+          ViewNodeKind::Scaff(_) => None }
       ) ? . ok_or ( "Content child has no ID" ) ?;
     result . insert ( child_pid, *child_treeid ); }
   Ok ( result ) }
@@ -158,7 +158,7 @@ fn mark_parentignores_and_move_invalidated_content (
   for invalid_treeid in & invalid_content_treeids {
     let child_pid : ID =
       write_at_node_in_tree ( tree, *invalid_treeid, |np| {
-        let OrgNodeKind::True(t) = &mut np . orgnode . kind
+        let ViewNodeKind::True(t) = &mut np . viewnode . kind
           else { return Err ( "Not-really-content child is not a TrueNode" ) };
         t . parent_ignores = true;
         Ok ( t . id_opt . clone () . unwrap () )
@@ -176,13 +176,13 @@ async fn append_new_definitive_nodepair_to_children_based_on_skgid (
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( skgnode, orgnode ) : ( SkgNode, OrgNode ) =
-    skgnode_and_orgnode_from_id (
+  let ( skgnode, viewnode ) : ( SkgNode, ViewNode ) =
+    skgnode_and_viewnode_from_id (
       config, driver, skgid ) . await ?;
   let new_child_id : NodeId = with_node_mut (
     tree, parent_nid,
     ( |mut parent_mut|
       parent_mut . append ( NodePair { mskgnode : Some(skgnode),
-                                       orgnode  : orgnode } )
+                                       viewnode  : viewnode } )
       . id () )) ?;
   Ok ( new_child_id ) }

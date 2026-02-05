@@ -5,7 +5,7 @@ pub mod none_node_fields_are_noops;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::SkgConfig;
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::orgnode::OrgNode;
+use crate::types::viewnode::ViewNode;
 
 use to_naive_instructions::naive_saveinstructions_from_forest;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
@@ -14,13 +14,13 @@ use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
-/// Converts a forest of OrgNodes to DefineNodes,
+/// Converts a forest of ViewNodes to DefineNodes,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// and clobbering None fields with data from disk.
 /// ASSUMES indefinitive nodes produced no instructions.
 /// (That filtering is done by 'naive_saveinstructions_from_forest'.)
-pub async fn orgnode_forest_to_nonmerge_save_instructions (
-  forest : &Tree<OrgNode>, // "forest" = tree with BufferRoot
+pub async fn viewnode_forest_to_nonmerge_save_instructions (
+  forest : &Tree<ViewNode>, // "forest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {

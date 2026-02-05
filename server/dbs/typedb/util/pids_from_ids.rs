@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::StreamExt;
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
-use crate::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
+use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
@@ -19,10 +19,10 @@ use crate::dbs::typedb::util::concept_document::{
 
 /// Collect IDs for bulk PID lookup
 pub fn collect_ids_in_tree (
-  node_ref : NodeRef < UncheckedOrgNode >,
+  node_ref : NodeRef < UncheckedViewNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let UncheckedOrgNodeKind::True ( t ) =
+  if let UncheckedViewNodeKind::True ( t ) =
     &node_ref . value () . kind
   { if let Some ( id ) = &t . id_opt
     { ids_to_lookup . push ( id . clone () ); }}
@@ -32,10 +32,10 @@ pub fn collect_ids_in_tree (
       ids_to_lookup ); } }
 
 pub fn assign_pids_throughout_tree_from_map (
-  mut node_ref : NodeMut < UncheckedOrgNode >,
+  mut node_ref : NodeMut < UncheckedViewNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let UncheckedOrgNodeKind::True(t)
+  if let UncheckedViewNodeKind::True(t)
   = &mut node_ref . value() . kind
   { let pid_opt : Option < ID > = t . id_opt . as_ref ()
       . and_then ( |id| pid_map . get ( id ) )
@@ -46,7 +46,7 @@ pub fn assign_pids_throughout_tree_from_map (
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
-        let tree : &Tree<UncheckedOrgNode> = node_ref . tree ();
+        let tree : &Tree<UncheckedViewNode> = node_ref . tree ();
         tree . get ( treeid ) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };

@@ -286,7 +286,7 @@ fn test_next_in_generation_with_deleted_node() {
 fn test_next_in_generation_across_forest_roots() {
   // Tree A (depth 2), Tree B (depth 3), Tree C (depth 2)
   let mut forest: Tree<String> =
-    // This 'forest root' is like BufferRoot from types::orgnode
+    // This 'forest root' is like BufferRoot from types::viewnode
     Tree::new("BufferRoot".to_string());
 
   // Add "tree" A with children A1, A2
@@ -340,7 +340,7 @@ fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> 
   // Tree B: has depth 4 (B -> B1 -> B11 -> B111)
   // Tree C: has depth 3 (C -> C1 -> C11)
   let mut forest: Tree<String> =
-    // This 'forest root' is like BufferRoot from types::orgnode
+    // This 'forest root' is like BufferRoot from types::viewnode
     Tree::new("BufferRoot".to_string());
 
   // Add "tree" A with child A1

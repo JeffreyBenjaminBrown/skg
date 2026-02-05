@@ -3,9 +3,9 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::tree::orgnode_skgnode::{
+use crate::types::tree::viewnode_skgnode::{
   append_indefinitive_from_disk_as_child,
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
@@ -22,20 +22,20 @@ use typedb_driver::TypeDBDriver;
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
 /// TODO ? Also check that the grandparent is a TrueNode.
 pub fn type_and_parent_type_consistent_with_subscribee (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < OrgNode > =
+  let node_ref : NodeRef < ViewNode > =
     tree . get ( node_id )
     . ok_or ( "type_and_parent_type_consistent_with_subscribee: node not found" ) ?;
   let is_truenode : bool = matches! (
     & node_ref . value () . kind,
-    OrgNodeKind::True ( _ ));
+    ViewNodeKind::True ( _ ));
   let parent_is_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
-              OrgNodeKind::Scaff ( Scaffold::SubscribeeCol )))
+              ViewNodeKind::Scaff ( Scaffold::SubscribeeCol )))
     . unwrap_or ( false );
   Ok ( is_truenode && parent_is_subscribee_col ) }
 
@@ -44,21 +44,21 @@ pub fn type_and_parent_type_consistent_with_subscribee (
 /// - if any hidden nodes are outside subscribee content,
 ///   a HiddenOutsideOfSubscribeeCol
 pub async fn maybe_add_subscribeeCol_branch (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  { let node_kind: OrgNodeKind =
+  { let node_kind: ViewNodeKind =
       read_at_node_in_tree (
-        tree, node_id, |orgnode| orgnode.kind.clone() )
+        tree, node_id, |viewnode| viewnode.kind.clone() )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
     match node_kind {
-      OrgNodeKind::Scaff ( _ ) =>
+      ViewNodeKind::Scaff ( _ ) =>
         return Err ( "maybe_add_subscribeeCol_branch: \
                       caller should not pass a Scaffold".into() ),
-      OrgNodeKind::True ( t ) => // skip indefinitive nodes
+      ViewNodeKind::True ( t ) => // skip indefinitive nodes
         if t.indefinitive { return Ok(( )) }} }
   { // Skip if there already is one.
     // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
@@ -110,7 +110,7 @@ pub async fn maybe_add_subscribeeCol_branch (
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubsribeeCol -> Subscribee
 pub async fn maybe_add_hiddenInSubscribeeCol_branch (
-  tree              : &mut Tree<OrgNode>,
+  tree              : &mut Tree<ViewNode>,
   map               : &mut SkgNodeMap,
   subscribee_treeid : NodeId,
   config            : &SkgConfig,

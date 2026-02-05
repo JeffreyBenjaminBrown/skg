@@ -1,5 +1,5 @@
 /// PITFALL: ASSUMES IDs have been replaced by PIDs
-/// in the 'id' field of every OrgNode.
+/// in the 'id' field of every ViewNode.
 /// (Currently, 'add_missing_info_to_forest' does this.)
 /// .
 /// THE IDEA
@@ -76,7 +76,7 @@ pub fn collect_dup_instructions(
 /// - Exactly 1 Save (validation ensures no duplicates), OR
 /// - 1+ Delete instructions (all equivalent)
 /// This function either supplements the single Save
-/// with disk data -- replacing None fields in the OrgNode
+/// with disk data -- replacing None fields in the ViewNode
 /// with the same field from disk, and including all the extra IDs
 /// -- or else returns the Delete instruction.
 pub async fn reconcile_same_id_instructions_for_one_id(
@@ -157,7 +157,7 @@ async fn build_supplemented_save(
   Ok(SaveNode(supplemented_node)) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
-/// MOTIVATION: An OrgNode uses only one ID,
+/// MOTIVATION: An ViewNode uses only one ID,
 /// while a SkgNode can have many.
 fn supplement_ids(
   from_buffer: &SkgNode,

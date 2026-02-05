@@ -1,10 +1,10 @@
 use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
-use crate::to_org::complete::contents::clobberIndefinitiveOrgnode;
+use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::orgnode::ViewRequest;
-use crate::types::orgnode::{
-    mk_definitive_orgnode, OrgNode, OrgNodeKind, forest_root_orgnode };
+use crate::types::viewnode::ViewRequest;
+use crate::types::viewnode::{
+    mk_definitive_viewnode, ViewNode, ViewNodeKind, forest_root_viewnode };
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
@@ -31,35 +31,35 @@ pub type DefinitiveMap =
 
 
 // ======================================================
-// Fetching, building and modifying SkgNodes and OrgNodes
+// Fetching, building and modifying SkgNodes and ViewNodes
 // ======================================================
 
 /// Fetch a SkgNode from disk (queries TypeDB for source).
-/// Make an OrgNode from it, with validated title.
+/// Make an ViewNode from it, with validated title.
 /// Return both.
-pub async fn skgnode_and_orgnode_from_id (
+pub async fn skgnode_and_viewnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID,
   map    : &mut SkgNodeMap,
-) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, SourceName) =
     pid_and_source_from_id( // Query TypeDB for them
       &config.db_name, driver, skgid).await?
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
-  skgnode_and_orgnode_from_pid_and_source (
+  skgnode_and_viewnode_from_pid_and_source (
     config, &pid_resolved, &source, map ) }
 
 /// Fetch a SkgNode from disk given PID and source.
-/// Make an OrgNode from it, with validated title.
+/// Make an ViewNode from it, with validated title.
 /// Return both.
-pub(super) fn skgnode_and_orgnode_from_pid_and_source (
+pub(super) fn skgnode_and_viewnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
   map    : &mut SkgNodeMap,
-) -> Result < ( SkgNode, OrgNode ), Box<dyn Error> > {
+) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( pid, map, config, source )?;
   let title : String = skgnode . title . replace ( '\n', " " );
@@ -68,43 +68,43 @@ pub(super) fn skgnode_and_orgnode_from_pid_and_source (
       io::ErrorKind::InvalidData,
       format! ( "SkgNode with ID {} has an empty title",
                  pid ), )) ); }
-  let orgnode : OrgNode = mk_definitive_orgnode (
+  let viewnode : ViewNode = mk_definitive_viewnode (
     pid . clone (),
     source . clone (),
     title,
     skgnode . body . clone () );
-  Ok (( skgnode . clone (), orgnode )) }
+  Ok (( skgnode . clone (), viewnode )) }
 
 /// Set 'indefinitive' to true,
 /// reset title and source,
 /// and set body to None.
 pub(super) fn makeIndefinitiveAndClobber (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   write_at_node_in_tree (
     tree, node_id,
-    |orgnode| {
-      let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-        &mut orgnode.kind
+    |viewnode| {
+      let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+        &mut viewnode.kind
         else { panic! (
                  "makeIndefinitiveAndClobber: expected TrueNode" ) };
       t . indefinitive = true; }
     ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-  clobberIndefinitiveOrgnode ( tree, map, node_id, config ) ?;
+  clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
-/// (skgnode, orgnode) pair to the tree.
+/// (skgnode, viewnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
 /// (and later will require even more, probably),
 /// which this function does:
 /// - handle repeats, cycles and the visited map
 /// - build a subscribee branch if needed
 pub async fn complete_branch_minus_content (
-  tree     : &mut Tree<OrgNode>,
+  tree     : &mut Tree<ViewNode>,
   map      : &mut SkgNodeMap,
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
@@ -115,7 +115,7 @@ pub async fn complete_branch_minus_content (
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
-  { clobberIndefinitiveOrgnode (
+  { clobberIndefinitiveViewnode (
       tree, map, node_id, config ) ?; }
   maybe_add_subscribeeCol_branch (
     tree, map, node_id, config, driver ) . await ?;
@@ -129,7 +129,7 @@ pub async fn complete_branch_minus_content (
 /// with marking things indefinitive, because the defmap
 /// is how we know whether to mark something indefinitive.
 pub fn make_indef_if_repeat_then_extend_defmap (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
@@ -138,9 +138,9 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let is_indefinitive : bool =
     write_at_node_in_tree ( // PITFALL: Does more than read.
       tree, node_id,
-      |orgnode|
-        { let OrgNodeKind::True ( t ) : &mut OrgNodeKind
-            = &mut orgnode.kind
+      |viewnode|
+        { let ViewNodeKind::True ( t ) : &mut ViewNodeKind
+            = &mut viewnode.kind
             else { unreachable!( "In make_indef_if_repeat_then_extend_defmap, get_id_from_treenode already verified TrueNode"); };
           if defMap . contains_key ( &pid )
             { // It's a repeat, so make it indefinitive.
@@ -154,15 +154,15 @@ pub fn make_indef_if_repeat_then_extend_defmap (
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
 pub fn detect_and_mark_cycle (
-  tree    : &mut Tree<OrgNode>,
+  tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_node_in_tree ( tree, node_id, |orgnode| {
-    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-      &mut orgnode.kind
+  write_at_node_in_tree ( tree, node_id, |viewnode| {
+    let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+      &mut viewnode.kind
       else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
     t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
@@ -181,8 +181,8 @@ pub async fn stub_forest_from_root_ids (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
-) -> Result < (Tree<OrgNode>, SkgNodeMap), Box<dyn Error> > {
-  let mut forest : Tree<OrgNode> = Tree::new ( forest_root_orgnode () );
+) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
+  let mut forest : Tree<ViewNode> = Tree::new ( forest_root_viewnode () );
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   let forest_root_treeid : NodeId = forest . root () . id ();
   for root_skgid in root_skgids {
@@ -194,19 +194,19 @@ pub async fn stub_forest_from_root_ids (
   Ok ( (forest, map) ) }
 
 pub fn collect_ids_from_tree (
-  tree : &Tree<OrgNode>,
+  tree : &Tree<ViewNode>,
 ) -> Vec < ID > {
   let mut pids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open ( node_ref ) = edge {
-      if let OrgNodeKind::True ( t ) = &node_ref . value () . kind {
+      if let ViewNodeKind::True ( t ) = &node_ref . value () . kind {
         pids . push ( t . id . clone( )); }} }
   pids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
 fn is_ancestor_id (
-  tree          : &Tree<OrgNode>,
+  tree          : &Tree<ViewNode>,
   origin_treeid : NodeId,
   target_skgid  : &ID,
 ) -> Result<bool, Box<dyn Error>> {
@@ -215,9 +215,9 @@ fn is_ancestor_id (
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
-      |orgnode| match &orgnode . kind {
-        OrgNodeKind::True ( t ) => Some ( t . id . clone () ),
-        OrgNodeKind::Scaff ( _ ) => None } )
+      |viewnode| match &viewnode . kind {
+        ViewNodeKind::True ( t ) => Some ( t . id . clone () ),
+        ViewNodeKind::Scaff ( _ ) => None } )
     { Ok(Some(id)) if &id == target_skgid
         => return Ok(true),
       Ok(_) => continue,
@@ -226,15 +226,15 @@ fn is_ancestor_id (
 
 /// Errors if the node is a Scaffold or not found.
 pub fn get_id_from_treenode (
-  tree   : &Tree<OrgNode>,
+  tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  let node_kind: OrgNodeKind =
+  let node_kind: ViewNodeKind =
     read_at_node_in_tree (
-      tree, treeid, |orgnode| orgnode.kind.clone() )?;
+      tree, treeid, |viewnode| viewnode.kind.clone() )?;
   match node_kind {
-    OrgNodeKind::Scaff ( _ ) => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
-    OrgNodeKind::True ( t ) => Ok ( t . id ) }}
+    ViewNodeKind::Scaff ( _ ) => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
+    ViewNodeKind::True ( t ) => Ok ( t . id ) }}
 
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
@@ -246,7 +246,7 @@ pub fn get_id_from_treenode (
 /// or they can all be done at once via
 /// 'build_node_branch_minus_content.
 pub async fn make_and_append_child_pair (
-  tree          : &mut Tree<OrgNode>,
+  tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   parent_treeid : NodeId, // will parent the new node
   child_skgid   : &ID, // how to find the new node
@@ -254,14 +254,14 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (_child_skgnode, child_orgnode) : (SkgNode, OrgNode) =
-    skgnode_and_orgnode_from_id (
+  let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
+    skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
       tree, parent_treeid,
       ( |mut parent_mut|
-        parent_mut . append(child_orgnode) . id() ))
+        parent_mut . append(child_viewnode) . id() ))
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok ( child_treeid ) }
 
@@ -273,7 +273,7 @@ pub async fn make_and_append_child_pair (
 /// - If tree_and_parent is Some and map is Some:
 ///   appends to tree
 pub async fn build_node_branch_minus_content (
-  tree_and_parent : Option<(&mut Tree<OrgNode>, NodeId)>, // if modifying an existing tree, attach as a child here
+  tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>, // if modifying an existing tree, attach as a child here
   map             : Option<&mut SkgNodeMap>,
   skgid           : &ID, // what to fetch
   config          : &SkgConfig,
@@ -282,14 +282,14 @@ pub async fn build_node_branch_minus_content (
 ) -> Result < NodeId, Box<dyn Error> > {
   match (tree_and_parent, map) {
     (Some ( (tree, parent_treeid) ), Some(map)) => {
-      let (_skgnode, orgnode) : (SkgNode, OrgNode) =
-        skgnode_and_orgnode_from_id (
+      let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+        skgnode_and_viewnode_from_id (
           config, driver, skgid, map ) . await ?;
-      let child_treeid : NodeId = // Add OrgNode to tree
+      let child_treeid : NodeId = // Add ViewNode to tree
         with_node_mut (
           tree, parent_treeid,
           ( |mut parent_mut|
-            parent_mut . append ( orgnode ) . id () ))
+            parent_mut . append ( viewnode ) . id () ))
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
       complete_branch_minus_content (
         tree, map, child_treeid, visited,
@@ -298,11 +298,11 @@ pub async fn build_node_branch_minus_content (
     (None, None) => {
       let mut map : SkgNodeMap =
         SkgNodeMap::new ();
-      let (_skgnode, orgnode) : (SkgNode, OrgNode) =
-        skgnode_and_orgnode_from_id (
+      let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+        skgnode_and_viewnode_from_id (
           config, driver, skgid, &mut map ) . await ?;
-      let mut tree : Tree<OrgNode> =
-        Tree::new ( orgnode );
+      let mut tree : Tree<ViewNode> =
+        Tree::new ( viewnode );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, &mut map, root_treeid, visited,
@@ -315,7 +315,7 @@ pub async fn build_node_branch_minus_content (
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
 /// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
-  tree   : &Tree<OrgNode>,
+  tree   : &Tree<ViewNode>,
   map    : &SkgNodeMap,
   treeid : NodeId,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
@@ -338,7 +338,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
 /// If effective root is None,
 /// the true root is used as the effective root.
 pub(super) fn nodes_after_in_generation (
-  tree                     : &Tree<OrgNode>,
+  tree                     : &Tree<ViewNode>,
   generation               : usize,
   generation_member_treeid : NodeId,
   effective_root           : Option < NodeId >,
@@ -356,30 +356,30 @@ pub(super) fn nodes_after_in_generation (
 
 
 // ==============================================
-// Reading from SkgNodes and OrgNodes, esp. in trees
+// Reading from SkgNodes and ViewNodes, esp. in trees
 // ==============================================
 
 /// Check if a TrueNode is indefinitive.
 /// Errs if given a Scaffold.
 pub fn truenode_in_tree_is_indefinitive (
-  tree   : &Tree<OrgNode>,
+  tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_kind: OrgNodeKind =
+  let node_kind: ViewNodeKind =
     read_at_node_in_tree ( tree, treeid,
-                           |orgnode| orgnode.kind.clone() )
+                           |viewnode| viewnode.kind.clone() )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   match node_kind {
-    OrgNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
-    OrgNodeKind::True (t)  => Ok (t.indefinitive) }}
+    ViewNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
+    ViewNodeKind::True (t)  => Ok (t.indefinitive) }}
 
 /// Collect all child tree NodeIds from a node.
 /// Returns an error if the node is not found.
 pub fn collect_child_treeids (
-  tree    : &Tree<OrgNode>,
+  tree    : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let node_ref : NodeRef < OrgNode > =
+  let node_ref : NodeRef < ViewNode > =
     tree . get ( treeid )
     . ok_or ( "collect_child_treeids: NodeId not in tree" ) ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
@@ -400,13 +400,13 @@ pub(super) fn remove_completed_view_request<T> (
   errors       : &mut Vec < String >,
   result       : Result < (), Box<dyn Error> >,
 ) -> Result < (), Box<dyn Error> >
-where T: AsMut<OrgNode>,
+where T: AsMut<ViewNode>,
 {
   if let Err ( e ) = result {
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut : NodeMut<T> =
     tree . get_mut (node_id) . ok_or ( "remove_completed_view_request: node not found" ) ?;
-  if let OrgNodeKind::True ( t )
+  if let ViewNodeKind::True ( t )
     = &mut node_mut . value () . as_mut () . kind
     { t . view_requests . remove ( &view_request ); }
   Ok (()) }

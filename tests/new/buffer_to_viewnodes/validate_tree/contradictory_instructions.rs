@@ -2,12 +2,12 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_forest_root_orgnode};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_forest_root_viewnode};
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::from_text::buffer_to_orgnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
 
@@ -21,7 +21,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
         "};
 
-  let forest_consistent: Tree<UncheckedOrgNode> =
+  let forest_consistent: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input_consistent).unwrap().0;
   let (inconsistent_ids_consistent, _, _) =
     find_inconsistent_instructions(&forest_consistent);
@@ -37,7 +37,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id conflict2))) another conflict end
         "};
 
-  let forest_inconsistent: Tree<UncheckedOrgNode> =
+  let forest_inconsistent: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input_inconsistent).unwrap().0;
   let (inconsistent_ids, _, _) = find_inconsistent_instructions(&forest_inconsistent);
 
@@ -53,14 +53,14 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id valid_node))) only node with id
         "};
 
-  let forest_no_ids: Tree<UncheckedOrgNode> =
+  let forest_no_ids: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input_no_ids).unwrap().0;
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
   assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty forest (just BufferRoot, no tree roots)
-  let empty_forest: Tree<UncheckedOrgNode> =
-    Tree::new(unchecked_forest_root_orgnode());
+  let empty_forest: Tree<UncheckedViewNode> =
+    Tree::new(unchecked_forest_root_viewnode());
   let (inconsistent_empty, _, _) =
     find_inconsistent_instructions(&empty_forest);
   assert_eq!(inconsistent_empty.len(), 0,
@@ -89,20 +89,20 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let forest: Tree<UncheckedOrgNode> =
+      let forest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
+        .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
         .collect();
 
       assert_eq!(multiple_defining_errors.len(), 1,
-                 "Should find exactly 1 Multiple_Defining_Orgnodes error for the problematic ID");
+                 "Should find exactly 1 Multiple_Defining_Viewnodes error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let BufferValidationError::Multiple_Defining_Orgnodes(id) = multiple_defining_errors[0] {
+      if let BufferValidationError::Multiple_Defining_Viewnodes(id) = multiple_defining_errors[0] {
         assert_eq!(id.0, "duplicate",
-                   "Multiple_Defining_Orgnodes error should come from the duplicate ID"); }
+                   "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }

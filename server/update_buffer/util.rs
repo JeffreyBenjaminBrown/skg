@@ -1,4 +1,4 @@
-use crate::types::orgnode::OrgNode;
+use crate::types::viewnode::ViewNode;
 use crate::types::tree::generic::with_node_mut;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -82,29 +82,29 @@ pub fn move_child_to_end<Node> (
     .map_err( |e| -> Box<dyn Error> { e.into() } )?;
   Ok( () ) }
 
-/// OrgNode-specialized version of complete_relevant_children.
+/// ViewNode-specialized version of complete_relevant_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'parent_id'
-pub fn complete_relevant_children_in_orgnodetree<Orderkey, Relevant, View> (
-  tree                : &mut Tree<OrgNode>,
+pub fn complete_relevant_children_in_viewnodetree<Orderkey, Relevant, View> (
+  tree                : &mut Tree<ViewNode>,
   parent_id           : NodeId,
   relevant            : Relevant,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
-  create_child        : impl Fn(&Orderkey) -> OrgNode,
+  create_child        : impl Fn(&Orderkey) -> ViewNode,
 ) -> Result<(), Box<dyn Error>>
 where
-  Relevant : Fn(&OrgNode) -> bool,
-  View     : Fn(&OrgNode) -> Orderkey,
+  Relevant : Fn(&ViewNode) -> bool,
+  View     : Fn(&ViewNode) -> Orderkey,
   Orderkey : Eq + Hash + Clone,
 {
   let problem_discard =
-    |tree: &Tree<OrgNode>, node_id: NodeId| -> Result<bool, String> {
-      subtree_satisfies( tree, node_id, &|n: &OrgNode| n.focused ) };
+    |tree: &Tree<ViewNode>, node_id: NodeId| -> Result<bool, String> {
+      subtree_satisfies( tree, node_id, &|n: &ViewNode| n.focused ) };
   let problem_discard_response =
-    |n: &mut OrgNode| { n.focused = true; };
+    |n: &mut ViewNode| { n.focused = true; };
   complete_relevant_children(
     tree,
     parent_id,

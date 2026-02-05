@@ -106,7 +106,7 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_Scaffold(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::Multiple_Defining_Orgnodes(id) => {
+    BufferValidationError::Multiple_Defining_Viewnodes(id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
               id.0) },
     BufferValidationError::AmbiguousDeletion(id) => {
@@ -118,7 +118,7 @@ fn format_buffer_validation_error (
     BufferValidationError::InconsistentSources(id, sources) => {
       let source_list: Vec<String> =
         sources.iter().map(|s| s.0.clone()).collect();
-      format!( "Multiple orgnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
+      format!( "Multiple viewnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
               id.0, source_list) },
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",

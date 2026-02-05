@@ -11,9 +11,9 @@ mod util {
 }
 
 use skg::to_org::render::content_view::single_root_view;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::orgnode::{OrgNode, OrgNodeKind};
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::viewnode::{ViewNode, ViewNodeKind};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -359,10 +359,10 @@ async fn test_recursive_document (
       &ID ( "a".to_string () ),
       false
     ) . await ?;
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
-  let result_forest : Tree<OrgNode> =
+  let result_forest : Tree<ViewNode> =
     unchecked_to_checked_tree ( unchecked_forest )
     . map_err ( |e| format! ( "Check error: {}", e ) ) ?;
 
@@ -372,12 +372,12 @@ async fn test_recursive_document (
     "Expected exactly 1 root node" );
 
   let root_node_ref = &tree_roots[0];
-  let root_node : &OrgNode = root_node_ref . value ();
+  let root_node : &ViewNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert! ( matches! ( &root_node.kind, OrgNodeKind::True (_) ),
+  assert! ( matches! ( &root_node.kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let OrgNodeKind::True ( root_t ) = &root_node.kind
+  let ViewNodeKind::True ( root_t ) = &root_node.kind
     else { unreachable!() };
   assert_eq! ( &root_t.id, &ID::from ("a"),
     "Root node should have id 'a'" );
@@ -388,11 +388,11 @@ async fn test_recursive_document (
   let mut root_children = root_node_ref . children ();
   let b_node_ref = root_children . next ()
     . expect ( "Root should have child 'b'" );
-  let b_node : &OrgNode = b_node_ref . value ();
+  let b_node : &ViewNode = b_node_ref . value ();
 
-  assert! ( matches! ( &b_node.kind, OrgNodeKind::True (_) ),
+  assert! ( matches! ( &b_node.kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let OrgNodeKind::True ( b_t ) = &b_node.kind
+  let ViewNodeKind::True ( b_t ) = &b_node.kind
     else { unreachable!() };
   assert_eq! ( &b_t.id, &ID::from ("b"),
     "First child should have id 'b'" );
@@ -407,11 +407,11 @@ async fn test_recursive_document (
   let mut b_children = b_node_ref . children ();
   let c_node_ref = b_children . next ()
     . expect ( "Node 'b' should have child 'c'" );
-  let c_node : &OrgNode = c_node_ref . value ();
+  let c_node : &ViewNode = c_node_ref . value ();
 
-  assert! ( matches! ( &c_node.kind, OrgNodeKind::True (_) ),
+  assert! ( matches! ( &c_node.kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let OrgNodeKind::True ( c_t ) = &c_node.kind
+  let ViewNodeKind::True ( c_t ) = &c_node.kind
     else { unreachable!() };
   assert_eq! ( &c_t.id, &ID::from ("c"),
     "Child of 'b' should have id 'c'" );
@@ -422,11 +422,11 @@ async fn test_recursive_document (
   let mut c_children = c_node_ref . children ();
   let b_repeat_ref = c_children . next ()
     . expect ( "Node 'c' should have child 'b' (repeated)" );
-  let b_repeat : &OrgNode = b_repeat_ref . value ();
+  let b_repeat : &ViewNode = b_repeat_ref . value ();
 
-  assert! ( matches! ( &b_repeat.kind, OrgNodeKind::True (_) ),
+  assert! ( matches! ( &b_repeat.kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let OrgNodeKind::True ( b_repeat_t ) = &b_repeat.kind
+  let ViewNodeKind::True ( b_repeat_t ) = &b_repeat.kind
     else { unreachable!() };
   assert_eq! ( &b_repeat_t.id, &ID::from ("b"),
     "Child of 'c' should have id 'b'" );

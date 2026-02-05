@@ -3,10 +3,10 @@
 use indoc::indoc;
 use ego_tree::Tree;
 use regex::Regex;
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_forest_root_orgnode};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_forest_root_viewnode};
 use skg::types::errors::BufferValidationError;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
 
@@ -34,7 +34,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
             "};
 
       let (forest, parsing_errors)
-        : (Tree<UncheckedOrgNode>, Vec<BufferValidationError>)
+        : (Tree<UncheckedViewNode>, Vec<BufferValidationError>)
         = org_to_uninterpreted_nodes(
             input_with_errors).unwrap();
       let validation_errors: Vec<BufferValidationError> =
@@ -93,16 +93,16 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
           assert_eq!(id.0, "conflict",
                      "AmbiguousDeletion error should come from conflicting ID"); }}
 
-      // Multiple_Defining_Orgnodes
+      // Multiple_Defining_Viewnodes
       { let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
+          .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
           .collect();
         assert_eq!(multiple_defining_errors.len(), 1,
-                   "Should find 1 Multiple_Defining_Orgnodes error");
-        if let BufferValidationError::Multiple_Defining_Orgnodes(id)
+                   "Should find 1 Multiple_Defining_Viewnodes error");
+        if let BufferValidationError::Multiple_Defining_Viewnodes(id)
           = multiple_defining_errors[0] {
           assert_eq!(id.0, "conflict",
-                     "Multiple_Defining_Orgnodes error should come from conflicting ID"); }}
+                     "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
       // Source validation (bad_child and alias_child have no sources)
       { let source_re = Regex::new(r"(?i)must.*source").unwrap();
@@ -171,7 +171,7 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let (forest, parsing_errors): (Tree<UncheckedOrgNode>, Vec<BufferValidationError>) =
+      let (forest, parsing_errors): (Tree<UncheckedViewNode>, Vec<BufferValidationError>) =
         org_to_uninterpreted_nodes(valid_input).unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver).await?;
 
@@ -190,7 +190,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (forest with just BufferRoot, no tree roots)
-      let empty_forest: Tree<UncheckedOrgNode> = Tree::new(unchecked_forest_root_orgnode());
+      let empty_forest: Tree<UncheckedViewNode> = Tree::new(unchecked_forest_root_viewnode());
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
 
       assert_eq!(errors.len(), 0, "Should find no errors in empty input");
@@ -216,7 +216,7 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
                 *** (skg alias) Second alias
             "};
 
-      let forest: Tree<UncheckedOrgNode> =
+      let forest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -251,7 +251,7 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
                 ** (skg (node (id 1))) 1
             "};
 
-      let forest: Tree<UncheckedOrgNode> =
+      let forest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -290,7 +290,7 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
                 ** (skg (node (id 2))) 2
             "};
 
-      let forest: Tree<UncheckedOrgNode> =
+      let forest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -321,7 +321,7 @@ fn test_root_without_source_validation(
                 * (skg (node (id root2))) Root without source (invalid)
             "};
 
-      let forest: Tree<UncheckedOrgNode> =
+      let forest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes(input).unwrap().0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&forest, config, driver).await?;
@@ -357,7 +357,7 @@ fn test_nonexistent_source_validation(
                   ** (skg (node (id child1) (source nonexistent))) Child with invalid source
                   * (skg (node (id root2) (source invalid_source))) Root with nonexistent source
               "};
-        let forest: Tree<UncheckedOrgNode> =
+        let forest: Tree<UncheckedViewNode> =
           org_to_uninterpreted_nodes(input).unwrap().0;
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&forest, config, driver).await?;

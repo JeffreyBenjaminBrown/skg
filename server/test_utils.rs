@@ -4,13 +4,13 @@ use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::from_text::buffer_to_orgnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
-use crate::serve::parse_metadata_sexp::OrgnodeMetadata;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
+use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
-use crate::types::orgnode::OrgNode;
+use crate::types::viewnode::ViewNode;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
-use crate::types::unchecked_orgnode::{ UncheckedOrgNode, UncheckedOrgNodeKind, checked_to_unchecked_tree };
+use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind, checked_to_unchecked_tree };
 
 use ego_tree::{Tree, NodeRef};
 use futures::StreamExt;
@@ -227,9 +227,9 @@ pub fn compare_headlines_modulo_id(
         // One has an ID and the other doesn't, so they are unequal.
         return false; }
       // Strip IDs from both (no-op if no ID present) and compare
-      let stripped_metadata1: Option<OrgnodeMetadata> =
+      let stripped_metadata1: Option<ViewnodeMetadata> =
         strip_id_from_metadata_struct(metadata1);
-      let stripped_metadata2: Option<OrgnodeMetadata> =
+      let stripped_metadata2: Option<ViewnodeMetadata> =
         strip_id_from_metadata_struct(metadata2);
       (level1, stripped_metadata1, title1) ==
         (level2, stripped_metadata2, title2) },
@@ -240,81 +240,81 @@ pub fn compare_headlines_modulo_id(
     _ => false,  // One is headline, other is not, or they have different errors
   }}
 
-/// Compare two UncheckedOrgNode trees by DFS.
+/// Compare two UncheckedViewNode trees by DFS.
 /// (PITFALL: Naive comparison of trees just compares NodeIds,
 /// which are nearly meaningless.)
-pub fn compare_orgnode_trees (
-  node1 : NodeRef < UncheckedOrgNode >,
-  node2 : NodeRef < UncheckedOrgNode >
+pub fn compare_viewnode_trees (
+  node1 : NodeRef < UncheckedViewNode >,
+  node2 : NodeRef < UncheckedViewNode >
 ) -> bool {
-  let n1 : & UncheckedOrgNode =
+  let n1 : & UncheckedViewNode =
     node1 . value ();
-  let n2 : & UncheckedOrgNode =
+  let n2 : & UncheckedViewNode =
     node2 . value ();
   if n1 != n2 { return false; }
   { // recurse
-    let children1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    let children1 : Vec < NodeRef < '_, UncheckedViewNode >> =
       node1 . children () . collect ();
-    let children2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    let children2 : Vec < NodeRef < '_, UncheckedViewNode >> =
       node2 . children () . collect ();
     children1 . len () == children2 . len () &&
       children1 . iter () . zip ( children2 . iter () )
       . all ( | ( c1, c2 ) |
-              compare_orgnode_trees ( *c1, *c2 )) }}
+              compare_viewnode_trees ( *c1, *c2 )) }}
 
 /// Compares ignoring ID value but not ID presence/absence.
-pub fn compare_orgnode_trees_modulo_id(
-  forest1: &Tree<UncheckedOrgNode>,
-  forest2: &Tree<UncheckedOrgNode>
+pub fn compare_viewnode_trees_modulo_id(
+  forest1: &Tree<UncheckedViewNode>,
+  forest2: &Tree<UncheckedViewNode>
 ) -> bool {
-  let root1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+  let root1 : Vec < NodeRef < '_, UncheckedViewNode >> =
     forest1.root().children().collect();
-  let root2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+  let root2 : Vec < NodeRef < '_, UncheckedViewNode >> =
     forest2.root().children().collect();
   if root1.len() != root2.len() {
     return false; }
   for (tree1, tree2) in root1.iter().zip(root2.iter()) {
-    if !compare_two_orgnode_branches_recursively_modulo_id(
+    if !compare_two_viewnode_branches_recursively_modulo_id(
       *tree1, *tree2 )
     { return false; }}
   true }
 
-/// Compare two UncheckedOrgNode subtrees, ignoring ID values.
-fn compare_two_orgnode_branches_recursively_modulo_id (
-  node1: NodeRef<UncheckedOrgNode>,
-  node2: NodeRef<UncheckedOrgNode>
+/// Compare two UncheckedViewNode subtrees, ignoring ID values.
+fn compare_two_viewnode_branches_recursively_modulo_id (
+  node1: NodeRef<UncheckedViewNode>,
+  node2: NodeRef<UncheckedViewNode>
 ) -> bool {
-  let n1 : &UncheckedOrgNode = node1.value();
-  let n2 : &UncheckedOrgNode = node2.value();
+  let n1 : &UncheckedViewNode = node1.value();
+  let n2 : &UncheckedViewNode = node2.value();
   match (&n1.kind, &n2.kind) {
-    ( UncheckedOrgNodeKind::True(_),
-      UncheckedOrgNodeKind::True(t2)) =>
+    ( UncheckedViewNodeKind::True(_),
+      UncheckedViewNodeKind::True(t2)) =>
     { // Copy the ID from one to the other, then compare.
-      let mut n1_copy : UncheckedOrgNode =
+      let mut n1_copy : UncheckedViewNode =
         n1.clone();
-      if let UncheckedOrgNodeKind::True(t) = &mut n1_copy.kind {
+      if let UncheckedViewNodeKind::True(t) = &mut n1_copy.kind {
         t.id_opt = t2.id_opt.clone(); }
       if n1_copy != *n2 { return false; }}
-    ( UncheckedOrgNodeKind::Scaff(_),
-      UncheckedOrgNodeKind::Scaff(_)) =>
+    ( UncheckedViewNodeKind::Scaff(_),
+      UncheckedViewNodeKind::Scaff(_)) =>
     { if n1 != n2 { return false; }}
     _ => return false, // mismatched kinds
   }
   { // Recurse on children
-    let children1 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    let children1 : Vec < NodeRef < '_, UncheckedViewNode >> =
       node1.children().collect();
-    let children2 : Vec < NodeRef < '_, UncheckedOrgNode >> =
+    let children2 : Vec < NodeRef < '_, UncheckedViewNode >> =
       node2.children().collect();
     ( children1.len() == children2.len() &&
       children1 . iter() . zip(children2.iter())
       . all (|(c1, c2)|
-             compare_two_orgnode_branches_recursively_modulo_id(
+             compare_two_viewnode_branches_recursively_modulo_id(
                *c1, *c2)) ) }}
 
 /// Remove ID from metadata struct while preserving other metadata
 fn strip_id_from_metadata_struct(
-  metadata: Option<OrgnodeMetadata>
-) -> Option<OrgnodeMetadata> {
+  metadata: Option<ViewnodeMetadata>
+) -> Option<ViewnodeMetadata> {
   metadata.map(|mut meta| {
     meta.id = None;
     meta

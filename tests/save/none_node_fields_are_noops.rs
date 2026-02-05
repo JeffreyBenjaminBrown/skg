@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use skg::from_text::orgnodes_to_instructions::none_node_fields_are_noops::
+use skg::from_text::viewnodes_to_instructions::none_node_fields_are_noops::
   noneclobber_skgnode;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};

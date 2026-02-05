@@ -4,18 +4,18 @@
 // so revising these tests feels low-priority.)
 
 use indoc::indoc;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, unchecked_to_checked_tree};
-use skg::from_text::orgnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
 use skg::test_utils::extract_skgnode_if_save_else_error;
-use skg::types::orgnode::{OrgNode, forest_root_orgnode};
+use skg::types::viewnode::{ViewNode, forest_root_viewnode};
 use skg::types::misc::ID;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::skgnode::SkgNode;
 use ego_tree::Tree;
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_basic() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
   let input: &str =
     indoc! {"
             * (skg (node (id root1) (source main))) root node 1
@@ -26,9 +26,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_basic() {
             Root 2 body
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -67,7 +67,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_basic() {
       panic!("Expected Delete, got Save") }; }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -79,9 +79,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
             Content body
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -111,7 +111,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_with_aliases() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_no_aliases() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_no_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id node1) (source main))) node without aliases
@@ -120,9 +120,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_no_aliases() {
             Child body
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -137,7 +137,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_no_aliases() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
   // Multiple AliasCols under the same node is invalid
   // (validate_tree rejects this). The function should error.
   let input: &str =
@@ -151,9 +151,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
             ** (skg (node (id content1) (source main))) content node
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let result : Result<Vec<DefineNode>, String> =
     naive_saveinstructions_from_forest(forest);
@@ -163,7 +163,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_mixed_relations() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root node
@@ -175,9 +175,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_mixed_relations() {
             ** (skg (node (id none_rel) (source main) parentIgnores)) parentIgnores relation child
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -195,7 +195,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_mixed_relations() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_deep_nesting() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"
             * (skg (node (id level1) (source main))) level 1
@@ -205,9 +205,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_deep_nesting() {
             ** (skg (node (id level2b) (source main))) level 2b
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -237,16 +237,16 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_deep_nesting() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_error_missing_id() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_error_missing_id() {
   let input: &str =
     indoc! {"
             * (skg (node (id good_node) (source main))) good node
             * node without ID
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let result : Result<Tree<OrgNode>, String> =
+  let result : Result<Tree<ViewNode>, String> =
     // This conversion fails because of missing ID
     unchecked_to_checked_tree(unchecked_forest);
 
@@ -257,8 +257,8 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_error_missing_id() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_empty_input() {
-  let forest: Tree<OrgNode> = Tree::new(forest_root_orgnode());
+fn test_viewnode_forest_to_nonmerge_save_instructions_empty_input() {
+  let forest: Tree<ViewNode> = Tree::new(forest_root_viewnode());
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
 
@@ -266,7 +266,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_empty_input() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_only_aliases() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -275,9 +275,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();
@@ -292,7 +292,7 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_only_aliases() {
 }
 
 #[test]
-fn test_orgnode_forest_to_nonmerge_save_instructions_complex_scenario() {
+fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
   let input: &str =
     indoc! {"
             * (skg (node (id doc1) (source main))) Document 1
@@ -308,9 +308,9 @@ fn test_orgnode_forest_to_nonmerge_save_instructions_complex_scenario() {
             * (skg (node (id doc2) (source main))) Document 2
             ** (skg (node (id ref_section) (source main) parentIgnores)) Reference Section
         "};
-  let unchecked_forest : Tree<UncheckedOrgNode> =
+  let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
-  let forest: Tree<OrgNode> =
+  let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_forest(forest).unwrap();

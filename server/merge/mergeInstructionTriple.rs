@@ -1,24 +1,24 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{SkgConfig, ID};
-use crate::types::orgnode::EditRequest;
-use crate::types::orgnode::{OrgNode, OrgNodeKind};
+use crate::types::viewnode::EditRequest;
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::skgnode::SkgNode;
 use crate::util::{dedup_vector, setlike_vector_subtraction};
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// PURPOSE: For each OrgNode with a merge instruction,
+/// PURPOSE: For each ViewNode with a merge instruction,
 /// this creates a Merge:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - acquiree_to_delete: acquiree marked for deletion
 ///
 /// TODO ? This is slightly inefficient. It would be faster to collect a list
-/// of orgnodes with merge instructions during one of the other walks of the forest.
-pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
-  forest: &Tree<OrgNode>,
+/// of viewnodes with merge instructions during one of the other walks of the forest.
+pub async fn instructiontriples_from_the_merges_in_an_viewnode_forest(
+  forest: &Tree<ViewNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<Merge>,
@@ -29,9 +29,9 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
     if let ego_tree::iter::Edge::Open(node_ref) = edge {
       merges.extend(
         { let node_merges : Vec<Merge> =
-            merges_from_the_merge_in_an_orgnode(
-              { let orgnode: &OrgNode = node_ref.value();
-                orgnode },
+            merges_from_the_merge_in_an_viewnode(
+              { let viewnode: &ViewNode = node_ref.value();
+                viewnode },
               config, driver ). await?;
           node_merges } ); } }
   Ok(merges) }
@@ -43,15 +43,15 @@ pub async fn instructiontriples_from_the_merges_in_an_orgnode_forest(
 /// nothing can merge with more than one other node per save.
 /// Given that the metadata permits multiple '(merge _)' instructions,
 /// though, this is a natural way to write the function.
-async fn merges_from_the_merge_in_an_orgnode(
-  node: &OrgNode,
+async fn merges_from_the_merge_in_an_viewnode(
+  node: &ViewNode,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<Merge>,
             Box<dyn Error>> {
   let mut merge_instructions: Vec<Merge> =
     Vec::new();
-  if let OrgNodeKind::True(t) = &node.kind {
+  if let ViewNodeKind::True(t) = &node.kind {
     if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request {
       let acquirer_id : &ID = &t.id;
       let acquirer_from_disk : SkgNode =

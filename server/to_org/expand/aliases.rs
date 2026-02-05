@@ -1,9 +1,9 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::orgnode::{OrgNode, ViewRequest, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::types::tree::orgnode_skgnode::{
+use crate::types::tree::viewnode_skgnode::{
   insert_scaffold_as_child, unique_scaffold_child};
 
 use ego_tree::Tree;
@@ -11,7 +11,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
-  tree          : &mut Tree<OrgNode>,
+  tree          : &mut Tree<ViewNode>,
   _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
@@ -28,7 +28,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
     errors, result ) }
 
 /// Integrate an AliasCol child and, under it, Alias grandchildren
-/// into the OrgNode tree containing the target node.
+/// into the ViewNode tree containing the target node.
 ///
 /// PITFALL: This function fetches aliases from disk and populates them immediately,
 /// whereas 'completeAliasCol' is only called on an AliasCol already in the tree.
@@ -39,7 +39,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// so any newly-created empty AliasCol
 /// would not be visited in the same save cycle.
 pub async fn build_and_integrate_aliases (
-  tree      : &mut Tree<OrgNode>,
+  tree      : &mut Tree<ViewNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,

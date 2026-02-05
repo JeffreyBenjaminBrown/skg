@@ -41,6 +41,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
      their parent is an indef TrueNode.
      If it is definitive then they just defined the truth,
      so they don't need to be adjusted toward it.
+     But completion should proceed within them.
 *** write these functions
 **** DONE completeAliasCol
      Take a treenode, a tree and a skgnodemap.

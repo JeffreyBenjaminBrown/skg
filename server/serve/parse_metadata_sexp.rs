@@ -19,9 +19,9 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::orgnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold};
-use crate::types::unchecked_orgnode::{
-    UncheckedOrgNode, UncheckedOrgNodeKind, UncheckedTrueNode,
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold};
+use crate::types::unchecked_viewnode::{
+    UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
 
 use sexp::Sexp;
@@ -32,9 +32,9 @@ use std::str::FromStr;
 // Parsing-internal types
 //
 
-/// Intermediate parsed metadata. Converted to OrgNode via orgnode_from_metadata().
+/// Intermediate parsed metadata. Converted to ViewNode via viewnode_from_metadata().
 #[derive(Debug, Clone, PartialEq)]
-pub struct OrgnodeMetadata {
+pub struct ViewnodeMetadata {
   pub focused: bool,
   pub folded: bool,
   // None means TrueNode, Some means Scaffold
@@ -52,8 +52,8 @@ pub struct OrgnodeMetadata {
   pub scaffold_diff: Option<FieldDiffStatus>,
 }
 
-pub fn default_metadata() -> OrgnodeMetadata {
-  OrgnodeMetadata {
+pub fn default_metadata() -> ViewnodeMetadata {
+  ViewnodeMetadata {
     focused: false,
     folded: false,
     scaffold: None,
@@ -68,16 +68,16 @@ pub fn default_metadata() -> OrgnodeMetadata {
     truenode_diff: None,
     scaffold_diff: None, }}
 
-/// Create an UncheckedOrgNode from parsed metadata components.
-/// This is the bridge between parsing (OrgnodeMetadata) and runtime (UncheckedOrgNode).
-/// Returns (UncheckedOrgNode, Option<BufferValidationError>) - error if Scaffold has body.
-pub fn orgnode_from_metadata (
-  metadata : &OrgnodeMetadata,
+/// Create an UncheckedViewNode from parsed metadata components.
+/// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
+/// Returns (UncheckedViewNode, Option<BufferValidationError>) - error if Scaffold has body.
+pub fn viewnode_from_metadata (
+  metadata : &ViewnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( UncheckedOrgNode, Option < BufferValidationError > ) {
+) -> ( UncheckedViewNode, Option < BufferValidationError > ) {
   let (kind, error)
-    : (UncheckedOrgNodeKind, Option<BufferValidationError>)
+    : (UncheckedViewNodeKind, Option<BufferValidationError>)
     = if let Some ( ref scaffold ) = metadata . scaffold {
         let error : Option<BufferValidationError> =
           if body . is_some () {
@@ -94,10 +94,10 @@ pub fn orgnode_from_metadata (
                               id: title . clone (),
                               diff: metadata . scaffold_diff },
           other => other . clone () };
-        ( UncheckedOrgNodeKind::Scaff ( scaffold_with_title ), error )
+        ( UncheckedViewNodeKind::Scaff ( scaffold_with_title ), error )
       } else {
       // UncheckedTrueNode
-      ( UncheckedOrgNodeKind::True ( UncheckedTrueNode {
+      ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
           title,
           body,
           id_opt           : metadata . id . clone (),
@@ -111,18 +111,18 @@ pub fn orgnode_from_metadata (
           diff             : metadata . truenode_diff, } ),
         None )
     };
-  ( UncheckedOrgNode { focused : metadata.focused,
+  ( UncheckedViewNode { focused : metadata.focused,
                        folded  : metadata.folded,
                        kind },
     error ) }
 
 
-/// Parse metadata from org-mode headline into OrgnodeMetadata.
+/// Parse metadata from org-mode headline into ViewnodeMetadata.
 /// See file header comment for full syntax.
-pub fn parse_metadata_to_orgnodemd (
+pub fn parse_metadata_to_viewnodemd (
   sexp_str : &str
-) -> Result<OrgnodeMetadata, String> {
-  let mut result : OrgnodeMetadata =
+) -> Result<ViewnodeMetadata, String> {
+  let mut result : ViewnodeMetadata =
     default_metadata ();
 
   let parsed : Sexp =
@@ -177,7 +177,7 @@ pub fn parse_metadata_to_orgnodemd (
         match bare_value . as_str () {
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
-          // Scaffold kinds as bare atoms (alias/id string comes from title in orgnode_from_metadata)
+          // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), diff: None } ),
           "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
           "forestRoot" => result . scaffold = Some ( Scaffold::BufferRoot ),
@@ -205,7 +205,7 @@ pub fn parse_metadata_to_orgnodemd (
 /// Parse the (node ...) s-expression contents.
 fn parse_node_sexp (
   items : &[Sexp],
-  metadata : &mut OrgnodeMetadata
+  metadata : &mut ViewnodeMetadata
 ) -> Result<(), String> {
   for element in items {
     match element {
@@ -319,7 +319,7 @@ fn parse_viewstats_sexp (
 /// Parse the (editRequest ...) s-expression contents.
 fn parse_editrequest_sexp (
   items : &[Sexp],
-  metadata : &mut OrgnodeMetadata
+  metadata : &mut ViewnodeMetadata
 ) -> Result<(), String> {
   for element in items {
     match element {

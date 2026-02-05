@@ -1,8 +1,8 @@
 use crate::dbs::tantivy::search_index;
-use crate::org_to_text::orgnode_to_text;
+use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
 use crate::types::misc::{TantivyIndex, ID, SourceName};
-use crate::types::orgnode::{OrgNode, OrgNodeKind, TrueNode, default_truenode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, default_truenode};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 
 use sexp::Sexp;
@@ -111,12 +111,12 @@ fn format_matches_as_org_mode (
   let mut result : String =
     String::new();
   result.push_str (
-    & orgnode_to_text (
+    & viewnode_to_text (
       1,
-      & OrgNode {
+      & ViewNode {
         focused : false,
         folded  : false,
-        kind    : OrgNodeKind::True (
+        kind    : ViewNodeKind::True (
           // The unique level-1 headline states the search terms.
           TrueNode {
             parent_ignores : true,
@@ -151,12 +151,12 @@ fn format_matches_as_org_mode (
     // First (best) match becomes level-2 headline
     let (score, title) : &(f32, String) = &matches[0];
     result.push_str (
-      & orgnode_to_text (
+      & viewnode_to_text (
         2,
-        & OrgNode {
+        & ViewNode {
           focused : false,
           folded  : false,
-          kind    : OrgNodeKind::True (
+          kind    : ViewNodeKind::True (
             TrueNode {
               indefinitive : true,
               .. default_truenode (
@@ -168,12 +168,12 @@ fn format_matches_as_org_mode (
     for (score, title) in matches.iter().skip(1) {
       // The rest, if any, become level-3 headlines.
       result.push_str (
-        & orgnode_to_text (
+        & viewnode_to_text (
           3,
-          & OrgNode {
+          & ViewNode {
             focused : false,
             folded  : false,
-            kind    : OrgNodeKind::True (
+            kind    : ViewNodeKind::True (
               TrueNode {
                 indefinitive : true,
                 .. default_truenode (

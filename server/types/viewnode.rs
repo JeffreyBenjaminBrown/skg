@@ -1,8 +1,8 @@
 /// Skg lets users control a graph, viewing it through a tree view in a text editor.
 /// Nodes of the graph are represented via the 'SkgNode' type.
-/// Nodes of the tree are represented via the 'OrgNode' type.
+/// Nodes of the tree are represented via the 'ViewNode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
-/// Some 'OrgNode's correspond to SkgNodes; these are 'TrueNode's.
+/// Some 'ViewNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
 use super::git::{NodeDiffStatus, FieldDiffStatus};
@@ -17,19 +17,19 @@ use std::str::FromStr;
 
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
-pub struct OrgNode {
+pub struct ViewNode {
   pub focused : bool,
   pub folded  : bool,
-  pub kind    : OrgNodeKind,
+  pub kind    : ViewNodeKind,
 }
 
 #[derive( Debug, Clone, PartialEq )]
-pub enum OrgNodeKind {
+pub enum ViewNodeKind {
   True  ( TrueNode ),
   Scaff ( Scaffold ),
 }
 
-/// An OrgNode that corresponds to a SkgNode.
+/// An ViewNode that corresponds to a SkgNode.
 #[derive( Debug, Clone, PartialEq )]
 pub struct TrueNode {
   pub title          : String,
@@ -39,7 +39,7 @@ pub struct TrueNode {
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
-  pub indefinitive  : bool, // When the user saves a buffer, an 'indefinitive' orgnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
+  pub indefinitive  : bool, // When the user saves a buffer, an 'indefinitive' viewnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
@@ -73,7 +73,7 @@ pub struct ViewNodeStats {
 
 /// Scaffold nodes are display-only structures
 /// that don't correspond per se to nodes in the graph,
-/// but encode information about the OrgNodes around them.
+/// but encode information about the ViewNodes around them.
 #[derive( Debug, Clone, PartialEq, Eq )]
 pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
@@ -202,19 +202,19 @@ impl ViewRequest {
       .map ( |(_, vr)| *vr ) }
 }
 
-impl OrgNode {
+impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title ( &self ) -> &str {
     match &self . kind {
-      OrgNodeKind::True ( t ) => &t . title,
-      OrgNodeKind::Scaff ( s ) => s . title (),
+      ViewNodeKind::True ( t ) => &t . title,
+      ViewNodeKind::Scaff ( s ) => s . title (),
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {
-      OrgNodeKind::True ( t ) => t . body . as_ref (),
-      OrgNodeKind::Scaff ( _ ) => None,
+      ViewNodeKind::True ( t ) => t . body . as_ref (),
+      ViewNodeKind::Scaff ( _ ) => None,
     }}
 }
 
@@ -305,12 +305,12 @@ pub fn default_truenode (
     diff           : None,
   }}
 
-pub fn mk_definitive_orgnode (
+pub fn mk_definitive_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,
   body   : Option < String >,
-) -> OrgNode { mk_orgnode ( id,
+) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
                             body,
@@ -319,14 +319,14 @@ pub fn mk_definitive_orgnode (
                             None,               // edit_request
                             HashSet::new () ) } // view_requests
 
-/// Create an indefinitive OrgNode from disk data.
+/// Create an indefinitive ViewNode from disk data.
 /// Body is always None since indefinitive nodes don't have editable content.
-pub fn mk_indefinitive_orgnode (
+pub fn mk_indefinitive_viewnode (
   id             : ID,
   source         : SourceName,
   title          : String,
   parent_ignores : bool,
-) -> OrgNode { mk_orgnode ( id,
+) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
                             None, // body
@@ -335,11 +335,11 @@ pub fn mk_indefinitive_orgnode (
                             None, // edit_request
                             HashSet::new ( )) } // view_requests
 
-/// Create a OrgNode with *nearly* full metadata control.
+/// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
-/// without considering the rest of the OrgNode tree.
-pub fn mk_orgnode (
+/// without considering the rest of the ViewNode tree.
+pub fn mk_viewnode (
   id             : ID,
   source         : SourceName,
   title          : String,
@@ -348,10 +348,10 @@ pub fn mk_orgnode (
   indefinitive   : bool,
   edit_request   : Option < EditRequest >,
   view_requests  : HashSet < ViewRequest >,
-) -> OrgNode {
-  OrgNode { focused : false,
+) -> ViewNode {
+  ViewNode { focused : false,
             folded  : false,
-            kind    : OrgNodeKind::True (
+            kind    : ViewNodeKind::True (
               TrueNode { body,
                          parent_ignores,
                          indefinitive,
@@ -360,18 +360,18 @@ pub fn mk_orgnode (
                          .. default_truenode (
                            id, source, title ) } ) }}
 
-/// Create a Scaffold OrgNode from a Scaffold.
-pub fn orgnode_from_scaffold ( scaffold : Scaffold ) -> OrgNode {
-  OrgNode {
+/// Create a Scaffold ViewNode from a Scaffold.
+pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {
+  ViewNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::Scaff ( scaffold ),
+    kind    : ViewNodeKind::Scaff ( scaffold ),
   }}
 
-/// Helper to create a BufferRoot OrgNode.
-pub fn forest_root_orgnode () -> OrgNode {
-  OrgNode {
+/// Helper to create a BufferRoot ViewNode.
+pub fn forest_root_viewnode () -> ViewNode {
+  ViewNode {
     focused : false,
     folded  : false,
-    kind    : OrgNodeKind::Scaff ( Scaffold::BufferRoot ),
+    kind    : ViewNodeKind::Scaff ( Scaffold::BufferRoot ),
   }}

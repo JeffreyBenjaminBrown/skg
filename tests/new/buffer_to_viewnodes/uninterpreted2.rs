@@ -1,9 +1,9 @@
 // cargo test uninterpreted2
 
 use indoc::indoc;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::misc::ID;
-use skg::types::unchecked_orgnode::{UncheckedOrgNode, UncheckedOrgNodeKind};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use ego_tree::Tree;
 
 #[test]
@@ -24,7 +24,7 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
   let forest_roots: Vec<_> = forest.root().children().collect();
@@ -76,7 +76,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
   // Get tree roots (children of BufferRoot)
@@ -91,8 +91,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test parentIgnores node
   let parentIgnores_node = tree_roots[1].value();
   let parentIgnores_t = match &parentIgnores_node.kind {
-    UncheckedOrgNodeKind::True(t) => t,
-    UncheckedOrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    UncheckedViewNodeKind::True(t) => t,
+    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(parentIgnores_node.title(), "parentIgnores node");
   assert_eq!(parentIgnores_t.parent_ignores, true);
   assert_eq!(parentIgnores_t.indefinitive, true);
@@ -101,8 +101,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test cycling node
   let cycle_node = tree_roots[2].value();
   let cycle_t = match &cycle_node.kind {
-    UncheckedOrgNodeKind::True(t) => t,
-    UncheckedOrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    UncheckedViewNodeKind::True(t) => t,
+    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(cycle_node.title(), "cycling node");
   assert_eq!(cycle_t.viewStats.cycle, true);
   assert_eq!(cycle_node.body(),
@@ -118,7 +118,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
   let tree_roots: Vec<_> = forest.root().children().collect();
@@ -127,8 +127,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   // Test first node - should have all default values except title and body
   let first_node = tree_roots[0].value();
   let first_t = match &first_node.kind {
-    UncheckedOrgNodeKind::True(t) => t,
-    UncheckedOrgNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    UncheckedViewNodeKind::True(t) => t,
+    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
   assert_eq!(first_node.title(), "simple node");
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_t.id_opt.as_ref(), None);
@@ -159,7 +159,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   let tree_roots: Vec<_> = forest.root().children().collect();
 
@@ -187,7 +187,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
 
   // Get tree roots (children of BufferRoot)
@@ -212,13 +212,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   // BufferRoot should have no children
   assert_eq!(forest.root().children().count(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Tree<UncheckedOrgNode> =
+  let trees2: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input2).unwrap().0;
   assert_eq!(trees2.root().children().count(), 0);
 }
@@ -232,7 +232,7 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let forest: Tree<UncheckedOrgNode> =
+  let forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(input).unwrap().0;
   assert_eq!(forest.root().children().count(), 0,
              "Should have no tree roots when there are no headlines");

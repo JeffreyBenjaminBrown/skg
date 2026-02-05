@@ -1,5 +1,5 @@
-use crate::types::orgnode::{
-    OrgNode, OrgNodeKind, Scaffold, TrueNode, EditRequest,
+use crate::types::viewnode::{
+    ViewNode, ViewNodeKind, Scaffold, TrueNode, EditRequest,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -11,30 +11,30 @@ use std::error::Error;
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a BufferRoot.
-pub fn orgnode_forest_to_string (
-  forest : &Tree<OrgNode>,
+pub fn viewnode_forest_to_string (
+  forest : &Tree<ViewNode>,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
-    node_ref : NodeRef < OrgNode >,
+    node_ref : NodeRef < ViewNode >,
     level    : usize,
   ) -> Result < String, Box<dyn Error> > {
-    let orgnode : &OrgNode = node_ref . value ();
+    let viewnode : &ViewNode = node_ref . value ();
     let mut out : String =
-      orgnode_to_text ( level, orgnode )?;
+      viewnode_to_text ( level, viewnode )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
           child,
           level + 1 )? ); }
     Ok ( out ) }
-  let root_ref : NodeRef<OrgNode> = forest . root ();
+  let root_ref : NodeRef<ViewNode> = forest . root ();
   let is_forest_root : bool =
     matches! (
       & root_ref . value () . kind,
-      OrgNodeKind::Scaff ( Scaffold::BufferRoot ));
+      ViewNodeKind::Scaff ( Scaffold::BufferRoot ));
   if ! is_forest_root {
     return Err (
-      "orgnode_forest_to_string: root is not a BufferRoot".into() ); }
+      "viewnode_forest_to_string: root is not a BufferRoot".into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {
@@ -42,26 +42,26 @@ pub fn orgnode_forest_to_string (
       & render_node_subtree_to_org ( child, 1 )? ); }
   Ok ( result ) }
 
-/// Renders an OrgNode as org-mode formatted text.
+/// Renders an ViewNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
-/// ERRORS: If orgnode is a BufferRoot.
-pub fn orgnode_to_text (
+/// ERRORS: If viewnode is a BufferRoot.
+pub fn viewnode_to_text (
   level   : usize,
-  orgnode : &OrgNode
+  viewnode : &ViewNode
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    orgnode_to_string ( orgnode )?;
-  let title : &str = match &orgnode . kind {
-    OrgNodeKind::True  ( t ) => &t . title,
-    OrgNodeKind::Scaff ( s ) => s . title (),
+    viewnode_to_string ( viewnode )?;
+  let title : &str = match &viewnode . kind {
+    ViewNodeKind::True  ( t ) => &t . title,
+    ViewNodeKind::Scaff ( s ) => s . title (),
   };
-  let body : Option < &String > = match &orgnode . kind {
-    OrgNodeKind::True  ( t ) => t . body . as_ref (),
-    OrgNodeKind::Scaff ( _ ) => None,
+  let body : Option < &String > = match &viewnode . kind {
+    ViewNodeKind::True  ( t ) => t . body . as_ref (),
+    ViewNodeKind::Scaff ( _ ) => None,
   };
   if metadata_str . is_empty () && title . is_empty () {
     panic! (
-      "orgnode_to_text called with both empty metadata and empty title"
+      "viewnode_to_text called with both empty metadata and empty title"
     ); }
   let mut result : String =
     String::new ();
@@ -83,14 +83,14 @@ pub fn orgnode_to_text (
         result . push ( '\n' ); }} }
   Ok ( result ) }
 
-pub fn orgnode_to_string (
-  orgnode : &OrgNode
+pub fn viewnode_to_string (
+  viewnode : &ViewNode
 ) -> Result < String, Box<dyn Error> > {
-  match &orgnode . kind {
-    OrgNodeKind::Scaff ( scaffold ) =>
-      scaffold_metadata_to_string ( orgnode . focused, orgnode . folded, scaffold ),
-    OrgNodeKind::True ( true_node ) =>
-      Ok ( true_node_metadata_to_string ( orgnode . focused, orgnode . folded, true_node )),
+  match &viewnode . kind {
+    ViewNodeKind::Scaff ( scaffold ) =>
+      scaffold_metadata_to_string ( viewnode . focused, viewnode . folded, scaffold ),
+    ViewNodeKind::True ( true_node ) =>
+      Ok ( true_node_metadata_to_string ( viewnode . focused, viewnode . folded, true_node )),
   }}
 
 /// Render metadata for a Scaffold:

@@ -11,10 +11,10 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::maps::add_v_to_map_if_absent;
-use crate::types::orgnode::{OrgNode, OrgNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::{
   read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::orgnode_skgnode::pid_and_source_from_treenode;
+use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -32,7 +32,7 @@ use typedb_driver::TypeDBDriver;
 /// - "restore": Because indefinitive nodes may have had their titles or bodies edited.
 ///   TODO ? Maybe look for edits to indefinitive nodes and throw an error, as is done for foreign nodes.
 pub fn complete_or_restore_each_node_in_branch<'a> (
-  tree          : &'a mut Tree<OrgNode>,
+  tree          : &'a mut Tree<ViewNode>,
   map           : &'a mut SkgNodeMap,
   node_id       : NodeId,
   config        : &'a SkgConfig,
@@ -41,7 +41,7 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 ) -> Pin<Box<dyn Future<Output =
                         Result<(), Box<dyn Error>>> + 'a>> {
   fn recurse<'b> (
-    tree          : &'b mut Tree<OrgNode>,
+    tree          : &'b mut Tree<ViewNode>,
     map           : &'b mut SkgNodeMap,
     node_id       : NodeId,
     config        : &'b SkgConfig,
@@ -60,13 +60,13 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
   Box::pin(async move {
     if read_at_node_in_tree(tree, node_id, |node| {
         matches!(&node.kind,
-                 OrgNodeKind::Scaff(Scaffold::AliasCol)) })
+                 ViewNodeKind::Scaff(Scaffold::AliasCol)) })
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // Don't recurse; completeAliasCol handles the whole subtree.
       completeAliasCol (
         tree, map, node_id ). await ?;
     } else if read_at_node_in_tree(tree, node_id, |node| {
-        matches!( &node.kind, OrgNodeKind::Scaff(_)) } )
+        matches!( &node.kind, ViewNodeKind::Scaff(_)) } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ? {
       // Skip, but recurse into children.
       recurse ( tree, map, node_id, config, typedb_driver, visited
@@ -85,9 +85,9 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
         tree, node_id, visited ) ?;
 
       { if truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
-          clobberIndefinitiveOrgnode (
+          clobberIndefinitiveViewnode (
             tree, map, node_id, config ) ?;
-        } else { // futz with the orgnode and its content children
+        } else { // futz with the viewnode and its content children
           maybe_add_subscribeeCol_branch (
             tree, map, node_id, config, typedb_driver ) . await ?; }
         recurse ( // Recurse to children even for indefinitive nodes, since they may have children from (for instance) view requests.
@@ -102,24 +102,24 @@ pub fn complete_or_restore_each_node_in_branch<'a> (
 /// - Set body to None.
 ///
 /// EXPECTS: The input node is indefinitive.
-pub fn clobberIndefinitiveOrgnode (
-  tree    : &mut Tree<OrgNode>,
+pub fn clobberIndefinitiveViewnode (
+  tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
   treeid  : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
-      tree, treeid, "clobberIndefinitiveOrgnode" ) ?;
+      tree, treeid, "clobberIndefinitiveViewnode" ) ?;
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk ( &node_id, map, config, &source ) ?;
   let title : String = skgnode . title . clone();
   let source : SourceName = skgnode . source . clone();
-  write_at_node_in_tree ( tree, treeid, |orgnode| {
-    let OrgNodeKind::True ( t ) : &mut OrgNodeKind =
-      &mut orgnode.kind
+  write_at_node_in_tree ( tree, treeid, |viewnode| {
+    let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+      &mut viewnode.kind
       else { panic! (
-             "clobberIndefinitiveOrgnode: expected TrueNode" ) };
+             "clobberIndefinitiveViewnode: expected TrueNode" ) };
     t . title = title;
     t . source = source;
     t . body = None; }

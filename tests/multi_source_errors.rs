@@ -3,11 +3,11 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::from_text::buffer_to_orgnode_forest_and_save_instructions;
-use skg::from_text::buffer_to_orgnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::buffer_to_orgnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::from_text::buffer_to_orgnodes::add_missing_info::add_missing_info_to_forest;
-use skg::types::unchecked_orgnode::UncheckedOrgNode;
+use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_forest;
+use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
@@ -54,12 +54,12 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       indoc! {"
         * (skg (node (id pub-1))) pub-1                                      # root with no source
         * (skg (node (id dub-1) (source dub))) dub-1                         # source does not exist
-        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_orgnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
-        * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining orgnodes for this id
+        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_viewnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
+        * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining viewnodes for this id
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut forest: Tree<UncheckedOrgNode> =
+    let mut forest: Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (&buffer_text)?.0;
     add_missing_info_to_forest(
       &mut forest, &config.db_name, &driver).await?;
@@ -90,12 +90,12 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors.iter()
           . filter(
-            |e| matches!(e, BufferValidationError::Multiple_Defining_Orgnodes(_)))
+            |e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
           . collect() );
       assert_eq!(multiple_defining_errors.len(), 1,
-                 "Expected exactly 1 Multiple_Defining_Orgnodes error for priv-1");
-      if let BufferValidationError::Multiple_Defining_Orgnodes(id) = multiple_defining_errors[0] {
-        assert_eq!(id.0, "priv-1", "Multiple_Defining_Orgnodes should be for priv-1"); }}
+                 "Expected exactly 1 Multiple_Defining_Viewnodes error for priv-1");
+      if let BufferValidationError::Multiple_Defining_Viewnodes(id) = multiple_defining_errors[0] {
+        assert_eq!(id.0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
     { let inconsistent_source_errors: Vec<&BufferValidationError>
       = ( errors.iter()
@@ -109,7 +109,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(sources.len(), 2, "Should have 2 different sources for priv-1"); }}
 
     assert_eq!(errors.len(), 4,
-               "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Orgnodes, 1 InconsistentSources");
+               "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
 
     cleanup_test_tantivy_and_typedb_dbs(
       &config.db_name,
@@ -162,7 +162,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      let result = buffer_to_orgnode_forest_and_save_instructions(
+      let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -228,7 +228,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      let result = buffer_to_orgnode_forest_and_save_instructions(
+      let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -315,7 +315,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_conflict);
 
-      let result = buffer_to_orgnode_forest_and_save_instructions(
+      let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
@@ -358,7 +358,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent_sources);
 
       // This should fail during validation (before indefinitives are filtered)
-      let result = buffer_to_orgnode_forest_and_save_instructions(
+      let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
         &driver
