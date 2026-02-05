@@ -86,9 +86,9 @@ fn test_interleaved_diff_additions() {
     vec!["a", "b", "c"];
   assert_eq! (
     compute_interleaved_diff ( &old, &new ),
-    vec![ Diff_Item::Unchanged  ("a"),
-          Diff_Item::NewHere    ("b"),
-          Diff_Item::Unchanged  ("c") ]); }
+    vec![ Diff_Item::Unchanged ("a"),
+          Diff_Item::New       ("b"),
+          Diff_Item::Unchanged ("c") ]); }
 
 #[test]
 fn test_interleaved_diff_removals() {
@@ -98,9 +98,9 @@ fn test_interleaved_diff_removals() {
     vec!["a", "c"];
   assert_eq! (
     compute_interleaved_diff ( &old, &new ),
-    vec![ Diff_Item::Unchanged   ("a"),
-          Diff_Item::RemovedHere ("b"),
-          Diff_Item::Unchanged   ("c") ]); }
+    vec![ Diff_Item::Unchanged ("a"),
+          Diff_Item::Removed   ("b"),
+          Diff_Item::Unchanged ("c") ]); }
 
 #[test]
 fn test_interleaved_diff() {
@@ -110,7 +110,7 @@ fn test_interleaved_diff() {
     vec!["a", "d", "c"];
   assert_eq! (
     compute_interleaved_diff ( &old, &new ),
-    vec![ Diff_Item::Unchanged   ("a"),
-          Diff_Item::RemovedHere ("b"),
-          Diff_Item::NewHere     ("d"),
-          Diff_Item::Unchanged   ("c") ]); }
+    vec![ Diff_Item::Unchanged ("a"),
+          Diff_Item::Removed   ("b"),
+          Diff_Item::New       ("d"),
+          Diff_Item::Unchanged ("c") ]); }

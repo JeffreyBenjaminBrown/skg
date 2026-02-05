@@ -130,9 +130,9 @@ fn prepend_idcol_with_children (
       match entry {
         Diff_Item::Unchanged ( id ) =>
           ( id . 0 . clone(), None ),
-        Diff_Item::NewHere ( id ) =>
+        Diff_Item::New ( id ) =>
           ( id . 0 . clone(), Some ( FieldDiffStatus::New )),
-        Diff_Item::RemovedHere ( id ) =>
+        Diff_Item::Removed ( id ) =>
           ( id . 0 . clone(), Some ( FieldDiffStatus::Removed )), };
     let id_scaffold : Scaffold =
       Scaffold::ID { id: id_str, diff };
@@ -153,7 +153,7 @@ fn process_truenode_contains_diff (
   let added_ids : HashSet<&ID> =
     node_changes . contains_diff . iter()
       . filter_map ( |d| match d {
-          Diff_Item::NewHere ( id ) => Some ( id ),
+          Diff_Item::New ( id ) => Some ( id ),
           _ => None })
       . collect();
   mark_newhere_children (
@@ -198,7 +198,7 @@ fn insert_phantom_nodes_for_removed_children (
   let removed_ids : Vec<&ID> =
     node_changes . contains_diff . iter()
       . filter_map ( |d| match d {
-          Diff_Item::RemovedHere ( id ) => Some ( id ),
+          Diff_Item::Removed ( id ) => Some ( id ),
           _ => None })
       . collect();
   for removed_child_id in removed_ids {
@@ -250,7 +250,7 @@ fn title_for_phantom (
         removed_child_id . 0, e )) }}
 
 /// Create an indefinitive phantom ViewNode with a diff status.
-fn mk_phantom_viewnode (
+pub(crate) fn mk_phantom_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,

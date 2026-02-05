@@ -12,12 +12,12 @@ use std::collections::HashMap;
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Diff_Item<T> {
-  /// Item exists in both old and new at same relative position
+  /// It exists in both old and new in same relative position.
   Unchanged(T),
-  /// Item was in old but not in new (or moved away)
-  RemovedHere(T),
-  /// Item is in new but not in old (or moved here)
-  NewHere(T),
+  /// It was in old but is not in new (at least in this position).
+  Removed(T),
+  /// It is in new but was not in old (at least in this position).
+  New(T),
 }
 
 //
@@ -68,12 +68,12 @@ where
         new_idx += 1; },
       ChangeTag::Delete => {
         if old_idx < old . len() {
-          result . push ( Diff_Item::RemovedHere (
+          result . push ( Diff_Item::Removed (
             old[old_idx] . clone() )); }
         old_idx += 1; },
       ChangeTag::Insert => {
         if new_idx < new . len() {
-          result . push ( Diff_Item::NewHere (
+          result . push ( Diff_Item::New (
             new[new_idx] . clone() )); }
         new_idx += 1; }}}
   result }

@@ -41,6 +41,20 @@ where F: FnOnce(&mut T) -> R, {
     .ok_or("target node not found")?;
   Ok(f(node_mut.value() )) }
 
+/// Error if the node does not satisfy the predicate.
+pub fn error_unless_node_satisfies<T, F>(
+  tree      : &Tree<T>,
+  treeid    : NodeId,
+  predicate : F,
+  message   : &str,
+) -> Result<(), String>
+where F: FnOnce(&T) -> bool {
+  let satisfied : bool =
+    read_at_node_in_tree( tree, treeid, predicate ) ?;
+  if !satisfied {
+    return Err( message.to_string() ); }
+  Ok(( )) }
+
 /// Read a node's value from a tree, applying a function to it.
 /// Returns an error if the node is not found.
 pub fn read_at_node_in_tree<T, F, R>(

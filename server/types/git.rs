@@ -1,7 +1,7 @@
 /// Git-related types for diff view functionality.
 
 use crate::types::list::Diff_Item;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 
 use std::collections::HashMap;
@@ -53,10 +53,10 @@ pub enum GitDiffStatus {
 /// Represents changes to a single SkgNode.
 #[derive(Debug, Clone, Default)]
 pub struct NodeChanges {
-  pub text_changed: bool,
-  pub aliases_diff: Vec<Diff_Item<String>>,
-  pub ids_diff: Vec<Diff_Item<ID>>,
-  pub contains_diff: Vec<Diff_Item<ID>>,
+  pub text_changed  : bool,
+  pub aliases_diff  : Vec<Diff_Item<String>>,
+  pub ids_diff      : Vec<Diff_Item<ID>>,
+  pub contains_diff : Vec<Diff_Item<ID>>,
 }
 
 /// Indicates how a node differs between the current state and HEAD.
@@ -87,7 +87,15 @@ impl SourceDiff {
     SourceDiff {
       is_git_repo: false,
       skgnode_diffs: HashMap::new(),
-      deleted_nodes: HashMap::new() }}}
+      deleted_nodes: HashMap::new() }}
+
+  pub fn skgnode_diff_for_pid (
+    &self,
+    pid : &ID,
+  ) -> Option<&SkgnodeDiff> {
+    let file_path : PathBuf =
+      PathBuf::from( format!( "{}.skg", pid.0 ) );
+    self.skgnode_diffs.get( &file_path ) }}
 
 impl NodeDiffStatus {
   /// Single source of truth for NodeDiffStatus <-> client string bijection.
@@ -166,3 +174,22 @@ impl FromStr for FieldDiffStatus {
   ) -> Result<Self, Self::Err> {
     Self::from_client_string ( s )
       .ok_or_else ( || format! ( "Unknown FieldDiffStatus value: {}", s ) ) } }
+
+//
+// Functions
+//
+
+/// Look up the NodeChanges for a TrueNode from source_diffs.
+/// Returns None if not in diff view, the source is not a git repo,
+/// or there are no recorded changes for this node's .skg file.
+pub fn node_changes_for_truenode<'a> (
+  source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
+) -> Option<&'a NodeChanges> {
+  source_diffs.as_ref().and_then(
+    |diffs| {
+      let sourcediff : &SourceDiff = diffs.get( source ) ?;
+      if !sourcediff.is_git_repo { return None; }
+      sourcediff.skgnode_diff_for_pid( pid ) ?
+        .node_changes.as_ref() } ) }
