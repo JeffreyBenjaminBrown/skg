@@ -6,7 +6,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use skg::git_ops::read_repo::{ head_is_merge_commit, get_file_content_at_head };
-use skg::types::list::{diff_lists, compute_interleaved_diff, ListDiff, ListDiffEntry};
+use skg::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_as_OneList_Item};
 
 fn setup_git_repo() -> (TempDir, Repository) {
   let dir : TempDir =
@@ -72,7 +72,7 @@ fn test_diff_lists_no_changes() {
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "b", "c"];
-  let diff : ListDiff<&str> =
+  let diff : Diff_as_TwoLists_Lossy<&str> =
     diff_lists ( &old, &new );
   assert! ( diff . added . is_empty() );
   assert! ( diff . removed . is_empty() ); }
@@ -83,7 +83,7 @@ fn test_diff_lists_additions() {
     vec!["a", "c"];
   let new : Vec<&str> =
     vec!["a", "b", "c"];
-  let diff : ListDiff<&str> =
+  let diff : Diff_as_TwoLists_Lossy<&str> =
     diff_lists ( &old, &new );
   assert_eq! ( diff . added, vec!["b"] );
   assert! ( diff . removed . is_empty() ); }
@@ -94,7 +94,7 @@ fn test_diff_lists_removals() {
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "c"];
-  let diff : ListDiff<&str> =
+  let diff : Diff_as_TwoLists_Lossy<&str> =
     diff_lists ( &old, &new );
   assert! ( diff . added . is_empty() );
   assert_eq! ( diff . removed, vec!["b"] ); }
@@ -105,7 +105,7 @@ fn test_interleaved_diff() {
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "d", "c"];
-  let interleaved : Vec<ListDiffEntry<&str>> =
+  let interleaved : Vec<Diff_as_OneList_Item<&str>> =
     compute_interleaved_diff ( &old, &new );
   let mut found_removed_b : bool = // Should have: a (unchanged), b (removed), d (new), c (unchanged)
     false;
@@ -113,8 +113,8 @@ fn test_interleaved_diff() {
     false;
   for entry in &interleaved {
     match entry {
-      ListDiffEntry::RemovedHere(s) if *s == "b" => found_removed_b = true,
-      ListDiffEntry::NewHere(s) if *s == "d" => found_new_d = true,
+      Diff_as_OneList_Item::RemovedHere(s) if *s == "b" => found_removed_b = true,
+      Diff_as_OneList_Item::NewHere(s) if *s == "d" => found_new_d = true,
       _ => {} }}
   assert! ( found_removed_b );
   assert! ( found_new_d ); }

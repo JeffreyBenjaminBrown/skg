@@ -1,0 +1,96 @@
+* pitching skg
+We must change human nature. We cannot change what we do not know. We We have an obligation to study and describe to each other our minds and the world, to keep learning as adults the things we tell children we understand: humility, courage, spacetime, desire, all the high ideas.
+
+We must therefore share the creation of a web of knowledge. As a side benefit, the app will permit private webs of knowledge, integrated seamlessly with the public ones.
+** Is it absurd?
+These hopes are predicated on people wanting to write about the high ideas, and believing they can gain from sharing the experience.
+
+It will be like social media, but less performative. You don't supply a stream, but a collection of accrreting information. It is less doing, more being.
+
+It will be like academia, but it rewards (if you count views) generality, not specificity.
+** quantum (like Schrodinger's cat) information
+If you fear belonging to a minority ignored by the dictator of truth, don't fear. There is room for all knowledge, multiply categorized. Different writers can testify to different things. Nobody dictates "the" article on anything; there are only views onto the collective information. You curate what you see, can promote and render invisible (to yourself and anyone who wants your lens) whole people or person-topic pairs however you wish. The result will be navigable, due to two innovations: (1) graphs, and (2) letting the user, not an alien invisible algorithm, choose what to see.
+** Welcome to the matrix, err, forest-web
+Knowledge is a forest-web. This is not strange or technical: Everyone naturally writes (at least sometimes) tree-shaped documents. Divide some text into sections, some sections into subsections, etc. Dividing it makes a tree. Multiple such documents are called a forest. The forest becomes a forest-web when it includes [[ordinary internet-style text hpyerlinks]]. Each point in the forest-web contains some text, which can contain any number (especially zero) of hyperlinks.
+** Integrate your forest-web with others'.
+Hopefully some people will share some of their trees, and you will find some trees by other people interesting. If so, Skg will let you do what *feels like* editing their data -- reordering branches, hiding branches, plugging branches from their tree into branches of your own trees. You're not actually changing their data; you're creating a lens onto it. When the original author edits those branches, you'll receive their changes.
+
+If someone integrates your data into theirs, and they share the* context they integrated it into, and you look, you might learn more about the topic. You can thereby both learn from each other, without either having to teach -- just reading and writing for understanding.
+* how skg works
+** It's not very strange, I promise.
+   Using skg is much like ordinary reading and writing. You read something you want to keep. You add it to your data. (Although unusually, edits to that thing will propogate into your data.) You write text. You divide, subdivide, organize, make links. You make some things public and others private (although with unusual granularity). You might learn someone enjoyed some of your public knowledge (although unusually, the way you would learn this is through their revelation of how it fit into their knowledge).
+** graph, view and the 'contains' relationship
+   A user's knowledge is represented as a graph ("forest-web"). Each node ("point") in the graph has a "title" (just text), a "body" (just text), a unique ID (a long number) and a 'data source'. Sources are for sharing and privacy, described later.
+
+   There is too much data to see it all at once, so we use trees to visualize parts of the graph. (This should eventually be extended to include tables and other presentation schemes.) The distinction between the underlying data and the view is important; I will refer to them as 'graph' and 'view'.
+
+   A node's body text can be hidden from view. The title can also be hidden, but only by hiding the entire node. Hiding makes it easy to see the structure of a tree.
+
+   The foundational relationship in the graph is "contains". The tree providing a view of a node shows not its node's text, but also the other nodes that it contains, and the nodes they contain, etc., recursively until reaching the 'leaves' of the tree, which contain nothing. Or until running into cycles, in which case the second and future occurences of the same node do show its children. The software is prepared to show containment cycles, because users have complete control over their data, but the 'contains' relationship is not intended to be cyclic.
+
+   'contains' is the relationship between sections and subsections, subsections and sub-subsections, etc. An initial view of a node is just itself plus everything it contains, recursively. The view might show other kinds of relationships, once the user starts exploring it, but initially, every parent-child relationship is the contains relationship.
+** sources, privacy and sharing
+   'Sharing' makes it sound like more work than it is.
+   Integration need not be mutual.
+   If someone integrates knowledge that you made available into theirs,
+   and they make available the context
+   into which they integrated your knowledge,
+   you don't have to look, or even be notified.
+
+   Recall that each node has a 'source'. If your notes are entirely private, you only need one source, but you might want to distinguish between a private source and a public source, or maybe more kinds than that.
+
+   Note that a private node can contain a public one, and vice versa. You do not, thus, have to decide whether a topic in its entirety is public or private; you can decide node by node whether to share each part of that document.
+
+   How you share your data is up to you. Skg includes no network protocol between people. Keeping your public notes on GitHub and giving people a link to the repository would do the job for free.
+
+   If you want to hide your private knowledge from your view (say, while reading it in public) you can do that.
+** hyperlinks
+   Any text at any node (so both title and body) can contain any number of hyperlinks to other nodes. A hyperlink is defined by the ID of its target and an arbitrary label invented by the author. A hyperlink points from its "source" node to its "target" node. (I try to say "hyperlink" and not "link" because any relationship can be thought of as a link.)
+** A tree can show more than the contains relationship.
+   Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish view-nodes from graph-nodes.
+
+   When a view is first created, each view-node represents a graph-node. Here's some example data -- probably private -- representing an initial view of a node called 'Go to the dentist.':
+```
+  * Go to the dentist.
+  ** Tooth #5 hurt when I drank lemonade.
+  *** Is lemon bad for teeth?
+  ** Retrieve the hat I left there.
+```
+   (Each of those nodes has a title and no body, which is valid.)
+
+   Each parent-child relationship in an initial view like the one above is the 'contains' relationship. However, the user can request information about other relationships. For instance, they might say 'show me everything that links to the first node', causing three new nodes to be added to the view::
+```
+  * go to the dentist
+  ** <<< these link to it >>>                                   # NEW
+  *** I promised _name_redacted_ I would [[go to the dentist]]      # NEW
+  *** I am allowed to drink beer again once I [[go to the dentist]] # NEW
+  ** tooth #5 hurt when I drank lemonade
+  *** Is lemon bad for teeth?
+  ** retrieve the hat I left there
+```
+   The third and fourth view-nodes represent graph-nodes that link to the first. The second view-node *does not represent a graph-node* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
+
+   It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relationship from container to content, the hyperlink relationship from source to target, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
+** Lenses onto foreign data require three more relationships.
+   The three relationships are called 'subscribes', 'hides-from-its-subscriptions' and 'overrides'.
+
+   When I "edit" a node of yours, I don't change anything for you. I instead create a lens onto your node. That lens is a node very much like yours: it has the same text and the same content, except to the extent that I edited those.
+
+   But the lens is created with some new relationships. For one, the lens 'overrides' your node. This means that whenever I build a view involving your node, I will in place of your node see my lens onto it. For another, the lens 'subscribes' to your node. The subscription means that if you add content to your node, it will be visible to me.
+
+   (A node can subscribe to and override multiple other nodes, but let's ignore that for now.)
+
+   If I delete a node from your node's content, that creates a 'hides' relationship from my lens to the deleted node. In my subscription to your node, I only see things your node contains that my node neither contains nor hides.
+* It's not done.
+  If you would be interested in working on it with me, please say so. I would work hard to bring you onboard, and I would document things more. (I've tried, but I've spent more time building than documenting.)
+* reasonable jumping-off points
+- [[./elisp/USAGE.md][using the client]]
+- [[./server/types/][the types]] (in the server)
+- [[./server/main.rs][main]] (in the server)
+- a few things [[./TODO.org][TODO]]
+* architecture
+  The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in Rust, which makes TypeDB queries. Clients could be written for other editors; I've written one for Emacs, using Emacs Lisp.
+
+  The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
+
+  Most tests can be run via 'cargo nextest run' or the *test*.sh scripts in ./bash. './bash/run-servers.sh' will start TypeDB and cargo watch, and './bash/kill-servers.sh' will stop them.

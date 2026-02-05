@@ -1,14 +1,18 @@
 * rewriting how buffer update works
 ** relevant prior art
-   Search for functions with 'integrate' or 'complete' in the name
-   to see how some of these ideas have been implemented,
-   albeit likely in a less principled way, already.
-** how it currently works
- A call graph can be found at
- tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
+*** the old completion functions
+    Search for functions with 'integrate' or 'complete' in the name
+    to see how some of these ideas have been implemented,
+    albeit likely in a less principled way, already.
+*** the code under server/update_buffer/
+*** the utilities under server::types::tree::
+** how buffer update currently works
+A call graph can be found at
+tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 *** skgnode_map : SkgNodeMap
-    incomplete, hence the importance of
-      skgnode_from_map_or_disk
+    PITFALL: incomplete, so don't read from it directly;
+    instead use skgnode_from_map_or_disk,
+    which reads from disk and updates it when a key is empty.
 *** source_diffs : Option<HashMap<SourceName, SourceDiff>>
     only for git-diff view
 *** deleted_id_src_map : HashMap<ID, SourceName>
@@ -31,9 +35,14 @@
     but for each node perform view requests last,
     so that they can be integrated with overlapping content.
 *** set_metadata_relationship_viewdata_in_forest
-** how to redo it
+** how to redo buffer update
+*** make these changes
+**** AliasCol, SubscribeeCol, IDCol only need completion if
+     their parent is an indef TrueNode.
+     If it is definitive then they just defined the truth,
+     so they don't need to be adjusted toward it.
 *** write these functions
-**** completeAliasCol
+**** DONE completeAliasCol
      Take a treenode, a tree and a skgnodemap.
      Verify that the node is an AliasCol.
      Visits its parent, verifies it's a truenode,
@@ -53,17 +62,57 @@
      Add those new Alias treenodes to its Alias children,
      such that the resulting list of Alias children
      is equal to 'aliases', and in the same order.
+**** DONE complete_relevant_children
+**** DONE partition_children
+**** DONE subtree_has_focus
+**** DONE move_child_to_end
 *** do these, in serial
+**** DFS preorder (parent-first) completion
+***** TrueNode
+****** apply make_indef_if_repeat_then_extend_defmap to it
+****** if it's definitive
+******* reorder children and complete content
+        Ensure your non-ignored truenode children are, and in order,
+        equal to your contents.
+        Reorder children to be non-truenodes,
+        then parentIgnored truenodes, then content truenodes.
+        In in git diff view, insert phantom nodes
+        (it is implemented elsewhere)
+        into the source of truth for the content list.
+******* mark its erroneous content children as parent-ignores
+        'erroneous content children' are truenode children
+        not marked parentIgnores but not among its content
+******** use another util, 'treat_certain_children'
+******* if a SubscribeeCol is needed and absent, prepend one
+        Don't populate it -- that happens later.
+******* if a TextChanged is needed and absent, prepend one
+        only in the git diff view
+******* if an IDCol is needed and absent, prepend one
+        only in the git diff view
+****** if it's indefinitive
+       clobberIndefinitiveOrgnode
+***** SubscribeeCol
+****** If there's a HiddenOutsideOfSubscribeeCol
+       make sure it's last
 **** DFS postorder (child-first) completion
-***** forestroot: nothing to do
-***** alias col
+***** DONE nothing to do : forestroot
+***** DONE alias col
       read your parent, and then
       order and complete its aliases among your children
-***** alias: nothing to do
+***** DONE nothing to do : alias
       but add a comment: for its own correctness, an alias must
         rely on its parent's having been processed correctly
+***** DONE nothing to do : TextChanged
+      but add a comment: for its own correctness, a TextChanged
+        relies on its parent's having been processed correctly
+***** DONE nothing to do : ID
+      but add a comment: For correctness, an ID relies on
+        its parent having been handled correctly.
+***** IDCol
+      Ensure that your children are only, and in order,
+        the IDs of your parent.
 ***** HiddenInSubscribeeCol
-      Read your parent (Subscribee) and grandparent (Subscriber),
+      Read the col's ancestor 1 (Subscribee) and 3 (Subscriber),
       find everything subscriber hides that subscribee contains,
       and ensure your children are only those, and in order.
       Mark anything else 'parentIgnores'.
@@ -73,12 +122,6 @@
       Ensure that your children are, and in order,
         only what the subscriber hides that no subscribee contains.
       If you have no children, remove yourself.
-***** ID: nothing to do
-      but add a comment: For correctness, an ID relies on
-        its parent having been handled correctly.
-***** IDCol
-      Ensure that your children are only, and in order,
-        the IDs of your parent.
 ***** SubscribeeCol
       read your parent, and then
       - ensure your non-ignored truenode children
@@ -90,27 +133,21 @@
         TRICKY: The HiddenOutsideOfSubscribeeCol
         must be processed after all the subscribees,
         so it can determine what they have already excluded.
+        DFS postorder (children first) traversal ensures this.
 ***** TrueNode
-****** apply make_indef_if_repeat_then_extend_defmap to it
-****** mark its erroneous content children as parent-ignores
-       'erroneous content children' are truenode children
-       not marked parentIgnores but not among its content
-****** reorder children and complete content
-       Ensure your non-ignored truenode children are, and in order,
-       equal to your contents.
-       Reorder children to be non-truenodes,
-       then parentIgnored truenodes, then content truenodes.
-***** TextChanged
-      Nothing to rewrite -- this is more easily
-      deleted from the buffer and respawned fresh.
-      Add a comment to that effect.
+      Process view requests.
+      TRICKY: Best to do this once its content is recursively complete.
+      The earlier preorder completion gives it all its children.
+      This gives the view request maximum opportunity
+      to use some of that content rather than create new content.
 **** compute GraphNodeStats
      the function is currently called
        set_metadata_relationship_viewdata_in_forest
      but should be renamed
        set_graphnodestats_in_forest
 **** compute ViewNodeStats
-     This currently happens in two places.
+     This currently happens in at least two places.
+       detect_and_mark_cycle is one of them.
      They should be collected into a single function,
        set_viewnodestats_in_forest
 ***** detect_and_mark_cycle
@@ -119,9 +156,5 @@
 **** Contra previously, we correct aliases and other 'regenerables'
      As the code courrently stands, regenerating them.
      See the function remove_regenerable_scaffolds.
-**** TrueNode content completion should include 'phantoms'
-     when in git diff view.
-     I haven't described how to find those,
-     but it's already implemented somewhere.
-     For purposes of this plan they should be treated like content,
-     even though they are not content (anymore).
+** cleanup
+*** Isn't there already something like subtree_has_focus?

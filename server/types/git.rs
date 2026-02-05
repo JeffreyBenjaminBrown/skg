@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::{ListDiff, ListDiffEntry};
+use crate::types::list::{Diff_as_TwoLists_Lossy, Diff_as_OneList_Item};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -56,13 +56,13 @@ pub struct NodeChanges {
   /// True if title or body changed
   pub text_changed: bool,
   /// Changes to the aliases list
-  pub aliases_diff: ListDiff<String>,
+  pub aliases_diff: Diff_as_TwoLists_Lossy<String>,
   /// Changes to the ids list
-  pub ids_diff: ListDiff<ID>,
+  pub ids_diff: Diff_as_TwoLists_Lossy<ID>,
   /// Interleaved diff for ids, for display in IDCol scaffold
-  pub ids_interleaved: Vec<ListDiffEntry<ID>>,
+  pub ids_interleaved: Vec<Diff_as_OneList_Item<ID>>,
   /// Changes to the contains list
-  pub contains_diff: ListDiff<ID>,
+  pub contains_diff: Diff_as_TwoLists_Lossy<ID>,
 }
 
 /// Indicates how a node differs between the current state and HEAD.

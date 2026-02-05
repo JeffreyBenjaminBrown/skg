@@ -1,5 +1,13 @@
+* rename OrgNode -> ViewNode
+* TODO use just one kind of diff
+  thoughts/git-diff-report.org
+** ONGOING remove Diff_as_TwoLists_Lossy
+* ONGOING thoughts/buffer-update.org
 * internalizing
    'merge' into the type containing 'save' and 'delete'.
+** identify relevant extant tooling when asking for a given task
+   Even if vague, like
+   'this code includes utilities for doing things in trees'.
 ** If my request led it to make a function that addresses one case among the types badly, I likely screwed up.
    This happened when I asked AI to merge
 ** Don't refactor something without reading its comments.
@@ -15,14 +23,10 @@
      into the _v2 functions.
 *** when asking to move code
     Emphasize leaving whitespace, formatting unchanged.
-** Don't reload without checking!
+** Don't reload a buffer without checking.
    If a buffer is empty when I don't think it should be,
    don't reload it. Check on disk if it is in fact empty.
    If not, try hitting 'undo' to restore it.
-* ONGOING complete thoughts/buffer-update.org
-* TODO identify relevant extant tooling when asking for a given task
-  Even if vague, like
-  'this code includes utilities for doing things in trees'.
 * AWAITS NOT FULLY TESTED : git diff view
 ** refs
   see
