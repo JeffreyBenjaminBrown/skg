@@ -29,28 +29,23 @@ where
     } ).map_err( |e| -> String { e.into() } )?; }
   Ok( () ) }
 
-/// Partition children of a node based on a predicate.
-/// Returns (true_children, false_children) where:
-/// - true_children: NodeIds of children for which predicate returns true
-/// - false_children: NodeIds of children for which predicate returns false
+/// Classify children of a node based on a classifier function.
+/// Returns a HashMap from classification key to Vec<NodeId>.
 /// Order is preserved within each list.
 pub fn partition_children<Node, F> (
-  tree      : &Tree<Node>,
-  treeid    : NodeId,
-  predicate : F,
-) -> Result<( Vec<NodeId>, Vec<NodeId> ), String>
-where F: Fn(&Node) -> bool {
+  tree       : &Tree<Node>,
+  treeid     : NodeId,
+  classifier : F,
+) -> Result<HashMap<i32, Vec<NodeId>>, String>
+where F: Fn(&Node) -> i32 {
   let node_ref : NodeRef<Node> =
     tree.get( treeid )
     .ok_or( "partition_children: node not found" )?;
-  let mut true_children  : Vec<NodeId> = Vec::new();
-  let mut false_children : Vec<NodeId> = Vec::new();
+  let mut groups : HashMap<i32, Vec<NodeId>> = HashMap::new();
   for child_ref in node_ref.children() {
-    if predicate( child_ref.value() ) {
-      true_children.push( child_ref.id() );
-    } else {
-      false_children.push( child_ref.id() ); } }
-  Ok( ( true_children, false_children ) ) }
+    let key = classifier( child_ref.value() );
+    groups.entry( key ).or_default().push( child_ref.id() ); }
+  Ok( groups ) }
 
 /// Returns true if this node or any descendant satisfies the predicate.
 pub fn subtree_satisfies<Node, Predicate> (
@@ -131,7 +126,8 @@ where Relevant : Fn(&ViewNode) -> bool,
 ///
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 /// Creates new children for any orderkeys missing from the original children.
-pub fn complete_relevant_children<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse> (
+pub fn complete_relevant_children
+<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse> (
   tree                     : &mut Tree<Node>,
   parent_id                : NodeId,
   relevant                 : Relevant,
@@ -148,10 +144,15 @@ where
   ProblemDiscard  : Fn(&Tree<Node>, NodeId) -> Result<bool, String>,
   ProblemResponse : FnMut(&mut Node),
 {
-  let ( relevant_ids, irrelevant_ids )
-    : ( Vec<NodeId>, Vec<NodeId> )
-    = partition_children( tree, parent_id, &relevant )
-        .map_err( |e| -> Box<dyn Error> { e.into() } )?;
+  let groups : HashMap<i32, Vec<NodeId>> =
+    partition_children (
+      tree, parent_id,
+      |n| if relevant(n) { 1 } else { 0 } )
+        . map_err( |e| -> Box<dyn Error> { e.into() } )?;
+  let relevant_ids   : Vec<NodeId> =
+    groups.get( &1 ).cloned().unwrap_or_default();
+  let irrelevant_ids : Vec<NodeId> =
+    groups.get( &0 ).cloned().unwrap_or_default();
   let goal_list_as_set : HashSet<Orderkey> =
     goal_list.iter().cloned().collect();
 

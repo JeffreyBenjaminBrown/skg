@@ -7,10 +7,9 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
-use crate::types::viewnode::ViewNode;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
-use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind, checked_to_unchecked_tree };
+use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
 
 use ego_tree::{Tree, NodeRef};
 use futures::StreamExt;

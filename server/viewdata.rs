@@ -9,7 +9,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
-use ego_tree::{NodeId, Tree, NodeMut};
+use ego_tree::{NodeId, Tree};
 use typedb_driver::TypeDBDriver;
 
 /// Each of these describes some kind of relationship,

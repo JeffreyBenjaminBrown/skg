@@ -73,6 +73,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 **** move_child_to_end
 *** do these, in serial
 **** DFS preorder (parent-first) completion
+***** TODO a smaller part of the TrueNode function
 ***** TODO TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
 ****** if it's definitive
@@ -103,6 +104,8 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
         This is only needed in the git diff view.
 ******* if an IDCol is needed and absent, prepend one as a child
         This is only needed in the git diff view.
+******* If an AliasCol is needed and absent, prepend it as a child.
+        It is only needed in the git diff view.
 ****** if it's indefinitive
        Run clobberIndefinitiveOrgnode on it.
 ***** SubscribeeCol
