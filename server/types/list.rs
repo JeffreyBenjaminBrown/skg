@@ -17,10 +17,11 @@ pub struct Diff_as_TwoLists_Lossy<T> {
   pub removed: Vec<T>,
 }
 
-/// An entry in an interleaved diff list.
+/// An entry in a list representing
+/// the diff of a 'new' list against an 'old' list.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
-pub enum Diff_as_OneList_Item<T> {
+pub enum Diff_Item<T> {
   /// Item exists in both old and new at same relative position
   Unchanged(T),
   /// Item was in old but not in new (or moved away)
@@ -65,7 +66,7 @@ where
 pub fn compute_interleaved_diff<T> (
   old : &[T],
   new : &[T],
-) -> Vec<Diff_as_OneList_Item<T>>
+) -> Vec<Diff_Item<T>>
 where
   T: Clone + Eq + std::hash::Hash,
 { // Use the similar crate for efficient LCS-based diff
@@ -90,7 +91,7 @@ where
       . collect();
   let diff : TextDiff<str> = // Use similar crate for the actual diff
     TextDiff::from_chars ( &old_str, &new_str );
-  let mut result : Vec<Diff_as_OneList_Item<T>> =
+  let mut result : Vec<Diff_Item<T>> =
     Vec::new();
   let mut old_idx : usize = 0;
   let mut new_idx : usize = 0;
@@ -98,18 +99,18 @@ where
     match change . tag() {
       ChangeTag::Equal => {
         if new_idx < new . len() {
-          result . push ( Diff_as_OneList_Item::Unchanged (
+          result . push ( Diff_Item::Unchanged (
             new[new_idx] . clone() )); }
         old_idx += 1;
         new_idx += 1; },
       ChangeTag::Delete => {
         if old_idx < old . len() {
-          result . push ( Diff_as_OneList_Item::RemovedHere (
+          result . push ( Diff_Item::RemovedHere (
             old[old_idx] . clone() )); }
         old_idx += 1; },
       ChangeTag::Insert => {
         if new_idx < new . len() {
-          result . push ( Diff_as_OneList_Item::NewHere (
+          result . push ( Diff_Item::NewHere (
             new[new_idx] . clone() )); }
         new_idx += 1; }}}
   result }

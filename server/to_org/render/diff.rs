@@ -3,7 +3,7 @@
 
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
-use crate::types::list::Diff_as_OneList_Item;
+use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_indefinitive_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -128,11 +128,11 @@ fn prepend_idcol_with_children (
   for entry in &node_changes . ids_interleaved {
     let (id_str, diff) : (String, Option<FieldDiffStatus>) =
       match entry {
-        Diff_as_OneList_Item::Unchanged ( id ) =>
+        Diff_Item::Unchanged ( id ) =>
           ( id . 0 . clone(), None ),
-        Diff_as_OneList_Item::NewHere ( id ) =>
+        Diff_Item::NewHere ( id ) =>
           ( id . 0 . clone(), Some ( FieldDiffStatus::New )),
-        Diff_as_OneList_Item::RemovedHere ( id ) =>
+        Diff_Item::RemovedHere ( id ) =>
           ( id . 0 . clone(), Some ( FieldDiffStatus::Removed )), };
     let id_scaffold : Scaffold =
       Scaffold::ID { id: id_str, diff };

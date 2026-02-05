@@ -1,5 +1,5 @@
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, SkgnodeDiff, NodeChanges };
-use crate::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_as_OneList_Item};
+use crate::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_Item};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -90,7 +90,7 @@ fn compare_skgnodes (
       & new . aliases . clone() . unwrap_or_default() );
   let ids_diff : Diff_as_TwoLists_Lossy<ID> =
     diff_lists ( & old . ids, & new . ids );
-  let ids_interleaved : Vec<Diff_as_OneList_Item<ID>> =
+  let ids_interleaved : Vec<Diff_Item<ID>> =
     compute_interleaved_diff ( & old . ids, & new . ids );
   let contains_diff : Diff_as_TwoLists_Lossy<ID> =
     diff_lists (

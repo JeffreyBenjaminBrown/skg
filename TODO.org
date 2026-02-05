@@ -1,8 +1,7 @@
-* rename OrgNode -> ViewNode
 * TODO use just one kind of diff
   thoughts/git-diff-report.org
 ** ONGOING remove Diff_as_TwoLists_Lossy
-* ONGOING thoughts/buffer-update.org
+* AWAITS one kind of diff : thoughts/buffer-update.org
 * internalizing
    'merge' into the type containing 'save' and 'delete'.
 ** identify relevant extant tooling when asking for a given task

@@ -6,7 +6,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use skg::git_ops::read_repo::{ head_is_merge_commit, get_file_content_at_head };
-use skg::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_as_OneList_Item};
+use skg::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_Item};
 
 fn setup_git_repo() -> (TempDir, Repository) {
   let dir : TempDir =
@@ -105,7 +105,7 @@ fn test_interleaved_diff() {
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "d", "c"];
-  let interleaved : Vec<Diff_as_OneList_Item<&str>> =
+  let interleaved : Vec<Diff_Item<&str>> =
     compute_interleaved_diff ( &old, &new );
   let mut found_removed_b : bool = // Should have: a (unchanged), b (removed), d (new), c (unchanged)
     false;
@@ -113,8 +113,8 @@ fn test_interleaved_diff() {
     false;
   for entry in &interleaved {
     match entry {
-      Diff_as_OneList_Item::RemovedHere(s) if *s == "b" => found_removed_b = true,
-      Diff_as_OneList_Item::NewHere(s) if *s == "d" => found_new_d = true,
+      Diff_Item::RemovedHere(s) if *s == "b" => found_removed_b = true,
+      Diff_Item::NewHere(s) if *s == "d" => found_new_d = true,
       _ => {} }}
   assert! ( found_removed_b );
   assert! ( found_new_d ); }

@@ -37,8 +37,8 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 *** set_metadata_relationship_viewdata_in_forest
 ** how to redo buffer update
 *** make these changes
-**** AliasCol, SubscribeeCol, IDCol only need completion if
-     their parent is an indef TrueNode.
+**** AliasCol, SubscribeeCol, IDCol
+     They only need completion if their parent is an indef TrueNode.
      If it is definitive then they just defined the truth,
      so they don't need to be adjusted toward it.
      But completion should proceed within them.
@@ -78,7 +78,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
         Reorder children to be non-truenodes,
         then parentIgnored truenodes, then content truenodes.
         In in git diff view, insert phantom nodes
-        (it is implemented elsewhere)
+        (this is already implemented somewhere)
         into the source of truth for the content list.
 ******* mark its erroneous content children as parent-ignores
         'erroneous content children' are truenode children

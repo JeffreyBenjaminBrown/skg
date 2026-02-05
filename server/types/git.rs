@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::{Diff_as_TwoLists_Lossy, Diff_as_OneList_Item};
+use crate::types::list::{Diff_as_TwoLists_Lossy, Diff_Item};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -60,7 +60,7 @@ pub struct NodeChanges {
   /// Changes to the ids list
   pub ids_diff: Diff_as_TwoLists_Lossy<ID>,
   /// Interleaved diff for ids, for display in IDCol scaffold
-  pub ids_interleaved: Vec<Diff_as_OneList_Item<ID>>,
+  pub ids_interleaved: Vec<Diff_Item<ID>>,
   /// Changes to the contains list
   pub contains_diff: Diff_as_TwoLists_Lossy<ID>,
 }
