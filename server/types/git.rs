@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::{Diff_as_TwoLists_Lossy, Diff_Item};
+use crate::types::list::Diff_Item;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -53,16 +53,10 @@ pub enum GitDiffStatus {
 /// Represents changes to a single SkgNode.
 #[derive(Debug, Clone, Default)]
 pub struct NodeChanges {
-  /// True if title or body changed
   pub text_changed: bool,
-  /// Changes to the aliases list
-  pub aliases_diff: Diff_as_TwoLists_Lossy<String>,
-  /// Changes to the ids list
-  pub ids_diff: Diff_as_TwoLists_Lossy<ID>,
-  /// Interleaved diff for ids, for display in IDCol scaffold
-  pub ids_interleaved: Vec<Diff_Item<ID>>,
-  /// Changes to the contains list
-  pub contains_diff: Diff_as_TwoLists_Lossy<ID>,
+  pub aliases_diff: Vec<Diff_Item<String>>,
+  pub ids_diff: Vec<Diff_Item<ID>>,
+  pub contains_diff: Vec<Diff_Item<ID>>,
 }
 
 /// Indicates how a node differs between the current state and HEAD.

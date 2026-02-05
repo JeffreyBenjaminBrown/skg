@@ -1,5 +1,5 @@
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, SkgnodeDiff, NodeChanges };
-use crate::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_Item};
+use crate::types::list::{compute_interleaved_diff, Diff_Item};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
@@ -84,21 +84,18 @@ fn compare_skgnodes (
   let text_changed : bool =
     old . title != new . title ||
     old . body  != new . body;
-  let aliases_diff : Diff_as_TwoLists_Lossy<String> =
-    diff_lists (
+  let aliases_diff : Vec<Diff_Item<String>> =
+    compute_interleaved_diff (
       & old . aliases . clone() . unwrap_or_default(),
       & new . aliases . clone() . unwrap_or_default() );
-  let ids_diff : Diff_as_TwoLists_Lossy<ID> =
-    diff_lists ( & old . ids, & new . ids );
-  let ids_interleaved : Vec<Diff_Item<ID>> =
+  let ids_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff ( & old . ids, & new . ids );
-  let contains_diff : Diff_as_TwoLists_Lossy<ID> =
-    diff_lists (
+  let contains_diff : Vec<Diff_Item<ID>> =
+    compute_interleaved_diff (
       & old . contains . clone() . unwrap_or_default(),
       & new . contains . clone() . unwrap_or_default() );
   NodeChanges {
     text_changed,
     aliases_diff,
     ids_diff,
-    ids_interleaved,
     contains_diff }}

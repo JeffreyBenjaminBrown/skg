@@ -1,7 +1,4 @@
-* TODO use just one kind of diff
-  thoughts/git-diff-report.org
-** ONGOING remove Diff_as_TwoLists_Lossy
-* AWAITS one kind of diff : thoughts/buffer-update.org
+* TODO thoughts/buffer-update.org
 * internalizing
    'merge' into the type containing 'save' and 'delete'.
 ** identify relevant extant tooling when asking for a given task

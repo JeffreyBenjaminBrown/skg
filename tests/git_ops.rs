@@ -6,7 +6,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use skg::git_ops::read_repo::{ head_is_merge_commit, get_file_content_at_head };
-use skg::types::list::{diff_lists, compute_interleaved_diff, Diff_as_TwoLists_Lossy, Diff_Item};
+use skg::types::list::{compute_interleaved_diff, Diff_Item};
 
 fn setup_git_repo() -> (TempDir, Repository) {
   let dir : TempDir =
@@ -67,37 +67,40 @@ fn test_get_file_content_at_head() {
   assert_eq! ( no_content, None ); }
 
 #[test]
-fn test_diff_lists_no_changes() {
+fn test_interleaved_diff_no_changes() {
   let old : Vec<&str> =
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "b", "c"];
-  let diff : Diff_as_TwoLists_Lossy<&str> =
-    diff_lists ( &old, &new );
-  assert! ( diff . added . is_empty() );
-  assert! ( diff . removed . is_empty() ); }
+  assert_eq! (
+    compute_interleaved_diff ( &old, &new ),
+    vec![ Diff_Item::Unchanged  ("a"),
+          Diff_Item::Unchanged  ("b"),
+          Diff_Item::Unchanged  ("c") ]); }
 
 #[test]
-fn test_diff_lists_additions() {
+fn test_interleaved_diff_additions() {
   let old : Vec<&str> =
     vec!["a", "c"];
   let new : Vec<&str> =
     vec!["a", "b", "c"];
-  let diff : Diff_as_TwoLists_Lossy<&str> =
-    diff_lists ( &old, &new );
-  assert_eq! ( diff . added, vec!["b"] );
-  assert! ( diff . removed . is_empty() ); }
+  assert_eq! (
+    compute_interleaved_diff ( &old, &new ),
+    vec![ Diff_Item::Unchanged  ("a"),
+          Diff_Item::NewHere    ("b"),
+          Diff_Item::Unchanged  ("c") ]); }
 
 #[test]
-fn test_diff_lists_removals() {
+fn test_interleaved_diff_removals() {
   let old : Vec<&str> =
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "c"];
-  let diff : Diff_as_TwoLists_Lossy<&str> =
-    diff_lists ( &old, &new );
-  assert! ( diff . added . is_empty() );
-  assert_eq! ( diff . removed, vec!["b"] ); }
+  assert_eq! (
+    compute_interleaved_diff ( &old, &new ),
+    vec![ Diff_Item::Unchanged   ("a"),
+          Diff_Item::RemovedHere ("b"),
+          Diff_Item::Unchanged   ("c") ]); }
 
 #[test]
 fn test_interleaved_diff() {
@@ -105,16 +108,9 @@ fn test_interleaved_diff() {
     vec!["a", "b", "c"];
   let new : Vec<&str> =
     vec!["a", "d", "c"];
-  let interleaved : Vec<Diff_Item<&str>> =
-    compute_interleaved_diff ( &old, &new );
-  let mut found_removed_b : bool = // Should have: a (unchanged), b (removed), d (new), c (unchanged)
-    false;
-  let mut found_new_d : bool =
-    false;
-  for entry in &interleaved {
-    match entry {
-      Diff_Item::RemovedHere(s) if *s == "b" => found_removed_b = true,
-      Diff_Item::NewHere(s) if *s == "d" => found_new_d = true,
-      _ => {} }}
-  assert! ( found_removed_b );
-  assert! ( found_new_d ); }
+  assert_eq! (
+    compute_interleaved_diff ( &old, &new ),
+    vec![ Diff_Item::Unchanged   ("a"),
+          Diff_Item::RemovedHere ("b"),
+          Diff_Item::NewHere     ("d"),
+          Diff_Item::Unchanged   ("c") ]); }

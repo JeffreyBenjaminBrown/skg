@@ -82,8 +82,8 @@ fn process_truenode_diff (
     if node_changes . text_changed {
       node_mut . prepend (
         viewnode_from_scaffold ( Scaffold::TextChanged )); }
-    if ! ( node_changes . ids_diff . added   . is_empty() &&
-           node_changes . ids_diff . removed . is_empty() ) {
+    if ! node_changes . ids_diff . iter()
+           . all ( |d| matches! ( d, Diff_Item::Unchanged(_) )) {
       prepend_idcol_with_children (
         &mut node_mut, node_changes ); }
     process_truenode_contains_diff (
@@ -125,7 +125,7 @@ fn prepend_idcol_with_children (
     node_mut . prepend ( idcol_node ) . id();
   let mut idcol_mut : NodeMut<ViewNode> =
     node_mut . tree() . get_mut ( idcol_treeid ) . unwrap();
-  for entry in &node_changes . ids_interleaved {
+  for entry in &node_changes . ids_diff {
     let (id_str, diff) : (String, Option<FieldDiffStatus>) =
       match entry {
         Diff_Item::Unchanged ( id ) =>
@@ -151,7 +151,11 @@ fn process_truenode_contains_diff (
   config       : &SkgConfig,
 ) -> Result<(), String> {
   let added_ids : HashSet<&ID> =
-    node_changes . contains_diff . added . iter() . collect();
+    node_changes . contains_diff . iter()
+      . filter_map ( |d| match d {
+          Diff_Item::NewHere ( id ) => Some ( id ),
+          _ => None })
+      . collect();
   mark_newhere_children (
     node_mut, tree_node_id, &added_ids, source_diff );
   insert_phantom_nodes_for_removed_children (
@@ -191,7 +195,13 @@ fn insert_phantom_nodes_for_removed_children (
   source       : &SourceName,
   config       : &SkgConfig,
 ) -> Result<(), String> {
-  for removed_child_id in &node_changes . contains_diff . removed {
+  let removed_ids : Vec<&ID> =
+    node_changes . contains_diff . iter()
+      . filter_map ( |d| match d {
+          Diff_Item::RemovedHere ( id ) => Some ( id ),
+          _ => None })
+      . collect();
+  for removed_child_id in removed_ids {
     let child_skgnode_diff : Option<&SkgnodeDiff> = {
       let child_file_path : PathBuf =
         PathBuf::from ( format! ( "{}.skg", removed_child_id . 0 ));

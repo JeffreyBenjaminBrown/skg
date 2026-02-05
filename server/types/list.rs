@@ -1,26 +1,16 @@
 /// Generic list diff types and utilities.
 
 use similar::{ChangeTag, TextDiff};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 //
 // Types
 //
 
-/// Result of comparing two lists.
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Default)]
-pub struct Diff_as_TwoLists_Lossy<T> {
-  /// In new but not old. In git context, items added since HEAD.
-  pub added: Vec<T>,
-  /// In old but not new. In git context, items removed since HEAD.
-  pub removed: Vec<T>,
-}
-
 /// An entry in a list representing
 /// the diff of a 'new' list against an 'old' list.
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Diff_Item<T> {
   /// Item exists in both old and new at same relative position
   Unchanged(T),
@@ -33,33 +23,6 @@ pub enum Diff_Item<T> {
 //
 // Functions
 //
-
-/// Compute a diff between two lists.
-/// Returns information about additions and removals.
-pub fn diff_lists<T> (
-  old : &[T],
-  new : &[T],
-) -> Diff_as_TwoLists_Lossy<T>
-where
-  T: Clone + Eq + std::hash::Hash,
-{
-  let old_set : HashSet<&T> = // Build sets for quick lookup
-    old . iter() . collect();
-  let new_set : HashSet<&T> =
-    new . iter() . collect();
-  let added : Vec<T> = // Items added (in new but not in old)
-    new . iter()
-      . filter ( |item| ! old_set . contains ( item ) )
-      . cloned()
-      . collect();
-  let removed : Vec<T> = // Items removed (in old but not in new)
-    old . iter()
-      . filter ( |item| ! new_set . contains ( item ) )
-      . cloned()
-      . collect();
-  Diff_as_TwoLists_Lossy {
-    added,
-    removed }}
 
 /// Compute an interleaved diff showing removed-here and new-here positions.
 /// Uses LCS-based algorithm via the `similar` crate.
