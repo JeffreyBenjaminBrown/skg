@@ -110,6 +110,10 @@ where Relevant : Fn(&ViewNode) -> bool,
     problem_discard,
     problem_discard_response ) }
 
+/// TODO ?
+/// Marking parentIgnores seems smarter than deletion.
+///
+/// PURPOSE:
 /// Reconciles a parent's "relevant" children against a desired list of 'orderkeys'.
 /// The payload of each tree node should be some possibly-improper supertype of
 /// 'orderkey' -- that is, there is a way to extract the orderkey from a node,

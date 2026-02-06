@@ -72,6 +72,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 **** subtree_has_focus
 **** move_child_to_end
 *** do these, in serial
+**** TODO Subscribee is a TrueNode case
 **** DFS preorder (parent-first) completion
 ***** DONE TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
