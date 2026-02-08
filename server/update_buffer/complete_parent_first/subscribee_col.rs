@@ -7,8 +7,8 @@ use crate::types::viewnode::{
     mk_indefinitive_viewnode};
 use crate::types::tree::generic::{
     error_unless_node_satisfies,
-    read_at_node_in_tree,
-    write_at_node_in_tree,
+    read_at_ancestor_in_tree,
+    write_at_ancestor_in_tree,
     with_node_mut};
 use crate::types::tree::viewnode_skgnode::{
     unique_scaffold_child,
@@ -49,18 +49,15 @@ pub async fn complete_subscribee_col_preorder (
                                    Scaffold::SubscribeeCol )),
       "complete_subscribee_col_preorder: expected SubscribeeCol"
     ). map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
-  let parent_treeid : NodeId =
-    tree.get( node )
-      .ok_or( "complete_subscribee_col_preorder: node not found" ) ?
-      .parent()
-      .ok_or( "complete_subscribee_col_preorder: SubscribeeCol has no parent" ) ?
-      .id();
   let (parent_skgid, parent_indefinitive) : (ID, bool) =
-    read_at_node_in_tree( tree, parent_treeid,
+    read_at_ancestor_in_tree(
+      tree, node, 1,
       |vn : &ViewNode| match &vn.kind {
         ViewNodeKind::True( t ) =>
           Some(( t.id.clone(), t.indefinitive )),
-        _ => None } ) ? .ok_or( "complete_subscribee_col_preorder: parent is not a TrueNode" ) ?;
+        _ => None } )
+    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
+    . ok_or( "complete_subscribee_col_preorder: parent is not a TrueNode" ) ?;
   let subscribees : Vec<ID> =
     map.get( &parent_skgid )
       .map( |skg| skg.subscribes_to.clone().unwrap_or_default() )
@@ -69,8 +66,9 @@ pub async fn complete_subscribee_col_preorder (
     let has_focus : bool =
       subtree_satisfies( tree, node, &|n : &ViewNode| n.focused ) ?;
     if has_focus {
-      write_at_node_in_tree( tree, parent_treeid,
-        |vn : &mut ViewNode| { vn.focused = true; } ) ?; }
+      write_at_ancestor_in_tree( tree, node, 1,
+        |vn : &mut ViewNode| { vn.focused = true; } )
+      .map_err( |e| -> Box<dyn Error> { e.into() } ) ?; }
     with_node_mut( tree, node, |mut n| { n.detach(); } )
       .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
     return Ok(( )); }
@@ -97,13 +95,12 @@ pub async fn complete_subscribee_col_preorder (
                                  if !t.parent_ignores ),
       |vn : &ViewNode| match &vn.kind {
         ViewNodeKind::True( t ) => t.id.clone(),
-        _ => panic!(
-          "complete_subscribee_col_preorder: \
-           relevant child not TrueNode" ) },
+        _ => panic!( "complete_subscribee_col_preorder: \
+                      relevant child not TrueNode" ) },
       &subscribees,
       |id : &ID| {
-        let ( source, title ) = child_data.get( id ).expect(
-          "complete_subscribee_col_preorder: child data not pre-fetched" );
+        let ( source, title ) =
+          child_data . get( id ) . expect( "complete_subscribee_col_preorder: child data not pre-fetched" );
         mk_indefinitive_viewnode(
           id.clone(), source.clone(),
           title.clone(), false ) }, ) ?; }
@@ -121,7 +118,8 @@ pub async fn complete_subscribee_col_preorder (
   Ok(( )) }
 
 /// Build a map from subscribee ID to (source, title)
-/// for use in the create_child closure.
+/// for use in the create_child closure argument to
+/// complete_relevant_children_in_viewnodetree.
 /// By this point all subscribees should be in the map
 /// (loaded in the previous step if they were missing).
 /// For each subscribee ID:

@@ -22,7 +22,7 @@ where F: FnOnce(&T) -> R, {
 /// The `generation` parameter specifies how many generations to climb up:
 /// 0 = the node itself, 1 = parent, 2 = grandparent, etc.
 /// Returns an error if the node is not found or if we can't climb that high.
-fn write_at_ancestor_in_tree<T, F, R>(
+pub fn write_at_ancestor_in_tree<T, F, R>(
   tree: &mut Tree<T>,
   treeid: NodeId,
   generation: usize,

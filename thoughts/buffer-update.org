@@ -38,12 +38,6 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 ** how to redo buffer update
 *** refs
     server/update_buffer/complete_parent_first/truenode.rs
-*** ONGOING Subscribee is a TrueNode case
-*** TODO git diff view affects SubscribeeCol's children
-Compute a diff list, like in complete_truenode_preorder,
-for the subscribeecol's children.
-This should be whatever its parent subscribes to (new),
-diffed against whatever it used to subscribe to (old).
 *** notes and complications
 **** We now correct, not regenerate, aliases and other 'regenerables'.
      As the code courrently stands, regenerating them.
@@ -84,25 +78,28 @@ diffed against whatever it used to subscribe to (old).
 ***** DONE TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
 ****** if it's definitive
-******* reorder children and complete content
-        Ensure its non-ignored truenode children are,
-        and in order, equal to its contents.
-        Do this by running complete_relevant_children
-        on its content (from the skgnode)
-        and its children (from the viewnode tree).
+******* if it's not a subscribee
+******** reorder children and complete content
+         Ensure its non-ignored truenode children are,
+         and in order, equal to its contents.
+         Do this by running complete_relevant_children
+         on its content (from the skgnode)
+         and its children (from the viewnode tree).
 
-        Reorder children to be non-truenodes,
-        then parentIgnored truenodes, then content truenodes.
-        Use partition_children for this.
+         Reorder children to be non-truenodes,
+         then parentIgnored truenodes, then content truenodes.
+         Use partition_children for this.
 
-        If in git diff view, insert phantom nodes
-        (this is already implemented somewhere)
-        into the source of truth for the content list.
-******* mark its erroneous content children as parent-ignores
-        'erroneous content children' are truenode children
-        not marked parentIgnores but not among its content.
-        Use its skgnode (not its viewnode) to determine its content.
-        Use 'treat_certain_children' and 'skgnode_for_viewnode'.
+         If in git diff view, insert phantom nodes
+         (this is already implemented somewhere)
+         into the source of truth for the content list.
+******** mark its erroneous content children as parent-ignores
+         'erroneous content children' are truenode children
+         not marked parentIgnores but not among its content.
+         Use its skgnode (not its viewnode) to determine its content.
+         Use 'treat_certain_children' and 'skgnode_for_viewnode'.
+******* if it's a subscribee
+Its target child content list depends on hidden nodes. Do everything in 'if it's not a subscribee' except with a different content list.
 ******* if a SubscribeeCol is needed and absent, prepend one as a child
         It is needed if the associated skgnode subscribes to anything.
         Don't populate the SubscribeCol with grandchildren

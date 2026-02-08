@@ -145,9 +145,9 @@ fn complete_non_subscribee_truenode (
     tree, node, content_ids ) ?;
   Ok(( )) }
 
-/// Like complete_non_subscribee_truenode, but filters content_ids
-/// to exclude IDs that the grandparent (subscriber) hides.
-/// The grandparent is: node -> SubscribeeCol -> subscriber.
+/// Almost identical to complete_non_subscribee_truenode,
+/// but filter from the target list of children
+/// anything the subscriber (grandparent) hides.
 fn complete_subscribee_truenode (
   // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
   // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
