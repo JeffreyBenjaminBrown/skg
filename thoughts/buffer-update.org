@@ -36,8 +36,16 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
     so that they can be integrated with overlapping content.
 *** set_metadata_relationship_viewdata_in_forest
 ** how to redo buffer update
+*** refs
+    server/update_buffer/complete_parent_first/truenode.rs
+*** ONGOING Subscribee is a TrueNode case
+*** TODO git diff view affects SubscribeeCol's children
+Compute a diff list, like in complete_truenode_preorder,
+for the subscribeecol's children.
+This should be whatever its parent subscribes to (new),
+diffed against whatever it used to subscribe to (old).
 *** notes and complications
-**** Contra previously, we correct aliases and other 'regenerables'.
+**** We now correct, not regenerate, aliases and other 'regenerables'.
      As the code courrently stands, regenerating them.
      See the function remove_regenerable_scaffolds.
 **** Some viewnodes only need completion if their parent is indef.
@@ -72,7 +80,6 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 **** subtree_has_focus
 **** move_child_to_end
 *** do these, in serial
-**** TODO Subscribee is a TrueNode case
 **** DFS preorder (parent-first) completion
 ***** DONE TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
