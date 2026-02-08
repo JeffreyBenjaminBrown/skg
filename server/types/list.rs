@@ -1,7 +1,7 @@
 /// Generic list diff types and utilities.
 
 use similar::{ChangeTag, TextDiff};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 //
 // Types
@@ -77,3 +77,22 @@ where
             new[new_idx] . clone() )); }
         new_idx += 1; }}}
   result }
+
+/// From a diff, extract:
+/// - itemlist: all items (Unchanged, New, and Removed)
+/// - removedset: only the Removed items
+pub fn itemlist_and_removedset_from_diff<T> (
+  diff : &[Diff_Item<T>],
+) -> (Vec<T>, HashSet<T>)
+where T: Clone + Eq + std::hash::Hash {
+  let mut itemlist : Vec<T> = Vec::new();
+  let mut removedset : HashSet<T> = HashSet::new();
+  for d in diff {
+    match d {
+      Diff_Item::Unchanged( x )
+      | Diff_Item::New( x ) =>
+        { itemlist.push( x.clone() ); },
+      Diff_Item::Removed( x ) =>
+        { itemlist.push( x.clone() );
+          removedset.insert( x.clone() ); }} }
+  (itemlist, removedset) }

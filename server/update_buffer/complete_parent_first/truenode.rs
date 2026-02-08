@@ -2,14 +2,16 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::render::diff::mk_phantom_viewnode;
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode};
-use crate::types::list::Diff_Item;
+use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
+use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold,
     mk_definitive_viewnode};
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, read_at_ancestor_in_tree, read_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
     pid_and_source_from_treenode,
     unique_scaffold_child,
@@ -88,34 +90,120 @@ pub fn complete_truenode_preorder (
     skgnode.subscribes_to.clone().unwrap_or_default();
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
-  { let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-      match node_changes {
-        None => (content_ids.clone(),
-                 HashSet::new()),
-        Some( nc ) => {
-          let mut goals : Vec<ID> = Vec::new();
-          let mut removed : HashSet<ID> = HashSet::new();
-          for d in &nc.contains_diff {
-            match d {
-              Diff_Item::Unchanged( id ) =>
-                { goals.push( id.clone() ); },
-              Diff_Item::New( id ) =>
-                { goals.push( id.clone() ); },
-              Diff_Item::Removed( id ) =>
-                { goals.push( id.clone() );
-                  removed.insert( id.clone() ); }} }
-          (goals, removed) }, };
-    complete_content_children(
-      tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config ) ?; }
-  mark_erroneous_content_children_as_parent_ignores(
-    tree, node, &content_ids ) ?;
+  { if is_subscribee( tree, node ) ? {
+      complete_subscribee_truenode(
+        tree, node, &content_ids, node_changes,
+        source_diffs, map, config ) ?;
+    } else {
+      complete_non_subscribee_truenode(
+        tree, node, &content_ids, node_changes,
+        source_diffs, map, config ) ?; } }
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
     tree, node, &subscribes_to ) ?;
   maybe_prepend_diff_view_scaffolds(
     tree, node, node_changes ) ?;
+  Ok(( )) }
+
+/// Whether this is a non-ignored child of a SubscribeeCol.
+fn is_subscribee (
+  tree : &Tree<ViewNode>,
+  node : NodeId,
+) -> Result<bool, Box<dyn Error>> {
+  let not_parent_ignores : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn.kind {
+        ViewNodeKind::True( t ) => !t.parent_ignores,
+        _ => false } ) ?;
+  let parent_is_subscribee_col : bool =
+    read_at_ancestor_in_tree( tree, node, 1,
+      |vn : &ViewNode| matches!( &vn.kind,
+        ViewNodeKind::Scaff( Scaffold::SubscribeeCol )))
+    .unwrap_or( false );
+  Ok( not_parent_ignores && parent_is_subscribee_col ) }
+
+fn complete_non_subscribee_truenode (
+  tree         : &mut Tree<ViewNode>,
+  node         : NodeId,
+  content_ids  : &[ID],
+  node_changes : Option<&NodeChanges>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  map          : &mut SkgNodeMap,
+  config       : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  { let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+      match node_changes {
+        None => (content_ids.to_vec(),
+                 HashSet::new()),
+        Some( nc ) =>
+          itemlist_and_removedset_from_diff( &nc.contains_diff ) };
+    complete_content_children(
+      tree, node, &goal_list, &removed_ids,
+      source_diffs, map, config ) ?; }
+  mark_erroneous_content_children_as_parent_ignores(
+    tree, node, content_ids ) ?;
+  Ok(( )) }
+
+/// Like complete_non_subscribee_truenode, but filters content_ids
+/// to exclude IDs that the grandparent (subscriber) hides.
+/// The grandparent is: node -> SubscribeeCol -> subscriber.
+fn complete_subscribee_truenode (
+  // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
+  // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
+  tree         : &mut Tree<ViewNode>,
+  node         : NodeId,
+  content_ids  : &[ID],
+  node_changes : Option<&NodeChanges>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  map          : &mut SkgNodeMap,
+  config       : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let (grandparent_pid, grandparent_source) : (ID, SourceName) =
+    read_at_ancestor_in_tree( tree, node, 2,
+      |vn : &ViewNode| match &vn.kind {
+        ViewNodeKind::True( t ) =>
+          Ok(( t.id.clone(), t.source.clone() )),
+        _ => Err( "complete_subscribee_truenode: grandparent is not a TrueNode" ) } )
+    . map_err( |e| -> Box<dyn Error> { e.into() } ) ? ?;
+  let worktree_hidden : Vec<ID> =
+    { let grandparent_skgnode : &SkgNode =
+        skgnode_from_map_or_disk(
+          &grandparent_pid, &grandparent_source, map, config ) ?;
+      grandparent_skgnode.hides_from_its_subscriptions
+        . clone() . unwrap_or_default() };
+  let worktree_visible_content : Vec<ID> =
+    setlike_vector_subtraction (
+      content_ids.to_vec(), &worktree_hidden );
+  { let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+      match node_changes {
+        None => (worktree_visible_content.clone(),
+                 HashSet::new()),
+        Some( nc ) => {
+          let head_hidden : Vec<ID> =
+            skgnode_from_git_head(
+                &grandparent_pid, &grandparent_source, config )
+              . ok()
+              . and_then( |skg| skg.hides_from_its_subscriptions )
+              . unwrap_or_default();
+          let head_visible : Vec<ID> =
+            setlike_vector_subtraction(
+              nc . contains_diff . iter() .filter_map (
+                  |d| match d { // If it's New, it was not in HEAD.
+                    Diff_Item::Unchanged( id ) |
+                      Diff_Item::Removed( id ) => Some( id.clone() ),
+                    Diff_Item::New( _ ) => None } )
+                . collect(),
+              &head_hidden );
+          let visible_diff : Vec<Diff_Item<ID>> =
+            compute_interleaved_diff(
+              &head_visible, &worktree_visible_content );
+          itemlist_and_removedset_from_diff( &visible_diff ) }, };
+    complete_content_children(
+      tree, node, &goal_list, &removed_ids,
+      source_diffs, map, config ) ?; }
+  mark_erroneous_content_children_as_parent_ignores(
+    tree, node, &worktree_visible_content ) ?;
   Ok(( )) }
 
 /// Reconcile the node's non-parentIgnored TrueNode children

@@ -45,7 +45,7 @@ where T: Clone + Eq + Hash {
 
 /// Removes from 'subtracting_from' anything in 'subtracting'.
 /// Preserves the order of elements in 'subtracting_from'.
-pub(super) fn setlike_vector_subtraction<T> (
+pub fn setlike_vector_subtraction<T> (
   subtracting_from : Vec<T>,
   subtracting      : &[T],
 ) -> Vec<T>
