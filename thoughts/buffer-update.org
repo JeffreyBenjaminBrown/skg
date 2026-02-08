@@ -156,10 +156,7 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
       Ensure that your children are only, and in order,
         the IDs of your parent,
         or (in the git diff view) the difflist associated with it.
-***** Subscribee
-      Append a HiddenInSubscribeeCol child.
-      Don't populate it with grandchildren.
-***** ONGOING HiddenInSubscribeeCol
+***** DONE HiddenInSubscribeeCol
 ****** ordinary
        Read the col's ancestor 1 (Subscribee) and 3 (Subscriber),
        find everything subscriber hides that subscribee contains,
