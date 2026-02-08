@@ -91,7 +91,7 @@ pub fn viewnode_from_metadata (
                               text: title . clone (),
                               diff: metadata . scaffold_diff },
           Scaffold::ID    { .. } => Scaffold::ID {
-                              id: title . clone (),
+                              id: title . clone () . into (),
                               diff: metadata . scaffold_diff },
           other => other . clone () };
         ( UncheckedViewNodeKind::Scaff ( scaffold_with_title ), error )
@@ -192,7 +192,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idCol" =>
             result . scaffold = Some ( Scaffold::IDCol ),
           "id" =>
-            result . scaffold = Some ( Scaffold::ID { id: String::new(), diff: None } ),
+            result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },

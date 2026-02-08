@@ -135,7 +135,7 @@ fn prepend_idcol_with_children (
         Diff_Item::Removed ( id ) =>
           ( id . 0 . clone(), Some ( FieldDiffStatus::Removed )), };
     let id_scaffold : Scaffold =
-      Scaffold::ID { id: id_str, diff };
+      Scaffold::ID { id: id_str.into(), diff };
     let id_viewnode : ViewNode =
       viewnode_from_scaffold ( id_scaffold );
     idcol_mut . append ( id_viewnode ); }}
