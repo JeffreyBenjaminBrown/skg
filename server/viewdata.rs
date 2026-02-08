@@ -25,7 +25,7 @@ struct MapsFromIdForView {
 /// Enrich all nodes in a forest with relationship metadata.
 /// Fetches relationship data from TypeDB and applies it to the forest.
 /// Forest is a single tree with BufferRoot at root.
-pub async fn set_metadata_relationship_viewdata_in_forest (
+pub async fn set_graphnodestats_in_forest (
   forest : &mut Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,

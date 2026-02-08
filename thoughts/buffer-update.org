@@ -34,8 +34,8 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
     Should instead interleave with other completion ops,
     but for each node perform view requests last,
     so that they can be integrated with overlapping content.
-*** set_metadata_relationship_viewdata_in_forest
-** how to redo buffer update
+*** set_graphnodestats_in_forest
+** TODO how to redo buffer update
 *** refs
     server/update_buffer/complete_parent_first/truenode.rs
 *** notes and complications
@@ -73,7 +73,7 @@ tools/introspect/call-graph/output/update_from_and_rerender_buffer.org
 **** partition_children
 **** subtree_has_focus
 **** move_child_to_end
-*** do these, in serial
+*** TODO do these, in serial
 **** DONE DFS preorder (parent-first) completion
 ***** TrueNode
 ****** apply make_indef_if_repeat_then_extend_defmap to it
@@ -138,25 +138,25 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
          with (from the SubscribeeCol's point of view) grandchildren.
          (The HiddenOutsideOfSubscribeeCol will be visitied soon,
          and will be processed from there, rather than from here.)
-**** DFS postorder (child-first) completion
-***** DONE nothing to do : forestroot
-***** DONE alias col
+**** TODO DFS postorder (child-first) completion
+***** TODO nothing to do : forestroot
+***** alias col
       read your parent, and then
       order and complete its aliases among your children
-***** DONE nothing to do : alias
+***** TODO nothing to do : alias
       but add a comment: for its own correctness, an alias must
         rely on its parent's having been processed correctly
-***** DONE nothing to do : TextChanged
+***** TODO nothing to do : TextChanged
       but add a comment: for its own correctness, a TextChanged
         relies on its parent's having been processed correctly
-***** DONE nothing to do : ID
+***** TODO nothing to do : ID
       but add a comment: For correctness, an ID relies on
         its parent having been handled correctly.
-***** DONE IDCol
+***** IDCol
       Ensure that your children are only, and in order,
         the IDs of your parent,
         or (in the git diff view) the difflist associated with it.
-***** DONE HiddenInSubscribeeCol
+***** HiddenInSubscribeeCol
 ****** ordinary
        Read the col's ancestor 1 (Subscribee) and 3 (Subscriber),
        find everything subscriber hides that subscribee contains,
@@ -164,7 +164,7 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
        Mark anything else 'parentIgnores'.
        If you have no children, remove yourself.
 ****** git diff view
-***** DONE HiddenOutsideOfSubscribeeCol
+***** HiddenOutsideOfSubscribeeCol
 ****** ordinary
        Read your siblings (subscribees) and parent (subscriber).
        Ensure that your children are, and in order,
@@ -177,12 +177,10 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
       The earlier preorder completion gives it all its children.
       This gives the view request maximum opportunity
       to use some of that content rather than create new content.
-**** compute GraphNodeStats
-     the function is currently called
-       set_metadata_relationship_viewdata_in_forest
-     but should be renamed
+**** DONE compute GraphNodeStats
+     The function to do this is named
        set_graphnodestats_in_forest
-**** compute ViewNodeStats
+**** TODO compute ViewNodeStats
      This currently happens in at least two places.
        detect_and_mark_cycle is one of them.
      They should be collected into a single function,

@@ -20,7 +20,7 @@ use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
   do_everywhere_in_tree_dfs_prunable };
-use crate::viewdata::set_metadata_relationship_viewdata_in_forest;
+use crate::viewdata::set_graphnodestats_in_forest;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use futures::executor::block_on;
@@ -212,7 +212,7 @@ pub async fn update_from_and_rerender_buffer (
         &mut visited,
         &mut errors,
         &deleted_id_src_map ). await ?;
-      set_metadata_relationship_viewdata_in_forest (
+      set_graphnodestats_in_forest (
         &mut forest_mut,
         config,
         typedb_driver ). await ?;
