@@ -90,14 +90,16 @@ pub fn complete_truenode_preorder (
     skgnode.subscribes_to.clone().unwrap_or_default();
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
-  { if is_subscribee( tree, node ) ? {
-      complete_subscribee_truenode(
+  let is_sub : bool = is_subscribee( tree, node ) ?;
+  { let (goal_list, removed_ids, apparent_content_ids) =
+      content_goal_list(
         tree, node, &content_ids, node_changes,
-        source_diffs, map, config ) ?;
-    } else {
-      complete_non_subscribee_truenode(
-        tree, node, &content_ids, node_changes,
-        source_diffs, map, config ) ?; } }
+        is_sub, map, config ) ?;
+    complete_content_children(
+      tree, node, &goal_list, &removed_ids,
+      source_diffs, map, config ) ?;
+    mark_erroneous_content_children_as_parent_ignores(
+      tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -123,61 +125,46 @@ fn is_subscribee (
     .unwrap_or( false );
   Ok( not_parent_ignores && parent_is_subscribee_col ) }
 
-fn complete_non_subscribee_truenode (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  content_ids  : &[ID],
-  node_changes : Option<&NodeChanges>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  map          : &mut SkgNodeMap,
-  config       : &SkgConfig,
-) -> Result<(), Box<dyn Error>> {
-  { let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+fn content_goal_list (
+  tree          : &Tree<ViewNode>,
+  node          : NodeId,
+  content_ids   : &[ID],
+  node_changes  : Option<&NodeChanges>,
+  is_subscribee : bool,
+  map           : &mut SkgNodeMap,
+  config        : &SkgConfig,
+) -> Result<(Vec<ID>, HashSet<ID>, Vec<ID>), Box<dyn Error>> {
+  if !is_subscribee {
+    let apparent_content_ids : Vec<ID> = content_ids.to_vec();
+    let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
       match node_changes {
         None => (content_ids.to_vec(),
                  HashSet::new()),
         Some( nc ) =>
           itemlist_and_removedset_from_diff( &nc.contains_diff ) };
-    complete_content_children(
-      tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config ) ?; }
-  mark_erroneous_content_children_as_parent_ignores(
-    tree, node, content_ids ) ?;
-  Ok(( )) }
-
-/// Almost identical to complete_non_subscribee_truenode,
-/// but filter from the target list of children
-/// anything the subscriber (grandparent) hides.
-fn complete_subscribee_truenode (
-  // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
-  // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  content_ids  : &[ID],
-  node_changes : Option<&NodeChanges>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  map          : &mut SkgNodeMap,
-  config       : &SkgConfig,
-) -> Result<(), Box<dyn Error>> {
-  let (grandparent_pid, grandparent_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree( tree, node, 2,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) =>
-          Ok(( t.id.clone(), t.source.clone() )),
-        _ => Err( "complete_subscribee_truenode: grandparent is not a TrueNode" ) } )
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ? ?;
-  let worktree_hidden : Vec<ID> =
-    { let grandparent_skgnode : &SkgNode =
-        skgnode_from_map_or_disk(
-          &grandparent_pid, &grandparent_source, map, config ) ?;
-      grandparent_skgnode.hides_from_its_subscriptions
-        . clone() . unwrap_or_default() };
-  let worktree_visible_content : Vec<ID> =
-    setlike_vector_subtraction (
-      content_ids.to_vec(), &worktree_hidden );
-  { let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+    Ok(( goal_list, removed_ids, apparent_content_ids ))
+  } else {
+    // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
+    // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
+    let (grandparent_pid, grandparent_source) : (ID, SourceName) =
+      read_at_ancestor_in_tree( tree, node, 2,
+        |vn : &ViewNode| match &vn.kind {
+          ViewNodeKind::True( t ) =>
+            Ok(( t.id.clone(), t.source.clone() )),
+          _ => Err( "content_goal_list: grandparent is not a TrueNode" ) } )
+      . map_err( |e| -> Box<dyn Error> { e.into() } ) ? ?;
+    let worktree_hidden : Vec<ID> =
+      { let grandparent_skgnode : &SkgNode =
+          skgnode_from_map_or_disk(
+            &grandparent_pid, &grandparent_source, map, config ) ?;
+        grandparent_skgnode.hides_from_its_subscriptions
+          . clone() . unwrap_or_default() };
+    let apparent_content_ids : Vec<ID> =
+      setlike_vector_subtraction (
+        content_ids.to_vec(), &worktree_hidden );
+    let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
       match node_changes {
-        None => (worktree_visible_content.clone(),
+        None => (apparent_content_ids.clone(),
                  HashSet::new()),
         Some( nc ) => {
           let head_hidden : Vec<ID> =
@@ -197,14 +184,11 @@ fn complete_subscribee_truenode (
               &head_hidden );
           let visible_diff : Vec<Diff_Item<ID>> =
             compute_interleaved_diff(
-              &head_visible, &worktree_visible_content );
+              &head_visible, &apparent_content_ids );
           itemlist_and_removedset_from_diff( &visible_diff ) }, };
-    complete_content_children(
-      tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config ) ?; }
-  mark_erroneous_content_children_as_parent_ignores(
-    tree, node, &worktree_visible_content ) ?;
-  Ok(( )) }
+    Ok(( goal_list, removed_ids, apparent_content_ids ))
+  } }
+
 
 /// Reconcile the node's non-parentIgnored TrueNode children
 /// against the goal list (content IDs, possibly interleaved with
