@@ -164,7 +164,7 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
        Mark anything else 'parentIgnores'.
        If you have no children, remove yourself.
 ****** git diff view
-***** HiddenOutsideOfSubscribeeCol
+***** DONE HiddenOutsideOfSubscribeeCol
 ****** ordinary
        Read your siblings (subscribees) and parent (subscriber).
        Ensure that your children are, and in order,

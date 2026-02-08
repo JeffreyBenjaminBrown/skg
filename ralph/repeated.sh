@@ -1,5 +1,6 @@
-# USAGE: First argument: request file.
-# Second argument: max number of iterations.
+# USAGE:
+# - Argument 1: request file.
+# - Argument 2: max number of iterations.
 
 set -e
 
