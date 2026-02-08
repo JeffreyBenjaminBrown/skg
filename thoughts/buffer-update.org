@@ -152,11 +152,14 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
 ***** DONE nothing to do : ID
       but add a comment: For correctness, an ID relies on
         its parent having been handled correctly.
-***** IDCol
+***** DONE IDCol
       Ensure that your children are only, and in order,
         the IDs of your parent,
         or (in the git diff view) the difflist associated with it.
-***** HiddenInSubscribeeCol
+***** Subscribee
+      Append a HiddenInSubscribeeCol child.
+      Don't populate it with grandchildren.
+***** ONGOING HiddenInSubscribeeCol
 ****** ordinary
        Read the col's ancestor 1 (Subscribee) and 3 (Subscriber),
        find everything subscriber hides that subscribee contains,
@@ -171,18 +174,6 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
          only what the subscriber hides that no subscribee contains.
        If you have no children, remove yourself.
 ****** git diff view
-***** SubscribeeCol
-      read your parent, and then
-      - ensure your non-ignored truenode children
-        include all of its subscribees
-      - mark any other truenode children 'parentIgnores',
-        and move them to before the subscribees
-      - append, after all the others, a HiddenOutsideOfSubscribeeCol
-        (which will be removed if it would be childless).
-        TRICKY: The HiddenOutsideOfSubscribeeCol
-        must be processed after all the subscribees,
-        so it can determine what they have already excluded.
-        DFS postorder (children first) traversal ensures this.
 ***** TrueNode
       Process view requests.
       TRICKY: Best to do this once its content is recursively complete.
