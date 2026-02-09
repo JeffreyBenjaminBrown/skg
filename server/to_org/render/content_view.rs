@@ -15,7 +15,8 @@ use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::ViewNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::viewdata::set_graphnodestats_in_forest;
+use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
+use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
 use ego_tree::Tree;
 use std::collections::HashMap;
@@ -46,8 +47,11 @@ pub async fn multi_root_view (
   let (mut forest, _map) : (Tree<ViewNode>, SkgNodeMap) =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
-  set_graphnodestats_in_forest (
-    &mut forest, config, driver ) . await ?;
+  let ( container_to_contents, content_to_containers ) =
+    set_graphnodestats_in_forest (
+      &mut forest, config, driver ) . await ?;
+  set_viewnodestats_in_forest (
+    &mut forest, &container_to_contents, &content_to_containers );
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source ( config );

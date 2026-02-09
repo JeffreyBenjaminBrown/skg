@@ -20,7 +20,8 @@ use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
   do_everywhere_in_tree_dfs_prunable };
-use crate::viewdata::set_graphnodestats_in_forest;
+use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
+use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use futures::executor::block_on;
@@ -212,10 +213,15 @@ pub async fn update_from_and_rerender_buffer (
         &mut visited,
         &mut errors,
         &deleted_id_src_map ). await ?;
-      set_graphnodestats_in_forest (
+      let ( container_to_contents, content_to_containers ) =
+        set_graphnodestats_in_forest (
+          &mut forest_mut,
+          config,
+          typedb_driver ). await ?;
+      set_viewnodestats_in_forest (
         &mut forest_mut,
-        config,
-        typedb_driver ). await ?;
+        &container_to_contents,
+        &content_to_containers );
       if let Some ( ref diffs ) = source_diffs {
         apply_diff_to_forest (
           &mut forest_mut, diffs, config ) ?; }}

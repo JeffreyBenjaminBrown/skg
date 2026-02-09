@@ -1,4 +1,3 @@
-pub mod viewdata;
 pub mod from_text;
 pub mod dbs;
 pub mod git_ops;
