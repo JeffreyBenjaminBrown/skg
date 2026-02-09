@@ -144,6 +144,10 @@ from being marked as erroneous.
 The IDCol and AliasCol are inserted EMPTY here. They get populated
 later in the postorder pass.
 
+**** TODO It feels like something's missing.
+
+     SubscribeeCol?
+
 ** Preorder pass: =complete_subscribee_col_preorder=
 
 File: =update_buffer/complete_parent_first/subscribee_col.rs=
@@ -191,6 +195,8 @@ all. (The preorder pass creates the empty AliasCol scaffold when
 aliases have changed, but the postorder populates it without diff
 markers.)
 
+*** TODO It should be diff-aware.
+
 ** Postorder pass: =complete_hiddeninsubscribee_col=
 
 File: =update_buffer/complete_child_first/hiddeninsubscribee_col.rs=
@@ -224,24 +230,24 @@ READS =t.diff.is_none()= when marking erroneous children.
 
 * Summary: what each path does and does not do
 
-|                                      | diff.rs | complete |
-|--------------------------------------+---------+----------|
-| Set =t.diff = NotInGit=             | yes     | no       |
-| Set =t.diff = New= (file added)     | yes     | no       |
-| Set =t.diff = Removed= (file del.)  | yes     | no       |
-| Set =t.diff = NewHere= on children  | yes     | no       |
-| Insert phantom content children      | yes     | yes      |
-| Insert =TextChanged= scaffold       | yes     | yes      |
-| Insert =IDCol= scaffold             | yes     | yes      |
-| Populate IDCol with ID children      | yes     | yes      |
-| Insert =AliasCol= scaffold          | no      | yes      |
-| Populate AliasCol with Alias{diff}   | no      | no (*)   |
-| Diff-aware content goal list         | no      | yes      |
-| Diff-aware subscribee goal list      | no      | yes      |
-| Diff-aware hidden-in-subscribee list | no      | yes      |
-| Diff-aware hidden-outside list       | no      | yes      |
-| Insert phantom subscribees           | no      | yes      |
-| Insert phantom hidden children       | no      | yes      |
+|                                      | diff.rs (old) | complete (new) |
+|--------------------------------------+---------------+----------------|
+| Set =t.diff = NotInGit=              | yes           | no             |
+| Set =t.diff = New= (file added)      | yes           | no             |
+| Set =t.diff = Removed= (file del.)   | yes           | no             |
+| Set =t.diff = NewHere= on children   | yes           | no             |
+| Insert phantom content children      | yes           | yes            |
+| Insert =TextChanged= scaffold        | yes           | yes            |
+| Insert =IDCol= scaffold              | yes           | yes            |
+| Populate IDCol with ID children      | yes           | yes            |
+| Insert =AliasCol= scaffold           | no            | yes            |
+| Populate AliasCol with Alias{diff}   | no            | no (*)         |
+| Diff-aware content goal list         | no            | yes            |
+| Diff-aware subscribee goal list      | no            | yes            |
+| Diff-aware hidden-in-subscribee list | no            | yes            |
+| Diff-aware hidden-outside list       | no            | yes            |
+| Insert phantom subscribees           | no            | yes            |
+| Insert phantom hidden children       | no            | yes            |
 
 (*) =completeAliasCol= creates =Alias { diff: None }= for all
     aliases. It does not mark any as New or Removed.

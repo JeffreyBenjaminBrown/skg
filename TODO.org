@@ -1,4 +1,7 @@
 * ONGOING buffer update & git diff
+** TODO & rebutted : apply the diff to the forest before completion
+   But I doubt it, because then completed things will need
+   whatever the apply does to them.
 ** TODO thoughts/comparing-diff-execution-paths.org
 ** TODO thoughts/use_new-preorder-postorder-logic_in_save-buffer.org
 ** integrate server/to_org/render/diff.rs and server/update_buffer.rs
