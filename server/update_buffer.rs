@@ -1,97 +1,161 @@
+// MANUAL RECURSION:
+// This uses manual async recursions, rather than calls to
+// `do_everywhere_in_tree_dfs`, because some dispatch targets
+// are async, and `do_everywhere_in_tree_dfs` takes a sync
+// `FnMut` closure which cannot `.await`.
+
 pub mod complete_child_first;
 pub mod complete_parent_first;
 pub mod util;
+pub mod viewnodestats;
 
-use crate::types::misc::ID;
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::git::SourceDiff;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::skgnodemap::SkgNodeMap;
+use crate::to_org::util::DefinitiveMap;
+
 use ego_tree::{Tree, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::error::Error;
+use std::future::Future;
+use std::pin::Pin;
+use typedb_driver::TypeDBDriver;
 
-pub fn set_viewnodestats_in_forest (
-  forest                : &mut Tree<ViewNode>,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-) {
-  let mut ancestor_ids : HashSet<ID> = HashSet::new ();
+pub async fn complete_viewtree (
+  forest             : &mut Tree<ViewNode>,
+  map                : &mut SkgNodeMap,
+  defmap             : &mut DefinitiveMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  config             : &SkgConfig,
+  driver             : &TypeDBDriver,
+  errors             : &mut Vec<String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = forest . root () . id ();
-  set_viewnodestats_recursive (
-    forest,
-    root_treeid,
-    None,
-    &mut ancestor_ids,
-    container_to_contents,
-    content_to_containers ); }
+  complete_preorder_recursive (
+    forest, root_treeid,
+    map, defmap, source_diffs, config, driver ) . await ?;
+  complete_postorder_recursive (
+    forest, root_treeid,
+    map, defmap, source_diffs, config, driver,
+    errors, deleted_id_src_map ) . await ?;
+  Ok(( )) }
 
-fn set_viewnodestats_recursive (
-  tree                  : &mut Tree<ViewNode>,
-  treeid                : NodeId,
-  parent_pid            : Option<&ID>,
-  ancestor_ids          : &mut HashSet<ID>,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-) {
-  let opt_pid : Option<ID> =
-    if let ViewNodeKind::True ( t ) =
-      &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
-    { let node_pid : ID = t.id.clone();
-      detect_and_mark_cycle_v2 (
-        tree, treeid, &node_pid, ancestor_ids );
-      set_parent_containment_stats_in_viewnode (
-        tree, treeid, &node_pid, parent_pid,
-        container_to_contents, content_to_containers );
-      Some ( node_pid )
-    } else { None };
-  let was_new : bool =
-    if let Some ( ref pid ) = opt_pid
-    { ancestor_ids . insert ( pid.clone() ) }
-    else { false };
-  let child_treeids : Vec<NodeId> =
-    tree . get ( treeid ) . unwrap ()
-    . children () . map ( |c| c . id () ) . collect ();
-  for child_treeid in child_treeids {
-    set_viewnodestats_recursive (
-      tree,
-      child_treeid,
-      opt_pid . as_ref (),
-      ancestor_ids,
-      container_to_contents,
-      content_to_containers ); }
-  if was_new {
-    if let Some ( ref pid ) = opt_pid
-    { ancestor_ids . remove ( pid ); } } }
+fn complete_preorder_recursive<'a> (
+  tree               : &'a mut Tree<ViewNode>,
+  treeid             : NodeId,
+  map                : &'a mut SkgNodeMap,
+  defmap             : &'a mut DefinitiveMap,
+  source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
+  config             : &'a SkgConfig,
+  driver             : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
+  // See the 'MANUAL RECURSION' comment at the top of this file.
+  Box::pin ( async move {
+    complete_preorder_for_one_node (
+      tree, treeid, map, defmap, source_diffs, config, driver
+    ) . await ?;
+    let child_treeids : Vec<NodeId> =
+      tree . get ( treeid ) . unwrap ()
+      . children () . map ( |c| c . id () ) . collect ();
+    for child_treeid in child_treeids {
+      complete_preorder_recursive (
+        tree, child_treeid,
+        map, defmap, source_diffs, config, driver
+      ) . await ?; }
+    Ok(( )) }) }
 
-/// The node's 'cycle' field becomes equal to
-/// whether the 'ancestor_ids' argument contains its ID.
-fn detect_and_mark_cycle_v2 (
+fn complete_postorder_recursive<'a> (
+  tree               : &'a mut Tree<ViewNode>,
+  treeid             : NodeId,
+  map                : &'a mut SkgNodeMap,
+  defmap             : &'a mut DefinitiveMap,
+  source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
+  config             : &'a SkgConfig,
+  driver             : &'a TypeDBDriver,
+  errors             : &'a mut Vec<String>,
+  deleted_id_src_map : &'a HashMap<ID, SourceName>,
+) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
+  // See the 'MANUAL RECURSION' comment at the top of this file.
+  Box::pin ( async move {
+    let child_treeids : Vec<NodeId> =
+      tree . get ( treeid ) . unwrap ()
+      . children () . map ( |c| c . id () ) . collect ();
+    for child_treeid in child_treeids {
+      complete_postorder_recursive (
+        tree, child_treeid,
+        map, defmap, source_diffs, config, driver,
+        errors, deleted_id_src_map
+      ) . await ?; }
+    complete_postorder_for_one_node (
+      tree, treeid, map, defmap, source_diffs, config, driver,
+      errors, deleted_id_src_map
+    ) . await ?;
+    Ok(( )) }) }
+
+async fn complete_preorder_for_one_node (
   tree         : &mut Tree<ViewNode>,
   treeid       : NodeId,
-  node_pid     : &ID,
-  ancestor_ids : &HashSet<ID>,
-) {
-  if let ViewNodeKind::True ( t ) =
-    &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
-  { t . viewStats . cycle = ancestor_ids . contains ( node_pid ); } }
+  map          : &mut SkgNodeMap,
+  defmap       : &mut DefinitiveMap,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  config       : &SkgConfig,
+  driver       : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let kind : ViewNodeKind =
+    tree . get ( treeid ) . unwrap () . value () . kind . clone ();
+  if matches!( kind, ViewNodeKind::True( _ )) {
+    complete_parent_first::truenode::
+    complete_truenode_preorder (
+      treeid, tree, map, defmap, source_diffs, config ) ?;
+  } else if matches!( kind,
+      ViewNodeKind::Scaff( Scaffold::SubscribeeCol ) ) {
+        complete_parent_first::subscribee_col::
+        complete_subscribee_col_preorder (
+          treeid, tree, map, source_diffs, config, driver
+        ). await ?; }
+  Ok(( )) }
 
-fn set_parent_containment_stats_in_viewnode (
-  tree                  : &mut Tree<ViewNode>,
-  treeid                : NodeId,
-  node_pid              : &ID,
-  parent_pid_opt        : Option<&ID>,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-) {
-  let (parent_is_container, parent_is_content) : (bool, bool) =
-    if let Some ( parent_pid ) = parent_pid_opt {
-      ( content_to_containers
-          . get ( node_pid )
-          . map_or ( false, | containers |
-                     containers . contains ( parent_pid )),
-        container_to_contents
-          . get ( node_pid )
-          . map_or ( false, | contents |
-                     contents . contains ( parent_pid )) )
-    } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply.
-  if let ViewNodeKind::True ( t ) =
-    &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
-  { t . viewStats . parentIsContainer = parent_is_container;
-    t . viewStats . parentIsContent = parent_is_content; }}
+async fn complete_postorder_for_one_node (
+  tree               : &mut Tree<ViewNode>,
+  treeid             : NodeId,
+  map                : &mut SkgNodeMap,
+  defmap             : &mut DefinitiveMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  config             : &SkgConfig,
+  driver             : &TypeDBDriver,
+  errors             : &mut Vec<String>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+) -> Result<(), Box<dyn Error>> {
+  let kind : ViewNodeKind =
+    tree . get ( treeid ) . unwrap () . value () . kind . clone ();
+  if matches!( kind, ViewNodeKind::True( _ )) {
+    complete_child_first::truenode::
+    complete_truenode (
+      treeid, tree, map, defmap, config, driver,
+      errors, deleted_id_src_map ) . await ?;
+  } else if matches!(
+    kind, ViewNodeKind::Scaff( Scaffold::AliasCol )) {
+      complete_child_first::aliascol::
+      completeAliasCol ( tree, map, treeid ) ?;
+  } else if matches!(
+      kind, ViewNodeKind::Scaff( Scaffold::IDCol )) {
+        complete_child_first::id_col::
+        completeIDCol ( treeid, tree, map, source_diffs ) ?;
+  } else if matches!(
+    kind, ViewNodeKind::Scaff( Scaffold::HiddenInSubscribeeCol )) {
+      complete_child_first::hiddeninsubscribee_col::
+      complete_hiddeninsubscribee_col (
+        treeid, tree, map, source_diffs, config ) ?;
+  } else if matches!( kind,
+      ViewNodeKind::Scaff( Scaffold::HiddenOutsideOfSubscribeeCol )) {
+        complete_child_first::hiddenoutsideof_subscribeecol::
+        complete_hiddenoutsideofsubscribeecol (
+          treeid, tree, map, source_diffs, config ) ?; }
+  // No-op for: BufferRoot, TextChanged, Alias { .. },
+  // ID { .. }, SubscribeeCol.
+  // These nodes' correctness depends on their parent
+  // having been processed (or, for SubscribeeCol, on the
+  // preorder pass).
+  Ok(( )) }

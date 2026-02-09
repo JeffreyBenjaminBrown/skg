@@ -180,7 +180,7 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
 **** DONE compute GraphNodeStats
      The function to do this is named
        set_graphnodestats_in_forest
-**** ONGOING compute ViewNodeStats
+**** DONE compute ViewNodeStats
      This currently happens in at least two places.
        detect_and_mark_cycle is one of them.
        set_metadata_relationships_in_node_recursive is another.
