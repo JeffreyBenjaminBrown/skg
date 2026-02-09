@@ -191,13 +191,6 @@ Its target child content list depends on hidden nodes. Do everything in 'if it's
        it won't be reachable from main yet.
      Please put the new function in a new file,
        server/update_buffer.rs
-**** TODO wire it together
-I would like a function 'complete_viewtree' at server/update_buffer.rs. If you look in server/update_buffer/ you'll find code it will need.
-
-'complete_viewtree_node' should perform two recursive traversals of the view tree: the first dfs preorder (parents-first), and the second dfs postorder (children first). The functions to use in each case can be found in the two folders 'complete_child_first' and 'complete_parent_first'. There will be some switch statement delegating to these functions. In the parent-first pass, if it's not a truenode or a subscribeecol, don't do anything (but do recurse into its children, regardless).
-
-In the child-first pass, if it's a ForestRoot, TextChanged, Alias or ID, do nothing, but add a comment that in each case we depend for the node's correctness on its parent having been processed properly.
-
-Then, 'complete_viewtree' should be defined using 'do_everywhere_in_tree'.
+**** ONGOING wire it together
 ** cleanup
 *** Isn't there already something like subtree_has_focus?

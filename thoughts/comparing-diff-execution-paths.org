@@ -1,0 +1,269 @@
+* How git diff information flows through the two code paths
+
+This report covers =server/to_org/render/diff.rs= ("diff.rs") and the
+=complete_viewtree= pipeline rooted in =server/update_buffer/complete.rs=
+("complete"). Both receive =source_diffs= and both modify the view
+tree, but they do different and partially overlapping things.
+
+* diff.rs: =apply_diff_to_forest=
+
+A single sync DFS preorder pass via =do_everywhere_in_tree_dfs=.
+Skips scaffolds. For each TrueNode, calls =process_truenode_diff=.
+
+** What it does to each TrueNode
+
+Looks up the node's source in =source_diffs=. If absent, no-op.
+
+*** 1. Not-in-git marker
+
+If =source_diff.is_git_repo= is false:
+- WRITES =t.diff = Some(NotInGit)=.
+- Returns early (nothing else happens to this node).
+
+*** 2. File-level diff marker
+
+Looks up the node's =.skg= file in =source_diff.skgnode_diffs=.
+If absent, no-op.
+
+If the file's =GitDiffStatus= is:
+- =Added=: WRITES =t.diff = Some(New)=. Returns early.
+- =Deleted=: WRITES =t.diff = Some(Removed)=. Returns early.
+- =Modified=: Falls through to field-level processing.
+
+*** 3. TextChanged scaffold (INSERTS a node)
+
+If =node_changes.text_changed= is true:
+- PREPENDS a =Scaffold::TextChanged= child.
+- Does NOT check whether one already exists.
+
+*** 4. IDCol scaffold with ID children (INSERTS nodes)
+
+If =node_changes.ids_diff= contains any non-Unchanged entry:
+- PREPENDS a =Scaffold::IDCol= child.
+- APPENDS =Scaffold::ID { id, diff }= grandchildren to it,
+  one per entry in =ids_diff=, with:
+  - =Unchanged= → =diff: None=
+  - =New= → =diff: Some(FieldDiffStatus::New)=
+  - =Removed= → =diff: Some(FieldDiffStatus::Removed)=
+- Does NOT check whether an IDCol already exists.
+
+*** 5. Content-children diff (MODIFIES + INSERTS nodes)
+
+Calls =process_truenode_contains_diff=, which does two things:
+
+**** 5a. Mark existing children as NewHere (MODIFIES nodes)
+
+For each child that is a TrueNode whose ID appears in the =New=
+entries of =contains_diff=: checks whether the child's =.skg= file
+was =Added= in the SourceDiff. If NOT (i.e. the file existed in HEAD
+but was not content of this node in HEAD):
+- WRITES =t.diff = Some(NewHere)= on the child.
+
+**** 5b. Insert phantom nodes for removed children (INSERTS nodes)
+
+For each =Removed= entry in =contains_diff=:
+- Checks whether the child's =.skg= file was =Deleted= in the
+  SourceDiff.
+  - If yes: phantom gets =NodeDiffStatus::Removed=.
+  - If no: phantom gets =NodeDiffStatus::RemovedHere=.
+- Determines title from =deleted_nodes= (if file deleted) or from
+  disk (if file still exists).
+- PREPENDS a phantom TrueNode (indefinitive, with =t.diff= set).
+
+** What diff.rs does NOT do
+
+- Does not handle AliasCol diffs (no =Scaffold::Alias { diff }= children).
+- Does not handle subscribee diffs (SubscribeeCol, HiddenInSubscribeeCol,
+  HiddenOutsideOfSubscribeeCol).
+- Does not use a diff-aware goal list — it just looks at whichever
+  children happen to already exist and marks/inserts around them.
+
+* complete_viewtree: the =update_buffer= pipeline
+
+Two async DFS passes (preorder then postorder), dispatching to
+per-node-kind handlers. Diff awareness is woven throughout rather
+than being a separate pass.
+
+** Preorder pass: =complete_truenode_preorder=
+
+File: =update_buffer/complete_parent_first/truenode.rs=
+
+Called for every TrueNode. This is the main place where the tree's
+content children are built or reconciled. It is deeply diff-aware.
+
+*** 1. Diff-aware content goal list (DETERMINES which children to show)
+
+=content_goal_list= computes the ordered list of child IDs.
+
+When =source_diffs= is =None=: goal list = worktree content IDs.
+
+When =source_diffs= is =Some=:
+- For normal (non-subscribee) nodes:
+  calls =itemlist_and_removedset_from_diff(nc.contains_diff)=.
+  The goal list interleaves worktree IDs with removed IDs so that
+  removed children appear in their original position.
+- For subscribee nodes (children of a SubscribeeCol):
+  additionally filters by grandparent's =hides_from_its_subscriptions=,
+  comparing HEAD hidden list vs worktree hidden list, then computes
+  an interleaved diff of the visible content.
+
+Returns =(goal_list, removed_ids, apparent_content_ids)=.
+
+*** 2. Reconcile content children (INSERTS + REMOVES nodes)
+
+=complete_content_children= reconciles actual tree children against
+the goal list:
+- Children present in goal list and already in tree: kept.
+- Children in goal list but missing from tree: INSERTED.
+  - If the ID is in =removed_ids=: created as a phantom TrueNode
+    via =mk_phantom_viewnode=, with =t.diff= set to =Removed= or
+    =RemovedHere= (determined by checking =sourcediff.deleted_nodes=).
+  - Otherwise: created as a normal definitive TrueNode.
+- Children in tree but not in goal list: handled later by
+  =mark_erroneous_content_children_as_parent_ignores=.
+
+*** 3. Mark erroneous children (MODIFIES nodes)
+
+=mark_erroneous_content_children_as_parent_ignores= sets
+=t.parent_ignores = true= on children that are TrueNodes, not already
+parent-ignored, not in the content list, and not phantoms.
+
+READS =t.diff.is_none()= to detect phantoms — phantoms are excluded
+from being marked as erroneous.
+
+*** 4. Prepend diff scaffolds (INSERTS nodes)
+
+=maybe_prepend_diff_view_scaffolds= checks =node_changes= and:
+- If =text_changed=: INSERTS =Scaffold::TextChanged= (only if absent,
+  checked via =unique_scaffold_child=).
+- If =ids_diff= has non-Unchanged entries: INSERTS empty
+  =Scaffold::IDCol= (only if absent).
+- If =aliases_diff= has non-Unchanged entries: INSERTS empty
+  =Scaffold::AliasCol= (only if absent).
+
+The IDCol and AliasCol are inserted EMPTY here. They get populated
+later in the postorder pass.
+
+** Preorder pass: =complete_subscribee_col_preorder=
+
+File: =update_buffer/complete_parent_first/subscribee_col.rs=
+
+Called for every =Scaffold::SubscribeeCol=.
+
+*** Diff-aware subscribee goal list
+
+=diff_aware_goal_list= works similarly to the content goal list:
+- Looks up parent's SourceDiff by source name.
+- If in a git repo: reads HEAD's =subscribes_to= via
+  =skgnode_from_git_head=, computes an interleaved diff against
+  worktree =subscribes_to=.
+- Returns =(goal_list, removed_ids)=.
+
+*** Reconcile subscribee children (INSERTS nodes)
+
+Uses =complete_relevant_children_in_viewnodetree= with the goal
+list. Phantom subscribees are created via =mk_phantom_viewnode= with
+status =Removed= or =RemovedHere= (checked against
+=sourcediff.deleted_nodes=).
+
+** Postorder pass: =completeIDCol=
+
+File: =update_buffer/complete_child_first/id_col.rs=
+
+Called for every =Scaffold::IDCol=. Populates it with
+=Scaffold::ID { id, diff }= children.
+
+*** Diff-aware ID children
+
+Looks up =node_changes_for_truenode= for the parent.
+If =NodeChanges= exists, iterates =nc.ids_diff=:
+- =Unchanged(id)= → =Scaffold::ID { id, diff: None }=
+- =New(id)= → =Scaffold::ID { id, diff: Some(FieldDiffStatus::New) }=
+- =Removed(id)= → =Scaffold::ID { id, diff: Some(FieldDiffStatus::Removed) }=
+
+** Postorder pass: =completeAliasCol=
+
+File: =update_buffer/complete_child_first/aliascol.rs=
+
+NOT diff-aware. Creates =Scaffold::Alias { text, diff: None }=
+children from worktree aliases. Does not consult =source_diffs= at
+all. (The preorder pass creates the empty AliasCol scaffold when
+aliases have changed, but the postorder populates it without diff
+markers.)
+
+** Postorder pass: =complete_hiddeninsubscribee_col=
+
+File: =update_buffer/complete_child_first/hiddeninsubscribee_col.rs=
+
+Reconciles hidden children that are content of the subscribee.
+
+*** Diff-aware goal list
+
+Similar pattern: compares HEAD state vs worktree state of
+(subscriber hides ∩ subscribee contains), using
+=node_changes_for_truenode= and =skgnode_from_git_head=.
+Produces phantom children for removed items.
+
+READS =t.diff.is_none()= when marking erroneous children (same
+pattern as =mark_erroneous_content_children_as_parent_ignores=).
+
+** Postorder pass: =complete_hiddenoutsideofsubscribeecol=
+
+File: =update_buffer/complete_child_first/hiddenoutsideof_subscribeecol.rs=
+
+Reconciles hidden children NOT in any subscribee's content.
+
+*** Diff-aware goal list
+
+Compares HEAD state vs worktree state of (subscriber hides − all
+subscribee content). Uses =head_subscribee_contains_from_map_and_diffs=
+to reconstruct HEAD's subscribee content from =nc.contains_diff=.
+Produces phantom children for removed items.
+
+READS =t.diff.is_none()= when marking erroneous children.
+
+* Summary: what each path does and does not do
+
+|                                      | diff.rs | complete |
+|--------------------------------------+---------+----------|
+| Set =t.diff = NotInGit=             | yes     | no       |
+| Set =t.diff = New= (file added)     | yes     | no       |
+| Set =t.diff = Removed= (file del.)  | yes     | no       |
+| Set =t.diff = NewHere= on children  | yes     | no       |
+| Insert phantom content children      | yes     | yes      |
+| Insert =TextChanged= scaffold       | yes     | yes      |
+| Insert =IDCol= scaffold             | yes     | yes      |
+| Populate IDCol with ID children      | yes     | yes      |
+| Insert =AliasCol= scaffold          | no      | yes      |
+| Populate AliasCol with Alias{diff}   | no      | no (*)   |
+| Diff-aware content goal list         | no      | yes      |
+| Diff-aware subscribee goal list      | no      | yes      |
+| Diff-aware hidden-in-subscribee list | no      | yes      |
+| Diff-aware hidden-outside list       | no      | yes      |
+| Insert phantom subscribees           | no      | yes      |
+| Insert phantom hidden children       | no      | yes      |
+
+(*) =completeAliasCol= creates =Alias { diff: None }= for all
+    aliases. It does not mark any as New or Removed.
+
+* Overlaps and conflicts
+
+** TextChanged scaffold
+
+Both paths insert it. diff.rs does so unconditionally (prepend).
+complete checks =unique_scaffold_child= first. If complete runs
+before diff.rs, diff.rs will add a duplicate.
+
+** IDCol scaffold + ID children
+
+Both paths insert an IDCol. diff.rs prepends it already populated
+with ID children. complete's preorder inserts an empty IDCol (checked
+for uniqueness), then the postorder populates it. If complete runs
+first, diff.rs will add a second, fully-populated IDCol.
+
+** Phantom content children
+
+Both paths insert phantom TrueNodes for removed content children.
+diff.rs prepends them. complete inserts them via
+=complete_relevant_children_in_viewnodetree= as part of goal-list
+reconciliation. If both run, there will be duplicate phantoms.

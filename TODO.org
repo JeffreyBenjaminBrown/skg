@@ -1,76 +1,100 @@
-* TODO thoughts/buffer-update.org
-* internalizing
-   'merge' into the type containing 'save' and 'delete'.
-** identify relevant extant tooling when asking for a given task
-   Even if vague, like
-   'this code includes utilities for doing things in trees'.
-** If my request led it to make a function that addresses one case among the types badly, I likely screwed up.
-   This happened when I asked AI to merge
-** Don't refactor something without reading its comments.
-   Even if it's as 'simple' as a type --
-   non-obvious decisions often go into those brief definitions.
-** Awkward or good ? Exactly some OrgNodes can have diffs.
-   That makes some invalid state unrepresentable.
-** how to prompt
-*** when asking for a refactor
-**** Name _v2 functions consistently.
-**** Duplicate comments from _v1 functions
-     (which keep their original names)
-     into the _v2 functions.
-*** when asking to move code
-    Emphasize leaving whitespace, formatting unchanged.
-** Don't reload a buffer without checking.
-   If a buffer is empty when I don't think it should be,
-   don't reload it. Check on disk if it is in fact empty.
-   If not, try hitting 'undo' to restore it.
-* AWAITS NOT FULLY TESTED : git diff view
-** refs
-  see
-    git-diff-view/big-plan.org
-** TODO test
-*** multiple repos
-*** extending a definitive view from a removed node R
-    one of whose children C is removed too,
-    and such that C has a removed child and a non-removed child
-** extract common logic from extendDefinitive* functions
-   across from-git and from-worktree varieties.
-** reading : comparing extending definitive from worktree and git
-*** from worktree
-**** // Mutate the root of the definitive view request:
-**** from_disk_replace_title_body_and_skgnode(
-**** // remove ViewRequest and mark definitive
-**** // add to visited
-**** extendDefinitiveSubtreeFromLeaf (
-**** // maybe add a HiddenInSubscribeeCol
-*** from git
-    see which child IDs exist
-** review
-   The only code I'm still uncertain about is
-     server/git_ops/diff.rs
-     server/to_org/expand/definitive.rs
-     server/to_org/render/diff.rs
-   reading:
-     server/serve/handlers/single_root_view.rs
-* Why a second path to noneclobber?
-/// Build and return a Save instruction supplemented with disk data.
-/// Replaces None fields in the instruction with values from disk,
-/// and validates that sources match.
-async fn build_supplemented_save(
-* a grammar for describing tree manip
-** one to map each orgnode kind to skgnode changes
-   Keep a set of skgnodes.
-   Different orgnodes can affect the same skgnode.
-** one for how to build each orgnode kind
-   Functions rather than types seem sufficient here.
-   I don't think they ever need to know about orgnode neighbors.
-* Permit BufferRoot to have no children.
+* ONGOING buffer update & git diff
+** TODO thoughts/comparing-diff-execution-paths.org
+** TODO thoughts/use_new-preorder-postorder-logic_in_save-buffer.org
+** integrate server/to_org/render/diff.rs and server/update_buffer.rs
+** TODO thoughts/buffer-update.org
+** how to test it
+*** git diff view and not
+*** multiple sources, source ownerships
+*** deleted here, deleted, new here, new
+*** each kind of node
+**** Alias
+     { text: String,
+       diff: Option<FieldDiffStatus> },
+**** AliasCol,
+**** BufferRoot,
+**** HiddenInSubscribeeCol,
+**** HiddenOutsideOfSubscribeeCol,
+**** ID
+     { id: ID,
+       diff: Option<FieldDiffStatus> },
+**** IDCol,
+**** SubscribeeCol,
+**** TextChanged,
+**** TrueNode Subscribee
+**** TrueNode Non-Subscribee
+** AWAITS NOT FULLY TESTED : git diff view
+*** refs
+   see
+     git-diff-view/big-plan.org
+*** TODO test
+**** multiple repos
+**** extending a definitive view from a removed node R
+     one of whose children C is removed too,
+     and such that C has a removed child and a non-removed child
+*** extract common logic from extendDefinitive* functions
+    across from-git and from-worktree varieties.
+*** reading : comparing extending definitive from worktree and git
+**** from worktree
+***** // Mutate the root of the definitive view request:
+***** from_disk_replace_title_body_and_skgnode(
+***** // remove ViewRequest and mark definitive
+***** // add to visited
+***** extendDefinitiveSubtreeFromLeaf (
+***** // maybe add a HiddenInSubscribeeCol
+**** from git
+     see which child IDs exist
+*** review
+    The only code I'm still uncertain about is
+      server/git_ops/diff.rs
+      server/to_org/expand/definitive.rs
+      server/to_org/render/diff.rs
+    reading:
+      server/serve/handlers/single_root_view.rs
+* the non-completion tasks should be moved out of complete_truenode
 * Search results should not use TrueNode.
-* Most scaffolds need no title. Leave that to Emacs.
-  How to display it should be left to Emacs.
 * Heralds to indicate otherwise-invisible relationships.
 ** the 3 sharing relations in either direction
 ** aliases
 ** extra ids
+* u
+** internalizing
+    'merge' into the type containing 'save' and 'delete'.
+*** identify relevant extant tooling when asking for a given task
+    Even if vague, like
+    'this code includes utilities for doing things in trees'.
+*** If my request led it to make a function that addresses one case among the types badly, I likely screwed up.
+    This happened when I asked AI to merge
+*** Don't refactor something without reading its comments.
+    Even if it's as 'simple' as a type --
+    non-obvious decisions often go into those brief definitions.
+*** Awkward or good ? Exactly some OrgNodes can have diffs.
+    That makes some invalid state unrepresentable.
+*** how to prompt
+**** when asking for a refactor
+***** Name _v2 functions consistently.
+***** Duplicate comments from _v1 functions
+      (which keep their original names)
+      into the _v2 functions.
+**** when asking to move code
+     Emphasize leaving whitespace, formatting unchanged.
+*** Don't reload a buffer without checking.
+    If a buffer is empty when I don't think it should be,
+    don't reload it. Check on disk if it is in fact empty.
+    If not, try hitting 'undo' to restore it.
+** Why a second path to noneclobber?
+ /// Build and return a Save instruction supplemented with disk data.
+ /// Replaces None fields in the instruction with values from disk,
+ /// and validates that sources match.
+ async fn build_supplemented_save(
+** a grammar for describing tree manip
+*** one to map each orgnode kind to skgnode changes
+    Keep a set of skgnodes.
+    Different orgnodes can affect the same skgnode.
+*** one for how to build each orgnode kind
+    Functions rather than types seem sufficient here.
+    I don't think they ever need to know about orgnode neighbors.
+** Permit BufferRoot to have no children.
 * understand it
 ** [[id:9e83b23b-ebcb-426a-a1aa-6ceeabaaef2f][Skg save data flow trace]]
 ** Do de-novo and save reuse enough code?
