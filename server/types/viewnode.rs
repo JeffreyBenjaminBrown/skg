@@ -343,6 +343,19 @@ pub fn mk_indefinitive_viewnode (
                             None, // edit_request
                             HashSet::new ( )) } // view_requests
 
+/// Create an indefinitive phantom ViewNode with a diff status.
+pub fn mk_phantom_viewnode (
+  id     : ID,
+  source : SourceName,
+  title  : String,
+  diff   : NodeDiffStatus,
+) -> ViewNode {
+  let mut viewnode : ViewNode =
+    mk_indefinitive_viewnode ( id, source, title, false );
+  if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
+    { t . diff = Some ( diff ); }
+  viewnode }
+
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,

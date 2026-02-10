@@ -5,7 +5,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_indefinitive_viewnode, };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
@@ -249,15 +249,3 @@ fn title_for_phantom (
         "Cannot determine title for moved node '{}': {}",
         removed_child_id . 0, e )) }}
 
-/// Create an indefinitive phantom ViewNode with a diff status.
-pub(crate) fn mk_phantom_viewnode (
-  id     : ID,
-  source : SourceName,
-  title  : String,
-  diff   : NodeDiffStatus,
-) -> ViewNode {
-  let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, false );
-  if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
-    { t . diff = Some ( diff ); }
-  viewnode }

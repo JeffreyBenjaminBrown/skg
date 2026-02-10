@@ -1,5 +1,5 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::to_org::render::diff::mk_phantom_viewnode;
+use crate::types::viewnode::mk_phantom_viewnode;
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};

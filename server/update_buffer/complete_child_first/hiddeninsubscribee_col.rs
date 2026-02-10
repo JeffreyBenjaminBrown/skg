@@ -1,5 +1,5 @@
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::to_org::render::diff::mk_phantom_viewnode;
+use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};

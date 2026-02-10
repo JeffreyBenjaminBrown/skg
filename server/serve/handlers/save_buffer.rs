@@ -180,11 +180,11 @@ pub async fn update_from_and_rerender_buffer (
     let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
       // Used for view request execution.
       if diff_mode_enabled
-      { Some ( compute_diff_for_every_source ( config ) ) }
+      { Some ( compute_diff_for_every_source ( config )) }
       else { None };
     let deleted_id_src_map : HashMap<ID, SourceName> =
       source_diffs . as_ref()
-      . map ( |d| deleted_ids_to_source ( d ) )
+      . map ( |d| deleted_ids_to_source ( d ))
       . unwrap_or_default();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
