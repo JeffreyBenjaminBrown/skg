@@ -92,7 +92,7 @@ pub async fn complete_subscribee_col_preorder (
     with_node_mut( tree, node, |mut n| { n.detach(); } )
       .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
     return Ok(( )); }
-  if parent_indefinitive { // If the parent is indefinitive (this case), then its SubscribeeCol might not reflect the truth, so we have to complete its children. We don't do this if the parent is definitive, because in that case the SubscribeeCol just *defined* the parent's subscriptions, and therefore does not need to be adjusted to reflect them.
+  if parent_indefinitive || source_diffs.is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
     let missing : Vec<ID> = worktree_subscribees.iter()
       .filter( |id| !map.contains_key( id ) )
       .cloned()
