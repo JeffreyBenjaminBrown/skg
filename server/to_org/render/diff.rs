@@ -5,6 +5,7 @@ use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, 
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
+use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
@@ -194,9 +195,6 @@ fn mark_newhere_children (
         if ! is_new_file {
           t . diff = Some ( NodeDiffStatus::NewHere ); }} } }}
 
-/// Insert phantom nodes for children removed from contents.
-/// Uses source_for_phantom to determine the correct source for each
-/// removed child, rather than assuming it matches the parent's source.
 fn insert_phantom_nodes_for_removed_children (
   node_mut           : &mut NodeMut<ViewNode>,
   node_changes       : &NodeChanges,
@@ -205,7 +203,7 @@ fn insert_phantom_nodes_for_removed_children (
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let empty_children : HashMap<ID, SourceName> = HashMap::new();
-  let empty_map = HashMap::new();
+  let empty_map : HashMap<ID, SkgNode> = HashMap::new();
   let removed_ids : Vec<&ID> =
     node_changes . contains_diff . iter()
       . filter_map ( |d| match d {

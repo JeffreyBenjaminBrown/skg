@@ -55,7 +55,7 @@ pub async fn multi_root_view (
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source ( config );
-    let deleted_id_src_map =
+    let deleted_id_src_map : HashMap<ID, SourceName> =
       deleted_ids_to_source ( &source_diffs );
     apply_diff_to_forest (
       &mut forest, &source_diffs,

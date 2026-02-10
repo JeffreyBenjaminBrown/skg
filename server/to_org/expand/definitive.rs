@@ -91,28 +91,37 @@ async fn execute_definitive_view_request (
     indefinitize_content_subtree ( forest, map,
                                    preexisting_node_id,
                                    visited, config ) ?; }}
-  if is_removed_node { // load removed nodes from git, not disk
-    from_git_replace_title_body (
-      // TODO ? This per-node git lookup might be slow.
-      forest, node_id, config ) ?;
+  { // Replace title/body, remove request, mark definitive, add to visited.
+    if is_removed_node
+      { from_git_replace_title_body (
+          // TODO ? This per-node git lookup might be slow.
+          forest, node_id, config ) ?; }
+      else { from_disk_replace_title_body_and_skgnode (
+               forest, map, node_id, config ) ?; }
     write_at_node_in_tree (
       forest, node_id,
-      |viewnode| { // remove ViewRequest and mark definitive (but keep removed status)
+      |viewnode| {
         let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
           &mut viewnode.kind
           else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
         t . view_requests . remove ( & ViewRequest::Definitive );
         t . indefinitive = false; } )
       . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-    visited . insert ( node_pid.clone(), node_id );
+    visited . insert ( node_pid.clone(), node_id ); }
+  if is_removed_node {
     extendDefinitiveSubtree_fromGit (
       forest, map, node_id, config.initial_node_limit,
-      visited, config, &hidden_ids, typedb_driver, deleted_id_src_map
-    ). await ?; }
+      visited, config, &hidden_ids, typedb_driver,
+      deleted_id_src_map ). await ?; }
   else {
-    extendDefinitiveSubtree_fromWorktree (
-      forest, map, node_id, &node_pid, config, typedb_driver,
-      visited, &hidden_ids ) . await ?; }
+    extendDefinitiveSubtreeFromLeaf (
+      forest, map, node_id, config.initial_node_limit,
+      visited, config, typedb_driver, &hidden_ids ). await ?;
+    if type_and_parent_type_consistent_with_subscribee (
+      forest, node_id ) ?
+    { maybe_add_hiddenInSubscribeeCol_branch (
+        forest, map, node_id, config, typedb_driver
+      ). await ?; } }
   Ok (( )) }
 
 /// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
@@ -371,46 +380,6 @@ async fn mk_removed_child_viewnode (
       t . source = source; }
     t . diff = Some ( child_diff ); }
   Ok ( child_viewnode ) }
-
-/// Extend a definitive subtree by loading content from disk.
-/// This is the usual case
-/// (as opposed to loading from git for removed nodes).
-async fn extendDefinitiveSubtree_fromWorktree (
-  forest        : &mut Tree<ViewNode>,
-  map           : &mut SkgNodeMap,
-  node_id       : NodeId,
-  node_pid      : &ID,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  visited       : &mut DefinitiveMap,
-  hidden_ids    : &HashSet<ID>,
-) -> Result<(), Box<dyn Error>> {
-  { // Mutate the root of the definitive view request:
-    from_disk_replace_title_body_and_skgnode (
-      // preserves relevant viewnode fields
-      forest, map, node_id, config ) ?;
-    write_at_node_in_tree (
-      forest, node_id,
-      |viewnode| { // remove ViewRequest and mark definitive
-        let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
-          &mut viewnode.kind
-          else { panic! ( "extendDefinitiveSubtree_fromWorktree: expected TrueNode" ) };
-        t . view_requests . remove ( & ViewRequest::Definitive );
-        t . indefinitive = false; } )
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?; }
-  visited . insert ( node_pid.clone(), node_id );
-  extendDefinitiveSubtreeFromLeaf ( // populate its tree-descendents
-    forest, map, node_id,
-    config.initial_node_limit, visited, config, typedb_driver,
-    hidden_ids,
-  ) . await ?;
-  // If this is a subscribee with some content hidden by its subscriber, add a HiddenInSubscribeeCol
-  if type_and_parent_type_consistent_with_subscribee (
-    forest, node_id )?
-  { maybe_add_hiddenInSubscribeeCol_branch (
-      forest, map, node_id, config, typedb_driver
-    ). await ?; }
-  Ok (( )) }
 
 /// Load title and body from git HEAD for a removed node.
 /// This is used when expanding a definitive view

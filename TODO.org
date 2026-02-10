@@ -1,10 +1,4 @@
 * ONGOING buffer update & git diff
-** TODO & rebutted : apply the diff to the forest before completion
-   But I doubt it, because then completed things will need
-   whatever the apply does to them.
-** TODO thoughts/comparing-diff-execution-paths.org
-** TODO thoughts/use_new-preorder-postorder-logic_in_save-buffer.org
-** integrate server/to_org/render/diff.rs and server/update_buffer.rs
 ** TODO thoughts/buffer-update.org
 ** how to test it
 *** git diff view and not
@@ -35,7 +29,7 @@
 **** extending a definitive view from a removed node R
      one of whose children C is removed too,
      and such that C has a removed child and a non-removed child
-*** extract common logic from extendDefinitive* functions
+*** ONGOING extract common logic from extendDefinitive* functions
     across from-git and from-worktree varieties.
 *** reading : comparing extending definitive from worktree and git
 **** from worktree
@@ -55,16 +49,16 @@
     reading:
       server/serve/handlers/single_root_view.rs
 * u
+** Heralds to indicate otherwise-invisible relationships.
+*** the 3 sharing relations in either direction
+*** aliases
+*** extra ids
 ** distinguish : RemovedHere != HIddenHere, NewHere != UnhiddenHere
 ** now just make it safe and use it a little
 ** ditch detect_and_mark_cycle
    or at least rename it to _v1
 ** the non-completion tasks should be moved out of complete_truenode
 ** Search results should not use TrueNode.
-** Heralds to indicate otherwise-invisible relationships.
-*** the 3 sharing relations in either direction
-*** aliases
-*** extra ids
 ** Why a second path to noneclobber?
  /// Build and return a Save instruction supplemented with disk data.
  /// Replaces None fields in the instruction with values from disk,
