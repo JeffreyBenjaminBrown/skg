@@ -202,6 +202,14 @@ impl ViewRequest {
       .map ( |(_, vr)| *vr ) }
 }
 
+impl AsRef<ViewNode> for ViewNode {
+  fn as_ref(&self) -> &ViewNode {
+    self }}
+
+impl AsMut<ViewNode> for ViewNode {
+  fn as_mut(&mut self) -> &mut ViewNode {
+    self }}
+
 impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title ( &self ) -> &str {

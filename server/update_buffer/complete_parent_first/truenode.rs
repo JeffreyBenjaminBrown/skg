@@ -28,9 +28,9 @@ use std::error::Error;
 use std::path::PathBuf;
 
 enum ChildKind {
-  Normal,       // exists on disk, is content of this node
-  RemovedHere,  // exists on disk, but removed from this node's contains
-  Removed,      // .skg file deleted from worktree entirely
+  Normal,      // in worktree, and in parent's content
+  RemovedHere, // in worktree, but removed from parent's content
+  Removed,     // not in worktree
 }
 
 struct ChildData {
@@ -59,17 +59,27 @@ struct ChildData {
 ///   - maybe_prepend_subscribee_col
 ///   - maybe_prepend_diff_view_scaffolds
 pub fn complete_truenode_preorder (
-  node      : NodeId,
-  tree         : &mut Tree<ViewNode>,
-  map          : &mut SkgNodeMap,
-  defmap       : &mut DefinitiveMap,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  config       : &SkgConfig,
+  node               : NodeId,
+  tree               : &mut Tree<ViewNode>,
+  map                : &mut SkgNodeMap,
+  defmap             : &mut DefinitiveMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  config             : &SkgConfig,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn.kind,
                                            ViewNodeKind::True( _ )),
     "complete_truenode_preorder: expected TrueNode" ) ?;
+  { // Phantoms (nodes with diff status already set, e.g. Removed,
+    // RemovedHere) are display-only placeholders created during
+    // content reconciliation. They need no further completion.
+    let is_phantom : bool =
+      read_at_node_in_tree( tree, node,
+        |vn : &ViewNode| match &vn.kind {
+          ViewNodeKind::True( t ) => t.diff.is_some(),
+          _ => false } ) ?;
+    if is_phantom { return Ok(( )); }}
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
   { let is_indefinitive : bool =
@@ -101,7 +111,7 @@ pub fn complete_truenode_preorder (
         is_sub, map, config ) ?;
     complete_content_children(
       tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config ) ?;
+      source_diffs, map, config, deleted_id_src_map ) ?;
     mark_erroneous_content_children_as_parent_ignores(
       tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -198,18 +208,19 @@ fn content_goal_list (
 /// phantom IDs in diff view). Missing children are created as
 /// indefinitive ViewNodes or phantom ViewNodes as appropriate.
 fn complete_content_children (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  goal_list    : &[ID],
-  removed_ids  : &HashSet<ID>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  map          : &mut SkgNodeMap,
-  config       : &SkgConfig,
+  tree               : &mut Tree<ViewNode>,
+  node               : NodeId,
+  goal_list          : &[ID],
+  removed_ids        : &HashSet<ID>,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  map                : &mut SkgNodeMap,
+  config             : &SkgConfig,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, removed_ids,
-      source_diffs, map, config ) ?;
+      source_diffs, map, config, deleted_id_src_map ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| matches!( &vn.kind,
@@ -374,13 +385,14 @@ fn maybe_prepend_alias_col (
 /// and does not conflict with the &mut tree borrow
 /// in complete_relevant_children_in_viewnodetree.
 fn build_child_creation_data (
-  tree         : &Tree<ViewNode>,
-  node         : NodeId,
-  goal_list    : &[ID],
-  removed_ids  : &HashSet<ID>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  map          : &mut SkgNodeMap,
-  config       : &SkgConfig,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  goal_list          : &[ID],
+  removed_ids        : &HashSet<ID>,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  map                : &mut SkgNodeMap,
+  config             : &SkgConfig,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
@@ -396,10 +408,17 @@ fn build_child_creation_data (
     if result.contains_key( id ) { continue; }
     let is_phantom : bool = removed_ids.contains( id );
     if is_phantom {
+      let phantom_source : SourceName =
+        child_sources.get( id ).cloned()
+          .or_else( || deleted_id_src_map.get( id ).cloned() )
+          .or_else( || map.get( id ).map( |n| n.source.clone() ))
+          .or_else( || source_from_disk( id, config ) )
+          .ok_or( format!(
+            "build_child_creation_data: \
+             no source for phantom {}",
+            id.0 )) ?;
       let opt_source_diff : Option<&SourceDiff> = source_diffs.as_ref()
-        .and_then( |diffs| {
-          child_sources.get( id ) .and_then(
-            |src| diffs.get( src )) } );
+        .and_then( |diffs| diffs.get( &phantom_source ) );
       let kind : ChildKind =
         if opt_source_diff .map(
              |sourcediff| sourcediff.deleted_nodes.contains_key( id )
@@ -409,13 +428,11 @@ fn build_child_creation_data (
         .and_then( |sourcediff| sourcediff.deleted_nodes.get( id ))
         .map( |n| n.title.clone() )
         .or_else( || map.get( id ).map( |n| n.title.clone() ))
-        .unwrap_or_else( || format!( "?{}", id.0 ));
-      let phantom_source : SourceName =
-        child_sources.get( id ).cloned()
-          .ok_or( format!(
-            "build_child_creation_data: \
-             no source for phantom {} (not a child)",
-            id.0 )) ?;
+        .or_else( || skgnode_from_map_or_disk(
+                        id, &phantom_source, map, config )
+                      .ok().map( |n| n.title.clone() ))
+        .unwrap_or_else( || format!( "No title found for ID {}.",
+                                     id.0 ));
       result.insert( id.clone(),
                      ChildData { title,
                                  source: phantom_source,
@@ -476,8 +493,8 @@ fn maybe_change_node_diff_status (
           ViewNodeKind::True( t ) =>
             Ok(( t.id.clone(), t.source.clone() )),
           _ => Err( "not a TrueNode" ) })
-      { Ok( r ) => r ?,
-        Err( _ ) => return Ok(( )) };
+      { Ok( Ok( r ) ) => r,
+        Ok( Err( _ ) ) | Err( _ ) => return Ok(( )) };
     let parent_changes : Option<&NodeChanges> =
       node_changes_for_truenode(
         source_diffs, &parent_pid, &parent_source );
@@ -502,3 +519,17 @@ fn set_truenode_diff (
       if let ViewNodeKind::True( ref mut t ) = vn.kind {
         t.diff = Some( status ); }}
   ).map_err( |e| -> Box<dyn Error> { e.into() } ) }
+
+/// Find the source for a node by checking which source directory
+/// contains its .skg file on disk. Returns None if not found in any source.
+fn source_from_disk (
+  id     : &ID,
+  config : &SkgConfig,
+) -> Option<SourceName> {
+  let filename : String = format!( "{}.skg", id.0 );
+  for (source_name, source_config) in &config.sources {
+    let path : PathBuf =
+      PathBuf::from( &source_config.path ).join( &filename );
+    if path.exists() {
+      return Some( source_name.clone() ); }}
+  None }

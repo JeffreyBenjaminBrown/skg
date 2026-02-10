@@ -7,14 +7,11 @@ use crate::merge::merge_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
-use crate::to_org::complete::contents::complete_or_restore_each_node_in_branch;
-use crate::to_org::expand::collect_view_requests::collectViewRequestsFromForest;
-use crate::to_org::expand::definitive::execute_view_requests;
-use crate::to_org::render::diff::apply_diff_to_forest;
+use crate::update_buffer::complete::complete_viewtree;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ViewRequest};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
@@ -134,8 +131,7 @@ fn empty_response_sexp (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
-/// - completeAndRestoreForest_collectingViewRequests is complex.
-/// - execute_view_requests is complex, because it attempts to integrate existing branches before generating new ones
+/// - complete_viewtree is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
 pub async fn update_from_and_rerender_buffer (
   org_buffer_text   : &str,
   typedb_driver     : &TypeDBDriver,
@@ -192,25 +188,13 @@ pub async fn update_from_and_rerender_buffer (
       . unwrap_or_default();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
-      let forest_root_id : NodeId = forest_mut.root().id();
-      complete_or_restore_each_node_in_branch (
+      complete_viewtree (
         &mut forest_mut,
         &mut skgnode_map,
-        forest_root_id,
-        config,
-        typedb_driver,
-        &mut visited ). await ?;
-      let view_requests : Vec < (NodeId, ViewRequest) > =
-        collectViewRequestsFromForest (
-          & forest_mut ) ?;
-      execute_view_requests ( // PITFALL: Must follow completion.
-        // Why: If a content child added during completion matches the head of the path to be integrated for a view request, then the path will be integrated there (where treatment=Content), instead of creating a duplicate child with treatment=ParentIgnores.
-        &mut forest_mut,
-        &mut skgnode_map,
-        view_requests,
-        config,
-        typedb_driver,
         &mut visited,
+        &source_diffs,
+        config,
+        typedb_driver,
         &mut errors,
         &deleted_id_src_map ). await ?;
       let ( container_to_contents, content_to_containers ) =
@@ -221,10 +205,7 @@ pub async fn update_from_and_rerender_buffer (
       set_viewnodestats_in_forest (
         &mut forest_mut,
         &container_to_contents,
-        &content_to_containers );
-      if let Some ( ref diffs ) = source_diffs {
-        apply_diff_to_forest (
-          &mut forest_mut, diffs, config ) ?; }}
+        &content_to_containers ); }
     let buffer_content : String =
       viewnode_forest_to_string ( & forest_mut ) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}

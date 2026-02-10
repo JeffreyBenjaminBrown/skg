@@ -134,8 +134,6 @@ fn test_every_kind_of_col(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
-       **** (skg (node (id hidden-for-no-reason) (source main) indefinitive (graphStats (containers 0)))) hidden-for-no-reason
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2)))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id hidden-in-E1) (source main) indefinitive)) hidden-in-E1
@@ -144,10 +142,12 @@ fn test_every_kind_of_col(
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id hidden-in-E2) (source main) indefinitive)) hidden-in-E2
        **** (skg (node (id E21) (source main))) E21
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id hidden-for-no-reason) (source main) indefinitive (graphStats (containers 0)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: HiddenInSubscribeeCol shown before content");
+      "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
 
     cleanup_test(
       db_name,
@@ -271,17 +271,17 @@ fn test_hidden_without_but_none_within(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
-       **** (skg (node (id H) (source main) indefinitive (graphStats (containers 0)))) H
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2)))) subscribee-1
        **** (skg (node (id E11) (source main))) E11
        **** (skg (node (id E12) (source main) (graphStats (contents 1)))) E12
        ***** (skg (node (id E121) (source main))) E121
        *** (skg (node (id E2) (source main) (graphStats (containers 0)))) subscribee-2
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id H) (source main) indefinitive (graphStats (containers 0)))) H
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
-      "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol; E1 expanded with E11, E12; E2 expanded but empty");
+      "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
 
     cleanup_test(
       db_name,

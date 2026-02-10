@@ -30,8 +30,9 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// Integrate an AliasCol child and, under it, Alias grandchildren
 /// into the ViewNode tree containing the target node.
 ///
-/// PITFALL: This function fetches aliases from disk and populates them immediately,
-/// whereas 'completeAliasCol' is only called on an AliasCol already in the tree.
+/// PITFALL: This function fetches aliases from disk and
+/// populates them immediately, whereas 'completeAliasCol' (in
+/// update_buffer) is only called on an AliasCol already in the tree.
 /// These two distinct ways of populating an AliasCol are necessary,
 /// because in 'complete_or_restore_each_node_in_branch',
 /// view requests are only processed AFTER recursing to children
@@ -49,7 +50,7 @@ pub async fn build_and_integrate_aliases (
   if unique_scaffold_child (
     tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,
-    // then completeAliasCol already handled it.
+    // then completeAliasCol (in update_buffer) already handled it.
     return Ok (( )); }
   let aliases : Vec < String > =
     fetch_aliases_from_file (

@@ -1,15 +1,18 @@
 // cargo test --test rebuild -- --nocapture
 
 use indoc::indoc;
+use std::collections::HashMap;
 use std::error::Error;
 
-use skg::to_org::complete::aliascol::completeAliasCol;
+use skg::update_buffer::complete_child_first::aliascol::completeAliasCol;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
 use skg::types::skgnodemap::{SkgNodeMap, skgnode_map_from_forest};
+use skg::types::misc::SourceName;
+use skg::types::git::SourceDiff;
 
 use ego_tree::{Tree, NodeId};
 
@@ -28,6 +31,8 @@ async fn test_completeAliasCol_logic (
   config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
+
+  let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
 
   // Create org text with three AliasCol scenarios
   let org_text : &str =
@@ -69,12 +74,13 @@ async fn test_completeAliasCol_logic (
       . id ()
   };
 
-  // Test 1: First AliasCol should have c and b (deduped, valid only)
+  // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
   completeAliasCol (
     &mut forest,
     &mut map,
-    aliascol_1_id
-  ) .await?;
+    aliascol_1_id,
+    &source_diffs
+  )?;
 
   {
     let aliascol_1_ref =
@@ -91,13 +97,13 @@ async fn test_completeAliasCol_logic (
     );
     assert_eq! (
       children [ 0 ],
-      "c",
-      "First child should be 'c'"
+      "b",
+      "First child should be 'b'"
     );
     assert_eq! (
       children [ 1 ],
-      "b",
-      "Second child should be 'b'"
+      "c",
+      "Second child should be 'c'"
     );
   }
 
@@ -105,8 +111,9 @@ async fn test_completeAliasCol_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    aliascol_2_id
-  ) .await?;
+    aliascol_2_id,
+    &source_diffs
+  )?;
 
   {
     let aliascol_2_ref =
@@ -149,8 +156,9 @@ async fn test_completeAliasCol_logic (
     completeAliasCol (
       &mut forest,
       &mut map,
-      aliascol_3_id
-    ).await;
+      aliascol_3_id,
+      &source_diffs
+    );
 
   assert! (
     result . is_err (),
@@ -174,6 +182,8 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
+
+  let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
 
   let org_text : &str =
     indoc! { "
@@ -213,12 +223,14 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    first_aliascol_id
-  ) .await?;
+    first_aliascol_id,
+    &source_diffs
+  )?;
 
   {
     let aliascol_ref =
       forest . get ( first_aliascol_id ) . unwrap ();
+    let aliascol_vn : &ViewNode = aliascol_ref . value ();
     let children_new : Vec < &ViewNode > =
       aliascol_ref . children ()
       . map ( |n| n . value () )
@@ -227,7 +239,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
     assert_eq! (
       children_new . len (),
       2,
-      "First AliasCol should have exactly 2 children (b focused, c)"
+      "First AliasCol should have exactly 2 children (b, c)"
     );
     assert_eq! (
       children_new [ 0 ] . title (),
@@ -235,8 +247,12 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
       "First child should be 'b'"
     );
     assert! (
-      children_new [ 0 ] . focused,
-      "First child should be focused"
+      ! children_new [ 0 ] . focused,
+      "First child should not be focused (focus transferred to AliasCol)"
+    );
+    assert! (
+      aliascol_vn . focused,
+      "AliasCol itself should have gained focus"
     );
     assert_eq! (
       children_new [ 1 ] . title (),
@@ -253,8 +269,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   completeAliasCol (
     &mut forest,
     &mut map,
-    second_aliascol_id
-  ) .await?;
+    second_aliascol_id,
+    &source_diffs
+  )?;
 
   {
     let aliascol_ref =

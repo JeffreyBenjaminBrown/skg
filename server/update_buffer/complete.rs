@@ -30,7 +30,8 @@ pub async fn complete_viewtree (
   let root_treeid : NodeId = forest . root () . id ();
   complete_preorder_recursive (
     forest, root_treeid,
-    map, defmap, source_diffs, config, driver ) . await ?;
+    map, defmap, source_diffs, config, driver,
+    deleted_id_src_map ) . await ?;
   complete_postorder_recursive (
     forest, root_treeid,
     map, defmap, source_diffs, config, driver,
@@ -45,11 +46,13 @@ fn complete_preorder_recursive<'a> (
   source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
   config             : &'a SkgConfig,
   driver             : &'a TypeDBDriver,
+  deleted_id_src_map : &'a HashMap<ID, SourceName>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     complete_preorder_for_one_node (
-      tree, treeid, map, defmap, source_diffs, config, driver
+      tree, treeid, map, defmap, source_diffs, config, driver,
+      deleted_id_src_map
     ) . await ?;
     let child_treeids : Vec<NodeId> =
       tree . get ( treeid ) . unwrap ()
@@ -57,7 +60,8 @@ fn complete_preorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_preorder_recursive (
         tree, child_treeid,
-        map, defmap, source_diffs, config, driver
+        map, defmap, source_diffs, config, driver,
+        deleted_id_src_map
       ) . await ?; }
     Ok(( )) }) }
 
@@ -90,20 +94,22 @@ fn complete_postorder_recursive<'a> (
     Ok(( )) }) }
 
 async fn complete_preorder_for_one_node (
-  tree         : &mut Tree<ViewNode>,
-  treeid       : NodeId,
-  map          : &mut SkgNodeMap,
-  defmap       : &mut DefinitiveMap,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  config       : &SkgConfig,
-  driver       : &TypeDBDriver,
+  tree               : &mut Tree<ViewNode>,
+  treeid             : NodeId,
+  map                : &mut SkgNodeMap,
+  defmap             : &mut DefinitiveMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  config             : &SkgConfig,
+  driver             : &TypeDBDriver,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get ( treeid ) . unwrap () . value () . kind . clone ();
   if matches!( kind, ViewNodeKind::True( _ )) {
     super::complete_parent_first::truenode::
     complete_truenode_preorder (
-      treeid, tree, map, defmap, source_diffs, config ) ?;
+      treeid, tree, map, defmap, source_diffs, config,
+      deleted_id_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff( Scaffold::SubscribeeCol ) ) {
         super::complete_parent_first::subscribee_col::
@@ -133,7 +139,7 @@ async fn complete_postorder_for_one_node (
   } else if matches!(
     kind, ViewNodeKind::Scaff( Scaffold::AliasCol )) {
       super::complete_child_first::aliascol::
-      completeAliasCol ( tree, map, treeid ) ?;
+      completeAliasCol ( tree, map, treeid, source_diffs ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff( Scaffold::IDCol )) {
         super::complete_child_first::id_col::

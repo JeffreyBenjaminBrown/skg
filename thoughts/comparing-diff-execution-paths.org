@@ -232,16 +232,16 @@ READS =t.diff.is_none()= when marking erroneous children.
 
 |                                      | diff.rs (old) | complete (new) |
 |--------------------------------------+---------------+----------------|
-| Set =t.diff = NotInGit=              | yes           | no             |
-| Set =t.diff = New= (file added)      | yes           | no             |
-| Set =t.diff = Removed= (file del.)   | yes           | no             |
-| Set =t.diff = NewHere= on children   | yes           | no             |
+| Set =t.diff = NotInGit=              | yes           | yes            |
+| Set =t.diff = New= (file added)      | yes           | yes            |
+| Set =t.diff = Removed= (file del.)   | yes           | yes            |
+| Set =t.diff = NewHere= on children   | yes           | yes            |
 | Insert phantom content children      | yes           | yes            |
 | Insert =TextChanged= scaffold        | yes           | yes            |
 | Insert =IDCol= scaffold              | yes           | yes            |
 | Populate IDCol with ID children      | yes           | yes            |
 | Insert =AliasCol= scaffold           | no            | yes            |
-| Populate AliasCol with Alias{diff}   | no            | no (*)         |
+| Populate AliasCol with Alias{diff}   | no            | yes            |
 | Diff-aware content goal list         | no            | yes            |
 | Diff-aware subscribee goal list      | no            | yes            |
 | Diff-aware hidden-in-subscribee list | no            | yes            |
@@ -249,8 +249,6 @@ READS =t.diff.is_none()= when marking erroneous children.
 | Insert phantom subscribees           | no            | yes            |
 | Insert phantom hidden children       | no            | yes            |
 
-(*) =completeAliasCol= creates =Alias { diff: None }= for all
-    aliases. It does not mark any as New or Removed.
 
 * Overlaps and conflicts
 
