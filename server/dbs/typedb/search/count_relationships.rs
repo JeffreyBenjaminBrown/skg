@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use typedb_driver::{
   answer::{QueryAnswer, ConceptDocument},
   answer::concept_document::Node,
@@ -148,12 +148,12 @@ async fn count_relations (
 
 /// Check whether each input ID participates in a given relation
 /// in either role. One TypeDB round-trip per call.
-/// Returns HashMap<ID, bool>.
+/// Returns HashSet<ID> — presence means the node participates.
 ///
 /// This largely duplicates `count_relations`, with these differences:
 /// - takes both role names and uses an OR so a node matches
 ///   regardless of which role it plays
-/// - returns bool (non-empty related list) rather than a count
+/// - returns a set of participating IDs rather than a map to counts
 async fn participates_in_relation (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -161,14 +161,12 @@ async fn participates_in_relation (
   relation : &str,
   role_a   : &str,
   role_b   : &str,
-) -> Result < HashMap < ID, bool >,
+) -> Result < HashSet < ID >,
               Box < dyn Error > > {
   if ids . is_empty () {
-    return Ok ( HashMap::new () ); }
-  let mut result : HashMap < ID, bool > =
-    HashMap::new ();
-  for id in ids {
-    result . insert ( id . clone (), false ); }
+    return Ok ( HashSet::new () ); }
+  let mut result : HashSet < ID > =
+    HashSet::new ();
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
@@ -232,20 +230,19 @@ async fn participates_in_relation (
         if let Some ( node_id ) = node_id_opt {
           if let Some ( Node::List ( related_list ) ) =
             map . get ( "related" )
-          { result . insert (
-              node_id,
-              ! related_list . is_empty () );
+          { if ! related_list . is_empty () {
+              result . insert ( node_id ); }
           }} }} }
   Ok (result) }
 
 pub async fn has_subscribes (
   db_name : &str, driver : &TypeDBDriver, ids : &[ID]
-) -> Result<HashMap<ID, bool>, Box<dyn Error>> {
+) -> Result<HashSet<ID>, Box<dyn Error>> {
   participates_in_relation ( db_name, driver, ids,
     "subscribes", "subscriber", "subscribee" ) . await }
 
 pub async fn has_overrides (
   db_name : &str, driver : &TypeDBDriver, ids : &[ID]
-) -> Result<HashMap<ID, bool>, Box<dyn Error>> {
+) -> Result<HashSet<ID>, Box<dyn Error>> {
   participates_in_relation ( db_name, driver, ids,
     "overrides_view_of", "replacement", "replaced" ) . await }

@@ -270,8 +270,9 @@ fn parse_graphstats_sexp (
         let key : String = atom_to_string ( element ) ?;
         match key . as_str () {
           "aliasing"    => { stats . aliasing    = true; },
-          "subscribing" => { stats . subscribing = true; },
+          "extraIDs"    => { stats . extraIDs    = true; },
           "overriding"  => { stats . overriding  = true; },
+          "subscribing" => { stats . subscribing = true; },
           _ => { return Err ( format! (
             "Unknown graphStats atom: {}", key )); }} },
       Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {

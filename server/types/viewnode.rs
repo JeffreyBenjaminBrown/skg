@@ -67,8 +67,9 @@ impl TrueNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphNodeStats {
   pub aliasing      : bool, // whether it has aliases
-  pub subscribing   : bool, // subscriber *or* subscribee, anywhere
+  pub extraIDs      : bool, // whether it has extra IDs (from merging)
   pub overriding    : bool, // overrides *or* overridden, anywhere
+  pub subscribing   : bool, // subscriber *or* subscribee, anywhere
   pub numContainers : Option<usize>,
   pub numContents   : Option<usize>,
   pub numLinksIn    : Option<usize>,
@@ -289,8 +290,9 @@ impl Default for GraphNodeStats {
   fn default () -> Self {
     GraphNodeStats {
       aliasing      : false,
-      subscribing   : false,
+      extraIDs      : false,
       overriding    : false,
+      subscribing   : false,
       numContainers : Some ( 1 ),
       numContents   : Some ( 0 ),
       numLinksIn    : Some ( 0 ),

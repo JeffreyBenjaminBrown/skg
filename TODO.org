@@ -49,16 +49,12 @@
     reading:
       server/serve/handlers/single_root_view.rs
 * u
-** Heralds to indicate otherwise-invisible relationships.
-*** the 3 sharing relations in either direction
-*** aliases
-*** extra ids
+** the non-completion tasks should be moved out of complete_truenode
+** Search results should not use TrueNode.
 ** distinguish : RemovedHere != HIddenHere, NewHere != UnhiddenHere
 ** now just make it safe and use it a little
 ** ditch detect_and_mark_cycle
    or at least rename it to _v1
-** the non-completion tasks should be moved out of complete_truenode
-** Search results should not use TrueNode.
 ** Why a second path to noneclobber?
  /// Build and return a Save instruction supplemented with disk data.
  /// Replaces None fields in the instruction with values from disk,

@@ -152,10 +152,12 @@ fn true_node_metadata_to_string (
           parts . push ( format! ( "(linksIn {})", count )); }}
       if true_node . graphStats . aliasing {
         parts . push ( "aliasing" . to_string () ); }
-      if true_node . graphStats . subscribing {
-        parts . push ( "subscribing" . to_string () ); }
+      if true_node . graphStats . extraIDs {
+        parts . push ( "extraIDs" . to_string () ); }
       if true_node . graphStats . overriding {
         parts . push ( "overriding" . to_string () ); }
+      if true_node . graphStats . subscribing {
+        parts . push ( "subscribing" . to_string () ); }
       if parts . is_empty () { None }
       else { Some ( format! ( "(graphStats {})", parts . join ( " " ))) }}
     fn view_stats ( true_node : & TrueNode ) -> Option < String > {

@@ -29,8 +29,9 @@
         (contents (ANY "{" IT))
         (linksIn (ANY IT "→"))
         (BLUE aliasing "A")
-        (BLUE subscribing "S")
-        (BLUE overriding "O"))
+        (BLUE extraIDs "I")
+        (BLUE overriding "O")
+        (BLUE subscribing "S"))
       (BLUE viewStats
         (BLUE cycle "⟳")
         (RED notInParent "!{")

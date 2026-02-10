@@ -18,8 +18,8 @@ use typedb_driver::TypeDBDriver;
 /// Each of these describes some kind of relationship,
 /// for each of a view's nodes.
 struct MapsFromIdForView {
-  has_subscribes : HashMap < ID, bool >,
-  has_overrides  : HashMap < ID, bool >,
+  has_subscribes : HashSet < ID >,
+  has_overrides  : HashSet < ID >,
   num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
   num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
   num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
@@ -69,9 +69,9 @@ async fn fetch_relationship_data (
     count_contents ( db_name, driver, pids ) . await ?;
   let num_links_in : HashMap < ID, usize > =
     count_link_sources ( db_name, driver, pids ) . await ?;
-  let has_subscribes_map : HashMap < ID, bool > =
+  let has_subscribes_map : HashSet < ID > =
     has_subscribes ( db_name, driver, pids ) . await ?;
-  let has_overrides_map : HashMap < ID, bool > =
+  let has_overrides_map : HashSet < ID > =
     has_overrides ( db_name, driver, pids ) . await ?;
   Ok ( MapsFromIdForView {
     has_subscribes : has_subscribes_map,
@@ -88,30 +88,34 @@ fn set_metadata_relationships_in_node_recursive (
   map      : &mut SkgNodeMap,
   config   : &SkgConfig,
 ) {
-  // PITFALL: Aliasing is computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
-  let aliasing : bool =
+  // PITFALL: Aliasing and extraIDs are computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
+  let ( aliasing, extra_ids ) : ( bool, bool ) =
     { // PITFALL: Uses 'false' for phantom nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       if let ViewNodeKind::True ( t )
         = & tree . get ( treeid ) . unwrap () . value () . kind
-        { skgnode_from_map_or_disk (
+        { let skgnode_opt = skgnode_from_map_or_disk (
               &t.id, &t.source, map, config
-            ). ok ()
+            ). ok ();
+          let aliasing = skgnode_opt . as_ref ()
             . and_then ( |n| n . aliases . as_ref () )
             . map ( |a| ! a . is_empty () )
-            . unwrap_or ( false ) }
-        else { false }};
+            . unwrap_or ( false );
+          let extra_ids = skgnode_opt . as_ref ()
+            . map ( |n| n . ids . len () > 1 )
+            . unwrap_or ( false );
+          ( aliasing, extra_ids ) }
+        else { ( false, false ) }};
   if let ViewNodeKind::True ( t )
     = &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
     { // Write all graphStats fields.
       // PITFALL: These booleans are not populated for phantom nodes. Populating those would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       let node_pid : &ID = &t.id;
       t . graphStats . aliasing = aliasing;
-      t . graphStats . subscribing =
-        rel_data . has_subscribes . get ( node_pid )
-          . copied () . unwrap_or ( false );
+      t . graphStats . extraIDs = extra_ids;
       t . graphStats . overriding =
-        rel_data . has_overrides . get ( node_pid )
-          . copied () . unwrap_or ( false );
+        rel_data . has_overrides . contains ( node_pid );
+      t . graphStats . subscribing =
+        rel_data . has_subscribes . contains ( node_pid );
       t . graphStats . numContainers =
         rel_data . num_containers . get ( node_pid ) . copied ();
       t . graphStats . numContents =
