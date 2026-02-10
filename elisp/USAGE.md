@@ -24,6 +24,7 @@ Now these commands can be evaluated (here, in Emacs):
   (skg-request-single-root-content-view-from-id "1")
   (skg-request-title-matches "1")
     ;; try match, title, or second
+  (skg-git-diff-toggle)
   (skg-verify-connection)
     ;; test connection to server
   (skg-doc-disconnect)

@@ -13,6 +13,7 @@
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)
+(require 'skg-request-git-diff-mode)
 (require 'skg-state)
 
 (defun skg-client-init (file)

@@ -32,6 +32,13 @@ causing Emacs to open an org-mode buffer displaying the results.
 ** misc
 *** heralds-minor-mode
 *** org-ancestry
+** git diff mode
+*** skg-git-diff-toggle
+Toggles git diff mode on the server.
+When enabled, subsequent content views and saves are annotated
+with git diff information (what changed between HEAD and worktree).
+Save the buffer (~skg-request-save-buffer~)
+or request a fresh content view to see the effect.
 ** tcp (likely never needed)
 *** skg-doc-disconnect
 *** skg-verify-connection

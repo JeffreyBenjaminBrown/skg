@@ -6,7 +6,6 @@ use crate::dbs::typedb::util::delete_database;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
-use crate::serve::util::value_from_request_sexp;
 use crate::serve::util::{request_type_from_request, send_response};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
@@ -127,10 +126,9 @@ fn handle_emacs (
               &typedb_driver,
               config);
             // Never returns - exits process
-          } else if request_type == "git diff mode" {
+          } else if request_type == "git diff mode toggle" {
             handle_git_diff_mode_request(
               &mut stream,
-              &request,
               &mut conn_state );
           } else {
             let error_msg : String =
@@ -149,32 +147,17 @@ fn handle_emacs (
   println!("Emacs disconnected: {peer}"); }
 
 /// Handle git diff mode toggle request.
-/// Request format: ((request . "git diff mode") (value . 'on))
-///   or 'off in place of 'on
+/// Request format: ((request . "git diff mode toggle"))
 fn handle_git_diff_mode_request (
   stream     : &mut TcpStream,
-  request    : &str,
   conn_state : &mut ConnectionState,
 ) {
-  match value_from_request_sexp ( "onOrOff", request ) {
-    Ok ( value ) => {
-      if value == "on" {
-        conn_state . diff_mode_enabled = true;
-        println! ( "Git diff mode enabled" );
-        send_response ( stream, "Git diff mode enabled" );
-      } else if value == "off" {
-        conn_state . diff_mode_enabled = false;
-        println! ( "Git diff mode disabled" );
-        send_response ( stream, "Git diff mode disabled" );
-      } else {
-        let msg : String = format! ( "Invalid git diff mode value: {}. Use 'on' or 'off'", value );
-        println! ( "{}", msg );
-        send_response ( stream, &msg ); }},
-    Err ( e ) => {
-      let msg : String = format! (
-        "Error parsing git diff mode request: {}", e );
-      println! ( "{}", msg );
-      send_response ( stream, &msg ); }} }
+  conn_state . diff_mode_enabled = ! conn_state . diff_mode_enabled;
+  let msg = if conn_state . diff_mode_enabled
+    { "Git diff mode enabled" } else
+    { "Git diff mode disabled" };
+  println! ( "{}", msg );
+  send_response ( stream, msg ); }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {

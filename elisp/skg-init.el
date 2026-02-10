@@ -19,6 +19,8 @@
 ;;;     skg-request-single-root-content-view-from-id
 ;;;   elisp/skg-request-verify-connection.el
 ;;;     skg-verify-connection
+;;;   elisp/skg-request-git-diff-mode.el
+;;;     skg-git-diff-toggle
 ;;;   elisp/skg-id-search.el
 ;;;     skg-visit-link
 ;;;     skg-next-id

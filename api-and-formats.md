@@ -20,6 +20,14 @@ So far there are these endpoints:
   - Response: success/failure indicator followed by length-prefixed content:
     - Success: `save: success\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains the processed buffer content
     - Failure: `save: failure\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains org-mode formatted error details
+- Git diff mode toggle
+  - Request: ((request . "git diff mode toggle"))
+  - Response: Plain text with newline termination.
+    "Git diff mode enabled" or "Git diff mode disabled".
+  - Behavior: Toggles per-connection state. When enabled,
+    subsequent `single root content view` and `save buffer`
+    responses include diff annotations showing changes
+    between git HEAD and the worktree.
 - Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.

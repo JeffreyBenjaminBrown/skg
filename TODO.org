@@ -1,3 +1,4 @@
+* now just make it safe and use it a little
 * ONGOING buffer update & git diff
 ** TODO thoughts/buffer-update.org
 ** how to test it
@@ -52,7 +53,6 @@
 ** the non-completion tasks should be moved out of complete_truenode
 ** Search results should not use TrueNode.
 ** distinguish : RemovedHere != HIddenHere, NewHere != UnhiddenHere
-** now just make it safe and use it a little
 ** Why a second path to noneclobber?
  /// Build and return a Save instruction supplemented with disk data.
  /// Replaces None fields in the instruction with values from disk,
@@ -106,14 +106,6 @@
    When fetched it is included,
    but if the user deletes it from the view,
    it stays deleted until they request it again.
-** TODO a herald for the presence of aliases
-   Otherwise the user won't know whether to ask for them.
-** alias, subscription, overrides, links
-   Bools for whether it has
-*** subscription action of any kind
-*** aliases
-*** overrides action of any kind
-*** any links in
 ** TODO complete_or_restore_each_node_in_branch
 *** When is it needed?
 **** An AliasCol under an indefinitive parent could need updating.
@@ -129,32 +121,6 @@
 *** TODO ?
     Unbundle those two ideas.
     I think the completion is unnecessary. All it does is add a subscribeecol if it can.
-** AWAITS Are there more unnecessary mid-functions?
-   as in midparent in a tree
-*** DONE flatten add_missing_info_to_forest
-*** DONE mark_repeats_and_extend_defmap
-**** two call chains lead to it
-***** de novo
- * main
- ** serve
- *** handle_emacs
- **** handle_single_root_view_request
- ***** single_root_view
- ****** multi_root_view
- ******* render_initial_forest_bfs
- ******** stub_forest_from_root_ids
- ********* build_node_branch_minus_content
- ********** complete_branch_minus_content
- *********** mark_repeats_and_extend_defmap
-***** save
- * main
- ** serve
- *** handle_emacs
- **** handle_save_buffer_request
- ***** update_from_and_rerender_buffer
- ****** complete_or_restore_each_node_in_branch
- ******* DUP mark_repeats_and_extend_defmap
-** Search for other places to use do_everywhere_in_tree_dfs.
 ** Write how each piece, if inelegant, at least fits into an elegant scheme.
 ** ? validate ancestry, not descendents
    This seems like it might prevent combinatorial explosion.
