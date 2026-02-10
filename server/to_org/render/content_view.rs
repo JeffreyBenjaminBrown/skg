@@ -7,7 +7,7 @@
 /// - if diff_mode_enabled, apply diff markers
 /// - render to string
 
-use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
+use crate::serve::handlers::save_buffer::{compute_diff_for_every_source, deleted_ids_to_source};
 use crate::types::git::SourceDiff;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::to_org::render::diff::apply_diff_to_forest;
@@ -55,7 +55,11 @@ pub async fn multi_root_view (
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source ( config );
-    apply_diff_to_forest ( &mut forest, &source_diffs, config ) ?; }
+    let deleted_id_src_map =
+      deleted_ids_to_source ( &source_diffs );
+    apply_diff_to_forest (
+      &mut forest, &source_diffs,
+      &deleted_id_src_map, config ) ?; }
   let buffer_content : String =
     viewnode_forest_to_string ( & forest ) ?;
   Ok ( buffer_content ) }

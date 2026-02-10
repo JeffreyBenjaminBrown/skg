@@ -220,10 +220,10 @@ fn build_subscribee_child_data (
           deleted_id_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let phantom : NodeDiffStatus =
-        phantom_diff_status( child_skgid, &child_src, source_diffs );
+        phantom_diff_status( child_skgid, &child_src, source_diffs.as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
-                           source_diffs, map, config );
+                           source_diffs.as_ref(), map, config );
       result.insert( child_skgid.clone(),
                      SubscribeeChildData { source: child_src,
                                            title: child_title,

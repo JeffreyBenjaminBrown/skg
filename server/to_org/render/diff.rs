@@ -1,10 +1,10 @@
 /// Diff application module for git diff view.
 /// Applies diff information to a forest of ViewNodes.
 
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
@@ -19,16 +19,18 @@ use std::path::PathBuf;
 /// - add diff markers
 /// - insert removed ('phantom') nodes
 pub fn apply_diff_to_forest (
-  forest       : &mut Tree<ViewNode>,
-  source_diffs : &HashMap<SourceName, SourceDiff>,
-  config       : &SkgConfig,
+  forest             : &mut Tree<ViewNode>,
+  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let root_id : NodeId =
     forest . root() . id();
   do_everywhere_in_tree_dfs (
     forest, root_id,
     &mut |node_mut| { process_node_for_diff (
-                        node_mut, source_diffs, config ) } )?;
+                        node_mut, source_diffs,
+                        deleted_id_src_map, config ) } )?;
   Ok (( )) }
 
 /// Process a single node for diff markers.
@@ -37,13 +39,15 @@ pub fn apply_diff_to_forest (
 /// will need processing here. But none of the regenerable scaffolds
 /// (see remove_regenerable_scaffolds) ever will.
 fn process_node_for_diff (
-  mut node_mut : NodeMut<ViewNode>,
-  source_diffs : &HashMap<SourceName, SourceDiff>,
-  config       : &SkgConfig,
+  mut node_mut       : NodeMut<ViewNode>,
+  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<(), String> {
   match &node_mut . value() . kind . clone() {
     ViewNodeKind::True ( _ ) =>
-      process_truenode_diff ( node_mut, source_diffs, config ),
+      process_truenode_diff (
+        node_mut, source_diffs, deleted_id_src_map, config ),
     _ => Ok (()) }}
 
 /// Process a TrueNode:
@@ -51,9 +55,10 @@ fn process_node_for_diff (
 /// - prepend TextChanged/IDCol child if needed
 /// - mark NewHere children and insert phantoms for removed children.
 fn process_truenode_diff (
-  mut node_mut : NodeMut<ViewNode>,
-  source_diffs : &HashMap<SourceName, SourceDiff>,
-  config       : &SkgConfig,
+  mut node_mut       : NodeMut<ViewNode>,
+  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
     node_mut . id();
@@ -87,8 +92,8 @@ fn process_truenode_diff (
       prepend_idcol_with_children (
         &mut node_mut, node_changes ); }
     process_truenode_contains_diff (
-      &mut node_mut, tree_node_id,
-      node_changes, source_diff, &source, config ) ?; }
+      &mut node_mut, tree_node_id, node_changes,
+      source_diff, source_diffs, deleted_id_src_map, config ) ?; }
   Ok (()) }
 
 /// Try to handle file-level diff status (Added/Deleted).
@@ -143,12 +148,13 @@ fn prepend_idcol_with_children (
 /// Mark existing children as NewHere if added to contains,
 /// and insert phantom nodes for removed children.
 fn process_truenode_contains_diff (
-  node_mut     : &mut NodeMut<ViewNode>,
-  tree_node_id : NodeId,
-  node_changes : &NodeChanges,
-  source_diff  : &SourceDiff,
-  source       : &SourceName,
-  config       : &SkgConfig,
+  node_mut           : &mut NodeMut<ViewNode>,
+  tree_node_id       : NodeId,
+  node_changes       : &NodeChanges,
+  source_diff        : &SourceDiff,
+  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<(), String> {
   let added_ids : HashSet<&ID> =
     node_changes . contains_diff . iter()
@@ -159,7 +165,8 @@ fn process_truenode_contains_diff (
   mark_newhere_children (
     node_mut, tree_node_id, &added_ids, source_diff );
   insert_phantom_nodes_for_removed_children (
-    node_mut, node_changes, source_diff, source, config ) }
+    node_mut, node_changes,
+    source_diffs, deleted_id_src_map, config ) }
 
 /// If a child corresponds to a file that already existed in HEAD
 /// but in HEAD it was not content here, mark it NewHere.
@@ -188,13 +195,17 @@ fn mark_newhere_children (
           t . diff = Some ( NodeDiffStatus::NewHere ); }} } }}
 
 /// Insert phantom nodes for children removed from contents.
+/// Uses source_for_phantom to determine the correct source for each
+/// removed child, rather than assuming it matches the parent's source.
 fn insert_phantom_nodes_for_removed_children (
-  node_mut     : &mut NodeMut<ViewNode>,
-  node_changes : &NodeChanges,
-  source_diff  : &SourceDiff,
-  source       : &SourceName,
-  config       : &SkgConfig,
+  node_mut           : &mut NodeMut<ViewNode>,
+  node_changes       : &NodeChanges,
+  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<(), String> {
+  let empty_children : HashMap<ID, SourceName> = HashMap::new();
+  let empty_map = HashMap::new();
   let removed_ids : Vec<&ID> =
     node_changes . contains_diff . iter()
       . filter_map ( |d| match d {
@@ -202,50 +213,22 @@ fn insert_phantom_nodes_for_removed_children (
           _ => None })
       . collect();
   for removed_child_id in removed_ids {
-    let child_skgnode_diff : Option<&SkgnodeDiff> = {
-      let child_file_path : PathBuf =
-        PathBuf::from ( format! ( "{}.skg", removed_child_id . 0 ));
-      source_diff . skgnode_diffs . get ( &child_file_path ) };
-    let child_is_deleted : bool =
-      child_skgnode_diff
-        . map ( |fd| fd . status == GitDiffStatus::Deleted )
-        . unwrap_or ( false );
+    let child_source : SourceName =
+      source_for_phantom(
+        removed_child_id, &empty_children,
+        deleted_id_src_map, &empty_map, config ) ?;
     let child_diff_status : NodeDiffStatus =
-      if child_is_deleted { NodeDiffStatus::Removed }
-      else                { NodeDiffStatus::RemovedHere };
+      phantom_diff_status(
+        removed_child_id, &child_source,
+        Some( source_diffs ) );
     let child_title : String =
-      title_for_phantom ( removed_child_id, child_is_deleted,
-                          source_diff, source, config ) ?;
+      title_for_phantom(
+        removed_child_id, &child_source,
+        Some( source_diffs ), &empty_map, config );
     node_mut . prepend (
       mk_phantom_viewnode (
         removed_child_id . clone(),
-        source . clone(),
+        child_source,
         child_title,
         child_diff_status )); }
   Ok (()) }
-
-/// Get the title for a phantom node.
-/// For deleted files, uses deleted_nodes from SourceDiff.
-/// For moved files (RemovedHere), reads from disk.
-fn title_for_phantom (
-  removed_child_id : &ID,
-  child_is_deleted : bool, // gone from worktree, not just here
-  source_diff      : &SourceDiff,
-  source           : &SourceName,
-  config           : &SkgConfig,
-) -> Result<String, String> {
-  if child_is_deleted {
-    source_diff . deleted_nodes . get ( removed_child_id )
-      . map ( |n| n . title . clone() )
-      . ok_or_else ( || format! (
-        "Cannot determine title for deleted node '{}': \
-         not found in deleted_nodes",
-        removed_child_id . 0 ))
-  } else {
-    skgnode_from_pid_and_source (
-        config, removed_child_id . clone(), source )
-      . map ( |n| n . title )
-      . map_err ( |e| format! (
-        "Cannot determine title for moved node '{}': {}",
-        removed_child_id . 0, e )) }}
-

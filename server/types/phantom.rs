@@ -31,11 +31,11 @@ pub fn source_for_phantom (
 pub fn title_for_phantom (
   id           : &ID,
   source       : &SourceName,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
   map          : &HashMap<ID, SkgNode>,
   config       : &SkgConfig,
 ) -> String {
-  source_diffs.as_ref()
+  source_diffs
     .and_then( |diffs| diffs.get( source ) )
     .and_then( |sd| sd.deleted_nodes.get( id ) )
     .map( |n| n.title.clone() )
@@ -51,9 +51,9 @@ pub fn title_for_phantom (
 pub fn phantom_diff_status (
   id           : &ID,
   source       : &SourceName,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
 ) -> NodeDiffStatus {
-  if source_diffs.as_ref()
+  if source_diffs
     .and_then( |diffs| diffs.get( source ) )
     .map( |sd| sd.deleted_nodes.contains_key( id ) )
     .unwrap_or( false )

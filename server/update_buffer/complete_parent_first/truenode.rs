@@ -414,12 +414,12 @@ fn build_child_creation_data (
           id, &child_sources, deleted_id_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let kind : ChildKind =
-        match phantom_diff_status( id, &phantom_source, source_diffs ) {
+        match phantom_diff_status( id, &phantom_source, source_diffs.as_ref() ) {
           NodeDiffStatus::Removed     => ChildKind::Removed,
           NodeDiffStatus::RemovedHere => ChildKind::RemovedHere,
           _                           => ChildKind::RemovedHere };
       let title : String =
-        title_for_phantom( id, &phantom_source, source_diffs, map, config );
+        title_for_phantom( id, &phantom_source, source_diffs.as_ref(), map, config );
       result.insert( id.clone(),
                      ChildData { title,
                                  source: phantom_source,
