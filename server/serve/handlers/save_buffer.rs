@@ -200,6 +200,7 @@ pub async fn update_from_and_rerender_buffer (
       let ( container_to_contents, content_to_containers ) =
         set_graphnodestats_in_forest (
           &mut forest_mut,
+          &mut skgnode_map,
           config,
           typedb_driver ). await ?;
       set_viewnodestats_in_forest (

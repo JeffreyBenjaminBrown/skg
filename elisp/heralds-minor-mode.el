@@ -27,7 +27,10 @@
       (BLUE graphStats
         (containers (ANY IT "{"))
         (contents (ANY "{" IT))
-        (linksIn (ANY IT "→")))
+        (linksIn (ANY IT "→"))
+        (BLUE aliasing "A")
+        (BLUE subscribing "S")
+        (BLUE overriding "O"))
       (BLUE viewStats
         (BLUE cycle "⟳")
         (RED notInParent "!{")

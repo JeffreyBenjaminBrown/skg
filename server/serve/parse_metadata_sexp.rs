@@ -266,6 +266,14 @@ fn parse_graphstats_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
+      Sexp::Atom ( _ ) => {
+        let key : String = atom_to_string ( element ) ?;
+        match key . as_str () {
+          "aliasing"    => { stats . aliasing    = true; },
+          "subscribing" => { stats . subscribing = true; },
+          "overriding"  => { stats . overriding  = true; },
+          _ => { return Err ( format! (
+            "Unknown graphStats atom: {}", key )); }} },
       Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
         let key : String =
           atom_to_string ( &kv_pair[0] ) ?;
@@ -289,7 +297,7 @@ fn parse_graphstats_sexp (
                   "Invalid linksIn value: {}", value )) ? ); },
           _ => { return Err ( format! ( "Unknown graphStats key: {}",
                                          key )); }} },
-      _ => { return Err ( "Unexpected element in graphStats (expected key-value pairs)"
+      _ => { return Err ( "Unexpected element in graphStats"
                            . to_string () ); }} }
   Ok (( )) }
 

@@ -189,17 +189,17 @@ fn test_multi_root_view_with_shared_nodes
         "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
-         ** (skg (node (id 3) (source main) (graphStats (linksIn 1)))) title 3
+         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1) subscribing))) title 2
+         ** (skg (node (id 3) (source main) (graphStats (linksIn 1) subscribing overriding))) title 3
          this one string could span pages
          *** (skg subscribeeCol) it subscribes to these
-         **** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
-         * (skg (node (id 2) (source main) (graphStats (linksIn 1)))) title 2
+         **** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0) subscribing overriding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1) subscribing overriding))) this title includes a [[id:22][textlink to another file]]
+         * (skg (node (id 2) (source main) (graphStats (linksIn 1) subscribing))) title 2
          this one string could span pages
          ** (skg subscribeeCol) it subscribes to these
-         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0) subscribing overriding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1) subscribing overriding))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -248,12 +248,12 @@ fn test_multi_root_view_with_node_limit
         "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
-         ** (skg (node (id 3) (source main) indefinitive (graphStats (linksIn 1)))) title 3
-         * (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1)))) title 2
+         ** (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1) subscribing))) title 2
+         ** (skg (node (id 3) (source main) indefinitive (graphStats (linksIn 1) subscribing overriding))) title 3
+         * (skg (node (id 2) (source main) indefinitive (graphStats (linksIn 1) subscribing))) title 2
          ** (skg subscribeeCol) it subscribes to these
-         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indefinitive (graphStats (containers 0) subscribing overriding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indefinitive (graphStats (containers 0) (linksIn 1) subscribing overriding))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view with limit=3 should truncate generation 2 sibling group");

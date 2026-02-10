@@ -111,12 +111,12 @@ fn test_every_kind_of_col(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
        **** (skg (node (id hidden-for-no-reason) (source main) indefinitive (graphStats (containers 0)))) hidden-for-no-reason
-       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 2)))) subscribee-1
-       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0) (contents 2)))) subscribee-2
+       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -132,13 +132,13 @@ fn test_every_kind_of_col(
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2)))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id hidden-in-E1) (source main) indefinitive)) hidden-in-E1
        **** (skg (node (id E11) (source main))) E11
-       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 2)))) subscribee-2
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id hidden-in-E2) (source main) indefinitive)) hidden-in-E2
        **** (skg (node (id E21) (source main))) E21
@@ -182,9 +182,9 @@ fn test_hidden_within_but_none_without(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 3)))) subscribee-1
+       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -202,9 +202,9 @@ fn test_hidden_within_but_none_without(
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 3)))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id H) (source main) indefinitive)) H
        **** (skg (node (id E11) (source main))) E11
@@ -249,12 +249,12 @@ fn test_hidden_without_but_none_within(
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
        **** (skg (node (id H) (source main) indefinitive (graphStats (containers 0)))) H
-       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 2)))) subscribee-1
-       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0)))) subscribee-2
+       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0) subscribing))) subscribee-2
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -269,13 +269,13 @@ fn test_hidden_without_but_none_within(
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2)))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg (node (id E11) (source main))) E11
        **** (skg (node (id E12) (source main) (graphStats (contents 1)))) E12
        ***** (skg (node (id E121) (source main))) E121
-       *** (skg (node (id E2) (source main) (graphStats (containers 0)))) subscribee-2
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) subscribing))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
        **** (skg (node (id H) (source main) indefinitive (graphStats (containers 0)))) H
        ** (skg (node (id R1) (source main))) R1
@@ -316,10 +316,10 @@ fn test_overlapping_hidden_within(
     ).await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 1)))) subscribee-1
-       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0) (contents 1)))) subscribee-2
+       *** (skg (node (id E1) (source main) indefinitive (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indefinitive (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -334,12 +334,12 @@ fn test_overlapping_hidden_within(
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1)))) R
+      "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 1)))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id H) (source main) indefinitive (graphStats (containers 2)))) H
-       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 1)))) subscribee-2
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
        ***** (skg (node (id H) (source main) indefinitive (graphStats (containers 2)))) H
        ** (skg (node (id R1) (source main))) R1

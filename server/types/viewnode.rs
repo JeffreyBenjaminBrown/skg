@@ -66,6 +66,9 @@ impl TrueNode {
 /// regardless of where/how the node appears in a view.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphNodeStats {
+  pub aliasing      : bool, // whether it has aliases
+  pub subscribing   : bool, // subscriber *or* subscribee, anywhere
+  pub overriding    : bool, // overrides *or* overridden, anywhere
   pub numContainers : Option<usize>,
   pub numContents   : Option<usize>,
   pub numLinksIn    : Option<usize>,
@@ -285,6 +288,9 @@ impl FromStr for ViewRequest {
 impl Default for GraphNodeStats {
   fn default () -> Self {
     GraphNodeStats {
+      aliasing      : false,
+      subscribing   : false,
+      overriding    : false,
       numContainers : Some ( 1 ),
       numContents   : Some ( 0 ),
       numLinksIn    : Some ( 0 ),

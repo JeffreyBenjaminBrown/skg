@@ -44,12 +44,12 @@ pub async fn multi_root_view (
   root_ids          : &[ID],
   diff_mode_enabled : bool,
 ) -> Result < String, Box<dyn Error> > {
-  let (mut forest, _map) : (Tree<ViewNode>, SkgNodeMap) =
+  let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     render_initial_forest_bfs (
       root_ids, config, driver ) . await ?;
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_forest (
-      &mut forest, config, driver ) . await ?;
+      &mut forest, &mut map, config, driver ) . await ?;
   set_viewnodestats_in_forest (
     &mut forest, &container_to_contents, &content_to_containers );
   if diff_mode_enabled {

@@ -145,3 +145,107 @@ async fn count_relations (
               count } );
           }} }} }
   Ok (result) }
+
+/// Check whether each input ID participates in a given relation
+/// in either role. One TypeDB round-trip per call.
+/// Returns HashMap<ID, bool>.
+///
+/// This largely duplicates `count_relations`, with these differences:
+/// - takes both role names and uses an OR so a node matches
+///   regardless of which role it plays
+/// - returns bool (non-empty related list) rather than a count
+async fn participates_in_relation (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids     : &[ID],
+  relation : &str,
+  role_a   : &str,
+  role_b   : &str,
+) -> Result < HashMap < ID, bool >,
+              Box < dyn Error > > {
+  if ids . is_empty () {
+    return Ok ( HashMap::new () ); }
+  let mut result : HashMap < ID, bool > =
+    HashMap::new ();
+  for id in ids {
+    result . insert ( id . clone (), false ); }
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Read
+    ) . await ?;
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
+    let answer : QueryAnswer =
+      tx . query ( {
+        let disjunction_clauses : String =
+          build_id_disjunction ( ids, "node_id" );
+        let query : String =
+          format! ( r#"match
+              {{ $node isa node, has id $node_id; }} or
+              {{ $e isa extra_id, has id $node_id;
+                 $rel isa has_extra_id ( extra_id: $e ); }};
+              {};
+              fetch {{
+                "node_id": $node_id,
+                "related": [
+                  match
+                    {{ $other isa node, has id $other_id;
+                       $input_a isa node, has id $node_id;
+                       $rel_a isa {} ( {}: $input_a,
+                                       {}: $other ); }} or
+                    {{ $other isa node, has id $other_id;
+                       $e_b isa extra_id, has id $node_id;
+                       $input_b isa node;
+                       $extra_rel_b isa has_extra_id ( node: $input_b,
+                                                       extra_id: $e_b );
+                       $rel_b isa {} ( {}: $input_b,
+                                       {}: $other ); }} or
+                    {{ $other isa node, has id $other_id;
+                       $input_c isa node, has id $node_id;
+                       $rel_c isa {} ( {}: $input_c,
+                                       {}: $other ); }} or
+                    {{ $other isa node, has id $other_id;
+                       $e_d isa extra_id, has id $node_id;
+                       $input_d isa node;
+                       $extra_rel_d isa has_extra_id ( node: $input_d,
+                                                       extra_id: $e_d );
+                       $rel_d isa {} ( {}: $input_d,
+                                       {}: $other ); }};
+                  fetch {{ "other_id": $other_id }};
+                ]
+              }};"#,
+            disjunction_clauses,
+            relation, role_a, role_b,
+            relation, role_a, role_b,
+            relation, role_b, role_a,
+            relation, role_b, role_a );
+        query } ). await ?;
+    answer }
+  { while let Some ( doc_result )
+      = stream . next () . await
+    { let doc : ConceptDocument =
+        doc_result ?;
+      if let Some ( Node::Map ( ref map ) )
+      = doc . root
+      { let node_id_opt : Option < ID > =
+          map . get ( "node_id" )
+          . and_then ( extract_id_from_node );
+        if let Some ( node_id ) = node_id_opt {
+          if let Some ( Node::List ( related_list ) ) =
+            map . get ( "related" )
+          { result . insert (
+              node_id,
+              ! related_list . is_empty () );
+          }} }} }
+  Ok (result) }
+
+pub async fn has_subscribes (
+  db_name : &str, driver : &TypeDBDriver, ids : &[ID]
+) -> Result<HashMap<ID, bool>, Box<dyn Error>> {
+  participates_in_relation ( db_name, driver, ids,
+    "subscribes", "subscriber", "subscribee" ) . await }
+
+pub async fn has_overrides (
+  db_name : &str, driver : &TypeDBDriver, ids : &[ID]
+) -> Result<HashMap<ID, bool>, Box<dyn Error>> {
+  participates_in_relation ( db_name, driver, ids,
+    "overrides_view_of", "replacement", "replaced" ) . await }

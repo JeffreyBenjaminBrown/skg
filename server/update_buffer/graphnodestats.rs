@@ -2,9 +2,12 @@ use crate::dbs::typedb::search::contains_from_pids::contains_from_pids;
 use crate::dbs::typedb::search::count_relationships::{
   count_containers,
   count_contents,
-  count_link_sources};
+  count_link_sources,
+  has_subscribes,
+  has_overrides};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
+use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
@@ -15,6 +18,8 @@ use typedb_driver::TypeDBDriver;
 /// Each of these describes some kind of relationship,
 /// for each of a view's nodes.
 struct MapsFromIdForView {
+  has_subscribes : HashMap < ID, bool >,
+  has_overrides  : HashMap < ID, bool >,
   num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
   num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
   num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
@@ -25,6 +30,7 @@ struct MapsFromIdForView {
 /// can pass to `set_viewnodestats_in_forest`.
 pub async fn set_graphnodestats_in_forest (
   forest : &mut Tree<ViewNode>,
+  map    : &mut SkgNodeMap,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
@@ -44,7 +50,9 @@ pub async fn set_graphnodestats_in_forest (
   set_metadata_relationships_in_node_recursive (
     forest,
     root_treeid,
-    & rel_data );
+    & rel_data,
+    map,
+    config );
   Ok (( container_to_contents,
         content_to_containers )) }
 
@@ -61,7 +69,13 @@ async fn fetch_relationship_data (
     count_contents ( db_name, driver, pids ) . await ?;
   let num_links_in : HashMap < ID, usize > =
     count_link_sources ( db_name, driver, pids ) . await ?;
+  let has_subscribes_map : HashMap < ID, bool > =
+    has_subscribes ( db_name, driver, pids ) . await ?;
+  let has_overrides_map : HashMap < ID, bool > =
+    has_overrides ( db_name, driver, pids ) . await ?;
   Ok ( MapsFromIdForView {
+    has_subscribes : has_subscribes_map,
+    has_overrides  : has_overrides_map,
     num_containers,
     num_contents,
     num_links_in,
@@ -71,16 +85,39 @@ fn set_metadata_relationships_in_node_recursive (
   tree     : &mut Tree<ViewNode>,
   treeid   : NodeId,
   rel_data : &MapsFromIdForView,
+  map      : &mut SkgNodeMap,
+  config   : &SkgConfig,
 ) {
-  if let ViewNodeKind::True ( t ) =
-    &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
-  { let node_pid : ID = t.id.clone();
-    t . graphStats . numContainers =
-      rel_data . num_containers . get ( &node_pid ) . copied ();
-    t . graphStats . numContents =
-      rel_data . num_contents . get ( &node_pid ) . copied ();
-    t . graphStats . numLinksIn =
-      rel_data . num_links_in . get ( &node_pid ) . copied (); }
+  // PITFALL: Aliasing is computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
+  let aliasing : bool =
+    { // PITFALL: Uses 'false' for phantom nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
+      if let ViewNodeKind::True ( t )
+        = & tree . get ( treeid ) . unwrap () . value () . kind
+        { skgnode_from_map_or_disk (
+              &t.id, &t.source, map, config
+            ). ok ()
+            . and_then ( |n| n . aliases . as_ref () )
+            . map ( |a| ! a . is_empty () )
+            . unwrap_or ( false ) }
+        else { false }};
+  if let ViewNodeKind::True ( t )
+    = &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
+    { // Write all graphStats fields.
+      // PITFALL: These booleans are not populated for phantom nodes. Populating those would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
+      let node_pid : &ID = &t.id;
+      t . graphStats . aliasing = aliasing;
+      t . graphStats . subscribing =
+        rel_data . has_subscribes . get ( node_pid )
+          . copied () . unwrap_or ( false );
+      t . graphStats . overriding =
+        rel_data . has_overrides . get ( node_pid )
+          . copied () . unwrap_or ( false );
+      t . graphStats . numContainers =
+        rel_data . num_containers . get ( node_pid ) . copied ();
+      t . graphStats . numContents =
+        rel_data . num_contents . get ( node_pid ) . copied ();
+      t . graphStats . numLinksIn =
+        rel_data . num_links_in . get ( node_pid ) . copied (); }
   let child_treeids : Vec < NodeId > =
     tree . get ( treeid ) . unwrap ()
     . children () . map ( | c | c . id () ) . collect ();
@@ -88,4 +125,6 @@ fn set_metadata_relationships_in_node_recursive (
     set_metadata_relationships_in_node_recursive (
       tree,
       child_treeid,
-      rel_data ); } }
+      rel_data,
+      map,
+      config ); } }
