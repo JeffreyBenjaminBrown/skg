@@ -111,7 +111,7 @@ pub async fn complete_branch_minus_content (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  detect_and_mark_cycle ( tree, node_id ) ?;
+  detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
@@ -153,7 +153,7 @@ pub fn make_indef_if_repeat_then_extend_defmap (
 
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
-pub fn detect_and_mark_cycle (
+pub fn detect_and_mark_cycle_v1 (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
@@ -163,7 +163,7 @@ pub fn detect_and_mark_cycle (
   write_at_node_in_tree ( tree, node_id, |viewnode| {
     let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
       &mut viewnode.kind
-      else { panic! ( "detect_and_mark_cycle: expected TrueNode" ) };
+      else { panic! ( "detect_and_mark_cycle_v1: expected TrueNode" ) };
     t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   Ok (( )) }

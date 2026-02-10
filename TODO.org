@@ -53,8 +53,6 @@
 ** Search results should not use TrueNode.
 ** distinguish : RemovedHere != HIddenHere, NewHere != UnhiddenHere
 ** now just make it safe and use it a little
-** ditch detect_and_mark_cycle
-   or at least rename it to _v1
 ** Why a second path to noneclobber?
  /// Build and return a Save instruction supplemented with disk data.
  /// Replaces None fields in the instruction with values from disk,

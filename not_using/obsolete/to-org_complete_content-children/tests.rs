@@ -5,7 +5,7 @@ use ego_tree::{Tree, NodeId};
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::test_utils::{ run_with_test_db, viewnode_forest_to_paired};
-use crate::to_org::util::{DefinitiveMap, detect_and_mark_cycle, make_indef_if_repeat_then_extend_defmap, truenode_in_tree_is_indefinitive};
+use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap, truenode_in_tree_is_indefinitive};
 use super::content_children::completeAndReorder_childrenOf_definitiveViewnode;
 use crate::to_org::complete::contents::{clobberIndefinitiveViewnode, ensure_skgnode};
 use crate::types::tree::PairTree;
