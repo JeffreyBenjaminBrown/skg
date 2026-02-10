@@ -6,6 +6,7 @@ use crate::types::list::{compute_interleaved_diff,
                           itemlist_and_removedset_from_diff,
                           Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::viewnode::{
@@ -48,12 +49,13 @@ struct SubscribeeChildData {
 /// - If parent is indefinitive: reconcile subscribee children.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
 pub async fn complete_subscribee_col_preorder (
-  node         : NodeId,
-  tree         : &mut Tree<ViewNode>,
-  map          : &mut SkgNodeMap,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  config       : &SkgConfig,
-  driver       : &TypeDBDriver,
+  node               : NodeId,
+  tree               : &mut Tree<ViewNode>,
+  map                : &mut SkgNodeMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  config             : &SkgConfig,
+  driver             : &TypeDBDriver,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
       tree, node,
@@ -105,7 +107,7 @@ pub async fn complete_subscribee_col_preorder (
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
       build_subscribee_child_data(
         tree, node, &goal_list, &removed_ids,
-        source_diffs, map ) ?;
+        source_diffs, map, deleted_id_src_map, config ) ?;
     complete_relevant_children_in_viewnodetree(
       tree, node,
       |vn : &ViewNode| matches!( &vn.kind,
@@ -184,12 +186,14 @@ fn diff_aware_goal_list (
 ///   SourceDiff.deleted_nodes contains the ID -> Some(Removed),
 ///   otherwise Some(RemovedHere).
 fn build_subscribee_child_data (
-  tree         : &Tree<ViewNode>,
-  node         : NodeId,
-  goal_list    : &[ID],
-  removed_ids  : &HashSet<ID>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  map          : &SkgNodeMap,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  goal_list          : &[ID],
+  removed_ids        : &HashSet<ID>,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
+  map                : &SkgNodeMap,
+  deleted_id_src_map : &HashMap<ID, SourceName>,
+  config             : &SkgConfig,
 ) -> Result<HashMap<ID, SubscribeeChildData>,
             Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> =
@@ -202,37 +206,24 @@ fn build_subscribee_child_data (
           m.insert( t.id.clone(),
                     ( t.source.clone(), t.title.clone() )); }}
       m };
+  let child_sources : HashMap<ID, SourceName> =
+    existing_children.iter()
+      .map( |(id, (s, _))| (id.clone(), s.clone()) )
+      .collect();
   let mut result : HashMap<ID, SubscribeeChildData> = HashMap::new();
   for child_skgid in goal_list {
     if result.contains_key( child_skgid ) { continue; }
     if removed_ids.contains( child_skgid ) {
-      // This is a phantom subscribee, removed from worktree subscriptions.
-      // Look up source/title from existing children, map, or deleted_nodes.
-      let (child_src, child_title) : (SourceName, String) =
-        if let Some( (s, t) ) = existing_children.get( child_skgid ) {
-          (s.clone(), t.clone())
-        } else if let Some( skgnode ) = map.get( child_skgid ) {
-          (skgnode.source.clone(), skgnode.title.clone())
-        } else if let Some( (s, t) )
-            = source_diffs.as_ref().and_then(
-                |diffs| diffs.iter().find_map(
-                  |(src, sd)| sd.deleted_nodes.get( child_skgid )
-                    .map( |skg| (src.clone(),
-                                 skg.title.clone() )) )) {
-            (s, t)
-        } else {
-          return Err( format!(
-            "build_subscribee_child_data: \
-             removed subscribee {} not found in children, map, or deleted_nodes",
-            child_skgid.0 ).into() ); };
+      let child_src : SourceName =
+        source_for_phantom(
+          child_skgid, &child_sources,
+          deleted_id_src_map, map, config )
+        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let phantom : NodeDiffStatus =
-        // 'Removed' if the subscribee's source has it in deleted_nodes;
-        // 'RemovedHere' otherwise.
-        if source_diffs.as_ref()
-          .and_then( |diffs| diffs.get( &child_src ) )
-          .map( |sd| sd.deleted_nodes.contains_key( child_skgid ) )
-          .unwrap_or( false )
-        { NodeDiffStatus::Removed } else { NodeDiffStatus::RemovedHere };
+        phantom_diff_status( child_skgid, &child_src, source_diffs );
+      let child_title : String =
+        title_for_phantom( child_skgid, &child_src,
+                           source_diffs, map, config );
       result.insert( child_skgid.clone(),
                      SubscribeeChildData { source: child_src,
                                            title: child_title,

@@ -7,7 +7,7 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_skgnode::{
   collect_grandchild_aliases_for_viewnode, unique_scaffold_child };
-use crate::util::dedup_vector;
+use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
 /// Converts a forest of ViewNodes to DefineNodes,

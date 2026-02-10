@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::path::PathBuf;
 
 /// PITFALL: Looks dead, but actually used
-/// by serde's `skip_serializing_if` attribute sometimes.
+/// by serde's `skip_serializing_if` attribute.
 pub fn option_vec_is_empty_or_none<T> (
   option_vec: &Option<Vec<T>>
 ) -> bool {
@@ -28,20 +28,6 @@ pub fn path_from_pid_and_source (
     . to_string_lossy ()
     . into_owned ()
 }
-
-/// Removes duplicates from a vector.
-/// Preserves the order of first occurrence.
-pub(super) fn dedup_vector<T> (
-  vec : Vec<T>
-) -> Vec<T>
-where T: Clone + Eq + Hash {
-  let mut seen : HashSet<T> = HashSet::new();
-  let mut result : Vec<T> = Vec::new();
-  for item in vec {
-    if !seen.contains(&item) {
-      seen.insert(item.clone());
-      result.push(item); }}
-  result }
 
 /// Removes from 'subtracting_from' anything in 'subtracting'.
 /// Preserves the order of elements in 'subtracting_from'.

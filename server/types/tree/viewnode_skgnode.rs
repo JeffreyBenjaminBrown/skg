@@ -10,7 +10,7 @@ use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::util::dedup_vector;
+use crate::types::list::dedup_vector;
 use super::generic::with_node_mut;
 
 use ego_tree::{Tree, NodeId, NodeRef};

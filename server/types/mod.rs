@@ -4,6 +4,7 @@ pub mod misc;
 pub mod errors;
 pub mod git;
 pub mod list;
+pub mod phantom;
 pub mod viewnode;
 pub mod unchecked_viewnode;
 pub mod skgnode;

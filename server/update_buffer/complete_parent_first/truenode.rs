@@ -4,6 +4,7 @@ use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
 use crate::types::skgnode::SkgNode;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -409,30 +410,16 @@ fn build_child_creation_data (
     let is_phantom : bool = removed_ids.contains( id );
     if is_phantom {
       let phantom_source : SourceName =
-        child_sources.get( id ).cloned()
-          .or_else( || deleted_id_src_map.get( id ).cloned() )
-          .or_else( || map.get( id ).map( |n| n.source.clone() ))
-          .or_else( || source_from_disk( id, config ) )
-          .ok_or( format!(
-            "build_child_creation_data: \
-             no source for phantom {}",
-            id.0 )) ?;
-      let opt_source_diff : Option<&SourceDiff> = source_diffs.as_ref()
-        .and_then( |diffs| diffs.get( &phantom_source ) );
+        source_for_phantom(
+          id, &child_sources, deleted_id_src_map, map, config )
+        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let kind : ChildKind =
-        if opt_source_diff .map(
-             |sourcediff| sourcediff.deleted_nodes.contains_key( id )
-           ).unwrap_or( false )
-        { ChildKind::Removed } else { ChildKind::RemovedHere };
-      let title : String = opt_source_diff
-        .and_then( |sourcediff| sourcediff.deleted_nodes.get( id ))
-        .map( |n| n.title.clone() )
-        .or_else( || map.get( id ).map( |n| n.title.clone() ))
-        .or_else( || skgnode_from_map_or_disk(
-                        id, &phantom_source, map, config )
-                      .ok().map( |n| n.title.clone() ))
-        .unwrap_or_else( || format!( "No title found for ID {}.",
-                                     id.0 ));
+        match phantom_diff_status( id, &phantom_source, source_diffs ) {
+          NodeDiffStatus::Removed     => ChildKind::Removed,
+          NodeDiffStatus::RemovedHere => ChildKind::RemovedHere,
+          _                           => ChildKind::RemovedHere };
+      let title : String =
+        title_for_phantom( id, &phantom_source, source_diffs, map, config );
       result.insert( id.clone(),
                      ChildData { title,
                                  source: phantom_source,
@@ -520,16 +507,3 @@ fn set_truenode_diff (
         t.diff = Some( status ); }}
   ).map_err( |e| -> Box<dyn Error> { e.into() } ) }
 
-/// Find the source for a node by checking which source directory
-/// contains its .skg file on disk. Returns None if not found in any source.
-fn source_from_disk (
-  id     : &ID,
-  config : &SkgConfig,
-) -> Option<SourceName> {
-  let filename : String = format!( "{}.skg", id.0 );
-  for (source_name, source_config) in &config.sources {
-    let path : PathBuf =
-      PathBuf::from( &source_config.path ).join( &filename );
-    if path.exists() {
-      return Some( source_name.clone() ); }}
-  None }

@@ -114,7 +114,8 @@ async fn complete_preorder_for_one_node (
       ViewNodeKind::Scaff( Scaffold::SubscribeeCol ) ) {
         super::complete_parent_first::subscribee_col::
         complete_subscribee_col_preorder (
-          treeid, tree, map, source_diffs, config, driver
+          treeid, tree, map, source_diffs, config, driver,
+          deleted_id_src_map
         ). await ?; }
   Ok(( )) }
 
@@ -148,12 +149,14 @@ async fn complete_postorder_for_one_node (
     kind, ViewNodeKind::Scaff( Scaffold::HiddenInSubscribeeCol )) {
       super::complete_child_first::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
-        treeid, tree, map, source_diffs, config ) ?;
+        treeid, tree, map, source_diffs, config,
+        deleted_id_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff( Scaffold::HiddenOutsideOfSubscribeeCol )) {
         super::complete_child_first::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
-          treeid, tree, map, source_diffs, config ) ?; }
+          treeid, tree, map, source_diffs, config,
+          deleted_id_src_map ) ?; }
   // No-op for: BufferRoot, TextChanged, Alias { .. },
   // ID { .. }, SubscribeeCol.
   // These nodes' correctness depends on their parent

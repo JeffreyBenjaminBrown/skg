@@ -54,12 +54,12 @@ pub struct TrueNode {
 impl TrueNode {
   /// A phantom is a display-only placeholder for a removed node
   /// in git diff view. Identified by Removed or RemovedHere status.
-  pub fn is_phantom(&self) -> bool {
+  pub fn is_phantom (
+    &self,
+  ) -> bool {
     matches!( self.diff,
               Some( NodeDiffStatus::Removed )
-            | Some( NodeDiffStatus::RemovedHere ) )
-  }
-}
+            | Some( NodeDiffStatus::RemovedHere ) ) }}
 
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
@@ -323,6 +323,19 @@ pub fn default_truenode (
     diff           : None,
   }}
 
+/// Create an indefinitive phantom ViewNode with a diff status.
+pub fn mk_phantom_viewnode (
+  id     : ID,
+  source : SourceName,
+  title  : String,
+  diff   : NodeDiffStatus,
+) -> ViewNode {
+  let mut viewnode : ViewNode =
+    mk_indefinitive_viewnode ( id, source, title, false );
+  if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
+    { t . diff = Some ( diff ); }
+  viewnode }
+
 pub fn mk_definitive_viewnode (
   id     : ID,
   source : SourceName,
@@ -352,19 +365,6 @@ pub fn mk_indefinitive_viewnode (
                             true, // indefinitive
                             None, // edit_request
                             HashSet::new ( )) } // view_requests
-
-/// Create an indefinitive phantom ViewNode with a diff status.
-pub fn mk_phantom_viewnode (
-  id     : ID,
-  source : SourceName,
-  title  : String,
-  diff   : NodeDiffStatus,
-) -> ViewNode {
-  let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, false );
-  if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
-    { t . diff = Some ( diff ); }
-  viewnode }
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,

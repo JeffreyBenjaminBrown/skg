@@ -96,3 +96,17 @@ where T: Clone + Eq + std::hash::Hash {
         { itemlist.push( x.clone() );
           removedset.insert( x.clone() ); }} }
   (itemlist, removedset) }
+
+/// Removes duplicates from a vector.
+/// Preserves the order of first occurrence.
+pub fn dedup_vector<T> (
+  vec : Vec<T>
+) -> Vec<T>
+where T: Clone + Eq + std::hash::Hash {
+  let mut seen : HashSet<T> = HashSet::new();
+  let mut result : Vec<T> = Vec::new();
+  for item in vec {
+    if !seen.contains(&item) {
+      seen.insert(item.clone());
+      result.push(item); }}
+  result }
