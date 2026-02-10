@@ -155,7 +155,7 @@ pub fn complete_hiddeninsubscribee_col (
         ViewNodeKind::True( t ) =>
           !t.parent_ignores
           && !subscribee_contains_set.contains( &t.id )
-          && t.diff.is_none(),
+          && !t.is_phantom(),
         _ => false },
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn.kind {

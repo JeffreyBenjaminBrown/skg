@@ -51,6 +51,16 @@ pub struct TrueNode {
   pub diff          : Option < NodeDiffStatus >,
 }
 
+impl TrueNode {
+  /// A phantom is a display-only placeholder for a removed node
+  /// in git diff view. Identified by Removed or RemovedHere status.
+  pub fn is_phantom(&self) -> bool {
+    matches!( self.diff,
+              Some( NodeDiffStatus::Removed )
+            | Some( NodeDiffStatus::RemovedHere ) )
+  }
+}
+
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
 /// regardless of where/how the node appears in a view.

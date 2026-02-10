@@ -147,7 +147,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
         ViewNodeKind::True( t ) =>
           !t.parent_ignores
           && !goal_set.contains( &t.id )
-          && t.diff.is_none(),
+          && !t.is_phantom(),
         _ => false },
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn.kind {

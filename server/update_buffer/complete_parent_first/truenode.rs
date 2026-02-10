@@ -77,7 +77,7 @@ pub fn complete_truenode_preorder (
     let is_phantom : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) => t.diff.is_some(),
+          ViewNodeKind::True( t ) => t.is_phantom(),
           _ => false } ) ?;
     if is_phantom { return Ok(( )); }}
   make_indef_if_repeat_then_extend_defmap(
@@ -254,7 +254,7 @@ fn complete_content_children (
 /// This marks them parentIgnores.
 /// (Note that phantom nodes are not content in the worktree,
 /// but they are content in HEAD.
-/// this does not mark such phantoms parentIgnores.)
+/// This does not mark such phantoms parentIgnores.)
 fn mark_erroneous_content_children_as_parent_ignores (
   tree        : &mut Tree<ViewNode>,
   node        : NodeId,
@@ -268,7 +268,7 @@ fn mark_erroneous_content_children_as_parent_ignores (
       ViewNodeKind::True( t ) =>
         !t.parent_ignores
         && !content_id_set.contains( &t.id )
-        && t.diff.is_none(), // phantoms have diff status; skip them
+        && !t.is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn.kind {
