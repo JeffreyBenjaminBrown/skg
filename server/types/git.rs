@@ -75,7 +75,6 @@ pub enum NodeDiffStatus {
 pub enum FieldDiffStatus {
   New,      // Value was not in the list in HEAD
   Removed,  // Value was in the list in HEAD, now gone
-  NotInGit, // Source is not a git repo
 }
 
 //
@@ -142,7 +141,6 @@ impl FieldDiffStatus {
   const REPRS_IN_CLIENT: &'static [(&'static str, FieldDiffStatus)] = &[
     ("new",        FieldDiffStatus::New),
     ("removed",    FieldDiffStatus::Removed),
-    ("not-in-git", FieldDiffStatus::NotInGit),
   ];
 
   /// String representation as used in client metadata.
