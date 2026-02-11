@@ -3,6 +3,7 @@ pub mod parse_metadata_sexp;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
+use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
@@ -113,23 +114,24 @@ fn handle_emacs (
               &tantivy_index,
               conn_state . diff_mode_enabled );
           } else if request_type == "title matches" {
-            handle_title_matches_request(
-              &mut stream,
-              &request,
-              &tantivy_index);
+            handle_title_matches_request( &mut stream,
+                                          &request,
+                                          &tantivy_index);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(
               &mut stream);
           } else if request_type == "shutdown" {
-            handle_shutdown_request(
-              &mut stream,
-              &typedb_driver,
-              config);
+            handle_shutdown_request( &mut stream,
+                                     &typedb_driver,
+                                     config);
             // Never returns - exits process
+          } else if request_type == "get file path" {
+            handle_get_file_path_request( &mut stream,
+                                          &request,
+                                          config);
           } else if request_type == "git diff mode toggle" {
-            handle_git_diff_mode_request(
-              &mut stream,
-              &mut conn_state );
+            handle_git_diff_mode_request( &mut stream,
+                                          &mut conn_state );
           } else {
             let error_msg : String =
               format! ( "Unsupported request type: {}",

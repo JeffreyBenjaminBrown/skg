@@ -6,3 +6,8 @@ port = 1730 # TCP port for Rust-Emacs API communication.
 nickname = "main"
 path = "data/default/skg"
 user_owns_it = true
+
+[[sources]]
+nickname = "foreign"
+path = "data/default/skg2"
+user_owns_it = false

@@ -20,6 +20,11 @@ So far there are these endpoints:
   - Response: success/failure indicator followed by length-prefixed content:
     - Success: `save: success\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains the processed buffer content
     - Failure: `save: failure\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains org-mode formatted error details
+- Get file path
+  - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
+  - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
+  - Errors: If the file does not exist on disk, responds with "File not found: <path>".
+  - Does not require TypeDB or Tantivy -- only the config.
 - Git diff mode toggle
   - Request: ((request . "git diff mode toggle"))
   - Response: Plain text with newline termination.

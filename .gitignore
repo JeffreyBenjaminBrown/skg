@@ -12,6 +12,7 @@
 /bash/kill-servers.sh
 /call-trees
 /data/*/skg
+/data/default/skg2/
 /devel-handy/temp.org
 /plans-done
 /rust-indent/

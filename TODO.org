@@ -1,4 +1,5 @@
 * now just make it safe and use it a little
+* ? [[id:ddec4e85-1ea5-4ddb-b6ec-d2c3f464dad7][get Claude to use Skg]]
 * ONGOING buffer update & git diff
 ** TODO thoughts/buffer-update.org
 ** how to test it

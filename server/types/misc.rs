@@ -44,6 +44,9 @@ pub struct SkgConfig {
 
   #[serde(default = "default_initial_node_limit")]
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
+
+  #[serde(skip)]
+  pub config_dir     : PathBuf, // Directory containing skgconfig.toml.
 }
 
 /// Each source has a unique nickname, defined in the SkgConfig,
@@ -158,7 +161,8 @@ impl SkgConfig {
       sources,
       port               : 0,
       delete_on_quit     : false,
-      initial_node_limit : 100, }}
+      initial_node_limit : 100,
+      config_dir         : PathBuf::from("."), }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
   /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
@@ -173,7 +177,8 @@ impl SkgConfig {
       sources,
       port               : 1730,
       delete_on_quit     : false,
-      initial_node_limit : 1000, }}
+      initial_node_limit : 1000,
+      config_dir         : PathBuf::from("."), }}
 
   pub fn user_owns_source (
     &self,

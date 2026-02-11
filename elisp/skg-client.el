@@ -13,11 +13,13 @@
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)
+(require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
 (require 'skg-state)
 
 (defun skg-client-init (file)
   (defvar skg-port (skg-port-from-toml file))
+  (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust))
 
 (defun skg-port-from-toml (file)

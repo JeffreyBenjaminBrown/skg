@@ -40,6 +40,7 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    config_dir : PathBuf::from("."),
   };
 
   let result :
@@ -84,6 +85,7 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    config_dir : PathBuf::from("."),
   };
   let result : Result<Option<&SkgNode>, Box<dyn Error>> =
     // Should error because the file doesn't exist on disk
@@ -122,6 +124,7 @@ fn test_skgnode_for_viewnode_scaffold() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    config_dir : PathBuf::from("."),
   };
 
   let result :

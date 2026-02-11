@@ -12,7 +12,7 @@ by evaluating the following (here, in Emacs):
 ```elisp
 (progn
   (load-file "skg-init.el")
-  (skg-client-init "../data/subscribe/skgconfig.toml"))
+  (skg-client-init "../data/default/skgconfig.toml"))
 ```
 
 # Commands you can run

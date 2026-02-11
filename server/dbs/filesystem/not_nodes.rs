@@ -32,9 +32,13 @@ pub fn load_config (
     return Err(format!("Config file not found: {}",
                        path)
                . into( )); }
-  let config: SkgConfig = {
+  let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path) ?;
     toml::from_str (&contents) ? };
+  config.config_dir = Path::new(path)
+    . parent()
+    . unwrap_or ( Path::new(".") )
+    . to_path_buf();
   validate_source_paths_creating_owned_ones_if_needed(
     &config.sources)?;
   Ok (config) }
@@ -77,6 +81,10 @@ pub fn load_config_with_overrides (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string(path)?;
     toml::from_str(&contents)? };
+  config.config_dir = Path::new(path)
+    . parent()
+    . unwrap_or ( Path::new(".") )
+    . to_path_buf();
   if let Some(name) = db_name {
     config.db_name = name.to_string();
     config.tantivy_folder =
