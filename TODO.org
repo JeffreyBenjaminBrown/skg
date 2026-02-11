@@ -1,7 +1,13 @@
+* TODO from using it
+** TextChange should show specially.
+   heralds-minor-mode doesn't change how this looks:
+   ```
+   ** (skg textChanged) Text changed. See git diff.
+   ```
+** ? How to copy the ID at this line?
 * now just make it safe and use it a little
 * ? [[id:ddec4e85-1ea5-4ddb-b6ec-d2c3f464dad7][get Claude to use Skg]]
-* ONGOING buffer update & git diff
-** TODO thoughts/buffer-update.org
+* test buffer update & git diff
 ** how to test it
 *** git diff view and not
 *** multiple sources, source ownerships
@@ -22,34 +28,15 @@
 **** TextChanged,
 **** TrueNode Subscribee
 **** TrueNode Non-Subscribee
-** AWAITS NOT FULLY TESTED : git diff view
-*** refs
-   see
-     git-diff-view/big-plan.org
-*** TODO test
-**** multiple repos
-**** extending a definitive view from a removed node R
-     one of whose children C is removed too,
-     and such that C has a removed child and a non-removed child
-*** ONGOING extract common logic from extendDefinitive* functions
-    across from-git and from-worktree varieties.
-*** reading : comparing extending definitive from worktree and git
-**** from worktree
-***** // Mutate the root of the definitive view request:
-***** from_disk_replace_title_body_and_skgnode(
-***** // remove ViewRequest and mark definitive
-***** // add to visited
-***** extendDefinitiveSubtreeFromLeaf (
-***** // maybe add a HiddenInSubscribeeCol
-**** from git
-     see which child IDs exist
-*** review
-    The only code I'm still uncertain about is
-      server/git_ops/diff.rs
-      server/to_org/expand/definitive.rs
-      server/to_org/render/diff.rs
-    reading:
-      server/serve/handlers/single_root_view.rs
+*** extending a definitive view from a removed node R
+    one of whose children C is removed too,
+    and such that C has a removed child and a non-removed child
+** some git diff view code I was uncertain about
+     server/git_ops/diff.rs
+     server/to_org/expand/definitive.rs
+     server/to_org/render/diff.rs
+   reading:
+     server/serve/handlers/single_root_view.rs
 * u
 ** the non-completion tasks should be moved out of complete_truenode
 ** Search results should not use TrueNode.
