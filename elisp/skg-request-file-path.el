@@ -26,8 +26,8 @@ and opens a magit diff of just that file."
           (message "No metadata sexp found on this line.")
         (if (not (skg--metadata-sexp-contains-id-p sexp))
             (message "Not a truenode line (no id in metadata).")
-          (let ((id     (skg--extract-id-from-sexp sexp))
-                (source (skg--extract-source-from-sexp sexp)))
+          (let ((id     (skg--extract-id-from-metadata-sexp sexp))
+                (source (skg--extract-source-from-metadata-sexp sexp)))
             (if (not (and id source))
                 (message "Could not extract id or source from metadata.")
               (setq skg-doc--response-handler

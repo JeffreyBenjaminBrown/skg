@@ -145,9 +145,9 @@ Does nothing if point is not within metadata or a link."
     (let (( pos (point) ))
       (beginning-of-line)
       (when (looking-at "^\\*+ (skg")
-        (let* ( ( skg-start (- (match-end 0) 4) )
+        (let* ( ( skg-start (- (match-end 0) 4))
                 ( after-bullet (buffer-substring-no-properties
-                                skg-start (line-end-position) )))
+                                skg-start (line-end-position)) ))
           (condition-case nil
               (let* ( ( sexp (read after-bullet) )
                       ( sexp-len (length (format "%S" sexp)) )
@@ -155,11 +155,11 @@ Does nothing if point is not within metadata or a link."
                 (when (and (>= pos skg-start)
                            (< pos skg-end)
                            (skg--metadata-sexp-contains-id-p sexp) )
-                  (let ( ( id (skg--extract-id-from-sexp sexp) )
-                         ( title (string-trim
-                                  (buffer-substring-no-properties
-                                   skg-end (line-end-position)) )))
-                    (cons id title) )) )
+                  (let ( (id (skg--extract-id-from-metadata-sexp sexp))
+                         (title (string-trim
+                                 (buffer-substring-no-properties
+                                  skg-end (line-end-position)) )) )
+                    (cons id title)) ))
             (error nil) )) )) ))
 
 (defun skg--metadata-sexp-contains-id-p
@@ -167,14 +167,14 @@ Does nothing if point is not within metadata or a link."
   "Return t if SEXP contains an id in the structure (skg (node (id ...)))."
   (skg-sexp-subtree-p sexp '(skg (node (id)))))
 
-(defun skg--extract-id-from-sexp
+(defun skg--extract-id-from-metadata-sexp
     (sexp)
   "Extract the id value from SEXP, a list like (skg (node (id X) ...)).
 Returns the id as a string, or nil if not found."
   (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node id)))))
     (when val (format "%s" val))))
 
-(defun skg--extract-source-from-sexp (sexp)
+(defun skg--extract-source-from-metadata-sexp (sexp)
   "Extract the source value from SEXP, a list like (skg (node (source X) ...)).
 Returns the source as a string, or nil if not found."
   (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node source)))))
