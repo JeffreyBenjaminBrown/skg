@@ -301,6 +301,14 @@ impl UncheckedViewNode {
     }
   }
 
+  /// A distinguishable label for error messages.
+  pub fn error_label(&self) -> String {
+    match &self.kind {
+      UncheckedViewNodeKind::True(t) => t.title.clone(),
+      UncheckedViewNodeKind::Scaff(s) => s.error_label(),
+    }
+  }
+
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body(&self) -> Option<&String> {
     match &self.kind {

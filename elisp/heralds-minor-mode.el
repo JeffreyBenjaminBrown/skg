@@ -18,6 +18,7 @@
     (GREEN hiddenInSubscribeeCol "hiddenIn")
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
+    (BLUE textChanged "<< Text changed. M-x skg-visit-file-diff to see. >>")
     (BLUE node
       (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
       (id (ANY "⦿")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.

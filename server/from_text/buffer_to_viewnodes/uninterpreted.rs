@@ -66,7 +66,7 @@ pub fn org_to_uninterpreted_nodes(
     if treeid_stack.len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-        viewnode.title(), level, level - 1)); }
+        viewnode.error_label(), level, level - 1)); }
     treeid_stack.push( {
       let parent_treeid: NodeId = *treeid_stack.last().unwrap();
       let new_treeid: NodeId = {

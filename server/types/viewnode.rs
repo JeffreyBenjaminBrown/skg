@@ -188,9 +188,22 @@ impl Scaffold {
       Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
       Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
       Scaffold::SubscribeeCol => "it subscribes to these",
-      Scaffold::TextChanged => "Text changed. See git diff.",
+      Scaffold::TextChanged => "",
       Scaffold::IDCol => "its IDs",
       Scaffold::ID { id, .. } => id,
+    }}
+
+  /// A distinguishable label for use in error messages.
+  /// For scaffolds with payload, includes the payload.
+  /// For others, uses repr_in_client().
+  pub fn error_label ( &self ) -> String {
+    match self {
+      Scaffold::Alias { text, .. } =>
+        format!( "scaffold:alias({})", text ),
+      Scaffold::ID { id, .. } =>
+        format!( "scaffold:id({})", id ),
+      _ =>
+        format!( "scaffold:{}", self.repr_in_client() ),
     }} }
 
 impl ViewRequest {

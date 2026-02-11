@@ -120,6 +120,12 @@
     (erase-buffer)
     (insert "(skg folded aliasCol)")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "aliases" result)))))
+      (should (string-match "aliases" result)))
+
+    ;; Test textChanged
+    (erase-buffer)
+    (insert "(skg textChanged)")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "Text changed" result)))))
 
 (provide 'test-heralds-minor-mode)

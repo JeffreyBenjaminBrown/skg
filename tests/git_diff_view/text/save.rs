@@ -73,7 +73,8 @@ fn test_edit_text_changed_scaffold_respawns()
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User tries to change the title of a textChanged scaffold
       let input = GIT_DIFF_VIEW.replace(
-        "Text changed. See git diff.", "User edited this scaffold.");
+        "** (skg textChanged)",
+        "** (skg textChanged) User edited this scaffold.");
 
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true).await?;
@@ -104,9 +105,9 @@ fn test_move_text_changed_scaffold_respawns()
 * (skg (node (id 1) (source main))) 1 has a new title.
 ** (skg (node (id 11) (source main))) 11
 11 has a new body.
-*** (skg textChanged) Text changed. See git diff.
+*** (skg textChanged)
 ** (skg (node (id 12) (source main))) 12
-** (skg textChanged) Text changed. See git diff.
+** (skg textChanged)
 ";
 
       let response = update_from_and_rerender_buffer(
@@ -135,7 +136,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
       // User moves a textChanged scaffold to under node 12 (which wasn't edited)
       let input = without_lines_containing(GIT_DIFF_VIEW, "textChanged");
       let input = insert_after(&input, "(id 12)",
-        "*** (skg textChanged) Text changed. See git diff.");
+        "*** (skg textChanged)");
 
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true).await?;

@@ -46,7 +46,7 @@ pub fn viewnode_forest_to_string (
 /// Not recursive -- just stars, metadata, title, and maybe a body.
 /// ERRORS: If viewnode is a BufferRoot.
 pub fn viewnode_to_text (
-  level   : usize,
+  level    : usize,
   viewnode : &ViewNode
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =

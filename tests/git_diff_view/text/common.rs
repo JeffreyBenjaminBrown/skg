@@ -6,10 +6,10 @@ pub use super::super::common::*;
 /// TextChanged scaffolds appear as children of nodes whose title or body changed.
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1 has a new title.
-** (skg textChanged) Text changed. See git diff.
+** (skg textChanged)
 ** (skg (node (id 11) (source main))) 11
 11 has a new body.
-*** (skg textChanged) Text changed. See git diff.
+*** (skg textChanged)
 ** (skg (node (id 12) (source main))) 12
 ";
 
