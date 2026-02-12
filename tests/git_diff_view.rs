@@ -11,3 +11,6 @@ mod text;
 
 #[path = "git_diff_view/ids/mod.rs"]
 mod ids;
+
+#[path = "git_diff_view/newhere_cycle/mod.rs"]
+mod newhere_cycle;
