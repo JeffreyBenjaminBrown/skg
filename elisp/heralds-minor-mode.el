@@ -19,6 +19,9 @@
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
     (BLUE textChanged "<< Text changed. M-x skg-visit-file-diff to see. >>")
+    (BLUE diff
+      (GREEN new "diff:new")
+      (RED removed "diff:removed"))
     (BLUE node
       (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
       (id (ANY "⦿")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
@@ -44,7 +47,13 @@
         (aliases "req:aliases")
         (containerwardView "req:containers")
         (sourcewardView "req:sources")
-        (definitiveView "req:definitive"))))
+        (definitiveView "req:definitive"))
+      (BLUE diff
+        (GREEN new "diff:new")
+        (GREEN new-here "diff:new-here")
+        (RED removed "diff:removed")
+        (RED removed-here "diff:removed-here")
+        (not-in-git "diff:not-in-git"))))
   "Rules to convert metadata sexps into herald tokens.")
 
 (defun heralds--tokens->text (tokens)
