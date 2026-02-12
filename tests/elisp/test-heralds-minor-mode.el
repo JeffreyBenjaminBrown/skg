@@ -128,4 +128,52 @@
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "Text changed" result)))))
 
+(ert-deftest test-heralds-diff-display ()
+  "Test that diff statuses are displayed as diff:STATUS heralds."
+  (with-temp-buffer
+    ;; TrueNode with (diff removed-here)
+    (erase-buffer)
+    (insert "(skg (node (id 1) (source s) (diff removed-here)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "diff:removed-here" result)))
+
+    ;; TrueNode with (diff new)
+    (erase-buffer)
+    (insert "(skg (node (id 2) (source s) (diff new)))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "diff:new" result)))
+
+    ;; Scaffold alias with (diff new)
+    (erase-buffer)
+    (insert "(skg alias (diff new))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "diff:new" result)))
+
+    ;; Scaffold alias with (diff removed)
+    (erase-buffer)
+    (insert "(skg alias (diff removed))")
+    (let ((result (heralds-from-metadata (buffer-string))))
+      (should (string-match "diff:removed" result)))))
+
+(ert-deftest test-heralds-survive-major-mode-switch ()
+  "After a major-mode switch orphans overlays, disabling heralds
+should still remove them."
+  (with-temp-buffer
+    (insert "(skg (node (id 1) (source s) (graphStats (contents 2))))\n")
+    (heralds-minor-mode 1)
+    ;; Overlays exist
+    (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
+                     (overlays-in (point-min) (point-max))))
+    ;; Major-mode switch kills buffer-local heralds-overlays but
+    ;; leaves the actual overlay objects in the buffer.
+    (text-mode)
+    (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
+                     (overlays-in (point-min) (point-max))))
+    ;; Switch back and disable — should clear orphans.
+    (org-mode)
+    (heralds-minor-mode 1)
+    (heralds-minor-mode -1)
+    (should-not (cl-some (lambda (ov) (overlay-get ov 'heralds))
+                         (overlays-in (point-min) (point-max))))))
+
 (provide 'test-heralds-minor-mode)

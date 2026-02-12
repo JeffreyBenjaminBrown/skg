@@ -1,5 +1,5 @@
+* not seeing 'new-here' when adding a preexisting node as content
 * TODO from using it
-** sometimes heralds-minor-mode can't be turned off
 ** ? How to copy the ID at this line?
 * now just make it safe and use it a little
 * ? [[id:ddec4e85-1ea5-4ddb-b6ec-d2c3f464dad7][get Claude to use Skg]]

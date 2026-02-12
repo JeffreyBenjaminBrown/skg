@@ -5,6 +5,16 @@
 ;;;
 ;;; USER-FACING FUNCTIONS
 ;;;   heralds-minor-mode
+;;;
+;;; PITFALL: ORPHANED OVERLAYS
+;;; Switching major modes (e.g. org -> text -> org) kills all
+;;; buffer-local variables, including `heralds-overlays'. But the
+;;; overlay objects themselves are attached to the buffer and survive.
+;;; With nothing referencing them, they become orphans: still setting
+;;; `display' properties on the text, but invisible to our clearing
+;;; code. To guard against this, every overlay we create is tagged
+;;; with (overlay-put ov 'heralds t), and the clearing functions scan
+;;; for that property rather than relying solely on the tracking list.
 
 (require 'cl-lib)
 (require 'skg-sexpr-search)
@@ -168,19 +178,22 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
               (when heralds
                 (let ((ov (make-overlay start (1+ end))))
                   (overlay-put ov 'display heralds)
+                  (overlay-put ov 'heralds t)
                   (overlay-put ov 'evaporate t)
                   (push ov heralds-overlays))))))))))
 
 (defun heralds-clear-overlays ()
-  "Remove all overlays from buffer."
-  (dolist (ov heralds-overlays)
-    (when ;; Exclude invalid overlays.
-        (and (overlayp ov) (overlay-buffer ov))
+  "Remove all heralds overlays from buffer.
+Scans every overlay for the `heralds' property so that orphaned
+overlays (e.g. from a major-mode switch that killed the
+buffer-local `heralds-overlays' list) are also deleted."
+  (dolist (ov (overlays-in (point-min) (point-max)))
+    (when (overlay-get ov 'heralds)
       (delete-overlay ov)))
   (setq heralds-overlays nil))
 
 (defun heralds-clear-overlays-in-region (start end)
-  "Delete overlays we manage that overlap [START, END)."
+  "Delete heralds overlays that overlap [START, END)."
   (let (keep)
     (dolist (ov heralds-overlays)
       (let ((valid (heralds-overlay-valid-and-useable-p ov)))
@@ -190,6 +203,9 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
             (delete-overlay ov)
           (when valid
             (push ov keep)))))
+    (dolist (ov (overlays-in start end))
+      (when (overlay-get ov 'heralds)
+        (delete-overlay ov)))
     (setq heralds-overlays (nreverse keep))))
 
 (defun heralds-from-metadata
