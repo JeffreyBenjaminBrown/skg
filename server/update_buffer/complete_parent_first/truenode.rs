@@ -72,17 +72,26 @@ pub fn complete_truenode_preorder (
     tree, node, |vn : &ViewNode| matches!( &vn.kind,
                                            ViewNodeKind::True( _ )),
     "complete_truenode_preorder: expected TrueNode" ) ?;
-  { // Phantoms (nodes with diff status already set, e.g. Removed,
-    // RemovedHere) are display-only placeholders created during
-    // content reconciliation. They need no further completion.
+  make_indef_if_repeat_then_extend_defmap(
+    tree, node, defmap ) ?;
+  let (pid, source) : (ID, SourceName) = {
+    // Handle git diff view *before* the clobber-and-early-return
+    // that happens to indefinitive nodes.
     let is_phantom : bool =
+      // Phantoms (nodes with diff status already set, e.g. Removed,
+      // RemovedHere) are display-only placeholders created during
+      // content reconciliation. They need no further completion.
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn.kind {
           ViewNodeKind::True( t ) => t.is_phantom(),
           _ => false } ) ?;
-    if is_phantom { return Ok(( )); }}
-  make_indef_if_repeat_then_extend_defmap(
-    tree, node, defmap ) ?;
+    if is_phantom { return Ok(( )); }
+    let (pid, source) : (ID, SourceName) =
+      pid_and_source_from_treenode( tree, node,
+                                    "complete_truenode_preorder" ) ?;
+    maybe_change_node_diff_status(
+      tree, node, &pid, source_diffs, &source)?;
+    (pid, source) };
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn.kind {
@@ -91,9 +100,6 @@ pub fn complete_truenode_preorder (
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
       return Ok(( )); }}
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_treenode( tree, node,
-                                  "complete_truenode_preorder" ) ?;
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
@@ -103,8 +109,6 @@ pub fn complete_truenode_preorder (
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
   let is_sub : bool = is_subscribee( tree, node ) ?;
-  maybe_change_node_diff_status(
-    tree, node, &pid, source_diffs, &source)?;
   { let (goal_list, removed_ids, apparent_content_ids) =
       // git diff view makes a difference
       content_goal_list(
@@ -506,4 +510,3 @@ fn set_truenode_diff (
       if let ViewNodeKind::True( ref mut t ) = vn.kind {
         t.diff = Some( status ); }}
   ).map_err( |e| -> Box<dyn Error> { e.into() } ) }
-
