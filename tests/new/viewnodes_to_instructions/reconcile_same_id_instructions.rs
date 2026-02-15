@@ -61,7 +61,7 @@ fn test_deletions_excluded (
       let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_tree(forest)?;
-      let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
+      let reduced = reconcile_same_id_instructions(instructions)?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
       let id1_instruction = reduced.iter()
@@ -97,7 +97,7 @@ fn test_defining_node_defines (
       let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_tree(forest)?;
-      let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
+      let reduced = reconcile_same_id_instructions(instructions)?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
       let id1_instruction = reduced.iter()
@@ -131,7 +131,7 @@ fn test_adding_without_definer (
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
       let instructions = naive_saveinstructions_from_tree(forest)?;
       let reduced = reconcile_same_id_instructions(
-        config, driver, instructions).await?;
+        instructions)?;
 
       { // id:1 is indefinitive-only, so it should be filtered out
         let id1_instruction = reduced.iter()

@@ -16,6 +16,7 @@ use typedb_driver::TypeDBDriver;
 
 pub mod buffer_to_viewnodes;
 pub mod viewnodes_to_instructions;
+pub mod supplement_from_disk;
 pub mod validate_foreign_nodes;
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
