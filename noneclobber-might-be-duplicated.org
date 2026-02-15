@@ -1,0 +1,88 @@
+* supplement_from_disk_if_save and noneclobber_skgnode overlap
+
+** Summary
+
+Both functions do the same thing: replace None fields in a SkgNode
+with values read from disk. They are called sequentially on every
+Save instruction in viewnode_forest_to_nonmerge_save_instructions.
+This means every Save hits disk twice, and the second pass
+(noneclobber) is largely redundant.
+
+** What each function does
+
+*** supplement_from_disk_if_save (viewnodes_to_instructions.rs)
+
+Reads disk via =optskgnode_from_id= (which calls =pid_and_source_from_id=
+then =skgnode_from_pid_and_source=).
+
+For each of these fields, replaces None with the disk value:
+- aliases
+- subscribes_to
+- hides_from_its_subscriptions
+- overrides_view_of
+
+Does NOT none-clobber:
+- body (copies buffer value as-is)
+- contains (copies buffer value as-is)
+
+Also does two extra things noneclobber does not:
+1. Validates that buffer source matches disk source (returns error if not)
+2. Supplements =ids= with extra IDs from disk (via =supplement_ids=)
+
+*** noneclobber_skgnode (none_node_fields_are_noops.rs)
+
+Reads disk via =pid_and_source_from_id= then =skgnode_from_pid_and_source=
+(same two underlying calls, just done separately rather than through
+=optskgnode_from_id=).
+
+For each of these fields, replaces None with the disk value:
+- aliases
+- contains
+- subscribes_to
+- hides_from_its_subscriptions
+- overrides_view_of
+
+Does NOT do:
+- source validation
+- id supplementation
+
+** Where they overlap
+
+| Field                          | build_disk.. | noneclobber |
+|--------------------------------+--------------+-------------|
+| aliases                        | clobbers     | clobbers    |
+| subscribes_to                  | clobbers     | clobbers    |
+| hides_from_its_subscriptions   | clobbers     | clobbers    |
+| overrides_view_of              | clobbers     | clobbers    |
+| contains                       | passes thru  | clobbers    |
+| body                           | passes thru  | no          |
+| ids                            | supplements  | no          |
+| source validation              | yes          | no          |
+
+For the four shared fields (aliases, subscribes_to,
+hides_from_its_subscriptions, overrides_view_of), the second pass
+through noneclobber is a no-op: supplement_from_disk_if_save already
+replaced any None with the disk value, so noneclobber finds Some(...)
+and skips.
+
+** The one field that actually matters in noneclobber
+
+=contains= is the only field where noneclobber does something
+supplement_from_disk_if_save does not. supplement_from_disk_if_save
+passes =contains= through unchanged. If it's None after that,
+noneclobber fills it from disk.
+
+** Possible resolutions
+
+1. *Merge into one function.* Add =contains= clobbering and keep
+   source validation + id supplementation. Delete the other.
+   Saves one disk read per instruction.
+
+2. *Have supplement_from_disk_if_save also clobber =contains=.*
+   Then noneclobber becomes fully redundant and can be deleted.
+
+3. *Move source validation and id supplementation into noneclobber,*
+   and delete supplement_from_disk_if_save.
+
+Options 1 and 2 are essentially the same. Option 3 is the mirror image.
+All three eliminate the redundant second disk read.
