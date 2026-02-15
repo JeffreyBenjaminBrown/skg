@@ -30,7 +30,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-
 /// Runs 'collect_dup_instructions' to group same-ID instructions.
 /// Then, on each group of DefineNodes,
 /// runs 'reconcile_same_id_instructions_for_one_id'

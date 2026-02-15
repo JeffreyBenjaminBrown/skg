@@ -5,7 +5,7 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
+use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
 use skg::test_utils::{run_with_test_db, extract_skgnode_if_save_else_error};
@@ -34,7 +34,7 @@ fn test_inconsistent_delete() {
 
   let forest = unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions =
-    naive_saveinstructions_from_forest(forest)
+    naive_saveinstructions_from_tree(forest)
     . unwrap();
   assert_eq!(instructions.len(), 2);
   assert_eq!(get_id(&instructions[0]), &ID::from("1"));
@@ -60,7 +60,7 @@ fn test_deletions_excluded (
 
       let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_tree(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // There are 3 instructions.
@@ -96,7 +96,7 @@ fn test_defining_node_defines (
 
       let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_tree(forest)?;
       let reduced = reconcile_same_id_instructions(config, driver, instructions).await?;
 
       assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -129,7 +129,7 @@ fn test_adding_without_definer (
         "};
       let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
       let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_forest(forest)?;
+      let instructions = naive_saveinstructions_from_tree(forest)?;
       let reduced = reconcile_same_id_instructions(
         config, driver, instructions).await?;
 

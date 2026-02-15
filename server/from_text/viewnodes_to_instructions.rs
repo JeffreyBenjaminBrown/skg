@@ -7,7 +7,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::viewnode::ViewNode;
 
-use to_naive_instructions::naive_saveinstructions_from_forest;
+use to_naive_instructions::naive_saveinstructions_from_tree;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
 use none_node_fields_are_noops::noneclobber_skgnode;
 use ego_tree::Tree;
@@ -18,7 +18,7 @@ use std::error::Error;
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// and clobbering None fields with data from disk.
 /// ASSUMES indefinitive nodes produced no instructions.
-/// (That filtering is done by 'naive_saveinstructions_from_forest'.)
+/// (That filtering is done by 'naive_saveinstructions_from_tree'.)
 pub async fn viewnode_forest_to_nonmerge_save_instructions (
   forest : &Tree<ViewNode>, // "forest" = tree with BufferRoot
   config : &SkgConfig,

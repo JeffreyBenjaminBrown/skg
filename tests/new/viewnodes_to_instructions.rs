@@ -6,7 +6,7 @@
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_forest;
+use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::viewnode::{ViewNode, forest_root_viewnode};
 use skg::types::misc::ID;
@@ -27,11 +27,11 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes(input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree(unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest) . unwrap();
 
   assert_eq!(instructions.len(), 3, "Should have 3 instructions");
 
@@ -84,7 +84,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   // Should have 2 instructions: main node and content_child
   // AliasCol and Alias nodes should not appear in output
@@ -125,7 +125,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_no_aliases() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   assert_eq!(instructions.len(), 2);
 
@@ -156,7 +156,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let result : Result<Vec<DefineNode>, String> =
-    naive_saveinstructions_from_forest(forest);
+    naive_saveinstructions_from_tree(forest);
 
   assert!(result.is_err());
   assert!(result.unwrap_err().contains("Expected at most one"));
@@ -180,7 +180,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   // Should have instructions for: root, parentIgnores, content1, content2, none_rel
   // AliasCol and Alias should be skipped
@@ -210,7 +210,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_deep_nesting() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   assert_eq!(instructions.len(), 5);
 
@@ -260,7 +260,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_error_missing_id() {
 fn test_viewnode_forest_to_nonmerge_save_instructions_empty_input() {
   let forest: Tree<ViewNode> = Tree::new(forest_root_viewnode());
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
 }
@@ -280,7 +280,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_only_aliases() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   assert_eq!(instructions.len(), 1); // Only main node
 
@@ -313,7 +313,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
   let forest: Tree<ViewNode> =
     unchecked_to_checked_tree(unchecked_forest).unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_forest(forest).unwrap();
+    naive_saveinstructions_from_tree(forest).unwrap();
 
   assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 

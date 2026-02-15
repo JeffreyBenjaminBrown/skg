@@ -16,70 +16,74 @@ use ego_tree::{NodeId, NodeRef, Tree};
 /// - reconcile DefineNodes with the same ID
 /// - clobber None fields with data from disk
 /// (Its caller 'viewnode_forest_to_nonmerge_save_instructions' does.)
-pub fn naive_saveinstructions_from_forest (
+pub fn naive_saveinstructions_from_tree (
   mut forest: Tree<ViewNode> // "forest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
-  let mut result: Vec<DefineNode> =
-    Vec::new();
-  let root_id : NodeId = forest.root().id();
-  naive_saveinstructions_from_tree ( &mut forest, root_id,
-                                     &mut result )?;
-  Ok(result) }
 
-/// Appends another DefineNode to 'result' and recurses (DFS order).
-/// Skips some nodes, because:
-/// - indefinitive nodes don't generate instructions
-/// - aliases     are handled by
-///   'collect_grandchild_aliases_for_viewnode'
-/// - subscribees are handled by
-///   'collect_subscribees'
-fn naive_saveinstructions_from_tree(
-  tree: &mut Tree<ViewNode>,
-  node_id: NodeId,
-  result: &mut Vec<DefineNode>
-) -> Result<(), String> {
-  fn recurse ( // because it's called in two places
+  /// Defined separately because it's called in two places.
+  fn recurse_dfs (
     tree: &mut Tree<ViewNode>,
     node_id: NodeId,
     result: &mut Vec<DefineNode>
   ) -> Result<(), String> {
-    for child_treeid in {
-      let child_treeids: Vec<NodeId> =
-        tree.get(node_id).unwrap().children()
-        .map(|c| c.id()).collect();
-      child_treeids }
-    { naive_saveinstructions_from_tree(
-        tree, child_treeid, result)?; }
+    for child_treeid in
+      { let child_treeids: Vec<NodeId> =
+          tree . get(node_id) . unwrap() . children()
+          . map(|c| c.id()) . collect();
+        child_treeids }
+      { append_defineonenode_and_recurse(
+          tree, child_treeid, result)?; }
     Ok(( )) }
-  let node_kind: ViewNodeKind =
-    read_at_node_in_tree(tree, node_id, |node| node.kind.clone())?;
-  match node_kind {
-    ViewNodeKind::Scaff ( Scaffold::BufferRoot ) =>
-      recurse( tree, node_id, result )?,
-    ViewNodeKind::Scaff ( _ ) => {
-      // Other scaffolds currently produce no DefineNodes.
-      // TODO: Recurse into SubscribeeCols.
-    },
-    ViewNodeKind::True ( t ) => {
-      if ! t.indefinitive {
-        let instruction: DefineNode =
-          if t.edit_request == Some(EditRequest::Delete)
-          { DefineNode::Delete(DeleteNode {
-              id: t.id.clone(),
-              source: t.source.clone() })
-          } else {
-            let aliases: Option<Vec<String>> =
-              collect_grandchild_aliases_for_viewnode(tree, node_id)?;
-            let subscribees: Option<Vec<ID>> =
-              collect_subscribees(tree, node_id)?;
-            let node_ref: NodeRef<ViewNode> = tree.get(node_id).ok_or(
-              "saveinstructions_from_tree: node not found")?;
-            let skg_node: SkgNode = skgnode_for_viewnode_in_tree(
-              node_ref.value(), &node_ref, aliases, subscribees)?;
-            DefineNode::Save(SaveNode(skg_node)) };
-        result.push(instruction); }
-      recurse( tree, node_id, result )?; }}
-  Ok(( )) }
+
+  /// Appends a DefineNode to 'result' and recurses.
+  /// Skips some nodes, because:
+  /// - indefinitive nodes don't generate instructions
+  /// - aliases     are handled by
+  ///   'collect_grandchild_aliases_for_viewnode'
+  /// - subscribees are handled by
+  ///   'collect_subscribees'
+  fn append_defineonenode_and_recurse (
+    tree    : &mut Tree<ViewNode>,
+    node_id : NodeId,
+    result  : &mut Vec<DefineNode>
+  ) -> Result<(), String> {
+    let node_kind: ViewNodeKind = read_at_node_in_tree(
+        tree, node_id, |node| node.kind.clone())?;
+    match node_kind {
+      ViewNodeKind::Scaff ( Scaffold::BufferRoot ) =>
+        recurse_dfs( tree, node_id, result )?,
+      ViewNodeKind::Scaff ( _ ) => {
+        // Other scaffolds currently produce no DefineNodes.
+        // TODO: Recurse into SubscribeeCols.
+      },
+      ViewNodeKind::True ( t ) => {
+        if ! t.indefinitive {
+          let instruction: DefineNode =
+            if t.edit_request == Some(EditRequest::Delete)
+            { DefineNode::Delete(DeleteNode {
+                id     : t.id    .clone(),
+                source : t.source.clone() })
+            } else {
+              let aliases: Option<Vec<String>> =
+                collect_grandchild_aliases_for_viewnode(
+                  tree, node_id)?;
+              let subscribees: Option<Vec<ID>> =
+                collect_subscribees( tree, node_id )?;
+              let node_ref: NodeRef<ViewNode> =
+                tree . get(node_id) . ok_or(
+                  "saveinstructions_from_tree: node not found")?;
+              let skgnode: SkgNode = skgnode_for_viewnode_in_tree (
+                node_ref.value(), &node_ref, aliases, subscribees)?;
+              DefineNode::Save(SaveNode(skgnode)) };
+          result . push(instruction); }
+        recurse_dfs( tree, node_id, result )?; }}
+    Ok(( )) }
+
+  let mut result: Vec<DefineNode> = Vec::new();
+  let root_id : NodeId = forest . root() . id();
+  append_defineonenode_and_recurse (
+    &mut forest, root_id, &mut result ) ?;
+  Ok (result) }
 
 fn skgnode_for_viewnode_in_tree<'a> (
   viewnode: &ViewNode,
