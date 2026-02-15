@@ -17,6 +17,24 @@ use crate::dbs::typedb::util::concept_document::{
   extract_id_from_map,
   build_id_disjunction};
 
+/// Collect all IDs, batch-lookup their PIDs in TypeDB, then replace.
+pub async fn replace_ids_with_pids(
+  forest  : &mut Tree<UncheckedViewNode>,
+  root_id : NodeId,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let mut ids_to_lookup: Vec<ID> = Vec::new();
+  collect_ids_in_tree( forest.root(),
+                       &mut ids_to_lookup );
+  let pid_map: HashMap<ID, Option<ID>> =
+    pids_from_ids( db_name, driver, &ids_to_lookup
+    ). await?;
+  if let Some(root_mut) = forest.get_mut(root_id) {
+    assign_pids_throughout_tree_from_map(
+      root_mut, &pid_map); }
+  Ok(( )) }
+
 /// Collect IDs for bulk PID lookup
 pub fn collect_ids_in_tree (
   node_ref : NodeRef < UncheckedViewNode >,
@@ -36,12 +54,12 @@ pub fn assign_pids_throughout_tree_from_map (
   pid_map : & HashMap < ID, Option < ID > >
 ) {
   if let UncheckedViewNodeKind::True(t)
-  = &mut node_ref . value() . kind
-  { let pid_opt : Option < ID > = t . id_opt . as_ref ()
-      . and_then ( |id| pid_map . get ( id ) )
-      . and_then ( |opt| opt . clone () );
-    if let Some ( pid ) = pid_opt {
-      t . id_opt = Some ( pid ); }}
+    = &mut node_ref . value() . kind
+    { let pid_opt : Option < ID > = t . id_opt . as_ref ()
+        . and_then ( |id| pid_map . get ( id ) )
+        . and_then ( |opt| opt . clone () );
+      if let Some ( pid ) = pid_opt {
+        t . id_opt = Some ( pid ); }}
   { // Recurse into children
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();

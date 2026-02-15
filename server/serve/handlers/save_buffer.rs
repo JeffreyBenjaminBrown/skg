@@ -45,11 +45,10 @@ impl SaveResponse {
       & self . buffer_content,
       & self . errors ) }}
 
-/* Handles save buffer requests from Emacs.
-.
-- Reads the buffer content with length prefix.
-- Puts that text through `update_from_and_rerender_buffer`.
-- Sends that back to Emacs (with a length prefix). */
+/// Handles save buffer requests from Emacs.
+/// - Reads the buffer content with length prefix.
+/// - Puts that text through `update_from_and_rerender_buffer`.
+/// - Sends that back to Emacs (with a length prefix).
 pub fn handle_save_buffer_request (
   reader            : &mut BufReader <TcpStream>,
   stream            : &mut TcpStream,
@@ -145,13 +144,11 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
   let (mut forest, save_instructions, merge_instructions)
-    : ( Tree<ViewNode>,
-        Vec<DefineNode>,
-        Vec<Merge> )
+    : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
     = buffer_to_viewnode_forest_and_save_instructions (
-      org_buffer_text, config, typedb_driver )
-    . await . map_err (
-      |e| Box::new(e) as Box<dyn Error> ) ?;
+        org_buffer_text, config, typedb_driver
+      ). await . map_err (
+        |e| Box::new(e) as Box<dyn Error> ) ?;
   if forest.root().children().next().is_none() { return Err (
     "Nothing to save found in org_buffer_text" . into( )); }
 
@@ -165,12 +162,12 @@ pub async fn update_from_and_rerender_buffer (
       save_instructions.clone(),
       config.clone(),
       tantivy_index,
-      typedb_driver ) . await ?;
+      typedb_driver ). await ?;
     merge_nodes (
       merge_instructions,
       config.clone(),
       tantivy_index,
-      typedb_driver ) . await ?; }
+      typedb_driver ). await ?; }
 
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();

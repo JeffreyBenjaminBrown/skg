@@ -35,8 +35,8 @@ pub async fn noneclobber_skgnode (
         io::ErrorKind::InvalidInput,
         "SkgNode has no IDs" ))?
     . clone ();
-  // Query TypeDB for PID and source
   let (pid_resolved, source) : (ID, SourceName) =
+    // Query TypeDB for PID and source
     ( match pid_and_source_from_id(
       &config.db_name, driver, &pid).await?
       { Some(result) => result,

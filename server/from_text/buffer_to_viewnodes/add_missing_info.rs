@@ -7,16 +7,15 @@ use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind}
 use crate::types::viewnode::Scaffold;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
-use crate::dbs::typedb::util::pids_from_ids::{pids_from_ids, collect_ids_in_tree, assign_pids_throughout_tree_from_map};
+use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::boxed::Box;
-use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
 /// PURPOSE:
-/// The code is clearer than a restatement in English would be.
+/// Just read the code; it's clearer than a restatement in English.
 /// .
 /// PITFALL:
 /// Does not add *all* missing info.
@@ -27,18 +26,17 @@ pub async fn add_missing_info_to_forest(
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let tree_root_ids: Vec<NodeId> =
-    forest.root().children().map(|c| c.id()).collect();
-  for tree_root_id in &tree_root_ids {
-    do_everywhere_in_tree_dfs(
-      forest, *tree_root_id,
-      &mut |mut node| {
-        make_alias_if_appropriate(&mut node)?;
-        inherit_parent_source_if_possible(&mut node)?;
-        assign_new_id_if_absent(&mut node)?;
-        Ok (( )) } )?; }
-  assign_pids_throughout_forest (
-    forest, &tree_root_ids, db_name, driver ). await }
+  do_everywhere_in_tree_dfs(
+    forest,
+    forest . root() . id(),
+    &mut |mut node| {
+      make_alias_if_appropriate(&mut node)?;
+      inherit_parent_source_if_possible(&mut node)?;
+      assign_new_id_if_absent(&mut node)?;
+      Ok (( )) } )?;
+  let root_id: NodeId = forest.root().id();
+  replace_ids_with_pids(
+    forest, root_id, db_name, driver ). await }
 
 /// Make this a Scaffold::Alias
 /// if this is a TrueNode
@@ -92,26 +90,3 @@ fn assign_new_id_if_absent(
       let new_id : String = Uuid::new_v4().to_string();
       t.id_opt = Some(ID(new_id)); }}
   Ok (( )) }
-
-/// PURPOSE: Replace each ID with, if it exists, the corresponding PID.
-/// METHOD: Collects all IDs, then performs a batch lookup in TypeDB.
-async fn assign_pids_throughout_forest (
-  forest        : &mut Tree<UncheckedViewNode>,
-  tree_root_ids : &[NodeId],
-  db_name       : &str,
-  driver        : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
-  let mut ids_to_lookup: Vec<ID> = Vec::new();
-  for tree_root_id in tree_root_ids {
-    if let Some(tree_root_ref) = forest.get(*tree_root_id) {
-      collect_ids_in_tree(tree_root_ref,
-                                    &mut ids_to_lookup); }}
-  let pid_map: HashMap<ID, Option<ID>> =
-    pids_from_ids( db_name, driver, &ids_to_lookup
-    ). await?;
-  for tree_root_id in tree_root_ids {
-    if let Some(tree_root_mut) =
-      forest.get_mut(*tree_root_id) {
-        assign_pids_throughout_tree_from_map(
-          tree_root_mut, &pid_map); }}
-  Ok(( )) }
