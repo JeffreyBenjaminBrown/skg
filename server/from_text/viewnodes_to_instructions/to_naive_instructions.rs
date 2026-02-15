@@ -10,12 +10,12 @@ use crate::types::tree::viewnode_skgnode::{
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-/// Converts a forest of ViewNodes to DefineNodes,
-/// taking them all at face value. In particular,
-/// it does *not*:
+/// Converts a forest of ViewNodes to DefineNodes, 'naively' --
+/// that is, leaving the following work to be handled elsewhere:
 /// - reconcile DefineNodes with the same ID
 /// - clobber None fields with data from disk
-/// (Its caller 'viewnode_forest_to_nonmerge_save_instructions' does.)
+/// (Its caller, 'viewnode_forest_to_nonmerge_save_instructions',
+/// does those things.)
 pub fn naive_saveinstructions_from_tree (
   mut forest: Tree<ViewNode> // "forest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
@@ -102,7 +102,8 @@ fn skgnode_for_viewnode_in_tree<'a> (
     source: t.source.clone(),
     ids: vec![t.id.clone()],
     body: t.body.clone(),
-    contains: Some(collect_contents_that_are_not_to_delete(noderef)),
+    contains: Some(
+      collect_contents_to_save_from_children(noderef) ),
     subscribes_to: subscribees,
     hides_from_its_subscriptions: None,
     overrides_view_of: None,
@@ -141,10 +142,12 @@ fn collect_subscribees (
         subscribees };
       Ok(Some(dedup_vector(subscribees))) }} }
 
-/// Returns IDs of all children for which treatment = Content.
-/// Not a recursive traversal;
-///   it is only concerned with this node's contents.
-fn collect_contents_that_are_not_to_delete<'a> (
+/// The following kinds of TrueNode children
+/// should be excluded from their parent's content:
+/// - anything marked parentIgnores
+/// - any phantom content ('Removed' or 'RemovedHere')
+/// - anything about to be deleted
+fn collect_contents_to_save_from_children<'a> (
   node_ref: &NodeRef<'a, ViewNode>
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
@@ -157,9 +160,9 @@ fn collect_contents_that_are_not_to_delete<'a> (
         matches!( t . diff,
                   Some(NodeDiffStatus::Removed) |
                   Some(NodeDiffStatus::RemovedHere) );
-      if !t.parent_ignores
-         && !is_phantom
+      if ! t.parent_ignores
+         && ! is_phantom
          && ! matches!( t . edit_request,
                         Some(EditRequest::Delete))
-      { contents.push(t.id.clone()); } } }
+      { contents.push( t.id.clone() ); }} }
   contents }

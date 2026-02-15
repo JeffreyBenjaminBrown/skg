@@ -59,11 +59,10 @@ pub fn collect_dup_instructions(
   for instr in instructions {
     let primary_id : ID = match &instr {
       DefineNode::Save(SaveNode(node)) =>
-        node.ids.first()
-        . ok_or("DefineNode::Save has no ID")?
-        . clone(),
+        node . ids . first()
+        . ok_or("DefineNode::Save has no ID")? . clone(),
       DefineNode::Delete(DeleteNode { id, .. }) =>
-        id.clone() };
+        id . clone() };
     grouped
       . entry (primary_id)
       . or_insert_with (Vec::new)
@@ -71,12 +70,12 @@ pub fn collect_dup_instructions(
   Ok(grouped) }
 
 /// Processes a group of DefineNodes with the same ID.
-/// After validation, each group contains:
-/// - Exactly 1 Save (validation ensures no duplicates), OR
-/// - 1+ Delete instructions (all equivalent)
-/// This function either supplements the single Save
-/// with disk data -- replacing None fields in the ViewNode
-/// with the same field from disk, and including all the extra IDs
+/// Thanks to validation, the 'instructions' input contains either:
+/// - Exactly 1 Save (validation ensures no duplicates)
+/// - 1 or more Deletes (all equivalent)
+/// This function either supplements the single Save with disk data
+/// -- replacing None fields in the ViewNode with
+///    the same field from disk, and including all the extra IDs
 /// -- or else returns the Delete instruction.
 pub async fn reconcile_same_id_instructions_for_one_id(
   config: &SkgConfig,
@@ -105,59 +104,58 @@ pub async fn reconcile_same_id_instructions_for_one_id(
   let save : SaveNode =
     save_opt . ok_or("No delete and no save instruction found. This should not be possible.")?;
   let supplemented : SaveNode =
-    // Return a Save. Replace None fields from the skgnode implied by the buffer with whatever was already on disk. (The buffer node can delete the data in such a field by sending Some([]) rather than None.)
-    build_supplemented_save ( config, driver, save ). await ?;
+    // Return a Save. Replace None fields from the skgnode implied by the buffer with whatever was already on disk.
+    build_disksupplemented_save ( config, driver, save ). await ?;
   Ok(DefineNode::Save(supplemented)) }
 
 /// Build and return a Save instruction supplemented with disk data.
 /// Replaces None fields in the instruction with values from disk,
-/// and validates that sources match.
-async fn build_supplemented_save(
+/// and validates that sources match. (To delete such a field,
+/// the SaveNode should use Some ( [] ) rather than None.)
+async fn build_disksupplemented_save(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   SaveNode(from_buffer): SaveNode,
 ) -> Result<SaveNode, Box<dyn Error>> {
   let pid: ID =
-    from_buffer.ids.first()
-    .ok_or("No primary ID found")?.clone();
-  let source : SourceName = from_buffer.source.clone();
+    from_buffer . ids . first()
+    . ok_or("No primary ID found")? . clone();
+  let source : SourceName = from_buffer . source . clone();
   let from_disk : Option<SkgNode> =
     optskgnode_from_id(config, driver, &pid).await?;
   if let Some(ref disk_node) = from_disk {
-    if source != disk_node.source { // sources don't match
+    if source != disk_node . source { // sources don't match
       return Err(Box::new(
         BufferValidationError::DiskSourceBufferSourceConflict(
-          pid.clone(),
-          disk_node.source.clone(),
-          source.clone() )) ); }}
+          pid . clone(),
+          disk_node . source . clone(),
+          source . clone() )) ); }}
   let supplemented_node : SkgNode = SkgNode {
-    title: from_buffer.title.clone(),
-    aliases: (
-      from_buffer.aliases.clone().or(
-        from_disk.as_ref().and_then(
-          |node| node.aliases.clone()))),
+    title: from_buffer . title . clone(),
+    aliases: ( from_buffer . aliases . clone() . or(
+                 from_disk . as_ref() . and_then(
+                   |node| node . aliases . clone() )) ),
     source,
     ids: supplement_ids( &from_buffer,
                          &from_disk),
-    body: from_buffer.body.clone(),
-    contains: from_buffer.contains.clone(),
+    body: from_buffer . body . clone(),
+    contains: from_buffer . contains . clone(),
     subscribes_to: (
-      from_buffer.subscribes_to.clone().or(
-        from_disk.as_ref().and_then(
-          |node| node.subscribes_to.clone()))),
+      from_buffer . subscribes_to . clone() . or(
+        from_disk . as_ref() . and_then(
+          |node| node . subscribes_to . clone() )) ),
     hides_from_its_subscriptions: (
-      from_buffer.hides_from_its_subscriptions.clone().or(
-        from_disk.as_ref().and_then(
-          |node| node.hides_from_its_subscriptions.clone()))),
+      from_buffer . hides_from_its_subscriptions . clone() . or(
+        from_disk . as_ref() . and_then(
+          |node| node . hides_from_its_subscriptions . clone() )) ),
     overrides_view_of: (
-      from_buffer.overrides_view_of.clone().or(
-        from_disk.as_ref().and_then(
-          |node| node.overrides_view_of.clone()))), };
+      from_buffer . overrides_view_of . clone() . or(
+        from_disk . as_ref() . and_then(
+          |node| node . overrides_view_of . clone() )) ), };
   Ok(SaveNode(supplemented_node)) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
-/// MOTIVATION: An ViewNode uses only one ID,
-/// while a SkgNode can have many.
+/// MOTIVATION: A ViewNode uses only one ID; a SkgNode can have many.
 fn supplement_ids(
   from_buffer: &SkgNode,
   optskgnode_from_disk: &Option<SkgNode>
