@@ -1,6 +1,7 @@
 * not seeing 'new-here' when adding a preexisting node as content
 * TODO from using it
 ** ? How to copy the ID at this line?
+* naive_saveinstructions_from_tree cannot skip SubscribeeCols
 * now just make it safe and use it a little
 * ? [[id:ddec4e85-1ea5-4ddb-b6ec-d2c3f464dad7][get Claude to use Skg]]
 * test buffer update & git diff
@@ -35,6 +36,16 @@
      server/serve/handlers/single_root_view.rs
 * u
 ** the non-completion tasks should be moved out of complete_truenode
+** ? find all things that return where maybe should error
+   e.g. if something isn't found
+** this looks like it should error instead
+  let (pid_resolved, source) : (ID, SourceName) =
+    // Query TypeDB for PID and source
+    ( match pid_and_source_from_id(
+      &config.db_name, driver, &pid).await?
+      { Some(result) => result,
+        None => { // No such node in database. Return input unchanged.
+          return Ok(from_user); }} );
 ** Search results should not use TrueNode.
 ** distinguish : RemovedHere != HIddenHere, NewHere != UnhiddenHere
 ** Why a second path to noneclobber?
@@ -111,70 +122,71 @@
    For instance, "an alias should have an aliascol parent"
    is easier to say than "an aliascol's children can only be aliases".
 * extend it
-** Why not use Git as the save safety layer?
-   really need these all before releasing
 ** {see, edit} {subscribes, overrides, hides} relationships
+*** save subscribees
+**** the subscribee tree format
+   - truenode // suppose this is a subscriber
+     - subscribeeCol
+       - [truenodes] // anything here is a subscribee
+         - [truenodes] // nodes here are content of the subscribee
+         - hiddeninsubscribeecol
+           - [truenodes] // nodes here are hidden by the subscriber
+       - hiddenoutsideofsubscribeecol
+         - [truenodes]
+**** extant procedure
+     Currently, subscribees are collected, nothing more.
+**** editing a subscribee
+     Suppose R is a subscriber.
+***** validate
+      A TrueNode can have at most one SubscribeeCol.
+      SubscribeeCol can have at most one Hiddenoutsideofsubscribeecol. Its TrueNode children (subscribees) cannot have the ID of its parent (subscriber) -- it can't subscribe to itself.
+      Nothing special to validate in a subscribee.
+      A Hidden*Col can only have TrueNode children.
+***** generate instructions
+****** collect subscribees
+       Already implemented. Whether they are definitive has no effect.
+****** collect hidden
+       Recurse into R's definitive subscribees.
+       For any such subcsribee E,
+       make a list C of IDs of its non-ignored content children.
+       Subtract from C any ID not in E's content on disk.
+       Everything E contains on disk that is absent from C
+       should be hidden from R.
+***** update view
+      The subscribees themselves need no updating,
+      nor do their content, but the hidden*Cols do.
+      For each hidden*Col, determine what it should contain,
+      see what it already contains, and insert anything missing.
+      Anything it should not contain should be marked parentIgnores.
+      The order in a Hiddeninsubscribeecol should correspond
+      to the order of the content of the subscribee.
+      The order in a Hiddenoutsideofsubscribeecol should correspond
+      to the order of the content of the subscriber's 'hidden' field.
+**** ruminating
+***** Edits to a foreign node.
+      Creates a lens.
+      It begins as whatever the user tried to save,
+      plus an overrides relationship to the foreign node,
+      plus a subscribes-to relationship to the foreign node,
+      plus hides relationships to the intersection
+      of its content and the foreign node's.
+***** Edits to a subscribee.
+      These don't make sense.
+***** Edits to a subscribee's content.
+      If it's deletion or insertion of a node the suscribee contains,
+      update the subscriber's hidden list.
+      If it's anything else, create a lens,
+      and use the lens when showing the subscribee's recursive content.
+***** A subscribee E can have its own subscribees.
+      Editing one of those is an edit to E, i.e. doesn't make sense.
+      To lens onto one, copy it elsewhere and edit that.
+*** show subscribees
 ** safe save
-   If invalid state is detected in the course of a save,
-   rollback to the previous state.
-** save subscribees
-*** the subscribee tree format
-  - truenode // suppose this is a subscriber
-    - subscribeeCol
-      - [truenodes] // anything here is a subscribee
-        - [truenodes] // nodes here are content of the subscribee
-        - hiddeninsubscribeecol
-          - [truenodes] // nodes here are hidden by the subscriber
-      - hiddenoutsideofsubscribeecol
-        - [truenodes]
-*** extant procedure
-    Currently, subscribees are collected, nothing more.
-*** editing a subscribee
-    Suppose R is a subscriber.
-**** validate
-     A TrueNode can have at most one SubscribeeCol.
-     SubscribeeCol can have at most one Hiddenoutsideofsubscribeecol. Its TrueNode children (subscribees) cannot have the ID of its parent (subscriber) -- it can't subscribe to itself.
-     Nothing special to validate in a subscribee.
-     A Hidden*Col can only have TrueNode children.
-**** generate instructions
-***** collect subscribees
-      Already implemented. Whether they are definitive has no effect.
-***** collect hidden
-      Recurse into R's definitive subscribees.
-      For any such subcsribee E,
-      make a list C of IDs of its non-ignored content children.
-      Subtract from C any ID not in E's content on disk.
-      Everything E contains on disk that is absent from C
-      should be hidden from R.
-**** update view
-     The subscribees themselves need no updating,
-     nor do their content, but the hidden*Cols do.
-     For each hidden*Col, determine what it should contain,
-     see what it already contains, and insert anything missing.
-     Anything it should not contain should be marked parentIgnores.
-     The order in a Hiddeninsubscribeecol should correspond
-     to the order of the content of the subscribee.
-     The order in a Hiddenoutsideofsubscribeecol should correspond
-     to the order of the content of the subscriber's 'hidden' field.
-*** ruminating
-**** Edits to a foreign node.
-     Creates a lens.
-     It begins as whatever the user tried to save,
-     plus an overrides relationship to the foreign node,
-     plus a subscribes-to relationship to the foreign node,
-     plus hides relationships to the intersection
-     of its content and the foreign node's.
-**** Edits to a subscribee.
-     These don't make sense.
-**** Edits to a subscribee's content.
-     If it's deletion or insertion of a node the suscribee contains,
-     update the subscriber's hidden list.
-     If it's anything else, create a lens,
-     and use the lens when showing the subscribee's recursive content.
-**** A subscribee E can have its own subscribees.
-     Editing one of those is an edit to E, i.e. doesn't make sense.
-     To lens onto one, copy it elsewhere and edit that.
-** show subscribees
+*** elaboration
+    If invalid state is detected in the course of a save,
+    rollback to the previous state.
+*** Why not use Git as the save safety layer?
+    really need these all before releasing
 * u
 ** dogfood it
 ** sourceward view ? ugly

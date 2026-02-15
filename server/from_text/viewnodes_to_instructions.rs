@@ -26,22 +26,20 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let mut clobbered_instructions : Vec<DefineNode> =
     Vec::new(); // they'll be clobbered by the end of this function
-  for instr in
-    { let instructions_without_dups : Vec<DefineNode> =
-        reconcile_same_id_instructions (
-          config, driver,
-          { let instructions : Vec<DefineNode> =
-              naive_saveinstructions_from_forest (
-                forest . clone( )) ?;
-            instructions } ) . await ?;
-      instructions_without_dups }
-  { let clobbered_instr : DefineNode = match instr {
-      DefineNode::Delete(_) =>
-        // Deletes need no clobbering; pass through unchanged.
-        instr,
-      DefineNode::Save(SaveNode(node)) => {
-        let noneclobbered_node : SkgNode =
-          noneclobber_skgnode ( config, driver, node ). await ?;
-        DefineNode::Save(SaveNode(noneclobbered_node)) } };
-    clobbered_instructions.push(clobbered_instr); }
+  for instr in { let instructions_without_dups : Vec<DefineNode> =
+                   reconcile_same_id_instructions (
+                     config, driver,
+                     { let instructions : Vec<DefineNode> =
+                         naive_saveinstructions_from_tree (
+                           forest . clone( )) ?;
+                       instructions } ) . await ?;
+                 instructions_without_dups }
+    { let clobbered_instr : DefineNode = match instr {
+        DefineNode::Delete(_) => // Deletes needs no clobbering.
+          instr,
+        DefineNode::Save(SaveNode(node)) => {
+          let noneclobbered_node : SkgNode =
+            noneclobber_skgnode ( config, driver, node ). await ?;
+          DefineNode::Save(SaveNode(noneclobbered_node)) } };
+      clobbered_instructions . push (clobbered_instr); }
   Ok (clobbered_instructions) }
