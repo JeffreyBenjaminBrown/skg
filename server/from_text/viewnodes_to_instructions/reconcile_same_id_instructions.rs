@@ -45,10 +45,13 @@ pub async fn reconcile_same_id_instructions(
     Vec::new();
   for (_id, instruction_group) in grouped_instructions {
     let reduced_instruction: DefineNode =
-      reconcile_same_id_instructions_for_one_id(
-        config, driver, instruction_group ). await ?;
-    result.push (reduced_instruction); }
-  Ok(result) }
+      reconcile_same_id_instructions_for_one_id (
+        instruction_group )?;
+    result . push (
+      build_disksupplemented_save (
+        config, driver, reduced_instruction
+      ). await ?); }
+  Ok (result) }
 
 /// Group DefineNodes with the same ID.
 pub fn collect_dup_instructions(
@@ -73,13 +76,9 @@ pub fn collect_dup_instructions(
 /// Thanks to validation, the 'instructions' input contains either:
 /// - Exactly 1 Save (validation ensures no duplicates)
 /// - 1 or more Deletes (all equivalent)
-/// This function either supplements the single Save with disk data
-/// -- replacing None fields in the ViewNode with
-///    the same field from disk, and including all the extra IDs
-/// -- or else returns the Delete instruction.
-pub async fn reconcile_same_id_instructions_for_one_id(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+/// Returns the single Save or Delete instruction.
+/// (Disk supplementation is done by the caller.)
+pub fn reconcile_same_id_instructions_for_one_id(
   instructions: Vec<DefineNode>
 ) -> Result<DefineNode, Box<dyn Error>> {
   if instructions.is_empty() {
@@ -103,20 +102,21 @@ pub async fn reconcile_same_id_instructions_for_one_id(
     return Ok(DefineNode::Delete(delete_instr)); }
   let save : SaveNode =
     save_opt . ok_or("No delete and no save instruction found. This should not be possible.")?;
-  let supplemented : SaveNode =
-    // Return a Save. Replace None fields from the skgnode implied by the buffer with whatever was already on disk.
-    build_disksupplemented_save ( config, driver, save ). await ?;
-  Ok(DefineNode::Save(supplemented)) }
+  Ok(DefineNode::Save(save)) }
 
-/// Build and return a Save instruction supplemented with disk data.
-/// Replaces None fields in the instruction with values from disk,
+/// Has no effect on Delete instructions.
+/// Supplements Save instructions with disk data:
+/// replaces None fields with values from disk,
 /// and validates that sources match. (To delete such a field,
 /// the SaveNode should use Some ( [] ) rather than None.)
 async fn build_disksupplemented_save(
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  SaveNode(from_buffer): SaveNode,
-) -> Result<SaveNode, Box<dyn Error>> {
+  instruction: DefineNode,
+) -> Result<DefineNode, Box<dyn Error>> {
+  let SaveNode(from_buffer) = match instruction {
+    DefineNode::Delete(_) => return Ok(instruction),
+    DefineNode::Save(save) => save };
   let pid: ID =
     from_buffer . ids . first()
     . ok_or("No primary ID found")? . clone();
@@ -152,7 +152,7 @@ async fn build_disksupplemented_save(
       from_buffer . overrides_view_of . clone() . or(
         from_disk . as_ref() . and_then(
           |node| node . overrides_view_of . clone() )) ), };
-  Ok(SaveNode(supplemented_node)) }
+  Ok(DefineNode::Save(SaveNode(supplemented_node))) }
 
 /// Supplements instruction's IDs with any extra IDs from disk.
 /// MOTIVATION: A ViewNode uses only one ID; a SkgNode can have many.
