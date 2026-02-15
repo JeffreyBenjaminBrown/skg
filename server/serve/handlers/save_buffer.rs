@@ -155,7 +155,6 @@ pub async fn update_from_and_rerender_buffer (
 
   { // Remove diff data from tree.
     remove_all_branches_marked_removed ( &mut forest ) ?;
-    remove_regenerable_scaffolds ( &mut forest ) ?;
     clear_diff_metadata ( &mut forest ) ?; }
 
   { // update the graph
@@ -245,49 +244,6 @@ pub fn remove_all_branches_marked_removed (
         Ok ( false ) // Prune: branch removed, so don't recurse
       } else { Ok ( true ) }} )? ; // recurse into children
   Ok (( )) }
-
-/// It's cheaper to regenerate these than to reconcile user edits.
-/// If a deleted branch contains focus, passes it up to the parent.
-pub fn remove_regenerable_scaffolds (
-  forest : &mut Tree<ViewNode>
-) -> Result<(), Box<dyn Error>> {
-  let forest_root_id : NodeId =
-    forest . root() . id();
-  do_everywhere_in_tree_dfs_prunable (
-    forest,
-    forest_root_id,
-    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
-      let is_regenerable_scaffold : bool =
-        matches! ( &node . value() . kind,
-                   ViewNodeKind::Scaff ( Scaffold::IDCol ) |
-                   ViewNodeKind::Scaff ( Scaffold::ID { .. } ) |
-                   ViewNodeKind::Scaff ( Scaffold::TextChanged ) |
-                   ViewNodeKind::Scaff ( Scaffold::AliasCol ) |
-                   ViewNodeKind::Scaff ( Scaffold::Alias { .. } ));
-      if is_regenerable_scaffold {
-        let node_id : NodeId = node . id();
-        if subtree_has_focus ( node . tree(), node_id )
-        { if let Some ( mut parent ) = node . parent()
-            { parent . value() . focused = true; }}
-        node . detach();
-        Ok ( false ) // subtree is gone, so don't recurse
-      } else { Ok ( true ) }} ) ?;
-  Ok (( )) }
-
-fn subtree_has_focus (
-  tree    : &Tree<ViewNode>,
-  node_id : NodeId,
-) -> bool {
-  let node_ref : NodeRef<ViewNode> =
-    match tree . get ( node_id ) {
-      Some ( n ) => n,
-      None => return false };
-  if node_ref . value() . focused {
-    return true; }
-  for child in node_ref . children() {
-    if subtree_has_focus ( tree, child . id() ) {
-      return true; }}
-  false }
 
 /// Clear diff metadata from all TrueNodes in the forest.
 /// Scaffolds with diff fields (Alias, ID) are already removed
