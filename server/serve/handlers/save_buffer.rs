@@ -149,8 +149,9 @@ pub async fn update_from_and_rerender_buffer (
         org_buffer_text, config, typedb_driver
       ). await . map_err (
         |e| Box::new(e) as Box<dyn Error> ) ?;
-  if forest.root().children().next().is_none() { return Err (
-    "Nothing to save found in org_buffer_text" . into( )); }
+  if forest . root() . children() . next() . is_none()
+    { return Err ( "Nothing to save found in org_buffer_text"
+                   . into() ); }
 
   { // Remove diff data from tree.
     remove_all_branches_marked_removed ( &mut forest ) ?;

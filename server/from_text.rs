@@ -28,11 +28,10 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver
-) -> Result<
-    ( Tree<ViewNode>,
-      Vec<DefineNode>,
-      Vec<Merge>
-    ), SaveError> {
+) -> Result< ( Tree<ViewNode>,
+               Vec<DefineNode>,
+               Vec<Merge> ),
+             SaveError> {
   let ( mut unchecked_forest, parsing_errors )
     : ( Tree<UncheckedViewNode>, Vec<BufferValidationError> )
     = org_to_uninterpreted_nodes ( buffer_text )

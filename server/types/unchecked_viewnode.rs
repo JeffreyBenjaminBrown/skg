@@ -12,8 +12,9 @@ use super::viewnode::{
   ViewNode, ViewNodeKind, TrueNode, Scaffold,
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
 };
+use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use ego_tree::{Tree, NodeId, NodeMut};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 //
 // Type declarations
@@ -143,61 +144,50 @@ impl From<ViewNode> for UncheckedViewNode {
   }
 }
 
-/// In the unchecked type, id and source are optional.
-/// This returns an error if any TrueNode is missing either field.
-/// Validation happens before this, so it should not error.
-pub fn unchecked_to_checked_tree(
+/// PURPOSE:
+/// Builds a Tree<ViewNode> isomorphic to the input tree.
+/// In the unchecked (input) type, id and source are optional;
+/// in the output, they are mandatory.
+/// .
+/// ERROR CONDITIONS:
+/// Errs if any TrueNode is missing either field.
+/// Since validation happens before this, it shouldn't err.
+pub fn unchecked_to_checked_tree (
   unchecked: Tree<UncheckedViewNode>
 ) -> Result<Tree<ViewNode>, String> {
-  // Convert the root node
-  let root_unchecked: &UncheckedViewNode = unchecked.root().value();
-  let root_checked: ViewNode = ViewNode::try_from(root_unchecked.clone())?;
-  let mut checked: Tree<ViewNode> = Tree::new(root_checked);
-
-  // Recursively convert children
-  fn convert_children(
-    unchecked_tree : &Tree<UncheckedViewNode>,
-    checked_tree   : &mut Tree<ViewNode>,
-    unchecked_id   : NodeId,
-    checked_id     : NodeId,
-  ) -> Result<(), String> {
-    let child_ids: Vec<NodeId> = unchecked_tree
-      .get(unchecked_id)
-      .unwrap()
-      .children()
-      .map(|c| c.id())
-      .collect();
-
-    for unchecked_child_id in child_ids {
-      let unchecked_child: &UncheckedViewNode = unchecked_tree
-        .get(unchecked_child_id)
-        .unwrap()
-        .value();
-      let checked_child: ViewNode =
-        ViewNode::try_from(unchecked_child.clone())?;
-
-      let checked_child_id: NodeId = {
+  let unchecked_root_id: NodeId =
+    unchecked . root() . id();
+  let mut checked: Tree<ViewNode> =
+    Tree::new( ViewNode::try_from(
+      unchecked . root() . value() . clone() )? );
+  let mut id_map: HashMap< NodeId, // key : unchecked
+                           NodeId > // value : checked
+    = HashMap::new();
+  id_map . insert( unchecked_root_id,
+                   checked . root() . id() );
+  do_everywhere_in_tree_dfs_readonly(
+    // PITFALL: Readonly for 'unchecked',
+    // but mutates 'checked' and 'id_map'.
+    &unchecked, unchecked_root_id,
+    &mut |node_ref
+    | {
+      if node_ref . id() == unchecked_root_id {
+        return Ok (( )); } // already converted
+      let checked_node: ViewNode =
+        ViewNode::try_from(
+          node_ref . value() . clone() )?;
+      let parent_checked_id: NodeId =
+        *id_map . get (
+          &node_ref . parent() . unwrap() . id()
+        ). unwrap();
+      let checked_id: NodeId = {
         let mut parent_mut: NodeMut<ViewNode> =
-          checked_tree.get_mut(checked_id).unwrap();
-        parent_mut.append(checked_child).id()
-      };
-
-      convert_children(
-        unchecked_tree,
-        checked_tree,
-        unchecked_child_id,
-        checked_child_id,
-      )?;
-    }
-    Ok(())
-  }
-
-  let unchecked_root_id: NodeId = unchecked.root().id();
-  let checked_root_id: NodeId = checked.root().id();
-  convert_children(&unchecked, &mut checked, unchecked_root_id, checked_root_id)?;
-
-  Ok(checked)
-}
+          checked . get_mut(parent_checked_id) . unwrap();
+        parent_mut . append(checked_node) . id() };
+      id_map . insert( node_ref . id(),
+                       checked_id );
+      Ok (( )) } )?;
+  Ok (checked) }
 
 /// Convert a checked ViewNode tree to an UncheckedViewNode tree.
 /// Infallible since checked types always satisfy unchecked requirements.
