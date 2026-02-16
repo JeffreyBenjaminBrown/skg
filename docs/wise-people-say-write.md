@@ -1,6 +1,6 @@
 # Wise People Say Write
 
-Knowledge mapping is [easier than traditional writing](it-will-be-fun.md), but it is, at root, writing.
+Knowledge mapping is [easier than traditional writing](./it-will-be-fun.md), but it is, at root, writing.
 
 ## Why writing matters
 
