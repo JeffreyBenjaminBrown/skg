@@ -1,3 +1,8 @@
+# No gratuitous renaming
+
+Don't rename variables, let alone functions, without a good reason.
+A lot of thought has gone into most of those names.
+
 # No legacy support code
 
 If I ask you to change a name, even if it's part of the API,
