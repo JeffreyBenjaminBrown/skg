@@ -5,25 +5,26 @@
 /// is the function 'buffer_to_viewnode_forest_and_save_instructions'
 /// defined here.
 
+pub mod buffer_to_viewnodes;
+pub mod viewnodes_to_instructions;
+pub mod supplement_from_disk;
+pub mod validate_foreign_nodes;
+
 use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::viewnode::ViewNode;
 use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use crate::types::save::{Merge, DefineNode};
-use ego_tree::Tree;
-use typedb_driver::TypeDBDriver;
-
-pub mod buffer_to_viewnodes;
-pub mod viewnodes_to_instructions;
-pub mod supplement_from_disk;
-pub mod validate_foreign_nodes;
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_viewnodes::add_missing_info::add_missing_info_to_forest;
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
 use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
+
+use ego_tree::Tree;
+use typedb_driver::TypeDBDriver;
 
 pub async fn buffer_to_viewnode_forest_and_save_instructions (
   buffer_text : &str,

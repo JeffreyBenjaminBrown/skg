@@ -1,9 +1,7 @@
-* see noneclobber-might-be-duplicated.org
 * reviewing save-buffer
 ** top
    fn update_from_and_rerender_buffer
      calls : buffer_to_viewnode_forest_and_save_instructions
-       calls : viewnode_forest_to_nonmerge_save_instructions
 * naive_saveinstructions_from_tree cannot skip SubscribeeCols
 * now just make it safe and use it a little
 * ? [[id:ddec4e85-1ea5-4ddb-b6ec-d2c3f464dad7][get Claude to use Skg]]

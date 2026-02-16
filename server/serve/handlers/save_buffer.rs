@@ -20,7 +20,7 @@ use crate::types::tree::generic::{
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
-use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use ego_tree::{Tree, NodeId, NodeMut};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::HashMap;
