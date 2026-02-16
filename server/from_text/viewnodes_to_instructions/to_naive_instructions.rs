@@ -1,6 +1,6 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -64,17 +64,22 @@ pub fn naive_saveinstructions_from_tree (
                 id     : t.id    .clone(),
                 source : t.source.clone() })
             } else {
-              let aliases: Option<Vec<String>> =
-                collect_grandchild_aliases_for_viewnode(
-                  tree, node_id)?;
-              let subscribees: Option<Vec<ID>> =
-                collect_subscribees( tree, node_id )?;
               let node_ref: NodeRef<ViewNode> =
                 tree . get(node_id) . ok_or(
                   "saveinstructions_from_tree: node not found")?;
-              let skgnode: SkgNode = skgnode_for_viewnode_in_tree (
-                node_ref.value(), &node_ref, aliases, subscribees)?;
-              DefineNode::Save(SaveNode(skgnode)) };
+              DefineNode::Save(SaveNode(SkgNode {
+                title:   t.title.clone(),
+                aliases: collect_grandchild_aliases_for_viewnode(
+                  tree, node_id)?,
+                source:  t.source.clone(),
+                ids:     vec![t.id.clone()],
+                body:    t.body.clone(),
+                contains: Some(
+                  collect_contents_to_save_from_children(&node_ref) ),
+                subscribes_to:
+                  collect_subscribees( tree, node_id )?,
+                hides_from_its_subscriptions: None,
+                overrides_view_of: None })) };
           result . push(instruction); }
         recurse_dfs( tree, node_id, result )?; }}
     Ok(( )) }
@@ -84,30 +89,6 @@ pub fn naive_saveinstructions_from_tree (
   append_defineonenode_and_recurse (
     &mut forest, root_id, &mut result ) ?;
   Ok (result) }
-
-fn skgnode_for_viewnode_in_tree<'a> (
-  viewnode: &ViewNode,
-  noderef: &NodeRef<'a, ViewNode>, // the same node, but in the tree
-  aliases: Option<Vec<String>>,
-  subscribees: Option<Vec<ID>>,
-) -> Result<SkgNode, String> {
-  let t : &TrueNode = match &viewnode.kind {
-    ViewNodeKind::True(t) => t,
-    ViewNodeKind::Scaff(_) => return Err(
-      "skgnode_for_viewnode_in_tree: expected TrueNode, got Scaffold"
-      . to_string()) };
-  Ok ( SkgNode {
-    title: t.title.clone(),
-    aliases,
-    source: t.source.clone(),
-    ids: vec![t.id.clone()],
-    body: t.body.clone(),
-    contains: Some(
-      collect_contents_to_save_from_children(noderef) ),
-    subscribes_to: subscribees,
-    hides_from_its_subscriptions: None,
-    overrides_view_of: None,
-  }) }
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,
@@ -140,7 +121,7 @@ fn collect_subscribees (
               continue, // valid child of SubscribeeCol, but not a subscribee
             ViewNodeKind::Scaff(s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
-      Ok(Some(dedup_vector(subscribees))) }} }
+      Ok( Some(dedup_vector(subscribees)) ) }} }
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
