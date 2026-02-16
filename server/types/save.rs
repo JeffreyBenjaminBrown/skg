@@ -24,11 +24,11 @@ pub enum DefineNode {
   Delete(DeleteNode),
 }
 
-/// A Save instruction: write this SkgNode to disk/databases.
+/// A Save instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SaveNode(pub SkgNode);
 
-/// A Delete instruction: remove node with this ID from this source.
+/// A Delete instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DeleteNode {
   pub id: ID,
