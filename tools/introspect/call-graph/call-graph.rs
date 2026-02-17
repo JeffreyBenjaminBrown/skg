@@ -7,10 +7,10 @@
 /// PURPOSE: Generate a 'call tree' document. That's an .org file, saved to
 /// tools/introspect/call-graph/output/function-name.org, for some function name. Each headline
 /// is a function name. The root headline is the same as the file's basename. Each
-/// headline calls each of its child headlines. The first appearance of a function
-/// lists what it calls; subsequent appearances are marked with a prefix:
-///   - "DUP" (duplicate): the function was already described earlier in the tree
-///   - "REC" (recursive): the function appears in its own ancestry (a cycle)
+/// headline calls each of its child headlines. A function that appears in its own
+/// ancestry is marked "REC" (recursive) and not expanded further, to avoid infinite
+/// loops. Functions that appear multiple times in the tree (via different call paths)
+/// are expanded each time.
 /// Only functions that are part of the library are listed; functions from other
 /// libraries ('std::collections', etc.) are not listed.
 ///
@@ -468,9 +468,8 @@ impl CallGraph {
 
   fn generate_org_tree(&self, root: &str) -> String {
     let mut output = String::new();
-    let mut described: HashSet<String> = HashSet::new();
 
-    self.write_node(&mut output, root, 1, &mut described, &mut vec![root.to_string()]);
+    self.write_node(&mut output, root, 1, &mut vec![root.to_string()]);
 
     output
   }
@@ -480,25 +479,16 @@ impl CallGraph {
     output: &mut String,
     func_name: &str,
     depth: usize,
-    described: &mut HashSet<String>,
     ancestors: &mut Vec<String>,
   ) {
     let stars = "*".repeat(depth);
 
-    // Check if this is a recursive call
+    // Check if this is a recursive call (the function is in its own ancestry)
     let is_recursive = ancestors[..ancestors.len().saturating_sub(1)]
       .contains(&func_name.to_string());
 
-    // Check if already fully described
-    let is_dup = described.contains(func_name);
-
     if is_recursive {
       output.push_str(&format!("{} REC {}\n", stars, func_name));
-      return;
-    }
-
-    if is_dup {
-      output.push_str(&format!("{} DUP {}\n", stars, func_name));
       return;
     }
 
@@ -522,9 +512,6 @@ impl CallGraph {
       output.push_str(&format!("{} {}\n", stars, func_name));
     }
 
-    // Mark as described
-    described.insert(func_name.to_string());
-
     // Get callees and recurse (recursive calls last)
     if let Some(callees) = self.calls.get(func_name) {
       // Partition: non-recursive first, recursive last
@@ -534,7 +521,7 @@ impl CallGraph {
 
       for callee in non_recursive.iter().chain(recursive.iter()) {
         ancestors.push((*callee).clone());
-        self.write_node(output, callee, depth + 1, described, ancestors);
+        self.write_node(output, callee, depth + 1, ancestors);
         ancestors.pop();
       }
     }

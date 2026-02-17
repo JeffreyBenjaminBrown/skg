@@ -130,7 +130,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
           "Path head {:?} does not match terminus {:?}",
           path[0], terminus_pid
         ) . into () ); }
-    path . remove ( 0 ); }
+    path . remove (0); }
   let last_node_id : NodeId =
     integrate_linear_portion_of_path (
       tree, map, node_id, &path, config, driver ) . await ?;
