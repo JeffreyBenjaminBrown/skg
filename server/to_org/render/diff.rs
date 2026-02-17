@@ -36,9 +36,8 @@ pub fn apply_diff_to_forest (
 
 /// Process a single node for diff markers.
 /// So far, only TrueNodes need processing; scaffolds are regenerated fresh.
-/// TODO : Sharing relationships (hides, overrides, subscribes)
-/// will need processing here. But none of the regenerable scaffolds
-/// (see remove_regenerable_scaffolds) ever will.
+/// TODO : Sharing relationships (hides, overrides, subscribes) will need processing here.
+/// TODO : Don't regenerate Scaffolds fresh; process them here.
 fn process_node_for_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,

@@ -1,7 +1,8 @@
-* ONGOING resume in TODO search after this comment
-  // TODO : This is kludgey. Find a better way to test for this kind of error.
+* ONGOING resume in TODO search at
+  server/to_org/render/diff.rs
 * TODO merge
 ** TODO items in this repo
+** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
 ** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * internalizing
