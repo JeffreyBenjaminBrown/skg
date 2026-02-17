@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
+use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher};
 
@@ -332,7 +333,7 @@ pub async fn all_pids_from_typedb(
     .to_string();
   let answer: QueryAnswer = tx.query(query).await?;
   let mut node_ids: HashSet<ID> = HashSet::new();
-  let mut stream = answer.into_rows();
+  let mut stream : ConceptRowStream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
     let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("node_id")? {
@@ -360,7 +361,7 @@ pub async fn extra_ids_from_pid(
     skgid.0 );
   let answer: QueryAnswer = tx.query(query).await?;
   let mut extra_ids : Vec<ID> = Vec::new();
-  let mut stream = answer.into_rows();
+  let mut stream : ConceptRowStream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
     let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("extra_id_value")? {

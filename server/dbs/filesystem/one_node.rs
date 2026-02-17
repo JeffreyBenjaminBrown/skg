@@ -52,7 +52,7 @@ pub fn skgnode_from_pid_and_source (
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
-/// Other errors are propagated.
+/// ERRORS are propagated only if they are not of the 'not found' kind.
 pub async fn optskgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,

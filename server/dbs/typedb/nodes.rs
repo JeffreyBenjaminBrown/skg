@@ -4,6 +4,8 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::dbs::typedb::util::concept_document::{
   build_disjunction, build_has_id_disjunction};
 
+use super::util::ConceptRowStream;
+
 use futures::StreamExt;
 use std::collections::{ HashSet, BTreeSet };
 use std::error::Error;
@@ -90,7 +92,7 @@ pub async fn which_ids_exist (
       db_name,
       TransactionType::Read
     ) . await ?;
-  let mut rows = { // TODO ? Is this hard to assign a type signature?
+  let mut rows : ConceptRowStream = {
     let answer : QueryAnswer =
       tx . query ( {
         let or_block : String =
@@ -188,7 +190,7 @@ pub async fn delete_nodes_from_pids (
     tx.query ( extra_ids_query ). await ? };
   let mut extra_id_values : Vec<String> =
     Vec::new();
-  let mut rows = answer.into_rows();
+  let mut rows : ConceptRowStream = answer.into_rows();
   while let Some(row_res) = rows.next().await {
     let row : ConceptRow = row_res?;
     if let Some(concept) = row.get("extra_id_value")? {

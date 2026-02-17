@@ -46,7 +46,6 @@ pub async fn validate_and_filter_foreign_instructions(
         ).await {
           Ok(Some(disk_node)) => {
             if buffernode_differs_from_disknode(node, &disk_node) {
-              // TODO : Later, rather than bork, an attempt to save a foreign node should create a local 'lens' onto it: a node that overrides it, subscribes to it, and begins with whatever contents the user saved.
               errors.push(BufferValidationError::ModifiedForeignNode(
                 primary_id . clone(),
                 node.source.clone() )); }

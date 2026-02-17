@@ -2,10 +2,11 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
 use skg::dbs::typedb::search::find_related_nodes;
+use skg::dbs::typedb::util::ConceptRowStream;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 
 use futures::StreamExt;
@@ -89,7 +90,7 @@ fn test_delete_container_node (
         select $container_id;
       "#;
       let answer : QueryAnswer = tx . query ( query ) . await ?;
-      let mut rows = answer . into_rows ();
+      let mut rows : ConceptRowStream = answer . into_rows ();
       println!("Checking for containers of node 2 after deleting node 1...");
       let mut container_count : usize = 0;
       while let Some ( row_res ) = rows . next () . await {

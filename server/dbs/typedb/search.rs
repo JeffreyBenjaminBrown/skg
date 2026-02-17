@@ -13,6 +13,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
+use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_id_from_node};
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::{ID, SourceName};
@@ -206,7 +207,7 @@ pub async fn find_related_nodes (
     format!("{}_id", input_role);
   let output_id_var : String =
     format!("{}_id", output_role);
-  let mut stream = {
+  let mut stream : ConceptRowStream = {
     let answer : QueryAnswer = tx.query ( {
       let input_disjunction : String =
         build_id_disjunction ( nodes, &input_id_var );

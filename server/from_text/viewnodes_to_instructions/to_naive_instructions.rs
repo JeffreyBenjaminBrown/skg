@@ -1,6 +1,6 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode};
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -76,7 +76,7 @@ pub fn naive_saveinstructions_from_tree (
 fn maybe_instruction_from_treenode (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
-  t       : &crate::types::viewnode::TrueNode
+  t       : &TrueNode
 ) -> Result<Option<DefineNode>, String> {
   if t.indefinitive { return Ok(None); }
   if t.edit_request == Some(EditRequest::Delete) {

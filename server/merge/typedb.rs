@@ -1,9 +1,11 @@
-use crate::types::save::Merge;
-use crate::types::skgnode::SkgNode;
-use crate::types::misc::ID;
 use crate::dbs::typedb::nodes::create_node;
 use crate::dbs::typedb::relationships::insert_relationship_from_list;
+use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::types::misc::ID;
+use crate::types::save::Merge;
+use crate::types::skgnode::SkgNode;
+
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
@@ -241,7 +243,7 @@ async fn reroute_what_acquiree_hides (
          select $hidden_id;"#,
       acquiree_id.as_str() );
     what_acquiree_hides } ).await?;
-  let mut stream = answer.into_rows();
+  let mut stream : ConceptRowStream = answer.into_rows();
   while let Some(row_result) = stream.next().await {
     let row : ConceptRow = row_result?;
     if let Some(concept) = row.get("hidden_id")? {

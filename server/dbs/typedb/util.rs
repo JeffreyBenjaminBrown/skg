@@ -3,6 +3,11 @@ pub mod concept_document;
 
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, DatabaseManager};
+use typedb_driver::answer::ConceptRow;
+
+pub type ConceptRowStream =
+  futures::stream::BoxStream<'static,
+                             typedb_driver::Result<ConceptRow>>;
 
 pub async fn delete_database (
   driver  : &TypeDBDriver,

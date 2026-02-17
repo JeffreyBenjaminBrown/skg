@@ -10,18 +10,19 @@ mod util {
   pub mod search;
 }
 
-use skg::to_org::render::content_view::single_root_view;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::viewnode::{ViewNode, ViewNodeKind};
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use skg::test_utils::run_with_test_db;
 use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::dbs::typedb::relationships::delete_out_links;
 use skg::dbs::typedb::search::pid_and_source_from_id;
+use skg::dbs::typedb::util::ConceptRowStream;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::test_utils::run_with_test_db;
+use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::types::viewnode::{ViewNode, ViewNodeKind};
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -341,7 +342,7 @@ async fn count_nodes (
          select $id;"#
     ) . await ?;
 
-  let mut rows = answer.into_rows ();
+  let mut rows : ConceptRowStream = answer.into_rows ();
   let mut n : usize = 0;
   while let Some ( row_res ) = rows . next () . await {
     let _row : ConceptRow = row_res ?;
@@ -451,7 +452,7 @@ async fn collect_all_of_some_binary_rel(
   let tx = driver.transaction(
     db_name, TransactionType::Read).await?;
   let answer = tx.query(query).await?;
-  let mut stream = answer.into_rows();
+  let mut stream : ConceptRowStream = answer.into_rows();
   let mut results: HashSet<(String, String)> = HashSet::new();
 
   while let Some(row_result) = stream.next().await {
