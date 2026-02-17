@@ -20,7 +20,8 @@ use typedb_driver::TypeDBDriver;
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
-/// TODO ? Also check that the grandparent is a TrueNode.
+/// (Checking that its grandparent (the subscriber) is a TrueNode
+/// happens from the SubscribeeCol, so needn't be repeated here.)
 pub fn type_and_parent_type_consistent_with_subscribee (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
@@ -62,7 +63,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   { // Skip if there already is one.
-    // TODO: Should not assume it's correct, but instead 'integrate' it, as is done somewhere else for something similar.
+    // PITFALL: If this code were used in the save-buffer pathway, we could not assume the existing SubscribeeCol is correct, and would instead have to 'integrate' it, as happens elsewhere for something similar. But so far it is only used for creating a new buffer, not updating one.
     if unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}

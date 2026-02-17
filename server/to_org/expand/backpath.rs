@@ -21,7 +21,7 @@ use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::tree::viewnode_skgnode::{
   find_child_by_id, find_children_by_ids};
 
-use ego_tree::Tree;
+use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
@@ -31,7 +31,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn build_and_integrate_containerward_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
-  node_id       : ego_tree::NodeId,
+  node_id       : NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
@@ -51,7 +51,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
 pub async fn build_and_integrate_containerward_path (
   tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
-  node_id   : ego_tree::NodeId,
+  node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -70,7 +70,7 @@ pub async fn build_and_integrate_containerward_path (
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
-  node_id       : ego_tree::NodeId,
+  node_id       : NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
@@ -92,7 +92,7 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
-  node_id   : ego_tree::NodeId,
+  node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -113,7 +113,7 @@ pub async fn build_and_integrate_sourceward_path (
 pub async fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree<ViewNode>,
   map         : &mut SkgNodeMap,
-  node_id     : ego_tree::NodeId,
+  node_id     : NodeId,
   mut path    : Vec < ID >,
   branches    : HashSet < ID >,
   cycle_node  : Option < ID >,
@@ -131,7 +131,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
           path[0], terminus_pid
         ) . into () ); }
     path . remove ( 0 ); }
-  let last_node_id : ego_tree::NodeId =
+  let last_node_id : NodeId =
     integrate_linear_portion_of_path (
       tree, map, node_id, &path, config, driver ) . await ?;
   if ! branches . is_empty () {
@@ -149,18 +149,18 @@ pub async fn integrate_path_that_might_fork_or_cycle (
 fn integrate_linear_portion_of_path<'a> (
   tree       : &'a mut Tree<ViewNode>,
   map        : &'a mut SkgNodeMap,
-  node_id    : ego_tree::NodeId,
+  node_id    : NodeId,
   path       : &'a [ID],
   config     : &'a SkgConfig,
   driver     : &'a TypeDBDriver,
-) -> Pin<Box<dyn Future<Output = Result<ego_tree::NodeId,
+) -> Pin<Box<dyn Future<Output = Result<NodeId,
                                         Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     if path . is_empty () {
       return Ok ( node_id ); }
     let path_head : &ID = &path[0];
     let path_tail : &[ID] = &path[1..];
-    let next_node_id : ego_tree::NodeId =
+    let next_node_id : NodeId =
       match find_child_by_id ( tree, node_id, path_head ) {
         Some ( child_treeid ) => child_treeid,
         None => { prepend_indefinitive_child_with_parent_ignores (
@@ -180,12 +180,12 @@ fn integrate_linear_portion_of_path<'a> (
 async fn integrate_branches_in_node (
   tree       : &mut Tree<ViewNode>,
   map        : &mut SkgNodeMap,
-  node_id    : ego_tree::NodeId,
+  node_id    : NodeId,
   branches   : HashSet < ID >,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let found_children : HashMap < ID, ego_tree::NodeId > =
+  let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &branches );
   let mut branches_to_add : Vec < ID > =
     branches . into_iter ()
@@ -205,7 +205,7 @@ async fn integrate_branches_in_node (
 async fn integrate_cycle_in_node (
   tree       : &mut Tree<ViewNode>,
   map        : &mut SkgNodeMap,
-  node_id    : ego_tree::NodeId,
+  node_id    : NodeId,
   cycle_id   : ID,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
@@ -222,11 +222,11 @@ async fn integrate_cycle_in_node (
 async fn prepend_indefinitive_child_with_parent_ignores (
   tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,
-  parent_treeid  : ego_tree::NodeId,
+  parent_treeid  : NodeId,
   child_skgid    : &ID,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
-) -> Result < ego_tree::NodeId, Box<dyn Error> > {
+) -> Result < NodeId, Box<dyn Error> > {
   let ( _, child_viewnode ) : ( _, ViewNode ) =
     skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map
@@ -241,7 +241,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
   let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, true );
-  let new_child_treeid : ego_tree::NodeId =
+  let new_child_treeid : NodeId =
     tree . get_mut ( parent_treeid ) . unwrap ()
     . prepend ( viewnode ) . id ();
   Ok ( new_child_treeid ) }
