@@ -19,7 +19,7 @@ fn first_tree_root_id ( forest : &PairTree ) -> NodeId {
 /// Helper to call ensure_skgnode, make_indef_if_repeat_then_extend_defmap_or_cycle,
 /// and then clobberIndefinitiveViewnode or completeAndReorder_childrenOf_definitiveViewnode.
 /// (matches the pattern used in complete_or_restore_each_node_in_branch).
-/// TODO: Unify with complete_or_restore_each_node_in_branch.
+/// WAS todo : Unify with complete_or_restore_each_node_in_branch.
 /// Does nothing for Scaffolds.
 async fn check_and_complete_if_truenode (
   tree     : &mut PairTree,

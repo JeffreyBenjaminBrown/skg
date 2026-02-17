@@ -12,8 +12,8 @@
 https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html")
 
 (defvar skg-doc--response-handler nil
-  ;; PITFALL | TODO:
-  ;; A global handler is racy. After process-send-string,
+  ;; PITFALL | TODO: A global handler is racy.
+  ;; After process-send-string,
   ;; Emacs returns to the event loop immediately (nothing blocks),
   ;; so the user could invoke a second request before the first
   ;; response arrives, overwriting this handler. In practice this

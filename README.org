@@ -1,6 +1,4 @@
 * why Skg
-We must improve human nature before we destroy ourselves. Every adult has an obligation to continue studying the things we tell children we understand: love, justice, art, death, honor, peace, desire, all the high ideas. But the universe of things to study is big. We can't do it well without helping each other.
-
 Skg is the result of a few beliefs about knowledge:
 
 - [[./docs/wise-people-say-write.md][Writing is powerful.]] It can -- like schooling, meditation, or therapy -- radically help a person.
