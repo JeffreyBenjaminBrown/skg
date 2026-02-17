@@ -49,19 +49,16 @@ pub async fn execute_view_requests (
           visited, errors, deleted_id_src_map ) . await ?; }, }}
   Ok (( )) }
 
-/// Expands a definitive view request.
-///
-/// This function:
-/// 1. 'Indefinitizes' any previously definitive ViewNode with that ID
-/// 2. Marks this ViewNode definitive
-/// 3. Expands (BFS) its content from disk (or from latest git commit for removed nodes), applying the node limit
-/// 4. Removes its ViewRequest::Definitive
-///
-/// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions'
-/// list is used to filter out content that should be hidden.
-///
-/// For nodes with `diff: Some(Removed)`: loads content from git HEAD
-/// instead of disk, and marks children as removed if they don't exist on disk.
+/// BEHAVIOR:
+/// In serial, this function:
+/// - 'Indefinitizes' any previously definitive ViewNode with that ID, and its *entire content subtree*. (Otherwise the requested definitive view would have indefinitive children and expand no further.)
+/// - marks this ViewNode definitive
+/// - expands (BFS) its content from disk (or from latest git commit for removed nodes), applying the node limit
+/// - removes its ViewRequest::Definitive
+/// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions' list is used to filter out content that should be hidden.
+/// For nodes with `diff: Some(Removed)`: loads content from git HEAD instead of disk, and marks children as removed if they don't exist on disk.
+/// .
+/// PITFALL: The indefinitization step can miss things: If definitive A contains indefinitive B, and elsewhere there is a definitive B, then when one requests a definitive view of A somewhere else, it will indefinitize the earlier A, but it will not indefinitize the earlier B. This seems fine -- searching through the whole tree for duplicates of A's recursive content would be expensive, and unless the user has strange habits they will at most rarely encounter this behavior.
 async fn execute_definitive_view_request (
   forest        : &mut Tree<ViewNode>, // "forest" = tree with BufferRoot
   map           : &mut SkgNodeMap,
@@ -94,7 +91,7 @@ async fn execute_definitive_view_request (
   { // Replace title/body, remove request, mark definitive, add to visited.
     if is_removed_node
       { from_git_replace_title_body (
-          // TODO ? This per-node git lookup might be slow.
+          // PITFALL: This per-node git lookup might be slow. Hard to see how to batch the lookoup, though, since it's from git.
           forest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_skgnode (
                forest, map, node_id, config ) ?; }
@@ -124,10 +121,10 @@ async fn execute_definitive_view_request (
       ). await ?; } }
   Ok (( )) }
 
-/// If the node is a Subscribee (child of SubscribeeCol, grandchild of Subscriber),
-/// return the Subscriber's 'hides_from_its_subscriptions' as a HashSet.
-/// Otherwise return an empty set (which might be dangerous --
-/// see the PITFALL | TODO comment in the function body.
+/// If the node is a Subscribee
+/// (child of SubscribeeCol, grandchild of Subscriber),
+/// returns the Subscriber's 'hides_from_its_subscriptions'.
+/// Otherwise returns the empty set.
 fn get_hidden_ids_if_subscribee (
   tree    : &Tree<ViewNode>,
   map     : &SkgNodeMap,
@@ -138,7 +135,7 @@ fn get_hidden_ids_if_subscribee (
     . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
   if !type_and_parent_type_consistent_with_subscribee (
        tree, node_id )?
-  { // PITFALL \ TODO: Maybe this should return an error rather than the empty set. The empty set says 'the subscriber hides none of its content', which is technically accurate, but only because it is not the kind of node that could have contents which could be so hidden.
+  { // Don't throw an error: 'if_subscribee' is in the function name.
     return Ok ( HashSet::new () ); }
   else {
     let subscribee_col : NodeRef < ViewNode > =
@@ -158,10 +155,10 @@ fn get_hidden_ids_if_subscribee (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
 /// - Remove them from `visited`.
-/// Only recurses into children into non-ignored TrueNodes;
+/// Only recurses into non-ignored TrueNode children;
 ///   ignored and scaffold children persist unchanged.
 /// TODO : This will need complication to properly handle
-///   sharing related nodes among the input node's descendents.
+///   sharing-related nodes among the input node's descendents.
 fn indefinitize_content_subtree (
   tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
@@ -171,21 +168,22 @@ fn indefinitize_content_subtree (
 ) -> Result < (), Box<dyn Error> > {
   let (node_pid, content_child_treeids)
     : (ID, Vec <NodeId>) =
-  { let node_ref : NodeRef < ViewNode > =
-      tree . get ( node_id )
-      . ok_or ( "indefinitize_content_subtree: NodeId not in tree" ) ?;
-    let node_pid : ID =
-      get_id_from_treenode ( tree, node_id ) ?;
-    let content_child_treeids : Vec < NodeId > =
-      node_ref . children ()
-      . filter ( |c| matches! ( &c . value() . kind,
-                                ViewNodeKind::True(t)
-                                if !t.parent_ignores ))
-      . map ( |c| c . id () )
-      . collect ();
-    (node_pid, content_child_treeids) };
-  visited . remove ( &node_pid );
-  makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?;
+    { let node_ref : NodeRef < ViewNode > =
+        tree . get (node_id) . ok_or (
+          "indefinitize_content_subtree: NodeId not in tree" ) ?;
+      let node_pid : ID =
+        get_id_from_treenode ( tree, node_id ) ?;
+      let content_child_treeids : Vec < NodeId > =
+        node_ref . children ()
+        . filter ( |c| matches! ( &c . value() . kind,
+                                  ViewNodeKind::True(t)
+                                  if !t.parent_ignores ))
+        . map ( |c| c . id () )
+        . collect ();
+      (node_pid, content_child_treeids) };
+  if ! truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
+    visited . remove ( &node_pid );
+    makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, map, child_treeid, visited, config ) ?; }
