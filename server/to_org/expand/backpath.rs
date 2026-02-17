@@ -192,9 +192,8 @@ async fn integrate_branches_in_node (
     . filter ( | b |
                  ! found_children . contains_key ( b ) )
     . collect ();
-  { // TODO : This should not be necessary. It must be for testing?
-    branches_to_add . sort ();
-    branches_to_add . reverse (); }
+  { // Simplifies testing. Not necessary in production.
+    branches_to_add . sort (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
       tree, map, node_id, &branch_id, config, driver ). await ?; }
@@ -215,10 +214,6 @@ async fn integrate_cycle_in_node (
       tree, map, node_id, &cycle_id, config, driver ). await ?; }
   Ok (( )) }
 
-/// Helper function to prepend a new child to a node in a tree.
-/// The new child has treatment=ParentIgnores and indefinitive=true.
-/// TODO: This procedure could later be improved to
-/// use treatment=Content when the child is in fact content.
 async fn prepend_indefinitive_child_with_parent_ignores (
   tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,

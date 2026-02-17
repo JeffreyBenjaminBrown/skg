@@ -147,9 +147,9 @@ async fn test_path_with_branches_no_cycle_impl(
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
     **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
-    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
     ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
+    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -229,9 +229,9 @@ async fn test_path_with_branches_with_cycle_impl(
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
     **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
-    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
     ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
+    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
+    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
