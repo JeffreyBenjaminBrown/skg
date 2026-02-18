@@ -28,8 +28,7 @@ pub struct SourceDiff {
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
 pub struct SkgnodeDiff {
-  // TODO ? Since we keep the skgnode around for deleted nodes already,
-  // why not just do that for everything, and dispense with the node_changes field?
+  // TODO ? Since we keep the skgnode around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
   pub head_node: Option<SkgNode>, // only for deleted files

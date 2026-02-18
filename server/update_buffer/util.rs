@@ -110,26 +110,23 @@ where Relevant : Fn(&ViewNode) -> bool,
     problem_discard,
     problem_discard_response ) }
 
-/// TODO ?
-/// Marking parentIgnores seems smarter than deletion.
-///
+/// TODO ? Marking parentIgnores might be than deletion.
+/// (Or, keeping it abstract, replacing deletion with a caller-supplied lambda.)
+/// .
 /// PURPOSE:
 /// Reconciles a parent's "relevant" children against a desired list of 'orderkeys'.
-/// The payload of each tree node should be some possibly-improper supertype of
-/// 'orderkey' -- that is, there is a way to extract the orderkey from a node,
-/// but the node might have other information.
-///
+/// The payload of each tree node should be some possibly-improper supertype of 'orderkey' -- that is,
+/// there is a way to extract the orderkey from a node, but the node might have other information.
+/// .
 /// STEPS:
 /// - Partitions children into "relevant" (matching a predicate) and "irrelevant".
-/// It is not necessary that irrelevant children be able to provide an orderkey.
-///
-/// - Among relevant children, identifies duplicates and those whose orderkey is
-/// not in goal_list. Runs problem_discard on each such node; if any returns true,
-/// will run problem_discard_response on the parent after discarding.
-/// Then discards those nodes.
-///
+///   It is not necessary that irrelevant children be able to provide an orderkey.
+/// - Among relevant children, identifies duplicates and those whose orderkey is not in goal_list.
+///   Runs problem_discard on each such node.
+///   If any returns true, will run problem_discard_response on the parent after discarding.
+///   Then discards those nodes.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
-/// Creates new children for any orderkeys missing from the original children.
+///   Creates new children for any orderkeys missing from the original children.
 pub fn complete_relevant_children
 <Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse> (
   tree                     : &mut Tree<Node>,

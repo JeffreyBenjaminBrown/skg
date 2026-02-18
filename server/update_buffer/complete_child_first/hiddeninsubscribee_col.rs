@@ -52,7 +52,8 @@ pub fn complete_hiddeninsubscribee_col (
       tree, node, 1,
       |vn : &ViewNode| match &vn.kind {
         ViewNodeKind::True( t ) =>
-          Ok(( t.id.clone(), t.source.clone() )),
+          Ok(( t . id . clone(),
+               t . source . clone() )),
         _ => Err( "complete_hiddeninsubscribee_col: \
                    ancestor 1 is not a TrueNode" ) } )
     . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
@@ -62,7 +63,8 @@ pub fn complete_hiddeninsubscribee_col (
       tree, node, 3,
       |vn : &ViewNode| match &vn.kind {
         ViewNodeKind::True( t ) =>
-          Ok(( t.id.clone(), t.source.clone() )),
+          Ok(( t . id . clone(),
+               t . source . clone() )),
         _ => Err( "complete_hiddeninsubscribee_col: \
                    ancestor 3 is not a TrueNode" ) } )
     . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
@@ -70,9 +72,9 @@ pub fn complete_hiddeninsubscribee_col (
   let subscribee_contains : Vec<ID> = {
     let subscribee_skgnode : &SkgNode =
       map.get( &subscribee_pid )
-      .ok_or( "complete_hiddeninsubscribee_col: \
+      . ok_or( "complete_hiddeninsubscribee_col: \
                subscribee SkgNode not in map" ) ?;
-    subscribee_skgnode.contains.clone().unwrap_or_default() };
+    subscribee_skgnode . contains . clone() . unwrap_or_default() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_skgnode : &SkgNode =
       map.get( &subscriber_pid )
@@ -90,37 +92,13 @@ pub fn complete_hiddeninsubscribee_col (
         .cloned().collect() };
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     match source_diffs {
-      None => (worktree_content.clone(),
-               HashSet::new()),
-      Some( _ ) => {
-        let subscribee_node_changes : Option<&NodeChanges>
-          = node_changes_for_truenode(
-              source_diffs, &subscribee_pid, &subscribee_source );
-        let head_subscribee_contains : Vec<ID> =
-          match subscribee_node_changes {
-            Some( nc ) =>
-              nc.contains_diff.iter().filter_map(
-                |d| match d {
-                  Diff_Item::Unchanged( id ) |
-                    Diff_Item::Removed( id ) => Some( id.clone() ),
-                  Diff_Item::New( _ ) => None } )
-              .collect(),
-            None => subscribee_contains.clone() };
-        let head_subscriber_hides : Vec<ID> =
-          skgnode_from_git_head(
-              &subscriber_pid, &subscriber_source, config )
-            .ok()
-            .and_then( |skg| skg.hides_from_its_subscriptions )
-            .unwrap_or_default();
-        let old_list : Vec<ID> =
-          { let head_subscribee_contains_set : HashSet<ID> =
-              head_subscribee_contains.iter().cloned().collect();
-            head_subscriber_hides.iter() .filter(
-                |id| head_subscribee_contains_set.contains( id )
-              ). cloned() . collect() };
-        let diff : Vec<Diff_Item<ID>> =
-          compute_interleaved_diff( &old_list, &worktree_content );
-        itemlist_and_removedset_from_diff( &diff ) } };
+      None => ( worktree_content . clone(),
+                HashSet::new() ),
+      Some( _ ) =>
+        goallist_and_removedids_for_hiddeninsubscribeecol_with_diff(
+          source_diffs, &subscribee_pid, &subscribee_source,
+          &subscriber_pid, &subscriber_source,
+          &subscribee_contains, &worktree_content, config ) };
   let child_data : HashMap<ID, HiddenChildData> = // Pre-compute this, so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
     build_hidden_child_data(
       tree, node, &goal_list, &removed_ids,
@@ -178,6 +156,48 @@ pub fn complete_hiddeninsubscribee_col (
       with_node_mut( tree, node, |mut n| { n.detach(); } )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?; } }
   Ok(( )) }
+
+/// Reconstruct the HEAD version of hidden-in-subscribee content,
+/// diff it against the worktree version,
+/// and return the goal list and removed set.
+fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
+  source_diffs        : &Option<HashMap<SourceName, SourceDiff>>,
+  subscribee_pid      : &ID,
+  subscribee_source   : &SourceName,
+  subscriber_pid      : &ID,
+  subscriber_source   : &SourceName,
+  subscribee_contains : &[ID],
+  worktree_content    : &[ID],
+  config              : &SkgConfig,
+) -> (Vec<ID>, HashSet<ID>) {
+  let subscribee_node_changes : Option<&NodeChanges> =
+    node_changes_for_truenode(
+      source_diffs, subscribee_pid, subscribee_source );
+  let head_subscribee_contains : Vec<ID> =
+    match subscribee_node_changes {
+      Some( nc ) =>
+        nc.contains_diff.iter().filter_map(
+          |d| match d {
+            Diff_Item::Unchanged( id ) |
+              Diff_Item::Removed( id ) => Some( id.clone() ),
+            Diff_Item::New( _ ) => None } )
+        .collect(),
+      None => subscribee_contains.to_vec() };
+  let head_subscriber_hides : Vec<ID> =
+    skgnode_from_git_head(
+        subscriber_pid, subscriber_source, config )
+      .ok()
+      .and_then( |skg| skg.hides_from_its_subscriptions )
+      .unwrap_or_default();
+  let old_list : Vec<ID> =
+    { let head_subscribee_contains_set : HashSet<ID> =
+        head_subscribee_contains.iter().cloned().collect();
+      head_subscriber_hides.iter() .filter(
+          |id| head_subscribee_contains_set.contains( id )
+        ). cloned() . collect() };
+  let diff : Vec<Diff_Item<ID>> =
+    compute_interleaved_diff( &old_list, worktree_content );
+  itemlist_and_removedset_from_diff( &diff ) }
 
 /// Build a map from child ID to HiddenChildData.
 /// For each ID in goal_list, pre-compute the source, title, and
