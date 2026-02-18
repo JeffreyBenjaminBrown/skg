@@ -21,7 +21,7 @@ pub fn set_viewnodestats_in_forest (
 fn set_viewnodestats_recursive (
   tree                  : &mut Tree<ViewNode>,
   treeid                : NodeId,
-  parent_pid            : Option<&ID>,
+  parent_opt_pid        : Option<&ID>,
   ancestor_ids          : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -29,11 +29,11 @@ fn set_viewnodestats_recursive (
   let opt_pid : Option<ID> =
     if let ViewNodeKind::True ( t ) =
       &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
-    { let node_pid : ID = t.id.clone();
+    { let node_pid : ID = t . id . clone();
       detect_and_mark_cycle_v2 (
         tree, treeid, &node_pid, ancestor_ids );
       set_parent_containment_stats_in_viewnode (
-        tree, treeid, &node_pid, parent_pid,
+        tree, treeid, &node_pid, parent_opt_pid,
         container_to_contents, content_to_containers );
       Some ( node_pid )
     } else { None };
@@ -80,14 +80,14 @@ fn set_parent_containment_stats_in_viewnode (
     if let Some ( parent_pid ) = parent_pid_opt {
       ( content_to_containers
           . get ( node_pid )
-          . map_or ( false, | containers |
+          . map_or ( false, |containers|
                      containers . contains ( parent_pid )),
         container_to_contents
           . get ( node_pid )
-          . map_or ( false, | contents |
+          . map_or ( false, |contents|
                      contents . contains ( parent_pid )) )
-    } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply.
-  if let ViewNodeKind::True ( t ) =
-    &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
+    } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply. But in that case, using these values for parent_is_container and parent_is_content has the desired effect on the node's metadata: It won't make any noise about either relationship.
+  if let ViewNodeKind::True (t) =
+    &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . parentIsContainer = parent_is_container;
     t . viewStats . parentIsContent = parent_is_content; }}

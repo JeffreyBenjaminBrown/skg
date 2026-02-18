@@ -163,8 +163,6 @@ fn content_goal_list (
           itemlist_and_removedset_from_diff( &nc.contains_diff ) };
     Ok(( goal_list, removed_ids, apparent_content_ids ))
   } else {
-    // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
-    // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
       pid_and_source_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;

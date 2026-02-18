@@ -57,9 +57,7 @@ pub fn complete_hiddeninsubscribee_col (
       "complete_hiddeninsubscribee_col" ) ?;
   let subscribee_contains : Vec<ID> = {
     let subscribee_skgnode : &SkgNode =
-      map.get( &subscribee_pid )
-      . ok_or( "complete_hiddeninsubscribee_col: \
-               subscribee SkgNode not in map" ) ?;
+      map . get (&subscribee_pid) . ok_or ("complete_hiddeninsubscribee_col: subscribee SkgNode not in map") ?;
     subscribee_skgnode . contains . clone() . unwrap_or_default() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_skgnode : &SkgNode =
@@ -111,22 +109,21 @@ pub fn complete_hiddeninsubscribee_col (
         Some( diff_status ) => mk_phantom_viewnode(
           id.clone(), d.source.clone(),
           d.title.clone(), diff_status ) }}, ) ?;
-  { // Mark erroneous content children as parentIgnores. Non-parentIgnored TrueNode children that are not in subscribee_contains and not phantoms are erroneous.
-    // TODO: I'm not sure this is right, in the git diff view case.
+  { // Mark erroneous content children as parentIgnores. "Erroneous content" are non-parentIgnores non-phantom TrueNode children that are not part of its content.
     let subscribee_contains_set : HashSet<ID> =
-      subscribee_contains.iter().cloned().collect();
+      subscribee_contains . iter() . cloned() . collect();
     treat_certain_children(
       tree, node,
-      |vn : &ViewNode| match &vn.kind {
+      |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True( t ) =>
-          !t.parent_ignores
-          && !subscribee_contains_set.contains( &t.id )
-          && !t.is_phantom(),
+          ! t . parent_ignores
+          && ! subscribee_contains_set . contains( &t . id )
+          && ! t . is_phantom(),
         _ => false },
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn.kind {
-          t.parent_ignores = true; } },
-    ).map_err( |e| -> Box<dyn Error> { e.into() } ) ?; }
+          t . parent_ignores = true; } },
+    ). map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
   { // Remove if empty.
     let has_children : bool =
       tree.get( node )
