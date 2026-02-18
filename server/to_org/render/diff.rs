@@ -35,9 +35,8 @@ pub fn apply_diff_to_forest (
   Ok (( )) }
 
 /// Process a single node for diff markers.
-/// So far, only TrueNodes need processing; scaffolds are regenerated fresh.
+/// This is only used for de-novo views (multi_root_view).
 /// TODO : Sharing relationships (hides, overrides, subscribes) will need processing here.
-/// TODO : Don't regenerate Scaffolds fresh; process them here.
 fn process_node_for_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
@@ -50,10 +49,11 @@ fn process_node_for_diff (
         node_mut, source_diffs, deleted_id_src_map, config ),
     _ => Ok (()) }}
 
-/// Process a TrueNode:
-/// - set diff marker based on file status
-/// - prepend TextChanged/IDCol child if needed
-/// - mark NewHere children and insert phantoms for removed children.
+/// Modifies the viewnode, and if its contents changed, those too.
+/// Cases: - not-in-git
+///        - added/deleted
+///        - preexisting but something changed:
+///          text, ids, and/or content
 fn process_truenode_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
@@ -70,7 +70,7 @@ fn process_truenode_diff (
     match source_diffs . get ( &source ) {
       Some ( d ) => d,
       None => return Ok (( )) };
-  if ! source_diff . is_git_repo { // Mark node as not-in-git
+  if ! source_diff . is_git_repo { // mark as not-in-git
     if let ViewNodeKind::True ( ref mut t )
       = node_mut . value() . kind
       { t . diff = Some ( NodeDiffStatus::NotInGit ); }
@@ -81,40 +81,44 @@ fn process_truenode_diff (
     match source_diff . skgnode_diffs . get ( &file_path ) {
       Some ( d ) => d,
       None => return Ok (( )) }};
-  if maybe_mark_file_level_diff ( &mut node_mut, skgnode_diff ) {
-    return Ok (( )); }
+  if maybe_mark_added_or_deleted ( // simpler than modifications
+      &mut node_mut, skgnode_diff ) ?
+    { return Ok (( )); }
   if let Some ( ref node_changes ) = skgnode_diff . node_changes {
-    if node_changes . text_changed {
+    if node_changes . text_changed { // changes to text
       node_mut . prepend (
         viewnode_from_scaffold ( Scaffold::TextChanged )); }
-    if ! node_changes . ids_diff . iter()
+    if ! node_changes . ids_diff . iter() // changes to ids
            . all ( |d| matches! ( d, Diff_Item::Unchanged(_) )) {
       prepend_idcol_with_children (
         &mut node_mut, node_changes ); }
-    process_truenode_contains_diff (
+    process_truenode_contains_diff ( // changes to content
       &mut node_mut, tree_node_id, node_changes,
       source_diff, source_diffs, deleted_id_src_map, config ) ?; }
-  Ok (()) }
+  Ok (( )) }
 
 /// Try to handle file-level diff status (Added/Deleted).
 /// Returns - true if handled (caller should return),
 ///         - false for Modified files.
-fn maybe_mark_file_level_diff (
-  node_mut  : &mut NodeMut<ViewNode>,
+fn maybe_mark_added_or_deleted (
+  node_mut     : &mut NodeMut<ViewNode>,
   skgnode_diff : &SkgnodeDiff,
-) -> bool {
+) -> Result<bool, String> {
   let node_diff_status : Option<NodeDiffStatus> =
     match skgnode_diff . status {
-      GitDiffStatus::Added   => Some ( NodeDiffStatus::New ),
-      GitDiffStatus::Deleted => Some ( NodeDiffStatus::Removed ),
+      GitDiffStatus::Added    => Some ( NodeDiffStatus::New ),
+      GitDiffStatus::Deleted  => Some ( NodeDiffStatus::Removed ),
       GitDiffStatus::Modified => None };
   match node_diff_status {
     Some ( diff_status ) => {
       if let ViewNodeKind::True ( ref mut t )
         = node_mut . value() . kind
         { t . diff = Some ( diff_status ); }
-      true },
-    None => false }}
+      else { return Err ( // if caller is correct, this is unreachable
+               "maybe_mark_added_or_deleted: expected TrueNode"
+               . to_string() ) }
+      Ok (true) },
+    None => Ok (false) }}
 
 /// Prepend an IDCol scaffold to the input's children,
 /// populated with ID scaffold grandchildren.
