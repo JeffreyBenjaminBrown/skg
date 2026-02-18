@@ -1,4 +1,26 @@
+use crate::types::misc::{ID, SourceName};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
+
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
+use std::error::Error;
+
+/// ERRORS if the ancestor is not found or is not a TrueNode.
+pub fn pid_and_source_from_ancestor (
+  tree       : &Tree<ViewNode>,
+  node       : NodeId,
+  generation : usize,
+  caller     : &str,
+) -> Result<(ID, SourceName), Box<dyn Error>> {
+  read_at_ancestor_in_tree(
+    tree, node, generation,
+    |vn : &ViewNode| match &vn.kind {
+      ViewNodeKind::True( t ) =>
+        Ok(( t.id.clone(), t.source.clone() )),
+      _ => Err( format!(
+        "{}: ancestor {} is not a TrueNode",
+        caller, generation )) } )
+  . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
+  . map_err( |e| -> Box<dyn Error> { e.into() } ) }
 
 /// Read a value from an ancestor of a node in a tree, applying a function to it.
 /// The `generation` parameter specifies how many generations to climb up:

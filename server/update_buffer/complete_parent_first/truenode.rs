@@ -12,7 +12,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold,
     mk_definitive_viewnode};
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
     pid_and_source_from_treenode,
     unique_scaffold_child,
@@ -166,12 +166,8 @@ fn content_goal_list (
     // TODO: Currently RemovedHere means both 'removed from subscribee content' and 'hidden by subscriber'. Newhere is similarly ambiguous.
     // Better would be to introduce two new diff values, 'RemovedByHiding' and 'NewByUnhiding'. It would be dangerous to make those available where diff values are currently used, so this means adding a new type, 'Diff_Item_Hiding'.
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
-      read_at_ancestor_in_tree( tree, node, 2,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) =>
-            Ok(( t.id.clone(), t.source.clone() )),
-          _ => Err( "content_goal_list: grandparent is not a TrueNode" ) } )
-      . map_err( |e| -> Box<dyn Error> { e.into() } ) ? ?;
+      pid_and_source_from_ancestor( tree, node, 2,
+                                    "content_goal_list" ) ?;
     let worktree_hidden : Vec<ID> =
       { let grandparent_skgnode : &SkgNode =
           skgnode_from_map_or_disk(

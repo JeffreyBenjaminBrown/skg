@@ -4,7 +4,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::types::tree::generic::read_at_ancestor_in_tree;
+use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -41,15 +41,9 @@ pub fn completeAliasCol (
     if !is_aliascol { return Err(
       "completeAliasCol: Node is not an AliasCol".into() ); }}
   let (parent_pid, parent_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree(
+    pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
-      |viewnode| match &viewnode.kind {
-        ViewNodeKind::True( t ) =>
-          Ok( ( t.id.clone(), t.source.clone() ) ),
-        ViewNodeKind::Scaff( _ ) =>
-          Err( "completeAliasCol: Parent is not a TrueNode" ), } )
-    .map_err( |e| -> Box<dyn Error> { e.into() } )?
-    .map_err( |e| -> Box<dyn Error> { e.into() } )? ;
+      "completeAliasCol" ) ?;
   let parent_skgnode : &SkgNode =
     map.get( &parent_pid )
     .ok_or( "completeAliasCol: Parent SkgNode not in map" )?;

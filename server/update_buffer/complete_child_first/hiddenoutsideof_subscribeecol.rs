@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children, subtree_satisfies};
 
@@ -59,15 +59,9 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
       . map_err( |e| -> Box<dyn Error> { e.into() } ) ?; }
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree(
+    pid_and_source_from_ancestor(
       tree, node, 2,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) =>
-          Ok(( t.id.clone(), t.source.clone() )),
-        _ => Err( "complete_hiddenoutsideofsubscribeecol: \
-                   ancestor 2 is not a TrueNode" ) } )
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+      "complete_hiddenoutsideofsubscribeecol" ) ?;
   let wt_subscriber_skgnode : &SkgNode =
     map.get( &subscriber_pid )
     .ok_or( "complete_hiddenoutsideofsubscribeecol: \

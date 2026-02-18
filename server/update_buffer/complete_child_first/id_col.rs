@@ -4,7 +4,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::git::{SourceDiff, node_changes_for_truenode};
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_ancestor_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use ego_tree::{NodeId, Tree};
@@ -34,15 +34,9 @@ pub fn completeIDCol (
     "completeIDCol: Node is not an IDCol" )
     .map_err( |e| -> Box<dyn Error> { e.into() } )?;
   let (parent_pid, parent_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree(
+    pid_and_source_from_ancestor(
       tree, idcol_node_id, 1,
-      |viewnode| match &viewnode.kind {
-        ViewNodeKind::True( t ) =>
-          Ok( ( t.id.clone(), t.source.clone() ) ),
-        ViewNodeKind::Scaff( _ ) =>
-          Err( "completeIDCol: Parent is not a TrueNode" ), } )
-    .map_err( |e| -> Box<dyn Error> { e.into() } )?
-    .map_err( |e| -> Box<dyn Error> { e.into() } )? ;
+      "completeIDCol" ) ?;
   let parent_skgnode : &SkgNode =
     map.get( &parent_pid )
     .ok_or( "completeIDCol: Parent SkgNode not in map" )?;

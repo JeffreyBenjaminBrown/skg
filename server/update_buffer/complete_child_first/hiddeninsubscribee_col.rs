@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children, subtree_satisfies};
 
@@ -48,27 +48,13 @@ pub fn complete_hiddeninsubscribee_col (
       "complete_hiddeninsubscribee_col: expected HiddenInSubscribeeCol"
     ). map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
   let (subscribee_pid, subscribee_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree(
+    pid_and_source_from_ancestor(
       tree, node, 1,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) =>
-          Ok(( t . id . clone(),
-               t . source . clone() )),
-        _ => Err( "complete_hiddeninsubscribee_col: \
-                   ancestor 1 is not a TrueNode" ) } )
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+      "complete_hiddeninsubscribee_col" ) ?;
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
-    read_at_ancestor_in_tree(
+    pid_and_source_from_ancestor(
       tree, node, 3,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) =>
-          Ok(( t . id . clone(),
-               t . source . clone() )),
-        _ => Err( "complete_hiddeninsubscribee_col: \
-                   ancestor 3 is not a TrueNode" ) } )
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+      "complete_hiddeninsubscribee_col" ) ?;
   let subscribee_contains : Vec<ID> = {
     let subscribee_skgnode : &SkgNode =
       map.get( &subscribee_pid )
