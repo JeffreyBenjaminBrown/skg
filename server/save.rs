@@ -4,6 +4,7 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
+use crate::serve::timing_log::{timed, timed_async};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::skgnode::SkgNode;
@@ -31,10 +32,9 @@ pub async fn update_graph_minus_merges (
   let db_name : &str = &config.db_name;
 
   { println!( "1) Updating TypeDB database '{}' ...", db_name );
-    update_typedb_from_saveinstructions (
-      db_name,
-      driver,
-      &instructions ). await ?;
+    timed_async ( &config, "update_typedb_from_saveinstructions",
+                  update_typedb_from_saveinstructions (
+                    db_name, driver, &instructions )) . await ?;
     println!( "   TypeDB update complete." ); }
 
   { // filesystem
@@ -43,18 +43,20 @@ pub async fn update_graph_minus_merges (
                { let total_input : usize = instructions.len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
-      update_fs_from_saveinstructions (
-        instructions.clone (), config.clone ()) ?;
+      timed ( &config, "update_fs_from_saveinstructions",
+              || update_fs_from_saveinstructions (
+                   instructions.clone (), config.clone () )) ?;
     println!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
   { // Tantivy
     println!( "3) Updating Tantivy index ..." );
+    let indexed_count : usize =
+      timed ( &config, "update_tantivy_from_saveinstructions",
+              || update_tantivy_from_saveinstructions (
+                   &instructions, tantivy_index )) ?;
     println!( "   Tantivy updated for {} document(s).",
-              { let indexed_count : usize =
-                  update_tantivy_from_saveinstructions (
-                      &instructions, tantivy_index )?;
-              indexed_count } ); }
+              indexed_count ); }
 
   println!( "All updates finished successfully." );
   Ok (( )) }

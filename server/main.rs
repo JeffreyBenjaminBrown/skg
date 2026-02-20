@@ -6,6 +6,7 @@
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::initialize_dbs;
 use skg::serve::serve;
+use skg::serve::timing_log::{clear_timing_log, timed};
 use skg::types::misc::{SkgConfig, TantivyIndex};
 
 use std::error::Error;
@@ -24,9 +25,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             "data/skgconfig.toml".to_string() };
         config_path } ) ?;
 
+  clear_timing_log ( &config );
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
-    = initialize_dbs ( &config );
+    = timed ( &config, "initialize_dbs",
+              || initialize_dbs ( &config ));
 
   serve (config, typedb_driver, tantivy_index)
     . map_err ( |e| Box::new(e)

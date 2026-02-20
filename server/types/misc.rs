@@ -45,6 +45,9 @@ pub struct SkgConfig {
   #[serde(default = "default_initial_node_limit")]
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 
+  #[serde(default)] // defaults to false
+  pub timing_log     : bool, // Write timing data to <config_dir>/timing.log.
+
   #[serde(skip)]
   pub config_dir     : PathBuf, // Directory containing skgconfig.toml.
 }
@@ -162,6 +165,7 @@ impl SkgConfig {
       port               : 0,
       delete_on_quit     : false,
       initial_node_limit : 100,
+      timing_log         : false,
       config_dir         : PathBuf::from("."), }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
@@ -178,6 +182,7 @@ impl SkgConfig {
       port               : 1730,
       delete_on_quit     : false,
       initial_node_limit : 1000,
+      timing_log         : false,
       config_dir         : PathBuf::from("."), }}
 
   pub fn user_owns_source (

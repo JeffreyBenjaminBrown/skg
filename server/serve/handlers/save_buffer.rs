@@ -6,6 +6,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::merge::merge_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
+use crate::serve::timing_log::{timed, timed_async};
 use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
 use crate::update_buffer::complete::complete_viewtree;
 use crate::to_org::util::DefinitiveMap;
@@ -58,51 +59,51 @@ pub fn handle_save_buffer_request (
   diff_mode_enabled : bool ) {
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
-      match block_on(
-        update_from_and_rerender_buffer (
-          // Most of the work happens here.
-          & initial_buffer_content,
-          typedb_driver, config, tantivy_index,
-          diff_mode_enabled ))
-      { Ok (save_response) =>
-        { // S-exp response format: ((content "...") (errors (...)))
-          stream . write_all (
-              { let response_sexp : String =
-                  save_response . to_sexp_string ();
-                let header : String =
-                  format! ( "Content-Length: {}\r\n\r\n",
-                               response_sexp . len () );
-                format! ( "{}{}", header, response_sexp ) }
-              . as_bytes() ). unwrap ();
-          stream . flush() . unwrap (); }
-        Err (err) => { // Check if this is a SaveError that should be formatted for the client
-          if let Some(save_error) = err.downcast_ref::<SaveError>() {
-            stream.write_all(
-              { let response_sexp : String =
-                  { let response : Sexp =
-                      empty_response_sexp (
-                        & { let error_buffer_content : String =
-                              format_save_error_as_org(save_error);
-                            error_buffer_content } );
-                    response }
-                  . to_string ();
-                let full_response : String =
-                  format! (
-                    "{}{}",
-                    { let header : String =
-                        format! ( "Content-Length: {}\r\n\r\n",
-                                  response_sexp . len ( ));
-                      header },
-                    response_sexp );
-                full_response
-              } .as_bytes( )) . unwrap();
-            stream.flush().unwrap();
-          } else {
-            let error_msg : String =
-              format!("Error processing buffer content: {}", err);
-            println!("{}", error_msg);
-            send_response(stream, &error_msg);
-          }} }}
+      timed ( config, "update_from_and_rerender_buffer", || {
+        match block_on(
+          update_from_and_rerender_buffer (
+            // Most of the work happens here.
+            & initial_buffer_content,
+            typedb_driver, config, tantivy_index,
+            diff_mode_enabled ))
+        { Ok (save_response) =>
+          { // S-exp response format: ((content "...") (errors (...)))
+            stream . write_all (
+                { let response_sexp : String =
+                    save_response . to_sexp_string ();
+                  let header : String =
+                    format! ( "Content-Length: {}\r\n\r\n",
+                                 response_sexp . len () );
+                  format! ( "{}{}", header, response_sexp ) }
+                . as_bytes() ). unwrap ();
+            stream . flush() . unwrap (); }
+          Err (err) => { // Check if this is a SaveError that should be formatted for the client
+            if let Some(save_error) = err.downcast_ref::<SaveError>() {
+              stream.write_all(
+                { let response_sexp : String =
+                    { let response : Sexp =
+                        empty_response_sexp (
+                          & { let error_buffer_content : String =
+                                format_save_error_as_org(save_error);
+                              error_buffer_content } );
+                      response }
+                    . to_string ();
+                  let full_response : String =
+                    format! (
+                      "{}{}",
+                      { let header : String =
+                          format! ( "Content-Length: {}\r\n\r\n",
+                                    response_sexp . len ( ));
+                        header },
+                      response_sexp );
+                  full_response
+                } .as_bytes( )) . unwrap();
+              stream.flush().unwrap();
+            } else {
+              let error_msg : String =
+                format!("Error processing buffer content: {}", err);
+              println!("{}", error_msg);
+              send_response(stream, &error_msg); }} }} ); }
     Err(err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
@@ -143,12 +144,15 @@ pub async fn update_from_and_rerender_buffer (
       config . sources . keys() . cloned() . collect();
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
+
   let (mut forest, save_instructions, merge_instructions)
     : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
-    = buffer_to_viewnode_forest_and_save_instructions (
-        org_buffer_text, config, typedb_driver
-      ). await . map_err (
-        |e| Box::new(e) as Box<dyn Error> ) ?;
+    = timed_async ( config,
+                    "buffer_to_viewnode_forest_and_save_instructions",
+                    buffer_to_viewnode_forest_and_save_instructions (
+                      org_buffer_text, config, typedb_driver )
+                  ). await . map_err (
+                    |e| Box::new(e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
@@ -158,16 +162,24 @@ pub async fn update_from_and_rerender_buffer (
     clear_diff_metadata ( &mut forest ) ?; }
 
   { // update the graph
-    update_graph_minus_merges (
-      save_instructions.clone(),
-      config.clone(),
-      tantivy_index,
-      typedb_driver ). await ?;
-    merge_nodes (
-      merge_instructions,
-      config.clone(),
-      tantivy_index,
-      typedb_driver ). await ?; }
+    timed_async ( config, "update_graph_minus_merges",
+                  async {
+                    update_graph_minus_merges (
+                      save_instructions.clone(),
+                      config.clone(),
+                      tantivy_index,
+                      typedb_driver ). await ?;
+                    Result::<(), Box<dyn Error>>::Ok (( )) }
+                ). await ?;
+    timed_async ( config, "merge_nodes",
+                  async {
+                    merge_nodes (
+                      merge_instructions,
+                      config.clone(),
+                      tantivy_index,
+                      typedb_driver ). await ?;
+                    Result::<(), Box<dyn Error>>::Ok (( )) }
+                ). await ?; }
 
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
@@ -185,27 +197,31 @@ pub async fn update_from_and_rerender_buffer (
       . unwrap_or_default();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
-      complete_viewtree (
-        &mut forest_mut,
-        &mut skgnode_map,
-        &mut visited,
-        &source_diffs,
-        config,
-        typedb_driver,
-        &mut errors,
-        &deleted_id_src_map ). await ?;
+      timed_async ( config, "complete_viewtree",
+                    complete_viewtree (
+                      &mut forest_mut,
+                      &mut skgnode_map,
+                      &mut visited,
+                      &source_diffs,
+                      config,
+                      typedb_driver,
+                      &mut errors,
+                      &deleted_id_src_map )) . await ?;
       let ( container_to_contents, content_to_containers ) =
-        set_graphnodestats_in_forest (
-          &mut forest_mut,
-          &mut skgnode_map,
-          config,
-          typedb_driver ). await ?;
-      set_viewnodestats_in_forest (
-        &mut forest_mut,
-        &container_to_contents,
-        &content_to_containers ); }
+        timed_async ( config, "set_graphnodestats_in_forest",
+                      set_graphnodestats_in_forest (
+                        &mut forest_mut,
+                        &mut skgnode_map,
+                        config,
+                        typedb_driver )) . await ?;
+      timed ( config, "set_viewnodestats_in_forest",
+              || set_viewnodestats_in_forest (
+                &mut forest_mut,
+                &container_to_contents,
+                &content_to_containers )); }
     let buffer_content : String =
-      viewnode_forest_to_string ( & forest_mut ) ?;
+      timed ( config, "save_render",
+              || viewnode_forest_to_string ( & forest_mut )) ?;
     Ok ( SaveResponse { buffer_content, errors } ) }}
 
 /// Strip from the forest every branch whose root

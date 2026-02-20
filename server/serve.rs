@@ -1,5 +1,6 @@
 pub mod handlers;
 pub mod parse_metadata_sexp;
+pub mod timing_log;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;

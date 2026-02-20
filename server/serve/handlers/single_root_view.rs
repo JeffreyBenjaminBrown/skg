@@ -1,4 +1,5 @@
 use crate::to_org::render::content_view::single_root_view;
+use crate::serve::timing_log::timed;
 use crate::serve::util::{
   send_response,
   send_response_with_length_prefix,
@@ -24,22 +25,24 @@ pub fn handle_single_root_view_request (
 ) {
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
-      let response_sexp : String = block_on ( async {
-        match single_root_view (
-          typedb_driver,
-          config,
-          &node_id,
-          diff_mode_enabled ) . await
-        { Ok ( buffer_content ) =>
-            format_buffer_response_sexp (
-              & buffer_content,
-              & vec![] ),
-          Err (e) => { // If we fail to generate the view, return error in content
-            let error_content : String = format!(
-              "Error generating document: {}", e);
-            format_buffer_response_sexp (
-              & error_content,
-              & vec![] ) }} } );
+      let response_sexp : String =
+        timed ( config, "single_root_view", || {
+          block_on ( async {
+            match single_root_view (
+              typedb_driver,
+              config,
+              &node_id,
+              diff_mode_enabled ) . await
+            { Ok ( buffer_content ) =>
+                format_buffer_response_sexp (
+                  & buffer_content,
+                  & vec![] ),
+              Err (e) => { // If we fail to generate the view, return error in content
+                let error_content : String = format!(
+                  "Error generating document: {}", e);
+                format_buffer_response_sexp (
+                  & error_content,
+                  & vec![] ) }} } ) } );
       send_response_with_length_prefix (
         stream,
         & response_sexp ); },

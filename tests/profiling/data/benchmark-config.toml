@@ -1,0 +1,11 @@
+db_name = "skg-test-profiling-bench2"
+tantivy_folder = "/home/ubuntu/tests/profiling/data/index.tantivy"
+port = 1731
+delete_on_quit = true
+initial_node_limit = 5000
+timing_log = true
+
+[[sources]]
+nickname = "main"
+path = "/home/ubuntu/tests/profiling/data/skg-data"
+user_owns_it = true

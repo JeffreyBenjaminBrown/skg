@@ -5,6 +5,7 @@ use crate::dbs::typedb::search::count_relationships::{
   count_link_sources,
   has_subscribes,
   has_overrides};
+use crate::serve::timing_log::{timed, timed_async};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -37,22 +38,26 @@ pub async fn set_graphnodestats_in_forest (
                HashMap < ID, HashSet < ID > > ),
              Box<dyn Error> > {
   let pids : Vec < ID > =
-    collect_ids_from_tree ( forest );
+    timed ( config, "collect_ids_from_tree",
+            || collect_ids_from_tree ( forest ));
   let rel_data : MapsFromIdForView =
-    fetch_relationship_data (
-      driver, & config . db_name, & pids ) . await ?;
+    timed_async ( config, "fetch_relationship_data",
+                  fetch_relationship_data (
+                    driver, & config . db_name, & pids )) . await ?;
   let ( container_to_contents, content_to_containers )
     : ( HashMap < ID, HashSet < ID > >,
         HashMap < ID, HashSet < ID > > )
-    = contains_from_pids (
-      & config . db_name, driver, & pids ) . await ?;
+    = timed_async ( config, "contains_from_pids",
+                    contains_from_pids (
+                      & config . db_name, driver, & pids )) . await ?;
   let root_treeid : NodeId = forest . root () . id ();
-  set_metadata_relationships_in_node_recursive (
-    forest,
-    root_treeid,
-    & rel_data,
-    map,
-    config );
+  timed ( config, "set_graphnodestats_recursive",
+          || set_metadata_relationships_in_node_recursive (
+               forest,
+               root_treeid,
+               & rel_data,
+               map,
+               config ));
   Ok (( container_to_contents,
         content_to_containers )) }
 

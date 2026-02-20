@@ -40,6 +40,7 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    timing_log : false,
     config_dir : PathBuf::from("."),
   };
 
@@ -85,6 +86,7 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    timing_log : false,
     config_dir : PathBuf::from("."),
   };
   let result : Result<Option<&SkgNode>, Box<dyn Error>> =
@@ -124,6 +126,7 @@ fn test_skgnode_for_viewnode_scaffold() {
     port : 3000,
     delete_on_quit : false,
     initial_node_limit : 100,
+    timing_log : false,
     config_dir : PathBuf::from("."),
   };
 
