@@ -139,16 +139,17 @@ fn true_node_metadata_to_string (
   true_node : & TrueNode
 ) -> String {
   fn node_sexp ( true_node : & TrueNode ) -> String {
+
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
       if true_node . graphStats . numContainers != Some ( 1 ) {
-        if let Some ( count ) = true_node . graphStats . numContainers {
+        if let Some (count) = true_node . graphStats . numContainers {
           parts . push ( format! ( "(containers {})", count )); }}
       if true_node . graphStats . numContents != Some ( 0 ) {
-        if let Some ( count ) = true_node . graphStats . numContents {
+        if let Some (count) = true_node . graphStats . numContents {
           parts . push ( format! ( "(contents {})", count )); }}
       if true_node . graphStats . numLinksIn != Some ( 0 ) {
-        if let Some ( count ) = true_node . graphStats . numLinksIn {
+        if let Some (count) = true_node . graphStats . numLinksIn {
           parts . push ( format! ( "(linksIn {})", count )); }}
       if true_node . graphStats . aliasing {
         parts . push ( "aliasing" . to_string () ); }
@@ -159,7 +160,9 @@ fn true_node_metadata_to_string (
       if true_node . graphStats . subscribing {
         parts . push ( "subscribing" . to_string () ); }
       if parts . is_empty () { None }
-      else { Some ( format! ( "(graphStats {})", parts . join ( " " ))) }}
+      else { Some ( format! (
+               "(graphStats {})", parts . join (" ") )) }}
+
     fn view_stats ( true_node : & TrueNode ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
       if true_node . viewStats . cycle {
@@ -169,21 +172,26 @@ fn true_node_metadata_to_string (
       if true_node . viewStats . parentIsContent {
         parts . push ( "containsParent" . to_string () ); }
       if parts . is_empty () { None }
-      else { Some ( format! ( "(viewStats {})", parts . join ( " " ))) }}
-    fn edit_request ( true_node : & TrueNode ) -> Option < String > {
+      else { Some ( format! (
+               "(viewStats {})", parts . join (" ") )) }}
+
+    fn edit_request ( true_node : & TrueNode
+                    ) -> Option < String > {
       true_node . edit_request . as_ref () . map ( | edit_req | {
         let edit_str : String = match edit_req {
-          EditRequest::Merge ( id ) => format! ( "(merge {})", id . 0 ),
+          EditRequest::Merge (id) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
-        format! ( "(editRequest {})", edit_str ) })}
-    fn view_requests ( true_node : & TrueNode ) -> Option < String > {
+        format! ( "(editRequest {})", edit_str ) } ) }
+    fn view_requests ( true_node : & TrueNode
+                     ) -> Option < String > {
       if true_node . view_requests . is_empty () { return None; }
       let mut request_strings : Vec < String > =
         true_node . view_requests . iter ()
           . map ( | req | req . to_string () )
           . collect ();
       request_strings . sort ();
-      Some ( format! ( "(viewRequests {})", request_strings . join ( " " ))) }
+      Some ( format! ( "(viewRequests {})",
+                       request_strings . join (" ") )) }
     fn diff_status ( true_node : & TrueNode ) -> Option < String > {
       true_node . diff . as_ref () . map ( | d |
         format! ( "(diff {})", d . repr_in_client () )) }
