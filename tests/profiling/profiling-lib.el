@@ -1,10 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Benchmark test: times view request, bulk edit, and save round-trip
-;;; for a ~781-node dataset.
+;;; Common profiling framework for skg benchmark tests.
+;;; Each test-emacs.el loads skg-init.el, then this file,
+;;; defines benchmark-phase-edit, and calls (run-profiling-test).
 
-;; Load the project elisp configuration
-(load-file "../../elisp/skg-init.el")
 (require 'cl-lib)
 
 ;; Timing results
@@ -42,21 +41,6 @@ Returns t if predicate became true, nil on timeout."
       (setq elapsed (+ elapsed interval)))
     (funcall predicate)))
 
-(defun run-benchmark ()
-  "Main benchmark orchestrator."
-  (message "=== SKG Benchmark Test ===")
-
-  ;; Set port from environment
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
-
-  (sleep-for 0.25)
-
-  ;; Phase 1: Request view
-  (benchmark-phase-view))
-
 (defun benchmark-phase-view ()
   "Phase 1: Request content view and time the round-trip."
   (message "=== PHASE 1: Requesting content view for node '0' ===")
@@ -84,44 +68,6 @@ Returns t if predicate became true, nil on timeout."
       (progn
         (message "TIMEOUT: View response not received within 120s")
         (kill-emacs 1)))))
-
-(defun benchmark-phase-edit ()
-  "Phase 2: Rotate all headline titles in the buffer."
-  (message "=== PHASE 2: Editing buffer (rotating titles) ===")
-  (let ((t3 (current-time)))
-    (with-current-buffer "*skg: 0*"
-      ;; Collect all headline positions and their titles
-      ;; Collect headlines top-to-bottom.
-      (let ((headlines '()))
-        (goto-char (point-min))
-        (while (re-search-forward
-                "^\\(\\*+\\) (skg .+))) \\(.*\\)$" nil t)
-          (push (list (match-beginning 2) (match-end 2)
-                      (match-string 2))
-                headlines))
-        (setq headlines (nreverse headlines))
-        ;; headlines is now top-to-bottom: ((beg end title) ...)
-        (message "Found %d headlines to rotate" (length headlines))
-        ;; Shift titles down: headline N gets title from N-1.
-        ;; First headline gets "Gone!".
-        ;; Build replacement list, then apply bottom-to-top
-        ;; so positions stay valid.
-        (when headlines
-          (let* ((old-titles (mapcar (lambda (hl) (nth 2 hl)) headlines))
-                 (new-titles (cons "Gone!" (butlast old-titles)))
-                 (pairs (cl-mapcar #'list headlines new-titles)))
-            (dolist (pair (nreverse pairs))
-              (let ((beg (nth 0 (car pair)))
-                    (end (nth 1 (car pair)))
-                    (new-title (cadr pair)))
-                (goto-char beg)
-                (delete-region beg end)
-                (insert new-title)))))))
-    (let ((t4 (current-time)))
-      (setq benchmark-edit-time
-            (benchmark-format-time t3 t4))
-      (message "emacs_edit: %ss" benchmark-edit-time)
-      (benchmark-phase-save))))
 
 (defun benchmark-phase-save ()
   "Phase 3: Save buffer and time the round-trip."
@@ -154,11 +100,20 @@ Returns t if predicate became true, nil on timeout."
   (setq benchmark-completed t)
   (kill-emacs 0))
 
-(progn
+(defun run-profiling-test ()
+  "Main benchmark orchestrator."
+  (message "=== SKG Benchmark Test ===")
+  ;; Set port from environment
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port)))
+  (sleep-for 0.25)
   ;; Global timeout: 10 minutes
   (run-at-time
    600 nil
    (lambda ()
      (message "TIMEOUT: Benchmark timed out after 10 minutes!")
      (kill-emacs 1)))
-  (run-benchmark))
+  ;; Phase 1: Request view
+  (benchmark-phase-view))
