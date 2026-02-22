@@ -96,27 +96,6 @@ pub(super) fn makeIndefinitiveAndClobber (
   clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
 
-/// Like make_and_append_child_pair, but skips the Neo4j query
-/// by accepting a pre-fetched PID and source.
-pub fn make_and_append_child_pair_from_pid_and_source (
-  tree          : &mut Tree<ViewNode>,
-  map           : &mut SkgNodeMap,
-  parent_treeid : NodeId,
-  pid           : &ID,
-  source        : &SourceName,
-  config        : &SkgConfig,
-) -> Result < NodeId, Box<dyn Error> > {
-  let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
-    skgnode_and_viewnode_from_pid_and_source (
-      config, pid, source, map ) ?;
-  let child_treeid : NodeId =
-    with_node_mut (
-      tree, parent_treeid,
-      ( |mut parent_mut|
-        parent_mut . append(child_viewnode) . id() ))
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-  Ok ( child_treeid ) }
-
 /// This function's callers add a pristine, out-of-context
 /// (skgnode, viewnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
@@ -280,6 +259,27 @@ pub async fn make_and_append_child_pair (
       config, graph, child_skgid, map ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
+      tree, parent_treeid,
+      ( |mut parent_mut|
+        parent_mut . append(child_viewnode) . id() ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok ( child_treeid ) }
+
+/// Like make_and_append_child_pair, but skips the Neo4j query
+/// by accepting a pre-fetched PID and source.
+pub fn make_and_append_child_pair_from_pid_and_source (
+  tree          : &mut Tree<ViewNode>,
+  map           : &mut SkgNodeMap,
+  parent_treeid : NodeId,
+  pid           : &ID,
+  source        : &SourceName,
+  config        : &SkgConfig,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
+    skgnode_and_viewnode_from_pid_and_source (
+      config, pid, source, map ) ?;
+  let child_treeid : NodeId =
+    with_node_mut (
       tree, parent_treeid,
       ( |mut parent_mut|
         parent_mut . append(child_viewnode) . id() ))

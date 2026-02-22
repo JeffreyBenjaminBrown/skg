@@ -46,17 +46,17 @@ pub fn initialize_neo4j_from_nodes (
 ) -> Arc<Graph> {
 
   println!("Initializing Neo4j database...");
-  let graph: Graph = handle.block_on ( async {
+  let graph: Graph = handle . block_on ( async {
     Graph::new(
-      &config.neo4j_uri,
-      &config.neo4j_user,
-      &config.neo4j_password,
+      &config . neo4j_uri,
+      &config . neo4j_user,
+      &config . neo4j_password,
     ) . await
       . unwrap_or_else ( |e| {
         eprintln!("Error connecting to Neo4j: {}", e);
         std::process::exit(1); } ) } );
 
-  handle.block_on ( async {
+  handle . block_on ( async {
     // Clear any existing data
     if let Err (e) = delete_database (
       & graph,
@@ -84,7 +84,7 @@ pub fn initialize_neo4j_from_nodes (
       eprintln! ( "Failed to create relationships: {}", e );
       std::process::exit(1); }} );
   println!("Neo4j database initialized successfully.");
-  Arc::new( graph ) }
+  Arc::new (graph) }
 
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,

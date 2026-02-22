@@ -249,13 +249,13 @@ pub async fn pids_and_sources_from_ids (
   let mut result_stream =
     graph . execute (
       neo4rs::query ( "\
-        UNWIND $ids AS input_id \
-        OPTIONAL MATCH (direct:Node {id: input_id}) \
-        OPTIONAL MATCH (alias:IdAlias {id: input_id}) \
-        WITH input_id, \
+        UNWIND $ids AS input_id                           \
+        OPTIONAL MATCH (direct:Node {id: input_id})       \
+        OPTIONAL MATCH (alias:IdAlias {id: input_id})     \
+        WITH input_id,                                    \
              coalesce(direct.id, alias.primary_id) AS pid \
-        WHERE pid IS NOT NULL \
-        MATCH (n:Node {id: pid}) \
+        WHERE pid IS NOT NULL                             \
+        MATCH (n:Node {id: pid})                          \
         RETURN input_id, n.id AS primary_id, n.source AS source" )
       . param ( "ids", id_strings )
     ) . await ?;

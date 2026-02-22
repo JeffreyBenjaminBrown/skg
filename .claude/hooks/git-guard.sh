@@ -7,7 +7,7 @@ command=$(echo "$input" | grep -oP '"command"\s*:\s*"\K[^"]*' | head -1)
 # Only intervene for git commands
 if [[ "$command" == git* ]]; then
   # Allowed git commands (read-only + mv)
-  if [[ "$command" =~ ^(git\ log|git\ diff|git\ status|git\ mv) ]]; then
+  if [[ "$command" =~ ^(git\ log|git\ show|git\ diff|git\ status|git\ mv) ]]; then
     exit 0  # Allow normally
   else
     # Block other git commands

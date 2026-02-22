@@ -5,8 +5,8 @@ use std::collections::{ HashSet, BTreeSet };
 use std::error::Error;
 use neo4rs::Graph;
 
+/// Creates all Node and IdAlias entities, then commits.
 pub async fn create_all_nodes (
-  // Creates all Node and IdAlias entities, then commits.
   graph : &Graph,
   nodes : &[SkgNode]
 ) -> Result < (), Box<dyn Error> > {
@@ -17,7 +17,7 @@ pub async fn create_all_nodes (
     create_node_in_txn ( node, &mut txn )
       . await ?; }
   txn . commit () . await ?;
-  Ok (()) }
+  Ok (( )) }
 
 /// Creates (in Neo4j) nodes whose primary IDs are not in the DB.
 /// Returns the number of nodes created.
@@ -51,44 +51,40 @@ pub async fn create_only_nodes_with_no_ids_present (
   Ok ( to_create.len () ) }
 
 /// Batch existence check:
-/// Given a set of candidate ID *strings*,
-/// return the subset that already exist in the DB.
+/// Given a set of candidate ID strings,
+/// return the subset that resolve to an existing node.
+/// If an extra ID is in the input and is found,
+/// it is not converted to the corresponding PID in the output.
 pub async fn which_ids_exist (
   graph : &Graph,
   ids   : &BTreeSet < String >
 ) -> Result < HashSet < String >, Box<dyn Error> > {
-  if ids.is_empty () {
+  if ids . is_empty () {
     return Ok ( HashSet::new () ); }
   let ids_vec : Vec<String> =
     ids . iter () . cloned () . collect ();
   let mut result =
     graph . execute (
-      neo4rs::query (
-        "MATCH (n:Node) WHERE n.id IN $ids RETURN n.id AS id" )
+      neo4rs::query ( "                                   \
+        UNWIND $ids AS input_id                           \
+        OPTIONAL MATCH (direct:Node {id: input_id})       \
+        OPTIONAL MATCH (alias:IdAlias {id: input_id})     \
+        WITH input_id,                                    \
+             coalesce(direct.id, alias.primary_id) AS pid \
+        WHERE pid IS NOT NULL                             \
+        RETURN input_id" )
       . param ( "ids", ids_vec )
-    ) . await ?;
+    ). await ?;
   let mut found : HashSet < String > =
     HashSet::new ();
   while let Some ( row ) = result . next () . await ? {
-    let id : String = row . get ( "id" ) ?;
-    found . insert ( id ); }
-  Ok ( found ) }
+    let input_id : String = row . get ( "input_id" ) ?;
+    found . insert ( input_id ); }
+  Ok (found) }
 
-pub async fn create_node (
-  // Creates the Node and any IdAlias entities.
-  // Uses an auto-commit transaction.
-  node  : &SkgNode,
-  graph : &Graph,
-) -> Result < (), Box<dyn Error> > {
-  let mut txn : neo4rs::Txn =
-    graph . start_txn () . await ?;
-  create_node_in_txn ( node, &mut txn ) . await ?;
-  txn . commit () . await ?;
-  Ok (()) }
-
+/// Creates the Node and any IdAlias entities.
+/// Does *not* commit.
 async fn create_node_in_txn (
-  // Creates the Node and any IdAlias entities.
-  // Does *not* commit.
   node : &SkgNode,
   txn  : &mut neo4rs::Txn,
 ) -> Result < (), Box<dyn Error> > {
@@ -100,8 +96,9 @@ async fn create_node_in_txn (
     . param ( "source", node . source . 0 . as_str () )
   ) . await ?;
   insert_extra_ids_in_txn ( &node, txn ) . await ?;
-  Ok (()) }
+  Ok (( )) }
 
+/// PURPOSE: Add extra IDs for a node that already exists.
 async fn insert_extra_ids_in_txn (
   node : &SkgNode,
   txn  : &mut neo4rs::Txn,
@@ -117,33 +114,19 @@ async fn insert_extra_ids_in_txn (
         . param ( "eid", extra_id . as_str () )
         . param ( "pid", primary_id . as_str () )
       ) . await ?; }}
-  Ok (()) }
-
-/// PURPOSE: Add extra IDs for a node that already exists.
-pub async fn insert_extra_ids (
-  graph      : &Graph,
-  primary_id : &ID,
-  extra_ids  : &[ID],
-) -> Result < (), Box<dyn Error> > {
-  for extra_id in extra_ids {
-    graph . run (
-      neo4rs::query (
-        "CREATE (:IdAlias {id: $eid, primary_id: $pid})" )
-      . param ( "eid", extra_id . as_str () )
-      . param ( "pid", primary_id . as_str () )
-    ) . await ?; }
-  Ok (()) }
+  Ok (( )) }
 
 /// ASSUMES: All input IDs are PIDs.
-/// PURPOSE: Delete the node corresponding to every ID it receives,
-/// including its IdAlias entities.
+/// PURPOSE: Delete the node corresponding to each input ID,
+///          *and* any corresponding IdAlias entities.
 pub async fn delete_nodes_from_pids (
   graph : &Graph,
   ids   : &[ID]
 ) -> Result < (), Box<dyn Error> > {
-  if ids.is_empty() { return Ok ( () ); }
+  if ids . is_empty() { return Ok (( )); }
   let id_strings : Vec<String> =
-    ids . iter () . map ( |id| id.0.clone () ) . collect ();
+    ids . iter () . map ( |id| id . 0 . clone ()
+                        ) . collect ();
   let mut txn : neo4rs::Txn =
     graph . start_txn () . await ?;
   txn . run (
@@ -157,4 +140,4 @@ pub async fn delete_nodes_from_pids (
     . param ( "pids", id_strings )
   ) . await ?;
   txn . commit () . await ?;
-  Ok ( () ) }
+  Ok (( )) }
