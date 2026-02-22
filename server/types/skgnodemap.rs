@@ -13,6 +13,10 @@ use neo4rs::Graph;
 /// Maps node IDs to their corresponding SkgNodes.
 pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
+/// Maps an ID (usually the PID, but sometimes an alias)
+/// to the (PID, SourceName) pair that Neo4j resolves it to.
+pub type IdToPidAndSource = HashMap<ID, (ID, SourceName)>;
+
 /// Extract SkgNode for an ViewNode from the map (tried first) or disk.
 /// Updates the map if needed.
 /// Returns None for Scaffolds.

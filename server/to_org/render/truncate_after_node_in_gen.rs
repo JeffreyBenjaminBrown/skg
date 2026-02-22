@@ -1,12 +1,13 @@
+use crate::dbs::neo4j::search::pids_and_sources_from_ids;
 use crate::to_org::util::{
   DefinitiveMap,
   get_id_from_treenode,
   makeIndefinitiveAndClobber,
-  make_and_append_child_pair,
+  make_and_append_child_pair_from_pid_and_source,
   nodes_after_in_generation };
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::ViewNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::skgnodemap::{SkgNodeMap, IdToPidAndSource};
 
 use ego_tree::{Tree, NodeId};
 use std::cmp::min;
@@ -37,15 +38,25 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
     min ( space_left, children . len () ) - 1;
   let limit_parent_treeid : NodeId =
     children [last_addable_index] . 0;
+  let all_child_ids : Vec<ID> =
+    children . iter ()
+    . map ( |( _, child_skgid )| child_skgid . clone () )
+    . collect ();
+  let pid_source_map : IdToPidAndSource =
+    pids_and_sources_from_ids ( graph, &all_child_ids ) . await ?;
   for (idx, (parent_treeid, child_skgid))
     in children . iter () . enumerate () {
       if ( idx > last_addable_index && // past limit
            *parent_treeid != limit_parent_treeid ) // in new sibling group
       { break; }
       else {
+        let (pid, source) : &(ID, SourceName) =
+          pid_source_map . get ( child_skgid )
+          . ok_or_else ( || format! (
+            "ID '{}' not found in database", child_skgid ) ) ?;
         let new_treeid : NodeId =
-          make_and_append_child_pair (
-            tree, map, *parent_treeid, child_skgid, config, graph ) . await ?;
+          make_and_append_child_pair_from_pid_and_source (
+            tree, map, *parent_treeid, pid, source, config ) ?;
         makeIndefinitiveAndClobber ( tree, map, new_treeid, config ) ?; }}
   truncate_after_node_in_generation_in_tree (
     tree, map, generation - 1, limit_parent_treeid,

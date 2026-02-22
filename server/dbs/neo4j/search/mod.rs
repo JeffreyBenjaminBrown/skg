@@ -7,6 +7,7 @@ use std::error::Error;
 use neo4rs::Graph;
 
 use crate::types::misc::{ID, SourceName};
+use crate::types::skgnodemap::IdToPidAndSource;
 
 /// Returns true if the from_role is the arrow's tail (outgoing).
 /// This replaces role-string gymnastics in the TypeQL query builder.
@@ -233,3 +234,38 @@ pub async fn pid_and_source_from_id (
     Ok ( Some (( ID ( primary_id ),
                  SourceName::from ( source ) )) ) }
   else { Ok (None) } }
+
+/// Batch version of pid_and_source_from_id.
+/// Resolves multiple IDs to (PID, SourceName) pairs in a single query.
+/// IDs not found in the database are omitted from the result.
+pub async fn pids_and_sources_from_ids (
+  graph : &Graph,
+  ids   : &[ID],
+) -> Result < IdToPidAndSource, Box<dyn Error> > {
+  if ids . is_empty () {
+    return Ok ( IdToPidAndSource::new () ); }
+  let id_strings : Vec<String> =
+    ids . iter () . map ( |id| id.0.clone () ) . collect ();
+  let mut result_stream =
+    graph . execute (
+      neo4rs::query ( "\
+        UNWIND $ids AS input_id \
+        OPTIONAL MATCH (direct:Node {id: input_id}) \
+        OPTIONAL MATCH (alias:IdAlias {id: input_id}) \
+        WITH input_id, \
+             coalesce(direct.id, alias.primary_id) AS pid \
+        WHERE pid IS NOT NULL \
+        MATCH (n:Node {id: pid}) \
+        RETURN input_id, n.id AS primary_id, n.source AS source" )
+      . param ( "ids", id_strings )
+    ) . await ?;
+  let mut result : IdToPidAndSource = IdToPidAndSource::new ();
+  while let Some ( row ) = result_stream . next () . await ? {
+    let input_id   : String = row . get ( "input_id" ) ?;
+    let primary_id : String = row . get ( "primary_id" ) ?;
+    let source     : String = row . get ( "source" ) ?;
+    result . insert (
+      ID ( input_id ),
+      ( ID ( primary_id ),
+        SourceName::from ( source ) )); }
+  Ok ( result ) }

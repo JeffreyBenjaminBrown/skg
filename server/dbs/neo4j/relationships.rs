@@ -109,27 +109,29 @@ async fn insert_relationship_from_list_in_txn (
   from_is_tail  : bool,
   txn           : &mut neo4rs::Txn,
 ) -> Result<(), Box<dyn Error>> {
-  for target_id in id_list {
-    // Resolve target via Node.id or IdAlias.id
-    let cypher : String = format! (
-      "MATCH (from:Node {{id: $from_id}}) \
-       OPTIONAL MATCH (direct:Node {{id: $to_id}}) \
-       OPTIONAL MATCH (alias:IdAlias {{id: $to_id}}) \
-       WITH from, coalesce(direct.id, alias.primary_id) AS resolved_pid \
-       WHERE resolved_pid IS NOT NULL \
-       MATCH (to_node:Node {{id: resolved_pid}}) \
-       CREATE ({})-[:{}]->({})",
-      if from_is_tail { "from" } else { "to_node" },
-      relation_name,
-      if from_is_tail { "to_node" } else { "from" } );
-    txn . run (
-      neo4rs::query ( &cypher )
-      . param ( "from_id", primary_id )
-      . param ( "to_id",   target_id . as_str () )
-    ) . await
-      . map_err(|e| format!(
-        "Cypher query failed for relationship '{}' from '{}' to '{}': {}",
-        relation_name, primary_id, target_id.as_str(), e))?; }
+  if id_list . is_empty () { return Ok (( )); }
+  let target_strings : Vec<String> =
+    id_list . iter () . map ( |id| id.0.clone () ) . collect ();
+  let cypher : String = format! (
+    "UNWIND $targets AS target_id \
+     MATCH (from:Node {{id: $from_id}}) \
+     OPTIONAL MATCH (direct:Node {{id: target_id}}) \
+     OPTIONAL MATCH (alias:IdAlias {{id: target_id}}) \
+     WITH from, coalesce(direct.id, alias.primary_id) AS resolved_pid \
+     WHERE resolved_pid IS NOT NULL \
+     MATCH (to_node:Node {{id: resolved_pid}}) \
+     CREATE ({})-[:{}]->({})",
+    if from_is_tail { "from" } else { "to_node" },
+    relation_name,
+    if from_is_tail { "to_node" } else { "from" } );
+  txn . run (
+    neo4rs::query ( &cypher )
+    . param ( "from_id", primary_id )
+    . param ( "targets", target_strings )
+  ) . await
+    . map_err(|e| format!(
+      "Cypher query failed for batch relationship '{}' from '{}': {}",
+      relation_name, primary_id, e))?;
   Ok (( )) }
 
 /// Delete every instance of `relation`
@@ -140,16 +142,20 @@ pub async fn delete_out_links (
   ids      : &Vec<ID>,
   relation : &str,
 ) -> Result < usize, Box<dyn Error> > {
+  if ids . is_empty () { return Ok ( 0 ); }
   let cypher : String = format! (
-    "MATCH (n:Node {{id: $id}})-[r:{}]->() DELETE r",
+    "UNWIND $ids AS nid \
+     MATCH (n:Node {{id: nid}})-[r:{}]->() \
+     DELETE r",
     relation );
+  let id_strings : Vec<String> =
+    ids . iter () . map ( |id| id.0.clone () ) . collect ();
   let mut txn : neo4rs::Txn =
     graph . start_txn () . await ?;
-  for id in ids {
-    txn . run (
-      neo4rs::query ( &cypher )
-      . param ( "id", id . as_str () )
-    ). await ?; }
+  txn . run (
+    neo4rs::query ( &cypher )
+    . param ( "ids", id_strings )
+  ). await ?;
   txn . commit () . await ?;
   Ok ( ids.len () ) }
 
@@ -161,15 +167,19 @@ pub async fn delete_in_links (
   ids      : &Vec<ID>,
   relation : &str,
 ) -> Result < usize, Box<dyn Error> > {
+  if ids . is_empty () { return Ok ( 0 ); }
   let cypher : String = format! (
-    "MATCH ()-[r:{}]->(n:Node {{id: $id}}) DELETE r",
+    "UNWIND $ids AS nid \
+     MATCH ()-[r:{}]->(n:Node {{id: nid}}) \
+     DELETE r",
     relation );
+  let id_strings : Vec<String> =
+    ids . iter () . map ( |id| id.0.clone () ) . collect ();
   let mut txn : neo4rs::Txn =
     graph . start_txn () . await ?;
-  for id in ids {
-    txn . run (
-      neo4rs::query ( &cypher )
-      . param ( "id", id . as_str () )
-    ). await ?; }
+  txn . run (
+    neo4rs::query ( &cypher )
+    . param ( "ids", id_strings )
+  ). await ?;
   txn . commit () . await ?;
   Ok ( ids.len () ) }

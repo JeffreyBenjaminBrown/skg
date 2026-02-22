@@ -17,11 +17,12 @@
 /// Then navigate up to L's parent P,
 /// and re-render as indefinitive every node in P's generation after P.
 
-use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
+use crate::dbs::neo4j::search::pids_and_sources_from_ids;
+use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content_from_pid_and_source, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
-use crate::types::misc::{SkgConfig, ID};
+use crate::types::misc::{SkgConfig, ID, SourceName};
 use crate::types::viewnode::ViewNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::skgnodemap::{SkgNodeMap, IdToPidAndSource};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -104,6 +105,8 @@ fn render_generation_and_recurse<'a> (
 
 /// Add children to the forest.
 /// Return their NodeIds.
+/// Batch-resolves all child IDs via a single Neo4j query,
+/// then builds each child without further Neo4j lookups.
 async fn add_children_and_collect_their_ids (
   forest      : &mut Tree<ViewNode>,
   map         : &mut SkgNodeMap,
@@ -112,12 +115,22 @@ async fn add_children_and_collect_their_ids (
   config      : &SkgConfig,
   graph       : &Graph,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
+  let all_child_ids : Vec<ID> =
+    rels_to_add . iter ()
+    . map ( |( _, child_skgid )| child_skgid . clone () )
+    . collect ();
+  let pid_source_map : IdToPidAndSource =
+    pids_and_sources_from_ids ( graph, &all_child_ids ) . await ?;
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
-    let child_treeid : NodeId = build_node_branch_minus_content (
-      Some ( (&mut *forest, parent_treeid) ),
-      Some ( &mut *map ),
-      &child_skgid, config, graph, visited ) . await ?;
+    let (pid, source) : &(ID, SourceName) =
+      pid_source_map . get ( &child_skgid )
+      . ok_or_else ( || format! (
+        "ID '{}' not found in database", child_skgid ) ) ?;
+    let child_treeid : NodeId =
+      build_node_branch_minus_content_from_pid_and_source (
+        forest, map, parent_treeid, pid, source,
+        config, graph, visited ) . await ?;
     child_treeids . push ( child_treeid ); }
   Ok ( child_treeids ) }
 

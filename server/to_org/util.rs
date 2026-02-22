@@ -96,6 +96,27 @@ pub(super) fn makeIndefinitiveAndClobber (
   clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
 
+/// Like make_and_append_child_pair, but skips the Neo4j query
+/// by accepting a pre-fetched PID and source.
+pub fn make_and_append_child_pair_from_pid_and_source (
+  tree          : &mut Tree<ViewNode>,
+  map           : &mut SkgNodeMap,
+  parent_treeid : NodeId,
+  pid           : &ID,
+  source        : &SourceName,
+  config        : &SkgConfig,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
+    skgnode_and_viewnode_from_pid_and_source (
+      config, pid, source, map ) ?;
+  let child_treeid : NodeId =
+    with_node_mut (
+      tree, parent_treeid,
+      ( |mut parent_mut|
+        parent_mut . append(child_viewnode) . id() ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  Ok ( child_treeid ) }
+
 /// This function's callers add a pristine, out-of-context
 /// (skgnode, viewnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
@@ -310,6 +331,33 @@ pub async fn build_node_branch_minus_content (
       Ok ( root_treeid ) },
     _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None".into()),
   } }
+
+/// Like build_node_branch_minus_content, but skips the Neo4j query
+/// by accepting a pre-fetched PID and source.
+/// Only supports the (Some, Some) case (appending to existing tree).
+pub async fn build_node_branch_minus_content_from_pid_and_source (
+  tree          : &mut Tree<ViewNode>,
+  map           : &mut SkgNodeMap,
+  parent_treeid : NodeId,
+  pid           : &ID,
+  source        : &SourceName,
+  config        : &SkgConfig,
+  graph         : &Graph,
+  visited       : &mut DefinitiveMap,
+) -> Result < NodeId, Box<dyn Error> > {
+  let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+    skgnode_and_viewnode_from_pid_and_source (
+      config, pid, source, map ) ?;
+  let child_treeid : NodeId =
+    with_node_mut (
+      tree, parent_treeid,
+      ( |mut parent_mut|
+        parent_mut . append ( viewnode ) . id () ))
+    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  complete_branch_minus_content (
+    tree, map, child_treeid, visited,
+    config, graph ) . await ?;
+  Ok ( child_treeid ) }
 
 /// Collect content child IDs from a node.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.
