@@ -36,12 +36,11 @@
 **** Add type signatures.
 **** Update list of user-facing functions in elisp/*.el.
 ** Any place I can separate concerns by re-traversing the tree, do it.
-* s, by urgency
-** later
-*** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
-*** 'content' count is wrong in Subsribees if any are hidden
-*** add 'numSubscribees' near 'numLinksIn'
-*** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
+* later
+** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
+** 'content' count is wrong in Subsribees if any are hidden
+** add 'numSubscribees' near 'numLinksIn'
+** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * internalize
 ** ask AI to research and present options before implementing
 *** Clear its context before doing that.
