@@ -1,9 +1,20 @@
+* Reviewing against main
+  RESUME at
+  server/dbs/typedb/search.rs
+* document in data model
+  There is no 'has extra id' relationship.
+  There instead exist IdAlias entities,
+  which have two fields, the PID and the alias ID.
 * TODO merge & export these notes
-** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
+** DONE "TODO" items in this repo
+** the rest of this file
 ** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * internalizing
+** nextest has to be single-threaded
+   cargo nextest run -j 1
+   because Neo4j's community version only provides one db
 ** move 'merge' into the type containing 'save' and 'delete'.
 ** identify relevant extant tooling when asking for a given task
    Even if vague, like
