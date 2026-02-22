@@ -11,7 +11,7 @@ use crate::types::skgnodemap::SkgNodeMap;
 use ego_tree::{Tree, NodeId};
 use std::cmp::min;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 
 /// PURPOSE:
@@ -29,7 +29,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
   effective_root : NodeId, // gen 0; had the definitive view req
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  graph          : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   if space_left < 1 { // shouldn't happen
     return Ok (( )); }
@@ -45,7 +45,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
       else {
         let new_treeid : NodeId =
           make_and_append_child_pair (
-            tree, map, *parent_treeid, child_skgid, config, driver ) . await ?;
+            tree, map, *parent_treeid, child_skgid, config, graph ) . await ?;
         makeIndefinitiveAndClobber ( tree, map, new_treeid, config ) ?; }}
   truncate_after_node_in_generation_in_tree (
     tree, map, generation - 1, limit_parent_treeid,

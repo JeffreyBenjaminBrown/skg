@@ -2,7 +2,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Validates that foreign (read-only) nodes are not being modified.
 /// Filters out foreign nodes without modifications (no need to write).
@@ -13,7 +13,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn validate_and_filter_foreign_instructions(
   instructions: Vec<DefineNode>,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<Vec<DefineNode>,
             Vec<BufferValidationError>> {
   let mut errors: Vec<BufferValidationError> = Vec::new();
@@ -42,7 +42,7 @@ pub async fn validate_and_filter_foreign_instructions(
             errors.push(BufferValidationError::Other(e));
             continue; }};
         match optskgnode_from_id(
-          config, driver, primary_id
+          config, graph, primary_id
         ).await {
           Ok(Some(disk_node)) => {
             if buffernode_differs_from_disknode(node, &disk_node) {

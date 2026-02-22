@@ -21,7 +21,7 @@ echo "Results will be written to: $TESTS_LOG"
 echo ""
 
 # Clean up any straggler test databases from previous runs
-# Uses TypeDB's API for safe deletion (doesn't require stopping TypeDB)
+# Uses Neo4j's API for safe deletion
 echo "Cleaning up straggler test databases..."
 PROJECT_ROOT="$(cd "$INTEGRATION_DIR/../.." && pwd)"
 "$PROJECT_ROOT/target/debug/cleanup-test-dbs"
@@ -160,7 +160,7 @@ fi
 echo ""
 echo "Complete results available in: $TESTS_LOG"
 
-# PITFALL: Manual DB deletion here# would cause TypeDB to crash
+# PITFALL: Manual DB deletion here# would cause issues
 # (when it tries to checkpoint deleted databases).
 # But test DBs *should* be cleaned up by each test server,
 # due to delete_on_quit = true in their configs.

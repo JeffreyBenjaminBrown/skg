@@ -3,7 +3,7 @@
 # Integration test for focus and folded markers functionality
 # This script:
 # - Backs up and resets test data to clean state (6 .skg files)
-# - Verifies TypeDB server is running
+# - Verifies Neo4j server is running
 # - Starts an independent cargo run process with test config
 # - Uses Emacs to test focus and folded marker addition during save
 # - Cleans up any test artifacts and restores original state
@@ -71,7 +71,7 @@ trap enhanced_cleanup EXIT
 # Setup test environment
 backup_and_reset_test_data
 
-check_typedb_server
+check_neo4j_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)

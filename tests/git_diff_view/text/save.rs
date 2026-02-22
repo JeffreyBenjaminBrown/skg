@@ -11,13 +11,13 @@ fn test_delete_text_changed_scaffold_respawns()
 {
   run_save_test(
     "skg-test-save-del-textchanged",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User deletes the textChanged scaffold under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: 1.skg should still have the new title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -40,14 +40,14 @@ fn test_delete_text_changed_scaffold_respawns()
 fn test_edit_text_changed_node_updates_disk()
   -> Result<(), Box<dyn Error>>
 {
-  run_save_test("skg-test-save-edit-textchanged", |config, driver, tantivy, repo_path| {
+  run_save_test("skg-test-save-edit-textchanged", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // User changes the title of node 1 again
       let input = GIT_DIFF_VIEW.replace(
         "1 has a new title.", "1 has an even newer title.");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: 1.skg should have the newest title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -70,14 +70,14 @@ fn test_edit_text_changed_scaffold_respawns()
 {
   run_save_test(
     "skg-test-save-edit-scaffold",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User tries to change the title of a textChanged scaffold
       let input = GIT_DIFF_VIEW.replace(
         "** (skg textChanged)",
         "** (skg textChanged) User edited this scaffold.");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -98,7 +98,7 @@ fn test_move_text_changed_scaffold_respawns()
 {
   run_save_test(
     "skg-test-save-move-scaffold",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // Below, user moves the textChanged scaffold
       // from first among its siblings to last.
       let input = "\
@@ -111,7 +111,7 @@ fn test_move_text_changed_scaffold_respawns()
 ";
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -132,14 +132,14 @@ fn test_move_text_changed_to_unedited_node_respawns()
 {
   run_save_test(
     "skg-test-save-move-to-unedited",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User moves a textChanged scaffold to under node 12 (which wasn't edited)
       let input = without_lines_containing(GIT_DIFF_VIEW, "textChanged");
       let input = insert_after(&input, "(id 12)",
         "*** (skg textChanged)");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: No changes should occur
       let node_12 = read_skgnode(repo_path, "12")?;
@@ -164,7 +164,7 @@ fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a TypeDBDriver,
+    &'a Graph,
     &'a TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -175,13 +175,14 @@ where
   let repo_path = temp_dir.path();
   setup_git_repo_with_fixtures(repo_path)?;
 
-  block_on(async {
-    let (config, driver, tantivy) =
+  { let rt : Runtime = Runtime::new()?;
+  rt.block_on(async {
+    let (config, graph, tantivy) =
       setup_test_dbs(db_name, repo_path.to_str().unwrap(), &tantivy_folder).await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path).await;
+    let result = test_fn(&config, &graph, &tantivy, repo_path).await;
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(&tantivy_folder))).await?;
+    cleanup_test_dbs(&graph, Some(Path::new(&tantivy_folder))).await?;
     result
-  })
+  }) }
 }

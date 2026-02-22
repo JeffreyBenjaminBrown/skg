@@ -1,9 +1,9 @@
-// cargo test --test typedb -- --nocapture
+// cargo test --test neo4j -- --nocapture
 
-mod typedb {
+mod neo4j {
   pub mod search;
   pub mod delete_nodes;
-  pub mod update_typedb_from_saveinstructions;
+  pub mod update_neo4j_from_saveinstructions;
 }
 
 mod util {
@@ -11,11 +11,9 @@ mod util {
 }
 
 use ego_tree::Tree;
-use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
-use skg::dbs::typedb::relationships::delete_out_links;
-use skg::dbs::typedb::search::pid_and_source_from_id;
-use skg::dbs::typedb::util::ConceptRowStream;
-use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::dbs::neo4j::nodes::create_only_nodes_with_no_ids_present;
+use skg::dbs::neo4j::relationships::delete_out_links;
+use skg::dbs::neo4j::search::pid_and_source_from_id;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::to_org::render::content_view::single_root_view;
@@ -24,78 +22,68 @@ use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
 
-use futures::StreamExt;
+use neo4rs::Graph;
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::{
-  answer::{ ConceptRow, QueryAnswer },
-  Transaction,
-  TransactionType,
-  TypeDBDriver, };
 
 #[test]
-fn test_typedb_all_relationships (
+fn test_neo4j_all_relationships (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-relationships",
+    "skg-test-neo4j-relationships",
     "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-relationships",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_all_relationships ( config, driver ) . await ?;
+    "/tmp/tantivy-test-neo4j-relationships",
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_all_relationships ( config, graph ) . await ?;
       Ok (( )) } ) ) }
 
 #[test]
-fn test_typedb_recursive_document (
+fn test_neo4j_recursive_document (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-recursive",
+    "skg-test-neo4j-recursive",
     "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-recursive",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_recursive_document ( driver, config ) . await ?;
+    "/tmp/tantivy-test-neo4j-recursive",
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_recursive_document ( graph, config ) . await ?;
       Ok (( )) } ) ) }
 
 #[test]
-fn test_typedb_create_only_nodes (
+fn test_neo4j_create_only_nodes (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-create-nodes",
+    "skg-test-neo4j-create-nodes",
     "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-create-nodes",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-create-nodes",
+    |config, graph, _tantivy| Box::pin ( async move {
       test_create_only_nodes_with_no_ids_present (
-        & config . db_name, driver ) . await ?;
+        graph ) . await ?;
       Ok (( )) } ) ) }
 
 #[test]
-fn test_typedb_delete_out_links (
+fn test_neo4j_delete_out_links (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-delete-links",
+    "skg-test-neo4j-delete-links",
     "tests/typedb/fixtures-2",
-    "/tmp/tantivy-test-typedb-delete-links",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-delete-links",
+    |config, graph, _tantivy| Box::pin ( async move {
       test_delete_out_links_contains_container (
-        & config . db_name, driver ) . await ?;
+        graph ) . await ?;
       Ok (( )) } ) ) }
 
 async fn test_all_relationships (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
-  let has_extra_id_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $n isa node, has id $ni;
-          $e isa extra_id, has id $ei;
-          $rel isa has_extra_id (node: $n,
-                                 extra_id: $e);
-        select $ni, $ei;"#,
-    "ni",
-    "ei"
-  ).await?;
+  let has_extra_id_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:IdAlias) RETURN a.primary_id AS pid, a.id AS alias_id",
+      "pid",
+      "alias_id"
+    ).await?;
   let expected_has_extra_id: HashSet<_> = [
     ("2", "22"),
     ("3", "33"),
@@ -105,19 +93,14 @@ async fn test_all_relationships (
     .collect();
   assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
-  let contains_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $container isa node, has id $container_id;
-          $contained isa node, has id $contained_id;
-          $rel isa contains (container: $container,
-                             contained: $contained);
-        select $container_id, $contained_id;"#,
-    "container_id",
-    "contained_id"
-  ).await?;
-  let mut expected_contains = HashSet::new();
+  let contains_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:contains]->(b:Node) RETURN a.id AS container_id, b.id AS contained_id",
+      "container_id",
+      "contained_id"
+    ).await?;
+  let mut expected_contains: HashSet<(String, String)> = HashSet::new();
   expected_contains.insert(("1".to_string(), "2".to_string()));
   expected_contains.insert(("1".to_string(), "3".to_string()));
   expected_contains.insert(("a".to_string(), "b".to_string()));
@@ -125,36 +108,26 @@ async fn test_all_relationships (
   expected_contains.insert(("c".to_string(), "b".to_string()));
   assert_eq!(contains_pairs, expected_contains);
 
-  let textlink_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $source isa node, has id $source_id;
-          $dest   isa node, has id $dest_id;
-          $rel    isa textlinks_to (source: $source,
-                                     dest:   $dest);
-        select $source_id, $dest_id;"#,
-    "source_id",
-    "dest_id"
-  ).await?;
-  let mut expected_textlinks = HashSet::new();
+  let textlink_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:textlinks_to]->(b:Node) RETURN a.id AS source_id, b.id AS dest_id",
+      "source_id",
+      "dest_id"
+    ).await?;
+  let mut expected_textlinks: HashSet<(String, String)> = HashSet::new();
   expected_textlinks.insert(("5".to_string(), "2".to_string()));
   expected_textlinks.insert(("5".to_string(), "3".to_string()));
   expected_textlinks.insert(("5".to_string(), "5".to_string()));
   assert_eq!(textlink_pairs, expected_textlinks);
 
-  let subscribes_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $subscriber isa node, has id $from;
-          $subscribee isa node, has id $to;
-          $rel isa subscribes (subscriber: $subscriber,
-                               subscribee: $subscribee);
-        select $from, $to;"#,
-    "from",
-    "to"
-  ).await?;
+  let subscribes_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:subscribes]->(b:Node) RETURN a.id AS from_id, b.id AS to_id",
+      "from_id",
+      "to_id"
+    ).await?;
   let expected_subscribes : HashSet<_> = [
     ("2", "4"),
     ("2", "5"),
@@ -164,39 +137,28 @@ async fn test_all_relationships (
     .collect();
   assert_eq!(subscribes_pairs, expected_subscribes);
 
-  let hides_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $hider isa node, has id $from;
-          $hidden isa node, has id $to;
-          $rel isa hides_from_its_subscriptions
-            ( hider:  $hider,
-              hidden: $hidden);
-        select $from, $to;"#,
-    "from",
-    "to"
-  ).await?;
-  let mut expected_hides_from_its_subscriptions = HashSet::new();
+  let hides_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:hides]->(b:Node) RETURN a.id AS from_id, b.id AS to_id",
+      "from_id",
+      "to_id"
+    ).await?;
+  let mut expected_hides_from_its_subscriptions: HashSet<(String, String)> = HashSet::new();
   expected_hides_from_its_subscriptions.insert((
     "1".to_string(), "4".to_string()));
   expected_hides_from_its_subscriptions.insert((
     "1".to_string(), "5".to_string()));
   assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
-  let replacement_pairs = collect_all_of_some_binary_rel(
-    & config . db_name,
-    & driver,
-    r#" match
-          $replacement isa node, has id $from;
-          $replaced isa node, has id $to;
-          $rel isa overrides_view_of (replacement: $replacement,
-                                      replaced:    $replaced);
-        select $from, $to;"#,
-    "from",
-    "to"
-  ).await?;
-  let mut expected_replacements = HashSet::new();
+  let replacement_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:overrides]->(b:Node) RETURN a.id AS from_id, b.id AS to_id",
+      "from_id",
+      "to_id"
+    ).await?;
+  let mut expected_replacements: HashSet<(String, String)> = HashSet::new();
   expected_replacements.insert((
     "5".to_string(), "3".to_string()));
   expected_replacements.insert((
@@ -206,24 +168,18 @@ async fn test_all_relationships (
   Ok (( )) }
 
 async fn test_delete_out_links_contains_container (
-  db_name : &str,
-  driver  : &TypeDBDriver
+  graph : &Graph
 ) -> Result < (), Box<dyn Error> > {
   // The README at fixtures-2/ draws the initial contains tree.
   // Sanity: initial contains edges include the full tree.
-  let before_pairs = collect_all_of_some_binary_rel(
-    db_name,
-    driver,
-    r#" match
-          $inner isa node, has id $inner_id;
-          $outer isa node, has id $outer_id;
-          $rel isa contains (container: $inner,
-                             contained: $outer);
-        select $inner_id, $outer_id;"#,
-    "inner_id",
-    "outer_id"
-  ).await?;
-  let mut expected_before = std::collections::HashSet::new();
+  let before_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel(
+      graph,
+      "MATCH (a:Node)-[:contains]->(b:Node) RETURN a.id AS inner_id, b.id AS outer_id",
+      "inner_id",
+      "outer_id"
+    ).await?;
+  let mut expected_before: HashSet<(String, String)> = std::collections::HashSet::new();
   expected_before.insert(("1".to_string(), "2".to_string()));
   expected_before.insert(("1".to_string(), "3".to_string()));
   expected_before.insert(("3".to_string(), "4".to_string()));
@@ -231,45 +187,35 @@ async fn test_delete_out_links_contains_container (
   assert_eq!(before_pairs, expected_before);
 
   // Delete relationship to contents for nodes 3, 4, 5.
-  let deleted_for_ids : usize =
-    delete_out_links (
-      db_name,
-      driver,
-      &vec![ ID::from("3"),
-             ID::from("4"),
-             ID::from("5") ],
-      "contains",
-      "container"
-    ) . await ?;
-  assert_eq!(deleted_for_ids, 3);
+  delete_out_links (
+    graph,
+    &vec![ ID::from("3"),
+           ID::from("4"),
+           ID::from("5") ],
+    "contains"
+  ) . await ?;
 
-  // Only the relationships (1→2) and (1→3) should remain.
-  let after_pairs = collect_all_of_some_binary_rel (
-    db_name,
-    driver,
-    r#" match
-          $container isa node, has id $container_id;
-          $contained isa node, has id $contained_id;
-          $rel isa contains (container: $container,
-                             contained: $contained);
-        select $container_id, $contained_id;"#,
-    "container_id",
-    "contained_id"
-  ).await?;
-  let mut expected_after = std::collections::HashSet::new();
+  // Only the relationships (1->2) and (1->3) should remain.
+  let after_pairs: HashSet<(String, String)> =
+    collect_all_of_some_binary_rel (
+      graph,
+      "MATCH (a:Node)-[:contains]->(b:Node) RETURN a.id AS container_id, b.id AS contained_id",
+      "container_id",
+      "contained_id"
+    ).await?;
+  let mut expected_after: HashSet<(String, String)> = std::collections::HashSet::new();
   expected_after.insert(("1".to_string(), "2".to_string()));
   expected_after.insert(("1".to_string(), "3".to_string()));
   assert_eq!(after_pairs, expected_after);
   Ok (( )) }
 
 async fn test_create_only_nodes_with_no_ids_present (
-  db_name : &str,
-  driver  : &TypeDBDriver
+  graph : &Graph
 ) -> Result < (), Box<dyn Error> > {
 
   // Baseline node count.
   let initial_number_of_nodes : usize =
-    count_nodes ( db_name, driver ) . await ?;
+    count_nodes ( graph ) . await ?;
 
   // Prepare two SkgNodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
@@ -285,8 +231,7 @@ async fn test_create_only_nodes_with_no_ids_present (
   // Expect exactly 1 creation (the id "new").
   let created_count : usize =
     create_only_nodes_with_no_ids_present (
-      db_name,
-      driver,
+      graph,
       &vec! [ fn_a.clone (), fn_new.clone () ]
     ) . await ?;
   assert_eq! (
@@ -298,23 +243,23 @@ async fn test_create_only_nodes_with_no_ids_present (
   // - 'new' should now exist (just created)
   // - 'absent' should not exist
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "a" ) )
+    pid_and_source_from_id ( graph, &ID::from ( "a" ) )
       . await . unwrap () . is_some (),
     "Expected lookup of existing id 'a' to return Some." );
 
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "new" ) )
+    pid_and_source_from_id ( graph, &ID::from ( "new" ) )
       . await . unwrap () . is_some (),
     "Expected lookup of newly created id 'new' to return Some." );
 
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "absent" ) )
+    pid_and_source_from_id ( graph, &ID::from ( "absent" ) )
       . await . unwrap () . is_none (),
     "Expected lookup of missing id 'absent' to return None." );
 
   // Final count should be +1 compared to initial.
   let final_number_of_nodes : usize =
-    count_nodes ( db_name, driver ) . await ?;
+    count_nodes ( graph ) . await ?;
   assert_eq! (
     final_number_of_nodes,
     initial_number_of_nodes + 1,
@@ -322,40 +267,24 @@ async fn test_create_only_nodes_with_no_ids_present (
 
   Ok ( () ) }
 
-/// Helper: count all `node` entities in the DB by streaming rows.
-/// (Avoids reliance on `count;` semantics.)
+/// Helper: count all Node entities in Neo4j.
 async fn count_nodes (
-  db_name : &str,
-  driver  : &TypeDBDriver,
+  graph : &Graph,
 ) -> Result < usize, Box<dyn Error> > {
-
-  let tx : Transaction =
-    driver . transaction (
-      db_name,
-      TransactionType::Read
-    ) . await ?;
-
-  let answer : QueryAnswer =
-    tx . query (
-      r#"match
-           $n isa node, has id $id;
-         select $id;"#
-    ) . await ?;
-
-  let mut rows : ConceptRowStream = answer.into_rows ();
-  let mut n : usize = 0;
-  while let Some ( row_res ) = rows . next () . await {
-    let _row : ConceptRow = row_res ?;
-    n += 1; }
-  Ok ( n ) }
+  let mut result_stream = graph.execute(
+    neo4rs::query("MATCH (n:Node) RETURN count(n) AS cnt")
+  ).await?;
+  let row = result_stream.next().await?.unwrap();
+  let cnt: i64 = row.get("cnt")?;
+  Ok(cnt as usize) }
 
 async fn test_recursive_document (
-  driver  : &TypeDBDriver,
-  config  : &SkgConfig
+  graph  : &Graph,
+  config : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let result_org_text : String =
     single_root_view (
-      driver,
+      graph,
       config,
       &ID ( "a".to_string () ),
       false
@@ -443,30 +372,15 @@ async fn test_recursive_document (
   Ok (( )) }
 
 async fn collect_all_of_some_binary_rel(
-  db_name: &str,
-  driver: &TypeDBDriver,
-  query: &str,
-  member1_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
-  member2_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
+  graph : &Graph,
+  query : &str,
+  col1  : &str,
+  col2  : &str,
 ) -> Result<HashSet<(String, String)>, Box<dyn Error>> {
-  let tx = driver.transaction(
-    db_name, TransactionType::Read).await?;
-  let answer = tx.query(query).await?;
-  let mut stream : ConceptRowStream = answer.into_rows();
+  let mut result_stream = graph.execute(neo4rs::query(query)).await?;
   let mut results: HashSet<(String, String)> = HashSet::new();
-
-  while let Some(row_result) = stream.next().await {
-    let row = row_result?;
-    let id1_raw = match row.get(member1_variable)? {
-      Some(c) => c.to_string(),
-      None => "unknown".to_string() };
-    let id2_raw = match row.get(member2_variable)? {
-      Some(c) => c.to_string(),
-      None => "unknown".to_string() };
-    let id1 = ID ( extract_payload_from_typedb_string_rep (
-      &id1_raw) );
-    let id2 = ID ( extract_payload_from_typedb_string_rep (
-      &id2_raw) );
-    results.insert ( (id1.to_string(),
-                      id2.to_string() ) ); }
-  Ok (results) }
+  while let Some(row) = result_stream.next().await? {
+    let v1: String = row.get(col1)?;
+    let v2: String = row.get(col2)?;
+    results.insert((v1, v2)); }
+  Ok(results) }

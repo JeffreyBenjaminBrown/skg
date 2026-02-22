@@ -1,33 +1,33 @@
-// cargo test typedb::search::count_relationships
+// cargo test neo4j::search::count_relationships
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::count_relationships::{count_containers, count_contents, count_link_sources};
+use skg::dbs::neo4j::search::count_relationships::{count_containers, count_contents, count_link_sources};
 use skg::types::misc::{ID, SkgConfig};
 
+use neo4rs::Graph;
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-search-count-relationships",
+    "skg-test-neo4j-search-count-relationships",
     "tests/typedb/search/contains_from_pids/fixtures",
-    "/tmp/tantivy-test-typedb-search-count-relationships",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-search-count-relationships",
+    |config, graph, _tantivy| Box::pin ( async move {
       test_count_containers (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       test_count_contents (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       test_count_link_sources (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       Ok (( )) } )
   ) }
 
 async fn test_count_containers (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   let input_ids : Vec<ID> =
@@ -39,8 +39,7 @@ async fn test_count_containers (
 
   let counts : HashMap < ID, usize > =
     count_containers (
-      & config . db_name,
-      & driver,
+      graph,
       & input_ids ) . await ?;
 
   // Expected counts:
@@ -63,7 +62,7 @@ async fn test_count_containers (
 
 async fn test_count_contents (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   let input_ids : Vec<ID> =
@@ -75,8 +74,7 @@ async fn test_count_contents (
 
   let counts : HashMap < ID, usize > =
     count_contents (
-      & config . db_name,
-      & driver,
+      graph,
       & input_ids ) . await ?;
 
   // Expected counts:
@@ -99,7 +97,7 @@ async fn test_count_contents (
 
 async fn test_count_link_sources (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   let input_ids : Vec<ID> =
@@ -111,8 +109,7 @@ async fn test_count_link_sources (
 
   let counts : HashMap < ID, usize > =
     count_link_sources (
-      & config . db_name,
-      & driver,
+      graph,
       & input_ids ) . await ?;
 
   // Expected counts:

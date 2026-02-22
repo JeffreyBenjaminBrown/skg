@@ -22,14 +22,14 @@ use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
 use ego_tree::{Tree, NodeId, NodeMut};
-use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::path::Path;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
+use tokio::runtime::Handle;
 
 /// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
@@ -53,18 +53,19 @@ impl SaveResponse {
 pub fn handle_save_buffer_request (
   reader            : &mut BufReader <TcpStream>,
   stream            : &mut TcpStream,
-  typedb_driver     : &TypeDBDriver,
+  graph             : &Graph,
   config            : &SkgConfig,
   tantivy_index     : &TantivyIndex,
-  diff_mode_enabled : bool ) {
+  diff_mode_enabled : bool,
+  handle            : &Handle ) {
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       timed ( config, "update_from_and_rerender_buffer", || {
-        match block_on(
+        match handle.block_on(
           update_from_and_rerender_buffer (
             // Most of the work happens here.
             & initial_buffer_content,
-            typedb_driver, config, tantivy_index,
+            graph, config, tantivy_index,
             diff_mode_enabled ))
         { Ok (save_response) =>
           { // S-exp response format: ((content "...") (errors (...)))
@@ -134,7 +135,7 @@ fn empty_response_sexp (
 /// - complete_viewtree is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
 pub async fn update_from_and_rerender_buffer (
   org_buffer_text   : &str,
-  typedb_driver     : &TypeDBDriver,
+  graph             : &Graph,
   config            : &SkgConfig,
   tantivy_index     : &TantivyIndex,
   diff_mode_enabled : bool,
@@ -150,7 +151,7 @@ pub async fn update_from_and_rerender_buffer (
     = timed_async ( config,
                     "buffer_to_viewnode_forest_and_save_instructions",
                     buffer_to_viewnode_forest_and_save_instructions (
-                      org_buffer_text, config, typedb_driver )
+                      org_buffer_text, config, graph )
                   ). await . map_err (
                     |e| Box::new(e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
@@ -168,7 +169,7 @@ pub async fn update_from_and_rerender_buffer (
                       save_instructions.clone(),
                       config.clone(),
                       tantivy_index,
-                      typedb_driver ). await ?;
+                      graph ). await ?;
                     Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?;
     timed_async ( config, "merge_nodes",
@@ -177,7 +178,7 @@ pub async fn update_from_and_rerender_buffer (
                       merge_instructions,
                       config.clone(),
                       tantivy_index,
-                      typedb_driver ). await ?;
+                      graph ). await ?;
                     Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?; }
 
@@ -204,7 +205,7 @@ pub async fn update_from_and_rerender_buffer (
                       &mut visited,
                       &source_diffs,
                       config,
-                      typedb_driver,
+                      graph,
                       &mut errors,
                       &deleted_id_src_map )) . await ?;
       let ( container_to_contents, content_to_containers ) =
@@ -213,7 +214,7 @@ pub async fn update_from_and_rerender_buffer (
                         &mut forest_mut,
                         &mut skgnode_map,
                         config,
-                        typedb_driver )) . await ?;
+                        graph )) . await ?;
       timed ( config, "set_viewnodestats_in_forest",
               || set_viewnodestats_in_forest (
                 &mut forest_mut,

@@ -8,19 +8,19 @@ use crate::types::tree::viewnode_skgnode::{
 
 use ego_tree::Tree;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
+  graph         : &Graph,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_aliases (
-      tree, node_id, config, typedb_driver ) . await;
+      tree, node_id, config, graph ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Aliases,
@@ -43,7 +43,7 @@ pub async fn build_and_integrate_aliases (
   tree      : &mut Tree<ViewNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  graph     : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -54,7 +54,7 @@ pub async fn build_and_integrate_aliases (
     return Ok (( )); }
   let aliases : Vec < String > =
     fetch_aliases_from_file (
-      config, driver, node_id_val ). await;
+      config, graph, node_id_val ). await;
   let aliascol_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
       Scaffold::AliasCol, true ) ?;

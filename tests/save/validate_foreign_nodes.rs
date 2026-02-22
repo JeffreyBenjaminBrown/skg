@@ -1,51 +1,51 @@
 // cargo test validate_foreign_nodes
 
 use indoc::indoc;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema};
+use neo4rs::Graph;
+use skg::dbs::neo4j::util::delete_database;
+use skg::dbs::neo4j::schema::apply_schema;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::neo4j::nodes::create_all_nodes;
+use skg::dbs::neo4j::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::SkgConfig;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::skgnode::SkgNode;
-use futures::executor::block_on;
+use tokio::runtime::Runtime;
 use std::error::Error;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 
 /// Helper to set up multi-source test environment
 async fn setup_multi_source_test(
   db_name: &str,
-) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
+) -> Result<(SkgConfig, Graph), Box<dyn Error>> {
   let config: SkgConfig =
     load_config_with_overrides(CONFIG_PATH, Some(db_name), &[])?;
 
-  let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
-    Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+  let graph: Graph = Graph::new(
+    "bolt://localhost:7687", "neo4j", "password"
   ).await?;
 
   // Load fixtures from both sources
   let nodes: Vec<SkgNode> =
     read_all_skg_files_from_sources(&config)?;
 
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+  delete_database(&graph).await?;
+  apply_schema(&graph).await?;
+  create_all_nodes(&graph, &nodes).await?;
+  create_all_relationships(&graph, &nodes).await?;
 
-  Ok((config, driver))
+  Ok((config, graph))
 }
 
 #[test]
 fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-unmodified").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-unmodified").await?;
 
     let org_text = indoc! {"
       * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
@@ -53,7 +53,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     assert!(result.is_ok(), "Unmodified foreign node should be allowed");
 
@@ -69,8 +69,9 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-modified").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-modified").await?;
 
     // Try to save buffer with modified foreign node (title changed)
     let org_text = indoc! {"
@@ -79,7 +80,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Modified foreign node should be rejected");
@@ -104,8 +105,9 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-body").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-body").await?;
 
     // Try to save buffer with modified foreign node (body changed)
     let org_text = indoc! {"
@@ -114,7 +116,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Foreign node with modified body should be rejected");
@@ -133,8 +135,9 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-indefinitive").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-indefinitive").await?;
 
     // Save buffer with indefinitive foreign node
     let org_text = indoc! {"
@@ -142,7 +145,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver).await;
+      org_text, &config, &graph).await;
 
     // Should succeed - indefinitive foreign nodes are allowed but filtered
     assert!(result.is_ok(), "Indefinitive foreign node should be allowed");
@@ -159,8 +162,9 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-owned").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-owned").await?;
 
     // Save buffer with owned node
     let org_text = indoc! {"
@@ -170,7 +174,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should succeed - owned nodes can be modified
     assert!(result.is_ok(), "Owned node modification should be allowed");
@@ -187,8 +191,9 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-delete").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-delete").await?;
 
     // Try to delete a foreign node
     let org_text = indoc! {"
@@ -197,7 +202,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Deleting foreign node should be rejected");
@@ -217,8 +222,9 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-new").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-new").await?;
 
     // Try to create a new node in foreign source
     let org_text = indoc! {"
@@ -227,7 +233,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Creating new foreign node should be rejected");
@@ -247,8 +253,9 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-mixed").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-foreign-mixed").await?;
 
     // Save buffer with mix of owned and unmodified foreign nodes
     let org_text = indoc! {"
@@ -260,7 +267,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should succeed
     assert!(result.is_ok(), "Mixed owned and unmodified foreign should be allowed");
@@ -285,8 +292,9 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-foreign-acquirer").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-merge-foreign-acquirer").await?;
 
     // Try to merge where the acquirer is foreign
     // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
@@ -297,7 +305,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail - can't merge into foreign node (would modify it)
     assert!(result.is_err(), "Merge into foreign acquirer should be rejected");
@@ -317,8 +325,9 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-foreign-acquiree").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-merge-foreign-acquiree").await?;
 
     // Try to merge where the acquiree is foreign
     let org_text = indoc! {"
@@ -328,7 +337,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should fail - can't merge foreign node (would delete it)
     assert!(result.is_err(), "Merge with foreign acquiree should be rejected");
@@ -348,8 +357,9 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-owned").await?;
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
+    let (config, graph) = setup_multi_source_test("skg-test-merge-owned").await?;
 
     // Merge where both nodes are owned - should work
     let org_text = indoc! {"
@@ -358,7 +368,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &graph ). await;
 
     // Should succeed - both nodes are owned
     assert!(result.is_ok(), "Merge with both owned nodes should be allowed");

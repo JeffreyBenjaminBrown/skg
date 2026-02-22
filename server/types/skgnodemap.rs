@@ -7,7 +7,7 @@ use super::misc::{ID, SkgConfig, SourceName};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Type alias for the new map-based approach.
 /// Maps node IDs to their corresponding SkgNodes.
@@ -53,13 +53,13 @@ pub fn skgnode_map_from_save_instructions (
 pub async fn skgnode_map_from_forest (
   forest : &Tree<ViewNode>,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph : &Graph,
 ) -> Result<SkgNodeMap, Box<dyn Error>>
 { let mut all_tree_ids : Vec<ID> = Vec::new();
   collect_ids_from_subtree (
     forest, forest . root () . id (), &mut all_tree_ids );
   let nodes : Vec<SkgNode> = skgnodes_from_ids (
-    config, driver, &all_tree_ids ) . await ?;
+    config, graph, &all_tree_ids ) . await ?;
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   for node in nodes {
     if let Some ( id ) = node . ids . first () {

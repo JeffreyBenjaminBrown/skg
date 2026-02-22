@@ -1,4 +1,4 @@
-use crate::dbs::typedb::search::hidden_in_subscribee_content::{
+use crate::dbs::neo4j::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
@@ -16,7 +16,7 @@ use crate::types::skgnodemap::SkgNodeMap;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
@@ -49,7 +49,7 @@ pub async fn maybe_add_subscribeeCol_branch (
   map     : &mut SkgNodeMap,
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  graph   : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -76,10 +76,10 @@ pub async fn maybe_add_subscribeeCol_branch (
     // hidden IDs that are outside all subscribee content
     let r_hides : HashSet < ID > =
       what_node_hides (
-        &config.db_name, driver, & subscriber_pid ) . await ?;
+        graph, & subscriber_pid ) . await ?;
     let all_subscribee_content : HashSet < ID > =
       what_nodes_contain (
-        &config.db_name, driver, & subscribee_ids ) . await ?;
+        graph, & subscribee_ids ) . await ?;
     r_hides . iter ()
       . filter ( | id | ! all_subscribee_content . contains ( id ) )
       . cloned () . collect () };
@@ -97,12 +97,12 @@ pub async fn maybe_add_subscribeeCol_branch (
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
           tree, map, hidden_outside_col_nid, & hidden_id,
-          false, config, driver
+          false, config, graph
         ). await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
         tree, map, subscribee_col_nid, & subscribee_id,
-        false, config, driver
+        false, config, graph
       ). await ?; }}
   Ok (( )) }
 
@@ -116,7 +116,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   map               : &mut SkgNodeMap,
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
-  driver            : &TypeDBDriver,
+  graph             : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
@@ -132,7 +132,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
-        & config.db_name, driver,
+        graph,
         & subscriber_pid, & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
     return Ok (( )); }
@@ -144,5 +144,5 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     // populate the collection
     append_indefinitive_from_disk_as_child (
       tree, map, hidden_col_nid, & hidden_id,
-      false, config, driver ). await ?; }
+      false, config, graph ). await ?; }
   Ok (( )) }

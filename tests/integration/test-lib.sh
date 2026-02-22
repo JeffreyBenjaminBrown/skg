@@ -3,25 +3,25 @@
 # Common library for skg integration tests
 # This file should be sourced by individual test runners
 
-# Function to check if TypeDB server is running
-is_typedb_running() {
-  if pgrep -f 'typedb_server_bin' >/dev/null 2>&1; then
+# Function to check if Neo4j server is running
+is_neo4j_running() {
+  if neo4j status 2>/dev/null | grep -q 'is running'; then
     return 0
   else
     return 1
   fi
 }
 
-# Function to verify TypeDB server is running and exit if not
-check_typedb_server() {
+# Function to verify Neo4j server is running and exit if not
+check_neo4j_server() {
   echo ""
-  echo "Checking TypeDB server..."
-  if ! is_typedb_running; then
-    echo "ERROR: TypeDB server is not running!"
-    echo "Please start TypeDB server first by running: ./run-servers.sh"
+  echo "Checking Neo4j server..."
+  if ! is_neo4j_running; then
+    echo "ERROR: Neo4j server is not running!"
+    echo "Please start Neo4j server first by running: ./run-servers.sh"
     exit 1
   fi
-  echo "✓ TypeDB server is running"
+  echo "✓ Neo4j server is running"
 }
 
 # Function to send shutdown command to skg server via Emacs
@@ -85,9 +85,8 @@ cleanup() {
     fi
   fi
 
-  # Do NOT manually delete test databases here - it causes TypeDB to crash
-  # when it tries to checkpoint deleted databases. The delete_on_quit flag
-  # in the test config handles cleanup during graceful shutdown (via SIGINT).
+  # The delete_on_quit flag in the test config handles cleanup
+  # during graceful shutdown (via SIGINT).
 }
 
 # Function to find available port by trying random ports in range

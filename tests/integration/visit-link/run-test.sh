@@ -20,7 +20,7 @@ cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
 
 trap cleanup EXIT
 
-check_typedb_server
+check_neo4j_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)

@@ -7,7 +7,7 @@ use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_t
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Postorder (child-first) TrueNode handler.
 ///
@@ -20,7 +20,7 @@ pub async fn complete_truenode (
   map                : &mut SkgNodeMap,
   visited            : &mut DefinitiveMap,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  graph              : &Graph,
   errors             : &mut Vec<String>,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
@@ -33,7 +33,7 @@ pub async fn complete_truenode (
     extract_view_requests_definitive_first( tree, node ) ?;
   if requests.is_empty() { return Ok(( )); }
   execute_view_requests(
-    tree, map, requests, config, driver,
+    tree, map, requests, config, graph,
     visited, errors, deleted_id_src_map ) . await ?;
   Ok(( )) }
 

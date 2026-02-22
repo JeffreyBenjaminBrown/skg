@@ -5,8 +5,8 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::climb_containerward_and_fetch_rootish_context;
-use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::dbs::neo4j::search::climb_containerward_and_fetch_rootish_context;
+use skg::dbs::neo4j::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::misc::{ID, SkgConfig};
 
 #[test]
@@ -16,8 +16,8 @@ fn test_a_mess_of_stuff
     "skg-test-content-view",
     "tests/content_view/fixtures",
     "/tmp/tantivy-test-content-view",
-    |config, driver, _tantivy| Box::pin ( async move {
-      run_path_and_root_tests ( config, driver ) . await
+    |config, graph, _tantivy| Box::pin ( async move {
+      run_path_and_root_tests ( config, graph ) . await
     } )) }
 
 #[test]
@@ -27,19 +27,18 @@ fn test_multi_root_view
     "skg-test-multi-root-view",
     "tests/content_view/fixtures-2",
     "/tmp/tantivy-test-multi-root-view",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_multi_root_view_logic ( config, driver ) . await
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_multi_root_view_logic ( config, graph ) . await
     } )) }
 
 async fn run_path_and_root_tests (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver
+  graph : &neo4rs::Graph
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   // Test the path from node "4" to the root container
   match path_containerward_to_end_cycle_and_or_branches (
-    & config . db_name,
-    & driver,
+    & graph,
     & ID("4".to_string() )
   ).await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
@@ -53,8 +52,7 @@ async fn run_path_and_root_tests (
       panic!("Error finding path to root container: {}", e); } }
 
   match climb_containerward_and_fetch_rootish_context (
-    & config . db_name,
-    & driver,
+    & graph,
     & ID("4".to_string() )
   ).await {
     Ok(root) => { assert_eq!(
@@ -67,8 +65,7 @@ async fn run_path_and_root_tests (
   // Test the path "to root" from node "cycle-3".
   // (1 contains 2 contains 3 contains 1.)
   match path_containerward_to_end_cycle_and_or_branches (
-    & config . db_name,
-    & driver,
+    & graph,
     & ID("cycle-3".to_string() )
   ).await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
@@ -84,8 +81,7 @@ async fn run_path_and_root_tests (
   // Test the path "to root" from node "cycle-1".
   // (1 contains 2 contains 3 contains 1.)
   match path_containerward_to_end_cycle_and_or_branches (
-    & config . db_name,
-    & driver,
+    & graph,
     & ID("cycle-1".to_string() )
   ).await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
@@ -103,7 +99,7 @@ async fn run_path_and_root_tests (
 
 async fn test_multi_root_view_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver
+  graph : &neo4rs::Graph
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   let focii : Vec<ID> = vec![
@@ -112,7 +108,7 @@ async fn test_multi_root_view_logic (
     ID("1".to_string())
   ];
   let result : String = multi_root_view (
-    & driver,
+    & graph,
     & config,
     & focii,
     false
@@ -137,10 +133,10 @@ fn test_single_root_view_with_cycle
     "skg-test-single-root-view-cycle",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-single-root-view-cycle",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
       let result : String = single_root_view (
-        driver,
+        graph,
         config,
         &ID ( "a".to_string () ),
         false
@@ -166,14 +162,14 @@ fn test_multi_root_view_with_shared_nodes
     "skg-test-multi-root-view-shared",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-multi-root-view-shared",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       // Test with multiple roots that share a node
       let focii = vec![
         ID ( "1".to_string () ),
         ID ( "2".to_string () )
       ];
       let result : String = multi_root_view (
-        driver,
+        graph,
         config,
         & focii,
         false
@@ -213,7 +209,7 @@ fn test_multi_root_view_with_node_limit
     "skg-test-multi-root-view-limit",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-multi-root-view-limit",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       // Test with two roots that share a node, with node limit
       // Tree structure: 1 -> (2, 3), 2 (standalone root)
       // Generations: 1: [1, 2], 2: [2 (repeated), 3]
@@ -226,7 +222,7 @@ fn test_multi_root_view_with_node_limit
         ID ( "2".to_string () )
       ];
       let result : String = multi_root_view (
-        driver,
+        graph,
         &test_config,
         & focii,
         false
@@ -267,7 +263,7 @@ fn test_limit_with_multiple_sibling_groups
     "skg-test-multiple-sibling-groups",
     "tests/content_view/fixtures-3",
     "/tmp/tantivy-test-multiple-sibling-groups",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       // Test that truncation correctly stops at sibling group boundaries
       // Tree structure:
       //   1 (gen 1)
@@ -288,7 +284,7 @@ fn test_limit_with_multiple_sibling_groups
       test_config.initial_node_limit = 4;
 
       let result : String = single_root_view (
-        driver,
+        graph,
         &test_config,
         &ID ( "1".to_string () ),
         false

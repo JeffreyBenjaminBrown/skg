@@ -12,7 +12,8 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 use std::error::Error;
 use std::env;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
+use tokio::runtime::Runtime;
 
 fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args().collect();
@@ -26,12 +27,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         config_path } ) ?;
 
   clear_timing_log ( &config );
-  let (typedb_driver, tantivy_index)
-    : (Arc<TypeDBDriver>, TantivyIndex)
+  let rt : Runtime = Runtime::new() ?;
+  let (graph, tantivy_index)
+    : (Arc<Graph>, TantivyIndex)
     = timed ( &config, "initialize_dbs",
-              || initialize_dbs ( &config ));
+              || initialize_dbs ( &config, rt.handle() ));
 
-  serve (config, typedb_driver, tantivy_index)
+  serve (config, graph, tantivy_index, rt.handle().clone())
     . map_err ( |e| Box::new(e)
                  as Box<dyn Error>) ?;
   Ok (( )) }

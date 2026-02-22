@@ -1,83 +1,83 @@
-// cargo test typedb::search
+// cargo test neo4j::search
 
 pub mod contains_from_pids;
 pub mod count_relationships;
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::find_containers_of;
-use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::dbs::neo4j::search::find_containers_of;
+use skg::dbs::neo4j::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::misc::{ID, SkgConfig};
 
+use neo4rs::Graph;
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-search-robust",
+    "skg-test-neo4j-search-robust",
     "tests/typedb/search/robust/fixtures",
-    "/tmp/tantivy-test-typedb-search-robust",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-search-robust",
+    |config, graph, _tantivy| Box::pin ( async move {
       test_find_containers_of (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       test_path_containerward_to_end_cycle_and_or_branches (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       Ok (( )) } ) ) }
 
 async fn test_find_containers_of (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   let containers_of_1 : HashSet<ID> =
     find_containers_of ( // 1 has no containers
-      & config . db_name, & driver,
+      graph,
       & ID("1".to_string() )) . await ?;
   assert_eq! ( containers_of_1,
                HashSet::new() );
 
   let containers_of_2 : HashSet<ID> =
     find_containers_of ( // 2 is in 211
-      & config . db_name, & driver,
+      graph,
       & ID("2".to_string() )) . await ?;
   assert_eq! ( containers_of_2,
                HashSet::from([ID("211".to_string())]) );
   let containers_of_11 : HashSet<ID> =
     find_containers_of ( // 11 is in 1
-      & config . db_name, & driver,
+      graph,
       & ID("11".to_string() )) . await ?;
   assert_eq! ( containers_of_11,
                HashSet::from([ID("1".to_string())]) );
   let containers_of_21 : HashSet<ID> =
     find_containers_of ( // 21 is in 1
-      & config . db_name, & driver,
+      graph,
       & ID("21".to_string() )) . await ?;
   assert_eq! ( containers_of_21,
                HashSet::from([ID("2".to_string())]) );
   let containers_of_211 : HashSet<ID> =
     find_containers_of ( // 211 is in 21
-      & config . db_name, & driver,
+      graph,
       & ID("211".to_string() )) . await ?;
   assert_eq! ( containers_of_211,
                HashSet::from([ID("21".to_string())]) );
   let containers_of_shared_1 : HashSet<ID> =
     find_containers_of ( // shared_1 is in shared
-      & config . db_name, & driver,
+      graph,
       & ID("shared_1".to_string() )) . await ?;
   assert_eq! ( containers_of_shared_1,
                HashSet::from([ID("shared".to_string())]) );
   let containers_of_shared_2 : HashSet<ID> =
     find_containers_of ( // shared_2 is in shared
-      & config . db_name, & driver,
+      graph,
       & ID("shared_2".to_string() )) . await ?;
   assert_eq! ( containers_of_shared_2,
                HashSet::from([ID("shared".to_string())]) );
 
   let containers_of_shared : HashSet<ID> =
     find_containers_of( // shared is in 1 *and* 2
-      & config . db_name, & driver,
+      graph,
       & ID("shared".to_string() )) . await ?;
   assert_eq! ( containers_of_shared,
                HashSet::from ( [ ID("1".to_string() ),
@@ -86,7 +86,7 @@ async fn test_find_containers_of (
   let containers_of_11_extra : HashSet<ID> =
     find_containers_of(
       // '11-extra-id' and '11' give the same result
-      & config . db_name, & driver,
+      graph,
       & ID("11-extra-id".to_string() )) . await ?;
   assert_eq! ( containers_of_11_extra,
                containers_of_11 );
@@ -95,7 +95,7 @@ async fn test_find_containers_of (
 
 async fn test_path_containerward_to_end_cycle_and_or_branches (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   // The containerward paths from 11 and from 11_extra_id
@@ -104,7 +104,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // with no option and no set.
   let result_11 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("11".to_string() )) . await ?;
   assert_eq! ( result_11.0, vec![ID("11".to_string()),
                                  ID("1".to_string())] );
@@ -112,7 +112,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   assert_eq! ( result_11.2, HashSet::new() );
   let result_11_extra : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("11-extra-id".to_string() )) . await ?;
   assert_eq! ( result_11_extra.0, vec![ID("11-extra-id".to_string()),
                                        ID("1".to_string())] );
@@ -123,7 +123,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // No option, no set.
   let result_111 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("111".to_string() )) . await ?;
   assert_eq! ( result_111.0, vec![ID("111".to_string()),
                                   ID("11".to_string()),
@@ -135,7 +135,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // That is, it comes back to 211.
   let result_211 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("211".to_string() )) . await ?;
   assert_eq! ( result_211.0, vec![ID("211".to_string()),
                                   ID("21".to_string()),
@@ -147,7 +147,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // That is, it comes back to 21.
   let result_21 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("21".to_string() )) . await ?;
   assert_eq! ( result_21.0, vec![ID("21".to_string()),
                                  ID("2".to_string()),
@@ -158,7 +158,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // The result from shared is [shared], None, {1,2}.
   let result_shared : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("shared".to_string() )) . await ?;
   assert_eq! ( result_shared.0, vec![ID("shared".to_string())] );
   assert_eq! ( result_shared.1, None );
@@ -168,7 +168,7 @@ async fn test_path_containerward_to_end_cycle_and_or_branches (
   // The result from shared_1 is [shared_1, shared], None, {1,2}.
   let result_shared_1 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
     path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name, & driver,
+      graph,
       & ID("shared_1".to_string() )) . await ?;
   assert_eq! ( result_shared_1.0, vec![ID("shared_1".to_string()),
                                        ID("shared".to_string())] );

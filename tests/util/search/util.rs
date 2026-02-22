@@ -1,41 +1,26 @@
-// cargo test typedb::search::util
+// cargo test neo4j::search::util
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::pid_and_source_from_id;
-use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use skg::dbs::typedb::util::pids_from_ids::pids_from_ids;
+use skg::dbs::neo4j::search::pid_and_source_from_id;
+use skg::dbs::neo4j::util::pids_from_ids::pids_from_ids;
 use skg::types::misc::{ID, SourceName};
 
 use std::error::Error;
 
 #[test]
-fn test_extract_payload_from_typedb_string_rep() {
-  assert_eq!(
-    extract_payload_from_typedb_string_rep("attribute \"value\" something"),
-    "value".to_string()
-  );
-  assert_eq!(
-    extract_payload_from_typedb_string_rep("\"hello world\" end"),
-    "hello world".to_string()
-  );
-}
-
-#[test]
 fn test_pid_from_id (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-search-util",
+    "skg-test-neo4j-search-util",
     "tests/typedb/search/util/fixtures",
-    "/tmp/tantivy-test-typedb-search-util",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-search-util",
+    |config, graph, _tantivy| Box::pin ( async move {
       let (pid_for_4, source_for_4) = pid_and_source_from_id (
-        & config . db_name,
-        & driver,
+        graph,
         & ID("4".to_string() ),
       ) . await ? . unwrap ();
       let (pid_for_44, source_for_44) =
-        pid_and_source_from_id ( & config . db_name,
-                                   & driver,
+        pid_and_source_from_id ( graph,
                                    & ID("44".to_string() )
       ) . await ? . unwrap ();
       assert_eq!(pid_for_4,  ID("4" . to_string () ));
@@ -48,11 +33,11 @@ fn test_pid_from_id (
 fn test_pids_from_ids (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-pids-from-ids",
+    "skg-test-neo4j-pids-from-ids",
     "tests/typedb/search/util/fixtures",
-    "/tmp/tantivy-test-typedb-pids-from-ids",
-    |config, driver, _tantivy| Box::pin ( async move {
-      // Test bulk lookup of multiple IDs using nested subqueries
+    "/tmp/tantivy-test-neo4j-pids-from-ids",
+    |config, graph, _tantivy| Box::pin ( async move {
+      // Test bulk lookup of multiple IDs
       let input_ids = vec![
         ID("4".to_string()),
         ID("44".to_string()),
@@ -60,8 +45,7 @@ fn test_pids_from_ids (
         ID("5".to_string())
       ];
 
-      let results = pids_from_ids ( & config . db_name,
-                                    & driver,
+      let results = pids_from_ids ( graph,
                                     &input_ids ). await ?;
 
       // Check results
@@ -72,8 +56,7 @@ fn test_pids_from_ids (
       assert_eq!(results.get(&ID("5".to_string())), Some(&Some(ID("5".to_string()))));
 
       // Test empty input
-      let empty_results = pids_from_ids ( & config . db_name,
-                                          & driver,
+      let empty_results = pids_from_ids ( graph,
                                           &[] ). await ?;
       assert!(empty_results.is_empty());
 

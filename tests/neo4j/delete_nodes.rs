@@ -2,21 +2,14 @@
 // cargo test test_delete_container_node -- --nocapture
 // cargo test test_delete_contained_node -- --nocapture
 
-use skg::dbs::typedb::nodes::{delete_nodes_from_pids, which_ids_exist};
-use skg::dbs::typedb::search::find_related_nodes;
-use skg::dbs::typedb::util::ConceptRowStream;
-use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use skg::dbs::neo4j::nodes::{delete_nodes_from_pids, which_ids_exist};
+use skg::dbs::neo4j::search::find_related_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 
-use futures::StreamExt;
+use neo4rs::Graph;
 use std::collections::{HashSet, BTreeSet};
 use std::error::Error;
-use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer},
-  Transaction,
-  TransactionType,
-};
 
 #[test]
 fn test_delete_container_node (
@@ -28,14 +21,13 @@ fn test_delete_container_node (
     "skg-test-delete-container",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-delete-container",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
 
     // Verify nodes 1, 2 and 3 exist
     let initial_ids : BTreeSet<String> =
       ["1", "2", "3"].iter().map(|s| s.to_string()).collect();
     let existing_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & initial_ids
     ) . await ?;
     assert!(existing_ids.contains("1"),
@@ -47,12 +39,10 @@ fn test_delete_container_node (
 
     // Verify node 1 contains 2 and 3
     let initially_contained : HashSet<ID> = find_related_nodes (
-      & config . db_name,
-      & driver,
+      graph,
       & [ ID("1".to_string()) ],
       "contains",
-      "container",
-      "contained"
+      "container"
     ) . await ?;
     assert!(initially_contained.contains(&ID("2".to_string())),
             "Node 1 should initially contain node 2");
@@ -60,8 +50,7 @@ fn test_delete_container_node (
             "Node 1 should initially contain node 3");
 
     delete_nodes_from_pids ( // Delete node 1
-      & config . db_name,
-      & driver,
+      graph,
       & vec![ ID("1".to_string()) ],
     ) . await ?;
 
@@ -69,8 +58,7 @@ fn test_delete_container_node (
     let after_delete_ids : BTreeSet<String> =
       ["1", "2", "3"].iter().map(|s| s.to_string()).collect();
     let remaining_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & after_delete_ids
     ) . await ?;
     assert!(!remaining_ids.contains("1"), "Node 1 should be deleted");
@@ -78,31 +66,19 @@ fn test_delete_container_node (
     assert!(remaining_ids.contains("3"), "Node 3 should still exist");
 
     // Check for any remaining contains relationships where 2 is contained
-    { let tx : Transaction = driver . transaction (
-        & config . db_name,
-        TransactionType::Read
-      ) . await ?;
-      let query : &str = r#"
-        match
-          $container isa node, has id $container_id;
-          $contained isa node, has id "2";
-          $rel isa contains (container: $container, contained: $contained);
-        select $container_id;
-      "#;
-      let answer : QueryAnswer = tx . query ( query ) . await ?;
-      let mut rows : ConceptRowStream = answer . into_rows ();
-      println!("Checking for containers of node 2 after deleting node 1...");
-      let mut container_count : usize = 0;
-      while let Some ( row_res ) = rows . next () . await {
-        let row : ConceptRow = row_res ?;
-        if let Some ( concept ) = row . get ( "container_id" ) ? {
-          let container_id : String =
-            extract_payload_from_typedb_string_rep (
-              & concept . to_string () );
-          println!("Found container of node 2: {}", container_id);
-          container_count += 1; }}
+    { let mut result_stream = graph.execute(
+        neo4rs::query(
+          "MATCH (container:Node)-[:contains]->(contained:Node {id: '2'}) \
+           RETURN container.id AS container_id"
+        )
+      ).await?;
+      let mut container_count: usize = 0;
+      while let Some(row) = result_stream.next().await? {
+        let container_id: String = row.get("container_id")?;
+        println!("Found container of node 2: {}", container_id);
+        container_count += 1; }
       assert_eq!(container_count, 0, "No containers should be found for node 2 after deleting node 1 (cascading delete should work)");
-    } // Drop transaction here
+    }
 
       Ok (( )) } )
   ) }
@@ -117,14 +93,13 @@ fn test_delete_contained_node (
     "skg-test-delete-contained",
     "tests/typedb/fixtures",
     "/tmp/tantivy-test-delete-contained",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
 
     // Verify nodes 1, 2, 3 exist
     let initial_ids : BTreeSet<String> =
       ["1", "2", "3"].iter().map(|s| s.to_string()).collect();
     let existing_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & initial_ids
     ) . await ?;
     assert!(existing_ids.contains("1"), "Node 1 should exist initially");
@@ -133,12 +108,10 @@ fn test_delete_contained_node (
 
     // Verify node 1 contains both 2 and 3
     let initially_contained : HashSet<ID> = find_related_nodes (
-      & config . db_name,
-      & driver,
+      graph,
       & [ ID("1".to_string()) ],
       "contains",
-      "container",
-      "contained"
+      "container"
     ) . await ?;
     assert!(initially_contained.contains(&ID("2".to_string())),
             "Node 1 should initially contain node 2");
@@ -147,8 +120,7 @@ fn test_delete_contained_node (
 
     // Delete node 2 (contained) using its PID 2
     delete_nodes_from_pids (
-      & config . db_name,
-      & driver,
+      graph,
       & vec![ ID("2".to_string()) ]
     ) . await ?;
 
@@ -156,8 +128,7 @@ fn test_delete_contained_node (
     let after_delete_ids : BTreeSet<String> =
       ["1", "2", "3"].iter().map(|s| s.to_string()).collect();
     let remaining_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & after_delete_ids
     ) . await ?;
     assert!(remaining_ids.contains("1"), "Node 1 should still exist");
@@ -169,8 +140,7 @@ fn test_delete_contained_node (
       ["22"].iter().map(|s| s.to_string()).collect();
     let remaining_extra_ids : HashSet<String> =
       which_ids_exist (
-        & config . db_name,
-        & driver,
+        graph,
         & extra_id_check
       ) . await ?;
     assert!(!remaining_extra_ids.contains("22"),
@@ -178,12 +148,10 @@ fn test_delete_contained_node (
 
     // Check what node 1 still contains after deleting node 2
     let finally_contained : HashSet<ID> = find_related_nodes (
-      & config . db_name,
-      & driver,
+      graph,
       & [ ID("1".to_string()) ],
       "contains",
-      "container",
-      "contained"
+      "container"
     ) . await ?;
     println!("After deleting node 2, node 1 contains:");
     for contained_id in & finally_contained {

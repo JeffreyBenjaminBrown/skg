@@ -11,7 +11,7 @@ use super::local;
 use ego_tree::Tree;
 use ego_tree::iter::Edge;
 use std::collections::HashSet;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
@@ -30,7 +30,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn find_buffer_errors_for_saving (
   forest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two phases: instruction validation and structure validation.
@@ -59,7 +59,7 @@ pub async fn find_buffer_errors_for_saving (
   { // merge validation
     for error_msg in {
       let merge_errors: Vec<String> =
-        validate_merge_requests(forest, config, driver).await?;
+        validate_merge_requests(forest, config, graph).await?;
       merge_errors }
     { errors.push(
         BufferValidationError::Other(error_msg)); }}

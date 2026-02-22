@@ -124,7 +124,7 @@ fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
     vec![];
 
   // The function should return an error for empty instructions
-  // We can't directly test the async function here without TypeDB setup,
+  // We can't directly test the async function here without Neo4j setup,
   // but we can verify the logic structure
   assert!(instructions.is_empty());
 }
@@ -428,4 +428,4 @@ fn test_id_merging() {
 }
 
 // Note: Integration tests for reconcile_same_id_instructions_for_one_id and reconcile_same_id_instructions
-// would require TypeDB setup and are better suited for integration test files
+// would require Neo4j setup and are better suited for integration test files

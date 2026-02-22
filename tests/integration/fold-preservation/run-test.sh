@@ -2,7 +2,7 @@
 
 # Integration test for fold preservation functionality
 # This script:
-# - Verifies TypeDB server is running
+# - Verifies Neo4j server is running
 # - Starts an independent cargo run process with test config
 # - Uses Emacs to create a buffer with folded content
 # - Tests that folding is preserved after save
@@ -43,7 +43,7 @@ enhanced_cleanup() {
 # Set up cleanup trap
 trap enhanced_cleanup EXIT
 
-check_typedb_server
+check_neo4j_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)

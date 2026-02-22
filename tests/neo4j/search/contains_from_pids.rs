@@ -1,29 +1,29 @@
-// cargo test typedb::search::contains_from_pids
+// cargo test neo4j::search::contains_from_pids
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
+use skg::dbs::neo4j::search::contains_from_pids::contains_from_pids;
 use skg::types::misc::{ID, SkgConfig};
 
+use neo4rs::Graph;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-typedb-search-contains-from-pids",
+    "skg-test-neo4j-search-contains-from-pids",
     "tests/typedb/search/contains_from_pids/fixtures",
-    "/tmp/tantivy-test-typedb-search-contains-from-pids",
-    |config, driver, _tantivy| Box::pin ( async move {
+    "/tmp/tantivy-test-neo4j-search-contains-from-pids",
+    |config, graph, _tantivy| Box::pin ( async move {
       test_contains_from_pids (
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       Ok (( )) } )
   ) }
 
 async fn test_contains_from_pids (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph  : &Graph
 ) -> Result<(), Box<dyn Error>> {
 
   let input_pids : Vec<ID> =
@@ -35,8 +35,7 @@ async fn test_contains_from_pids (
   let ( container_to_contents, content_to_containers )
     : ( HashMap < ID, HashSet < ID > >, HashMap < ID, HashSet < ID > > ) =
     contains_from_pids (
-      & config . db_name,
-      & driver,
+      graph,
       & input_pids ) . await ?;
 
   // Expected container_to_contents:

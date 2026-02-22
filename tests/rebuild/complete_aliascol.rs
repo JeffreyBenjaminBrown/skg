@@ -23,13 +23,13 @@ fn test_completeAliasCol
     "skg-test-complete-aliascol",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_completeAliasCol_logic ( config, driver ) . await
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_completeAliasCol_logic ( config, graph ) . await
     } )) }
 
 async fn test_completeAliasCol_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
@@ -55,7 +55,7 @@ async fn test_completeAliasCol_logic (
   let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
-    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
+    skgnode_map_from_forest ( & forest, config, graph ) . await ?;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_id : NodeId =
@@ -174,13 +174,13 @@ fn test_completeAliasCol_duplicate_aliases_different_orders
     "skg-test-complete-aliascol-duplicates",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol-duplicates",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       test_completeAliasCol_duplicate_aliases_different_orders_logic (
-        config, driver ). await } )) }
+        config, graph ). await } )) }
 
 async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
@@ -201,7 +201,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree ( unchecked_forest ) ?;
   let mut map : SkgNodeMap =
-    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
+    skgnode_map_from_forest ( & forest, config, graph ) . await ?;
 
   let tree_root_id : NodeId =
     forest . root () . first_child () . unwrap () . id ();

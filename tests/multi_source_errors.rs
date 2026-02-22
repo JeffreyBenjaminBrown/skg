@@ -2,7 +2,8 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
+use neo4rs::Graph;
+use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_neo4j_dbs};
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
@@ -13,18 +14,19 @@ use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema};
+use skg::dbs::neo4j::nodes::create_all_nodes;
+use skg::dbs::neo4j::relationships::create_all_relationships;
+use skg::dbs::neo4j::util::delete_database;
+use skg::dbs::neo4j::schema::apply_schema;
 use ego_tree::Tree;
 use std::error::Error;
 use std::path::PathBuf;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
-use futures::executor::block_on;
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     // Load config from file and override db_name for this test
     let mut config: SkgConfig =
       load_config(
@@ -32,21 +34,19 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     config.db_name = "skg-test-multi-source-errors-1".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-1");
 
-    // Set up TypeDB driver
-    let driver: TypeDBDriver =
-      TypeDBDriver::new(
-        "127.0.0.1:1729",
-        Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
+    // Set up Neo4j driver
+    let graph: Graph =
+      Graph::new(
+        "bolt://localhost:7687", "neo4j", "password"
       ).await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    delete_database(&graph).await?;
+    apply_schema(&graph).await?;
+    create_all_nodes(&graph, &nodes).await?;
+    create_all_relationships(&graph, &nodes).await?;
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
@@ -62,10 +62,10 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let mut forest: Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (&buffer_text)?.0;
     add_missing_info_to_forest(
-      &mut forest, &config.db_name, &driver).await?;
+      &mut forest, &graph).await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
-        &forest, &config, &driver).await?;
+        &forest, &config, &graph).await?;
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
       // and one for pub-1 (no source at all).
@@ -111,9 +111,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     assert_eq!(errors.len(), 4,
                "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
 
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
-      &driver,
+    cleanup_test_tantivy_and_neo4j_dbs(
+      &graph,
       Some(config.tantivy_folder.as_path())
     ).await?;
     Ok(( )) } ) }
@@ -121,26 +120,25 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_foreign_node_modification_errors(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let mut config: SkgConfig =
       load_config(
         "tests/multi_source_errors/fixtures/skgconfig.toml")?;
     config.db_name = "skg-test-multi-source-errors-2".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-2");
-    let driver: TypeDBDriver =
-      TypeDBDriver::new(
-        "127.0.0.1:1729",
-        Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
+    let graph: Graph =
+      Graph::new(
+        "bolt://localhost:7687", "neo4j", "password"
       ).await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    delete_database(&graph).await?;
+    apply_schema(&graph).await?;
+    create_all_nodes(&graph, &nodes).await?;
+    create_all_relationships(&graph, &nodes).await?;
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -165,7 +163,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &graph
       ).await;
 
       assert!(result.is_err(), "Expected errors for foreign node modifications");
@@ -231,7 +229,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &graph
       ).await;
 
       assert!(result.is_err(),
@@ -271,9 +269,8 @@ fn test_foreign_node_modification_errors(
     }
 
     // Cleanup
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
-      &driver,
+    cleanup_test_tantivy_and_neo4j_dbs(
+      &graph,
       Some(config.tantivy_folder.as_path())
     ).await?;
 
@@ -283,27 +280,26 @@ fn test_foreign_node_modification_errors(
 
 #[test]
 fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     // Load config from file and override db_name for this test
     let mut config: SkgConfig = load_config(
       "tests/multi_source_errors/fixtures/skgconfig.toml")?;
     config.db_name = "skg-test-multi-source-errors-3".to_string();
     config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-3");
 
-    // Set up TypeDB driver
-    let driver: TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
+    // Set up Neo4j driver
+    let graph: Graph = Graph::new(
+      "bolt://localhost:7687", "neo4j", "password"
     ).await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    delete_database(&graph).await?;
+    apply_schema(&graph).await?;
+    create_all_nodes(&graph, &nodes).await?;
+    create_all_relationships(&graph, &nodes).await?;
 
     // Test 1: DiskSourceBufferSourceConflict
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
@@ -318,7 +314,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &graph
       ).await;
 
       assert!(result.is_err(), "Expected DiskSourceBufferSourceConflict error");
@@ -361,7 +357,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &graph
       ).await;
 
       println!("\n=== InconsistentSources test ===");
@@ -387,9 +383,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     }
 
     // Cleanup
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
-      &driver,
+    cleanup_test_tantivy_and_neo4j_dbs(
+      &graph,
       Some(config.tantivy_folder.as_path())
     ).await?;
 

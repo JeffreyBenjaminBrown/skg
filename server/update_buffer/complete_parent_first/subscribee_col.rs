@@ -28,7 +28,7 @@ use crate::update_buffer::util::{
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 struct SubscribeeChildData {
   source  : SourceName,
@@ -54,7 +54,7 @@ pub async fn complete_subscribee_col_preorder (
   map                : &mut SkgNodeMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  graph              : &Graph,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -99,7 +99,7 @@ pub async fn complete_subscribee_col_preorder (
       .collect();
     if !missing.is_empty() { // Ensure all subscribees are in the map.
       let fetched_missing : Vec<SkgNode> =
-        skgnodes_from_ids( config, driver, &missing ).await ?;
+        skgnodes_from_ids( config, graph, &missing ).await ?;
       for skg in fetched_missing {
         if let Some( id ) = skg.ids.first() {
           map.insert( id.clone(), skg ); } } }

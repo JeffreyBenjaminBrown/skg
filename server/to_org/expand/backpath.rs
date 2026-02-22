@@ -10,7 +10,7 @@
 use crate::to_org::util::{
   get_id_from_treenode, skgnode_and_viewnode_from_id,
   remove_completed_view_request};
-use crate::dbs::typedb::search::{
+use crate::dbs::neo4j::search::{
   path_containerward_to_end_cycle_and_or_branches,
   path_sourceward_to_end_cycle_and_or_branches};
 use crate::types::misc::{ID, SkgConfig, SourceName};
@@ -26,19 +26,19 @@ use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::pin::Pin;
 use std::future::Future;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn build_and_integrate_containerward_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
+  graph         : &Graph,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_containerward_path (
-      tree, map, node_id, config, typedb_driver ). await;
+      tree, map, node_id, config, graph ). await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
@@ -53,18 +53,17 @@ pub async fn build_and_integrate_containerward_path (
   map       : &mut SkgNodeMap,
   node_id   : NodeId,
   config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  graph     : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
+      graph,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
-    tree, map, node_id, path, branches, cycle_node, config, driver
+    tree, map, node_id, path, branches, cycle_node, config, graph
   ). await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
@@ -72,12 +71,12 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
+  graph         : &Graph,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_sourceward_path (
-      tree, map, node_id, config, typedb_driver ) . await;
+      tree, map, node_id, config, graph ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Sourceward,
@@ -94,18 +93,17 @@ pub async fn build_and_integrate_sourceward_path (
   map       : &mut SkgNodeMap,
   node_id   : NodeId,
   config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  graph     : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
   let ( path, cycle_node, branches )
     : ( Vec < ID >, Option < ID >, HashSet < ID > )
     = path_sourceward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
+      graph,
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
-    tree, map, node_id, path, branches, cycle_node, config, driver
+    tree, map, node_id, path, branches, cycle_node, config, graph
   ). await }
 
 /// Integrate a (maybe forked or cyclic) path into an ViewNode tree,
@@ -118,7 +116,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   branches    : HashSet < ID >,
   cycle_node  : Option < ID >,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
+  graph       : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -133,14 +131,14 @@ pub async fn integrate_path_that_might_fork_or_cycle (
     path . remove (0); }
   let last_node_id : NodeId =
     integrate_linear_portion_of_path (
-      tree, map, node_id, &path, config, driver ) . await ?;
+      tree, map, node_id, &path, config, graph ) . await ?;
   if ! branches . is_empty () {
     integrate_branches_in_node (
-      tree, map, last_node_id, branches, config, driver ) . await ?;
+      tree, map, last_node_id, branches, config, graph ) . await ?;
   } else if let Some ( cycle_id ) = cycle_node {
     // PITFALL: If there are branches, the cycle node is ignored.
     integrate_cycle_in_node (
-      tree, map, last_node_id, cycle_id, config, driver ) . await ?; }
+      tree, map, last_node_id, cycle_id, config, graph ) . await ?; }
   Ok (( )) }
 
 /// Recursively integrate the remaining path into the tree.
@@ -152,7 +150,7 @@ fn integrate_linear_portion_of_path<'a> (
   node_id    : NodeId,
   path       : &'a [ID],
   config     : &'a SkgConfig,
-  driver     : &'a TypeDBDriver,
+  graph      : &'a Graph,
 ) -> Pin<Box<dyn Future<Output = Result<NodeId,
                                         Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -164,7 +162,7 @@ fn integrate_linear_portion_of_path<'a> (
       match find_child_by_id ( tree, node_id, path_head ) {
         Some ( child_treeid ) => child_treeid,
         None => { prepend_indefinitive_child_with_parent_ignores (
-                    tree, map, node_id, path_head, config, driver
+                    tree, map, node_id, path_head, config, graph
                   ). await ? } };
     integrate_linear_portion_of_path ( // recurse
       tree,
@@ -172,7 +170,7 @@ fn integrate_linear_portion_of_path<'a> (
       next_node_id, // we just found or inserted this
       path_tail,
       config,
-      driver ) . await } ) }
+      graph ) . await } ) }
 
 /// Add branch nodes as children of the specified node.
 /// Branches are added in sorted order (reversed for prepending).
@@ -183,7 +181,7 @@ async fn integrate_branches_in_node (
   node_id    : NodeId,
   branches   : HashSet < ID >,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
+  graph      : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &branches );
@@ -196,7 +194,7 @@ async fn integrate_branches_in_node (
     branches_to_add . sort (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, map, node_id, &branch_id, config, driver ). await ?; }
+      tree, map, node_id, &branch_id, config, graph ). await ?; }
   Ok (( )) }
 
 /// Add a cycle node as a child of the specified node.
@@ -207,11 +205,11 @@ async fn integrate_cycle_in_node (
   node_id    : NodeId,
   cycle_id   : ID,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
+  graph      : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   if find_child_by_id ( tree, node_id, &cycle_id ) . is_none () {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, map, node_id, &cycle_id, config, driver ). await ?; }
+      tree, map, node_id, &cycle_id, config, graph ). await ?; }
   Ok (( )) }
 
 async fn prepend_indefinitive_child_with_parent_ignores (
@@ -220,11 +218,11 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   parent_treeid  : NodeId,
   child_skgid    : &ID,
   config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  graph          : &Graph,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( _, child_viewnode ) : ( _, ViewNode ) =
     skgnode_and_viewnode_from_id (
-      config, driver, child_skgid, map
+      config, graph, child_skgid, map
     ). await ?;
   let (id, source, title) : (ID, SourceName, String)
   = match &child_viewnode.kind

@@ -5,4 +5,4 @@
 pub mod filesystem;
 pub mod init;
 pub mod tantivy;
-pub mod typedb;
+pub mod neo4j;

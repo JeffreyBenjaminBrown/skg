@@ -1,5 +1,5 @@
-use crate::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use crate::dbs::typedb::search::count_relationships::{
+use crate::dbs::neo4j::search::contains_from_pids::contains_from_pids;
+use crate::dbs::neo4j::search::count_relationships::{
   count_containers,
   count_contents,
   count_link_sources,
@@ -14,7 +14,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use ego_tree::{NodeId, Tree};
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Each of these describes some kind of relationship,
 /// for each of a view's nodes.
@@ -26,14 +26,14 @@ struct MapsFromIdForView {
   num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
 }
 
-/// Enrich all nodes in a forest with graphStats from TypeDB.
+/// Enrich all nodes in a forest with graphStats from Neo4j.
 /// Also fetches and returns the containment maps, which callers
 /// can pass to `set_viewnodestats_in_forest`.
 pub async fn set_graphnodestats_in_forest (
   forest : &mut Tree<ViewNode>,
   map    : &mut SkgNodeMap,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
                HashMap < ID, HashSet < ID > > ),
              Box<dyn Error> > {
@@ -43,13 +43,13 @@ pub async fn set_graphnodestats_in_forest (
   let rel_data : MapsFromIdForView =
     timed_async ( config, "fetch_relationship_data",
                   fetch_relationship_data (
-                    driver, & config . db_name, & pids )) . await ?;
+                    graph, & pids )) . await ?;
   let ( container_to_contents, content_to_containers )
     : ( HashMap < ID, HashSet < ID > >,
         HashMap < ID, HashSet < ID > > )
     = timed_async ( config, "contains_from_pids",
                     contains_from_pids (
-                      & config . db_name, driver, & pids )) . await ?;
+                      graph, & pids )) . await ?;
   let root_treeid : NodeId = forest . root () . id ();
   timed ( config, "set_graphnodestats_recursive",
           || set_metadata_relationships_in_node_recursive (
@@ -64,20 +64,19 @@ pub async fn set_graphnodestats_in_forest (
 /// Run three batch queries to fetch all relationship data
 /// for the given PIDs.
 async fn fetch_relationship_data (
-  driver  : &TypeDBDriver,
-  db_name : &str,
-  pids    : &[ID],
+  graph : &Graph,
+  pids  : &[ID],
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
   let num_containers : HashMap < ID, usize > =
-    count_containers ( db_name, driver, pids ) . await ?;
+    count_containers ( graph, pids ) . await ?;
   let num_contents : HashMap < ID, usize > =
-    count_contents ( db_name, driver, pids ) . await ?;
+    count_contents ( graph, pids ) . await ?;
   let num_links_in : HashMap < ID, usize > =
-    count_link_sources ( db_name, driver, pids ) . await ?;
+    count_link_sources ( graph, pids ) . await ?;
   let has_subscribes_map : HashSet < ID > =
-    has_subscribes ( db_name, driver, pids ) . await ?;
+    has_subscribes ( graph, pids ) . await ?;
   let has_overrides_map : HashSet < ID > =
-    has_overrides ( db_name, driver, pids ) . await ?;
+    has_overrides ( graph, pids ) . await ?;
   Ok ( MapsFromIdForView {
     has_subscribes : has_subscribes_map,
     has_overrides  : has_overrides_map,

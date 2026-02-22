@@ -6,50 +6,48 @@
 // 2. After saving with definitive view requests, HiddenInSubscribeeCol is shown
 
 use indoc::indoc;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use neo4rs::Graph;
+use skg::dbs::neo4j::util::delete_database;
+use skg::dbs::neo4j::schema::apply_schema;
+use skg::dbs::init::create_empty_tantivy_index;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::neo4j::nodes::create_all_nodes;
+use skg::dbs::neo4j::relationships::create_all_relationships;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::skgnode::SkgNode;
-use futures::executor::block_on;
+use tokio::runtime::Runtime;
 use std::error::Error;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 async fn setup_test(
   db_name: &str,
   config_path: &str,
 ) -> Result<(SkgConfig,
-             TypeDBDriver,
+             Graph,
              TantivyIndex),
             Box<dyn Error>> {
   let config: SkgConfig =
     load_config_with_overrides(config_path, Some(db_name), &[])?;
-  let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
-    Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+  let graph: Graph = Graph::new(
+    "bolt://localhost:7687", "neo4j", "password"
   ).await?;
   let nodes: Vec<SkgNode> =
     read_all_skg_files_from_sources(&config)?;
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+  delete_database(&graph).await?;
+  apply_schema(&graph).await?;
+  create_all_nodes(&graph, &nodes).await?;
+  create_all_relationships(&graph, &nodes).await?;
   let tantivy_index: TantivyIndex =
     create_empty_tantivy_index(&config.tantivy_folder)?;
-  Ok((config, driver, tantivy_index)) }
+  Ok((config, graph, tantivy_index)) }
 
 async fn cleanup_test(
-  db_name: &str,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
-  if driver.databases().contains(db_name).await? {
-    driver.databases().get(db_name).await?.delete().await?; }
+  delete_database(graph).await?;
   if tantivy_folder.exists() {
     std::fs::remove_dir_all(tantivy_folder)?; }
   Ok (( )) }
@@ -95,15 +93,16 @@ fn add_definitive_view_request_to_subscribees (
 #[test]
 fn test_every_kind_of_col(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let db_name = "skg-test-hidden-every-kind-of-col";
-    let (config, driver, tantivy) = setup_test(
+    let (config, graph, tantivy) = setup_test(
       db_name,
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
     ).await?;
 
     let initial_view: String = single_root_view(
-      &driver,
+      &graph,
       &config,
       &ID("R".to_string()), // Initial view from R ("subscribeR")
       false,
@@ -127,7 +126,7 @@ fn test_every_kind_of_col(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false ) . await ?;
+        &modified_view, &graph, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
@@ -150,8 +149,7 @@ fn test_every_kind_of_col(
       "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
 
     cleanup_test(
-      db_name,
-      &driver,
+      &graph,
       &config.tantivy_folder,
     ).await?;
     Ok (( )) } ) }
@@ -169,12 +167,13 @@ fn test_every_kind_of_col(
 #[test]
 fn test_hidden_within_but_none_without(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let db_name = "skg-test-hidden-within-but-none-without";
-    let (config, driver, tantivy) = setup_test(
+    let (config, graph, tantivy) = setup_test(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ). await?;
     let initial_view: String = single_root_view(
-      &driver,
+      &graph,
       &config,
       &ID("R".to_string()), // the root
       false,
@@ -195,7 +194,7 @@ fn test_hidden_within_but_none_without(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false ) . await ?;
+        &modified_view, &graph, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
@@ -215,8 +214,7 @@ fn test_hidden_within_but_none_without(
       "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
 
     cleanup_test(
-      db_name,
-      &driver,
+      &graph,
       &config.tantivy_folder,
     ).await?;
     Ok (( )) } ) }
@@ -236,13 +234,14 @@ fn test_hidden_within_but_none_without(
 #[test]
 fn test_hidden_without_but_none_within(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let db_name = "skg-test-hidden-without-but-none-within";
-    let (config, driver, tantivy) =
+    let (config, graph, tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml").await?;
     let initial_view: String = single_root_view(
-      &driver,
+      &graph,
       &config,
       &ID("R".to_string()), // origin of the view
       false,
@@ -264,7 +263,7 @@ fn test_hidden_without_but_none_within(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false ) . await ?;
+        &modified_view, &graph, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
@@ -284,8 +283,7 @@ fn test_hidden_without_but_none_within(
       "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
 
     cleanup_test(
-      db_name,
-      &driver,
+      &graph,
       &config.tantivy_folder,
     ).await?;
     Ok (( )) } ) }
@@ -303,13 +301,14 @@ fn test_hidden_without_but_none_within(
 #[test]
 fn test_overlapping_hidden_within(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let db_name = "skg-test-overlapping-hidden-within";
-    let (config, driver, tantivy) =
+    let (config, graph, tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml").await?;
     let initial_view: String = single_root_view(
-      &driver,
+      &graph,
       &config,
       &ID("R".to_string()), // root of the view
       false,
@@ -330,7 +329,7 @@ fn test_overlapping_hidden_within(
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false ) . await ?;
+        &modified_view, &graph, &config, &tantivy, false ) . await ?;
       response.buffer_content };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
@@ -347,8 +346,7 @@ fn test_overlapping_hidden_within(
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");
     cleanup_test(
-      db_name,
-      &driver,
+      &graph,
       &config.tantivy_folder,
     ).await?;
     Ok (( )) } ) }

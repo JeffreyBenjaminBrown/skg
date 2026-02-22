@@ -1,9 +1,9 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
-use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
-use crate::dbs::typedb::nodes::delete_nodes_from_pids;
-use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_out_links;
+use crate::dbs::neo4j::nodes::create_only_nodes_with_no_ids_present;
+use crate::dbs::neo4j::nodes::delete_nodes_from_pids;
+use crate::dbs::neo4j::relationships::create_all_relationships;
+use crate::dbs::neo4j::relationships::delete_out_links;
 use crate::serve::timing_log::{timed, timed_async};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -13,10 +13,10 @@ use itertools::{Itertools, Either};
 use std::error::Error;
 use std::io;
 use tantivy::IndexWriter;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Updates **everything** from the given `DefineNode`s, in order:
-///   1) TypeDB
+///   1) Neo4j
 ///   2) Filesystem
 ///   3) Tantivy
 /// PITFALL: If any but the first step fails,
@@ -25,17 +25,15 @@ pub async fn update_graph_minus_merges (
   instructions  : Vec<DefineNode>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
-  driver        : &TypeDBDriver,
+  graph         : &Graph,
 ) -> Result < (), Box<dyn Error> > {
-  println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
+  println!( "Updating (1) Neo4j, (2) FS, and (3) Tantivy ..." );
 
-  let db_name : &str = &config.db_name;
-
-  { println!( "1) Updating TypeDB database '{}' ...", db_name );
-    timed_async ( &config, "update_typedb_from_saveinstructions",
-                  update_typedb_from_saveinstructions (
-                    db_name, driver, &instructions )) . await ?;
-    println!( "   TypeDB update complete." ); }
+  { println!( "1) Updating Neo4j ..." );
+    timed_async ( &config, "update_neo4j_from_saveinstructions",
+                  update_neo4j_from_saveinstructions (
+                    graph, &instructions )) . await ?;
+    println!( "   Neo4j update complete." ); }
 
   { // filesystem
     // TODO: Print per-source write information
@@ -71,9 +69,8 @@ pub async fn update_graph_minus_merges (
 ///    PITFALL: Only the primary ID from each SkgNode is used.
 /// 5) Recreate all relationships for those nodes, via
 ///      create_all_relationships
-pub async fn update_typedb_from_saveinstructions (
-  db_name : &str,
-  driver  : &TypeDBDriver,
+pub async fn update_neo4j_from_saveinstructions (
+  graph        : &Graph,
   instructions : &Vec<DefineNode>
 ) -> Result<(), Box<dyn Error>> {
 
@@ -97,9 +94,7 @@ pub async fn update_typedb_from_saveinstructions (
     if ! to_delete_pids . is_empty () {
       println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
       delete_nodes_from_pids (
-        // PITFALL: deletions cascade in TypeDB by default,
-        // so we are left with no incomplete relationships.
-        db_name, driver, & to_delete_pids ). await ?; }}
+        graph, & to_delete_pids ). await ?; }}
 
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
@@ -114,14 +109,13 @@ pub async fn update_typedb_from_saveinstructions (
                       . cloned() )
       . collect ();
     create_only_nodes_with_no_ids_present (
-      db_name, driver, & to_write_skgnodes ). await ?;
+      graph, & to_write_skgnodes ). await ?;
     delete_out_links (
-      db_name, driver,
+      graph,
       & to_write_pids, // Will barf if nonempty, which is good.
-      "contains",
-      "container" ). await ?;
+      "contains" ). await ?;
     create_all_relationships (
-      db_name, driver, & to_write_skgnodes ). await ?; }
+      graph, & to_write_skgnodes ). await ?; }
 
   Ok (( )) }
 

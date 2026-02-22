@@ -39,7 +39,7 @@ run_profiling_test() {
 
   trap benchmark_cleanup EXIT
 
-  check_typedb_server
+  check_neo4j_server
 
   AVAILABLE_PORT=$(find_available_port)
   echo ""

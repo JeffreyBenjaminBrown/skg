@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
-use crate::dbs::typedb::nodes::which_ids_exist;
+use crate::dbs::neo4j::nodes::which_ids_exist;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
@@ -17,14 +17,14 @@ use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn execute_view_requests (
   forest        : &mut Tree<ViewNode>,
   map           : &mut SkgNodeMap,
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
+  graph         : &Graph,
   visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
   deleted_id_src_map : &HashMap<ID, SourceName>,
@@ -33,19 +33,19 @@ pub async fn execute_view_requests (
     match request {
       ViewRequest::Aliases => {
         build_and_integrate_aliases_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, map, node_id, config, graph, errors )
           . await ?; },
       ViewRequest::Containerward => {
         build_and_integrate_containerward_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, map, node_id, config, graph, errors )
           . await ?; },
       ViewRequest::Sourceward => {
         build_and_integrate_sourceward_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, map, node_id, config, graph, errors )
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
-          forest, map, node_id, config, typedb_driver,
+          forest, map, node_id, config, graph,
           visited, errors, deleted_id_src_map ) . await ?; }, }}
   Ok (( )) }
 
@@ -64,7 +64,7 @@ async fn execute_definitive_view_request (
   map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
+  graph         : &Graph,
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
   deleted_id_src_map : &HashMap<ID, SourceName>,
@@ -108,16 +108,16 @@ async fn execute_definitive_view_request (
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
       forest, map, node_id, config.initial_node_limit,
-      visited, config, &hidden_ids, typedb_driver,
+      visited, config, &hidden_ids, graph,
       deleted_id_src_map ). await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
       forest, map, node_id, config.initial_node_limit,
-      visited, config, typedb_driver, &hidden_ids ). await ?;
+      visited, config, graph, &hidden_ids ). await ?;
     if type_and_parent_type_consistent_with_subscribee (
       forest, node_id ) ?
     { maybe_add_hiddenInSubscribeeCol_branch (
-        forest, map, node_id, config, typedb_driver
+        forest, map, node_id, config, graph
       ). await ?; } }
   Ok (( )) }
 
@@ -219,7 +219,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   limit          : usize,
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  graph          : &Graph,
   hidden_ids     : &HashSet < ID >,
 ) -> Result < (), Box<dyn Error> > {
   let mut gen_with_children : Vec < (NodeId, // effective root
@@ -239,14 +239,14 @@ async fn extendDefinitiveSubtreeFromLeaf (
       let space_left : usize = limit - nodes_rendered;
       add_last_generation_and_truncate_some_of_previous (
         tree, map, generation, &gen_with_children,
-        space_left, effective_root, visited, config, driver ) . await ?;
+        space_left, effective_root, visited, config, graph ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
       let new_treeid : NodeId = build_node_branch_minus_content (
         Some((tree, parent_treeid)),
         Some(map),
-        &child_skgid, config, driver, visited ). await ?;
+        &child_skgid, config, graph, visited ). await ?;
       nodes_rendered += 1;
       if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
@@ -288,8 +288,8 @@ fn from_disk_replace_title_body_and_skgnode (
 
 /// Expand children for a removed node,
 /// by loading content from git HEAD.
-/// Children that exist in TypeDB are marked as RemovedHere.
-/// Children that don't exist in TypeDB are marked as Removed.
+/// Children that exist in Neo4j are marked as RemovedHere.
+/// Children that don't exist in Neo4j are marked as Removed.
 async fn extendDefinitiveSubtree_fromGit (
   tree           : &mut Tree<ViewNode>,
   _map           : &mut SkgNodeMap,
@@ -298,7 +298,7 @@ async fn extendDefinitiveSubtree_fromGit (
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   hidden_ids     : &HashSet<ID>,
-  typedb_driver  : &TypeDBDriver,
+  graph          : &Graph,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let (pid, src) : (ID, SourceName) =
@@ -318,7 +318,7 @@ async fn extendDefinitiveSubtree_fromGit (
         . collect();
       let contents_in_worktree : HashSet<String> =
         which_ids_exist (
-          &config . db_name, typedb_driver, &not_hidden
+          graph, &not_hidden
         ). await ?;
       (contents, contents_in_worktree) };
   for child_id in contents . iter() . take ( limit ) {
@@ -326,7 +326,7 @@ async fn extendDefinitiveSubtree_fromGit (
     let child_viewnode : ViewNode =
       mk_removed_child_viewnode (
         child_id, &src, &contents_in_worktree,
-        deleted_id_src_map, config, typedb_driver ) . await ?;
+        deleted_id_src_map, config, graph ) . await ?;
     let mut parent_mut : NodeMut<ViewNode> = // Add child to tree
       tree . get_mut ( effective_root ) . ok_or (
         "Parent not found" ) ?;
@@ -344,7 +344,7 @@ async fn mk_removed_child_viewnode (
   contents_in_worktree : &HashSet<String>,
   deleted_id_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
-  typedb_driver      : &TypeDBDriver,
+  graph              : &Graph,
 ) -> Result<ViewNode, Box<dyn Error>> {
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
@@ -353,7 +353,7 @@ async fn mk_removed_child_viewnode (
     = if in_worktree
       { ( NodeDiffStatus::RemovedHere,
           optskgnode_from_id (
-            config, typedb_driver, child_id ) . await ? ) }
+            config, graph, child_id ) . await ? ) }
       else
       { ( NodeDiffStatus::Removed,
           skgnode_from_git_head ( child_id, parent_src, config

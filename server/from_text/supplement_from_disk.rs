@@ -14,13 +14,13 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Has no effect on Delete instructions.
 /// Supplements Save instructions with disk data.
 pub async fn supplement_none_fields_from_disk_if_save (
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
+  graph       : &Graph,
   instruction : DefineNode
 ) -> Result<DefineNode, Box<dyn Error>> {
   let mut from_buffer : SkgNode = match instruction {
@@ -30,7 +30,7 @@ pub async fn supplement_none_fields_from_disk_if_save (
     from_buffer . ids . first()
     . ok_or("No primary ID found")? . clone();
   let from_disk : Option<SkgNode> =
-    optskgnode_from_id( config, driver, &pid
+    optskgnode_from_id( config, graph, &pid
                       ). await?;
   if let Some(disk_node) = from_disk {
     { // Replace buffer's (singleton) ids

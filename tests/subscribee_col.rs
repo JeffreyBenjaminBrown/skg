@@ -1,48 +1,44 @@
 // cargo test --test subscribee_col -- --nocapture
 
 use indoc::indoc;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema};
+use neo4rs::Graph;
+use skg::dbs::neo4j::util::delete_database;
+use skg::dbs::neo4j::schema::apply_schema;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::neo4j::nodes::create_all_nodes;
+use skg::dbs::neo4j::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 use skg::types::skgnode::SkgNode;
-use futures::executor::block_on;
+use tokio::runtime::Runtime;
 use std::error::Error;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 const CONFIG_PATH: &str = "tests/subscribee_col/fixtures/skgconfig.toml";
 
 /// Helper to set up multi-source test environment
 async fn setup_multi_source_test(
   db_name: &str,
-) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
+) -> Result<(SkgConfig, Graph), Box<dyn Error>> {
   let config: SkgConfig =
     load_config_with_overrides(CONFIG_PATH, Some(db_name), &[])?;
-  let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
-    Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+  let graph: Graph = Graph::new(
+    "bolt://localhost:7687", "neo4j", "password"
   ).await?;
   let nodes: Vec<SkgNode> =
     read_all_skg_files_from_sources(&config)?;
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
-  Ok((config, driver)) }
+  delete_database(&graph).await?;
+  apply_schema(&graph).await?;
+  create_all_nodes(&graph, &nodes).await?;
+  create_all_relationships(&graph, &nodes).await?;
+  Ok((config, graph)) }
 
 async fn cleanup_test(
-  db_name: &str,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
   // Delete the database
-  if driver.databases().contains(db_name).await? {
-    driver.databases().get(db_name).await?.delete().await?;
-  }
+  delete_database(graph).await?;
   // Clean up tantivy folder
   if tantivy_folder.exists() {
     std::fs::remove_dir_all(tantivy_folder)?;
@@ -53,12 +49,13 @@ async fn cleanup_test(
 #[test]
 fn test_subscribee_col_appears_for_subscribers(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
+  let rt : Runtime = Runtime::new().unwrap();
+  rt.block_on(async {
     let db_name = "skg-test-subscribee-col";
-    let (config, driver) =
+    let (config, graph) =
       setup_multi_source_test(db_name).await?;
     let result: String = single_root_view(
-      &driver,
+      &graph,
       &config,
       &ID("1".to_string()),
       false,
@@ -84,8 +81,7 @@ fn test_subscribee_col_appears_for_subscribers(
     assert_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeCol children");
     cleanup_test(
-      db_name,
-      &driver,
+      &graph,
       &config.tantivy_folder,
     ).await?;
     Ok (( )) } ) }

@@ -3,7 +3,7 @@
 use skg::dbs::filesystem::one_node::skgnode_from_id;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::save::update_fs_from_saveinstructions;
-use skg::save::update_typedb_from_saveinstructions;
+use skg::save::update_neo4j_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
@@ -34,7 +34,7 @@ fn test_parentignores_and_indefinitive(
       "skg-test-parentignores",
       "tests/save/parentIgnores_and_indefinitive/fixtures",
       "/tmp/tantivy-test-parentignores",
-      |config, driver, _tantivy| Box::pin ( async move {
+      |config, graph, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
         // Node 1 contains node 2 (which has treatment=parentIgnores and indefinitive)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
@@ -48,10 +48,9 @@ fn test_parentignores_and_indefinitive(
           buffer_to_viewnode_forest_and_save_instructions(
             org_text,
             config,
-            driver, ). await?;
-        update_typedb_from_saveinstructions(
-          &config.db_name,
-          driver,
+            graph, ). await?;
+        update_neo4j_from_saveinstructions(
+          graph,
           &save_instructions, ). await?;
         update_fs_from_saveinstructions(
           save_instructions,
@@ -60,7 +59,7 @@ fn test_parentignores_and_indefinitive(
         { // verify indefinitive is treated correctly
           let node2 : SkgNode =
             skgnode_from_id(
-              config, driver, &ID("2".to_string() ))
+              config, graph, &ID("2".to_string() ))
             .await?;
         assert_eq!(
           node2.contains,
@@ -70,7 +69,7 @@ fn test_parentignores_and_indefinitive(
         { // verify parentIgnores is treated correctly
           let node1 : SkgNode =
             skgnode_from_id(
-              config, driver, &ID("1".to_string() ))
+              config, graph, &ID("1".to_string() ))
             .await?;
         assert_eq!(
           node1.contains,

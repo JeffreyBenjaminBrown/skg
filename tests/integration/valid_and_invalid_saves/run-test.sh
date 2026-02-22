@@ -3,7 +3,7 @@
 # Integration test for skg save error handling
 # This script:
 # - Backs up and resets test data to clean state
-# - Verifies TypeDB server is running
+# - Verifies Neo4j server is running
 # - Starts an independent cargo run process with test config
 # - Uses Emacs to test invalid save (should create error buffer) and valid save
 # - Cleans up any test artifacts and restores original state
@@ -79,7 +79,7 @@ trap enhanced_cleanup EXIT
 # Setup test environment
 backup_and_reset_test_data
 
-check_typedb_server
+check_neo4j_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)

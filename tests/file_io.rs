@@ -186,24 +186,24 @@ fn test_fetch_aliases_from_file(
     "skg-test-fetch-aliases",
     "tests/file_io/fixtures",
     "/tmp/tantivy-test-fetch-aliases",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_fetch_aliases_from_file_impl(config, driver).await
+    |config, graph, _tantivy| Box::pin(async move {
+      test_fetch_aliases_from_file_impl(config, graph).await
     } )) }
 
 async fn test_fetch_aliases_from_file_impl(
   config: &SkgConfig,
-  driver: &typedb_driver::TypeDBDriver,
+  graph: &neo4rs::Graph,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let aliases_result : Vec<String> =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_with_aliases") ).await;
+      &config, graph, ID::new ("node_with_aliases") ).await;
   assert_eq! ( aliases_result,
                vec![ "first alias".to_string (),
                      "second alias".to_string () ],
                "Should return aliases when present" );
   let no_aliases_result =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_without_aliases") ).await;
+      &config, graph, ID::new ("node_without_aliases") ).await;
   assert_eq! ( no_aliases_result, Vec::<String>::new(),
                "Should return empty Vec when no aliases" );
   Ok (( )) }

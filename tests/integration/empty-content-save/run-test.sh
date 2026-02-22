@@ -42,7 +42,7 @@ trap enhanced_cleanup EXIT
 
 prepare_data_dirs
 
-check_typedb_server
+check_neo4j_server
 
 AVAILABLE_PORT=$(find_available_port)
 echo ""

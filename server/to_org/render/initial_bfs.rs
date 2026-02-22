@@ -27,19 +27,19 @@ use ego_tree::{NodeId, Tree};
 use std::error::Error;
 use std::pin::Pin;
 use std::future::Future;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// See file header comment.
 /// Returns a "forest" (tree with BufferRoot).
 pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
-  driver   : &TypeDBDriver,
+  graph    : &Graph,
 ) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
   let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     stub_forest_from_root_ids (
-      root_ids, config, driver, &mut visited ) . await ?;
+      root_ids, config, graph, &mut visited ) . await ?;
   let forest_root_id : NodeId = forest . root () . id ();
   let root_nodes : Vec < NodeId > =
     forest . root () . children ()
@@ -55,7 +55,7 @@ pub async fn render_initial_forest_bfs (
     forest_root_id, // effective_root for truncation
     &mut visited,
     config,
-    driver,
+    graph,
   ) . await ?;
   Ok ( (forest, map) ) }
 
@@ -70,7 +70,7 @@ fn render_generation_and_recurse<'a> (
   effective_root : NodeId,         // BufferRoot for initial rendering
   visited        : &'a mut DefinitiveMap,
   config         : &'a SkgConfig,
-  driver         : &'a TypeDBDriver,
+  graph          : &'a Graph,
 ) -> Pin<Box<dyn Future<
     Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
@@ -86,18 +86,18 @@ fn render_generation_and_recurse<'a> (
     if rendered_count + next_gen_count < limit {
       let next_gen : Vec < NodeId > =
         add_children_and_collect_their_ids (
-          forest, map, parent_child_rels_to_add, visited, config, driver
+          forest, map, parent_child_rels_to_add, visited, config, graph
         ) . await ?;
       render_generation_and_recurse (
         forest, map, next_gen, gen_int + 1,
         rendered_count, limit, effective_root,
-        visited, config, driver,
+        visited, config, graph,
       ) . await }
     else {
       add_last_generation_and_truncate_some_of_previous (
         forest, map, gen_int + 1, &parent_child_rels_to_add,
         limit - rendered_count, effective_root,
-        visited, config, driver,
+        visited, config, graph,
       ) . await ?;
       return Ok(( )); }
   } ) }
@@ -110,14 +110,14 @@ async fn add_children_and_collect_their_ids (
   rels_to_add : Vec < (NodeId, ID) >,
   visited     : &mut DefinitiveMap,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
+  graph       : &Graph,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
     let child_treeid : NodeId = build_node_branch_minus_content (
       Some ( (&mut *forest, parent_treeid) ),
       Some ( &mut *map ),
-      &child_skgid, config, driver, visited ) . await ?;
+      &child_skgid, config, graph, visited ) . await ?;
     child_treeids . push ( child_treeid ); }
   Ok ( child_treeids ) }
 

@@ -11,12 +11,12 @@ use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
   config    : &SkgConfig,
-  driver    : &typedb_driver::TypeDBDriver,
+  graph     : &neo4rs::Graph,
   user_node : SkgNode
 ) -> Result<SkgNode, Box<dyn Error>> {
   let result : DefineNode =
     supplement_none_fields_from_disk_if_save (
-      config, driver,
+      config, graph,
       DefineNode::Save(SaveNode(user_node)) ). await ?;
   match result {
     DefineNode::Save(SaveNode(node)) => Ok(node),
@@ -30,14 +30,14 @@ fn test_none_aliases_get_replaced_with_disk_aliases (
     "skg-test-none-aliases",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-aliases",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       test_none_aliases_get_replaced_with_disk_aliases_logic (
-        config, driver ) . await
+        config, graph ) . await
     } )) }
 
 async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
@@ -46,7 +46,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.aliases = None; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![ "alias 1 on disk".to_string (),
@@ -59,7 +59,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.aliases = Some ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![] ),
@@ -71,7 +71,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node.aliases = Some ( vec![ "new alias".to_string () ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.aliases,
       Some ( vec![ "new alias".to_string () ] ),
@@ -86,14 +86,14 @@ fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
     "skg-test-none-subscribes",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-subscribes",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
-        config, driver ) . await
+        config, graph ) . await
     } )) }
 
 async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
@@ -102,7 +102,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.subscribes_to = None; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![ ID::new("sub_1_on_disk"),
@@ -115,7 +115,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.subscribes_to = Some ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![] ),
@@ -127,7 +127,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node.subscribes_to = Some ( vec![ ID::new("new_sub") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.subscribes_to,
       Some ( vec![ ID::new("new_sub") ] ),
@@ -142,14 +142,14 @@ fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
     "skg-test-none-hides",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-hides",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
-        config, driver ) . await
+        config, graph ) . await
     } )) }
 
 async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
@@ -158,7 +158,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.hides_from_its_subscriptions = None; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![ ID::new("hide_1_on_disk") ]),
@@ -170,7 +170,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.hides_from_its_subscriptions = Some ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![] ),
@@ -182,7 +182,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node.hides_from_its_subscriptions = Some ( vec![ ID::new("new_hide") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.hides_from_its_subscriptions,
       Some ( vec![ ID::new("new_hide") ] ),
@@ -197,14 +197,14 @@ fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
     "skg-test-none-overrides",
     "tests/save/none_node_fields_are_noops/fixtures",
     "/tmp/tantivy-test-none-overrides",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
       test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
-        config, driver ) . await
+        config, graph ) . await
     } )) }
 
 async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  graph : &neo4rs::Graph,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : SkgNode = empty_skgnode ();
@@ -213,7 +213,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.overrides_view_of = None; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![ ID::new("override_1_on_disk"),
@@ -227,7 +227,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.overrides_view_of = Some ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![] ),
@@ -239,7 +239,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node.overrides_view_of = Some ( vec![ ID::new("new_override") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
-        &config, &driver, user_node ). await ?;
+        &config, &graph, user_node ). await ?;
     assert_eq! (
       result.overrides_view_of,
       Some ( vec![ ID::new("new_override") ] ),

@@ -13,7 +13,7 @@ use skg::org_to_text::viewnode_forest_to_string;
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 #[test]
 fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
@@ -21,15 +21,15 @@ fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
     "skg-test-integrate-backpath-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_path_with_cycle_impl(config, driver).await
+    |config, graph, _tantivy| Box::pin(async move {
+      test_path_with_cycle_impl(config, graph).await
     })
   )
 }
 
 async fn test_path_with_cycle_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -61,7 +61,7 @@ async fn test_path_with_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, root_id, path, branches,
-    cycle_node, &config, driver, ).await?;
+    cycle_node, &config, graph, ).await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 1) (source main))) 1
@@ -92,13 +92,13 @@ fn test_path_with_branches_no_cycle(
     "skg-test-integrate-backpath-branches-no-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-branches-no-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_path_with_branches_no_cycle_impl(config, driver).await
+    |config, graph, _tantivy| Box::pin(async move {
+      test_path_with_branches_no_cycle_impl(config, graph).await
     } )) }
 
 async fn test_path_with_branches_no_cycle_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -140,7 +140,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, node_1_id, path, branches,
-    cycle_node, &config, driver ).await?;
+    cycle_node, &config, graph ).await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
@@ -173,13 +173,13 @@ fn test_path_with_branches_with_cycle(
     "skg-test-integrate-backpath-branches-with-cycle",
     "tests/rebuild/fixtures",
     "/tmp/tantivy-test-integrate-backpath-branches-with-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_path_with_branches_with_cycle_impl(config, driver).await
+    |config, graph, _tantivy| Box::pin(async move {
+      test_path_with_branches_with_cycle_impl(config, graph).await
     } )) }
 
 async fn test_path_with_branches_with_cycle_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -222,7 +222,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, node_1_id, path, branches,
-    cycle_node, &config, driver ).await?;
+    cycle_node, &config, graph ).await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0

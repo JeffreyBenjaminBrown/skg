@@ -8,7 +8,7 @@ use crate::types::list::dedup_vector;
 use crate::util::setlike_vector_subtraction;
 use ego_tree::Tree;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// PURPOSE: For each ViewNode with a merge instruction, creates a Merge:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
@@ -19,7 +19,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn instructiontriples_from_the_merges_in_an_viewnode_forest(
   forest: &Tree<ViewNode>,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<Vec<Merge>,
             Box<dyn Error>> {
   let mut merges: Vec<Merge> =
@@ -30,7 +30,7 @@ pub async fn instructiontriples_from_the_merges_in_an_viewnode_forest(
         optmerge_from_viewnode(
           { let viewnode : &ViewNode = node_ref.value();
             viewnode },
-          config, driver ). await?
+          config, graph ). await?
         { merges.push(merge); }} }
   Ok(merges) }
 
@@ -39,7 +39,7 @@ pub async fn instructiontriples_from_the_merges_in_an_viewnode_forest(
 async fn optmerge_from_viewnode (
   node   : &ViewNode,
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph : &Graph
 ) -> Result<Option<Merge>,
             Box<dyn Error>> {
   let t : &TrueNode = match &node . kind {
@@ -51,10 +51,10 @@ async fn optmerge_from_viewnode (
   let acquirer_id : &ID = &t . id;
   let acquirer_from_disk : SkgNode =
     skgnode_from_id(
-      config, driver, acquirer_id ). await?;
+      config, graph, acquirer_id ). await?;
   let acquiree_from_disk : SkgNode =
     skgnode_from_id(
-      config, driver, &acquiree_id ). await?;
+      config, graph, &acquiree_id ). await?;
   let acquiree_text_preserver : SkgNode =
     create_acquiree_text_preserver ( &acquiree_from_disk );
   let updated_acquirer : SkgNode =

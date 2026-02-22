@@ -1,34 +1,25 @@
 /* delete-one-db
- * Quick utility to delete a single database by name
- * Usage: cargo run --bin delete-one-db test-manual
+ * Quick utility to clear all data from Neo4j.
+ * Neo4j Community Edition has a single database,
+ * so there is nothing to select by name.
+ *
+ * Usage: cargo run --bin delete-one-db
  */
 
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
-use std::env;
+use neo4rs::Graph;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <database-name>", args[0]);
-        std::process::exit(1);
-    }
+  let graph : Graph = Graph::new(
+    "bolt://localhost:7687",
+    "neo4j",
+    "password",
+  ).await?;
 
-    let db_name = &args[1];
+  graph.run(
+    neo4rs::query("MATCH (n) DETACH DELETE n")
+  ).await?;
 
-    let driver = TypeDBDriver::new(
-        "127.0.0.1:1729",
-        Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
-    ).await?;
-
-    let databases = driver.databases();
-    if databases.contains(db_name).await? {
-        let db = databases.get(db_name).await?;
-        db.delete().await?;
-        println!("✓ Deleted '{}'", db_name);
-    } else {
-        println!("✗ Database '{}' not found", db_name);
-    }
-    Ok(())
+  println!("✓ All data cleared.");
+  Ok(())
 }

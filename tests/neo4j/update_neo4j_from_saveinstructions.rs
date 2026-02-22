@@ -1,9 +1,9 @@
-// cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
+// cargo test --test neo4j neo4j::update_neo4j_from_saveinstructions -- --nocapture
 
 use skg::test_utils::run_with_test_db;
-use skg::save::update_typedb_from_saveinstructions;
-use skg::dbs::typedb::search::find_related_nodes;
-use skg::dbs::typedb::nodes::which_ids_exist;
+use skg::save::update_neo4j_from_saveinstructions;
+use skg::dbs::neo4j::search::find_related_nodes;
+use skg::dbs::neo4j::nodes::which_ids_exist;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
@@ -24,7 +24,7 @@ fn test_update_nodes_and_relationships2 (
     "skg-test-update2",
     "tests/typedb/update_typedb_from_saveinstructions/fixtures",
     "/tmp/tantivy-test-update2",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, graph, _tantivy| Box::pin ( async move {
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
@@ -54,18 +54,16 @@ fn test_update_nodes_and_relationships2 (
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<DefineNode> =
       viewnode_forest_to_nonmerge_save_instructions (
-        & forest, & config, & driver ) . await ?;
+        & forest, & config, & graph ) . await ?;
 
     // Apply the update
-    update_typedb_from_saveinstructions (
-      & config . db_name,
-      & driver,
+    update_neo4j_from_saveinstructions (
+      graph,
       & reconciled_instructions ). await ?;
 
     // Node 3 should not exist (deleted)
     let existing_node3_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & ["3", "33"].iter().map(|s| s.to_string()).collect()
     ) . await ?;
     assert!(
@@ -75,8 +73,7 @@ fn test_update_nodes_and_relationships2 (
 
     // Node 4 (not mentioned in buffer) should still exist.
     let existing_node4_ids : HashSet<String> = which_ids_exist (
-      & config . db_name,
-      & driver,
+      graph,
       & ["4"].iter().map(|s| s.to_string()).collect()
     ) . await ?;
     assert!( ! existing_node4_ids . is_empty (),
@@ -84,12 +81,10 @@ fn test_update_nodes_and_relationships2 (
 
     // Nodes 1 and 2 should contain each other
     let node1_contains : HashSet<ID> = find_related_nodes (
-      & config . db_name,
-      & driver,
+      graph,
       & [ ID("1".to_string()) ],
       "contains",
-      "container",
-      "contained"
+      "container"
     ) . await ?;
     assert!(
       node1_contains . contains (
@@ -101,12 +96,10 @@ fn test_update_nodes_and_relationships2 (
       node1_contains );
 
     let node2_contains : HashSet<ID> = find_related_nodes (
-      & config . db_name,
-      & driver,
+      graph,
       & [ ID("2".to_string()) ],
       "contains",
-      "container",
-      "contained"
+      "container"
     ) . await ?;
     assert!( node2_contains . contains ( & ID("1".to_string()) ),
              "Node 2 should contain node 1" );

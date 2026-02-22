@@ -22,25 +22,25 @@ use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 use ego_tree::Tree;
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 
 /// See file header comment.
 pub async fn single_root_view (
-  driver            : &TypeDBDriver,
+  graph             : &Graph,
   config            : &SkgConfig,
   root_id           : &ID,
   diff_mode_enabled : bool,
 ) -> Result < String, Box<dyn Error> > {
   multi_root_view (
-    driver,
+    graph,
     config,
     & [ root_id . clone () ],
     diff_mode_enabled ) . await }
 
 /// See file header comment.
 pub async fn multi_root_view (
-  driver            : &TypeDBDriver,
+  graph             : &Graph,
   config            : &SkgConfig,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
@@ -48,12 +48,12 @@ pub async fn multi_root_view (
   let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     timed_async ( config, "render_initial_forest_bfs",
                   render_initial_forest_bfs (
-                    root_ids, config, driver )) . await ?;
+                    root_ids, config, graph )) . await ?;
   let ( container_to_contents, content_to_containers ) =
     timed_async ( config, "set_graphnodestats_in_forest",
                   set_graphnodestats_in_forest (
                     &mut forest, &mut map,
-                    config, driver )) . await ?;
+                    config, graph )) . await ?;
   set_viewnodestats_in_forest (
     &mut forest, &container_to_contents, &content_to_containers );
   if diff_mode_enabled {

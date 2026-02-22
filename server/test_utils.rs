@@ -1,9 +1,10 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use crate::dbs::init::create_empty_tantivy_index;
+use crate::dbs::neo4j::nodes::create_all_nodes;
+use crate::dbs::neo4j::relationships::create_all_relationships;
+use crate::dbs::neo4j::schema::apply_schema;
+use crate::dbs::neo4j::util::delete_database;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::nodes::create_all_nodes;
-use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
@@ -12,17 +13,14 @@ use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
 
 use ego_tree::{Tree, NodeRef};
-use futures::StreamExt;
-use futures::executor::block_on;
+use tokio::runtime::Runtime;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::answer::{QueryAnswer, ConceptRow};
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
-use crate::dbs::typedb::util::ConceptRowStream;
+use neo4rs::Graph;
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher};
 
@@ -35,23 +33,8 @@ use tantivy::{DocAddress, Searcher};
 /// 3. Running test functions
 /// 4. Cleaning up the database, index, and temp fixtures
 ///
-/// The test_fn closure receives references to SkgConfig, TypeDBDriver, and TantivyIndex
+/// The test_fn closure receives references to SkgConfig, Graph, and TantivyIndex
 /// and can run multiple test functions sequentially.
-///
-/// Example:
-/// ```
-/// #[test]
-/// fn my_test() -> Result<(), Box<dyn Error>> {
-///   run_with_test_db(
-///     "skg-test-my-test",
-///     "tests/my_test/fixtures",
-///     "/tmp/tantivy-test-my-test",
-///     |config, driver, tantivy| Box::pin(async move {
-///       test_function_1(config, driver, tantivy).await?;
-///       test_function_2(config, driver, tantivy).await?;
-///       Ok(())
-///     } )) }
-/// ```
 pub fn run_with_test_db<F>(
   db_name: &str,
   fixtures_folder: &str,
@@ -60,7 +43,7 @@ pub fn run_with_test_db<F>(
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a TypeDBDriver, &'a TantivyIndex)
+  FnOnce(&'a SkgConfig, &'a Graph, &'a TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
@@ -73,16 +56,16 @@ where
     &PathBuf::from(fixtures_folder),
     &temp_fixtures)?;
 
-  let result : Result<(), Box<dyn Error>> = block_on(async {
-    let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
-      setup_test_tantivy_and_typedb_dbs(
+  let rt : Runtime = Runtime::new()?;
+  let result : Result<(), Box<dyn Error>> = rt.block_on(async {
+    let (config, graph, tantivy): (SkgConfig, Graph, TantivyIndex) =
+      setup_test_tantivy_and_neo4j_dbs(
         db_name,
         temp_fixtures.to_str().unwrap(),
         tantivy_folder ). await?;
-    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy).await;
-    cleanup_test_tantivy_and_typedb_dbs(
-      db_name,
-      &driver,
+    let result : Result<(), Box<dyn Error>> = test_fn(&config, &graph, &tantivy).await;
+    cleanup_test_tantivy_and_neo4j_dbs(
+      &graph,
       Some(config.tantivy_folder.as_path())
     ).await?;
     result
@@ -116,8 +99,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
 /// A helper function for tests.
 pub async fn populate_test_db_from_fixtures (
   data_folder: &str,
-  db_name: &str,
-  driver: &TypeDBDriver
+  graph: &Graph
 ) -> Result<(), Box<dyn Error>> {
   let nodes: Vec<SkgNode> = {
     let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
@@ -129,33 +111,28 @@ pub async fn populate_test_db_from_fixtures (
         user_owns_it: true, } );
     read_all_skg_files_from_sources(
       &SkgConfig::dummyFromSources( sources ))? };
-  overwrite_new_empty_db (
-    db_name, driver ). await ?;
-  define_schema (
-    db_name, driver ). await?;
+  delete_database ( graph ). await ?;
+  apply_schema ( graph ). await?;
   create_all_nodes (
-    db_name, driver, &nodes ). await ?;
+    graph, &nodes ). await ?;
   create_all_relationships (
-    db_name, driver, &nodes ). await ?;
+    graph, &nodes ). await ?;
   Ok (( )) }
 
-/* PURPOSE: Set up test dbs (Tantivy and TypeDB)
+/* PURPOSE: Set up test dbs (Tantivy and Neo4j)
 with fixtures from the given folder.
-The test database will be named with the given db_name prefix.
-The program calling this should call `cleanup_test_tantivy_and_typedb_dbs`
+The program calling this should call `cleanup_test_tantivy_and_neo4j_dbs`
 after the test completes to remove the database.
 .
 PITFALL: This sets delete_on_quit=false
 because tests tear down the db themselves.
 Unit tests don't even run the Rust-Emacs server (integration tests do),
 so while there's something to delete, there's no server to quit. */
-pub async fn setup_test_tantivy_and_typedb_dbs (
+pub async fn setup_test_tantivy_and_neo4j_dbs (
   db_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
-  // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs,
-  // not via delete_on_quit, because there's no server to quit.
+) -> Result<(SkgConfig, Graph, TantivyIndex), Box<dyn Error>> {
   let config: SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources.insert (
@@ -166,37 +143,32 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
         user_owns_it : true, });
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
-  let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
-    Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+  let graph: Graph = Graph::new(
+    &config.neo4j_uri,
+    &config.neo4j_user,
+    &config.neo4j_password,
   ). await ?;
   populate_test_db_from_fixtures(
     fixtures_folder,
-    db_name,
-    &driver
+    &graph
   ). await?;
   let tantivy_index: TantivyIndex =
     create_empty_tantivy_index(&config.tantivy_folder)?;
-  Ok ((config, driver, tantivy_index)) }
+  Ok ((config, graph, tantivy_index)) }
 
 /// Clean up test database and tantivy index after a test completes.
 ///
-/// This deletes:
-/// - The TypeDB database (if it exists)
+/// This clears:
+/// - All Neo4j data (MATCH (n) DETACH DELETE n)
 /// - The Tantivy index directory (if it exists)
 ///
 /// Does NOT delete the .skg fixture files.
-pub async fn cleanup_test_tantivy_and_typedb_dbs(
-  db_name: &str,
-  driver: &TypeDBDriver,
+pub async fn cleanup_test_tantivy_and_neo4j_dbs(
+  graph: &Graph,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
-  // Delete TypeDB database
-  let databases : &DatabaseManager = driver.databases();
-  if databases.contains(db_name).await? {
-    let database : Arc<Database> = databases.get(db_name).await?;
-    database.delete().await?; }
+  // Clear Neo4j data
+  delete_database( graph ).await?;
 
   // Delete Tantivy index if path provided and exists
   if let Some(tantivy_path) = tantivy_folder {
@@ -320,56 +292,38 @@ fn strip_id_from_metadata_struct(
     meta
   } ) }
 
-/// Query all primary node IDs from TypeDB.
-/// Returns a HashSet of all IDs belonging to primary nodes (not extra_ids).
-pub async fn all_pids_from_typedb(
-  db_name: &str,
-  driver: &TypeDBDriver,
+/// Query all primary node IDs from Neo4j.
+/// Returns a HashSet of all IDs belonging to primary nodes (not IdAliases).
+pub async fn all_pids_from_neo4j(
+  graph: &Graph,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver.transaction(
-    db_name, TransactionType::Read ). await ?;
-  let query: String =
-    "match $node isa node, has id $node_id; select $node_id;"
-    .to_string();
-  let answer: QueryAnswer = tx.query(query).await?;
+  let mut result_stream =
+    graph . execute (
+      neo4rs::query ( "MATCH (n:Node) RETURN n.id AS node_id" )
+    ) . await ?;
   let mut node_ids: HashSet<ID> = HashSet::new();
-  let mut stream : ConceptRowStream = answer.into_rows();
-  while let Some(row_result) = stream.next().await {
-    let row : ConceptRow = row_result?;
-    if let Some(concept) = row.get("node_id")? {
-      let node_id_str: String =
-        extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      node_ids.insert(ID(node_id_str)); }}
+  while let Some ( row ) = result_stream . next () . await ? {
+    let node_id_str: String = row . get ( "node_id" ) ?;
+    node_ids.insert(ID(node_id_str)); }
   Ok (node_ids) }
 
-/// Query all extra_ids for a given primary node ID from TypeDB.
-/// Returns a Vec of all extra_ids associated with the node.
+/// Query all extra_ids for a given primary node ID from Neo4j.
+/// Returns a Vec of all IdAlias IDs associated with the node.
 pub async fn extra_ids_from_pid(
-  db_name: &str,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   skgid: &ID,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver.transaction(
-    db_name, TransactionType::Read ). await?;
-  let query : String = format!(
-    r#"match $node isa node, has id "{}";
-       $e isa extra_id;
-       $rel isa has_extra_id (node: $node, extra_id: $e);
-       $e has id $extra_id_value;
-       select $extra_id_value;"#,
-    skgid.0 );
-  let answer: QueryAnswer = tx.query(query).await?;
+  let mut result_stream =
+    graph . execute (
+      neo4rs::query (
+        "MATCH (a:IdAlias {primary_id: $pid}) \
+         RETURN a.id AS alias_id" )
+      . param ( "pid", skgid . as_str () )
+    ) . await ?;
   let mut extra_ids : Vec<ID> = Vec::new();
-  let mut stream : ConceptRowStream = answer.into_rows();
-  while let Some(row_result) = stream.next().await {
-    let row : ConceptRow = row_result?;
-    if let Some(concept) = row.get("extra_id_value")? {
-      let extra_id_str : String =
-        extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      extra_ids.push(
-        ID(extra_id_str)); }}
+  while let Some ( row ) = result_stream . next () . await ? {
+    let alias_id : String = row . get ( "alias_id" ) ?;
+    extra_ids.push( ID(alias_id) ); }
   Ok(extra_ids) }
 
 /// Check if a specific ID exists in Tantivy search results.

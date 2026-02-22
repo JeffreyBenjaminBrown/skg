@@ -26,12 +26,12 @@ use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_
 use crate::serve::timing_log::{timed, timed_async};
 
 use ego_tree::Tree;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn buffer_to_viewnode_forest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver
+  graph       : &Graph
 ) -> Result< ( Tree<ViewNode>,
                Vec<DefineNode>,
                Vec<Merge> ),
@@ -46,13 +46,13 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
     // For why, see the header comment of one of them,
     // 'find_buffer_errors_for_saving'.
     add_missing_info_to_forest (
-      & mut unchecked_forest, & config . db_name, driver )
+      & mut unchecked_forest, graph )
   ). await . map_err ( SaveError::DatabaseError ) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
       timed_async ( config, "find_buffer_errors_for_saving",
         find_buffer_errors_for_saving (
-          & unchecked_forest, config, driver )
+          & unchecked_forest, config, graph )
       ). await . map_err ( SaveError::DatabaseError ) ?;
     validation_errors . extend ( parsing_errors );
     if ! validation_errors . is_empty () {
@@ -65,17 +65,17 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
   let nonmerge_instructions : Vec<DefineNode> =
     timed_async ( config, "viewnode_forest_to_nonmerge_save_instructions",
       viewnode_forest_to_nonmerge_save_instructions (
-        & viewnode_forest, config, driver )
+        & viewnode_forest, config, graph )
     ). await . map_err ( SaveError::DatabaseError ) ?;
   let nonmerge_instructions : Vec<DefineNode> =
     timed_async ( config, "validate_and_filter_foreign_instructions",
       validate_and_filter_foreign_instructions (
-        nonmerge_instructions, config, driver )
+        nonmerge_instructions, config, graph )
     ). await . map_err ( SaveError::BufferValidationErrors ) ?;
   let merge_instructions : Vec<Merge> =
     timed_async ( config, "instructiontriples_from_the_merges_in_an_viewnode_forest",
       instructiontriples_from_the_merges_in_an_viewnode_forest (
-        & viewnode_forest, config, driver )
+        & viewnode_forest, config, graph )
     ). await . map_err ( SaveError::DatabaseError ) ?;
   timed ( config, "validate_merges_involve_only_owned_nodes",
           || validate_merges_involve_only_owned_nodes (

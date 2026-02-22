@@ -40,7 +40,14 @@ pub struct SkgConfig {
   pub port           : u16,  // TCP port for Rust-Emacs comms.
 
   #[serde(default)] // defaults to false
-  pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
+  pub delete_on_quit : bool, // Clear Neo4j on server shutdown.
+
+  #[serde(default = "default_neo4j_uri")]
+  pub neo4j_uri      : String,
+  #[serde(default = "default_neo4j_user")]
+  pub neo4j_user     : String,
+  #[serde(default = "default_neo4j_password")]
+  pub neo4j_password : String,
 
   #[serde(default = "default_initial_node_limit")]
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
@@ -88,8 +95,10 @@ where
 }
 
 fn default_port() -> u16 { 1730 }
-
 fn default_initial_node_limit() -> usize { 1000 }
+fn default_neo4j_uri() -> String { "bolt://localhost:7687".to_string() }
+fn default_neo4j_user() -> String { "neo4j".to_string() }
+fn default_neo4j_password() -> String { "password".to_string() }
 
 
 //
@@ -164,12 +173,15 @@ impl SkgConfig {
       sources,
       port               : 0,
       delete_on_quit     : false,
+      neo4j_uri          : default_neo4j_uri(),
+      neo4j_user         : default_neo4j_user(),
+      neo4j_password     : default_neo4j_password(),
       initial_node_limit : 100,
       timing_log         : false,
       config_dir         : PathBuf::from("."), }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
-  /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
+  /// Useful for tests that actually connect to Neo4j and create Tantivy indices.
   pub fn fromSourcesAndDbName (
     sources        : HashMap<SourceName, SkgfileSource>,
     db_name        : &str,
@@ -181,6 +193,9 @@ impl SkgConfig {
       sources,
       port               : 1730,
       delete_on_quit     : false,
+      neo4j_uri          : default_neo4j_uri(),
+      neo4j_user         : default_neo4j_user(),
+      neo4j_password     : default_neo4j_password(),
       initial_node_limit : 1000,
       timing_log         : false,
       config_dir         : PathBuf::from("."), }}

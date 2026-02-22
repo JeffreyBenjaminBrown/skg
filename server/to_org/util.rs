@@ -1,5 +1,5 @@
 use crate::types::tree::generations::collect_generation_ids;
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::dbs::neo4j::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::viewnode::ViewRequest;
@@ -15,7 +15,7 @@ use ego_tree::iter::Edge;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 
 /// Tracks which IDs have been rendered definitively and where.
@@ -34,18 +34,18 @@ pub type DefinitiveMap =
 // Fetching, building and modifying SkgNodes and ViewNodes
 // ======================================================
 
-/// Fetch a SkgNode from disk (queries TypeDB for source).
+/// Fetch a SkgNode from disk (queries Neo4j for source).
 /// Make an ViewNode from it, with validated title.
 /// Return both.
 pub async fn skgnode_and_viewnode_from_id (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
   skgid  : &ID,
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, SourceName) =
-    pid_and_source_from_id( // Query TypeDB for them
-      &config.db_name, driver, skgid).await?
+    pid_and_source_from_id( // Query Neo4j for them
+      graph, skgid).await?
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
   skgnode_and_viewnode_from_pid_and_source (
@@ -109,7 +109,7 @@ pub async fn complete_branch_minus_content (
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
-  driver   : &TypeDBDriver,
+  graph    : &Graph,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
@@ -118,7 +118,7 @@ pub async fn complete_branch_minus_content (
   { clobberIndefinitiveViewnode (
       tree, map, node_id, config ) ?; }
   maybe_add_subscribeeCol_branch (
-    tree, map, node_id, config, driver ) . await ?;
+    tree, map, node_id, config, graph ) . await ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -179,7 +179,7 @@ pub fn detect_and_mark_cycle_v1 (
 pub async fn stub_forest_from_root_ids (
   root_skgids : &[ID],
   config   : &SkgConfig,
-  driver   : &TypeDBDriver,
+  graph    : &Graph,
   visited  : &mut DefinitiveMap,
 ) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
   let mut forest : Tree<ViewNode> = Tree::new ( forest_root_viewnode () );
@@ -189,7 +189,7 @@ pub async fn stub_forest_from_root_ids (
     build_node_branch_minus_content (
       Some ( (&mut forest, forest_root_treeid) ),
       Some ( &mut map ),
-      root_skgid, config, driver, visited
+      root_skgid, config, graph, visited
     ) . await ?; }
   Ok ( (forest, map) ) }
 
@@ -251,12 +251,12 @@ pub async fn make_and_append_child_pair (
   parent_treeid : NodeId, // will parent the new node
   child_skgid   : &ID, // how to find the new node
   config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  graph          : &Graph,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
   let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
     skgnode_and_viewnode_from_id (
-      config, driver, child_skgid, map ) . await ?;
+      config, graph, child_skgid, map ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
       tree, parent_treeid,
@@ -277,14 +277,14 @@ pub async fn build_node_branch_minus_content (
   map             : Option<&mut SkgNodeMap>,
   skgid           : &ID, // what to fetch
   config          : &SkgConfig,
-  driver          : &TypeDBDriver,
+  graph           : &Graph,
   visited         : &mut DefinitiveMap,
 ) -> Result < NodeId, Box<dyn Error> > {
   match (tree_and_parent, map) {
     (Some ( (tree, parent_treeid) ), Some(map)) => {
       let (_skgnode, viewnode) : (SkgNode, ViewNode) =
         skgnode_and_viewnode_from_id (
-          config, driver, skgid, map ) . await ?;
+          config, graph, skgid, map ) . await ?;
       let child_treeid : NodeId = // Add ViewNode to tree
         with_node_mut (
           tree, parent_treeid,
@@ -293,20 +293,20 @@ pub async fn build_node_branch_minus_content (
         . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
       complete_branch_minus_content (
         tree, map, child_treeid, visited,
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       Ok ( child_treeid ) },
     (None, None) => {
       let mut map : SkgNodeMap =
         SkgNodeMap::new ();
       let (_skgnode, viewnode) : (SkgNode, ViewNode) =
         skgnode_and_viewnode_from_id (
-          config, driver, skgid, &mut map ) . await ?;
+          config, graph, skgid, &mut map ) . await ?;
       let mut tree : Tree<ViewNode> =
         Tree::new ( viewnode );
       let root_treeid : NodeId = tree . root () . id ();
       complete_branch_minus_content (
         &mut tree, &mut map, root_treeid, visited,
-        config, driver ) . await ?;
+        config, graph ) . await ?;
       Ok ( root_treeid ) },
     _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None".into()),
   } }

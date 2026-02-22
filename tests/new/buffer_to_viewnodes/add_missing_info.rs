@@ -9,7 +9,7 @@ use skg::types::misc::{SkgConfig, ID};
 use ego_tree::Tree;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 #[test]
 fn test_add_missing_info_comprehensive(
@@ -18,14 +18,14 @@ fn test_add_missing_info_comprehensive(
     "skg-test-add-missing-info",
     "tests/new/buffer_to_viewnodes/add_missing_info/fixtures",
     "/tmp/tantivy-test-add-missing-info",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_add_missing_info_logic ( config, driver ) . await ?;
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_add_missing_info_logic ( config, graph ) . await ?;
       Ok (( )) } )
   ) }
 
 async fn test_add_missing_info_logic (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph : &Graph
 ) -> Result<(), Box<dyn Error>> {
   // Applying 'add_missing_info_to_forest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
@@ -54,8 +54,7 @@ async fn test_add_missing_info_logic (
       with_missing_info).unwrap().0;
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
-    &config.db_name,
-    driver ).await ?;
+    graph ).await ?;
   let expected_forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
       without_missing_info ). unwrap().0;
@@ -88,14 +87,14 @@ fn test_source_inheritance_multi_level(
     "skg-test-source-inheritance",
     "tests/new/buffer_to_viewnodes/add_missing_info/fixtures",
     "/tmp/tantivy-test-source-inheritance",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_source_inheritance_logic ( config, driver ) . await ?;
+    |config, graph, _tantivy| Box::pin ( async move {
+      test_source_inheritance_logic ( config, graph ) . await ?;
       Ok (( )) } )
   ) }
 
 async fn test_source_inheritance_logic (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  graph : &Graph
 ) -> Result<(), Box<dyn Error>> {
   // Tests source inheritance through multiple levels,
   // with explicit sources overriding inheritance at various depths.
@@ -127,8 +126,7 @@ async fn test_source_inheritance_logic (
     org_to_uninterpreted_nodes( input ).unwrap().0;
   add_missing_info_to_forest(
     &mut actual_forest,
-    &config.db_name,
-    driver ).await ?;
+    graph ).await ?;
   let expected_forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes( expected ).unwrap().0;
 

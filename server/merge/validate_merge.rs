@@ -10,11 +10,11 @@
 use crate::types::viewnode::EditRequest;
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::dbs::neo4j::search::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 struct MergeValidationData<'a> {
   acquirer_viewnodes     : Vec<&'a UncheckedViewNode>,
@@ -28,7 +28,7 @@ struct MergeValidationData<'a> {
 pub async fn validate_merge_requests(
   forest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let merge_validation_data : MergeValidationData =
@@ -47,7 +47,7 @@ pub async fn validate_merge_requests(
                 continue; }};
     if let Some(EditRequest::Merge(acquiree_id)) = &t.edit_request
     { let pair_errors : Vec<String> = validate_merge_pair(
-        config, driver, acquirer_id, acquiree_id,
+        graph, acquirer_id, acquiree_id,
         &merge_validation_data.to_delete_ids).await?;
       errors.extend( pair_errors ); }}
   errors.extend( {
@@ -94,8 +94,7 @@ fn collect_merge_validation_data<'a>(
 /// Returns a vector of validation errors for this pair.
 /// The error messages explain what each passage does.
 async fn validate_merge_pair(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   acquirer_id: &ID,
   acquiree_id: &ID,
   to_delete_ids: &HashSet<ID>,
@@ -103,7 +102,7 @@ async fn validate_merge_pair(
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
     match pid_and_source_from_id (
-      &config.db_name, driver, acquirer_id).await?
+      graph, acquirer_id).await?
     { Some((pid, _source)) => pid,
       None      => {
         errors.push(format!(
@@ -112,7 +111,7 @@ async fn validate_merge_pair(
         return Ok(errors); }} );
   let acquiree_pid : ID = (
     match pid_and_source_from_id(
-      &config.db_name, driver, acquiree_id).await?
+      graph, acquiree_id).await?
     { Some((pid, _source)) => pid,
       None => {
         errors.push(format!(

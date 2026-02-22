@@ -1,22 +1,22 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::dbs::neo4j::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use std::io;
 use std::path::Path;
 use std::fs;
 use serde_yaml;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn skgnode_from_id (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
   skgid  : &ID
 ) -> Result<SkgNode, Box<dyn Error>> {
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_id (
-      & config.db_name, driver, skgid
+      graph, skgid
     ). await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", skgid ) ) ?;
@@ -26,13 +26,13 @@ pub async fn skgnode_from_id (
 /// Fetch multiple SkgNodes from disk given a list of IDs.
 pub async fn skgnodes_from_ids (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
   ids    : &[ID],
 ) -> Result<Vec<SkgNode>, Box<dyn Error>> {
   let mut nodes : Vec<SkgNode> = Vec::new();
   for id in ids {
     let node : SkgNode =
-      skgnode_from_id ( config, driver, id ). await ?;
+      skgnode_from_id ( config, graph, id ). await ?;
     nodes . push ( node ); }
   Ok ( nodes ) }
 
@@ -55,11 +55,11 @@ pub fn skgnode_from_pid_and_source (
 /// ERRORS are propagated only if they are not of the 'not found' kind.
 pub async fn optskgnode_from_id (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
   skgid  : &ID
 ) -> Result<Option<SkgNode>, Box<dyn Error>> {
   match skgnode_from_id(
-    config, driver, skgid
+    config, graph, skgid
   ). await {
     Ok(skgnode) => Ok(Some(skgnode)),
     Err(e)      => {
@@ -75,11 +75,11 @@ pub async fn optskgnode_from_id (
 /// returns the empty vector.
 pub async fn fetch_aliases_from_file (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph  : &Graph,
   skgid  : ID,
 ) -> Vec<String> {
   match optskgnode_from_id(
-    config, driver, &skgid
+    config, graph, &skgid
   ). await {
     Ok ( Some ( skgnode )) =>
       skgnode.aliases.unwrap_or_default(),

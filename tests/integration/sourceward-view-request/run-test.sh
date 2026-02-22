@@ -86,7 +86,7 @@ trap enhanced_cleanup EXIT
 
 backup_and_reset_test_data
 
-check_typedb_server
+check_neo4j_server
 
 AVAILABLE_PORT=$(find_available_port)
 echo ""

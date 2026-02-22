@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 pub async fn complete_viewtree (
   forest             : &mut Tree<ViewNode>,
@@ -23,18 +23,18 @@ pub async fn complete_viewtree (
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  graph              : &Graph,
   errors             : &mut Vec<String>,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = forest . root () . id ();
   complete_preorder_recursive (
     forest, root_treeid,
-    map, defmap, source_diffs, config, driver,
+    map, defmap, source_diffs, config, graph,
     deleted_id_src_map ) . await ?;
   complete_postorder_recursive (
     forest, root_treeid,
-    map, defmap, source_diffs, config, driver,
+    map, defmap, source_diffs, config, graph,
     errors, deleted_id_src_map ) . await ?;
   Ok(( )) }
 
@@ -45,13 +45,13 @@ fn complete_preorder_recursive<'a> (
   defmap             : &'a mut DefinitiveMap,
   source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
   config             : &'a SkgConfig,
-  driver             : &'a TypeDBDriver,
+  graph              : &'a Graph,
   deleted_id_src_map : &'a HashMap<ID, SourceName>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     complete_preorder_for_one_node (
-      tree, treeid, map, defmap, source_diffs, config, driver,
+      tree, treeid, map, defmap, source_diffs, config, graph,
       deleted_id_src_map
     ) . await ?;
     let child_treeids : Vec<NodeId> =
@@ -60,7 +60,7 @@ fn complete_preorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_preorder_recursive (
         tree, child_treeid,
-        map, defmap, source_diffs, config, driver,
+        map, defmap, source_diffs, config, graph,
         deleted_id_src_map
       ) . await ?; }
     Ok(( )) }) }
@@ -72,7 +72,7 @@ fn complete_postorder_recursive<'a> (
   defmap             : &'a mut DefinitiveMap,
   source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
   config             : &'a SkgConfig,
-  driver             : &'a TypeDBDriver,
+  graph              : &'a Graph,
   errors             : &'a mut Vec<String>,
   deleted_id_src_map : &'a HashMap<ID, SourceName>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
@@ -84,11 +84,11 @@ fn complete_postorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_postorder_recursive (
         tree, child_treeid,
-        map, defmap, source_diffs, config, driver,
+        map, defmap, source_diffs, config, graph,
         errors, deleted_id_src_map
       ) . await ?; }
     complete_postorder_for_one_node (
-      tree, treeid, map, defmap, source_diffs, config, driver,
+      tree, treeid, map, defmap, source_diffs, config, graph,
       errors, deleted_id_src_map
     ) . await ?;
     Ok(( )) }) }
@@ -100,7 +100,7 @@ async fn complete_preorder_for_one_node (
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  graph              : &Graph,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
@@ -114,7 +114,7 @@ async fn complete_preorder_for_one_node (
       ViewNodeKind::Scaff( Scaffold::SubscribeeCol ) ) {
         super::complete_parent_first::subscribee_col::
         complete_subscribee_col_preorder (
-          treeid, tree, map, source_diffs, config, driver,
+          treeid, tree, map, source_diffs, config, graph,
           deleted_id_src_map
         ). await ?; }
   Ok(( )) }
@@ -126,7 +126,7 @@ async fn complete_postorder_for_one_node (
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  graph              : &Graph,
   errors             : &mut Vec<String>,
   deleted_id_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
@@ -135,7 +135,7 @@ async fn complete_postorder_for_one_node (
   if matches!( kind, ViewNodeKind::True( _ )) {
     super::complete_child_first::truenode::
     complete_truenode (
-      treeid, tree, map, defmap, config, driver,
+      treeid, tree, map, defmap, config, graph,
       errors, deleted_id_src_map ) . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff( Scaffold::AliasCol )) {

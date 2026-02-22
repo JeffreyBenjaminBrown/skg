@@ -21,29 +21,27 @@ SKG_CONFIG="${SKG_CONFIG:-data/default/skgconfig.toml}"
 #         is printed when it starts,
 #         and if buried can be found running `ps -af`.
 
-is_typedb_running() {
-  if pgrep -f 'typedb_server_bin' >/dev/null 2>&1; then
+is_neo4j_running() {
+  if neo4j status 2>/dev/null | grep -q 'is running'; then
     return 0  # It is
   else
     return 1  # It isn't
   fi
 }
 
-start_typedb() {
+start_neo4j() {
   echo ""
-  echo "Starting TypeDB server..."
-  nohup typedb server > logs/typedb.log 2>&1 < /dev/null &
-  echo "TypeDB server started in background (PID: $!)"
-  echo "Waiting for TypeDB server to be ready..."
+  echo "Starting Neo4j server..."
+  neo4j start
+  echo "Waiting for Neo4j server to be ready..."
   for i in {1..30}; do
-    # Wait for TypeDB to be ready (max 30 seconds)
-    if is_typedb_running; then
-      echo "TypeDB server is ready, and logging to logs/typedb.log."
+    if is_neo4j_running; then
+      echo "Neo4j server is ready."
       return 0
     fi
     sleep 1
   done
-  echo "Warning: TypeDB server may not be ready yet"
+  echo "Warning: Neo4j server may not be ready yet"
   return 1
 }
 
@@ -67,10 +65,10 @@ cleanup() { # trap handler for graceful shutdown
   pkill -f "cargo watch.*skg" 2>/dev/null || true
   pkill -f "cargo run --bin skg" 2>/dev/null || true
   sleep 1  # Give TypeDB a second to shutdown
-  if is_typedb_running; then
-    echo "TypeDB server was still running (a second after start-servers.sh initiated cleanup)."
+  if is_neo4j_running; then
+    echo "Neo4j server was still running (a second after start-servers.sh initiated cleanup)."
   else
-    echo "TypeDB server has shut down"
+    echo "Neo4j server has shut down"
   fi
   exit 0
 }
@@ -93,11 +91,11 @@ echo "kill -TERM -$$" >> bash/kill-servers.sh
 chmod +x                 bash/kill-servers.sh
 echo "Created bash/kill-servers.sh - run it to stop all servers"
 
-# Check and start TypeDB server if needed
-if is_typedb_running; then
-  echo "TypeDB server is already running"
+# Check and start Neo4j server if needed
+if is_neo4j_running; then
+  echo "Neo4j server is already running"
 else
-  start_typedb
+  start_neo4j
 fi
 
 # Start skg server with auto-restart

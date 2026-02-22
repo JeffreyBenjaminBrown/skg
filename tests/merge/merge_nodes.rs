@@ -2,22 +2,22 @@
 
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::merge::merge_nodes;
-use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
+use skg::test_utils::{run_with_test_db, all_pids_from_neo4j, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, forest_root_viewnode, default_truenode};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
-use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use skg::dbs::typedb::search::find_related_nodes;
+use skg::dbs::neo4j::search::contains_from_pids::contains_from_pids;
+use skg::dbs::neo4j::search::find_related_nodes;
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 fn mk_test_viewnode (
   title        : &str,
@@ -55,8 +55,8 @@ fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
     "skg-test-merge-2-into-1",
     "/tmp/merge-test-2-into-1-fixtures",
     "/tmp/tantivy-test-merge-2-into-1",
-    |config, driver, tantivy| Box::pin(async move {
-      test_merge_2_into_1_impl(config, driver, tantivy).await?;
+    |config, graph, tantivy| Box::pin(async move {
+      test_merge_2_into_1_impl(config, graph, tantivy).await?;
       Ok(( ))
     } ));
 
@@ -70,7 +70,7 @@ fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
 
 async fn test_merge_2_into_1_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode forest with node 1 requesting to merge node 2
@@ -83,7 +83,7 @@ async fn test_merge_2_into_1_impl(
     instructiontriples_from_the_merges_in_an_viewnode_forest(
       &forest,
       config,
-      driver,
+      graph,
   ).await?;
 
   // Expect 1 Merge (containing 3 DefineNodes)
@@ -95,35 +95,34 @@ async fn test_merge_2_into_1_impl(
     merge_instructions.clone(),
     config.clone(),
     tantivy,
-    driver,
+    graph,
   ).await?;
 
   // Verify results
-  verify_typedb_after_merge_2_into_1(
-    config, driver).await?;
+  verify_neo4j_after_merge_2_into_1(
+    config, graph).await?;
   verify_filesystem_after_merge_2_into_1(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
     tantivy, &merge_instructions )?;
   Ok(( )) }
 
-async fn verify_typedb_after_merge_2_into_1 (
+async fn verify_neo4j_after_merge_2_into_1 (
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
 ) -> Result<(), Box<dyn Error>> {
-  let db_name: &String = &config.db_name;
 
-  // Node 2 should be gone from TypeDB as primary node
+  // Node 2 should be gone from Neo4j as primary node
   let all_primary_node_ids: HashSet<ID> =
-    all_pids_from_typedb(
-      db_name, driver ). await ?;
+    all_pids_from_neo4j(
+      graph ). await ?;
   assert!(!all_primary_node_ids.contains(&ID::from("2")),
           "PID 2 should not exist. It was merged and deleted.");
 
   // Node 1 should have extra_ids: 2 and 2-extra-id
   let node_1_extra_ids: Vec<ID> =
     extra_ids_from_pid(
-      db_name, driver, &ID::from("1")).await?;
+      graph, &ID::from("1")).await?;
   assert!(node_1_extra_ids.contains(&ID::from("2")),
           "Node 1 should have extra_id '2'");
   assert!(node_1_extra_ids.contains(&ID::from("2-extra-id")),
@@ -131,12 +130,12 @@ async fn verify_typedb_after_merge_2_into_1 (
 
   // Node 1 should contain 7 things: [acquiree_text_preserver_id, 11, 12, overlap, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
   // IMPORTANT: contains_from_pids only returns relationships where BOTH nodes are in the input list, so we must include all the child nodes we want to check for. We query with all nodes in the DB.
-  let all_node_ids: HashSet<ID> = all_pids_from_typedb(db_name, driver).await?;
+  let all_node_ids: HashSet<ID> = all_pids_from_neo4j(graph).await?;
   let input_pids: Vec<ID> = all_node_ids.into_iter().collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
     = contains_from_pids(
-      db_name, driver, &input_pids ). await ?;
+      graph, &input_pids ). await ?;
 
   let node_1_contents: &HashSet<ID> =
     container_to_contents.get(
@@ -312,8 +311,8 @@ fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
     "skg-test-merge-1-into-2",
     "/tmp/merge-test-1-into-2-fixtures",
     "/tmp/tantivy-test-merge-1-into-2",
-    |config, driver, tantivy| Box::pin(async move {
-      test_merge_1_into_2_impl(config, driver, tantivy).await?;
+    |config, graph, tantivy| Box::pin(async move {
+      test_merge_1_into_2_impl(config, graph, tantivy).await?;
       Ok(( ))
     } ));
 
@@ -327,7 +326,7 @@ fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
 
 async fn test_merge_1_into_2_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode forest with node 2 requesting to merge node 1
@@ -340,7 +339,7 @@ async fn test_merge_1_into_2_impl(
     instructiontriples_from_the_merges_in_an_viewnode_forest(
       &forest,
       config,
-      driver,
+      graph,
   ).await?;
 
   // Expect 1 Merge (containing 3 DefineNodes)
@@ -352,35 +351,34 @@ async fn test_merge_1_into_2_impl(
     merge_instructions.clone(),
     config.clone(),
     tantivy,
-    driver,
+    graph,
   ).await?;
 
   // Verify results
-  verify_typedb_after_merge_1_into_2(
-    config, driver, &merge_instructions).await?;
+  verify_neo4j_after_merge_1_into_2(
+    config, graph, &merge_instructions).await?;
   verify_filesystem_after_merge_1_into_2(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
     tantivy, &merge_instructions)?;
   Ok(( )) }
 
-async fn verify_typedb_after_merge_1_into_2 (
+async fn verify_neo4j_after_merge_1_into_2 (
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   merge_instructions: &[Merge],
 ) -> Result<(), Box<dyn Error>> {
-  let db_name: &String = &config.db_name;
 
-  // Node 1 should be gone from TypeDB as primary node
+  // Node 1 should be gone from Neo4j as primary node
   let all_primary_node_ids: HashSet<ID> =
-    all_pids_from_typedb(db_name, driver).await?;
+    all_pids_from_neo4j(graph).await?;
   assert!(!all_primary_node_ids.contains(&ID::from("1")),
           "PID 1 should NOT exist (it was merged and deleted)");
 
   // Node 2 should have new extra_id '1',
   // in addition to its preexisting extra id '2-extra-id'.
   let node_2_extra_ids: Vec<ID> =
-    extra_ids_from_pid(db_name, driver, &ID::from("2")).await?;
+    extra_ids_from_pid(graph, &ID::from("2")).await?;
   assert!(node_2_extra_ids.contains(&ID::from("1")),
           "Node 2 should have extra_id '1'");
 
@@ -388,12 +386,12 @@ async fn verify_typedb_after_merge_1_into_2 (
   // relationships where BOTH nodes are in the input list,
   // so we query with all nodes in the DB.
   let all_node_ids: HashSet<ID> =
-    all_pids_from_typedb(db_name, driver).await?;
+    all_pids_from_neo4j(graph).await?;
   let input_pids: Vec<ID> = all_node_ids.into_iter().collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
     = contains_from_pids(
-      db_name, driver, &input_pids ). await ?;
+      graph, &input_pids ). await ?;
   let node_2_contents: &HashSet<ID> =
     container_to_contents.get(&ID::from("2"))
     .ok_or("Node 2 should have contains relationships")?;
@@ -419,8 +417,8 @@ async fn verify_typedb_after_merge_1_into_2 (
     &merge_instructions[0].targets_from_merge().0.ids[0];
   let acquiree_text_preserver_textlink_dests: HashSet<ID> =
     find_related_nodes(
-      db_name, driver, & [ acquiree_text_preserver_id . clone () ],
-      "textlinks_to", "source", "dest"
+      graph, & [ acquiree_text_preserver_id . clone () ],
+      "textlinks_to", "source"
     ). await ?;
   assert!(
     acquiree_text_preserver_textlink_dests.contains(&ID::from("1-links-to")),
@@ -429,8 +427,8 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - Node 2 should NOT have the outbound textlink from node 1
   //   (the textlink is in the text, which went to acquiree_text_preserver)
   let node_2_textlink_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("2") ],
-    "textlinks_to", "source", "dest" ). await ?;
+    graph, & [ ID::from("2") ],
+    "textlinks_to", "source" ). await ?;
   assert!(
     !node_2_textlink_dests.contains(&ID::from("1-links-to")),
     "Node 2 should NOT textlink to 1-links-to");
@@ -438,8 +436,8 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - The textlink from links-to-1 to 1 should now be from links-to-1 to 2
   //   (inbound textlinks target the acquirer because acquiree's ID becomes an extra_id)
   let links_to_1_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("links-to-1") ],
-    "textlinks_to", "source", "dest" ). await ?;
+    graph, & [ ID::from("links-to-1") ],
+    "textlinks_to", "source" ). await ?;
   assert!(links_to_1_dests.contains(&ID::from("2")),
           "links-to-1 should textlink to 2 (rerouted from 1)");
   assert!(!links_to_1_dests.contains(&ID::from("1")),
@@ -448,16 +446,16 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Subscribes relationships should be rerouted
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2
   let node_2_subscribes_to: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("2") ],
-    "subscribes", "subscriber", "subscribee" ). await ?;
+    graph, & [ ID::from("2") ],
+    "subscribes", "subscriber" ). await ?;
   assert!(node_2_subscribes_to.contains(&ID::from("1-subscribes-to")),
           "Node 2 should subscribe to 1-subscribes-to");
 
   // - subscribes-to-1, which subscribed to [1],
   // should now subscribe to [2]
   let subscribes_to_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("subscribes-to-1") ],
-    "subscribes", "subscriber", "subscribee" ). await ?;
+    graph, & [ ID::from("subscribes-to-1") ],
+    "subscribes", "subscriber" ). await ?;
   assert!(subscribes_to_1_targets.contains(&ID::from("2")),
           "subscribes-to-1 should subscribe to 2 (rerouted from 1)");
   assert!(!subscribes_to_1_targets.contains(&ID::from("1")),
@@ -468,7 +466,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - After merge: Node 2 should hide [hidden-from-1s-subscriptions] but NOT [hidden-from-subscriptions-of-1-but-in-content-of-2]
   //   because hidden-from-subscriptions-of-1-but-in-content-of-2 IS in node 2's contents.
   let node_2_hides: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("2") ], "hides_from_its_subscriptions", "hider", "hidden"
+    graph, & [ ID::from("2") ], "hides", "hider"
   ).await?;
   assert!(node_2_hides.contains(&ID::from("hidden-from-1s-subscriptions")),
           "Node 2 should hide hidden-from-1s-subscriptions (transferred from node 1)");
@@ -477,7 +475,7 @@ async fn verify_typedb_after_merge_1_into_2 (
 
   // - hides-1-from-subscriptions hid [1, 11] → should now hide [11] only (relationship hiding 1 is DROPPED)
   let hides_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("hides-1-from-subscriptions") ], "hides_from_its_subscriptions", "hider", "hidden"
+    graph, & [ ID::from("hides-1-from-subscriptions") ], "hides", "hider"
   ).await?;
   assert!(hides_1_targets.contains(&ID::from("11")),
           "hides-1-from-subscriptions should still hide 11");
@@ -487,15 +485,15 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Overrides relationships should be processed correctly
   // - Node 1's overrides [1-overrides-view-of] should transfer to node 2
   let node_2_overrides: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("2") ], "overrides_view_of", "replacement", "replaced"
+    graph, & [ ID::from("2") ], "overrides", "replacement"
   ).await?;
   assert!(node_2_overrides.contains(&ID::from("1-overrides-view-of")),
           "Node 2 should override view of 1-overrides-view-of (transferred from node 1)");
 
   // - overrides-view-of-1 that overrode [1] should have that relationship DROPPED (1 no longer exists to be replaced)
   let overrides_view_of_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from("overrides-view-of-1") ],
-    "overrides_view_of", "replacement", "replaced" ). await ?;
+    graph, & [ ID::from("overrides-view-of-1") ],
+    "overrides", "replacement" ). await ?;
   assert!(!overrides_view_of_1_targets.contains(&ID::from("1")) &&
           !overrides_view_of_1_targets.contains(&ID::from("2")),
           "overrides-view-of-1 should NOT override 1 or 2 (relationship to merged node is DROPPED)");

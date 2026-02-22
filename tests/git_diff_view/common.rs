@@ -5,16 +5,17 @@ pub use std::collections::HashMap;
 pub use std::error::Error;
 pub use std::fs;
 pub use std::path::{Path, PathBuf};
-pub use std::sync::Arc;
 pub use tempfile::TempDir;
 
-pub use futures::executor::block_on;
-pub use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Database};
+pub use tokio::runtime::Runtime;
+pub use neo4rs::Graph;
 
-pub use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+pub use skg::dbs::neo4j::util::delete_database;
+pub use skg::dbs::neo4j::schema::apply_schema;
+pub use skg::dbs::init::create_empty_tantivy_index;
 pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-pub use skg::dbs::typedb::nodes::create_all_nodes;
-pub use skg::dbs::typedb::relationships::create_all_relationships;
+pub use skg::dbs::neo4j::nodes::create_all_nodes;
+pub use skg::dbs::neo4j::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
@@ -72,7 +73,7 @@ pub async fn setup_test_dbs(
   db_name: &str,
   source_path: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
+) -> Result<(SkgConfig, Graph, TantivyIndex), Box<dyn Error>> {
   let config : SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources.insert(SourceName::from("main"), SkgfileSource {
@@ -83,10 +84,8 @@ pub async fn setup_test_dbs(
     SkgConfig::fromSourcesAndDbName(sources, db_name, tantivy_folder)
   };
 
-  let driver = TypeDBDriver::new(
-    "127.0.0.1:1729",
-    Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+  let graph : Graph = Graph::new(
+    "bolt://localhost:7687", "neo4j", "password"
   ).await?;
 
   let nodes : Vec<SkgNode> = {
@@ -99,25 +98,20 @@ pub async fn setup_test_dbs(
     read_all_skg_files_from_sources(
       &SkgConfig::dummyFromSources(sources))? };
 
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+  delete_database(&graph).await?;
+  apply_schema(&graph).await?;
+  create_all_nodes(&graph, &nodes).await?;
+  create_all_relationships(&graph, &nodes).await?;
 
   let tantivy_index = create_empty_tantivy_index(&config.tantivy_folder)?;
-  Ok((config, driver, tantivy_index))
+  Ok((config, graph, tantivy_index))
 }
 
 pub async fn cleanup_test_dbs(
-  db_name: &str,
-  driver: &TypeDBDriver,
+  graph: &Graph,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
-  let databases = driver.databases();
-  if databases.contains(db_name).await? {
-    let database: Arc<Database> = databases.get(db_name).await?;
-    database.delete().await?;
-  }
+  delete_database(graph).await?;
   if let Some(path) = tantivy_folder {
     if path.exists() { fs::remove_dir_all(path)?; }
   }

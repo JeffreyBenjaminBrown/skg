@@ -9,14 +9,14 @@ use super::common::*;
 fn test_delete_removed_node_respawns()
   -> Result<(), Box<dyn Error>>
 {
-  run_save_test("skg-test-save-del-removed", |config, driver, tantivy, repo_path| {
+  run_save_test("skg-test-save-del-removed", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // Scenario: User deletes the gets-removed line
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "gets-removed");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: gets-removed.skg should still not exist
       assert!(!repo_path.join("gets-removed.skg").exists(),
@@ -43,14 +43,14 @@ fn test_delete_removed_node_respawns()
 fn test_delete_removed_here_node_respawns()
   -> Result<(), Box<dyn Error>>
 {
-  run_save_test("skg-test-save-del-removed-here", |config, driver, tantivy, repo_path| {
+  run_save_test("skg-test-save-del-removed-here", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // User deletes the removed-here node under 12 (called 'moves')
       let input =
         without_lines_containing(GIT_DIFF_VIEW, "removed-here");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: 12.skg should still have empty contains
       let node_12 = read_skgnode(repo_path, "12")?;
@@ -76,13 +76,13 @@ fn test_delete_removed_here_node_respawns()
 fn test_delete_new_here_updates_disk()
   -> Result<(), Box<dyn Error>>
 {
-  run_save_test("skg-test-save-del-new-here", |config, driver, tantivy, repo_path| {
+  run_save_test("skg-test-save-del-new-here", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // User deleted 'moves' under 11 (the new-here one)
       let input = without_lines_containing(GIT_DIFF_VIEW, "new-here");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: 11.skg should no longer contain moves
       let node_11 = read_skgnode(repo_path, "11")?;
@@ -108,7 +108,7 @@ fn test_delete_new_here_updates_disk()
 fn test_add_new_child_creates_on_disk()
   -> Result<(), Box<dyn Error>>
 {
-  run_save_test("skg-test-save-add-child", |config, driver, tantivy, repo_path| {
+  run_save_test("skg-test-save-add-child", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // User added 'newer' as child of 12
       let input = insert_after(
@@ -117,7 +117,7 @@ fn test_add_new_child_creates_on_disk()
         "*** (skg (node (id newer))) newer");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, graph, config, tantivy, true).await?;
 
       // DISK: newer.skg should be created with correct id and title
       assert!(repo_path.join("newer.skg").exists(),
@@ -152,7 +152,7 @@ fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a TypeDBDriver,
+    &'a Graph,
     &'a TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -163,13 +163,14 @@ where
   let repo_path = temp_dir.path();
   setup_git_repo_with_fixtures(repo_path)?;
 
-  block_on(async {
-    let (config, driver, tantivy) =
+  { let rt : Runtime = Runtime::new()?;
+  rt.block_on(async {
+    let (config, graph, tantivy) =
       setup_test_dbs(db_name, repo_path.to_str().unwrap(), &tantivy_folder).await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path).await;
+    let result = test_fn(&config, &graph, &tantivy, repo_path).await;
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(&tantivy_folder))).await?;
+    cleanup_test_dbs(&graph, Some(Path::new(&tantivy_folder))).await?;
     result
-  })
+  }) }
 }

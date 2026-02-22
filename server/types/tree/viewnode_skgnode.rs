@@ -16,7 +16,7 @@ use super::generic::with_node_mut;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
 
 /// Extract (ID, source) from a TrueNode in the tree.
 /// Returns an error if the node is not found or not a TrueNode.
@@ -146,11 +146,11 @@ pub async fn append_indefinitive_from_disk_as_child (
   node_id        : &ID,
   parent_ignores : bool,
   config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  graph          : &Graph,
 ) -> Result < (), Box<dyn Error> > {
   let ( _skgnode, content_viewnode ) : ( SkgNode, ViewNode ) =
     skgnode_and_viewnode_from_id (
-      config, driver, node_id, map ) . await ?;
+      config, graph, node_id, map ) . await ?;
   let (id, source, title) : (ID, SourceName, String)
   = match &content_viewnode.kind
   { ViewNodeKind::True(t) => (

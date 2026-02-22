@@ -2,7 +2,7 @@
 
 # Integration test for skg title-matches functionality
 # This script:
-# - Verifies TypeDB server is running
+# - Verifies Neo4j server is running
 # - Starts an independent cargo run process with test config
 # - Uses Emacs to send title-matches request for "apples"
 # - Tests that Emacs receives search results and can visit links
@@ -24,7 +24,7 @@ cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
 
 trap cleanup EXIT
 
-check_typedb_server
+check_neo4j_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)

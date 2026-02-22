@@ -1,33 +1,27 @@
-// PURPOSE: Initialize TypeDB and Tantivy databases.
+// PURPOSE: Initialize Neo4j and Tantivy databases.
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::tantivy::update_index_with_nodes;
-use crate::dbs::typedb::nodes::create_all_nodes;
-use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::neo4j::nodes::create_all_nodes;
+use crate::dbs::neo4j::relationships::create_all_relationships;
+use crate::dbs::neo4j::schema::apply_schema;
+use crate::dbs::neo4j::util::delete_database;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
-use futures::executor::block_on;
 use std::error::Error;
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tantivy::{schema, Index};
-use typedb_driver::{
-  Credentials,
-  Database,
-  DatabaseManager,
-  DriverOptions,
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
+use neo4rs::Graph;
+use tokio::runtime::Handle;
 
 /// Reads all SkgNodes from disk, then uses that data
-/// to initialize both databases (TypeDB and Tantivy).
+/// to initialize both databases (Neo4j and Tantivy).
 pub fn initialize_dbs (
   config : & SkgConfig,
-) -> (Arc<TypeDBDriver>, TantivyIndex) {
+  handle : & Handle,
+) -> (Arc<Graph>, TantivyIndex) {
 
   println!("Reading .skg files from all sources...");
   let nodes: Vec<SkgNode> =
@@ -38,64 +32,59 @@ pub fn initialize_dbs (
   println!("{} .skg files were read from {} source(s)",
            nodes.len(), config.sources.len());
 
-  let typedb_driver: Arc<TypeDBDriver> =
-    initialize_typedb_from_nodes ( config, &nodes );
+  let graph: Arc<Graph> =
+    initialize_neo4j_from_nodes ( config, &nodes, handle );
   let tantivy_index: TantivyIndex =
     initialize_tantivy_from_nodes ( config, &nodes );
 
-  (typedb_driver, tantivy_index) }
+  (graph, tantivy_index) }
 
-pub fn initialize_typedb_from_nodes (
+pub fn initialize_neo4j_from_nodes (
   config : & SkgConfig,
-  nodes: &[SkgNode],
-) -> Arc<TypeDBDriver> {
-  // Connects to the TypeDB server,
-  // then populates it with the provided SkgNodes.
+  nodes  : &[SkgNode],
+  handle : & Handle,
+) -> Arc<Graph> {
 
-  println!("Initializing TypeDB database...");
-  let driver: TypeDBDriver = block_on ( async {
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None).unwrap() )
-      . await
+  println!("Initializing Neo4j database...");
+  let graph: Graph = handle.block_on ( async {
+    Graph::new(
+      &config.neo4j_uri,
+      &config.neo4j_user,
+      &config.neo4j_password,
+    ) . await
       . unwrap_or_else ( |e| {
-        eprintln!("Error connecting to TypeDB: {}", e);
+        eprintln!("Error connecting to Neo4j: {}", e);
         std::process::exit(1); } ) } );
 
-  block_on ( async {
-    // Recreate the database from scratch
-    if let Err (e) = overwrite_new_empty_db (
-      & config . db_name,
-      & driver,
+  handle.block_on ( async {
+    // Clear any existing data
+    if let Err (e) = delete_database (
+      & graph,
     ) . await {
-      eprintln! ( "Failed to create empty database: {}", e );
+      eprintln! ( "Failed to clear database: {}", e );
       std::process::exit(1); }
 
-    if let Err (e) = define_schema (
-      & config . db_name,
-      & driver,
+    if let Err (e) = apply_schema (
+      & graph,
     ) . await {
-      eprintln! ( "Failed to define schema: {}", e );
+      eprintln! ( "Failed to apply schema: {}", e );
       std::process::exit(1); }
 
     if let Err (e) = create_all_nodes (
-      & config . db_name,
-      & driver,
+      & graph,
       nodes,
     ) . await {
       eprintln! ( "Failed to create nodes: {}", e );
       std::process::exit(1); }
 
     if let Err (e) = create_all_relationships (
-      & config . db_name,
-      & driver,
+      & graph,
       nodes,
     ) . await {
       eprintln! ( "Failed to create relationships: {}", e );
       std::process::exit(1); }} );
-  println!("TypeDB database initialized successfully.");
-  Arc::new( driver ) }
+  println!("Neo4j database initialized successfully.");
+  Arc::new( graph ) }
 
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
@@ -158,39 +147,3 @@ pub fn in_fs_wipe_index_then_create_it (
   let indexed_count: usize =
     update_index_with_nodes ( nodes, & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
-
-pub async fn overwrite_new_empty_db (
-  // Destroys the db named `db_name` if it exists,
-  // then makes a new, empty one.
-  db_name : &str,
-  driver  : &TypeDBDriver
-) -> Result < (), Box<dyn Error> > {
-
-  let databases : &DatabaseManager = driver.databases ();
-  if databases.contains (db_name) . await ? {
-    println! ( "Deleting existing database '{}'...",
-                db_name );
-    { let database : Arc<Database> =
-        databases.get (db_name) . await ?;
-      database } . delete () . await ?; }
-  println! ( "Creating empty database '{}'...", db_name );
-  databases.create (db_name) . await ?;
-  Ok (()) }
-
-pub async fn define_schema (
-  db_name : &str,
-  driver  : &TypeDBDriver
-)-> Result < (), Box<dyn Error> > {
-
-  let tx : Transaction =
-    driver.transaction ( db_name,
-                         TransactionType::Schema )
-    . await ?;
-  println! ( "Defining schema ..." );
-  tx.query ( {
-    let schema : String = fs::read_to_string
-      ("schema.tql")
-      . expect ( "Failed to read TypeDB schema file" );
-    schema } ) . await ?;
-  tx.commit () . await ?;
-  Ok (()) }

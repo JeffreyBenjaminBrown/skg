@@ -7,10 +7,10 @@ use crate::serve::util::{
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::{SkgConfig, ID};
 
-use futures::executor::block_on;
 use sexp::Sexp;
 use std::net::TcpStream; // handles two-way communication
-use typedb_driver::TypeDBDriver;
+use neo4rs::Graph;
+use tokio::runtime::Handle;
 
 /// Gets a node id from the request,
 /// generates an org view of that id's content (recursively),
@@ -19,17 +19,18 @@ use typedb_driver::TypeDBDriver;
 pub fn handle_single_root_view_request (
   stream            : &mut TcpStream,
   request           : &str,
-  typedb_driver     : &TypeDBDriver,
+  graph             : &Graph,
   config            : &SkgConfig,
   diff_mode_enabled : bool,
+  handle            : &Handle,
 ) {
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
       let response_sexp : String =
         timed ( config, "single_root_view", || {
-          block_on ( async {
+          handle.block_on ( async {
             match single_root_view (
-              typedb_driver,
+              graph,
               config,
               &node_id,
               diff_mode_enabled ) . await
