@@ -3,6 +3,7 @@ pub mod reconcile_same_id_instructions;
 
 use crate::types::misc::SkgConfig;
 use crate::types::save::DefineNode;
+use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::viewnode::ViewNode;
 
 use to_naive_instructions::naive_saveinstructions_from_tree;
@@ -20,7 +21,8 @@ use std::error::Error;
 pub async fn viewnode_forest_to_nonmerge_save_instructions (
   forest : &Tree<ViewNode>, // "forest" = tree with BufferRoot
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  driver : &TypeDBDriver,
+  pool   : &SkgNodeMap
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
@@ -32,6 +34,6 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
   for instr in instructions_without_dups {
     result . push (
       supplement_none_fields_from_disk_if_save (
-        config, driver, instr
+        config, driver, pool, instr
       ). await ? ); }
   Ok (result) }

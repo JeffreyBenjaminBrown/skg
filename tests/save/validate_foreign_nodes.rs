@@ -11,6 +11,7 @@ use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::SkgConfig;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::skgnode::SkgNode;
+use skg::types::skgnodemap::SkgNodeMap;
 use futures::executor::block_on;
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -53,7 +54,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     assert!(result.is_ok(), "Unmodified foreign node should be allowed");
 
@@ -79,7 +80,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Modified foreign node should be rejected");
@@ -114,7 +115,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Foreign node with modified body should be rejected");
@@ -142,7 +143,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver).await;
+      org_text, &config, &driver, &SkgNodeMap::new()).await;
 
     // Should succeed - indefinitive foreign nodes are allowed but filtered
     assert!(result.is_ok(), "Indefinitive foreign node should be allowed");
@@ -170,7 +171,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should succeed - owned nodes can be modified
     assert!(result.is_ok(), "Owned node modification should be allowed");
@@ -197,7 +198,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Deleting foreign node should be rejected");
@@ -227,7 +228,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail with ModifiedForeignNode error
     assert!(result.is_err(), "Creating new foreign node should be rejected");
@@ -260,7 +261,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should succeed
     assert!(result.is_ok(), "Mixed owned and unmodified foreign should be allowed");
@@ -297,7 +298,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail - can't merge into foreign node (would modify it)
     assert!(result.is_err(), "Merge into foreign acquirer should be rejected");
@@ -328,7 +329,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should fail - can't merge foreign node (would delete it)
     assert!(result.is_err(), "Merge with foreign acquiree should be rejected");
@@ -358,7 +359,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ). await;
 
     // Should succeed - both nodes are owned
     assert!(result.is_ok(), "Merge with both owned nodes should be allowed");

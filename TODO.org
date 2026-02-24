@@ -1,9 +1,21 @@
+* ONGOING skgnodes-in-memory-request.org
+** replace rerender_collateral_view_from_scratch
+   which might make the 'root_pids' field obsolete
+** extend completion to cover deletion
+** test multi-buffer edits
+   A cycle a <-> b.
+   Open a view from a and a view from b.
+   In the view from a, delete b as a child.
+   Now the view from b should only have definitive nodes b -> a,
+   rather than b -> a -> (indef b).
+* fix some integration tests
 * TODO merge & export these notes
 ** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
 ** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * internalizing
+** don't erase discussion in plan until it is settled
 ** move 'merge' into the type containing 'save' and 'delete'.
 ** identify relevant extant tooling when asking for a given task
    Even if vague, like

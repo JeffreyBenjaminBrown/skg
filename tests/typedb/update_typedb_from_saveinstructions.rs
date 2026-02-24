@@ -11,6 +11,7 @@ use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::save::DefineNode;
+use skg::types::skgnodemap::SkgNodeMap;
 use ego_tree::Tree;
 use indoc::indoc;
 
@@ -54,7 +55,7 @@ fn test_update_nodes_and_relationships2 (
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<DefineNode> =
       viewnode_forest_to_nonmerge_save_instructions (
-        & forest, & config, & driver ) . await ?;
+        & forest, & config, & driver, & SkgNodeMap::new() ). await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (

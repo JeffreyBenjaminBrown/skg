@@ -9,6 +9,7 @@ pub mod viewnode;
 pub mod unchecked_viewnode;
 pub mod skgnode;
 pub mod skgnodemap;
+pub mod skg_memory;
 pub mod save;
 pub mod tree;
 pub mod maps;

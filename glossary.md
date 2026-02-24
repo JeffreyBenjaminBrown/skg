@@ -2,6 +2,12 @@ Some terms and abbreviations used in this code.
 
 # Terms and abbreviations specific to Skg
 
+## "buffer", or sometimes "forest"
+
+Buffer is a term from Emacs.
+Each view onto the graph is represented via a separate buffer.
+Each buffer is a forest of "viewnodes".
+
 ## "child" and "parent"
 
 The TypeDB graph contains a number of relationships -- 'contains', 'textlinks to', etc. Where in this code the terms "child" or "parent" are used, it refers to none of those TypeDB relations, but rather the relationship between headlines in an Emacs org mode buffer. (I have tried to stick to the more precise "org-child" and "org-parent".)

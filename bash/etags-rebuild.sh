@@ -27,6 +27,9 @@ RUST_REGEXES=(
   --regex='/^[ \t]*mod[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^[ \t]*pub[ \t]+mod[ \t]+\([a-zA-Z0-9_]+\)/\1/'
   --regex='/^macro_rules![ \t]+\([a-zA-Z0-9_]+\)/\1/'
+  # Struct/enum fields: "  pub field_name: ..." or "  field_name: ..."
+  --regex='/^[ \t]+pub[ \t]+\([a-zA-Z0-9_]+\)[ \t]*:/\1/'
+  --regex='/^[ \t]+\([a-zA-Z0-9_]+\)[ \t]*:/\1/'
 )
 
 # Process .el files with default elisp support

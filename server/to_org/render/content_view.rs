@@ -14,7 +14,7 @@ use crate::org_to_text::viewnode_forest_to_string;
 use crate::to_org::render::diff::apply_diff_to_forest;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
@@ -31,7 +31,8 @@ pub async fn single_root_view (
   config            : &SkgConfig,
   root_id           : &ID,
   diff_mode_enabled : bool,
-) -> Result < String, Box<dyn Error> > {
+) -> Result < (String, SkgNodeMap, Vec<ID>),
+              Box<dyn Error> > {
   multi_root_view (
     driver,
     config,
@@ -44,7 +45,8 @@ pub async fn multi_root_view (
   config            : &SkgConfig,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
-) -> Result < String, Box<dyn Error> > {
+) -> Result < (String, SkgNodeMap, Vec<ID>),
+              Box<dyn Error> > {
   let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     timed_async ( config, "render_initial_forest_bfs",
                   render_initial_forest_bfs (
@@ -64,7 +66,14 @@ pub async fn multi_root_view (
     apply_diff_to_forest (
       &mut forest, &source_diffs,
       &deleted_id_src_map, config ) ?; }
+  let pids : Vec<ID> = {
+    // Collect PIDs from forest before rendering to string.
+    let mut ids : Vec<ID> = Vec::new ();
+    for node_ref in forest . root () . descendants () {
+      if let ViewNodeKind::True ( t ) = &node_ref . value () . kind
+        { ids . push ( t . id . clone () ); }}
+    ids };
   let buffer_content : String =
     timed ( config, "viewnode_forest_to_string",
             || viewnode_forest_to_string ( & forest )) ?;
-  Ok ( buffer_content ) }
+  Ok ((buffer_content, map, pids)) }

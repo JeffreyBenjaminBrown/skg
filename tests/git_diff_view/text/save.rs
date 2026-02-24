@@ -17,7 +17,7 @@ fn test_delete_text_changed_scaffold_respawns()
         GIT_DIFF_VIEW, "textChanged");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: 1.skg should still have the new title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -31,7 +31,7 @@ fn test_delete_text_changed_scaffold_respawns()
 
       // BUFFER: textChanged scaffolds should respawn
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(( )) }) }) }
 
 /// Editing a node with textChanged should update the disk normally.
@@ -47,7 +47,7 @@ fn test_edit_text_changed_node_updates_disk()
         "1 has a new title.", "1 has an even newer title.");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: 1.skg should have the newest title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -55,7 +55,8 @@ fn test_edit_text_changed_node_updates_disk()
         "1.skg should have the edited title");
 
       // BUFFER: textChanged scaffold should still appear (still differs from HEAD)
-      assert!(response.buffer_content.contains("textChanged"),
+      assert!(
+        response . response . saved_view . contains("textChanged"),
         "textChanged scaffold should still appear");
       Ok(())
     })
@@ -77,7 +78,7 @@ fn test_edit_text_changed_scaffold_respawns()
         "** (skg textChanged) User edited this scaffold.");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -85,10 +86,9 @@ fn test_edit_text_changed_scaffold_respawns()
         "1.skg should be unchanged");
 
       // BUFFER: textChanged scaffolds respawn with original text
-      assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
-      Ok(()) }) })
-}
+      assert_buffer_contains( &response . response . saved_view,
+                              GIT_DIFF_VIEW);
+      Ok (( )) }) }) }
 
 /// Moving a textChanged scaffold should be a no-op.
 /// The scaffold respawns in its original location.
@@ -111,7 +111,7 @@ fn test_move_text_changed_scaffold_respawns()
 ";
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -120,7 +120,7 @@ fn test_move_text_changed_scaffold_respawns()
 
       // BUFFER: textChanged scaffolds should respawn in correct locations
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -139,7 +139,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
         "*** (skg textChanged)");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: No changes should occur
       let node_12 = read_skgnode(repo_path, "12")?;
@@ -152,7 +152,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
       // BUFFER: textChanged scaffolds should respawn in their correct locations
       // (under nodes 1 and 11, not under 12)
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 

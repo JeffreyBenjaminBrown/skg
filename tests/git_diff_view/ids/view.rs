@@ -19,7 +19,8 @@ fn test_ids_diff_shows_id_col_scaffold()
       setup_test_dbs(db_name, repo_path.to_str().unwrap(), tantivy_folder).await?;
 
     let root_ids = vec![ID("1".to_string())];
-    let actual = multi_root_view(&driver, &config, &root_ids, true).await?;
+    let (actual, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+      multi_root_view(&driver, &config, &root_ids, true).await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 

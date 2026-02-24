@@ -23,14 +23,15 @@ fn test_newhere_cycle_survives_save()
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1".to_string())];
-    let initial_view =
+    let (initial_view, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
       multi_root_view(&driver, &config, &root_ids, true).await?;
 
     // Round-trip through the save pipeline.
     let response = update_from_and_rerender_buffer(
-      &initial_view, &driver, &config, &tantivy, true).await?;
+      &initial_view, &driver, &config, &tantivy, true, SkgNodeMap::new() ).await?;
 
-    assert_buffer_contains(&response.buffer_content, GIT_DIFF_VIEW);
+    assert_buffer_contains( &response . response . saved_view,
+                            GIT_DIFF_VIEW);
 
     cleanup_test_dbs(db_name, &driver, Some(Path::new(tantivy_folder))).await?;
     Ok(())

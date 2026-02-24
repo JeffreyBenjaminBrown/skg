@@ -9,8 +9,13 @@ use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Type alias for the new map-based approach.
-/// Maps node IDs to their corresponding SkgNodes.
+/// Per-request working set of SkgNodes, keyed by PID.
+/// Created fresh per request, seeded from SkgnodesInMemory.pool,
+/// mutated during request processing (complete_viewtree adds nodes
+/// via skgnode_from_map_or_disk), and merged back into the pool
+/// after the request succeeds. Provides transactional isolation:
+/// if the request fails, the pool stays clean.
+/// See also: SkgnodesInMemory (the persistent, cross-request layer).
 pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
 /// Extract SkgNode for an ViewNode from the map (tried first) or disk.

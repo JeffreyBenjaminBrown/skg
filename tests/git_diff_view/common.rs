@@ -19,12 +19,15 @@ pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
 pub use skg::types::skgnode::SkgNode;
+pub use skg::types::skgnodemap::SkgNodeMap;
 
 //
 // Git helpers
 //
 
-pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
+pub fn copy_dir_all ( src: &Path,
+                      dst: &Path
+                    ) -> Result<(), Box<dyn Error>> {
   if !dst.exists() { fs::create_dir_all(dst)?; }
   for entry in fs::read_dir(src)? {
     let entry = entry?;
@@ -33,11 +36,8 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
     if entry.file_type()?.is_dir() {
       copy_dir_all(&src_path, &dst_path)?;
     } else {
-      fs::copy(&src_path, &dst_path)?;
-    }
-  }
-  Ok(())
-}
+      fs::copy(&src_path, &dst_path)?; }}
+  Ok (( )) }
 
 pub fn configure_git_user(repo: &Repository) {
   let mut config = repo.config().unwrap();

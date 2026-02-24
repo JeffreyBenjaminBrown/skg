@@ -8,6 +8,7 @@ use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::skgnodemap::SkgNodeMap;
 
 async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
   config    : &SkgConfig,
@@ -16,7 +17,7 @@ async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
 ) -> Result<SkgNode, Box<dyn Error>> {
   let result : DefineNode =
     supplement_none_fields_from_disk_if_save (
-      config, driver,
+      config, driver, &SkgNodeMap::new(),
       DefineNode::Save(SaveNode(user_node)) ). await ?;
   match result {
     DefineNode::Save(SaveNode(node)) => Ok(node),

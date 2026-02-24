@@ -11,6 +11,7 @@ use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
+use skg::types::skgnodemap::SkgNodeMap;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
@@ -165,7 +166,8 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &driver,
+        &SkgNodeMap::new()
       ).await;
 
       assert!(result.is_err(), "Expected errors for foreign node modifications");
@@ -231,7 +233,8 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &driver,
+        &SkgNodeMap::new()
       ).await;
 
       assert!(result.is_err(),
@@ -318,7 +321,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &driver,
+        &SkgNodeMap::new()
       ).await;
 
       assert!(result.is_err(), "Expected DiskSourceBufferSourceConflict error");
@@ -361,7 +365,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
         &config,
-        &driver
+        &driver,
+        &SkgNodeMap::new()
       ).await;
 
       println!("\n=== InconsistentSources test ===");

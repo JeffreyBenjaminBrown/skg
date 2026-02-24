@@ -15,6 +15,9 @@ use std::str::FromStr;
 // Type declarations
 //
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ViewUri ( pub String );
+
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
 pub struct ViewNode {

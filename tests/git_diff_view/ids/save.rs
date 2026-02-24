@@ -17,7 +17,7 @@ fn test_delete_id_col_scaffold_respawns()
         GIT_DIFF_VIEW, "skg id");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -32,7 +32,7 @@ fn test_delete_id_col_scaffold_respawns()
 
       // BUFFER: idCol scaffold should respawn
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -50,7 +50,7 @@ fn test_delete_id_scaffolds_respawns()
         GIT_DIFF_VIEW, "(skg id)");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -59,7 +59,7 @@ fn test_delete_id_scaffolds_respawns()
 
       // BUFFER: id scaffolds should respawn
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -77,7 +77,7 @@ fn test_edit_id_scaffold_respawns()
         "(diff new)) 2'", "(diff new)) 2-modified");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -88,7 +88,7 @@ fn test_edit_id_scaffold_respawns()
 
       // BUFFER: id scaffolds should respawn with original values
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -113,7 +113,7 @@ fn test_move_id_scaffolds_to_child_respawns()
 ";
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
 
       // DISK: child.skg should not have any new ids
       let node_child = read_skgnode(repo_path, "child")?;
@@ -129,7 +129,7 @@ fn test_move_id_scaffolds_to_child_respawns()
 
       // BUFFER: id scaffolds should respawn under node 1
       assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
+        &response.response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 

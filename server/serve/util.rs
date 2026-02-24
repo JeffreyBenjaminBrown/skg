@@ -1,4 +1,5 @@
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::viewnode::ViewUri;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;
@@ -35,6 +36,12 @@ pub fn request_type_from_request (
       "Failed to parse S-expression: {}", e ) ) ?;
   extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
 
+pub fn view_uri_from_request (
+  request : &str,
+) -> Result<ViewUri, String> {
+  value_from_request_sexp ( "view-uri", request )
+    . map ( ViewUri ) }
+
 /// Extract a value from a request like
 /// ((request . "type") (key . 'xyz))
 pub fn value_from_request_sexp (
@@ -66,6 +73,38 @@ pub(super) fn format_buffer_response_sexp (
           . map ( |e| Sexp::Atom (
             Atom::S ( e . clone () )) )
           . collect () ) ] ) ] )
+    . to_string () }
+
+/// Format buffer content, errors, and other-views-to-update as an s-expression.
+/// Format: ((content "...") (errors ("e1" ...)) (other-views-to-update (("URI1" "c1") ...)))
+pub(super) fn format_buffer_response_sexp_with_updates (
+  buffer_content   : &str,
+  errors           : &[String],
+  collateral_views : &[(ViewUri, String)],
+) -> String {
+  let collateral_views_sexp : Sexp =
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "other-views-to-update" . to_string () )),
+      Sexp::List (
+        collateral_views
+          . iter ()
+          . map ( |(uri, content)| Sexp::List ( vec! [
+            Sexp::Atom ( Atom::S ( uri . 0 . clone () )),
+            Sexp::Atom ( Atom::S ( content . clone () )) ] ) )
+          . collect () ) ] );
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "errors" . to_string () )),
+      Sexp::List (
+        errors
+          . iter ()
+          . map ( |e| Sexp::Atom (
+            Atom::S ( e . clone () )) )
+          . collect () ) ] ),
+    collateral_views_sexp ] )
     . to_string () }
 
 /// Reads length-prefixed content from the stream.

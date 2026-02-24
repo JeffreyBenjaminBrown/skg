@@ -20,6 +20,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::test_utils::run_with_test_db;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
+use skg::types::skgnodemap::SkgNodeMap;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
@@ -353,13 +354,11 @@ async fn test_recursive_document (
   driver  : &TypeDBDriver,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
-  let result_org_text : String =
-    single_root_view (
-      driver,
-      config,
-      &ID ( "a".to_string () ),
-      false
-    ) . await ?;
+  let (result_org_text, _map, _pids)
+    : (String, SkgNodeMap, Vec<ID>)
+    = single_root_view (
+          driver, config, &ID ( "a".to_string () ), false
+        ). await ?;
   let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes ( & result_org_text )
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;

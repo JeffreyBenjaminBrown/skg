@@ -24,6 +24,7 @@ use viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
 use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
 
 use crate::serve::timing_log::{timed, timed_async};
+use crate::types::skgnodemap::SkgNodeMap;
 
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -31,7 +32,8 @@ use typedb_driver::TypeDBDriver;
 pub async fn buffer_to_viewnode_forest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver
+  driver      : &TypeDBDriver,
+  pool        : &SkgNodeMap
 ) -> Result< ( Tree<ViewNode>,
                Vec<DefineNode>,
                Vec<Merge> ),
@@ -65,7 +67,7 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
   let nonmerge_instructions : Vec<DefineNode> =
     timed_async ( config, "viewnode_forest_to_nonmerge_save_instructions",
       viewnode_forest_to_nonmerge_save_instructions (
-        & viewnode_forest, config, driver )
+        & viewnode_forest, config, driver, pool )
     ). await . map_err ( SaveError::DatabaseError ) ?;
   let nonmerge_instructions : Vec<DefineNode> =
     timed_async ( config, "validate_and_filter_foreign_instructions",

@@ -8,6 +8,7 @@ use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
+use skg::types::skgnodemap::SkgNodeMap;
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::error::Error;
@@ -57,12 +58,9 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test(db_name).await?;
-    let result: String = single_root_view(
-      &driver,
-      &config,
-      &ID("1".to_string()),
-      false,
-    ).await?;
+    let (result, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+      single_root_view( &driver, &config, &ID("1".to_string()), false
+                      ).await?;
     println!("SubscribeeCol test result:\n{}", result);
 
     // Nodes 11 and 12 subscribe to something, so they get SubscribeeCol children.

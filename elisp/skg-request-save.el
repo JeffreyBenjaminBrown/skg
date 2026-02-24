@@ -7,6 +7,7 @@
 (require 'skg-org-fold)
 (require 'skg-focus)
 (require 'skg-metadata)
+(require 'skg-buffer)
 
 (defun skg-request-save-buffer ()
   "Send the current buffer contents to Rust for processing.
@@ -20,7 +21,8 @@ which will replace the current buffer contents."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (buffer-contents (buffer-string))
          (request-s-exp (concat (prin1-to-string
-                                 `((request . "save buffer")))
+                                 `((request . "save buffer")
+                                   (view-uri . ,skg-view-uri)))
                                 "\n"))
          (content-bytes (encode-coding-string buffer-contents 'utf-8))
          (content-length (length content-bytes))
@@ -45,29 +47,36 @@ which will replace the current buffer contents."
     (process-send-string tcp-proc buffer-contents)))
 
 (defun skg-handle-save-sexp (sexp-string)
-  "Parse and handle save response s-exp: ((content ...) (errors ...))."
+  "Parse and handle save response s-exp: ((content ...) (errors (...)) (other-views-to-update ((URI_1 CONTENT_1) ...)))."
   (condition-case err
       (let* ((response (read sexp-string))
-             (content-pair (assoc 'content response))
-             (errors-pair (assoc 'errors response))
-             (content-value (cadr content-pair))
-             (errors-list (cadr errors-pair)))
-        ;; If content is not nil, update the buffer
-        (when content-value
+             (content-value         (cadr (assoc 'content response)))
+             (errors-list           (cadr (assoc 'errors response)))
+             (other-views-to-update (cadr (assoc 'other-views-to-update response))))
+        (when ;; If content is not nil, update the saved buffer
+            content-value
           (skg-replace-buffer-with-new-content nil content-value))
-        ;; If there are errors, show them
-        (when errors-list
-          (let ((errors-text (if (listp errors-list)
-                                 (mapconcat 'identity errors-list "\n\n")
-                               errors-list)))
+        (when other-views-to-update ;; Maybe update other views too
+          (dolist (entry other-views-to-update)
+            (let* ((uri (car entry))
+                   (new-content (cadr entry))
+                   (buf (skg-find-buffer-by-uri uri)))
+              (when buf
+                (with-current-buffer buf
+                  (skg-replace-buffer-with-new-content
+                   nil new-content)) )) ))
+        (when errors-list ;; If there are errors, show them
+          (let ((errors-text
+                 (if (listp errors-list)
+                     (mapconcat 'identity errors-list "\n\n")
+                   errors-list)))
             (if content-value
-                ;; Success with warnings
-                (skg-show-save-warnings errors-text)
-              ;; Failure with errors
-              (skg-show-save-errors errors-text)))))
-    (error
-     (message "ERROR parsing save response: %S" err)
-     (message "Sexp string was: %S" sexp-string))))
+                (skg-show-save-warnings ;; Success with warnings
+                 errors-text)
+              (skg-show-save-errors ;; Failure with errors
+               errors-text)))))
+    (error (message "ERROR parsing save response: %S" err)
+           (message "Sexp string was: %S" sexp-string))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content)
   "Replace the current buffer contents with NEW-CONTENT from Rust.

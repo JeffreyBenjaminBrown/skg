@@ -1,11 +1,14 @@
+use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
 use crate::serve::timing_log::timed;
 use crate::serve::util::{
+  view_uri_from_request,
   send_response,
   send_response_with_length_prefix,
   format_buffer_response_sexp};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::{SkgConfig, ID};
+use crate::types::viewnode::ViewUri;
 
 use futures::executor::block_on;
 use sexp::Sexp;
@@ -17,12 +20,14 @@ use typedb_driver::TypeDBDriver;
 /// and sends the response to Emacs (length-prefixed).
 /// Response format: ((content "...") (errors ("error1" "error2" ...)))
 pub fn handle_single_root_view_request (
-  stream            : &mut TcpStream,
-  request           : &str,
-  typedb_driver     : &TypeDBDriver,
-  config            : &SkgConfig,
-  diff_mode_enabled : bool,
+  stream        : &mut TcpStream,
+  request       : &str,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
+  conn_state    : &mut ConnectionState,
 ) {
+  let view_uri_result : Result<ViewUri, String> =
+    view_uri_from_request (request);
   match node_id_from_single_root_view_request ( request ) {
     Ok ( node_id ) => {
       let response_sexp : String =
@@ -32,11 +37,19 @@ pub fn handle_single_root_view_request (
               typedb_driver,
               config,
               &node_id,
-              diff_mode_enabled ) . await
-            { Ok ( buffer_content ) =>
+              conn_state . diff_mode_enabled ) . await
+            { Ok ( (buffer_content, map, pids) ) => {
+                if let Ok ( view_uri ) = &view_uri_result {
+                  for (pid, skgnode) in map {
+                    conn_state . memory . pool . insert (
+                      pid, skgnode ); }
+                  conn_state . memory . register_view (
+                    view_uri . clone (),
+                    vec! [ node_id . clone () ],
+                    &pids ); }
                 format_buffer_response_sexp (
                   & buffer_content,
-                  & vec![] ),
+                  & vec![] ) },
               Err (e) => { // If we fail to generate the view, return error in content
                 let error_content : String = format!(
                   "Error generating document: {}", e);

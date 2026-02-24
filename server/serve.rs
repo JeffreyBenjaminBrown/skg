@@ -4,12 +4,14 @@ pub mod timing_log;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
+use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
 use crate::serve::util::{request_type_from_request, send_response};
 use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::skg_memory::SkgnodesInMemory;
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
@@ -19,10 +21,11 @@ use std::sync::Arc;
 use std::thread;
 use typedb_driver::TypeDBDriver;
 
-/// Per-connection state for managing diff mode,
-/// and (probably, later) other session-specific settings.
+/// Per-connection ("global") state.
 pub struct ConnectionState {
-  pub diff_mode_enabled: bool,
+  pub diff_mode_enabled : bool,
+  pub memory            : SkgnodesInMemory,
+  // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInMemory is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
@@ -81,7 +84,9 @@ fn handle_emacs (
   config        : &SkgConfig,
 ) {
   let mut conn_state : ConnectionState =
-    ConnectionState { diff_mode_enabled: false, };
+    ConnectionState {
+      diff_mode_enabled : false,
+      memory            : SkgnodesInMemory::new () };
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -90,33 +95,40 @@ fn handle_emacs (
     : BufReader<TcpStream> // the underlying stream, but buffered
     = BufReader::new (
       stream . try_clone() . unwrap() );
-  let mut request : String = String::new();
+  let mut request_header : String = String::new();
   while let Ok(n) =
-    reader.read_line( &mut request ) { // reads until a newline
+    reader.read_line( &mut request_header ) { // reads until a newline
       if n == 0 { break; } // emacs disconnected
-      println! ( "Received request: {}", request.trim_end () );
-      match request_type_from_request( &request ) {
+      println! ( "Received request: {}", request_header.trim_end () );
+      match request_type_from_request( &request_header ) {
+        // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
         Ok(request_type) => {
           if request_type == "single root content view" {
             handle_single_root_view_request (
               &mut stream,
-              &request,
+              &request_header,
               &typedb_driver,
               config,
-              conn_state . diff_mode_enabled );
+              &mut conn_state );
           } else if request_type == "save buffer" {
             // PITFALL: Uses the same BufReader that read the request,
             // so that any already-buffered header/payload are visible.
             handle_save_buffer_request (
               &mut reader,
               &mut stream,
+              &request_header,
               &typedb_driver,
               config,
               &tantivy_index,
-              conn_state . diff_mode_enabled );
+              &mut conn_state );
+          } else if request_type == "close view" {
+            handle_close_view_request (
+              &mut stream,
+              &request_header,
+              &mut conn_state );
           } else if request_type == "title matches" {
             handle_title_matches_request( &mut stream,
-                                          &request,
+                                          &request_header,
                                           &tantivy_index);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(
@@ -128,7 +140,7 @@ fn handle_emacs (
             // Never returns - exits process
           } else if request_type == "get file path" {
             handle_get_file_path_request( &mut stream,
-                                          &request,
+                                          &request_header,
                                           config);
           } else if request_type == "git diff mode toggle" {
             handle_git_diff_mode_request( &mut stream,
@@ -146,7 +158,7 @@ fn handle_emacs (
             &mut stream, &format!(
               "Error determining request type: {}",
               err)); } };
-      request.clear(); }
+      request_header.clear(); }
   println!("Emacs disconnected: {peer}"); }
 
 /// Handle git diff mode toggle request.

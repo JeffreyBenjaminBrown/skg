@@ -1,3 +1,4 @@
+pub mod close_view;
 pub mod get_file_path;
 pub mod save_buffer;
 pub mod single_root_view;

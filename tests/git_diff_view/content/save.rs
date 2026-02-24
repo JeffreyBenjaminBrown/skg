@@ -16,7 +16,8 @@ fn test_delete_removed_node_respawns()
         GIT_DIFF_VIEW, "gets-removed");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+          &input, driver, config, tantivy, true, SkgNodeMap::new()
+        ). await?;
 
       // DISK: gets-removed.skg should still not exist
       assert!(!repo_path.join("gets-removed.skg").exists(),
@@ -31,11 +32,9 @@ fn test_delete_removed_node_respawns()
         "11.skg should not contain gets-removed");
 
       // BUFFER: gets-removed should respawn with (diff removed)
-      assert_buffer_contains(&response.buffer_content, GIT_DIFF_VIEW);
-      Ok(())
-    })
-  })
-}
+      assert_buffer_contains(&response.response.saved_view,
+                             GIT_DIFF_VIEW);
+      Ok (( )) } ) } ) }
 
 /// Deleting a 'removed-here' phantom node should be a no-op.
 /// The node respawns in the returned buffer.
@@ -50,7 +49,8 @@ fn test_delete_removed_here_node_respawns()
         without_lines_containing(GIT_DIFF_VIEW, "removed-here");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new()
+      ).await?;
 
       // DISK: 12.skg should still have empty contains
       let node_12 = read_skgnode(repo_path, "12")?;
@@ -63,12 +63,9 @@ fn test_delete_removed_here_node_respawns()
         "moves.skg should still exist");
 
       // BUFFER: phantom moves should respawn under 12
-      assert_buffer_contains(
-        &response.buffer_content, GIT_DIFF_VIEW);
-      Ok(())
-    })
-  })
-}
+      assert_buffer_contains( &response . response . saved_view,
+                              GIT_DIFF_VIEW);
+      Ok (( )) }) }) }
 
 /// Deleting a 'new-here' node should update the disk.
 /// The node disappears from its new location but remains as phantom in old location.
@@ -82,7 +79,8 @@ fn test_delete_new_here_updates_disk()
       let input = without_lines_containing(GIT_DIFF_VIEW, "new-here");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new()
+      ).await?;
 
       // DISK: 11.skg should no longer contain moves
       let node_11 = read_skgnode(repo_path, "11")?;
@@ -97,7 +95,8 @@ fn test_delete_new_here_updates_disk()
       // BUFFER: moves gone from 11, still under 12 as removed-here
       let expected = without_lines_containing(
         GIT_DIFF_VIEW, "new-here");
-      assert_buffer_contains(&response.buffer_content, &expected);
+      assert_buffer_contains(&response.response.saved_view,
+                             &expected);
       Ok(())
     })
   })
@@ -117,7 +116,8 @@ fn test_add_new_child_creates_on_disk()
         "*** (skg (node (id newer))) newer");
 
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new()
+      ).await?;
 
       // DISK: newer.skg should be created with correct id and title
       assert!(repo_path.join("newer.skg").exists(),
@@ -138,7 +138,8 @@ fn test_add_new_child_creates_on_disk()
       // PITFALL: I'm not sure 12's children will be in this order.
       let expected = insert_after(GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer) (diff new))) newer");
-      assert_buffer_contains(&response.buffer_content, &expected);
+      assert_buffer_contains(&response.response.saved_view,
+                             &expected);
       Ok(())
     })
   })

@@ -1,19 +1,26 @@
 use crate::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
+use crate::serve::ConnectionState;
+use crate::to_org::render::content_view::multi_root_view;
 use crate::types::git::{SourceDiff, NodeDiffStatus, GitDiffStatus};
 use crate::types::misc::{ID, SourceName};
+use crate::types::viewnode::ViewUri;
 use crate::merge::merge_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::save::update_graph_minus_merges;
 use crate::serve::timing_log::{timed, timed_async};
-use crate::serve::util::{ format_buffer_response_sexp, read_length_prefixed_content, send_response};
+use crate::serve::util::{
+  view_uri_from_request,
+  format_buffer_response_sexp_with_updates,
+  read_length_prefixed_content,
+  send_response};
 use crate::update_buffer::complete::complete_viewtree;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
+use crate::types::save::{DefineNode, SaveNode, Merge, format_save_error_as_org};
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
@@ -24,7 +31,7 @@ use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 use ego_tree::{Tree, NodeId, NodeMut};
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
@@ -33,44 +40,94 @@ use typedb_driver::TypeDBDriver;
 
 /// Rust's response to Emacs for a save operation.
 /// Contains the regenerated buffer content and any warnings/errors.
+/// 'Collateral views' are other views that need updating
+/// as a result of the save.
 pub struct SaveResponse {
-  pub buffer_content : String,
-  pub errors         : Vec < String >,
+  pub saved_view       : String,
+  pub errors           : Vec < String >,
+  pub collateral_views : Vec<(ViewUri, String)>,
+}
+
+/// The full result of update_from_and_rerender_buffer,
+/// including data needed for pool updates and re-rendering.
+/// This is only constructed once at the very end of
+/// update_from_and_rerender_buffer,
+/// so every field is accurate the moment it springs into existence.
+pub struct SaveResult {
+  // The re-rendered buffer content and any errors/warnings. Sent back to Emacs as the response to the save request.
+  pub response                     : SaveResponse,
+  // The SkgNodeMap after complete_viewtree has finished. Contains every node the pipeline touched (from save instructions + pool seed + nodes fetched during completion). Merged back into SkgnodesInMemory.pool so subsequent requests see fresh data.
+  pub skgnodemap_after_completion  : SkgNodeMap,
+  // The parsed save/delete instructions from the buffer. Used after the pipeline to determine which PIDs changed, so we can find other views that contain those PIDs and re-render them.
+  pub save_instructions            : Vec<DefineNode>,
+  // Every TrueNode PID in the completed forest (all descendants). Passed to memory.update_view so the view's PID set stays current (used for pool GC and for finding affected views on future saves).
+  pub forest_pids                  : Vec<ID>,
+  // The PIDs of only the top-level TrueNode children of BufferRoot. Passed to memory.update_view as the view's root_ids, so we can re-render this view later via multi_root_view(root_ids).
+  pub forest_root_ids              : Vec<ID>,
 }
 
 impl SaveResponse {
-  /// Format the response as an s-expression.
-  /// Format: ((content "...") (errors ("error1" "error2" ...)))
+  /// Format: ((content "...") (errors (...)) (other-views-to-update (("URI1" "c1") ...)))
   fn to_sexp_string ( &self ) -> String {
-    format_buffer_response_sexp (
-      & self . buffer_content,
-      & self . errors ) }}
+    format_buffer_response_sexp_with_updates (
+      & self . saved_view,
+      & self . errors,
+      & self . collateral_views ) }}
 
 /// Handles save buffer requests from Emacs.
-/// - Reads the buffer content with length prefix.
-/// - Puts that text through `update_from_and_rerender_buffer`.
-/// - Sends that back to Emacs (with a length prefix).
+/// - Reads the buffer content (with length prefix).
+/// - Builds an initial SkgnodeMap from the ConnectionState's memory. It can change during the save process.
+/// - 'update_from_and_rerender_buffer'
+/// - 'update_memory_for_saved_view'
+/// - 'rerender_collateral_views'
+/// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
-  reader            : &mut BufReader <TcpStream>,
-  stream            : &mut TcpStream,
-  typedb_driver     : &TypeDBDriver,
-  config            : &SkgConfig,
-  tantivy_index     : &TantivyIndex,
-  diff_mode_enabled : bool ) {
+  reader        : &mut BufReader <TcpStream>,
+  stream        : &mut TcpStream, // PITFALL: writes to the same TCP stream as 'reader'
+  request       : &str,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
+  tantivy_index : &TantivyIndex,
+  conn_state    : &mut ConnectionState,
+) {
+  let viewuri_from_request_result : Result<ViewUri, String> =
+    view_uri_from_request ( request );
+  let saveview_skgnodes_pre_save : SkgNodeMap = {
+    // the skgnodes already in memory for this view
+    let mut it : SkgNodeMap = SkgNodeMap::new ();
+    if let Ok (ref uri) = viewuri_from_request_result {
+      for pid in conn_state . memory . pids_in_view (uri) {
+        if let Some (skgnode)
+          = conn_state . memory . pool . get ( &pid )
+          { it . insert ( pid, skgnode . clone () ); }} }
+    it };
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       timed ( config, "update_from_and_rerender_buffer", || {
         match block_on(
           update_from_and_rerender_buffer (
-            // Most of the work happens here.
             & initial_buffer_content,
             typedb_driver, config, tantivy_index,
-            diff_mode_enabled ))
-        { Ok (save_response) =>
-          { // S-exp response format: ((content "...") (errors (...)))
+            conn_state . diff_mode_enabled,
+            saveview_skgnodes_pre_save ))
+        { Ok (pipeline_result) => {
+            let mut pipeline_result : SaveResult =
+              pipeline_result;
+            if let Some ( view_uri ) =
+              update_memory_for_saved_view (
+                &viewuri_from_request_result,
+                &pipeline_result,
+                conn_state )
+            { pipeline_result . response . collateral_views =
+                rerender_collateral_views (
+                  view_uri,
+                  &pipeline_result,
+                  conn_state,
+                  typedb_driver,
+                  config ); }
             stream . write_all (
                 { let response_sexp : String =
-                    save_response . to_sexp_string ();
+                    pipeline_result . response . to_sexp_string ();
                   let header : String =
                     format! ( "Content-Length: {}\r\n\r\n",
                                  response_sexp . len () );
@@ -110,6 +167,107 @@ pub fn handle_save_buffer_request (
       println! ( "{}", error_msg );
       send_response ( stream, &error_msg ); }} }
 
+/// Update the SkgnodesInMemory's pool of skgnodes,
+/// and its view of the saved buffer (but not the collateral ones).
+/// Returns the ViewUri on success,
+/// or None if viewuri_from_request_result was Err.
+/// TODO : On error, should instead
+/// unwind the entire save and report the error.
+fn update_memory_for_saved_view<'a> (
+  viewuri_from_request_result : &'a Result<ViewUri, String>,
+  pipeline_result : &SaveResult,
+  conn_state      : &mut ConnectionState,
+) -> Option<&'a ViewUri> {
+  let view_uri : &ViewUri = match viewuri_from_request_result {
+    Ok ( uri ) => uri,
+    Err ( _ ) =>
+      return None };
+  for (pid, skgnode) // update the skgnode pool
+    in &pipeline_result . skgnodemap_after_completion
+    { conn_state . memory . pool . insert ( pid . clone (),
+                                            skgnode . clone () ); }
+  conn_state . memory . update_view (
+    view_uri,
+    pipeline_result . forest_root_ids . clone (),
+    &pipeline_result . forest_pids );
+  Some ( view_uri ) }
+
+/// When the user saves a buffer, the nodes they edited
+/// might also appear in other open Emacs buffers. Those are
+/// "collateral views", which this updates.
+fn rerender_collateral_views (
+  view_uri        : &ViewUri,
+  pipeline_result : &SaveResult,
+  conn_state      : &mut ConnectionState,
+  typedb_driver   : &TypeDBDriver,
+  config          : &SkgConfig,
+) -> Vec<(ViewUri, String)> {
+  let changed_pids : HashSet<ID> =
+    pipeline_result . save_instructions . iter ()
+    . filter_map ( |instr| match instr {
+      DefineNode::Save ( SaveNode (n)) =>
+        n . ids . first () . cloned (),
+      DefineNode::Delete ( dn ) =>
+        Some ( dn . id . clone () ) } )
+    . collect ();
+  let collateral_views : HashSet<ViewUri> =
+    changed_pids . iter ()
+    . flat_map ( |pid| conn_state . memory . views_containing (pid) )
+    . filter ( |uri| // this, the saved view, is already up to date
+               uri != view_uri )
+    . collect ();
+  let mut updates : Vec<(ViewUri, String)> =
+    Vec::new ();
+  for uri in collateral_views {
+    // TODO: Complete rather than rerender.
+    if let Some ( (uri, text) ) =
+      rerender_collateral_view_from_scratch (
+        &uri, conn_state, typedb_driver, config )
+    { updates . push ( (uri, text) ); } }
+  updates }
+
+/// Re-render a single collateral view from scratch.
+/// Each view was originally created from its root_ids
+/// (the top-level TrueNode PIDs), so we re-render via
+/// multi_root_view using the same root_ids.
+/// Returns Some((uri, org-text)) on success, None on failure
+/// or if the view has no root_ids in memory.
+/// .
+/// TODO | PITFALL: I haven't reviewed this code,
+/// because I intend to replace rerendering with completion.
+fn rerender_collateral_view_from_scratch (
+  uri           : &ViewUri,
+  conn_state    : &mut ConnectionState,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
+) -> Option<(ViewUri, String)> {
+  let root_ids_owned : Vec<ID> =
+    conn_state . memory . root_ids_in_view (uri)
+    ? . to_vec ();
+  // multi_root_view does the full pipeline: fetch each root
+  // from TypeDB/disk, build a viewnode forest, complete it,
+  // and render to org text. It also returns the SkgNodeMap
+  // and PID list so we can update memory.
+  match block_on ( multi_root_view (
+    typedb_driver, config, &root_ids_owned,
+    conn_state . diff_mode_enabled ) )
+  { Ok ( (text, map, re_pids) ) => {
+      // Merge the freshly-fetched nodes into the pool
+      // so future requests see up-to-date data.
+      for (pid, skgnode) in map {
+        conn_state . memory . pool . insert (
+          pid, skgnode ); }
+      // Update this view's PID set in memory
+      // (nodes may have been added/removed by the save).
+      conn_state . memory . update_view (
+        uri, root_ids_owned, &re_pids );
+      Some ( (uri . clone (), text) ) },
+    Err ( e ) => {
+      eprintln! (
+        "Warning: Failed to re-render view: {}",
+        e );
+      None }} }
+
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
   error_buffer_content : &str
@@ -133,12 +291,13 @@ fn empty_response_sexp (
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
 /// - complete_viewtree is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
 pub async fn update_from_and_rerender_buffer (
-  org_buffer_text   : &str,
-  typedb_driver     : &TypeDBDriver,
-  config            : &SkgConfig,
-  tantivy_index     : &TantivyIndex,
-  diff_mode_enabled : bool,
-) -> Result<SaveResponse, Box<dyn Error>> {
+  org_buffer_text            : &str,
+  typedb_driver              : &TypeDBDriver,
+  config                     : &SkgConfig,
+  tantivy_index              : &TantivyIndex,
+  diff_mode_enabled          : bool,
+  saveview_skgnodes_pre_save : SkgNodeMap,
+) -> Result<SaveResult, Box<dyn Error>> {
   if diff_mode_enabled {
     let sources : Vec<SourceName> =
       config . sources . keys() . cloned() . collect();
@@ -147,12 +306,14 @@ pub async fn update_from_and_rerender_buffer (
 
   let (mut forest, save_instructions, merge_instructions)
     : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
-    = timed_async ( config,
-                    "buffer_to_viewnode_forest_and_save_instructions",
-                    buffer_to_viewnode_forest_and_save_instructions (
-                      org_buffer_text, config, typedb_driver )
-                  ). await . map_err (
-                    |e| Box::new(e) as Box<dyn Error> ) ?;
+    = timed_async (
+        config,
+        "buffer_to_viewnode_forest_and_save_instructions",
+        buffer_to_viewnode_forest_and_save_instructions (
+          org_buffer_text, config, typedb_driver,
+          &saveview_skgnodes_pre_save )
+      ). await . map_err (
+        |e| Box::new(e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
@@ -183,8 +344,13 @@ pub async fn update_from_and_rerender_buffer (
 
   { // update the view and return it to the client
     let mut errors : Vec < String > = Vec::new ();
-    let mut skgnode_map : SkgNodeMap =
-      skgnode_map_from_save_instructions ( & save_instructions );
+    let mut skgnode_map : SkgNodeMap = {
+      let mut it : SkgNodeMap =
+        skgnode_map_from_save_instructions ( & save_instructions );
+      for (pid, skgnode) in saveview_skgnodes_pre_save { // Use these to fill in missing values, giving preference to the user's edits.
+        it . entry ( pid )
+          . or_insert_with ( || skgnode ); }
+      it };
     let mut forest_mut : Tree<ViewNode> = forest;
     let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
       // Used for view request execution.
@@ -219,10 +385,41 @@ pub async fn update_from_and_rerender_buffer (
                 &mut forest_mut,
                 &container_to_contents,
                 &content_to_containers )); }
+    let (forest_pids, forest_root_ids)
+      : ( Vec<ID>, Vec<ID> )
+      = allpids_and_rootpids_from_forest (&forest_mut);
     let buffer_content : String =
       timed ( config, "save_render",
               || viewnode_forest_to_string ( & forest_mut )) ?;
-    Ok ( SaveResponse { buffer_content, errors } ) }}
+    Ok ( SaveResult {
+      response : SaveResponse {
+        saved_view : buffer_content, errors,
+        collateral_views : Vec::new () },
+      skgnodemap_after_completion : skgnode_map,
+      save_instructions,
+      forest_pids,
+      forest_root_ids } ) }}
+
+/// Returns a pair:
+///   (all_pids = every TrueNode PID at any depth,
+///    root_pids = the top-level TrueNode children of the BufferRoot)
+fn allpids_and_rootpids_from_forest (
+  forest : &Tree<ViewNode>
+) -> ( Vec<ID>, Vec<ID> ) {
+  let all_pids : Vec<ID> = {
+    let mut ids : Vec<ID> = Vec::new ();
+    for node_ref in forest . root () . descendants () {
+      if let ViewNodeKind::True ( t )
+        = &node_ref . value () . kind
+        { ids . push ( t . id . clone () ); }}
+    ids };
+  let root_pids : Vec<ID> =
+    forest . root () . children ()
+    . filter_map ( |c| match &c . value () . kind {
+      ViewNodeKind::True ( t ) => Some ( t . id . clone () ),
+      _ => None } )
+    . collect ();
+  ( all_pids, root_pids ) }
 
 /// Strip from the forest every branch whose root
 ///   is marked as removed or removed-here.

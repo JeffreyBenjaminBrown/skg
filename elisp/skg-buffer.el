@@ -3,7 +3,15 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-open-empty-content-view
 
+(require 'org-id)
+(require 'cl-lib)
 (require 'skg-sexpr-search)
+
+(defvar-local skg-view-uri nil
+  "Unique view URI for this skg buffer.")
+(put 'skg-view-uri
+     'permanent-local ; to survive major-mode changes
+     t)
 
 (defconst skg-fallback-buffer-name
   "*skg*")
@@ -50,16 +58,52 @@ and truncates to a reasonable length."
   (skg-open-org-buffer-from-text
    nil "" skg-fallback-buffer-name))
 
-(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name)
-  "Open a new buffer and insert ORG-TEXT, enabling org-mode."
-  (let ((buffer (get-buffer-create buffer-name)))
+(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-uri)
+  "Open a new buffer and insert ORG-TEXT, enabling org-mode.
+If VIEW-URI is provided, set it as the buffer's skg-view-uri;
+otherwise generate a new UUID."
+  (let ((buffer (get-buffer-create buffer-name))
+        (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert org-text)
         (org-mode))
+      (setq skg-view-uri uri)
+      (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
+      (add-hook 'first-change-hook
+                #'skg-warn-if-other-buffer-modified nil t)
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
     (switch-to-buffer buffer)))
+
+(defun skg-send-close-view ()
+  "Send a close-view message to the server for this buffer's view URI."
+  (when (and skg-view-uri
+             (boundp 'skg-rust-tcp-proc)
+             skg-rust-tcp-proc
+             (process-live-p skg-rust-tcp-proc))
+    (let ((request (concat (prin1-to-string
+                            `((request . "close view")
+                              (view-uri . ,skg-view-uri)))
+                           "\n")))
+      (process-send-string skg-rust-tcp-proc request))))
+
+(defun skg-warn-if-other-buffer-modified ()
+  "Warn if another skg buffer has unsaved modifications."
+  (let ((other-modified
+         (cl-some (lambda (buf)
+                    (and (not (eq buf (current-buffer)))
+                         (buffer-local-value 'skg-view-uri buf)
+                         (buffer-modified-p buf)))
+                  (buffer-list))))
+    (when other-modified
+      (message "WARNING: Another skg buffer has unsaved modifications. Saving is ill-defined when multiple buffers have unsaved edits.")) ))
+
+(defun skg-find-buffer-by-uri (uri)
+  "Find the buffer whose skg-view-uri matches URI."
+  (cl-find-if (lambda (buf)
+                (string= uri (buffer-local-value 'skg-view-uri buf)))
+              (buffer-list)))
 
 (provide 'skg-buffer)
