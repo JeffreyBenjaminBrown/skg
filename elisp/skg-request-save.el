@@ -19,6 +19,7 @@ which will replace the current buffer contents."
   (skg-add-folded-markers)
   (skg-add-focused-marker)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
+         (save-buffer (current-buffer))
          (buffer-contents (buffer-string))
          (request-s-exp (concat (prin1-to-string
                                  `((request . "save buffer")
@@ -28,16 +29,19 @@ which will replace the current buffer contents."
          (content-length (length content-bytes))
          (header (format "Content-Length: %d\r\n\r\n" content-length)))
 
-    ;; Prepare LP state and handler for the response
-    (setq skg-lp--buf (unibyte-string)
-          skg-lp--bytes-left nil
-          skg-doc--response-handler
-          (lambda (tcp-proc chunk)
-            (skg-lp-handle-generic-chunk
-             (lambda (_tcp-proc payload)
-               (skg-handle-save-sexp payload)
-               (setq skg-doc--response-handler nil))
-             tcp-proc chunk)))
+    (setq ;; Prepare LP state and handler for the response.
+     ;; The TCP process filter may fire in an arbitrary buffer,
+     ;; so we capture save-buffer and switch into it for the handler.
+     skg-lp--buf (unibyte-string)
+     skg-lp--bytes-left nil
+     skg-doc--response-handler
+     (lambda (tcp-proc chunk)
+       (skg-lp-handle-generic-chunk
+        (lambda (_tcp-proc payload)
+          (with-current-buffer save-buffer
+            (skg-handle-save-sexp payload))
+          (setq skg-doc--response-handler nil))
+        tcp-proc chunk)))
 
     ;; Send the request line first
     (process-send-string tcp-proc request-s-exp)

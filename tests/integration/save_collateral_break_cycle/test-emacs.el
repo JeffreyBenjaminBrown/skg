@@ -10,65 +10,11 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "test-helpers.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
-
-(defun headline-structure (buffer)
-  "Extract (depth . id) pairs from every headline in BUFFER.
-Depth is the number of asterisks. ID is extracted from the (skg (node (id X) ...))
-metadata via skg-sexp-cdr-at-path."
-  (with-current-buffer buffer
-    (let ((result '()))
-      (save-excursion
-        (goto-char (point-min))
-        (while (not (eobp))
-          (let* ((line (buffer-substring-no-properties
-                        (line-beginning-position) (line-end-position)))
-                 (parts (skg-split-as-stars-metadata-title line)))
-            (when parts
-              (let* ((stars (nth 0 parts))
-                     (metadata-str (nth 1 parts))
-                     (depth (length (string-trim-right stars)))
-                     (sexp (condition-case nil
-                               (car (read-from-string metadata-str))
-                             (error nil)))
-                     (id-list (when sexp
-                                (skg-sexp-cdr-at-path sexp '(skg node id))))
-                     (id (when id-list
-                           (format "%s" (car id-list)))))
-                (when id
-                  (push (cons depth id) result)))))
-          (forward-line 1)))
-      (nreverse result))))
-
-(defun structure-equal-p (actual expected)
-  "Compare two lists of (depth . id) pairs for equality."
-  (equal actual expected))
-
-(defun format-structure (structure)
-  "Format a headline structure list for display."
-  (mapconcat
-   (lambda (pair)
-     (format "(%d . %S)" (car pair) (cdr pair)))
-   structure ", "))
-
-(defun assert-headline-structure (buffer expected phase-label)
-  "Assert that BUFFER's headline structure matches EXPECTED.
-PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
-  (let ((actual (headline-structure buffer)))
-    (if (structure-equal-p actual expected)
-        (message "✓ PASS [%s]: headline-structure is ((%s))"
-                 phase-label (format-structure actual))
-      (progn
-        (message "✗ FAIL [%s]: headline-structure mismatch" phase-label)
-        (message "  Expected: ((%s))" (format-structure expected))
-        (message "  Got:      ((%s))" (format-structure actual))
-        (message "  Buffer content: %S"
-                 (with-current-buffer buffer
-                   (buffer-substring-no-properties (point-min) (point-max))))
-        (kill-emacs 1)))))
 
 (defun phase-1-open-buffer-a ()
   "Open buffer A and verify its initial structure."
