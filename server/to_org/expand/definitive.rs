@@ -78,7 +78,7 @@ async fn execute_definitive_view_request (
         ViewNodeKind::True ( t ) =>
           matches! (t . diff,
                     Some (NodeDiffStatus::Removed)),
-        ViewNodeKind::Scaff ( _ ) => false } ) ?;
+        _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
     get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;

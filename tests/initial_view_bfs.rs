@@ -64,7 +64,7 @@ fn test_bfs_limit_across_multiple_trees
         ID ( "3".to_string () )
       ];
 
-      let (result, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+      let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
                         ). await ?;
 
@@ -119,7 +119,7 @@ fn test_bfs_limit_9_three_branches
         ID ( "3".to_string () )
       ];
 
-      let (result, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+      let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
                         ). await ?;
 
@@ -168,7 +168,7 @@ fn test_bfs_limit_8_two_branches
         // Note: node 3 and its descendants not included
       ];
 
-      let (result, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+      let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
                         ). await ?;
 

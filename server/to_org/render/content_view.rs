@@ -31,7 +31,7 @@ pub async fn single_root_view (
   config            : &SkgConfig,
   root_id           : &ID,
   diff_mode_enabled : bool,
-) -> Result < (String, SkgNodeMap, Vec<ID>),
+) -> Result < (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   multi_root_view (
     driver,
@@ -45,7 +45,7 @@ pub async fn multi_root_view (
   config            : &SkgConfig,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
-) -> Result < (String, SkgNodeMap, Vec<ID>),
+) -> Result < (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
     timed_async ( config, "render_initial_forest_bfs",
@@ -76,4 +76,4 @@ pub async fn multi_root_view (
   let buffer_content : String =
     timed ( config, "viewnode_forest_to_string",
             || viewnode_forest_to_string ( & forest )) ?;
-  Ok ((buffer_content, map, pids)) }
+  Ok ((buffer_content, map, pids, forest)) }

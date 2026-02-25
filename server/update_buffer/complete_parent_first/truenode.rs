@@ -10,7 +10,7 @@ use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold,
+    ViewNode, ViewNodeKind, Scaffold, DeletedNode,
     mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
@@ -67,6 +67,7 @@ pub fn complete_truenode_preorder (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_pids       : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn.kind,
@@ -100,8 +101,30 @@ pub fn complete_truenode_preorder (
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
       return Ok(( )); }}
-  let skgnode : &SkgNode =
-    skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
+  let skgnode_result =
+    skgnode_from_map_or_disk( &pid, &source, map, config );
+  let skgnode : &SkgNode = match skgnode_result {
+    Ok ( skg ) => skg,
+    Err ( e ) => {
+      if deleted_pids . contains ( &pid ) {
+        // Degrade this TrueNode to a DeletedNode.
+        let (title, body) : (String, Option<String>) =
+          read_at_node_in_tree ( tree, node,
+            |vn : &ViewNode| match &vn.kind {
+              ViewNodeKind::True ( t ) =>
+                ( t.title.clone(), t.body.clone() ),
+              _ => ( String::new(), None ) } ) ?;
+        write_at_node_in_tree ( tree, node,
+          |vn : &mut ViewNode| {
+            vn . kind = ViewNodeKind::Deleted ( DeletedNode {
+              id     : pid.clone(),
+              source : source.clone(),
+              title,
+              body, } ); }
+        ) . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+        return Ok(( ));
+      } else {
+        return Err ( e ); }} };
   let content_ids : Vec<ID> =
     skgnode.contains.clone().unwrap_or_default();
   let subscribes_to : Vec<ID> =
@@ -287,8 +310,10 @@ fn order_children_as_scaffolds_then_ignored_then_content (
     partition_children( tree, node,
       |vn : &ViewNode| match &vn.kind {
         ViewNodeKind::Scaff( _ )                    => 0,
+        ViewNodeKind::DeletedScaff                  => 0,
         ViewNodeKind::True( t ) if t.parent_ignores => 1,
         ViewNodeKind::True( _ )                     => 2,
+        ViewNodeKind::Deleted( _ )                  => 2,
       } ).map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups.get( &0 ).unwrap_or( &empty ).iter()

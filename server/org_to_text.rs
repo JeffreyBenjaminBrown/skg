@@ -1,5 +1,5 @@
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, TrueNode, EditRequest,
+    ViewNode, ViewNodeKind, Scaffold, TrueNode, DeletedNode, EditRequest,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -51,14 +51,8 @@ pub fn viewnode_to_text (
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
     viewnode_to_string ( viewnode )?;
-  let title : &str = match &viewnode . kind {
-    ViewNodeKind::True  ( t ) => &t . title,
-    ViewNodeKind::Scaff ( s ) => s . title (),
-  };
-  let body : Option < &String > = match &viewnode . kind {
-    ViewNodeKind::True  ( t ) => t . body . as_ref (),
-    ViewNodeKind::Scaff ( _ ) => None,
-  };
+  let title : &str = viewnode . title ();
+  let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
     panic! (
       "viewnode_to_text called with both empty metadata and empty title"
@@ -91,6 +85,10 @@ pub fn viewnode_to_string (
       scaffold_metadata_to_string ( viewnode . focused, viewnode . folded, scaffold ),
     ViewNodeKind::True ( true_node ) =>
       Ok ( true_node_metadata_to_string ( viewnode . focused, viewnode . folded, true_node )),
+    ViewNodeKind::Deleted ( deleted_node ) =>
+      Ok ( deleted_node_metadata_to_string ( viewnode . focused, viewnode . folded, deleted_node )),
+    ViewNodeKind::DeletedScaff =>
+      Ok ( deleted_scaff_metadata_to_string ( viewnode . focused, viewnode . folded )),
   }}
 
 /// Render metadata for a Scaffold:
@@ -218,6 +216,33 @@ fn true_node_metadata_to_string (
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
   parts . push ( node_sexp ( true_node ));
+  parts . join ( " " ) }
+
+/// Render metadata for a DeletedNode:
+///   (skg [focused] [folded] (deleted (id X) (source S)))
+fn deleted_node_metadata_to_string (
+  focused      : bool,
+  folded       : bool,
+  deleted_node : &DeletedNode,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused { parts . push ( "focused" . to_string () ); }
+  if folded  { parts . push ( "folded" . to_string () ); }
+  parts . push ( format! ( "(deleted (id {}) (source {}))",
+                            deleted_node . id . 0,
+                            deleted_node . source ));
+  parts . join ( " " ) }
+
+/// Render metadata for a DeletedScaff:
+///   (skg [focused] [folded] deletedScaffold)
+fn deleted_scaff_metadata_to_string (
+  focused : bool,
+  folded  : bool,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused { parts . push ( "focused" . to_string () ); }
+  if folded  { parts . push ( "folded" . to_string () ); }
+  parts . push ( "deletedScaffold" . to_string () );
   parts . join ( " " ) }
 
 fn org_bullet ( level: usize ) -> String {

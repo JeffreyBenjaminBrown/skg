@@ -59,7 +59,10 @@ pub fn validate_local_structure (
         validate_idcol(tree, node_id),
       Scaffold::ID { .. } =>
         validate_idscaffold(tree, node_id),
-    }};
+    },
+    UncheckedViewNodeKind::Deleted ( _ ) => Vec::new(),
+    UncheckedViewNodeKind::DeletedScaff => Vec::new(),
+    };
 
   if errors.is_empty() {
     Ok (( ))
@@ -83,7 +86,8 @@ fn validate_buffer_root (
   if !generation_includes_only(
     tree, node_id, 1, false,
     |node| matches!(&node.kind,
-                    UncheckedViewNodeKind::True(_) ))
+                    UncheckedViewNodeKind::True(_) |
+                    UncheckedViewNodeKind::Deleted(_) ))
  { errors.push("BufferRoot's children must be TrueNodes."
                 . to_string() ); }
   errors }
@@ -228,8 +232,10 @@ fn validate_truenode (
          UncheckedViewNodeKind::Scaff(Scaffold::AliasCol)      |
          UncheckedViewNodeKind::Scaff(Scaffold::IDCol)         |
          UncheckedViewNodeKind::Scaff(Scaffold::SubscribeeCol) |
-         UncheckedViewNodeKind::Scaff(Scaffold::TextChanged))) {
-    errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, or TextChanged".to_string()); }
+         UncheckedViewNodeKind::Scaff(Scaffold::TextChanged)   |
+         UncheckedViewNodeKind::Deleted(_)                     |
+         UncheckedViewNodeKind::DeletedScaff                   )) {
+    errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff".to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors.push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).".to_string()); }
   if t.indefinitive && t.edit_request.is_some() {

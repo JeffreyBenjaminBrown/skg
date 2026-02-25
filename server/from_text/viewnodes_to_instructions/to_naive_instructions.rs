@@ -58,6 +58,10 @@ pub fn naive_saveinstructions_from_tree (
       ViewNodeKind::Scaff ( _ ) => {
         // TODO ? Recurse into more Scaffolds.
       },
+      ViewNodeKind::Deleted ( _ ) =>
+        recurse_on_children( tree, node_id, result )?,
+      ViewNodeKind::DeletedScaff =>
+        recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::True ( t ) => {
         if let Some(instruction)
           = maybe_instruction_from_treenode( tree, node_id, &t )?
@@ -129,6 +133,9 @@ fn collect_subscribees (
                 subscribees.push(t.id.clone()); }},
             ViewNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
+            ViewNodeKind::Deleted ( _ ) |
+            ViewNodeKind::DeletedScaff =>
+              continue, // inert in a deleted context
             ViewNodeKind::Scaff(s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
       Ok( Some(dedup_vector(subscribees)) ) }} }
@@ -145,15 +152,19 @@ fn collect_contents_to_save_from_children<'a> (
     Vec::new();
   for child_ref in node_ref.children() {
     let child : &ViewNode = child_ref . value();
-    if let ViewNodeKind::True(t) = &child.kind {
-      let is_phantom : bool =
-        // In diff view, skip phantom (Removed/RemovedHere) nodes
-        matches!( t . diff,
-                  Some(NodeDiffStatus::Removed) |
-                  Some(NodeDiffStatus::RemovedHere) );
-      if ! t.parent_ignores
-         && ! is_phantom
-         && ! matches!( t . edit_request,
-                        Some(EditRequest::Delete))
-      { contents.push( t.id.clone() ); }} }
+    match &child.kind {
+      ViewNodeKind::Deleted ( _ ) |
+      ViewNodeKind::DeletedScaff => continue,
+      ViewNodeKind::Scaff ( _ ) => continue,
+      ViewNodeKind::True(t) => {
+        let is_phantom : bool =
+          // In diff view, skip phantom (Removed/RemovedHere) nodes
+          matches!( t . diff,
+                    Some(NodeDiffStatus::Removed) |
+                    Some(NodeDiffStatus::RemovedHere) );
+        if ! t.parent_ignores
+           && ! is_phantom
+           && ! matches!( t . edit_request,
+                          Some(EditRequest::Delete))
+        { contents.push( t.id.clone() ); }} } }
   contents }

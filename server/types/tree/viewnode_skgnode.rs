@@ -28,11 +28,14 @@ pub fn pid_and_source_from_treenode (
   let node_ref : NodeRef<ViewNode> =
     tree . get ( treeid ) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
-  let ViewNodeKind::True ( t ) : &ViewNodeKind =
-    &node_ref . value() . kind
-    else { return Err ( format! ( "{}: expected TrueNode",
-                                  caller_name ) . into() ) };
-  Ok (( t.id.clone(), t.source.clone() )) }
+  match &node_ref . value() . kind {
+    ViewNodeKind::True ( t ) =>
+      Ok (( t.id.clone(), t.source.clone() )),
+    ViewNodeKind::Deleted ( d ) =>
+      Ok (( d.id.clone(), d.source.clone() )),
+    _ => Err ( format! ( "{}: expected TrueNode or Deleted",
+                         caller_name ) . into() ),
+  }}
 
 /// Get the ID from this node if it's an UncheckedTrueNode with an ID,
 /// otherwise recursively try ancestors.
@@ -157,7 +160,7 @@ pub async fn append_indefinitive_from_disk_as_child (
       t . id . clone(),
       t . source . clone(),
       t . title . clone( )),
-    ViewNodeKind::Scaff(_) => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
+    _ => return Err("append_indefinitive_from_disk_as_child: expected TrueNode".into()) };
   let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, parent_ignores );
   with_node_mut (
@@ -248,9 +251,14 @@ pub fn find_children_by_ids (
 ) -> HashMap < ID, NodeId > {
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree.get(parent_treeid).unwrap().children() {
-    if let ViewNodeKind::True(t) = &child.value().kind {
-      if target_skgids.contains(&t.id) {
-        result.insert(t.id.clone(), child.id()); }}}
+    match &child.value().kind {
+      ViewNodeKind::True(t) =>
+        if target_skgids.contains(&t.id)
+        { result.insert(t.id.clone(), child.id()); },
+      ViewNodeKind::Deleted(d) =>
+        if target_skgids.contains(&d.id)
+        { result.insert(d.id.clone(), child.id()); },
+      _ => {} } }
   result }
 
 /// Check if all nodes at the specified generation satisfy the predicate.

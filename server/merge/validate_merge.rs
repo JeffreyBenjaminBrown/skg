@@ -39,7 +39,10 @@ pub async fn validate_merge_requests(
       UncheckedViewNodeKind::Scaff(s) => {
         errors.push(format!(
           "Acquirer node cannot be a Scaffold: {:?}", s));
-        continue; }};
+        continue; }
+      UncheckedViewNodeKind::Deleted(_) |
+      UncheckedViewNodeKind::DeletedScaff => continue,
+    };
     let acquirer_id : &ID = match &t.id_opt {
       Some(id) => id,
       None => { errors.push(format!(

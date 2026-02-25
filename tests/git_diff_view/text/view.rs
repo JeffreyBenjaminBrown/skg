@@ -19,7 +19,7 @@ fn test_title_diff_shows_text_changed_scaffolds()
       setup_test_dbs(db_name, repo_path.to_str().unwrap(), tantivy_folder).await?;
 
     let root_ids = vec![ID("1".to_string())];
-    let (actual, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+    let (actual, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
       multi_root_view(&driver, &config, &root_ids, true).await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);

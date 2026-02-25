@@ -199,8 +199,12 @@ pub fn collect_ids_from_tree (
   let mut pids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open ( node_ref ) = edge {
-      if let ViewNodeKind::True ( t ) = &node_ref . value () . kind {
-        pids . push ( t . id . clone( )); }} }
+      match &node_ref . value () . kind {
+        ViewNodeKind::True ( t )    =>
+          pids . push ( t . id . clone () ),
+        ViewNodeKind::Deleted ( d ) =>
+          pids . push ( d . id . clone () ),
+        _ => {} } } }
   pids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
@@ -216,8 +220,10 @@ fn is_ancestor_id (
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
       |viewnode| match &viewnode . kind {
-        ViewNodeKind::True ( t ) => Some ( t . id . clone () ),
-        ViewNodeKind::Scaff ( _ ) => None } )
+        ViewNodeKind::True ( t )    => Some ( t . id . clone () ),
+        ViewNodeKind::Deleted ( d ) => Some ( d . id . clone () ),
+        ViewNodeKind::Scaff ( _ ) |
+        ViewNodeKind::DeletedScaff  => None } )
     { Ok(Some(id)) if &id == target_skgid
         => return Ok(true),
       Ok(_) => continue,
@@ -233,8 +239,11 @@ pub fn get_id_from_treenode (
     read_at_node_in_tree (
       tree, treeid, |viewnode| viewnode.kind.clone() )?;
   match node_kind {
-    ViewNodeKind::Scaff ( _ ) => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
-    ViewNodeKind::True ( t ) => Ok ( t . id ) }}
+    ViewNodeKind::True ( t )    => Ok ( t . id ),
+    ViewNodeKind::Deleted ( d ) => Ok ( d . id ),
+    ViewNodeKind::Scaff ( _ )   => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
+    ViewNodeKind::DeletedScaff  => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
+  }}
 
 /// Build a node from disk and
 /// append it at 'parent_treeid' as a child.
@@ -370,8 +379,11 @@ pub fn truenode_in_tree_is_indefinitive (
                            |viewnode| viewnode.kind.clone() )
     . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
   match node_kind {
-    ViewNodeKind::Scaff (_) => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
-    ViewNodeKind::True (t)  => Ok (t.indefinitive) }}
+    ViewNodeKind::True (t)    => Ok (t.indefinitive),
+    ViewNodeKind::Deleted (_) => Ok (false),
+    ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
+    ViewNodeKind::DeletedScaff => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),
+  }}
 
 /// Collect all child tree NodeIds from a node.
 /// Returns an error if the node is not found.

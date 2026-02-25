@@ -354,8 +354,8 @@ async fn test_recursive_document (
   driver  : &TypeDBDriver,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
-  let (result_org_text, _map, _pids)
-    : (String, SkgNodeMap, Vec<ID>)
+  let (result_org_text, _map, _pids, _)
+    : (String, SkgNodeMap, Vec<ID>, _)
     = single_root_view (
           driver, config, &ID ( "a".to_string () ), false
         ). await ?;

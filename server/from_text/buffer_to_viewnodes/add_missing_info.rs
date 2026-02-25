@@ -69,13 +69,13 @@ fn inherit_parent_source_if_possible(
   let needs_source : bool =
     match &node.value().kind {
       UncheckedViewNodeKind::True(t) => t.source_opt.is_none(),
-      UncheckedViewNodeKind::Scaff(_) => false, };
+      _ => false, };
   if needs_source {
     let parent_source : Option<SourceName> =
       node.parent().and_then(|mut p| {
         match &p.value().kind {
           UncheckedViewNodeKind::True(pt) => pt.source_opt.clone(),
-          UncheckedViewNodeKind::Scaff(_) => None, }} );
+          _ => None, }} );
     if let Some(source) = parent_source {
       if let UncheckedViewNodeKind::True(t) = &mut node.value().kind {
         t.source_opt = Some(source); }} }

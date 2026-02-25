@@ -32,7 +32,9 @@ pub fn skgnode_for_viewnode<'a> (
         skgnode_from_map_or_disk(
           &t.id, &t.source, map, config)?;
       Ok(Some(skgnode)) },
-    ViewNodeKind::Scaff(_) => Ok(None),
+    ViewNodeKind::Scaff(_) |
+    ViewNodeKind::Deleted(_) |
+    ViewNodeKind::DeletedScaff => Ok(None),
   }}
 
 /// Build a SkgNodeMap from DefineNodes.
@@ -92,9 +94,12 @@ fn collect_ids_from_subtree (
   ids_out : &mut Vec<ID>, )
 { let node_ref : NodeRef<ViewNode> =
     tree . get ( node_id ) . unwrap ();
-  if let ViewNodeKind::True ( t )
-    = &node_ref . value () . kind
-    { ids_out . push ( t . id . clone () ); }
+  match &node_ref . value () . kind {
+    ViewNodeKind::True ( t )    =>
+      ids_out . push ( t . id . clone () ),
+    ViewNodeKind::Deleted ( d ) =>
+      ids_out . push ( d . id . clone () ),
+    _ => {} }
   for child in node_ref . children () {
     collect_ids_from_subtree (
       tree, child . id (), ids_out ); }}

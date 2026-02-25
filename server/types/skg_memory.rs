@@ -1,7 +1,8 @@
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::ViewUri;
+use crate::types::viewnode::{ViewUri, ViewNode, ViewNodeKind};
 
+use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 
 /// Persistent cross-request cache of all SkgNodes currently displayed
@@ -18,9 +19,24 @@ pub struct SkgnodesInMemory {
   // id_resolver is not yet wired into the render pipeline (which would require threading &mut SkgnodesInMemory through render_initial_forest_bfs and complete_viewtree). If pid_and_source_from_id remains a bottleneck after pool seeding, wire id_resolver into skgnode_and_viewnode_from_id, or apply the batch-query optimization from typedb-batching.org.
 }
 
+/// Invariant: all forest mutations must go through register_view /
+/// update_view, which maintain pids in sync with the forest.
+/// Direct forest mutation would make pids stale.
 pub struct ViewState {
-  pub root_ids : Vec<ID>,
-  pub pids     : HashSet<ID>, // all the TrueNodes in the buffer
+  pub forest : Tree<ViewNode>,
+  pub pids   : HashSet<ID>, // all the TrueNodes (and DeletedNodes) in the buffer
+}
+
+impl ViewState {
+  /// Compute root IDs from the forest (top-level True/Deleted
+  /// children of BufferRoot).
+  pub fn root_ids ( &self ) -> Vec<ID> {
+    self . forest . root () . children ()
+      . filter_map ( |c| match &c . value () . kind {
+        ViewNodeKind::True ( t )    => Some ( t . id . clone () ),
+        ViewNodeKind::Deleted ( d ) => Some ( d . id . clone () ),
+        _ => None } )
+      . collect () }
 }
 
 impl SkgnodesInMemory {
@@ -41,28 +57,35 @@ impl SkgnodesInMemory {
   pub fn root_ids_in_view (
     &self,
     uri : &ViewUri,
-  ) -> Option<&[ID]> {
+  ) -> Option<Vec<ID>> {
     self . views . get ( uri )
-      . map ( |vs| vs . root_ids . as_slice () ) }
+      . map ( |vs| vs . root_ids () ) }
+
+  pub fn forest_in_view (
+    &self,
+    uri : &ViewUri,
+  ) -> Option<&Tree<ViewNode>> {
+    self . views . get ( uri )
+      . map ( |vs| &vs . forest ) }
 
   pub fn register_view (
     &mut self,
-    uri      : ViewUri,
-    root_ids : Vec<ID>,
-    pids     : &[ID],
+    uri    : ViewUri,
+    forest : Tree<ViewNode>,
+    pids   : &[ID],
   ) { let state : ViewState =
-        ViewState { root_ids,
+        ViewState { forest,
                     pids : pids . iter () . cloned () . collect () };
       self . views . insert ( uri, state ); }
 
   pub fn update_view (
     &mut self,
-    uri          : &ViewUri,
-    new_root_ids : Vec<ID>,
-    new_pids     : &[ID],
+    uri        : &ViewUri,
+    new_forest : Tree<ViewNode>,
+    new_pids   : &[ID],
   ) { if let Some (vs)
         = self . views . get_mut (uri)
-        { vs . root_ids = new_root_ids;
+        { vs . forest = new_forest;
           vs . pids = new_pids . iter () . cloned () . collect (); }
       self . gc (); }
 

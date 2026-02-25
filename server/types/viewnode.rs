@@ -28,8 +28,22 @@ pub struct ViewNode {
 
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewNodeKind {
-  True  ( TrueNode ),
-  Scaff ( Scaffold ),
+  True         ( TrueNode ),
+  Scaff        ( Scaffold ),
+  Deleted      ( DeletedNode ),
+  DeletedScaff,
+}
+
+/// A node whose .skg file was deleted by a save in another buffer.
+/// Inert: generates no save instructions, excluded from parent's
+/// contains list, never "completed".
+/// Retains its children so the user's subtree is preserved.
+#[derive( Debug, Clone, PartialEq )]
+pub struct DeletedNode {
+  pub id     : ID,
+  pub source : SourceName,
+  pub title  : String,
+  pub body   : Option < String >,
 }
 
 /// An ViewNode that corresponds to a SkgNode.
@@ -244,15 +258,19 @@ impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title ( &self ) -> &str {
     match &self . kind {
-      ViewNodeKind::True ( t ) => &t . title,
-      ViewNodeKind::Scaff ( s ) => s . title (),
+      ViewNodeKind::True    ( t ) => &t . title,
+      ViewNodeKind::Scaff   ( s ) => s . title (),
+      ViewNodeKind::Deleted ( d ) => &d . title,
+      ViewNodeKind::DeletedScaff  => "",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body ( &self ) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::True ( t ) => t . body . as_ref (),
-      ViewNodeKind::Scaff ( _ ) => None,
+      ViewNodeKind::True    ( t ) => t . body . as_ref (),
+      ViewNodeKind::Scaff   ( _ ) => None,
+      ViewNodeKind::Deleted ( d ) => d . body . as_ref (),
+      ViewNodeKind::DeletedScaff  => None,
     }}
 }
 

@@ -95,7 +95,7 @@ fn set_metadata_relationships_in_node_recursive (
 ) {
   // PITFALL: Aliasing and extraIDs are computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
   let ( aliasing, extra_ids ) : ( bool, bool ) =
-    { // PITFALL: Uses 'false' for phantom nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
+    { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       if let ViewNodeKind::True ( t )
         = & tree . get ( treeid ) . unwrap () . value () . kind
         { let skgnode_opt = skgnode_from_map_or_disk (
@@ -109,7 +109,8 @@ fn set_metadata_relationships_in_node_recursive (
             . map ( |n| n . ids . len () > 1 )
             . unwrap_or ( false );
           ( aliasing, extra_ids ) }
-        else { ( false, false ) }};
+        else { ( false, false ) } // Scaff, Deleted, DeletedScaff
+    };
   if let ViewNodeKind::True ( t )
     = &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
     { // Write all graphStats fields.

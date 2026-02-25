@@ -92,7 +92,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let parentIgnores_node = tree_roots[1].value();
   let parentIgnores_t = match &parentIgnores_node.kind {
     UncheckedViewNodeKind::True(t) => t,
-    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    _ => panic!("expected TrueNode") };
   assert_eq!(parentIgnores_node.title(), "parentIgnores node");
   assert_eq!(parentIgnores_t.parent_ignores, true);
   assert_eq!(parentIgnores_t.indefinitive, true);
@@ -102,7 +102,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let cycle_node = tree_roots[2].value();
   let cycle_t = match &cycle_node.kind {
     UncheckedViewNodeKind::True(t) => t,
-    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    _ => panic!("expected TrueNode") };
   assert_eq!(cycle_node.title(), "cycling node");
   assert_eq!(cycle_t.viewStats.cycle, true);
   assert_eq!(cycle_node.body(),
@@ -128,7 +128,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   let first_node = tree_roots[0].value();
   let first_t = match &first_node.kind {
     UncheckedViewNodeKind::True(t) => t,
-    UncheckedViewNodeKind::Scaff(_) => panic!("expected TrueNode") };
+    _ => panic!("expected TrueNode") };
   assert_eq!(first_node.title(), "simple node");
   assert_eq!(first_node.body(), Some(&"Simple body".to_string()));
   assert_eq!(first_t.id_opt.as_ref(), None);

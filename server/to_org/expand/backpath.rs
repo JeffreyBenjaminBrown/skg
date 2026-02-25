@@ -232,7 +232,7 @@ async fn prepend_indefinitive_child_with_parent_ignores (
       t . id . clone(),
       t . source . clone(),
       t . title . clone() ),
-    ViewNodeKind::Scaff(_) =>
+    _ =>
       return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
   let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, true );

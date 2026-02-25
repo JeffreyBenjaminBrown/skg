@@ -29,6 +29,10 @@
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
     (BLUE textChanged "<< Text changed. M-x skg-visit-file-diff to see. >>")
+    (RED deletedScaffold "DELETED")
+    (RED deleted "DELETED"
+      (id (ANY IT))
+      (source))
     (BLUE diff
       (GREEN new "diff:new")
       (RED removed "diff:removed"))

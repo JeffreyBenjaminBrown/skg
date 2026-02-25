@@ -23,7 +23,7 @@ fn test_newhere_cycle_survives_save()
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1".to_string())];
-    let (initial_view, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+    let (initial_view, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
       multi_root_view(&driver, &config, &root_ids, true).await?;
 
     // Round-trip through the save pipeline.

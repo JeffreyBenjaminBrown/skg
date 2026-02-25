@@ -38,14 +38,14 @@ pub fn handle_single_root_view_request (
               config,
               &node_id,
               conn_state . diff_mode_enabled ) . await
-            { Ok ( (buffer_content, map, pids) ) => {
+            { Ok ( (buffer_content, map, pids, forest) ) => {
                 if let Ok ( view_uri ) = &view_uri_result {
                   for (pid, skgnode) in map {
                     conn_state . memory . pool . insert (
                       pid, skgnode ); }
                   conn_state . memory . register_view (
                     view_uri . clone (),
-                    vec! [ node_id . clone () ],
+                    forest,
                     &pids ); }
                 format_buffer_response_sexp (
                   & buffer_content,

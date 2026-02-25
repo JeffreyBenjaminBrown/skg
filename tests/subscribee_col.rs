@@ -58,7 +58,7 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test(db_name).await?;
-    let (result, _map, _pids) : (String, SkgNodeMap, Vec<ID>) =
+    let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
       single_root_view( &driver, &config, &ID("1".to_string()), false
                       ).await?;
     println!("SubscribeeCol test result:\n{}", result);

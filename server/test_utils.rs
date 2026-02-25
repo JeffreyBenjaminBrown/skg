@@ -298,6 +298,12 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
     ( UncheckedViewNodeKind::Scaff(_),
       UncheckedViewNodeKind::Scaff(_)) =>
     { if n1 != n2 { return false; }}
+    ( UncheckedViewNodeKind::Deleted(_),
+      UncheckedViewNodeKind::Deleted(_)) =>
+    { if n1 != n2 { return false; }}
+    ( UncheckedViewNodeKind::DeletedScaff,
+      UncheckedViewNodeKind::DeletedScaff) =>
+    { if n1 != n2 { return false; }}
     _ => return false, // mismatched kinds
   }
   { // Recurse on children

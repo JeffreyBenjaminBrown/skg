@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, DeletedNode};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -50,6 +50,10 @@ pub struct ViewnodeMetadata {
   pub view_requests: HashSet<ViewRequest>,
   pub truenode_diff: Option<NodeDiffStatus>,
   pub scaffold_diff: Option<FieldDiffStatus>,
+  // When true, this is a DeletedNode (id and source are used).
+  pub is_deleted_node: bool,
+  // When true, this is a DeletedScaff (no payload).
+  pub is_deleted_scaff: bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -66,7 +70,9 @@ pub fn default_metadata() -> ViewnodeMetadata {
     edit_request: None,
     view_requests: HashSet::new(),
     truenode_diff: None,
-    scaffold_diff: None, }}
+    scaffold_diff: None,
+    is_deleted_node: false,
+    is_deleted_scaff: false, }}
 
 /// Create an UncheckedViewNode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
@@ -78,7 +84,18 @@ pub fn viewnode_from_metadata (
 ) -> ( UncheckedViewNode, Option < BufferValidationError > ) {
   let (kind, error)
     : (UncheckedViewNodeKind, Option<BufferValidationError>)
-    = if let Some ( ref scaffold ) = metadata . scaffold {
+    = if metadata . is_deleted_scaff {
+        ( UncheckedViewNodeKind::DeletedScaff, None )
+      } else if metadata . is_deleted_node {
+        ( UncheckedViewNodeKind::Deleted ( DeletedNode {
+            id     : metadata . id . clone ()
+                       . unwrap_or_else ( || ID::from ( "" )),
+            source : metadata . source . clone ()
+                       . unwrap_or_else ( || SourceName::from ( "" )),
+            title,
+            body,
+          } ), None )
+      } else if let Some ( ref scaffold ) = metadata . scaffold {
         let error : Option<BufferValidationError> =
           if body . is_some () {
             Some ( BufferValidationError::Body_of_Scaffold (
@@ -151,6 +168,9 @@ pub fn parse_metadata_to_viewnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
+          "deleted" => {
+            result . is_deleted_node = true;
+            parse_deleted_sexp ( &items[1..], &mut result ) ?; },
           "diff" => {
             // (diff <value>) at top level is for Scaffolds (Alias/ID)
             if items . len () != 2 {
@@ -193,6 +213,8 @@ pub fn parse_metadata_to_viewnodemd (
             result . scaffold = Some ( Scaffold::IDCol ),
           "id" =>
             result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
+          "deletedScaffold" =>
+            result . is_deleted_scaff = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },
@@ -257,6 +279,34 @@ fn parse_node_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
+/// Parse the (deleted (id X) (source S)) s-expression contents.
+fn parse_deleted_sexp (
+  items    : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  for element in items {
+    match element {
+      Sexp::List ( subitems ) if subitems . len () >= 1 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        match key . as_str () {
+          "id" => {
+            if subitems . len () != 2 {
+              return Err ( "deleted id requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . id = Some ( ID::from ( value )); },
+          "source" => {
+            if subitems . len () != 2 {
+              return Err ( "deleted source requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . source = Some ( SourceName::from ( value )); },
+          _ => { return Err ( format! ( "Unknown deleted key: {}",
+                                         key )); }} },
+      _ => { return Err ( "Unexpected element in deleted sexp"
+                           . to_string () ); }} }
+  Ok (( )) }
 
 /// Parse the (graphStats ...) s-expression contents.
 /// Only handles key-value pairs (containers, contents, linksIn).

@@ -9,7 +9,7 @@
 use super::git::NodeDiffStatus;
 use super::misc::{ID, SourceName};
 use super::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold,
+  ViewNode, ViewNodeKind, TrueNode, Scaffold, DeletedNode,
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
 };
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
@@ -30,8 +30,10 @@ pub struct UncheckedViewNode {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UncheckedViewNodeKind {
-  True  ( UncheckedTrueNode ),
-  Scaff ( Scaffold ),  // Scaffold is shared - scaffolds never have IDs
+  True         ( UncheckedTrueNode ),
+  Scaff        ( Scaffold ),  // Scaffold is shared - scaffolds never have IDs
+  Deleted      ( DeletedNode ),
+  DeletedScaff,
 }
 
 /// Unchecked version of TrueNode - id and source are optional.
@@ -87,6 +89,10 @@ impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
         Ok(ViewNodeKind::True(TrueNode::try_from(t)?)),
       UncheckedViewNodeKind::Scaff(s) =>
         Ok(ViewNodeKind::Scaff(s)),
+      UncheckedViewNodeKind::Deleted(d) =>
+        Ok(ViewNodeKind::Deleted(d)),
+      UncheckedViewNodeKind::DeletedScaff =>
+        Ok(ViewNodeKind::DeletedScaff),
     }
   }
 }
@@ -130,6 +136,10 @@ impl From<ViewNodeKind> for UncheckedViewNodeKind {
         UncheckedViewNodeKind::True(UncheckedTrueNode::from(t)),
       ViewNodeKind::Scaff(s) =>
         UncheckedViewNodeKind::Scaff(s),
+      ViewNodeKind::Deleted(d) =>
+        UncheckedViewNodeKind::Deleted(d),
+      ViewNodeKind::DeletedScaff =>
+        UncheckedViewNodeKind::DeletedScaff,
     }
   }
 }
@@ -286,32 +296,40 @@ impl UncheckedViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title(&self) -> &str {
     match &self.kind {
-      UncheckedViewNodeKind::True(t) => &t.title,
-      UncheckedViewNodeKind::Scaff(s) => s.title(),
+      UncheckedViewNodeKind::True(t)    => &t.title,
+      UncheckedViewNodeKind::Scaff(s)   => s.title(),
+      UncheckedViewNodeKind::Deleted(d) => &d.title,
+      UncheckedViewNodeKind::DeletedScaff => "",
     }
   }
 
   /// A distinguishable label for error messages.
   pub fn error_label(&self) -> String {
     match &self.kind {
-      UncheckedViewNodeKind::True(t) => t.title.clone(),
-      UncheckedViewNodeKind::Scaff(s) => s.error_label(),
+      UncheckedViewNodeKind::True(t)    => t.title.clone(),
+      UncheckedViewNodeKind::Scaff(s)   => s.error_label(),
+      UncheckedViewNodeKind::Deleted(d) => format!("deleted:{}", d.id.0),
+      UncheckedViewNodeKind::DeletedScaff => "deletedScaffold".to_string(),
     }
   }
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body(&self) -> Option<&String> {
     match &self.kind {
-      UncheckedViewNodeKind::True(t) => t.body.as_ref(),
-      UncheckedViewNodeKind::Scaff(_) => None,
+      UncheckedViewNodeKind::True(t)    => t.body.as_ref(),
+      UncheckedViewNodeKind::Scaff(_)   => None,
+      UncheckedViewNodeKind::Deleted(d) => d.body.as_ref(),
+      UncheckedViewNodeKind::DeletedScaff => None,
     }
   }
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt(&self) -> Option<&ID> {
     match &self.kind {
-      UncheckedViewNodeKind::True(t) => t.id_opt.as_ref(),
-      UncheckedViewNodeKind::Scaff(_) => None,
+      UncheckedViewNodeKind::True(t)    => t.id_opt.as_ref(),
+      UncheckedViewNodeKind::Scaff(_)   => None,
+      UncheckedViewNodeKind::Deleted(d) => Some(&d.id),
+      UncheckedViewNodeKind::DeletedScaff => None,
     }
   }
 }
