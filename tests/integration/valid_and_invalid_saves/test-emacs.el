@@ -12,34 +12,6 @@
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
 
-(defun run-all-tests ()
-  "Main orchestrator function that runs all integration tests."
-  (message "=== SKG Valid and Invalid Saves Integration Test ===")
-
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
-
-  ;; Phase 1: Test invalid save (should create error buffer)
-  (test-invalid-save)
-
-  ;; Wait for completion with timeout
-  (let ((timeout 0))
-    (while (and (not integration-test-completed) (< timeout 200))
-      (sleep-for 0.25)
-      (setq timeout (1+ timeout))))
-
-  ;; If we got here without completion, it's a timeout
-  (unless integration-test-completed
-    (message "TIMEOUT: No complete response received!")
-    (message "Last phase: %s" integration-test-phase)
-    (kill-emacs 1)))
-
 (defun test-invalid-save ()
   "Test invalid save that should create error buffer."
   (message "=== PHASE 1: Testing invalid save (duplicate ID without indefinitive) ===")
@@ -85,9 +57,7 @@
                   (if (string= content "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
                       (progn
                         (message "✓ PASS: Buffer has focused marker as expected")
-                        (setq integration-test-phase "invalid-save-complete")
-                        ;; Proceed to valid save test
-                        (test-valid-save))
+                        (setq integration-test-phase "invalid-save-complete"))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
                       (message "Expected: %S" "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
@@ -134,15 +104,32 @@
       (if (and (string-match-p "cycle" updated-content)
                (string-match-p "indefinitive" updated-content))
           (progn
-            (message "✓ PASS: Valid save worked and showed cycle indefinitive")
-            (message "✓ PASS: Integration test successful!")
-            (setq integration-test-completed t)
-            (kill-emacs 0))
+            (message "✓ PASS: Valid save worked and showed cycle indefinitive"))
         (progn
           (message "✗ FAIL: Expected cycle and indefinitive markers not found")
           (message "Expected to contain: 'cycle' and 'indefinitive'")
           (message "Got: %s" updated-content)
           (kill-emacs 1))))))
+
+(defun run-all-tests ()
+  "Main orchestrator function that runs all integration tests."
+  (message "=== SKG Valid and Invalid Saves Integration Test ===")
+
+  ;; Set the port from environment variable if available
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port)))
+
+  ;; Wait a moment for server to be fully ready
+  (sleep-for 0.25)
+
+  (test-invalid-save)
+  (test-valid-save)
+
+  (message "✓ PASS: Integration test successful!")
+  (setq integration-test-completed t)
+  (kill-emacs 0))
 
 (progn ;; Run the test with a timeout in case things hang.
   (run-at-time

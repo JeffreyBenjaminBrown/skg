@@ -33,34 +33,6 @@
         (forward-line 1))
       result)))
 
-(defun run-all-tests ()
-  "Main orchestrator function that runs all integration tests."
-  (message "=== SKG Containerward View Request Integration Test ===")
-
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
-
-  ;; Phase 1: Create initial buffer and save to establish relationships
-  (test-establish-relationships)
-
-  ;; Wait for completion with timeout
-  (let ((timeout 0))
-    (while (and (not integration-test-completed) (< timeout 100))
-      (sleep-for 0.25)
-      (setq timeout (1+ timeout))))
-
-  ;; If we got here without completion, it's a timeout
-  (unless integration-test-completed
-    (message "TIMEOUT: No complete response received!")
-    (message "Last phase: %s" integration-test-phase)
-    (kill-emacs 1)))
-
 (defun test-establish-relationships ()
   "Create initial buffer with full structure and save to establish relationships."
   (message "=== PHASE 1: Establishing relationships on disk ===")
@@ -86,10 +58,7 @@
       (sleep-for 0.5)
 
       (message "✓ Relationships established on disk")
-      (setq integration-test-phase "relationships-established")
-
-      ;; Now create new buffer without node 0
-      (test-create-new-buffer))))
+      (setq integration-test-phase "relationships-established"))))
 
 (defun test-create-new-buffer ()
   "Obliterate buffer and create new one without node 0."
@@ -111,10 +80,7 @@
         (forward-line 2)
         (message "✓ Positioned on node 12 (line 3)")
 
-        (setq integration-test-phase "new-buffer-created")
-
-        ;; Call containerward view request
-        (test-request-containerward-view)))))
+        (setq integration-test-phase "new-buffer-created")))))
 
 (defun test-request-containerward-view ()
   "Call skg-request-containerward-view on node 12."
@@ -128,8 +94,7 @@
     ;; Wait for response
     (sleep-for 0.5)
 
-    (setq integration-test-phase "containerward-request-complete")
-    (test-verify-result)))
+    (setq integration-test-phase "containerward-request-complete")))
 
 (defun test-verify-result ()
   "Strip metadata and verify result matches expected structure."
@@ -170,10 +135,7 @@
             (if (string= stripped-buffer-content expected-without-metadata)
                 (progn
                   (message "✓ PASS: Stripped buffer-content matches expected structure")
-                  (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12")
-                  (message "✓ PASS: Integration test successful!")
-                  (setq integration-test-completed t)
-                  (kill-emacs 0))
+                  (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12"))
               (progn
                 (message "✗ FAIL: Stripped buffer-content does not match expected without metadata")
                 (kill-emacs 1))))
@@ -181,6 +143,28 @@
           (message "✗ FAIL: Buffer-Content does not match expected (with metadata)")
           (message "Expected containerward path [1, 0] under node 12")
           (kill-emacs 1))))))
+
+(defun run-all-tests ()
+  "Main orchestrator function that runs all integration tests."
+  (message "=== SKG Containerward View Request Integration Test ===")
+
+  ;; Set the port from environment variable if available
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port)))
+
+  ;; Wait a moment for server to be fully ready
+  (sleep-for 0.25)
+
+  (test-establish-relationships)
+  (test-create-new-buffer)
+  (test-request-containerward-view)
+  (test-verify-result)
+
+  (message "✓ PASS: Integration test successful!")
+  (setq integration-test-completed t)
+  (kill-emacs 0))
 
 (progn ;; Run the test with a timeout in case things hang.
   (run-at-time

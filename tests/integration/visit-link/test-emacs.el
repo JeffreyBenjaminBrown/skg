@@ -68,44 +68,20 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                 (setq found t)))))))
     found))
 
-;;; Test phases (caller precedes callee)
+;;; Test phases
 
-(defun integration-test-main ()
-  "Main test: search for 'has', then traverse links src → dest."
-  (message "=== SKG Visit-Link Traversal Integration Test ===")
-
-  ;; Set port from environment
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
-
-  ;; Wait for server
-  (sit-for 0.25)
-
-  ;; Search for "has" (should find src: "Src has a [[id:dest][link to dest]].")
+(defun phase-0-search ()
+  "Search for 'has' and wait for results."
   (message "=== PHASE 0: Searching for 'has' ===")
   (skg-request-title-matches "has")
   (message "Sent title-matches request")
 
   ;; Wait for search results buffer to contain the expected link
   (unless (wait-for-buffer (skg-search-buffer-name "has") "\\[\\[id:src\\]" 5)
-    (test-fail "Timeout waiting for search results"))
+    (test-fail "Timeout waiting for search results")))
 
-  ;; Start the link traversal
-  (integration-test-phase-1-visit-src)
-
-  ;; Timeout fallback (sit-for processes pending input)
-  (let ((timeout 0))
-    (while (and (not integration-test-completed) (< timeout 20))
-      (sit-for 0.25)
-      (setq timeout (1+ timeout))))
-
-  (unless integration-test-completed
-    (test-fail "Timeout waiting for test completion")))
-
-(defun integration-test-phase-1-visit-src ()
-  "PHASE 1: From search results, visit src."
+(defun phase-1-visit-src ()
+  "From search results, visit src."
   (message "=== PHASE 1: Visiting src from search results ===")
 
   (let ((search-buffer (get-buffer (skg-search-buffer-name "has"))))
@@ -141,16 +117,13 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
 
                         ;; Wait for content view buffer to show src's content
                         (unless (wait-for-content-view "\\[\\[id:dest\\]" 5)
-                          (test-fail "Timeout waiting for src content view"))
-
-                        ;; Continue to phase 2
-                        (integration-test-phase-2-visit-dest))
+                          (test-fail "Timeout waiting for src content view")))
                     (test-fail "Could not find '][' in src link")))
               (test-fail "Could not find [[id:src] link"))))
       (test-fail "Search buffer not found"))))
 
-(defun integration-test-phase-2-visit-dest ()
-  "PHASE 2: From src's content view, follow link to dest."
+(defun phase-2-visit-dest ()
+  "From src's content view, follow link to dest."
   (message "=== PHASE 2: Following link from src to dest ===")
 
   (let ((content-buffer (find-skg-content-buffer)))
@@ -178,16 +151,13 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
 
                         ;; Wait for content view buffer to show dest's content
                         (unless (wait-for-content-view "Dest need not be aware" 5)
-                          (test-fail "Timeout waiting for dest content view"))
-
-                        ;; Verify we reached dest
-                        (integration-test-phase-3-verify-dest))
+                          (test-fail "Timeout waiting for dest content view")))
                     (test-fail "Could not find '][' in dest link")))
               (test-fail "Could not find [[id:dest] link in src"))))
       (test-fail "Content view buffer not found after visiting src"))))
 
-(defun integration-test-phase-3-verify-dest ()
-  "PHASE 3: Verify we arrived at dest's content view."
+(defun phase-3-verify-dest ()
+  "Verify we arrived at dest's content view."
   (message "=== PHASE 3: Verifying dest content view ===")
 
   (let ((content-buffer (find-skg-content-buffer)))
@@ -198,11 +168,30 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
             (if (string-match-p "Dest need not be aware" content)
                 (progn
                   (test-pass "Arrived at dest content view!")
-                  (test-pass "Link traversal test complete!")
-                  (setq integration-test-completed t)
-                  (kill-emacs 0))
+                  (test-pass "Link traversal test complete!"))
               (test-fail "Expected dest content, got: %s" content))))
       (test-fail "Content view buffer not found after visiting dest"))))
+
+(defun integration-test-main ()
+  "Main test: search for 'has', then traverse links src → dest."
+  (message "=== SKG Visit-Link Traversal Integration Test ===")
+
+  ;; Set port from environment
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port)))
+
+  ;; Wait for server
+  (sit-for 0.25)
+
+  (phase-0-search)
+  (phase-1-visit-src)
+  (phase-2-visit-dest)
+  (phase-3-verify-dest)
+
+  (setq integration-test-completed t)
+  (kill-emacs 0))
 
 ;;; Run test with timeout
 

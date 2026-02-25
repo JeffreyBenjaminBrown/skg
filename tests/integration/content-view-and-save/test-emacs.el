@@ -15,36 +15,8 @@
 (defvar integration-test-completed nil)
 (defvar integration-test-new-uuid nil) ;; Track created UUID for verification
 
-(defun run-all-tests ()
-  "Main orchestrator function that runs all integration tests."
-  (message "=== SKG Content View and Save Integration Test ===")
-
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
-
-  ;; Phase 1: Test content view creation
-  (test-content-view)
-
-  ;; Wait for completion with timeout
-  (let ((timeout 0))
-    (while (and (not integration-test-completed) (< timeout 100))
-      (sleep-for 0.25)
-      (setq timeout (1+ timeout))))
-
-  ;; If we got here without completion, it's a timeout
-  (unless integration-test-completed
-    (message "TIMEOUT: No complete response received!")
-    (message "Last phase: %s" integration-test-phase)
-    (kill-emacs 1)))
-
 (defun test-content-view ()
-  "Test content view creation and proceed to save test if successful."
+  "Test content view creation."
   (message "=== PHASE 1: Requesting content view for node '1' ===")
   (skg-request-single-root-content-view-from-id "1")
   (message "Called skg-request-single-root-content-view-from-id")
@@ -66,9 +38,7 @@
               (if (string= content expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")
-                    (setq integration-test-phase "content-view-complete")
-                    ;; Proceed to save test
-                    (test-save-content))
+                    (setq integration-test-phase "content-view-complete"))
                 (progn
                   (message "✗ FAIL: Buffer content does not exactly match expected")
                   (message "Expected exactly: %S" expected-content)
@@ -130,10 +100,7 @@
                     (message "✓ Extracted new UUID: %s" integration-test-new-uuid))
 
                   (message "✓ PASS: Buffer shows correct structure after save")
-                  (message "✓ PASS: Found new UUID in saved content")
-                  (message "✓ PASS: Integration test successful!")
-                  (setq integration-test-completed t)
-                  (kill-emacs 0))
+                  (message "✓ PASS: Found new UUID in saved content"))
               (progn
                 (message "✗ FAIL: Expected content structure not found after save")
                 (message "Expected: * (skg (node (id 1) (source main) ...)) 1 and ** (skg (node (id UUID) (source main) ...)) 2")
@@ -142,6 +109,26 @@
       (progn
         (message "✗ FAIL: Content view buffer not found for save test")
         (kill-emacs 1)))))
+
+(defun run-all-tests ()
+  "Main orchestrator function that runs all integration tests."
+  (message "=== SKG Content View and Save Integration Test ===")
+
+  ;; Set the port from environment variable if available
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port)))
+
+  ;; Wait a moment for server to be fully ready
+  (sleep-for 0.25)
+
+  (test-content-view)
+  (test-save-content)
+
+  (message "✓ PASS: Integration test successful!")
+  (setq integration-test-completed t)
+  (kill-emacs 0))
 
 (progn ;; Run the test with a timeout in case things hang.
   (run-at-time

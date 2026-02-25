@@ -9,9 +9,37 @@
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
 
+(defun test-title-search ()
+  "Search for 'apples' and verify search results."
+  (message "=== PHASE 1: Requesting title matches for 'apples' ===")
+  (skg-request-title-matches "apples")
+  (message "Called skg-request-title-matches")
 
-(defun integration-test-visit-link ()
-  "Test visiting a link from search results."
+  ;; Wait a moment for the response to be processed
+  (sleep-for 0.25)
+
+  ;; Check if the title search buffer was created and contains expected content
+  (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
+    (if search-buffer
+        (with-current-buffer search-buffer
+          (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+            (message "Search results received")
+            (message "Content: %s" content)
+            (if (string-match-p "\\[\\[id:apples\\]" content)
+                (progn
+                  (message "✓ PASS: Found apples link in search results")
+                  (setq integration-test-phase "search-complete"))
+              (progn
+                (message "✗ FAIL: Expected apples link not found in search results")
+                (message "Expected pattern: \\[\\[id:apples\\]")
+                (message "Got: %s" content)
+                (kill-emacs 1)))))
+      (progn
+        (message "✗ FAIL: No skg search buffer was created")
+        (kill-emacs 1)))))
+
+(defun test-visit-link ()
+  "Visit the apples link from search results."
   (message "=== PHASE 2: Testing link visit ===")
 
   ;; Get the search results buffer
@@ -45,11 +73,7 @@
                           (message "Content view buffer created successfully")
                           (message "Content: %s" content)
                           (if (string-match-p "apples" content)
-                              (progn
-                                (message "✓ PASS: Found apples content in view")
-                                (message "✓ PASS: Integration test successful!")
-                                (setq integration-test-completed t)
-                                (kill-emacs 0))
+                              (message "✓ PASS: Found apples content in view")
                             (progn
                               (message "✗ FAIL: Expected apples content not found")
                               (message "Got: %s" content)
@@ -67,7 +91,7 @@
         (kill-emacs 1)))))
 
 (defun integration-test-title-matches ()
-  "Integration test for title matches functionality."
+  "Main orchestrator function."
   (message "=== SKG Title Matches Integration Test ===")
 
   ;; Set the port from environment variable if available
@@ -79,47 +103,12 @@
   ;; Wait a moment for server to be fully ready
   (sleep-for 0.25)
 
-  ;; Use the skg-request-title-matches function
-  (message "=== PHASE 1: Requesting title matches for 'apples' ===")
-  (skg-request-title-matches "apples")
-  (message "Called skg-request-title-matches")
+  (test-title-search)
+  (test-visit-link)
 
-  ;; Wait a moment for the response to be processed
-  (sleep-for 0.25)
-
-  ;; Check if the title search buffer was created and contains expected content
-  (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
-    (if search-buffer
-        (with-current-buffer search-buffer
-          (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-            (message "Search results received")
-            (message "Content: %s" content)
-            (if (string-match-p "\\[\\[id:apples\\]" content)
-                (progn
-                  (message "✓ PASS: Found apples link in search results")
-                  (setq integration-test-phase "search-complete")
-                  ;; Proceed to test link visiting
-                  (integration-test-visit-link))
-              (progn
-                (message "✗ FAIL: Expected apples link not found in search results")
-                (message "Expected pattern: \\[\\[id:apples\\]")
-                (message "Got: %s" content)
-                (kill-emacs 1)))))
-      (progn
-        (message "✗ FAIL: No skg search buffer was created")
-        (kill-emacs 1))))
-
-  ;; Wait for completion with timeout
-  (let ((timeout 0))
-    (while (and (not integration-test-completed) (< timeout 50))
-      (sleep-for 0.25)
-      (setq timeout (1+ timeout))))
-
-  ;; If we got here without completion, it's a timeout
-  (unless integration-test-completed
-    (message "TIMEOUT: No complete response received!")
-    (message "Last phase: %s" integration-test-phase)
-    (kill-emacs 1)))
+  (message "✓ PASS: Integration test successful!")
+  (setq integration-test-completed t)
+  (kill-emacs 0))
 
 (progn ;; Run the test with a timeout in case things hang.
   (run-at-time
