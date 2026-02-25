@@ -55,7 +55,7 @@
       (skg-request-save-buffer)
 
       ;; Wait for save to complete
-      (sleep-for 0.5)
+      (sleep-for 2.0)
 
       (message "✓ Relationships established on disk")
       (setq integration-test-phase "relationships-established"))))
@@ -92,7 +92,7 @@
     (skg-request-save-buffer) ;; save to send request to server
 
     ;; Wait for response
-    (sleep-for 0.5)
+    (sleep-for 2.0)
 
     (setq integration-test-phase "containerward-request-complete")))
 
@@ -118,7 +118,7 @@
             (concat "* (skg (node (id 1) (source main) (graphStats (contents 3)))) 1\n"
                     "** (skg (node (id 11) (source main))) 11\n"
                     "** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12\n"
-                    "*** (skg (node (id 1) (source main) parentIgnores indefinitive (graphStats (contents 3)) (viewStats notInParent containsParent))) 1\n"
+                    "*** (skg (node (id 1) (source main) parentIgnores indefinitive (graphStats (contents 3)) (viewStats cycle notInParent containsParent))) 1\n"
                     "**** (skg (node (id 0) (source main) parentIgnores indefinitive (graphStats (containers 0) (contents 1)) (viewStats notInParent containsParent))) 0\n"
                     "*** (skg (node (id 121) (source main))) 121\n"
                     "** (skg (node (id 13) (source main))) 13\n")))

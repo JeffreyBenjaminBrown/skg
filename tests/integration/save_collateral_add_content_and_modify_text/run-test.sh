@@ -83,17 +83,17 @@ cleanup_test_data() {
     BACKUP_A=$(find "$TEST_DIR/data/skg-data" -name "a.skg.backup.*" | head -1)
     if [ -n "$BACKUP_A" ] && [ -f "$BACKUP_A" ]; then
         cp "$BACKUP_A" "$TEST_DIR/data/skg-data/a.skg"
-        rm -f "$BACKUP_A"
         echo "✓ Restored a.skg from backup"
     fi
+    find "$TEST_DIR/data/skg-data" -name "a.skg.backup.*" -delete
 
     # Restore original b.skg if backup exists
     BACKUP_B=$(find "$TEST_DIR/data/skg-data" -name "b.skg.backup.*" | head -1)
     if [ -n "$BACKUP_B" ] && [ -f "$BACKUP_B" ]; then
         cp "$BACKUP_B" "$TEST_DIR/data/skg-data/b.skg"
-        rm -f "$BACKUP_B"
         echo "✓ Restored b.skg from backup"
     fi
+    find "$TEST_DIR/data/skg-data" -name "b.skg.backup.*" -delete
 }
 
 # Enhanced cleanup function

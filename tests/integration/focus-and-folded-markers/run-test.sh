@@ -54,9 +54,9 @@ cleanup_test_data() {
         BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$i.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
             cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$i.skg"
-            rm -f "$BACKUP_FILE"
             echo "✓ Restored $i.skg from backup"
         fi
+        find "$TEST_DIR/data/skg-data" -name "$i.skg.backup.*" -delete
     done
 }
 

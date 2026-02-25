@@ -71,9 +71,9 @@ cleanup_test_data() {
         local backup=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$backup" ] && [ -f "$backup" ]; then
             cp "$backup" "$TEST_DIR/data/skg-data/$file.skg"
-            rm -f "$backup"
             echo "✓ Restored $file.skg from backup"
         fi
+        find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" -delete
     done
 }
 
