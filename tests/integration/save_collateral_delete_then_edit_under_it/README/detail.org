@@ -99,6 +99,9 @@ This integration test exercises:
 2. Editing under a =DeletedNode=: a subsequent save from the
    collateral buffer adds a new child node, and the other buffer
    picks up the change.
+3. Re-saving a buffer containing =Deleted= / =DeletedScaff= nodes:
+   they round-trip through parse → completion → render unchanged,
+   and a new node created under a =DeletedScaff= gets a UUID.
 
 All existing collateral tests deal only with containment changes.
 This is the first to exercise the =DeletedNode= / =DeletedScaff=
@@ -346,6 +349,38 @@ Expected headline-titles:
  (1 . "subee")
  (2 . "subee-1")
  (2 . "subee-2"))     ;; new child from collateral update
+#+end_example
+
+* Phase 5: Add new-root under deletedScaff in buffer 1
+
+Insert =new-root= as a sibling of =subee= under the depth-3
+=DeletedScaff= (formerly =subscribeeCol=) in buffer 1. Source
+metadata must be supplied explicitly (=(source main)=) because
+=DeletedScaff= has no source to inherit from.
+
+This exercises:
+- =Deleted= / =DeletedScaff= round-tripping through the save
+  pipeline (parse → completion → render) without disruption.
+- Creating a new node under a =DeletedScaff=: the node gets a
+  UUID and is saved to disk, but no parent claims it in its
+  =contains= (the =DeletedScaff= generates no save instructions).
+
+** Expected buffer 1 after save
+
+Same as before, but =new-root= appears at depth 4 with a UUID.
+
+Expected headline-titles (approximately):
+#+begin_example
+((1 . "1")
+ (2 . "11")           ;; DeletedNode
+ (3 . "")             ;; DeletedScaff
+ (4 . "subee")        ;; TrueNode (indefinitive)
+ (4 . "new-root")     ;; new TrueNode (now has UUID)
+ (4 . "")             ;; DeletedScaff
+ (5 . "also-hidden")  ;; hidden node preserved
+ (1 . "subee")        ;; standalone root, unchanged
+ (2 . "subee-1")
+ (2 . "subee-2"))
 #+end_example
 
 * Rust code fix: =build_child_creation_data= disk fallback

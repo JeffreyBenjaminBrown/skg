@@ -7,9 +7,12 @@
 ;;;   scaffolds become DeletedScaff in collateral buffer 1.
 ;;; Phase 6: add subee-2 under subee in buffer 1 → collateral
 ;;;   buffer 2 picks up subee-2.
+;;; Phase 8: add new-root under a deletedScaff in buffer 1 →
+;;;   Deleted/DeletedScaff round-trip harmlessly through save.
 ;;;
 ;;; Exercises DeletedNode / DeletedScaff degradation path in
-;;; complete_viewtree, and editing under a DeletedNode.
+;;; complete_viewtree, editing under a DeletedNode, and
+;;; re-saving a buffer containing Deleted/DeletedScaff nodes.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -251,6 +254,70 @@ takes priority over subee.skg on disk."
        (2 node "subee-2"))
      "phase 7: buffer 2 after updating collateral view")))
 
+(defun phase-8-add-new-root-under-deleted-scaff ()
+  "Add new-root as a sibling of subee under the deletedScaff in buffer 1.
+Exercises saving a buffer containing Deleted/DeletedScaff nodes,
+and creating a new node under a DeletedScaff. Source metadata is
+required because the parent (DeletedScaff) has no source to inherit."
+  (message "=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===")
+  (setq integration-test-phase "phase-8-add-new-root")
+  (with-current-buffer "*skg: 1*"
+    (when (goto-nth-headline-with-title "subee" 1)
+      (let ((subee-depth
+             (let* ((line (buffer-substring-no-properties
+                           (line-beginning-position) (line-end-position)))
+                    (parts (skg-split-as-stars-metadata-title line)))
+               (length (string-trim-right (nth 0 parts))))))
+        ;; Move forward past all children (deeper headlines).
+        (forward-line 1)
+        (while (and (not (eobp))
+                    (let* ((line (buffer-substring-no-properties
+                                  (line-beginning-position) (line-end-position)))
+                           (parts (skg-split-as-stars-metadata-title line)))
+                      (and parts
+                           (> (length (string-trim-right (nth 0 parts)))
+                              subee-depth))))
+          (forward-line 1))
+        ;; Insert new-root as a sibling of subee.
+        (let ((stars (make-string subee-depth ?*)))
+          (insert (format "%s (skg (node (source main))) new-root\n"
+                          stars)))))
+    (message "Buffer 1 after inserting new-root:\n%s"
+             (buffer-substring-no-properties (point-min) (point-max)))
+    (skg-request-save-buffer))
+  (sleep-for 2.0))
+
+(defun phase-9-verify-after-new-root ()
+  "Verify both buffers after saving with new-root under a deletedScaff."
+  (message "=== PHASE 9: Verify both buffers after new-root ===")
+  (setq integration-test-phase "phase-9-verify-after-new-root")
+
+  ;; Verify buffer 1: new-root appears at depth 4 under deletedScaff,
+  ;; everything else unchanged from phase 7.
+  (let ((buf1 (get-buffer "*skg: 1*")))
+    (unless buf1
+      (message "✗ FAIL [phase 9]: Buffer 1 no longer exists")
+      (kill-emacs 1))
+    (message "Buffer 1 after new-root save:\n%s"
+             (with-current-buffer buf1
+               (buffer-substring-no-properties (point-min) (point-max))))
+    (assert-headline-types-and-titles
+     buf1
+     '((1 node "1")
+       (2 deleted "11")
+       (3 deletedScaffold "")
+       (4 node "subee")
+       (4 node "new-root")
+       (4 deletedScaffold "")
+       (5 node "also-hidden")
+       (1 node "subee")
+       (2 node "subee-1")
+       (2 node "subee-2"))
+     "phase 9: buffer 1 after new-root"))
+
+  ;; We could also verify that buffer 2 is unchanged, but meh.
+  )
+
 (defun run-all-tests ()
   "Main orchestrator."
   (message "=== SKG Collateral Delete Then Edit Under It Integration Test ===")
@@ -271,6 +338,8 @@ takes priority over subee.skg on disk."
   (phase-5-verify-after-delete)
   (phase-6-add-subee-2-from-buffer-1)
   (phase-7-verify-after-add)
+  (phase-8-add-new-root-under-deleted-scaff)
+  (phase-9-verify-after-new-root)
 
   (message "✓ PASS: All phases completed successfully!")
   (setq integration-test-completed t)
