@@ -1,0 +1,88 @@
+The initial data looks like this:
+
+#+begin_example
+  * 1
+  ** 11
+  *** (aliasCol)
+  **** (alias) eleven
+  *** (subscribeeCol)
+  **** subee
+  ***** (HiddenInSubscribeeCol)
+  ****** subee-1
+  **** (hiddenoutsideofsubscribeecol)
+  ***** also-hidden
+  * subee
+  ** subee-1
+#+end_example
+
+That is:
+- as usual for tests, all nodes have titles equal to their IDs
+- node 1 has a single child, 11
+- 11 subscribes to subee
+- subee has a child subee-1, and 11 hides it
+- 11 also hides the node called "also-hidden", which is a node with
+  no other connection to anything, just its ID and title
+- 11 has an alias, "eleven"
+
+Notice that subee appears twice in that buffer:
+Once as a subscribee, and once as a standalone root.
+
+In a second buffer we have just two roots, 11 and subee,
+with none of the scaffolding:
+
+#+begin_example
+  * (indef) 11 ;; indefinite to avoid seeing its content
+  * subee
+  ** subee-1
+#+end_example
+
+From that buffer we remove 'indef' from 11's metadata,
+add a delete request to 11, and save.
+Now the first buffer should look like:
+
+#+begin_example
+  * 1
+  ** (deleted)
+  *** (deletedscaff)
+  **** subee
+  ***** subee-1  ;; tricky!
+  ***** (deletedscaff)
+  ****** subee-1
+  **** (deletedscaff)
+  ***** also-hidden
+  * subee
+  ** subee-1
+#+end_example
+
+That "tricky" line happens because subee gets completed
+(via "complete_viewtree") when the buffer is saved.
+
+And now we go a step further:
+We make an edit from the view with deleted nodes.
+In particular, let's add a new node with the title subee-2
+to subee:
+
+#+begin_example
+  * 1
+  ** (deleted)
+  *** (deletedscaff)
+  **** subee
+  ***** subee-1
+  ***** subee-2 ;; NEW
+  ***** (deletedscaff)
+  ****** subee-1
+  **** (deletedscaff)
+  ***** also-hidden
+  * subee
+  ** subee-1
+  ** subee-2
+#+end_example
+
+After saving that, the other buffer should now read:
+
+#+begin_example
+  * (deleted) 11
+  * subee
+  ** subee-1
+  ** subee-2
+#+end_example

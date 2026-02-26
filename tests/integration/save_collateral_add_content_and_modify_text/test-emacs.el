@@ -119,23 +119,24 @@
 
 (defun phase-5-verify-collateral ()
   "Check collateral buffer A.
-Collateral completion currently fails when a new node was created
-\(build_child_creation_data can't find the new UUID), so buffer A
-is NOT updated. Assert that it's unchanged from the initial view."
-  (message "=== PHASE 5: Verify collateral buffer A (known limitation) ===")
+The collateral update succeeds: buffer A picks up the title change
+and the new child c."
+  (message "=== PHASE 5: Verify collateral buffer A ===")
   (setq integration-test-phase "phase-5-verify-collateral")
   (let ((buf (get-buffer "*skg: a*")))
     (unless buf
       (message "✗ FAIL [phase 5]: Buffer *skg: a* no longer exists")
       (kill-emacs 1))
-    (message "Buffer A content (should be unchanged): %S"
+    (message "Buffer A content: %S"
              (with-current-buffer buf
                (buffer-substring-no-properties (point-min) (point-max))))
-    ;; Buffer A is unchanged because collateral completion failed
-    (assert-headline-structure
+    (assert-headline-titles
      buf
-     '((1 . "a") (2 . "b") (3 . "a"))
-     "phase 5: buffer A unchanged (collateral failed on new UUID)")))
+     '((1 . "a")
+       (2 . "b")
+       (3 . "Node a was given this longer title")
+       (2 . "c"))
+     "phase 5: buffer A after collateral update")))
 
 (defun run-all-tests ()
   "Main orchestrator function that runs all integration tests."

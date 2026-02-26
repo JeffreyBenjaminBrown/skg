@@ -1,0 +1,10 @@
+title: "11"
+ids:
+  - "11"
+aliases:
+  - eleven
+subscribes_to:
+  - subee
+hides_from_its_subscriptions:
+  - subee-1
+  - also-hidden

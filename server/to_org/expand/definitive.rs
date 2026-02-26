@@ -27,7 +27,7 @@ pub async fn execute_view_requests (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -46,7 +46,8 @@ pub async fn execute_view_requests (
       ViewRequest::Definitive => {
         execute_definitive_view_request (
           forest, map, node_id, config, typedb_driver,
-          visited, errors, deleted_id_src_map ) . await ?; }, }}
+          visited, errors,
+          deleted_since_head_pid_src_map ). await ?; }, }}
   Ok (( )) }
 
 /// BEHAVIOR:
@@ -67,7 +68,7 @@ async fn execute_definitive_view_request (
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     forest, node_id ) ?;
@@ -109,7 +110,7 @@ async fn execute_definitive_view_request (
     extendDefinitiveSubtree_fromGit (
       forest, map, node_id, config.initial_node_limit,
       visited, config, &hidden_ids, typedb_driver,
-      deleted_id_src_map ). await ?; }
+      deleted_since_head_pid_src_map ). await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
       forest, map, node_id, config.initial_node_limit,
@@ -299,7 +300,7 @@ async fn extendDefinitiveSubtree_fromGit (
   config         : &SkgConfig,
   hidden_ids     : &HashSet<ID>,
   typedb_driver  : &TypeDBDriver,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, effective_root,
@@ -326,7 +327,8 @@ async fn extendDefinitiveSubtree_fromGit (
     let child_viewnode : ViewNode =
       mk_removed_child_viewnode (
         child_id, &src, &contents_in_worktree,
-        deleted_id_src_map, config, typedb_driver ) . await ?;
+        deleted_since_head_pid_src_map,
+        config, typedb_driver ). await ?;
     let mut parent_mut : NodeMut<ViewNode> = // Add child to tree
       tree . get_mut ( effective_root ) . ok_or (
         "Parent not found" ) ?;
@@ -342,7 +344,7 @@ async fn mk_removed_child_viewnode (
   child_id           : &ID,
   parent_src         : &SourceName,
   contents_in_worktree : &HashSet<String>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   typedb_driver      : &TypeDBDriver,
 ) -> Result<ViewNode, Box<dyn Error>> {
@@ -365,7 +367,7 @@ async fn mk_removed_child_viewnode (
       child_id ) ) ?;
   let child_source : Option<SourceName> =
     if in_worktree { Some ( child_skgnode . source . clone() ) }
-    else           { deleted_id_src_map . get ( child_id )
+    else           { deleted_since_head_pid_src_map . get ( child_id )
                        . cloned() };
   let mut child_viewnode : ViewNode =
     mk_indefinitive_viewnode (

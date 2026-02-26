@@ -14,7 +14,7 @@ use crate::serve::util::{
   format_buffer_response_sexp_with_updates,
   read_length_prefixed_content,
   send_response};
-use crate::update_buffer::complete::{complete_viewtree, complete_viewtree_with_deleted_pids};
+use crate::update_buffer::complete::complete_viewtree;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::errors::SaveError;
 use crate::types::misc::{SkgConfig, TantivyIndex};
@@ -59,8 +59,6 @@ pub struct SaveResult {
   pub skgnodemap_after_completion  : SkgNodeMap,
   // The parsed save/delete instructions from the buffer. Used after the pipeline to determine which PIDs changed, so we can find other views that contain those PIDs and re-render them.
   pub save_instructions            : Vec<DefineNode>,
-  // Every TrueNode PID in the completed forest (all descendants). Passed to memory.update_view so the view's PID set stays current (used for pool GC and for finding affected views on future saves).
-  pub forest_pids                  : Vec<ID>,
   // The completed viewnode forest. Stored in ViewState so collateral views can be completed (rather than re-rendered from scratch) on future saves.
   pub completed_forest             : Tree<ViewNode>,
 }
@@ -187,8 +185,7 @@ fn update_memory_for_saved_view<'a> (
                                             skgnode . clone () ); }
   conn_state . memory . update_view (
     view_uri,
-    pipeline_result . completed_forest . clone (),
-    &pipeline_result . forest_pids );
+    pipeline_result . completed_forest . clone () );
   Some ( view_uri ) }
 
 /// When the user saves a buffer, the nodes they edited
@@ -209,7 +206,7 @@ fn rerender_collateral_views (
       DefineNode::Delete ( dn ) =>
         Some ( dn . id . clone () ) } )
     . collect ();
-  let deleted_pids : HashSet<ID> =
+  let deleted_by_this_save_pids : HashSet<ID> =
     pipeline_result . save_instructions . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Delete ( dn ) =>
@@ -228,13 +225,14 @@ fn rerender_collateral_views (
     if let Some ( (uri, text) ) =
       complete_collateral_view (
         &uri, conn_state, typedb_driver,
-        config, &deleted_pids )
+        config, &deleted_by_this_save_pids )
     { updates . push ( (uri, text) ); } }
   updates }
 
 /// Complete a single collateral view by re-running the
 /// completion pipeline on the stored forest. Nodes whose
-/// PIDs are in deleted_pids are degraded to DeletedNode.
+/// Viewnodes with PIDs in deleted_by_this_save_pids
+/// are degraded to DeletedNode.
 /// The server completes collateral views from its stored
 /// forest rather than requesting the buffer from Emacs.
 /// This works correctly only if the user adheres to the
@@ -248,7 +246,7 @@ fn complete_collateral_view (
   conn_state    : &mut ConnectionState,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
-  deleted_pids  : &HashSet<ID>,
+  deleted_by_this_save_pids  : &HashSet<ID>,
 ) -> Option<(ViewUri, String)> {
   let mut forest : Tree<ViewNode> =
     conn_state . memory . forest_in_view ( uri ) ? . clone ();
@@ -262,11 +260,11 @@ fn complete_collateral_view (
   match block_on ( async {
     let mut errors : Vec<String> = Vec::new ();
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-    complete_viewtree_with_deleted_pids (
+    complete_viewtree (
       &mut forest, &mut map, &mut defmap,
       &None, config, typedb_driver,
       &mut errors, &HashMap::new (),
-      deleted_pids ) . await ?;
+      deleted_by_this_save_pids ). await ?;
     let ( container_to_contents, content_to_containers ) =
       set_graphnodestats_in_forest (
         &mut forest, &mut map,
@@ -282,9 +280,8 @@ fn complete_collateral_view (
       for (pid, skgnode) in map {
         conn_state . memory . pool . insert (
           pid, skgnode ); }
-      let pids : Vec<ID> = allpids_from_forest ( &forest );
       conn_state . memory . update_view (
-        uri, forest, &pids );
+        uri, forest );
       Some ( (uri . clone (), text) ) },
     Err ( e ) => {
       eprintln! (
@@ -348,25 +345,23 @@ pub async fn update_from_and_rerender_buffer (
 
   { // update the graph
     timed_async ( config, "update_graph_minus_merges",
-                  async {
-                    update_graph_minus_merges (
-                      save_instructions.clone(),
-                      config.clone(),
-                      tantivy_index,
-                      typedb_driver ). await ?;
-                    Result::<(), Box<dyn Error>>::Ok (( )) }
+                  async { update_graph_minus_merges (
+                            save_instructions . clone(),
+                            config . clone(),
+                            tantivy_index,
+                            typedb_driver ). await ?;
+                          Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?;
     timed_async ( config, "merge_nodes",
-                  async {
-                    merge_nodes (
-                      merge_instructions,
-                      config.clone(),
-                      tantivy_index,
-                      typedb_driver ). await ?;
-                    Result::<(), Box<dyn Error>>::Ok (( )) }
+                  async { merge_nodes (
+                            merge_instructions,
+                            config . clone(),
+                            tantivy_index,
+                            typedb_driver ). await ?;
+                          Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?; }
 
-  { // update the view and return it to the client
+  { // update views
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap = {
       let mut it : SkgNodeMap =
@@ -381,10 +376,17 @@ pub async fn update_from_and_rerender_buffer (
       if diff_mode_enabled
       { Some ( compute_diff_for_every_source ( config )) }
       else { None };
-    let deleted_id_src_map : HashMap<ID, SourceName> =
+    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+      // only nonempty when git diff view is enabled
       source_diffs . as_ref()
       . map ( |d| deleted_ids_to_source ( d ))
       . unwrap_or_default();
+    let deleted_by_this_save_pids : HashSet<ID> = // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
+      save_instructions . iter()
+      . filter_map( |instr| match instr {
+        DefineNode::Delete( d ) => Some( d.id.clone() ),
+        _ => None })
+      . collect();
     { // mutate it before re-rendering it
       let mut visited : DefinitiveMap = DefinitiveMap::new();
       timed_async ( config, "complete_viewtree",
@@ -396,7 +398,8 @@ pub async fn update_from_and_rerender_buffer (
                       config,
                       typedb_driver,
                       &mut errors,
-                      &deleted_id_src_map )) . await ?;
+                      &deleted_since_head_pid_src_map,
+                      &deleted_by_this_save_pids )) . await ?;
       let ( container_to_contents, content_to_containers ) =
         timed_async ( config, "set_graphnodestats_in_forest",
                       set_graphnodestats_in_forest (
@@ -409,8 +412,6 @@ pub async fn update_from_and_rerender_buffer (
                 &mut forest_mut,
                 &container_to_contents,
                 &content_to_containers )); }
-    let forest_pids : Vec<ID> =
-      allpids_from_forest (&forest_mut);
     let buffer_content : String =
       timed ( config, "save_render",
               || viewnode_forest_to_string ( & forest_mut )) ?;
@@ -420,22 +421,7 @@ pub async fn update_from_and_rerender_buffer (
         collateral_views : Vec::new () },
       skgnodemap_after_completion : skgnode_map,
       save_instructions,
-      forest_pids,
       completed_forest : forest_mut } ) }}
-
-/// Every True/Deleted PID at any depth in the forest.
-fn allpids_from_forest (
-  forest : &Tree<ViewNode>
-) -> Vec<ID> {
-  let mut ids : Vec<ID> = Vec::new ();
-  for node_ref in forest . root () . descendants () {
-    match &node_ref . value () . kind {
-      ViewNodeKind::True ( t )    =>
-        ids . push ( t . id . clone () ),
-      ViewNodeKind::Deleted ( d ) =>
-        ids . push ( d . id . clone () ),
-      _ => {} } }
-  ids }
 
 /// Strip from the forest every branch whose root
 ///   is marked as removed or removed-here.

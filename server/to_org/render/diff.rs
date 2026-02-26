@@ -22,7 +22,7 @@ use std::path::PathBuf;
 pub fn apply_diff_to_forest (
   forest             : &mut Tree<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let root_id : NodeId =
@@ -31,7 +31,7 @@ pub fn apply_diff_to_forest (
     forest, root_id,
     &mut |node_mut| { process_node_for_diff (
                         node_mut, source_diffs,
-                        deleted_id_src_map, config ) } )?;
+                        deleted_since_head_pid_src_map, config ) } )?;
   Ok (( )) }
 
 /// Process a single node for diff markers.
@@ -40,13 +40,14 @@ pub fn apply_diff_to_forest (
 fn process_node_for_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), String> {
   match &node_mut . value() . kind . clone() {
     ViewNodeKind::True ( _ ) =>
       process_truenode_diff (
-        node_mut, source_diffs, deleted_id_src_map, config ),
+        node_mut, source_diffs, deleted_since_head_pid_src_map,
+        config ),
     _ => Ok (()) }}
 
 /// Modifies the viewnode, and if its contents changed, those too.
@@ -57,7 +58,7 @@ fn process_node_for_diff (
 fn process_truenode_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
@@ -94,7 +95,8 @@ fn process_truenode_diff (
         &mut node_mut, node_changes ); }
     process_truenode_contains_diff ( // changes to content
       &mut node_mut, tree_node_id, node_changes,
-      source_diff, source_diffs, deleted_id_src_map, config ) ?; }
+      source_diff, source_diffs, deleted_since_head_pid_src_map,
+      config ) ?; }
   Ok (( )) }
 
 /// Try to handle file-level diff status (Added/Deleted).
@@ -157,7 +159,7 @@ fn process_truenode_contains_diff (
   node_changes       : &NodeChanges,
   source_diff        : &SourceDiff,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let added_ids : HashSet<&ID> =
@@ -170,7 +172,7 @@ fn process_truenode_contains_diff (
     node_mut, tree_node_id, &added_ids, source_diff );
   insert_phantom_nodes_for_removed_children (
     node_mut, node_changes,
-    source_diffs, deleted_id_src_map, config ) }
+    source_diffs, deleted_since_head_pid_src_map, config ) }
 
 /// If a child corresponds to a file that already existed in HEAD
 /// but in HEAD it was not content here, mark it NewHere.
@@ -202,7 +204,7 @@ fn insert_phantom_nodes_for_removed_children (
   node_mut           : &mut NodeMut<ViewNode>,
   node_changes       : &NodeChanges,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let empty_children : HashMap<ID, SourceName> = HashMap::new();
@@ -217,7 +219,7 @@ fn insert_phantom_nodes_for_removed_children (
     let child_source : SourceName =
       source_for_phantom(
         removed_child_id, &empty_children,
-        deleted_id_src_map, &empty_map, config ) ?;
+        deleted_since_head_pid_src_map, &empty_map, config ) ?;
     let child_diff_status : NodeDiffStatus =
       phantom_diff_status(
         removed_child_id, &child_source,

@@ -38,7 +38,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   map                : &SkgNodeMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   { // verify node and parent are the right kinds
     error_unless_node_satisfies(
@@ -111,7 +111,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   let child_data : HashMap<ID, HiddenChildData> = // Pre-compute this, so that the create_child closure captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
     build_hidden_child_data(
       tree, node, &goal_list, &removed_ids,
-      source_diffs, map, deleted_id_src_map, config ) ?;
+      source_diffs, map, deleted_since_head_pid_src_map, config ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| matches!( &vn.kind,
@@ -211,7 +211,7 @@ fn build_hidden_child_data (
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   map                : &SkgNodeMap,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, HiddenChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> =
@@ -235,7 +235,7 @@ fn build_hidden_child_data (
       let child_src : SourceName =
         source_for_phantom(
           child_skgid, &child_sources,
-          deleted_id_src_map, map, config )
+          deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let phantom : NodeDiffStatus =
         phantom_diff_status( child_skgid, &child_src, source_diffs.as_ref() );

@@ -55,7 +55,7 @@ pub async fn complete_subscribee_col_preorder (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
       tree, node,
@@ -107,7 +107,7 @@ pub async fn complete_subscribee_col_preorder (
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
       build_subscribee_child_data(
         tree, node, &goal_list, &removed_ids,
-        source_diffs, map, deleted_id_src_map, config ) ?;
+        source_diffs, map, deleted_since_head_pid_src_map, config ) ?;
     complete_relevant_children_in_viewnodetree(
       tree, node,
       |vn : &ViewNode| matches!( &vn.kind,
@@ -192,7 +192,7 @@ fn build_subscribee_child_data (
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   map                : &SkgNodeMap,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, SubscribeeChildData>,
             Box<dyn Error>> {
@@ -217,7 +217,7 @@ fn build_subscribee_child_data (
       let child_src : SourceName =
         source_for_phantom(
           child_skgid, &child_sources,
-          deleted_id_src_map, map, config )
+          deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let phantom : NodeDiffStatus =
         phantom_diff_status( child_skgid, &child_src, source_diffs.as_ref() );

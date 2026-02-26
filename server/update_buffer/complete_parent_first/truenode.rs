@@ -4,7 +4,7 @@ use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{source_for_phantom, source_from_disk, title_for_phantom, phantom_diff_status};
 use crate::types::skgnode::SkgNode;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -52,7 +52,7 @@ struct ChildData {
 /// - Error unless it's a truenode.
 /// - make_indef_if_repeat_then_extend_defmap
 /// - If it's indefinitive:
-///   - clobberIndefinitiveViewnode.
+///   - clobberIndefinitiveViewnode
 /// - If it's definitive, run (in order):
 ///   - complete_content_children
 ///   - mark_erroneous_content_children_as_parent_ignores
@@ -66,8 +66,8 @@ pub fn complete_truenode_preorder (
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
-  deleted_pids       : &HashSet<ID>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_pids       : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn.kind,
@@ -101,30 +101,25 @@ pub fn complete_truenode_preorder (
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
       return Ok(( )); }}
-  let skgnode_result =
-    skgnode_from_map_or_disk( &pid, &source, map, config );
-  let skgnode : &SkgNode = match skgnode_result {
-    Ok ( skg ) => skg,
-    Err ( e ) => {
-      if deleted_pids . contains ( &pid ) {
-        // Degrade this TrueNode to a DeletedNode.
-        let (title, body) : (String, Option<String>) =
-          read_at_node_in_tree ( tree, node,
-            |vn : &ViewNode| match &vn.kind {
-              ViewNodeKind::True ( t ) =>
-                ( t.title.clone(), t.body.clone() ),
-              _ => ( String::new(), None ) } ) ?;
-        write_at_node_in_tree ( tree, node,
-          |vn : &mut ViewNode| {
-            vn . kind = ViewNodeKind::Deleted ( DeletedNode {
-              id     : pid.clone(),
-              source : source.clone(),
-              title,
-              body, } ); }
-        ) . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-        return Ok(( ));
-      } else {
-        return Err ( e ); }} };
+  if deleted_by_this_save_pids . contains (&pid) {
+    // Degrade this TrueNode to a DeletedNode.
+    let (title, body) : (String, Option<String>) =
+      read_at_node_in_tree ( tree, node,
+        |vn : &ViewNode| match &vn.kind {
+          ViewNodeKind::True ( t ) =>
+            ( t.title.clone(), t.body.clone() ),
+          _ => ( String::new(), None ) } ) ?;
+    write_at_node_in_tree ( tree, node,
+      |vn : &mut ViewNode| {
+        vn . kind = ViewNodeKind::Deleted ( DeletedNode {
+          id     : pid.clone(),
+          source : source.clone(),
+          title,
+          body, } ); }
+    ) . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+    return Ok(( )); }
+  let skgnode : &SkgNode =
+    skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
     skgnode.contains.clone().unwrap_or_default();
   let subscribes_to : Vec<ID> =
@@ -139,7 +134,7 @@ pub fn complete_truenode_preorder (
         is_sub, map, config ) ?;
     complete_content_children(
       tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config, deleted_id_src_map ) ?;
+      source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
     mark_erroneous_content_children_as_parent_ignores(
       tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -237,12 +232,12 @@ fn complete_content_children (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   map                : &mut SkgNodeMap,
   config             : &SkgConfig,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, removed_ids,
-      source_diffs, map, config, deleted_id_src_map ) ?;
+      source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| matches!( &vn.kind,
@@ -416,7 +411,7 @@ fn build_child_creation_data (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   map                : &mut SkgNodeMap,
   config             : &SkgConfig,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
@@ -434,7 +429,7 @@ fn build_child_creation_data (
     if is_phantom {
       let phantom_source : SourceName =
         source_for_phantom(
-          id, &child_sources, deleted_id_src_map, map, config )
+          id, &child_sources, deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let kind : ChildKind =
         match phantom_diff_status( id, &phantom_source, source_diffs.as_ref() ) {
@@ -448,13 +443,17 @@ fn build_child_creation_data (
                                  source: phantom_source,
                                  kind } );
     } else {
-      let child_source : &SourceName = child_sources.get( id )
+      let child_source : SourceName =
+        child_sources.get( id ).cloned()
+        .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
+        .or_else( || map.get( id ).map( |n| n.source.clone() ))
+        .or_else( || source_from_disk( id, config ) )
         .ok_or( format!(
           "build_child_creation_data: \
-           no source for {} (not in map, not a child)",
+           no source for {}",
           id.0 )) ?;
       let skg : &SkgNode =
-        skgnode_from_map_or_disk( id, child_source, map, config ) ?;
+        skgnode_from_map_or_disk( id, &child_source, map, config ) ?;
       result.insert( id.clone(),
                      ChildData { title: skg.title.clone(),
                                  source: skg.source.clone(),
@@ -487,7 +486,7 @@ fn maybe_change_node_diff_status (
         GitDiffStatus::Deleted =>
           return set_truenode_diff( tree, node,
                                     NodeDiffStatus::Removed),
-        GitDiffStatus::Modified => { // This case that falls through to the NewHere logic. The same happens if there's no skgnode_diff (i.e. if fetching this file_path gave None).
+        GitDiffStatus::Modified => { // This case falls through to the NewHere logic. The same happens if there's no skgnode_diff (i.e. if fetching this file_path gave None).
         } }}
   { // NewHere: Node was added to its parent's contains list,
     // but the file already existed (Added would have returned above).

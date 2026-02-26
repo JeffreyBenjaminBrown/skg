@@ -5,17 +5,19 @@ use crate::types::viewnode::{ViewUri, ViewNode, ViewNodeKind};
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 
+//
+// Type declarations
+//
+
 /// Persistent cross-request cache of all SkgNodes currently displayed
 /// in any Emacs view. The pool is the authoritative in-memory store;
 /// SkgNodeMap is the per-request transactional layer that shadows it.
 /// See also: SkgNodeMap (the per-request working set).
 pub struct SkgnodesInMemory {
   pub pool        : HashMap<ID, SkgNode>,
-  // TODO ? OPTIMIZE:
+  views           : HashMap<ViewUri, ViewState>, // TODO ? OPTIMIZE:
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewUri>> maintained alongside this one) for O(1) reverse lookups.
-  views           : HashMap<ViewUri, ViewState>,
-  pub id_resolver : HashMap<ID, (ID, SourceName)>,
-  // TODO ? OPTIMIZE:
+  pub id_resolver : HashMap<ID, (ID, SourceName)>, // TODO ? OPTIMIZE:
   // id_resolver is not yet wired into the render pipeline (which would require threading &mut SkgnodesInMemory through render_initial_forest_bfs and complete_viewtree). If pid_and_source_from_id remains a bottleneck after pool seeding, wire id_resolver into skgnode_and_viewnode_from_id, or apply the batch-query optimization from typedb-batching.org.
 }
 
@@ -27,17 +29,9 @@ pub struct ViewState {
   pub pids   : HashSet<ID>, // all the TrueNodes (and DeletedNodes) in the buffer
 }
 
-impl ViewState {
-  /// Compute root IDs from the forest (top-level True/Deleted
-  /// children of BufferRoot).
-  pub fn root_ids ( &self ) -> Vec<ID> {
-    self . forest . root () . children ()
-      . filter_map ( |c| match &c . value () . kind {
-        ViewNodeKind::True ( t )    => Some ( t . id . clone () ),
-        ViewNodeKind::Deleted ( d ) => Some ( d . id . clone () ),
-        _ => None } )
-      . collect () }
-}
+//
+// Implementations
+//
 
 impl SkgnodesInMemory {
   pub fn new () -> Self {
@@ -53,13 +47,6 @@ impl SkgnodesInMemory {
     self . views . get ( uri )
       . map ( |vs| vs . pids . iter () . cloned () . collect () )
       . unwrap_or_default () }
-
-  pub fn root_ids_in_view (
-    &self,
-    uri : &ViewUri,
-  ) -> Option<Vec<ID>> {
-    self . views . get ( uri )
-      . map ( |vs| vs . root_ids () ) }
 
   pub fn forest_in_view (
     &self,
@@ -82,11 +69,21 @@ impl SkgnodesInMemory {
     &mut self,
     uri        : &ViewUri,
     new_forest : Tree<ViewNode>,
-    new_pids   : &[ID],
-  ) { if let Some (vs)
+  ) { let pids : HashSet<ID> =
+        new_forest . root () . descendants ()
+        . filter_map ( |n| match &n . value () . kind {
+          ViewNodeKind::True (t)    => Some ( t . id . clone () ),
+          ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
+          _ => None } )
+        . collect ();
+      if let Some (vs)
         = self . views . get_mut (uri)
         { vs . forest = new_forest;
-          vs . pids = new_pids . iter () . cloned () . collect (); }
+          vs . pids = pids; }
+      else { self . views . insert (
+               uri . clone (),
+               ViewState { forest : new_forest,
+                           pids } ); }
       self . gc (); }
 
   pub fn unregister_view (

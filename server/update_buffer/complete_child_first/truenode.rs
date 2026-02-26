@@ -22,7 +22,7 @@ pub async fn complete_truenode (
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
   errors             : &mut Vec<String>,
-  deleted_id_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
@@ -34,7 +34,7 @@ pub async fn complete_truenode (
   if requests.is_empty() { return Ok(( )); }
   execute_view_requests(
     tree, map, requests, config, driver,
-    visited, errors, deleted_id_src_map ) . await ?;
+    visited, errors, deleted_since_head_pid_src_map ). await ?;
   Ok(( )) }
 
 /// Read the node's view_requests set and return them as a Vec

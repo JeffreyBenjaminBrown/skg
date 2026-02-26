@@ -1,0 +1,566 @@
+* Prompt (verbatim)
+
+Here's the original data. (So this will need a more complex set of
+fixtures than the earlir two similarly-named integration tests.)
+
+#+begin_example
+  * 1
+  ** 11
+  *** (aliasCol)
+  **** (alias) eleven
+  *** (subscribeeCol)
+  **** subee
+  ***** (HiddenInSubscribeeCol)
+  ****** subee-1
+  **** (hiddenoutsideofsubscribeecol)
+  ***** also-hidden
+  * subee
+  ** subee-1
+#+end_example
+
+That is:
+- as usual for tests, all nodes have titles equal to their IDs
+- node 1 has a single child, 11
+- 11 subscribes to subee
+- subee has a child subee-1, and 11 hides it
+- 11 also hides the node called "also-hidden", which is a node with
+  no other connection to anything, just its ID and title
+- 11 has an alias, "eleven"
+
+Notice that subee appears twice in that buffer:
+Once as a subscribee, and once as a standalone root.
+
+In a second buffer we have just two roots, 11 and subee,
+with none of the scaffolding.
+
+#+begin_example
+  * (indef) 11
+  * subee
+  ** subee-1
+#+end_example
+
+From that buffer we remove 'indef' from 11's metadata,
+add a delete request to that metadata, and save.
+Now the first buffer should look like:
+
+#+begin_example
+  * 1
+  ** (deleted)
+  *** (deletedscaff)
+  **** subee
+  ***** subee-1  ;; tricky!
+  ***** (deletedscaff)
+  ****** subee-1
+  **** (deletedscaff)
+  ***** also-hidden
+  * subee
+  ** subee-1
+#+end_example
+
+That "tricky" line happens because subee gets completed
+(via "complete_viewtree") when the buffer is saved.
+
+And now we go a step further:
+We make an edit from the view with deleted nodes.
+In particular, let's add a new node with the title subee-2
+to subee:
+
+#+begin_example
+  * 1
+  ** (deleted)
+  *** (deletedscaff)
+  **** subee
+  ***** subee-1
+  ***** subee-2
+  ***** (deletedscaff)
+  ****** subee-1
+  **** (deletedscaff)
+  ***** also-hidden
+  * subee
+  ** subee-1
+  ** subee-2
+#+end_example
+
+After saving that, the other buffer should now read:
+
+#+begin_example
+  * (deleted) 11
+  * subee
+  ** subee-1
+  ** subee-2
+#+end_example
+
+* Context
+
+This integration test exercises:
+1. Node deletion via =(editRequest delete)=: a save from one buffer
+   deletes a =.skg= file, and the collateral buffer degrades the
+   node to =DeletedNode= with scaffolds becoming =DeletedScaff=.
+2. Editing under a =DeletedNode=: a subsequent save from the
+   collateral buffer adds a new child node, and the other buffer
+   picks up the change.
+
+All existing collateral tests deal only with containment changes.
+This is the first to exercise the =DeletedNode= / =DeletedScaff=
+degradation path in =complete_viewtree=.
+
+* Fixtures
+
+Five =.skg= files under =data/skg-data/=:
+
+** =1.skg=
+
+#+begin_src yaml
+title: "1"
+ids:
+  - "1"
+contains:
+  - "11"
+#+end_src
+
+** =11.skg=
+
+#+begin_src yaml
+title: "11"
+ids:
+  - "11"
+aliases:
+  - eleven
+subscribes_to:
+  - subee
+hides_from_its_subscriptions:
+  - subee-1
+  - also-hidden
+#+end_src
+
+** =subee.skg=
+
+#+begin_src yaml
+title: subee
+ids:
+  - subee
+contains:
+  - subee-1
+#+end_src
+
+** =subee-1.skg=
+
+#+begin_src yaml
+title: subee-1
+ids:
+  - subee-1
+#+end_src
+
+** =also-hidden.skg=
+
+#+begin_src yaml
+title: also-hidden
+ids:
+  - also-hidden
+#+end_src
+
+* Buffer 1: multi-root view (scaffolded "1" + standalone subee)
+
+Constructed in two steps:
+
+1. Request =skg-request-single-root-content-view-from-id "1"=.
+   The server renders all scaffolding for node 11 (subscribeeCol,
+   hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol).
+   This gives us a single-root view with root "1".
+
+2. Add an aliases view request to node 11 via
+   =skg-edit-metadata-at-point=, append two org lines for the
+   standalone subee root:
+
+#+begin_example
+  * (skg (node (id subee) (source main))) subee
+  ** (skg (node (id subee-1) (source main))) subee-1
+#+end_example
+
+   Then save to register the multi-root view with the server.
+   After the save response, the buffer is complete (including
+   the aliasCol and alias for node 11).
+
+** Expected initial structure (titles)
+
+Scaffold rendering uses fixed titles ("it subscribes to these",
+"hidden from this subscription", etc.) defined in
+=server/types/viewnode.rs= =Scaffold::title()=. The expected
+=headline-titles= output is approximately:
+
+#+begin_example
+((1 . "1")
+ (2 . "11")
+ (3 . "its aliases")
+ (4 . "eleven")
+ (3 . "it subscribes to these")
+ (4 . "subee")
+ (5 . "hidden from this subscription")
+ (6 . "subee-1")
+ (4 . "hidden from all subscriptions")
+ (5 . "also-hidden")
+ (1 . "subee")
+ (2 . "subee-1"))
+#+end_example
+
+The exact metadata (graphStats, viewStats, etc.) is unpredictable.
+Assert on headline-titles and headline-structure instead.
+
+* Buffer 2: manually constructed multi-root view
+
+There is no multi-root view request handler in the server. Follow
+the pattern from =containerward-view-request/test-emacs.el=: create
+a buffer with =get-buffer-create=, insert the org content manually,
+and call =skg-request-save-buffer= to register the view.
+
+Buffer content before save:
+
+#+begin_example
+  * (skg (node (id 11) (source main) indefinitive)) 11
+  * (skg (node (id subee) (source main))) subee
+  ** (skg (node (id subee-1) (source main))) subee-1
+#+end_example
+
+After saving, the server completes the tree and sends back the
+response. Since 11 is indefinitive it generates no save
+instructions. subee and subee-1 are definitive and match the
+fixtures, so it's a no-op.
+
+The save response replaces the buffer with the completed view.
+Assert: headline-titles include "11", "subee", "subee-1".
+
+* Phase 3: Delete 11 from buffer 2
+
+Edit buffer 2:
+- Remove =indefinitive= from 11's metadata
+- Add =(editRequest delete)= to 11's metadata
+- Save
+
+The server:
+1. Generates =DefineNode::Delete= for 11
+2. Deletes =11.skg= from disk
+3. Re-renders buffer 2 with =deleted_by_this_save_pids = {11}=
+4. Completes collateral buffer 1 with =deleted_by_this_save_pids = {11}=
+
+** Expected buffer 2 after save
+
+11 becomes a =DeletedNode=. subee is unaffected.
+
+Expected headline-titles (approximately):
+#+begin_example
+((1 . "11")
+ (1 . "subee")
+ (2 . "subee-1"))
+#+end_example
+
+Line 1 metadata should contain =(deleted (id 11) ...)=.
+
+** Expected collateral buffer 1 after deletion
+
+Node 11 degrades to =DeletedNode=. Its scaffolds
+(subscribeeCol, hiddenInSubscribeeCol,
+hiddenOutsideOfSubscribeeCol) become =DeletedScaff=. The
+aliasCol also becomes =DeletedScaff=; its leaf child
+(the =alias= scaffold) becomes a childless =DeletedScaff=
+which the postorder pass detaches. So aliasCol and its
+alias disappear entirely.
+
+subee is a TrueNode under the (now =DeletedScaff=)
+subscribeeCol. =complete_viewtree= completes it normally,
+adding subee-1 as a real child. This is the "tricky" line.
+
+Expected headline-titles (approximately):
+#+begin_example
+((1 . "1")
+ (2 . "11")           ;; DeletedNode
+ (3 . "")             ;; DeletedScaff (was subscribeeCol)
+ (4 . "subee")        ;; TrueNode, completed
+ (5 . "subee-1")      ;; child from completion
+ (5 . "")             ;; DeletedScaff (was hiddenInSubscribeeCol)
+ (6 . "subee-1")      ;; hidden node preserved
+ (4 . "")             ;; DeletedScaff (was hiddenOutsideOfSubscribeeCol)
+ (5 . "also-hidden")  ;; hidden node preserved
+ (1 . "subee")        ;; standalone root, unaffected
+ (2 . "subee-1"))     ;; its child
+#+end_example
+
+Note: Childless DeletedNode stays in the tree (the postorder
+handler is a no-op for Deleted; only childless DeletedScaff
+is detached). The aliasCol scaffold becomes DeletedScaff;
+its leaf child (the =alias= scaffold) also becomes childless
+DeletedScaff and IS detached. So aliasCol and its alias
+disappear entirely.
+
+DeletedScaff has no title (renders as empty). The assertion
+should check for the presence of the right number of
+empty-titled headlines at the right depths, and the TrueNode
+titles at the right depths.
+
+* Phase 4: Add subee-2 from buffer 1
+
+Edit buffer 1 (the one with deleted structure):
+- Navigate to the =subee= headline
+- Position after =subee-1= (the completed child, at depth 5)
+- Insert =****** subee-2= (a bare headline with no metadata)
+- Save
+
+Deleted and DeletedScaff nodes are inert (generate no save
+instructions). The save pipeline creates a new node for subee-2
+and updates subee's =contains= to include it.
+
+** Expected buffer 1 after save
+
+Same structure as before, but with subee-2 inserted as a child
+of subee. subee-2 gets a UUID and metadata from the server.
+The standalone subee root also gains subee-2 as a child
+(it's completed normally from the updated =subee.skg=).
+
+Expected headline-titles (approximately):
+#+begin_example
+((1 . "1")
+ (2 . "11")           ;; DeletedNode, still present
+ (3 . "")             ;; DeletedScaff
+ (4 . "subee")        ;; TrueNode, completed
+ (5 . "subee-1")      ;; existing child
+ (5 . "subee-2")      ;; new child (now has UUID + metadata)
+ (5 . "")             ;; DeletedScaff
+ (6 . "subee-1")      ;; hidden node preserved
+ (4 . "")             ;; DeletedScaff
+ (5 . "also-hidden")  ;; hidden node preserved
+ (1 . "subee")        ;; standalone root, completed
+ (2 . "subee-1")
+ (2 . "subee-2"))     ;; also gains subee-2
+#+end_example
+
+** Expected collateral buffer 2
+
+After fixing =build_child_creation_data= (see Rust code fix
+section below), the collateral update for buffer 2 succeeds.
+=complete_viewtree= re-processes =subee=, reads the updated
+=subee.skg= (which now lists =subee-2= in =contains=), and
+creates subee-2 as a new TrueNode child.
+
+Expected headline-titles:
+#+begin_example
+((1 . "11")           ;; DeletedNode, still present
+ (1 . "subee")
+ (2 . "subee-1")
+ (2 . "subee-2"))     ;; new child from collateral update
+#+end_example
+
+* Rust code fix: =build_child_creation_data= disk fallback
+
+=server/update_buffer/complete_parent_first/truenode.rs=,
+function =build_child_creation_data= (around line 450).
+
+Currently, for a non-phantom child not already in the tree,
+the function errors: "no source for X (not in map, not a child)".
+This prevents collateral updates from picking up new children
+created by another buffer's save.
+
+The fix: when =child_sources.get(id)= returns =None=, fall back
+to =source_from_disk(id, config)= (defined in
+=server/types/phantom.rs=). This mirrors the fallback chain in
+=source_for_phantom= (same file).
+
+Current code (lines ~451-455):
+
+#+begin_example
+} else {
+  let child_source : &SourceName = child_sources.get( id )
+    .ok_or( format!(
+      "build_child_creation_data: \
+       no source for {} (not in map, not a child)",
+      id.0 )) ?;
+#+end_example
+
+Replacement — follow the same chain as =source_for_phantom=
+(=server/types/phantom.rs=), which already does
+=existing_children → deleted_since_head_pid_src_map → map → disk=.
+All four parameters are already available in
+=build_child_creation_data=:
+
+#+begin_example
+} else {
+  let child_source : SourceName =
+    child_sources.get( id ).cloned()
+    .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
+    .or_else( || map.get( id ).map( |n| n.source.clone() ) )
+    .or_else( || source_from_disk( id, config ) )
+    .ok_or( format!(
+      "build_child_creation_data: \
+       no source for {}",
+      id.0 )) ?;
+#+end_example
+
+Note: the variable changes from =&SourceName= to =SourceName=
+(owned). The subsequent line that uses =child_source= (passed to
+=skgnode_from_map_or_disk=) takes =&SourceName=, so use
+=&child_source= there.
+
+Import =source_from_disk= at the top of the file from
+=crate::types::phantom::source_from_disk=.
+
+* Files to create
+
+All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
+
+| File                               | Purpose                       |
+|------------------------------------+-------------------------------|
+| =README.org=                       | This document                 |
+| =run-test.sh=                      | Shell orchestrator            |
+| =test-emacs.el=                    | ELisp test logic              |
+| =data/skg-data/1.skg=             | Fixture: node 1               |
+| =data/skg-data/11.skg=            | Fixture: node 11              |
+| =data/skg-data/subee.skg=         | Fixture: node subee           |
+| =data/skg-data/subee-1.skg=       | Fixture: node subee-1         |
+| =data/skg-data/also-hidden.skg=   | Fixture: node also-hidden     |
+| =data/index.tantivy/.gitkeep=     | Empty Tantivy index directory |
+
+=run-test.sh= follows existing pattern. Differences:
+- Five fixture files to back up / restore
+- UUID files to clean up (subee-2 is a new node)
+
+=test-emacs.el= loads =skg-init.el= and
+=save_collateral_break_cycle/test-helpers.el= for shared helpers.
+
+* Assertion strategy
+
+Use =assert-headline-titles= for structural checks. For
+specific lines (e.g., "line 2 is a DeletedNode"), decompose
+with =skg-split-as-stars-metadata-title= and check the
+metadata sexp directly — e.g., that it contains =(deleted ...)=
+rather than =(node ...)=.
+
+For =DeletedScaff= lines, check that metadata contains
+=deletedScaffold=.
+
+* Reusable tools
+
+| Tool                                              | Source                                              |
+|---------------------------------------------------+-----------------------------------------------------|
+| =test-lib.sh= helpers                             | =tests/integration/test-lib.sh=                     |
+| =skg-request-single-root-content-view-from-id=    | =elisp/skg-request-single-root-content-view.el=     |
+| =skg-request-save-buffer=                         | =elisp/skg-request-save.el=                         |
+| =skg-edit-metadata-at-point=                      | =elisp/skg-metadata.el= (for editing 11's metadata) |
+| =skg--extract-id-from-metadata-sexp=              | =elisp/skg-id-search.el=                            |
+| =headline-titles=, =assert-headline-titles=       | =save_collateral_break_cycle/test-helpers.el=       |
+| =headline-structure=, =assert-headline-structure= | =save_collateral_break_cycle/test-helpers.el=       |
+| =skg-split-as-stars-metadata-title=               | =elisp/skg-metadata.el=                             |
+
+* Verification
+
+#+begin_example
+cargo build
+cargo nextest run                    ;; Rust unit tests (check fix doesn't break anything)
+bash tests/integration/save_collateral_delete_then_edit_under_it/run-test.sh
+bash tests/integration/save_collateral_add_content_and_modify_text/run-test.sh  ;; also benefits from fix
+bash tests/integration/run-all-tests.sh
+#+end_example
+
+* Problems
+
+** Multi-root buffer 1 (resolved)
+
+Buffer 1 has two roots: the scaffolded "1" tree and a standalone
+=subee= root. Built by requesting single-root view from "1",
+appending two lines for standalone =subee= + =subee-1=, and
+saving to register. The two-root structure is needed so that
+the standalone subee root reflects collateral updates (e.g.,
+gains subee-2 after phase 4's save).
+
+** DeletedScaff title rendering
+
+=DeletedScaff= nodes render via =deleted_scaff_metadata_to_string=
+(=server/org_to_text.rs=) which produces =(skg deletedScaffold)=
+with NO title. The scaffolds they replaced (subscribeeCol, etc.)
+had titles like "it subscribes to these". After degradation,
+=deletedScaff= is an opaque tombstone — it renders as:
+
+#+begin_example
+  *** (skg deletedScaffold)
+#+end_example
+
+This means =skg-split-as-stars-metadata-title= will return an
+empty title for =DeletedScaff= lines. The assertion strategy
+needs to account for this: check depths and the count of
+empty-titled lines, not their original scaffold names.
+
+However, I should verify whether =skg-split-as-stars-metadata-title=
+can parse =(skg deletedScaffold)= at all. It might fail if it
+expects =(skg (node ...))= structure.
+
+** The notation in the prompt (resolved)
+
+The prompt uses shorthand throughout: =** (deleted)= means a
+=DeletedNode=, =*** (deletedscaff)= means =DeletedScaff=,
+=* (indef) 11= means an indefinitive TrueNode, etc. None of these
+are the literal org-mode rendering.
+
+The actual rendering would be:
+- =(deleted)= → =(skg (deleted (id 11) (source main))) 11=
+- =(deletedscaff)= → =(skg deletedScaffold)= (no title)
+- =(indef) 11= → =(skg (node (id 11) (source main) indefinitive)) 11=
+
+** Childless DeletedNode stays in tree (resolved)
+
+=* 11= in the final buffer 2 expected output is a =DeletedNode=.
+It has no children in buffer 2, but it stays in the tree.
+
+Confirmed from code: in =complete_postorder_for_one_node=
+(=server/update_buffer/complete.rs= line ~194), =DeletedNode= is
+a no-op ("Deleted nodes are inert"). Only =DeletedScaff= checks
+for childlessness and detaches. So:
+- Childless =DeletedScaff= → detached (removed from tree)
+- Childless =DeletedNode= → stays (inert, no-op)
+
+The prompt's expected outputs are correct.
+
+** Collateral update with new node (resolved — fix needed)
+
+When buffer 1 is saved with the new =subee-2= node, the server
+creates =subee-2.skg= on disk and updates subee's =contains=.
+Then the collateral update for buffer 2 re-completes its stored
+forest.
+
+Currently =build_child_creation_data= fails for =subee-2=
+because it's not in =child_sources= (existing tree children).
+This is the same limitation from the
+=save_collateral_add_content_and_modify_text= test.
+
+Fix: add a =source_from_disk= fallback to
+=build_child_creation_data= (see "Rust code fix" section above).
+After the fix, the collateral update succeeds: =complete_viewtree=
+processes =subee=, reads the updated =subee.skg=, finds =subee-2=
+in =contains=, looks up its source from disk, and creates it as
+a new TrueNode child. Buffer 2 gains =subee-2= under =subee=.
+
+This also fixes the known limitation in the
+=save_collateral_add_content_and_modify_text= test. After applying
+the fix, that test's phase-4 assertion for collateral buffer A
+could be upgraded to expect the new child "c" to appear.
+
+** =skg-edit-metadata-at-point= for editing 11's metadata
+
+In buffer 2, we need to:
+1. Remove =indefinitive= from 11's metadata
+2. Add =(editRequest delete)= to 11's metadata
+
+=skg-edit-metadata-at-point= merges sexp structures. It can ADD
+fields but it's unclear if it can REMOVE =indefinitive= (a bare
+atom, not a key-value pair). We may need to use =(DELETE indefinitive)=
+syntax (like =skg-remove-focused-marker= uses =(DELETE focused)=).
+
+So the two calls would be:
+1. =(skg-edit-metadata-at-point '(skg (DELETE indefinitive)))=
+2. =(skg-edit-metadata-at-point '(skg (node (editRequest delete))))=
+
+I should verify that these work before relying on them in the test.
+
+** Sleep durations
+
+The server's save pipeline is slow (TypeDB update + FS writes +
+Tantivy reindex + merge + collateral completion). The containerward
+test needed 2.0s sleeps. This test has TWO save-and-verify cycles,
+so the total test time will be significant. Timeout should be at
+least 30s, possibly 40s.
