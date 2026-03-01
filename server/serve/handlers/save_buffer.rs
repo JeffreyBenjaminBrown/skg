@@ -275,29 +275,12 @@ fn complete_collateral_view (
     . unwrap_or_default ();
   let text : String = block_on ( async {
     let mut errors : Vec<String> = Vec::new ();
-    let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-    remove_branches_that_git_marked_removed (&mut viewforest)
-      . map_err ( |e| format! (
-        "complete_collateral_view: {}", e )) ?;
-    clear_diff_metadata (&mut viewforest)
-      . map_err ( |e| format! (
-        "complete_collateral_view: {}", e )) ?;
-    complete_viewtree (
-      &mut viewforest, &mut skgnodemap, &mut defmap,
+    rerender_view (
+      &mut viewforest, &mut skgnodemap,
       &source_diffs, config, typedb_driver,
       &mut errors, &deleted_since_head_pid_src_map,
-      deleted_by_this_save_pids ). await ?;
-    let ( container_to_contents, content_to_containers ) =
-      set_graphnodestats_in_forest (
-        &mut viewforest, &mut skgnodemap,
-        config, typedb_driver ) . await ?;
-    set_viewnodestats_in_forest (
-      &mut viewforest,
-      &container_to_contents,
-      &content_to_containers );
-    let text : String =
-      viewnode_forest_to_string ( &viewforest ) ?;
-    Result::<String, Box<dyn Error>>::Ok (text) } ) ?;
+      deleted_by_this_save_pids ). await
+  } ) ?;
   for (pid, skgnode) in skgnodemap {
     conn_state . memory . pool . insert (
       pid, skgnode ); }
@@ -305,6 +288,35 @@ fn complete_collateral_view (
     uri, viewforest );
   Ok (( uri . clone (),
         text )) }
+
+/// Strip stale diff data, re-complete the viewtree,
+/// set graph/view stats, and render to string.
+async fn rerender_view (
+  forest                         : &mut Tree<ViewNode>,
+  map                            : &mut SkgNodeMap,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  config                         : &SkgConfig,
+  typedb_driver                  : &TypeDBDriver,
+  errors                         : &mut Vec<String>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_pids      : &HashSet<ID>,
+) -> Result<String, Box<dyn Error>> {
+  remove_branches_that_git_marked_removed (forest) ?;
+  clear_diff_metadata (forest) ?;
+  let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+  complete_viewtree (
+    forest, map, &mut defmap,
+    source_diffs, config, typedb_driver,
+    errors, deleted_since_head_pid_src_map,
+    deleted_by_this_save_pids ). await ?;
+  let ( container_to_contents, content_to_containers ) =
+    set_graphnodestats_in_forest (
+      forest, map, config, typedb_driver ). await ?;
+  set_viewnodestats_in_forest (
+    forest,
+    &container_to_contents,
+    &content_to_containers );
+  viewnode_forest_to_string (forest) }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -374,10 +386,6 @@ pub async fn update_from_and_rerender_buffer (
                           Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?; }
 
-  { // Remove diff data from tree.
-    remove_branches_that_git_marked_removed (&mut forest) ?;
-    clear_diff_metadata (&mut forest) ?; }
-
   { // update views
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap = {
@@ -404,34 +412,17 @@ pub async fn update_from_and_rerender_buffer (
         DefineNode::Delete( d ) => Some( d.id.clone() ),
         _ => None })
       . collect();
-    { // mutate it before re-rendering it
-      let mut visited : DefinitiveMap = DefinitiveMap::new();
-      timed_async ( config, "complete_viewtree",
-                    complete_viewtree (
+    let buffer_content : String =
+      timed_async ( config, "rerender_view",
+                    rerender_view (
                       &mut forest_mut,
                       &mut skgnode_map,
-                      &mut visited,
                       &source_diffs,
                       config,
                       typedb_driver,
                       &mut errors,
                       &deleted_since_head_pid_src_map,
                       &deleted_by_this_save_pids )) . await ?;
-      let ( container_to_contents, content_to_containers ) =
-        timed_async ( config, "set_graphnodestats_in_forest",
-                      set_graphnodestats_in_forest (
-                        &mut forest_mut,
-                        &mut skgnode_map,
-                        config,
-                        typedb_driver )) . await ?;
-      timed ( config, "set_viewnodestats_in_forest",
-              || set_viewnodestats_in_forest (
-                &mut forest_mut,
-                &container_to_contents,
-                &content_to_containers )); }
-    let buffer_content : String =
-      timed ( config, "save_render",
-              || viewnode_forest_to_string ( & forest_mut )) ?;
     Ok ( SaveResult {
       response : SaveResponse {
         saved_view : buffer_content, errors,
