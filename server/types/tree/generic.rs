@@ -180,7 +180,8 @@ pub fn do_everywhere_in_tree_dfs_prunable<T, F>(
   start_node_id : NodeId,
   f             : &mut F
 ) -> Result<(), String>
-where F: FnMut(NodeMut<T>) -> Result<bool, String> {
+where F: FnMut(NodeMut<T>
+              ) -> Result<bool, String> {
   let child_ids : Vec<NodeId> = {
     let node_ref : NodeRef<T> =
       tree . get ( start_node_id ) . ok_or (

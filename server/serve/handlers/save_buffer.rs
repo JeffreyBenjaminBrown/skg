@@ -93,7 +93,7 @@ pub fn handle_save_buffer_request (
     // the skgnodes already in memory for this view
     let mut it : SkgNodeMap = SkgNodeMap::new ();
     if let Ok (ref uri) = viewuri_from_request_result {
-      for pid in conn_state . memory . pids_in_view (uri) {
+      for pid in conn_state . memory . viewuri_to_pids (uri) {
         if let Some (skgnode)
           = conn_state . memory . pool . get ( &pid )
           { it . insert ( pid, skgnode . clone () ); }} }
@@ -107,24 +107,24 @@ pub fn handle_save_buffer_request (
             typedb_driver, config, tantivy_index,
             conn_state . diff_mode_enabled,
             saveview_skgnodes_pre_save ))
-        { Ok (pipeline_result) => {
-            let mut pipeline_result : SaveResult =
-              pipeline_result;
+        { Ok (save_result) => {
+            let mut save_result : SaveResult =
+              save_result;
             if let Some ( view_uri ) =
               update_memory_for_saved_view (
                 &viewuri_from_request_result,
-                &pipeline_result,
+                &save_result,
                 conn_state )
-            { pipeline_result . response . collateral_views =
+            { save_result . response . collateral_views =
                 rerender_collateral_views (
                   view_uri,
-                  &pipeline_result,
+                  &save_result,
                   conn_state,
                   typedb_driver,
                   config ); }
             stream . write_all (
                 { let response_sexp : String =
-                    pipeline_result . response . to_sexp_string ();
+                    save_result . response . to_sexp_string ();
                   let header : String =
                     format! ( "Content-Length: {}\r\n\r\n",
                                  response_sexp . len () );
@@ -172,34 +172,34 @@ pub fn handle_save_buffer_request (
 /// unwind the entire save and report the error.
 fn update_memory_for_saved_view<'a> (
   viewuri_from_request_result : &'a Result<ViewUri, String>,
-  pipeline_result : &SaveResult,
-  conn_state      : &mut ConnectionState,
+  save_result                 : &SaveResult,
+  conn_state                  : &mut ConnectionState,
 ) -> Option<&'a ViewUri> {
   let view_uri : &ViewUri = match viewuri_from_request_result {
     Ok ( uri ) => uri,
     Err ( _ ) =>
       return None };
   for (pid, skgnode) // update the skgnode pool
-    in &pipeline_result . skgnodemap_after_completion
+    in &save_result . skgnodemap_after_completion
     { conn_state . memory . pool . insert ( pid . clone (),
                                             skgnode . clone () ); }
   conn_state . memory . update_view (
     view_uri,
-    pipeline_result . completed_forest . clone () );
+    save_result . completed_forest . clone () );
   Some ( view_uri ) }
 
 /// When the user saves a buffer, the nodes they edited
 /// might also appear in other open Emacs buffers. Those are
 /// "collateral views", which this updates.
-fn rerender_collateral_views (
-  view_uri        : &ViewUri,
-  pipeline_result : &SaveResult,
-  conn_state      : &mut ConnectionState,
-  typedb_driver   : &TypeDBDriver,
-  config          : &SkgConfig,
+pub fn rerender_collateral_views (
+  view_uri      : &ViewUri,
+  save_result   : &SaveResult,
+  conn_state    : &mut ConnectionState,
+  typedb_driver : &TypeDBDriver,
+  config        : &SkgConfig,
 ) -> Vec<(ViewUri, String)> {
   let changed_pids : HashSet<ID> =
-    pipeline_result . save_instructions . iter ()
+    save_result . save_instructions . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Save ( SaveNode (n)) =>
         n . ids . first () . cloned (),
@@ -207,7 +207,7 @@ fn rerender_collateral_views (
         Some ( dn . id . clone () ) } )
     . collect ();
   let deleted_by_this_save_pids : HashSet<ID> =
-    pipeline_result . save_instructions . iter ()
+    save_result . save_instructions . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Delete ( dn ) =>
         Some ( dn . id . clone () ),
@@ -222,72 +222,89 @@ fn rerender_collateral_views (
   let mut updates : Vec<(ViewUri, String)> =
     Vec::new ();
   for uri in collateral_views {
-    if let Some ( (uri, text) ) =
-      complete_collateral_view (
-        &uri, conn_state, typedb_driver,
-        config, &deleted_by_this_save_pids )
-    { updates . push ( (uri, text) ); } }
+    match complete_collateral_view (
+      &uri, conn_state, typedb_driver,
+      config, &deleted_by_this_save_pids )
+    { Ok ( (uri, text) ) =>
+        { updates . push ( (uri, text) ); },
+      Err (e) =>
+        { eprintln! (
+            "Warning: Failed to complete collateral view: {}",
+            e ); }} }
   updates }
 
 /// Complete a single collateral view by re-running the
-/// completion pipeline on the stored forest. Nodes whose
-/// Viewnodes with PIDs in deleted_by_this_save_pids
-/// are degraded to DeletedNode.
+/// completion pipeline on the stored viewforest.
+/// Each Viewnode with a PID in deleted_by_this_save_pids,
+/// is degraded to DeletedNode.
+/// .
+/// TODO | PITFALL:
 /// The server completes collateral views from its stored
-/// forest rather than requesting the buffer from Emacs.
+/// viewforest rather than requesting the buffer from Emacs.
 /// This works correctly only if the user adheres to the
 /// recommendation that at most one buffer has unsaved
 /// changes at a time. In the future, hopefully, this
 /// recommendation will be retracted, and we will instead
-/// update by parsing the raw buffer text of the collateral
-/// view.
+/// update by parsing the raw buffer text of the collateral view.
 fn complete_collateral_view (
   uri           : &ViewUri,
   conn_state    : &mut ConnectionState,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
   deleted_by_this_save_pids  : &HashSet<ID>,
-) -> Option<(ViewUri, String)> {
-  let mut forest : Tree<ViewNode> =
-    conn_state . memory . forest_in_view ( uri ) ? . clone ();
-  let mut map : SkgNodeMap = {
+) -> Result<(ViewUri, String), Box<dyn Error>> {
+  let mut viewforest : Tree<ViewNode> =
+    conn_state . memory . viewuri_to_view (uri)
+    . ok_or_else ( || format! (
+      "complete_collateral_view: no viewforest for {}", uri.0 )) ?
+    . clone ();
+  let mut skgnodemap : SkgNodeMap = {
     let mut it : SkgNodeMap = SkgNodeMap::new ();
-    for pid in conn_state . memory . pids_in_view ( uri ) {
-      if let Some ( skgnode )
-        = conn_state . memory . pool . get ( &pid )
+    for pid in conn_state . memory . viewuri_to_pids ( uri ) {
+      if let Some (skgnode)
+        = conn_state . memory . pool . get (&pid)
         { it . insert ( pid, skgnode . clone () ); } }
     it };
-  match block_on ( async {
+  let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
+    if conn_state . diff_mode_enabled
+    { Some ( compute_diff_for_every_source ( config )) }
+    else { None };
+  let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+    source_diffs . as_ref ()
+    . map ( |d| deleted_ids_to_source ( d ))
+    . unwrap_or_default ();
+  let text : String = block_on ( async {
     let mut errors : Vec<String> = Vec::new ();
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+    remove_branches_that_git_marked_removed (&mut viewforest)
+      . map_err ( |e| format! (
+        "complete_collateral_view: {}", e )) ?;
+    clear_diff_metadata (&mut viewforest)
+      . map_err ( |e| format! (
+        "complete_collateral_view: {}", e )) ?;
     complete_viewtree (
-      &mut forest, &mut map, &mut defmap,
-      &None, config, typedb_driver,
-      &mut errors, &HashMap::new (),
+      &mut viewforest, &mut skgnodemap, &mut defmap,
+      &source_diffs, config, typedb_driver,
+      &mut errors, &deleted_since_head_pid_src_map,
       deleted_by_this_save_pids ). await ?;
     let ( container_to_contents, content_to_containers ) =
       set_graphnodestats_in_forest (
-        &mut forest, &mut map,
+        &mut viewforest, &mut skgnodemap,
         config, typedb_driver ) . await ?;
     set_viewnodestats_in_forest (
-      &mut forest,
+      &mut viewforest,
       &container_to_contents,
       &content_to_containers );
     let text : String =
-      viewnode_forest_to_string ( &forest ) ?;
-    Result::<String, Box<dyn Error>>::Ok ( text ) } )
-  { Ok ( text ) => {
-      for (pid, skgnode) in map {
-        conn_state . memory . pool . insert (
-          pid, skgnode ); }
-      conn_state . memory . update_view (
-        uri, forest );
-      Some ( (uri . clone (), text) ) },
-    Err ( e ) => {
-      eprintln! (
-        "Warning: Failed to complete collateral view: {}",
-        e );
-      None }} }
+      viewnode_forest_to_string ( &viewforest ) ?;
+    Result::<String, Box<dyn Error>>::Ok (text) } ) ?;
+  for (pid, skgnode) in skgnodemap {
+    conn_state . memory . pool . insert (
+      pid, skgnode ); }
+  conn_state . memory . update_view (
+    uri, viewforest );
+  Ok (( uri . clone (),
+        text )) }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -339,10 +356,6 @@ pub async fn update_from_and_rerender_buffer (
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
 
-  { // Remove diff data from tree.
-    remove_all_branches_marked_removed ( &mut forest ) ?;
-    clear_diff_metadata ( &mut forest ) ?; }
-
   { // update the graph
     timed_async ( config, "update_graph_minus_merges",
                   async { update_graph_minus_merges (
@@ -361,25 +374,29 @@ pub async fn update_from_and_rerender_buffer (
                           Result::<(), Box<dyn Error>>::Ok (( )) }
                 ). await ?; }
 
+  { // Remove diff data from tree.
+    remove_branches_that_git_marked_removed (&mut forest) ?;
+    clear_diff_metadata (&mut forest) ?; }
+
   { // update views
     let mut errors : Vec < String > = Vec::new ();
     let mut skgnode_map : SkgNodeMap = {
       let mut it : SkgNodeMap =
-        skgnode_map_from_save_instructions ( & save_instructions );
+        skgnode_map_from_save_instructions (& save_instructions);
       for (pid, skgnode) in saveview_skgnodes_pre_save { // Use these to fill in missing values, giving preference to the user's edits.
-        it . entry ( pid )
+        it . entry (pid)
           . or_insert_with ( || skgnode ); }
       it };
     let mut forest_mut : Tree<ViewNode> = forest;
-    let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
-      // Used for view request execution.
-      if diff_mode_enabled
-      { Some ( compute_diff_for_every_source ( config )) }
-      else { None };
+    let source_diffs // Used to execute view requests.
+      : Option<HashMap<SourceName, SourceDiff>>
+      = if diff_mode_enabled
+        { Some ( compute_diff_for_every_source (config)) }
+        else {None};
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
       // only nonempty when git diff view is enabled
       source_diffs . as_ref()
-      . map ( |d| deleted_ids_to_source ( d ))
+      . map ( |d| deleted_ids_to_source (d))
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> = // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
       save_instructions . iter()
@@ -430,7 +447,7 @@ pub async fn update_from_and_rerender_buffer (
 ///   - parent_ignores nodes
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
-pub fn remove_all_branches_marked_removed (
+pub fn remove_branches_that_git_marked_removed (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
@@ -459,7 +476,7 @@ pub fn remove_all_branches_marked_removed (
       if should_remove {
         node . detach();
         Ok ( false ) // Prune: branch removed, so don't recurse
-      } else { Ok ( true ) }} )? ; // recurse into children
+      } else { Ok (true) }} )? ; // recurse into children
   Ok (( )) }
 
 /// Clear diff metadata from all TrueNodes in the forest.
@@ -473,13 +490,13 @@ pub fn clear_diff_metadata (
   do_everywhere_in_tree_dfs (
     forest,
     forest_root_id,
-    &mut |mut node : NodeMut<ViewNode>| -> Result<(), String> {
-      // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
-      if let ViewNodeKind::True ( t ) = &mut node . value() . kind {
-        t . diff = None; }
-      Ok (()) }
-  ) ?;
-  Ok (()) }
+    &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
+      { // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
+        if let ViewNodeKind::True (t) =
+          &mut node . value() . kind
+        { t . diff = None; }
+        Ok (( )) } ) ?;
+  Ok (( )) }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

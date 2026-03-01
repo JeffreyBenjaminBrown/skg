@@ -14,3 +14,6 @@ mod ids;
 
 #[path = "git_diff_view/newhere_cycle/mod.rs"]
 mod newhere_cycle;
+
+#[path = "git_diff_view/collateral/mod.rs"]
+mod collateral;

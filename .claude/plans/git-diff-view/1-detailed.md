@@ -154,7 +154,7 @@ struct ConnectionState {
   - Walk tree and remove entire branches rooted at nodes marked removed/removed-here
   - EXCEPT: root nodes (BufferRoot children) and parent_ignores=true nodes
   - After stripping branches, clear diff metadata from remaining nodes
-- Functions `remove_all_branches_marked_removed()` and `clear_diff_metadata()` are called before saving
+- Functions `remove_branches_that_git_marked_removed()` and `clear_diff_metadata()` are called before saving
 
 ### 6.3 Pre-save merge commit check — DONE
 - **File:** `server/serve/handlers/save_buffer.rs`
@@ -226,6 +226,6 @@ struct ConnectionState {
 
 All phases have been implemented:
 - ✓ Phase 5.1: `apply_diff_to_forest()` wired up in content_view.rs
-- ✓ Phase 6.2/6.3: `remove_all_branches_marked_removed()`, `clear_diff_metadata()`, `validate_no_merge_commits()` called in save_buffer.rs
+- ✓ Phase 6.2/6.3: `remove_branches_that_git_marked_removed()`, `clear_diff_metadata()`, `validate_no_merge_commits()` called in save_buffer.rs
 - ✓ Phase 6.4: Diff recomputation after save
 - ✓ Phase 7: Definitive view expansion for removed nodes (loading from git via `from_git_replace_title_body()` and `extendDefinitiveSubtree_fromGit()`)

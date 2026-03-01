@@ -1,14 +1,44 @@
-* ONGOING skgnodes-in-memory-request.org
-** replace rerender_collateral_view_from_scratch
-   which might make the 'root_pids' field obsolete
-** extend completion to cover deletion
-** test multi-buffer edits
-   A cycle a <-> b.
-   Open a view from a and a view from b.
-   In the view from a, delete b as a child.
-   Now the view from b should only have definitive nodes b -> a,
-   rather than b -> a -> (indef b).
-* fix some integration tests
+* dedup completion for primary and collateral views
+** the tangle
+   Look over update_from_and_rerender_buffer.
+   It was structured before I introduced collateral views.
+   It needs rearrangement now;
+   steps that belong together are separate.
+** the shared pipeline
+   For collateral views, there's the following.
+   For the initial view there should be something similar.
+
+   remove_branches_that_git_marked_removed (&mut viewforest)
+     . map_err ( |e| format! (
+       "complete_collateral_view: {}", e )) ?;
+   clear_diff_metadata (&mut viewforest)
+     . map_err ( |e| format! (
+       "complete_collateral_view: {}", e )) ?;
+   complete_viewtree (
+     &mut viewforest, &mut skgnodemap, &mut defmap,
+     &source_diffs, config, typedb_driver,
+     &mut errors, &deleted_since_head_pid_src_map,
+     deleted_by_this_save_pids ). await ?;
+   let ( container_to_contents, content_to_containers ) =
+     set_graphnodestats_in_forest (
+       &mut viewforest, &mut skgnodemap,
+       config, typedb_driver ) . await ?;
+   set_viewnodestats_in_forest (
+     &mut viewforest,
+     &container_to_contents,
+     &content_to_containers );
+* 'timed' and 'timed_async' are noisy
+  Maybe, rather than using them at the function call,
+  use them at the function's definition.
+* new AI testing strategy
+  I specify a feature. AI codes it.
+  Commit it *without reviewing*,
+    with UNREVIEWED prominent in the commit message.
+  I specify tests. AI debugs with the tests.
+  *Then* I review the code,
+    and maybe squash the last few commits into one.
+* Deletedscaffold should record what it used to be
+  with a ScaffoldKind field
 * TODO merge & export these notes
 ** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]

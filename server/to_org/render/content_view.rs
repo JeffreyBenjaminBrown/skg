@@ -51,13 +51,6 @@ pub async fn multi_root_view (
     timed_async ( config, "render_initial_forest_bfs",
                   render_initial_forest_bfs (
                     root_ids, config, driver )) . await ?;
-  let ( container_to_contents, content_to_containers ) =
-    timed_async ( config, "set_graphnodestats_in_forest",
-                  set_graphnodestats_in_forest (
-                    &mut forest, &mut map,
-                    config, driver )) . await ?;
-  set_viewnodestats_in_forest (
-    &mut forest, &container_to_contents, &content_to_containers );
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source ( config );
@@ -66,6 +59,13 @@ pub async fn multi_root_view (
     apply_diff_to_forest (
       &mut forest, &source_diffs,
       &deleted_since_head_pid_src_map, config ) ?; }
+  let ( container_to_contents, content_to_containers ) =
+    timed_async ( config, "set_graphnodestats_in_forest",
+                  set_graphnodestats_in_forest (
+                    &mut forest, &mut map,
+                    config, driver )) . await ?;
+  set_viewnodestats_in_forest (
+    &mut forest, &container_to_contents, &content_to_containers );
   let pids : Vec<ID> = {
     // Collect PIDs from forest before rendering to string.
     let mut ids : Vec<ID> = Vec::new ();

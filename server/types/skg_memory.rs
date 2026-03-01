@@ -40,7 +40,7 @@ impl SkgnodesInMemory {
       views       : HashMap::new (),
       id_resolver : HashMap::new () }}
 
-  pub fn pids_in_view (
+  pub fn viewuri_to_pids (
     &self,
     uri : &ViewUri,
   ) -> Vec<ID> {
@@ -48,7 +48,7 @@ impl SkgnodesInMemory {
       . map ( |vs| vs . pids . iter () . cloned () . collect () )
       . unwrap_or_default () }
 
-  pub fn forest_in_view (
+  pub fn viewuri_to_view (
     &self,
     uri : &ViewUri,
   ) -> Option<&Tree<ViewNode>> {
