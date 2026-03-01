@@ -445,8 +445,10 @@ fn build_child_creation_data (
     } else {
       let child_source : SourceName =
         child_sources.get( id ).cloned()
-        .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
-        .or_else( || map.get( id ).map( |n| n.source.clone() ))
+        .or_else( || deleted_since_head_pid_src_map
+                     . get(id) . cloned() )
+        .or_else( || map . get(id)
+                     . map( |n| n . source . clone() ))
         .or_else( || source_from_disk( id, config ) )
         .ok_or( format!(
           "build_child_creation_data: \

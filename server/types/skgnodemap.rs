@@ -32,10 +32,7 @@ pub fn skgnode_for_viewnode<'a> (
         skgnode_from_map_or_disk(
           &t.id, &t.source, map, config)?;
       Ok(Some(skgnode)) },
-    ViewNodeKind::Scaff(_) |
-    ViewNodeKind::Deleted(_) |
-    ViewNodeKind::DeletedScaff => Ok(None),
-  }}
+    _ => Ok(None) }}
 
 /// Build a SkgNodeMap from DefineNodes.
 /// Each SkgNode is indexed by its first ID.

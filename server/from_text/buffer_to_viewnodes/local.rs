@@ -37,32 +37,30 @@ pub fn validate_local_structure (
     }); };
 
   let errors : Vec<String> =
-    match &node_ref.value().kind {
-    UncheckedViewNodeKind::True(t) =>
-      validate_truenode(tree, node_id, t, config),
-    UncheckedViewNodeKind::Scaff(s) => match s {
-      Scaffold::BufferRoot =>
-        validate_buffer_root(tree, node_id),
-      Scaffold::Alias { .. } =>
-        validate_alias(tree, node_id),
-      Scaffold::AliasCol =>
-        validate_aliascol(tree, node_id),
-      Scaffold::HiddenInSubscribeeCol =>
-        validate_hidden_in_subscribee_col(tree, node_id),
-      Scaffold::HiddenOutsideOfSubscribeeCol =>
-        validate_hidden_outside_of_subscribee_col(tree, node_id),
-      Scaffold::SubscribeeCol =>
-        validate_subscribeecol(tree, node_id),
-      Scaffold::TextChanged =>
-        validate_text_changed(tree, node_id),
-      Scaffold::IDCol =>
-        validate_idcol(tree, node_id),
-      Scaffold::ID { .. } =>
-        validate_idscaffold(tree, node_id),
-    },
-    UncheckedViewNodeKind::Deleted ( _ ) => Vec::new(),
-    UncheckedViewNodeKind::DeletedScaff => Vec::new(),
-    };
+    match &node_ref.value().kind
+    { UncheckedViewNodeKind::True(t) =>
+        validate_truenode(tree, node_id, t, config),
+      UncheckedViewNodeKind::Scaff(s) => match s {
+        Scaffold::BufferRoot =>
+          validate_buffer_root(tree, node_id),
+        Scaffold::Alias { .. } =>
+          validate_alias(tree, node_id),
+        Scaffold::AliasCol =>
+          validate_aliascol(tree, node_id),
+        Scaffold::HiddenInSubscribeeCol =>
+          validate_hidden_in_subscribee_col(tree, node_id),
+        Scaffold::HiddenOutsideOfSubscribeeCol =>
+          validate_hidden_outside_of_subscribee_col(tree, node_id),
+        Scaffold::SubscribeeCol =>
+          validate_subscribeecol(tree, node_id),
+        Scaffold::TextChanged =>
+          validate_text_changed(tree, node_id),
+        Scaffold::IDCol =>
+          validate_idcol(tree, node_id),
+        Scaffold::ID { .. } =>
+          validate_idscaffold(tree, node_id), },
+      UncheckedViewNodeKind::Deleted ( _ ) => Vec::new(),
+      UncheckedViewNodeKind::DeletedScaff => Vec::new() };
 
   if errors.is_empty() {
     Ok (( ))

@@ -354,7 +354,7 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let (mut forest, save_instructions, merge_instructions)
+  let (forest, save_instructions, merge_instructions)
     : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
     = timed_async (
         config,
@@ -455,15 +455,13 @@ pub fn remove_branches_that_git_marked_removed (
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          ViewNodeKind::True ( t ) => {
+          ViewNodeKind::True (t) => {
             matches! ( t . diff,
                        Some ( NodeDiffStatus::Removed ) |
                        Some ( NodeDiffStatus::RemovedHere ))
             && ! is_forest_root_child
             && ! t . parent_ignores },
-          ViewNodeKind::Scaff ( _ ) |
-          ViewNodeKind::Deleted ( _ ) |
-          ViewNodeKind::DeletedScaff => false };
+          _ => false };
       if should_remove {
         node . detach();
         Ok ( false ) // Prune: branch removed, so don't recurse
@@ -483,9 +481,9 @@ pub fn clear_diff_metadata (
     forest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
       { // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
-        if let ViewNodeKind::True (t) =
-          &mut node . value() . kind
-        { t . diff = None; }
+        if let ViewNodeKind::True (t)
+          = &mut node . value() . kind
+          { t . diff = None; }
         Ok (( )) } ) ?;
   Ok (( )) }
 

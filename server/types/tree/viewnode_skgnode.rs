@@ -241,7 +241,6 @@ pub fn find_child_by_id (
   find_children_by_ids( tree, parent_treeid, &singleton)
     . remove(target_skgid) }
 
-/// Find child nodes by their IDs.
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_ids (

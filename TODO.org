@@ -1,35 +1,17 @@
-* dedup completion for primary and collateral views
-** the tangle
-   Look over update_from_and_rerender_buffer.
-   It was structured before I introduced collateral views.
-   It needs rearrangement now;
-   steps that belong together are separate.
-** the shared pipeline
-   For collateral views, there's the following.
-   For the initial view there should be something similar.
-
-   remove_branches_that_git_marked_removed (&mut viewforest)
-     . map_err ( |e| format! (
-       "complete_collateral_view: {}", e )) ?;
-   clear_diff_metadata (&mut viewforest)
-     . map_err ( |e| format! (
-       "complete_collateral_view: {}", e )) ?;
-   complete_viewtree (
-     &mut viewforest, &mut skgnodemap, &mut defmap,
-     &source_diffs, config, typedb_driver,
-     &mut errors, &deleted_since_head_pid_src_map,
-     deleted_by_this_save_pids ). await ?;
-   let ( container_to_contents, content_to_containers ) =
-     set_graphnodestats_in_forest (
-       &mut viewforest, &mut skgnodemap,
-       config, typedb_driver ) . await ?;
-   set_viewnodestats_in_forest (
-     &mut viewforest,
-     &container_to_contents,
-     &content_to_containers );
-* 'timed' and 'timed_async' are noisy
-  Maybe, rather than using them at the function call,
-  use them at the function's definition.
+* complete_preorder_for_one_node calls complete_truenode
+  so it's not really for one node
+* is this logic duplicated anywhere?
+        child_sources.get( id ).cloned()
+        .or_else( || deleted_since_head_pid_src_map
+                     . get(id) . cloned() )
+        .or_else( || map . get(id)
+                     . map( |n| n . source . clone() ))
+        .or_else( || source_from_disk( id, config ) )
+* rename things in save_buffer
+* ? rerender_collateral_views v. rerender_view
+  e.g. complete_collateral_view calls rerender_view,
+  which seems backward
+* [[id:e6fff78e-0fc6-47e9-b444-06718a88be12][replace ( *token *) with (token)]]
 * new AI testing strategy
   I specify a feature. AI codes it.
   Commit it *without reviewing*,
@@ -37,6 +19,9 @@
   I specify tests. AI debugs with the tests.
   *Then* I review the code,
     and maybe squash the last few commits into one.
+* 'timed' and 'timed_async' are noisy
+  Maybe, rather than using them at the function call,
+  use them at the function's definition.
 * Deletedscaffold should record what it used to be
   with a ScaffoldKind field
 * TODO merge & export these notes

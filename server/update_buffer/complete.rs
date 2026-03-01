@@ -50,7 +50,7 @@ fn complete_preorder_recursive<'a> (
   config             : &'a SkgConfig,
   driver             : &'a TypeDBDriver,
   deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
-  deleted_by_this_save_pids       : &'a HashSet<ID>,
+  deleted_by_this_save_pids      : &'a HashSet<ID>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
@@ -106,12 +106,12 @@ async fn complete_preorder_for_one_node (
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids       : &HashSet<ID>,
+  deleted_by_this_save_pids      : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get ( treeid ) . unwrap () . value () . kind . clone ();
-  // Guard: Scaff under Deleted or DeletedScaff parent becomes DeletedScaff.
-  if matches!( kind, ViewNodeKind::Scaff( _ )) {
+  if matches!( kind, ViewNodeKind::Scaff(_)) {
+    // Scaff under Deleted or DeletedScaff parent becomes DeletedScaff.
     let parent_is_deleted : bool =
       read_at_ancestor_in_tree ( tree, treeid, 1,
         |vn : &ViewNode| matches! ( &vn.kind,
@@ -119,7 +119,7 @@ async fn complete_preorder_for_one_node (
           ViewNodeKind::DeletedScaff ))
       . unwrap_or ( false );
     if parent_is_deleted {
-      tree . get_mut ( treeid ) . unwrap () . value () . kind =
+      tree . get_mut (treeid) . unwrap () . value () . kind =
         ViewNodeKind::DeletedScaff;
       return Ok(( )); }}
   if matches!( kind, ViewNodeKind::True( _ )) {
@@ -177,8 +177,7 @@ async fn complete_postorder_for_one_node (
         complete_hiddenoutsideofsubscribeecol (
           treeid, tree, map, source_diffs, config,
           deleted_since_head_pid_src_map ) ?;
-  } else if matches!( kind, ViewNodeKind::Deleted( _ )) {
-    // No-op: Deleted nodes are inert.
+  } else if matches!( kind, ViewNodeKind::Deleted( _ )) { // no-op
   } else if matches!( kind, ViewNodeKind::DeletedScaff ) {
     // Detach self if no children remain.
     let has_children : bool =

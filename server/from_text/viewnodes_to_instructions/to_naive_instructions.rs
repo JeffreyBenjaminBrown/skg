@@ -153,9 +153,6 @@ fn collect_contents_to_save_from_children<'a> (
   for child_ref in node_ref.children() {
     let child : &ViewNode = child_ref . value();
     match &child.kind {
-      ViewNodeKind::Deleted ( _ ) |
-      ViewNodeKind::DeletedScaff => continue,
-      ViewNodeKind::Scaff ( _ ) => continue,
       ViewNodeKind::True(t) => {
         let is_phantom : bool =
           // In diff view, skip phantom (Removed/RemovedHere) nodes
@@ -166,5 +163,6 @@ fn collect_contents_to_save_from_children<'a> (
            && ! is_phantom
            && ! matches!( t . edit_request,
                           Some(EditRequest::Delete))
-        { contents.push( t.id.clone() ); }} } }
+        { contents.push( t.id.clone() ); }},
+      _ => continue }}
   contents }

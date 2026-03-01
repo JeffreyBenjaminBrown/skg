@@ -92,9 +92,7 @@ impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
       UncheckedViewNodeKind::Deleted(d) =>
         Ok(ViewNodeKind::Deleted(d)),
       UncheckedViewNodeKind::DeletedScaff =>
-        Ok(ViewNodeKind::DeletedScaff),
-    }
-  }
+        Ok(ViewNodeKind::DeletedScaff) }}
 }
 
 impl TryFrom<UncheckedViewNode> for ViewNode {
@@ -139,9 +137,7 @@ impl From<ViewNodeKind> for UncheckedViewNodeKind {
       ViewNodeKind::Deleted(d) =>
         UncheckedViewNodeKind::Deleted(d),
       ViewNodeKind::DeletedScaff =>
-        UncheckedViewNodeKind::DeletedScaff,
-    }
-  }
+      UncheckedViewNodeKind::DeletedScaff }}
 }
 
 impl From<ViewNode> for UncheckedViewNode {

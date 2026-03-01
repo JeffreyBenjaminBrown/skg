@@ -82,14 +82,17 @@ pub fn viewnode_to_string (
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
     ViewNodeKind::Scaff ( scaffold ) =>
-      scaffold_metadata_to_string ( viewnode . focused, viewnode . folded, scaffold ),
+      scaffold_metadata_to_string (
+        viewnode . focused, viewnode . folded, scaffold ),
     ViewNodeKind::True ( true_node ) =>
-      Ok ( true_node_metadata_to_string ( viewnode . focused, viewnode . folded, true_node )),
+      Ok ( true_node_metadata_to_string (
+        viewnode . focused, viewnode . folded, true_node )),
     ViewNodeKind::Deleted ( deleted_node ) =>
-      Ok ( deleted_node_metadata_to_string ( viewnode . focused, viewnode . folded, deleted_node )),
+      Ok ( deleted_node_metadata_to_string (
+        viewnode . focused, viewnode . folded, deleted_node )),
     ViewNodeKind::DeletedScaff =>
-      Ok ( deleted_scaff_metadata_to_string ( viewnode . focused, viewnode . folded )),
-  }}
+      Ok ( deleted_scaff_metadata_to_string (
+        viewnode . focused, viewnode . folded )) }}
 
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
