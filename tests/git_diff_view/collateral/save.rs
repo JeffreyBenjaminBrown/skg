@@ -23,7 +23,7 @@ fn test_collateral_view_preserves_diff_annotations()
     : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
        String, ViewUri) =
     block_on ( async {
-      let (config, driver, tantivy)
+      let (config, driver, mut tantivy)
         : (SkgConfig, TypeDBDriver, TantivyIndex) =
         setup_test_dbs (
           db_name, repo_path . to_str() . unwrap(),
@@ -63,7 +63,7 @@ fn test_collateral_view_preserves_diff_annotations()
         "** (skg (node (id c))) c" );
       let save_response : SaveResponse =
         update_from_and_rerender_buffer (
-          &save_input, &driver, &config, &tantivy,
+          &save_input, &driver, &config, &mut tantivy,
           true, map,
           &Ok ( uri_1 . clone () ),
           &mut conn_state ) . await ?;

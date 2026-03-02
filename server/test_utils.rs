@@ -60,7 +60,7 @@ pub fn run_with_test_db<F>(
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a TypeDBDriver, &'a TantivyIndex)
+  FnOnce(&'a SkgConfig, &'a TypeDBDriver, &'a mut TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
@@ -74,12 +74,12 @@ where
     &temp_fixtures)?;
 
   let result : Result<(), Box<dyn Error>> = block_on(async {
-    let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
+    let (config, driver, mut tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
       setup_test_tantivy_and_typedb_dbs(
         db_name,
         temp_fixtures . to_str() . unwrap(),
         tantivy_folder ) . await?;
-    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy) . await;
+    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &mut tantivy) . await;
     cleanup_test_tantivy_and_typedb_dbs(
       db_name,
       &driver,

@@ -1,4 +1,5 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
+use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
@@ -16,30 +17,23 @@ use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
 /// Updates **everything** from the given `DefineNode`s, in order:
-///   1) TypeDB
-///   2) Filesystem
-///   3) Tantivy
-/// PITFALL: If any but the first step fails,
-///   the resulting system state is invalid.
+///   1) Filesystem (source of truth)
+///   2) TypeDB (with recovery: rebuild from disk on failure)
+///   3) Tantivy (with recovery: rebuild from disk on failure)
+/// Returns `None` when all three stores updated normally.
+/// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_merges (
   instructions  : Vec<DefineNode>,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  println!("Updating (1) TypeDB, (2) FS, and (3) Tantivy ...");
-
+) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  println!("Updating (1) FS, (2) TypeDB, and (3) Tantivy ...");
   let db_name : &str = &config . db_name;
 
-  { println!( "1) Updating TypeDB database '{}' ...", db_name );
-    timed_async ( &config, "update_typedb_from_saveinstructions",
-                  update_typedb_from_saveinstructions (
-                    db_name, driver, &instructions )) . await ?;
-    println!("   TypeDB update complete."); }
-
-  { // filesystem
+  { // Step 1: FS (source of truth)
     // TODO: Print per-source write information
-    println!( "2) Writing {} instruction(s) to disk ...",
+    println!( "1) Writing {} instruction(s) to disk ...",
                { let total_input : usize = instructions . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
@@ -49,17 +43,37 @@ pub async fn update_graph_minus_merges (
     println!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
-  { // Tantivy
-    println!("3) Updating Tantivy index ...");
-    let indexed_count : usize =
-      timed ( &config, "update_tantivy_from_saveinstructions",
-              || update_tantivy_from_saveinstructions (
-                   &instructions, tantivy_index )) ?;
-    println!( "   Tantivy updated for {} document(s).",
-              indexed_count ); }
+  if let Err (e) = timed_async ( // Step 2: TypeDB
+    &config, "update_typedb_from_saveinstructions",
+    update_typedb_from_saveinstructions (
+      db_name, driver, &instructions )) . await
+    { eprintln!("TypeDB update failed: {}. Rebuilding from disk...", e);
+      rebuild_typedb_from_disk (&config, driver) . await
+        . map_err (|e2| -> Box<dyn Error> {
+          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
+          . into () }) ?;
+      eprintln!("Save succeeded, but TypeDB had to be rebuilt from disk.");
+    } else {
+      println!("   TypeDB update complete."); }
 
-  println!("All updates finished successfully.");
-  Ok (( )) }
+  match timed ( // Step 3: Tantivy
+    &config, "update_tantivy_from_saveinstructions",
+    || update_tantivy_from_saveinstructions (
+         &instructions, tantivy_index ))
+    { Ok (indexed_count) => {
+        println!( "   Tantivy updated for {} document(s).",
+                  indexed_count );
+        println!("All updates finished successfully.");
+        Ok (None) }
+      Err (e) => {
+        eprintln!("Tantivy update failed: {}. Rebuilding from disk...", e);
+        let new_index : TantivyIndex =
+          rebuild_tantivy_from_disk (&config)
+          . map_err (|e2| -> Box<dyn Error> {
+            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
+            . into () }) ?;
+        eprintln!("Save succeeded, but Tantivy had to be rebuilt from disk.");
+        Ok (Some (new_index)) } } }
 
 /// Update the DB from a batch of `DefineNode`s:
 /// 1) Delete all nodes marked Delete, using delete_nodes_from_pids

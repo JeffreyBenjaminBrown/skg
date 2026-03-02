@@ -158,7 +158,7 @@ where
   F: for<'a> FnOnce(
     &'a SkgConfig,
     &'a TypeDBDriver,
-    &'a TantivyIndex,
+    &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
@@ -169,10 +169,10 @@ where
   setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
-    let (config, driver, tantivy) =
+    let (config, driver, mut tantivy) =
       setup_test_dbs(db_name, repo_path . to_str() . unwrap(), &tantivy_folder) . await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path) . await;
+    let result = test_fn(&config, &driver, &mut tantivy, repo_path) . await;
 
     cleanup_test_dbs(db_name, &driver, Some(Path::new (&tantivy_folder))) . await?;
     result

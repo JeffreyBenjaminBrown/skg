@@ -57,7 +57,7 @@ pub fn handle_save_buffer_request (
   request       : &str,
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
-  tantivy_index : &TantivyIndex,
+  tantivy_index : &mut TantivyIndex,
   conn_state    : &mut ConnectionState,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
@@ -151,7 +151,7 @@ pub async fn update_from_and_rerender_buffer (
   org_buffer_text             : &str,
   typedb_driver               : &TypeDBDriver,
   config                      : &SkgConfig,
-  tantivy_index               : &TantivyIndex,
+  tantivy_index               : &mut TantivyIndex,
   diff_mode_enabled           : bool,
   saveview_skgnodes_pre_save  : SkgNodeMap,
   viewuri_from_request_result : &Result<ViewUri, String>,
@@ -178,22 +178,26 @@ pub async fn update_from_and_rerender_buffer (
                    . into() ); }
 
   { // update the graph
-    timed_async ( config, "update_graph_minus_merges",
-                  async { update_graph_minus_merges (
-                            save_instructions . clone(),
-                            config . clone(),
-                            tantivy_index,
-                            typedb_driver ) . await ?;
-                          Result::<(), Box<dyn Error>>::Ok (( )) }
-                ) . await ?;
-    timed_async ( config, "merge_nodes",
-                  async { merge_nodes (
-                            merge_instructions,
-                            config . clone(),
-                            tantivy_index,
-                            typedb_driver ) . await ?;
-                          Result::<(), Box<dyn Error>>::Ok (( )) }
-                ) . await ?; }
+    let save_replacement : Option<TantivyIndex> =
+      timed_async ( config, "update_graph_minus_merges",
+                    update_graph_minus_merges (
+                      save_instructions . clone(),
+                      config . clone(),
+                      tantivy_index,
+                      typedb_driver )
+                  ) . await ?;
+    if let Some (new_index) = save_replacement {
+      *tantivy_index = new_index; }
+    let merge_replacement : Option<TantivyIndex> =
+      timed_async ( config, "merge_nodes",
+                    merge_nodes (
+                      merge_instructions,
+                      config . clone(),
+                      tantivy_index,
+                      typedb_driver )
+                  ) . await ?;
+    if let Some (new_index) = merge_replacement {
+      *tantivy_index = new_index; } }
 
   update_views_after_save (
     forest,

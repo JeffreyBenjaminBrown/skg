@@ -64,38 +64,48 @@ pub fn initialize_typedb_from_nodes (
         std::process::exit (1); } ) } );
 
   block_on ( async {
-    // Recreate the database from scratch
-    if let Err (e) = overwrite_new_empty_db (
-      & config . db_name,
-      & driver,
+    if let Err (e) = populate_typedb_from_nodes (
+      config, &driver, nodes
     ) . await {
-      eprintln! ( "Failed to create empty database: {}", e );
-      std::process::exit (1); }
-
-    if let Err (e) = define_schema (
-      & config . db_name,
-      & driver,
-    ) . await {
-      eprintln! ( "Failed to define schema: {}", e );
-      std::process::exit (1); }
-
-    if let Err (e) = create_all_nodes (
-      & config . db_name,
-      & driver,
-      nodes,
-    ) . await {
-      eprintln! ( "Failed to create nodes: {}", e );
-      std::process::exit (1); }
-
-    if let Err (e) = create_all_relationships (
-      & config . db_name,
-      & driver,
-      nodes,
-    ) . await {
-      eprintln! ( "Failed to create relationships: {}", e );
+      eprintln! ( "Failed to populate TypeDB: {}", e );
       std::process::exit (1); }} );
   println!("TypeDB database initialized successfully.");
   Arc::new (driver) }
+
+/// Destroys and rebuilds the TypeDB database from .skg files on disk.
+/// Uses an existing driver connection rather than creating a new one.
+pub async fn rebuild_typedb_from_disk (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<SkgNode> =
+    read_all_skg_files_from_sources (config) ?;
+  populate_typedb_from_nodes (
+    config, driver, &nodes ) . await }
+
+/// Populates a TypeDB database from the given nodes:
+/// overwrites with empty db, defines schema,
+/// creates all nodes and relationships.
+async fn populate_typedb_from_nodes (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  nodes  : &[SkgNode],
+) -> Result<(), Box<dyn Error>> {
+  overwrite_new_empty_db (
+    & config . db_name,
+    driver ) . await ?;
+  define_schema (
+    & config . db_name,
+    driver ) . await ?;
+  create_all_nodes (
+    & config . db_name,
+    driver,
+    nodes ) . await ?;
+  create_all_relationships (
+    & config . db_name,
+    driver,
+    nodes ) . await ?;
+  Ok (( )) }
 
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
@@ -114,6 +124,20 @@ pub fn initialize_tantivy_from_nodes (
     "Tantivy index initialized successfully. Indexed {} files.",
     indexed_count);
   tantivy_index }
+
+/// Destroys and rebuilds the Tantivy index from .skg files on disk.
+/// Returns a fresh TantivyIndex.
+pub fn rebuild_tantivy_from_disk (
+  config : &SkgConfig,
+) -> Result<TantivyIndex, Box<dyn Error>> {
+  let nodes : Vec<SkgNode> =
+    read_all_skg_files_from_sources (config) ?;
+  let (tantivy_index, _indexed_count)
+    : ( TantivyIndex, usize ) =
+    in_fs_wipe_index_then_create_it (
+      &nodes,
+      Path::new ( & config . tantivy_folder )) ?;
+  Ok (tantivy_index) }
 
 /// Create an empty TantivyIndex, cleaning up any existing index first.
 pub fn create_empty_tantivy_index (

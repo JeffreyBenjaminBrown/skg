@@ -100,7 +100,7 @@ fn test_every_kind_of_col(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-every-kind-of-col";
-    let (config, driver, tantivy) = setup_test(
+    let (config, driver, mut tantivy) = setup_test(
       db_name,
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
     ) . await?;
@@ -133,7 +133,7 @@ fn test_every_kind_of_col(
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
-          &modified_view, &driver, &config, &tantivy, false,
+          &modified_view, &driver, &config, &mut tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
         ) . await ?;
@@ -180,7 +180,7 @@ fn test_hidden_within_but_none_without(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-within-but-none-without";
-    let (config, driver, tantivy) = setup_test(
+    let (config, driver, mut tantivy) = setup_test(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ) . await?;
     let (initial_view, _map, _pids, _)
       : (String, SkgNodeMap, Vec<ID>, _)
@@ -206,7 +206,7 @@ fn test_hidden_within_but_none_without(
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
-          &modified_view, &driver, &config, &tantivy, false,
+          &modified_view, &driver, &config, &mut tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
         ) . await ?;
@@ -252,7 +252,7 @@ fn test_hidden_without_but_none_within(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-without-but-none-within";
-    let (config, driver, tantivy) =
+    let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await?;
     let (initial_view, _map, _pids, _)
@@ -280,7 +280,7 @@ fn test_hidden_without_but_none_within(
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false,
+        &modified_view, &driver, &config, &mut tantivy, false,
         SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state ) . await ?;
       response . saved_view };
@@ -323,7 +323,7 @@ fn test_overlapping_hidden_within(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-overlapping-hidden-within";
-    let (config, driver, tantivy) =
+    let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await?;
     let (initial_view, _map, _pids, _)
@@ -350,7 +350,7 @@ fn test_overlapping_hidden_within(
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
-        &modified_view, &driver, &config, &tantivy, false,
+        &modified_view, &driver, &config, &mut tantivy, false,
         SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state ) . await ?;
       response . saved_view };

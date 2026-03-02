@@ -18,7 +18,7 @@ fn test_newhere_cycle_survives_save()
   setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
-    let (config, driver, tantivy) =
+    let (config, driver, mut tantivy) =
       setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
@@ -31,7 +31,7 @@ fn test_newhere_cycle_survives_save()
       diff_mode_enabled : true,
       memory            : SkgnodesInMemory::new () };
     let response = update_from_and_rerender_buffer(
-      &initial_view, &driver, &config, &tantivy, true, SkgNodeMap::new(),
+      &initial_view, &driver, &config, &mut tantivy, true, SkgNodeMap::new(),
       &Err ( String::new () ), &mut conn_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,

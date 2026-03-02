@@ -78,10 +78,10 @@ pub fn serve (
 ///   handle_title_matches_request
 /// API: See /api.md
 fn handle_emacs (
-  mut stream    : TcpStream,
-  typedb_driver : Arc<TypeDBDriver>,
-  tantivy_index : TantivyIndex,
-  config        : &SkgConfig,
+  mut stream        : TcpStream,
+  typedb_driver     : Arc<TypeDBDriver>,
+  mut tantivy_index : TantivyIndex,
+  config            : &SkgConfig,
 ) {
   let mut conn_state : ConnectionState =
     ConnectionState {
@@ -119,7 +119,7 @@ fn handle_emacs (
               &request_header,
               &typedb_driver,
               config,
-              &tantivy_index,
+              &mut tantivy_index,
               &mut conn_state );
           } else if request_type == "close view" {
             handle_close_view_request (
