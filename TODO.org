@@ -5,9 +5,6 @@
   I specify tests. AI debugs with the tests.
   *Then* I review the code,
     and maybe squash the last few commits into one.
-* 'timed' and 'timed_async' are noisy
-  Maybe, rather than using them at the function call,
-  use them at the function's definition.
 * TODO merge & export these notes
 ** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
@@ -48,6 +45,9 @@
 **** Update list of user-facing functions in elisp/*.el.
 ** Any place I can separate concerns by re-traversing the tree, do it.
 * later
+** 'timed' and 'timed_async' are noisy
+   Maybe, rather than using them at the function call,
+   use them at the function's definition.
 ** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
 ** 'content' count is wrong in Subsribees if any are hidden
 ** add 'numSubscribees' near 'numLinksIn'

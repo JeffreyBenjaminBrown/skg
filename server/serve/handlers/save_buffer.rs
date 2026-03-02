@@ -9,7 +9,8 @@ use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp_with_updates,
   read_length_prefixed_content,
-  send_response};
+  send_response,
+  send_response_with_length_prefix};
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
@@ -23,7 +24,7 @@ use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::{BufReader, Write};
+use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 use typedb_driver::TypeDBDriver;
@@ -83,37 +84,17 @@ pub fn handle_save_buffer_request (
             &viewuri_from_request_result,
             conn_state ))
         { Ok (save_response) => {
-            stream . write_all (
-                { let response_sexp : String =
-                    save_response . to_sexp_string ();
-                  let header : String =
-                    format! ( "Content-Length: {}\r\n\r\n",
-                                 response_sexp . len () );
-                  format! ( "{}{}", header, response_sexp ) }
-                . as_bytes() ) . unwrap ();
-            stream . flush() . unwrap (); }
+            send_response_with_length_prefix (
+              stream,
+              & save_response . to_sexp_string () ); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
-              stream . write_all(
-                { let response_sexp : String =
-                    { let response : Sexp =
-                        empty_response_sexp (
-                          & { let error_buffer_content : String =
-                                format_save_error_as_org (save_error);
-                              error_buffer_content } );
-                      response }
-                    . to_string ();
-                  let full_response : String =
-                    format! (
-                      "{}{}",
-                      { let header : String =
-                          format! ( "Content-Length: {}\r\n\r\n",
-                                    response_sexp . len ( ));
-                        header },
-                      response_sexp );
-                  full_response
-                } . as_bytes( )) . unwrap();
-              stream . flush() . unwrap();
+              let response_sexp : String =
+                empty_response_sexp (
+                  & format_save_error_as_org (save_error) )
+                . to_string ();
+              send_response_with_length_prefix (
+                stream, & response_sexp );
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);

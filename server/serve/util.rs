@@ -8,24 +8,28 @@ use std::net::TcpStream; // handles two-way communication
 
 pub fn send_response (
   stream   : &mut TcpStream,
-  response : &str) {
-  writeln! ( // appends a newline
-    stream, "{}", response )
-    . unwrap ();
-  stream . flush () . unwrap () ; }
+  response : &str,
+) { if let Err (e) = writeln! (stream, "{}", response) {
+      eprintln!("Failed to send response: {}", e);
+      return; }
+    if let Err (e) = stream . flush () {
+      eprintln!("Failed to flush response: {}", e); } }
 
 pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
   stream   : &mut TcpStream,
-  response : &str)
-{ let payload : &[u8] = response . as_bytes ();
-  let header : String = format! ( "Content-Length: {}\r\n\r\n",
-                           payload . len () );
-  use std::io::Write as _;
-  stream . write_all ( header . as_bytes () ) . unwrap ();
-  stream . write_all (payload)            . unwrap ();
-  stream . flush ()                         . unwrap ();
-}
+  response : &str,
+) { let payload : &[u8] = response . as_bytes ();
+    let header : String = format! ( "Content-Length: {}\r\n\r\n",
+                                     payload . len () );
+    if let Err (e) = stream . write_all ( header . as_bytes () ) {
+      eprintln!("Failed to send length-prefixed response: {}", e);
+      return; }
+    if let Err (e) = stream . write_all (payload) {
+      eprintln!("Failed to send length-prefixed response: {}", e);
+      return; }
+    if let Err (e) = stream . flush () {
+      eprintln!("Failed to flush length-prefixed response: {}", e); } }
 
 pub fn request_type_from_request (
   request : &str
