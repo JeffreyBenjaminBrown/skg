@@ -54,7 +54,7 @@ fn complete_preorder_recursive<'a> (
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
-    complete_preorder_for_one_node (
+    complete_preorder_with_limited_recursion (
       tree, treeid, map, defmap, source_diffs, config, driver,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids
     ) . await ?;
@@ -91,13 +91,16 @@ fn complete_postorder_recursive<'a> (
         map, defmap, source_diffs, config, driver,
         errors, deleted_since_head_pid_src_map
       ) . await ?; }
-    complete_postorder_for_one_node (
+    complete_postorder_with_limited_recursion (
       tree, treeid, map, defmap, source_diffs, config, driver,
       errors, deleted_since_head_pid_src_map
     ) . await ?;
     Ok(( )) }) }
 
-async fn complete_preorder_for_one_node (
+/// Dispatches to functions that might descend a few layers --
+/// e.g. to complete a truenode, its content must all be children.
+/// But this dispatcher cannot call itself.
+async fn complete_preorder_with_limited_recursion (
   tree               : &mut Tree<ViewNode>,
   treeid             : NodeId,
   map                : &mut SkgNodeMap,
@@ -139,7 +142,10 @@ async fn complete_preorder_for_one_node (
   // containing them).
   Ok(( )) }
 
-async fn complete_postorder_for_one_node (
+/// Dispatches to functions that might descend a few layers --
+/// e.g. to complete a truenode, its content must all be children.
+/// But this dispatcher cannot call itself.
+async fn complete_postorder_with_limited_recursion (
   tree               : &mut Tree<ViewNode>,
   treeid             : NodeId,
   map                : &mut SkgNodeMap,

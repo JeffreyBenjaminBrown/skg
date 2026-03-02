@@ -542,7 +542,7 @@ The actual rendering would be:
 =* 11= in the final buffer 2 expected output is a =DeletedNode=.
 It has no children in buffer 2, but it stays in the tree.
 
-Confirmed from code: in =complete_postorder_for_one_node=
+Confirmed from code: in =complete_postorder_with_limited_recursion=
 (=server/update_buffer/complete.rs= line ~194), =DeletedNode= is
 a no-op ("Deleted nodes are inert"). Only =DeletedScaff= checks
 for childlessness and detaches. So:
