@@ -10,22 +10,6 @@ use super::git::{SourceDiff, NodeDiffStatus};
 use super::misc::{ID, SkgConfig, SourceName};
 use super::skgnode::SkgNode;
 
-/// Unified source lookup for phantom nodes.
-/// Lookup order: existing children → deleted_since_head_pid_src_map → map → disk.
-pub fn source_for_phantom (
-  id                 : &ID,
-  existing_children  : &HashMap<ID, SourceName>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  map                : &HashMap<ID, SkgNode>,
-  config             : &SkgConfig,
-) -> Result<SourceName, String> {
-  existing_children.get( id ).cloned()
-    .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
-    .or_else( || map.get( id ).map( |n| n.source.clone() ))
-    .or_else( || source_from_disk( id, config ) )
-    .ok_or_else( || format!(
-      "source_for_phantom: no source for phantom {}", id.0 )) }
-
 /// Unified title lookup for phantom nodes.
 /// Lookup order: source_diffs deleted_nodes → map → disk → fallback.
 pub fn title_for_phantom (

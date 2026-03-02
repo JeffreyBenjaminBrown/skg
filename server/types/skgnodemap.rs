@@ -3,6 +3,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use super::misc::{ID, SkgConfig, SourceName};
+use super::phantom::source_from_disk;
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -100,3 +101,31 @@ fn collect_ids_from_subtree (
   for child in node_ref . children () {
     collect_ids_from_subtree (
       tree, child . id (), ids_out ); }}
+
+/// Lookup a node's source by trying, in order:
+/// - sources_from_siblings
+/// - deleted_since_head_pid_src_map
+/// - map
+/// - disk (which, if used, updates the SkgnodeMap)
+pub fn find_source_many_ways (
+  id                             : &ID,
+  sources_from_siblings          : &HashMap<ID, SourceName>, // When 'find_source_many_ways' is called from a parent, the parent's child viewnodes can be scanned for IDs and put here. If that's not done and this is empty, the source will still probably be found.
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>, // built by deleted_ids_to_source
+  map                            : &mut SkgNodeMap,
+  config                         : &SkgConfig,
+) -> Result<SourceName, String> {
+  if let Some (s) = sources_from_siblings . get (id)
+    { return Ok ( s . clone () ); }
+  if let Some (s) = deleted_since_head_pid_src_map . get (id)
+    { return Ok ( s . clone () ); }
+
+  // PITFALL: The next eight lines, just to look up from the map or disk, looks overcomplex but is necessary. (1) map.get is needed for correctness, not just speed — if the node is in memory but its .skg file isn't on disk (e.g. newly created in this save), source_from_disk would fail, even though the answer is sitting in the map. (2) source_from_disk is needed because skgnode_from_map_or_disk requires a source parameter — it can't find the file without knowing which  source directory to look in. (3) The only genuine redundancy is that skgnode_from_map_or_disk re-checks map.contains_key(id) even though we just verified the node isn't there. That's harmless.
+  if let Some (s) = map . get (id) . map ( |n| n . source . clone () )
+    { return Ok (s); }
+  let source : SourceName =
+    source_from_disk ( id, config )
+    . ok_or_else ( || format! (
+      "find_source_many_ways: no source found for {}", id.0 )) ?;
+  skgnode_from_map_or_disk ( id, &source, map, config )
+    . map_err ( |e| e . to_string () ) ?;
+  Ok (source) }

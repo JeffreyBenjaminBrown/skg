@@ -6,7 +6,8 @@ use crate::types::list::{compute_interleaved_diff,
                           itemlist_and_removedset_from_diff,
                           Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::skgnodemap::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::viewnode::{
@@ -191,7 +192,7 @@ fn build_subscribee_child_data (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &SkgNodeMap,
+  map                : &mut SkgNodeMap,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, SubscribeeChildData>,
@@ -215,7 +216,7 @@ fn build_subscribee_child_data (
     if result.contains_key( child_skgid ) { continue; }
     if removed_ids.contains( child_skgid ) {
       let child_src : SourceName =
-        source_for_phantom(
+        find_source_many_ways(
           child_skgid, &child_sources,
           deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;

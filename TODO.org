@@ -1,12 +1,5 @@
 * complete_preorder_for_one_node calls complete_truenode
   so it's not really for one node
-* is this logic duplicated anywhere?
-        child_sources.get( id ).cloned()
-        .or_else( || deleted_since_head_pid_src_map
-                     . get(id) . cloned() )
-        .or_else( || map . get(id)
-                     . map( |n| n . source . clone() ))
-        .or_else( || source_from_disk( id, config ) )
 * rename things in save_buffer
 * ? rerender_collateral_views v. rerender_view
   e.g. complete_collateral_view calls rerender_view,

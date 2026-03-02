@@ -4,7 +4,8 @@
 use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::skgnodemap::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -208,7 +209,7 @@ fn insert_phantom_nodes_for_removed_children (
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let empty_children : HashMap<ID, SourceName> = HashMap::new();
-  let empty_map : HashMap<ID, SkgNode> = HashMap::new();
+  let mut empty_map : HashMap<ID, SkgNode> = HashMap::new();
   let removed_ids : Vec<&ID> =
     node_changes . contains_diff . iter()
       . filter_map ( |d| match d {
@@ -217,9 +218,9 @@ fn insert_phantom_nodes_for_removed_children (
       . collect();
   for removed_child_id in removed_ids {
     let child_source : SourceName =
-      source_for_phantom(
+      find_source_many_ways(
         removed_child_id, &empty_children,
-        deleted_since_head_pid_src_map, &empty_map, config ) ?;
+        deleted_since_head_pid_src_map, &mut empty_map, config ) ?;
     let child_diff_status : NodeDiffStatus =
       phantom_diff_status(
         removed_child_id, &child_source,

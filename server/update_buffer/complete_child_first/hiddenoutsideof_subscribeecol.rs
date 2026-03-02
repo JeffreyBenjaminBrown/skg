@@ -3,7 +3,8 @@ use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{source_for_phantom, title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::skgnodemap::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::types::skgnodemap::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
@@ -35,7 +36,7 @@ struct HiddenChildData {
 pub fn complete_hiddenoutsideofsubscribeecol (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
-  map                : &SkgNodeMap,
+  map                : &mut SkgNodeMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -210,7 +211,7 @@ fn build_hidden_child_data (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &SkgNodeMap,
+  map                : &mut SkgNodeMap,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, HiddenChildData>, Box<dyn Error>> {
@@ -233,7 +234,7 @@ fn build_hidden_child_data (
     if result.contains_key( child_skgid ) { continue; }
     if removed_ids.contains( child_skgid ) {
       let child_src : SourceName =
-        source_for_phantom(
+        find_source_many_ways(
           child_skgid, &child_sources,
           deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;

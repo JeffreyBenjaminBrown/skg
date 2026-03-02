@@ -4,7 +4,8 @@ use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap
 use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{source_for_phantom, source_from_disk, title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::skgnodemap::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -428,7 +429,7 @@ fn build_child_creation_data (
     let is_phantom : bool = removed_ids.contains( id );
     if is_phantom {
       let phantom_source : SourceName =
-        source_for_phantom(
+        find_source_many_ways(
           id, &child_sources, deleted_since_head_pid_src_map, map, config )
         .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let kind : ChildKind =
@@ -444,16 +445,9 @@ fn build_child_creation_data (
                                  kind } );
     } else {
       let child_source : SourceName =
-        child_sources.get( id ).cloned()
-        .or_else( || deleted_since_head_pid_src_map
-                     . get(id) . cloned() )
-        .or_else( || map . get(id)
-                     . map( |n| n . source . clone() ))
-        .or_else( || source_from_disk( id, config ) )
-        .ok_or( format!(
-          "build_child_creation_data: \
-           no source for {}",
-          id.0 )) ?;
+        find_source_many_ways( id, &child_sources,
+                     deleted_since_head_pid_src_map, map, config )
+        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
       let skg : &SkgNode =
         skgnode_from_map_or_disk( id, &child_source, map, config ) ?;
       result.insert( id.clone(),
