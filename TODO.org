@@ -1,5 +1,3 @@
-* complete_preorder_for_one_node calls complete_truenode
-  so it's not really for one node
 * rename things in save_buffer
 * ? rerender_collateral_views v. rerender_view
   e.g. complete_collateral_view calls rerender_view,

@@ -5,9 +5,12 @@ echo "=== TypeDB Status Check ==="
 echo ""
 
 # Check if process is running
-if ps aux | grep -v grep | grep typedb > /dev/null; then
+# Use typedb_server_bin (not just "typedb") to avoid false positives
+# from matching this script's own bash process or other commands
+# containing "typedb" in their path.
+if pgrep -f typedb_server_bin > /dev/null; then
     echo "✓ TypeDB process is RUNNING"
-    ps aux | grep -v grep | grep typedb | head -1
+    ps aux | grep typedb_server_bin | grep -v grep | head -1
     echo ""
 else
     echo "✗ TypeDB process is NOT running"

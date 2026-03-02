@@ -27,10 +27,14 @@ fn test_newhere_cycle_survives_save()
       multi_root_view(&driver, &config, &root_ids, true).await?;
 
     // Round-trip through the save pipeline.
+    let mut conn_state : ConnectionState = ConnectionState {
+      diff_mode_enabled : true,
+      memory            : SkgnodesInMemory::new () };
     let response = update_from_and_rerender_buffer(
-      &initial_view, &driver, &config, &tantivy, true, SkgNodeMap::new() ).await?;
+      &initial_view, &driver, &config, &tantivy, true, SkgNodeMap::new(),
+      &Err ( String::new () ), &mut conn_state ).await?;
 
-    assert_buffer_contains( &response . response . saved_view,
+    assert_buffer_contains( &response . saved_view,
                             GIT_DIFF_VIEW);
 
     cleanup_test_dbs(db_name, &driver, Some(Path::new(tantivy_folder))).await?;

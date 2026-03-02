@@ -15,7 +15,9 @@ use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::skgnode::SkgNode;
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
+use skg::serve::ConnectionState;
+use skg::types::memory::SkgnodesInMemory;
 use futures::executor::block_on;
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -127,11 +129,15 @@ fn test_every_kind_of_col(
       let modified_view : String =
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
           &modified_view, &driver, &config, &tantivy, false,
-          SkgNodeMap::new()
+          SkgNodeMap::new(),
+          &Err ( String::new () ), &mut conn_state
         ). await ?;
-      response.response.saved_view };
+      response.saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
@@ -196,11 +202,15 @@ fn test_hidden_within_but_none_without(
       let modified_view : String =
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
           &modified_view, &driver, &config, &tantivy, false,
-          SkgNodeMap::new()
+          SkgNodeMap::new(),
+          &Err ( String::new () ), &mut conn_state
         ). await ?;
-      response.response.saved_view };
+      response.saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
@@ -266,10 +276,14 @@ fn test_hidden_without_but_none_within(
       let modified_view : String =
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}", modified_view);
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
         &modified_view, &driver, &config, &tantivy, false,
-        SkgNodeMap::new() ). await ?;
-      response . response . saved_view };
+        SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ). await ?;
+      response . saved_view };
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
@@ -332,10 +346,14 @@ fn test_overlapping_hidden_within(
         add_definitive_view_request_to_subscribees ( &initial_view );
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer (
         &modified_view, &driver, &config, &tantivy, false,
-        SkgNodeMap::new() ). await ?;
-      response.response.saved_view };
+        SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ). await ?;
+      response.saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R

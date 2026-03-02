@@ -2,7 +2,7 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};

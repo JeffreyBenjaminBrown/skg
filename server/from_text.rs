@@ -24,7 +24,7 @@ use viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
 use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
 
 use crate::serve::timing_log::{timed, timed_async};
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;

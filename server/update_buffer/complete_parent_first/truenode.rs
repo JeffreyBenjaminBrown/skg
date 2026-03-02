@@ -5,10 +5,10 @@ use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_fo
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
-use crate::types::skgnodemap::find_source_many_ways;
+use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode,

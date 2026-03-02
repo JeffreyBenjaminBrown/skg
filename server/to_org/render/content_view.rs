@@ -15,7 +15,7 @@ use crate::to_org::render::diff::apply_diff_to_forest;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 

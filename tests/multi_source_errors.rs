@@ -11,7 +11,7 @@ use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::skgnode::SkgNode;
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;

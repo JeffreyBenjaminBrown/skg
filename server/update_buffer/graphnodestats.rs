@@ -8,7 +8,7 @@ use crate::dbs::typedb::search::count_relationships::{
 use crate::serve::timing_log::{timed, timed_async};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};

@@ -11,7 +11,7 @@ use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::handle_title_matches_request;
 use crate::serve::util::{request_type_from_request, send_response};
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::skg_memory::SkgnodesInMemory;
+use crate::types::memory::SkgnodesInMemory;
 
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;

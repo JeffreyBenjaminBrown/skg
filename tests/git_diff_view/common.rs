@@ -19,7 +19,9 @@ pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
 pub use skg::types::skgnode::SkgNode;
-pub use skg::types::skgnodemap::SkgNodeMap;
+pub use skg::types::memory::SkgNodeMap;
+pub use skg::serve::ConnectionState;
+pub use skg::types::memory::SkgnodesInMemory;
 
 //
 // Git helpers

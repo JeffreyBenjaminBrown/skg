@@ -13,7 +13,7 @@ use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 

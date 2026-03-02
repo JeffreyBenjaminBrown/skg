@@ -16,8 +16,12 @@ fn test_delete_id_col_scaffold_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -32,7 +36,7 @@ fn test_delete_id_col_scaffold_respawns()
 
       // BUFFER: idCol scaffold should respawn
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -49,8 +53,12 @@ fn test_delete_id_scaffolds_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -59,7 +67,7 @@ fn test_delete_id_scaffolds_respawns()
 
       // BUFFER: id scaffolds should respawn
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -76,8 +84,12 @@ fn test_edit_id_scaffold_respawns()
       let input = GIT_DIFF_VIEW.replace(
         "(diff new)) 2'", "(diff new)) 2-modified");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -88,7 +100,7 @@ fn test_edit_id_scaffold_respawns()
 
       // BUFFER: id scaffolds should respawn with original values
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -112,8 +124,12 @@ fn test_move_id_scaffolds_to_child_respawns()
 **** (skg id) 3
 ";
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: child.skg should not have any new ids
       let node_child = read_skgnode(repo_path, "child")?;
@@ -129,7 +145,7 @@ fn test_move_id_scaffolds_to_child_respawns()
 
       // BUFFER: id scaffolds should respawn under node 1
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 

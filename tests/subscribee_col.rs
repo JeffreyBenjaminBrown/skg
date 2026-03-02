@@ -8,7 +8,7 @@ use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::error::Error;

@@ -11,7 +11,7 @@ use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::save::DefineNode;
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use ego_tree::Tree;
 use indoc::indoc;
 

@@ -5,7 +5,7 @@ use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, 
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
-use crate::types::skgnodemap::find_source_many_ways;
+use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;

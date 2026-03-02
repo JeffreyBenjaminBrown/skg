@@ -4,10 +4,7 @@ pub use super::super::common::*;
 
 pub use ego_tree::Tree;
 
-pub use skg::serve::ConnectionState;
-pub use skg::serve::handlers::save_buffer::rerender_collateral_views;
-pub use skg::serve::handlers::save_buffer::SaveResult;
-pub use skg::types::skg_memory::SkgnodesInMemory;
+pub use skg::serve::handlers::save_buffer::SaveResponse;
 pub use skg::types::viewnode::{ViewUri, ViewNode};
 
 /// The expected initial diff view for a containing b (text changed).

@@ -6,7 +6,7 @@ use crate::to_org::util::{
   nodes_after_in_generation };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::ViewNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 
 use ego_tree::{Tree, NodeId};
 use std::cmp::min;

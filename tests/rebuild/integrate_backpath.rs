@@ -7,7 +7,7 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use skg::org_to_text::viewnode_forest_to_string;
 
 use ego_tree::{NodeId,Tree};

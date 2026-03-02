@@ -20,7 +20,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::test_utils::run_with_test_db;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};

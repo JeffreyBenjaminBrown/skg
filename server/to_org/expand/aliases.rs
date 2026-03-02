@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::tree::viewnode_skgnode::{
   insert_scaffold_as_child, unique_scaffold_child};
 

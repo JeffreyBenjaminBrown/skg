@@ -7,9 +7,9 @@ use crate::types::list::{compute_interleaved_diff,
                           Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
-use crate::types::skgnodemap::find_source_many_ways;
+use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold,
     mk_indefinitive_viewnode};

@@ -7,7 +7,7 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 

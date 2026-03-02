@@ -37,8 +37,13 @@ ubuntu    276330 10.5  0.8 6410476 130144 ?      Sl   14:45   1:02 /opt/typedb/c
 #+end_example
 
 Other commands that work:
-- `pgrep typedb` - simple process name search
-- `ps -ef | grep typedb` - alternative format
+- `pgrep -f typedb_server_bin` - recommended; matches the actual server binary
+- `ps -ef | grep typedb_server_bin` - alternative format
+
+*Caution with bare `grep typedb`*: When running a script whose path
+contains "typedb" (e.g., ~bash troubleshooting/typedb/check-typedb-status.sh~),
+`ps aux | grep typedb` will match the bash process executing the script,
+producing a false positive. Always grep for =typedb_server_bin= specifically.
 
 ** "Address already in use" Error
 
@@ -89,7 +94,9 @@ This issue was fixed in `/home/ubuntu/bash/run-servers.sh` on 2025-10-14. If you
 
 ** Quick Fix
 
-If TypeDB fails to start with "Too many open files" errors:
+If TypeDB panics at startup with "Too many open files" errors (the log
+will show a RocksDB error mentioning a specific database's =LOCK= file,
+followed by a Rust panic at =main.rs=):
 
 #+begin_src bash
 # Nuclear option - when TypeDB is crashed and won't start

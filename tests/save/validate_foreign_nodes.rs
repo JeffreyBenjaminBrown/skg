@@ -11,7 +11,7 @@ use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::SkgConfig;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::skgnode::SkgNode;
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use futures::executor::block_on;
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};

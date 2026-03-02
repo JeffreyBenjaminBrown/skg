@@ -3,7 +3,7 @@ pub mod reconcile_same_id_instructions;
 
 use crate::types::misc::SkgConfig;
 use crate::types::save::DefineNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::ViewNode;
 
 use to_naive_instructions::naive_saveinstructions_from_tree;

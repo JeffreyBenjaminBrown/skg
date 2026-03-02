@@ -16,8 +16,12 @@ fn test_delete_text_changed_scaffold_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: 1.skg should still have the new title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -31,7 +35,7 @@ fn test_delete_text_changed_scaffold_respawns()
 
       // BUFFER: textChanged scaffolds should respawn
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(( )) }) }) }
 
 /// Editing a node with textChanged should update the disk normally.
@@ -46,8 +50,12 @@ fn test_edit_text_changed_node_updates_disk()
       let input = GIT_DIFF_VIEW.replace(
         "1 has a new title.", "1 has an even newer title.");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: 1.skg should have the newest title
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -56,7 +64,7 @@ fn test_edit_text_changed_node_updates_disk()
 
       // BUFFER: textChanged scaffold should still appear (still differs from HEAD)
       assert!(
-        response . response . saved_view . contains("textChanged"),
+        response . saved_view . contains("textChanged"),
         "textChanged scaffold should still appear");
       Ok(())
     })
@@ -77,8 +85,12 @@ fn test_edit_text_changed_scaffold_respawns()
         "** (skg textChanged)",
         "** (skg textChanged) User edited this scaffold.");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -86,7 +98,7 @@ fn test_edit_text_changed_scaffold_respawns()
         "1.skg should be unchanged");
 
       // BUFFER: textChanged scaffolds respawn with original text
-      assert_buffer_contains( &response . response . saved_view,
+      assert_buffer_contains( &response . saved_view,
                               GIT_DIFF_VIEW);
       Ok (( )) }) }) }
 
@@ -110,8 +122,12 @@ fn test_move_text_changed_scaffold_respawns()
 ** (skg textChanged)
 ";
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
@@ -120,7 +136,7 @@ fn test_move_text_changed_scaffold_respawns()
 
       // BUFFER: textChanged scaffolds should respawn in correct locations
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -138,8 +154,12 @@ fn test_move_text_changed_to_unedited_node_respawns()
       let input = insert_after(&input, "(id 12)",
         "*** (skg textChanged)");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new() ).await?;
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state ).await?;
 
       // DISK: No changes should occur
       let node_12 = read_skgnode(repo_path, "12")?;
@@ -152,7 +172,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
       // BUFFER: textChanged scaffolds should respawn in their correct locations
       // (under nodes 1 and 11, not under 12)
       assert_buffer_contains(
-        &response.response.saved_view, GIT_DIFF_VIEW);
+        &response.saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 

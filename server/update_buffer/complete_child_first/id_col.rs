@@ -2,7 +2,7 @@ use crate::types::git::{FieldDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::git::{SourceDiff, node_changes_for_truenode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold};

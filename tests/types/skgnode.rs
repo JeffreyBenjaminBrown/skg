@@ -3,7 +3,7 @@
 //
 
 use skg::types::skgnode::{empty_skgnode, SkgNode};
-use skg::types::skgnodemap::{skgnode_for_viewnode, skgnode_map_from_save_instructions, SkgNodeMap};
+use skg::types::memory::{skgnode_for_viewnode, skgnode_map_from_save_instructions, SkgNodeMap};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, default_truenode};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};

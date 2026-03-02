@@ -9,7 +9,7 @@ use crate::types::viewnode::{
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::list::dedup_vector;
 use super::generic::with_node_mut;
 

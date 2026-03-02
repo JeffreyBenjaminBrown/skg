@@ -18,11 +18,10 @@ fn test_collateral_view_preserves_diff_annotations()
   let repo_path : &Path = temp_dir.path();
   setup_git_repo_with_fixtures(repo_path)?;
 
-  // Phase 1 (async): set up DBs, get initial view, save with new child.
-  let (config, driver, _tantivy, pipeline_result, mut conn_state,
-       uri_1, uri_2, initial_buffer)
-    : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResult,
-       ConnectionState, ViewUri, ViewUri, String) =
+  let (_config, driver, _tantivy, save_response, initial_buffer,
+       uri_2)
+    : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
+       String, ViewUri) =
     block_on ( async {
       let (config, driver, tantivy)
         : (SkgConfig, TypeDBDriver, TantivyIndex) =
@@ -58,43 +57,31 @@ fn test_collateral_view_preserves_diff_annotations()
         uri_2 . clone (), forest . clone (), &pids );
 
       // 4. Save buffer 1 with a new child "c" under "a".
+      //    This also updates memory and re-renders collateral views.
       let save_input : String = insert_after (
         &initial_buffer, "(id a)",
         "** (skg (node (id c))) c" );
-      let pipeline_result : SaveResult =
+      let save_response : SaveResponse =
         update_from_and_rerender_buffer (
           &save_input, &driver, &config, &tantivy,
-          true, map ). await ?;
-
-      // 5. Update memory for saved view
-      //    (replicates update_memory_for_saved_view).
-      for (pid, skgnode)
-        in &pipeline_result . skgnodemap_after_completion
-        { conn_state . memory . pool . insert (
-            pid . clone (), skgnode . clone () ); }
-      conn_state . memory . update_view (
-        &uri_1,
-        pipeline_result . completed_forest . clone () );
+          true, map,
+          &Ok ( uri_1 . clone () ),
+          &mut conn_state ). await ?;
 
       Result::<_, Box<dyn Error>>::Ok ((
-        config, driver, tantivy, pipeline_result,
-        conn_state, uri_1, uri_2, initial_buffer )) } ) ?;
+        config, driver, tantivy, save_response,
+        initial_buffer, uri_2 )) } ) ?;
 
-  // Phase 2 (sync): rerender_collateral_views calls block_on
-  // internally, so it must run outside the outer block_on.
-  let collateral_updates : Vec<(ViewUri, String)> =
-    rerender_collateral_views (
-      &uri_1, &pipeline_result,
-      &mut conn_state, &driver, &config );
-
-  // 6. There should be exactly one collateral update (buffer 2).
+  // 5. There should be exactly one collateral update (buffer 2).
+  let collateral_updates : &Vec<(ViewUri, String)> =
+    &save_response . collateral_views;
   assert_eq!( collateral_updates . len (), 1,
     "Expected one collateral update (buffer 2), got {}.\n\
      Initial buffer:\n{}\n\
      Saved view:\n{}",
     collateral_updates . len (),
     initial_buffer,
-    pipeline_result . response . saved_view );
+    save_response . saved_view );
   let (ref collateral_uri, ref collateral_buffer)
     : (ViewUri, String) = collateral_updates[0];
   assert_eq!( collateral_uri, &uri_2,

@@ -10,7 +10,7 @@ use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 

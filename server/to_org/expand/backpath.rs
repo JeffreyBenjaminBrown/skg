@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, mk_indefinitive_viewnode };
-use crate::types::skgnodemap::SkgNodeMap;
+use crate::types::memory::SkgNodeMap;
 use crate::types::tree::viewnode_skgnode::{
   find_child_by_id, find_children_by_ids};
 

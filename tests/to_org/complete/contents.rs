@@ -2,7 +2,7 @@
 
 use skg::types::maps::add_v_to_map_if_absent;
 use skg::types::skgnode::{empty_skgnode, SkgNode};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 use skg::types::misc::ID;
 
 #[tokio::test]

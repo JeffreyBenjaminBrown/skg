@@ -8,7 +8,7 @@ use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 
 async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
   config    : &SkgConfig,

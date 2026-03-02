@@ -7,7 +7,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 use skg::types::skgnode::SkgNode;
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 
 use indoc::indoc;
 use std::error::Error;

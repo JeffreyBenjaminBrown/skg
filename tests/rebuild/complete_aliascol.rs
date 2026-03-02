@@ -10,7 +10,7 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
-use skg::types::skgnodemap::{SkgNodeMap, skgnode_map_from_forest};
+use skg::types::memory::{SkgNodeMap, skgnode_map_from_forest};
 use skg::types::misc::SourceName;
 use skg::types::git::SourceDiff;
 

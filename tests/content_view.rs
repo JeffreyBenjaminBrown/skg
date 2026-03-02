@@ -8,7 +8,7 @@ use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::climb_containerward_and_fetch_rootish_context;
 use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::skgnodemap::SkgNodeMap;
+use skg::types::memory::SkgNodeMap;
 
 #[test]
 fn test_a_mess_of_stuff

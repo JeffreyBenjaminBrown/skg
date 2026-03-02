@@ -15,8 +15,12 @@ fn test_delete_removed_node_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "gets-removed");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-          &input, driver, config, tantivy, true, SkgNodeMap::new()
+          &input, driver, config, tantivy, true, SkgNodeMap::new(),
+          &Err ( String::new () ), &mut conn_state
         ). await?;
 
       // DISK: gets-removed.skg should still not exist
@@ -32,7 +36,7 @@ fn test_delete_removed_node_respawns()
         "11.skg should not contain gets-removed");
 
       // BUFFER: gets-removed should respawn with (diff removed)
-      assert_buffer_contains(&response.response.saved_view,
+      assert_buffer_contains(&response.saved_view,
                              GIT_DIFF_VIEW);
       Ok (( )) } ) } ) }
 
@@ -48,8 +52,12 @@ fn test_delete_removed_here_node_respawns()
       let input =
         without_lines_containing(GIT_DIFF_VIEW, "removed-here");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new()
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state
       ).await?;
 
       // DISK: 12.skg should still have empty contains
@@ -63,7 +71,7 @@ fn test_delete_removed_here_node_respawns()
         "moves.skg should still exist");
 
       // BUFFER: phantom moves should respawn under 12
-      assert_buffer_contains( &response . response . saved_view,
+      assert_buffer_contains( &response . saved_view,
                               GIT_DIFF_VIEW);
       Ok (( )) }) }) }
 
@@ -78,8 +86,12 @@ fn test_delete_new_here_updates_disk()
       // User deleted 'moves' under 11 (the new-here one)
       let input = without_lines_containing(GIT_DIFF_VIEW, "new-here");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new()
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state
       ).await?;
 
       // DISK: 11.skg should no longer contain moves
@@ -95,7 +107,7 @@ fn test_delete_new_here_updates_disk()
       // BUFFER: moves gone from 11, still under 12 as removed-here
       let expected = without_lines_containing(
         GIT_DIFF_VIEW, "new-here");
-      assert_buffer_contains(&response.response.saved_view,
+      assert_buffer_contains(&response.saved_view,
                              &expected);
       Ok(())
     })
@@ -115,8 +127,12 @@ fn test_add_new_child_creates_on_disk()
         GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer))) newer");
 
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
-        &input, driver, config, tantivy, true, SkgNodeMap::new()
+        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &Err ( String::new () ), &mut conn_state
       ).await?;
 
       // DISK: newer.skg should be created with correct id and title
@@ -138,7 +154,7 @@ fn test_add_new_child_creates_on_disk()
       // PITFALL: I'm not sure 12's children will be in this order.
       let expected = insert_after(GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer) (diff new))) newer");
-      assert_buffer_contains(&response.response.saved_view,
+      assert_buffer_contains(&response.saved_view,
                              &expected);
       Ok(())
     })

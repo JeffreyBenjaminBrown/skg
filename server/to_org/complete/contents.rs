@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::types::skgnodemap::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::tree::generic::write_at_node_in_tree;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
