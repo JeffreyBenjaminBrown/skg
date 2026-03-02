@@ -1,6 +1,7 @@
 pub mod from_text;
 pub mod dbs;
 pub mod git_ops;
+pub mod import_org_roam;
 pub mod merge;
 pub mod org_to_text;
 pub mod save;

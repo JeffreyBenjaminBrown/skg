@@ -1,3 +1,9 @@
+* usage
+** import org-roam data
+cargo run --bin skg -- import-org-roam [source] [target]
+** run the server
+*** TODO merge this documentation
+** [[./elisp/USAGE.md][play with the client]]
 * why Skg
 Skg is the result of a few beliefs about knowledge:
 

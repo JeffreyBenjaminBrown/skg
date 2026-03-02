@@ -1,0 +1,10 @@
+* Next, let's import it.
+  This will be a commitment for me --
+  translating changes I make in skg to changes in org-roam seems hard.
+
+  org-roam data maps onto
+  the containment and hyperlink relationships in typedb,
+  and what would be the synonym relationship in Tantivy
+    (:ROAM_ALIASES:)
+    if it reified relationships.
+  A UUID will need to be made for every headline.
