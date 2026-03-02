@@ -38,22 +38,6 @@ pub struct SaveResponse {
   pub collateral_views : Vec<(ViewUri, String)>,
 }
 
-/// The full result of update_from_and_rerender_buffer,
-/// including data needed for pool updates and re-rendering.
-/// This is only constructed once at the very end of
-/// update_from_and_rerender_buffer,
-/// so every field is accurate the moment it springs into existence.
-pub struct SaveResult {
-  // The re-rendered buffer content and any errors/warnings. Sent back to Emacs as the response to the save request.
-  pub response                     : SaveResponse,
-  // The SkgNodeMap after complete_viewtree has finished. Contains every node the pipeline touched (from save instructions + pool seed + nodes fetched during completion). Merged back into SkgnodesInMemory.pool so subsequent requests see fresh data.
-  pub skgnodemap_after_completion  : SkgNodeMap,
-  // The parsed save/delete instructions from the buffer. Used after the pipeline to determine which PIDs changed, so we can find other views that contain those PIDs and re-render them.
-  pub save_instructions            : Vec<DefineNode>,
-  // The completed viewnode forest. Stored in ViewState so collateral views can be completed (rather than re-rendered from scratch) on future saves.
-  pub completed_forest             : Tree<ViewNode>,
-}
-
 impl SaveResponse {
   /// Format: ((content "...") (errors (...)) (other-views-to-update (("URI1" "c1") ...)))
   fn to_sexp_string ( &self ) -> String {
@@ -66,8 +50,6 @@ impl SaveResponse {
 /// - Reads the buffer content (with length prefix).
 /// - Builds an initial SkgnodeMap from the ConnectionState's memory. It can change during the save process.
 /// - 'update_from_and_rerender_buffer'
-/// - 'update_memory_for_saved_view'
-/// - 'rerender_collateral_views'
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
   reader        : &mut BufReader <TcpStream>,
