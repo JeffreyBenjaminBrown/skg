@@ -60,7 +60,7 @@ pub fn validate_local_structure (
         Scaffold::ID { .. } =>
           validate_idscaffold(tree, node_id), },
       UncheckedViewNodeKind::Deleted (_) => Vec::new(),
-      UncheckedViewNodeKind::DeletedScaff => Vec::new() };
+      UncheckedViewNodeKind::DeletedScaff (_) => Vec::new() };
 
   if errors . is_empty() {
     Ok (( ))
@@ -232,7 +232,7 @@ fn validate_truenode (
          UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol) |
          UncheckedViewNodeKind::Scaff (Scaffold::TextChanged)   |
          UncheckedViewNodeKind::Deleted (_)                     |
-         UncheckedViewNodeKind::DeletedScaff                   )) {
+         UncheckedViewNodeKind::DeletedScaff (_)               )) {
     errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }

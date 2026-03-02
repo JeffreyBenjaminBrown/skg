@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, DeletedNode};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -52,8 +52,8 @@ pub struct ViewnodeMetadata {
   pub scaffold_diff: Option<FieldDiffStatus>,
   // When true, this is a DeletedNode (id and source are used).
   pub is_deleted_node: bool,
-  // When true, this is a DeletedScaff (no payload).
-  pub is_deleted_scaff: bool,
+  // When Some, this is a DeletedScaff carrying its kind.
+  pub deleted_scaff_kind: Option<ScaffoldKind>,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -72,7 +72,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     truenode_diff: None,
     scaffold_diff: None,
     is_deleted_node: false,
-    is_deleted_scaff: false, }}
+    deleted_scaff_kind: None, }}
 
 /// Create an UncheckedViewNode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
@@ -84,8 +84,8 @@ pub fn viewnode_from_metadata (
 ) -> ( UncheckedViewNode, Option < BufferValidationError > ) {
   let (kind, error)
     : (UncheckedViewNodeKind, Option<BufferValidationError>)
-    = if metadata . is_deleted_scaff {
-        ( UncheckedViewNodeKind::DeletedScaff, None )
+    = if let Some (kind) = metadata . deleted_scaff_kind {
+        ( UncheckedViewNodeKind::DeletedScaff (kind), None )
       } else if metadata . is_deleted_node {
         ( UncheckedViewNodeKind::Deleted ( DeletedNode {
             id     : metadata . id . clone ()
@@ -180,6 +180,15 @@ pub fn parse_metadata_to_viewnodemd (
             result . scaffold_diff = Some (
               FieldDiffStatus::from_client_string (&value)
                 . ok_or_else ( || format! ( "Invalid FieldDiffStatus value: {}", value ))? ); },
+          "deletedScaffold" => {
+            if items . len () != 2 {
+              return Err ( "deletedScaffold requires exactly one kind value" . to_string () ); }
+            let kind_str : String =
+              atom_to_string ( &items[1] ) ?;
+            let kind : ScaffoldKind =
+              ScaffoldKind::from_client_string (&kind_str)
+                . ok_or_else ( || format! ( "Invalid ScaffoldKind value: {}", kind_str ) ) ?;
+            result . deleted_scaff_kind = Some (kind); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -214,7 +223,7 @@ pub fn parse_metadata_to_viewnodemd (
           "id" =>
             result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
           "deletedScaffold" =>
-            result . is_deleted_scaff = true,
+            return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },

@@ -9,7 +9,7 @@
 use super::git::NodeDiffStatus;
 use super::misc::{ID, SourceName};
 use super::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold, DeletedNode,
+  ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode,
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
 };
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
@@ -33,7 +33,7 @@ pub enum UncheckedViewNodeKind {
   True         (UncheckedTrueNode),
   Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
   Deleted      (DeletedNode),
-  DeletedScaff,
+  DeletedScaff (ScaffoldKind),
 }
 
 /// Unchecked version of TrueNode - id and source are optional.
@@ -91,8 +91,8 @@ impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
         Ok(ViewNodeKind::Scaff (s)),
       UncheckedViewNodeKind::Deleted (d) =>
         Ok(ViewNodeKind::Deleted (d)),
-      UncheckedViewNodeKind::DeletedScaff =>
-        Ok (ViewNodeKind::DeletedScaff) }}
+      UncheckedViewNodeKind::DeletedScaff (kind) =>
+        Ok (ViewNodeKind::DeletedScaff (kind)) }}
 }
 
 impl TryFrom<UncheckedViewNode> for ViewNode {
@@ -136,8 +136,8 @@ impl From<ViewNodeKind> for UncheckedViewNodeKind {
         UncheckedViewNodeKind::Scaff (s),
       ViewNodeKind::Deleted (d) =>
         UncheckedViewNodeKind::Deleted (d),
-      ViewNodeKind::DeletedScaff =>
-      UncheckedViewNodeKind::DeletedScaff }}
+      ViewNodeKind::DeletedScaff (kind) =>
+        UncheckedViewNodeKind::DeletedScaff (kind) }}
 }
 
 impl From<ViewNode> for UncheckedViewNode {
@@ -295,19 +295,18 @@ impl UncheckedViewNode {
       UncheckedViewNodeKind::True (t)    => &t . title,
       UncheckedViewNodeKind::Scaff (s)   => s . title(),
       UncheckedViewNodeKind::Deleted (d) => &d . title,
-      UncheckedViewNodeKind::DeletedScaff => "",
-    }
-  }
+      UncheckedViewNodeKind::DeletedScaff (kind) =>
+        kind . default_title (), }}
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {
     match &self . kind {
       UncheckedViewNodeKind::True (t)    => t . title . clone(),
       UncheckedViewNodeKind::Scaff (s)   => s . error_label(),
-      UncheckedViewNodeKind::Deleted (d) => format!("deleted:{}", d . id . 0),
-      UncheckedViewNodeKind::DeletedScaff => "deletedScaffold" . to_string(),
-    }
-  }
+      UncheckedViewNodeKind::Deleted (d) =>
+        format!("deleted:{}", d . id . 0),
+      UncheckedViewNodeKind::DeletedScaff (kind) =>
+        format!("deletedScaffold:{}", kind . repr_in_client ()), }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option<&String> {
@@ -315,9 +314,7 @@ impl UncheckedViewNode {
       UncheckedViewNodeKind::True (t)    => t . body . as_ref(),
       UncheckedViewNodeKind::Scaff (_)   => None,
       UncheckedViewNodeKind::Deleted (d) => d . body . as_ref(),
-      UncheckedViewNodeKind::DeletedScaff => None,
-    }
-  }
+      UncheckedViewNodeKind::DeletedScaff (_) => None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt (&self) -> Option<&ID> {
@@ -325,9 +322,7 @@ impl UncheckedViewNode {
       UncheckedViewNodeKind::True (t)    => t . id_opt . as_ref(),
       UncheckedViewNodeKind::Scaff (_)   => None,
       UncheckedViewNodeKind::Deleted (d) => Some(&d . id),
-      UncheckedViewNodeKind::DeletedScaff => None,
-    }
-  }
+      UncheckedViewNodeKind::DeletedScaff (_) => None, }}
 }
 
 //
@@ -338,14 +333,10 @@ pub fn unchecked_forest_root_viewnode() -> UncheckedViewNode {
   UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot),
-  }
-}
+    kind    : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot), }}
 
 pub fn unchecked_viewnode_from_scaffold(scaffold: Scaffold) -> UncheckedViewNode {
   UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff (scaffold),
-  }
-}
+    kind    : UncheckedViewNodeKind::Scaff (scaffold), }}

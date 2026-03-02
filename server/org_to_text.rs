@@ -1,5 +1,5 @@
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, TrueNode, DeletedNode, EditRequest,
+    ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -90,9 +90,9 @@ pub fn viewnode_to_string (
     ViewNodeKind::Deleted (deleted_node) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded, deleted_node )),
-    ViewNodeKind::DeletedScaff =>
+    ViewNodeKind::DeletedScaff (kind) =>
       Ok ( deleted_scaff_metadata_to_string (
-        viewnode . focused, viewnode . folded )) }}
+        viewnode . focused, viewnode . folded, kind )) }}
 
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
@@ -237,15 +237,17 @@ fn deleted_node_metadata_to_string (
   parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:
-///   (skg [focused] [folded] deletedScaffold)
+///   (skg [focused] [folded] (deletedScaffold kindString))
 fn deleted_scaff_metadata_to_string (
   focused : bool,
   folded  : bool,
+  kind    : &ScaffoldKind,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
-  parts . push ( "deletedScaffold" . to_string () );
+  parts . push ( format! ( "(deletedScaffold {})",
+                           kind . repr_in_client () ) );
   parts . join (" ") }
 
 fn org_bullet ( level: usize ) -> String {

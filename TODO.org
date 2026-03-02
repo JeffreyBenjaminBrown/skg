@@ -1,8 +1,3 @@
-* rename things in save_buffer
-* ? rerender_collateral_views v. rerender_view
-  e.g. complete_collateral_view calls rerender_view,
-  which seems backward
-* [[id:e6fff78e-0fc6-47e9-b444-06718a88be12][replace ( *token *) with (token)]]
 * new AI testing strategy
   I specify a feature. AI codes it.
   Commit it *without reviewing*,
@@ -13,8 +8,6 @@
 * 'timed' and 'timed_async' are noisy
   Maybe, rather than using them at the function call,
   use them at the function's definition.
-* Deletedscaffold should record what it used to be
-  with a ScaffoldKind field
 * TODO merge & export these notes
 ** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]

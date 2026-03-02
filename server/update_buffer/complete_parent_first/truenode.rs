@@ -305,11 +305,11 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (_)                    => 0,
-        ViewNodeKind::DeletedScaff                  => 0,
+        ViewNodeKind::Scaff (_)                      => 0,
+        ViewNodeKind::DeletedScaff (_)               => 0,
         ViewNodeKind::True (t) if t . parent_ignores => 1,
-        ViewNodeKind::True (_)                     => 2,
-        ViewNodeKind::Deleted (_)                  => 2,
+        ViewNodeKind::True (_)                       => 2,
+        ViewNodeKind::Deleted (_)                    => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()

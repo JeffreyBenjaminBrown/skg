@@ -223,7 +223,7 @@ fn is_ancestor_id (
         ViewNodeKind::True (t)    => Some ( t . id . clone () ),
         ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
         ViewNodeKind::Scaff (_) |
-        ViewNodeKind::DeletedScaff  => None } )
+        ViewNodeKind::DeletedScaff (_) => None } )
     { Ok(Some (id)) if &id == target_skgid
         => return Ok (true),
       Ok (_) => continue,
@@ -242,7 +242,7 @@ pub fn get_id_from_treenode (
     ViewNodeKind::True (t)    => Ok ( t . id ),
     ViewNodeKind::Deleted (d) => Ok ( d . id ),
     ViewNodeKind::Scaff (_)   => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
-    ViewNodeKind::DeletedScaff  => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
+    ViewNodeKind::DeletedScaff (_) => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
   }}
 
 /// Build a node from disk and
@@ -382,7 +382,7 @@ pub fn truenode_in_tree_is_indefinitive (
     ViewNodeKind::True (t)    => Ok (t . indefinitive),
     ViewNodeKind::Deleted (_) => Ok (false),
     ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
-    ViewNodeKind::DeletedScaff => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),
+    ViewNodeKind::DeletedScaff (_) => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),
   }}
 
 /// Collect all child tree NodeIds from a node.

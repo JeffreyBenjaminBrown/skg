@@ -6,7 +6,7 @@
 
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::git::SourceDiff;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
 use crate::types::memory::SkgNodeMap;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
@@ -113,17 +113,18 @@ async fn complete_preorder_with_limited_recursion (
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
-  if matches!( kind, ViewNodeKind::Scaff (_)) {
+  if let ViewNodeKind::Scaff (ref s) = kind {
     // Scaff under Deleted or DeletedScaff parent becomes DeletedScaff.
+    let scaffold_kind : ScaffoldKind = s . kind ();
     let parent_is_deleted : bool =
       read_at_ancestor_in_tree ( tree, treeid, 1,
         |vn : &ViewNode| matches! ( &vn . kind,
           ViewNodeKind::Deleted (_) |
-          ViewNodeKind::DeletedScaff ))
+          ViewNodeKind::DeletedScaff (_) ))
       . unwrap_or (false);
     if parent_is_deleted {
       tree . get_mut (treeid) . unwrap () . value () . kind =
-        ViewNodeKind::DeletedScaff;
+        ViewNodeKind::DeletedScaff (scaffold_kind);
       return Ok(( )); }}
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_parent_first::truenode::
@@ -184,7 +185,7 @@ async fn complete_postorder_with_limited_recursion (
           treeid, tree, map, source_diffs, config,
           deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
-  } else if matches!( kind, ViewNodeKind::DeletedScaff ) {
+  } else if matches!( kind, ViewNodeKind::DeletedScaff (_) ) {
     // Detach self if no children remain.
     let has_children : bool =
       tree . get (treeid) . unwrap ()

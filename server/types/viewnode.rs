@@ -31,7 +31,7 @@ pub enum ViewNodeKind {
   True         (TrueNode),
   Scaff        (Scaffold),
   Deleted      (DeletedNode),
-  DeletedScaff,
+  DeletedScaff (ScaffoldKind),
 }
 
 /// A node whose .skg file was deleted by a save in another buffer.
@@ -124,7 +124,7 @@ pub enum Scaffold {
 /// (We can't simply use the Scaffold variants themselves,
 /// because of the Alias/ID payloads.)
 /// Used for the bijective Emacs string mapping.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScaffoldKind { Alias,
                         AliasCol,
                         BufferRoot,
@@ -157,8 +157,8 @@ pub enum ViewRequest {
 // Implementations
 //
 
-impl Scaffold {
-  /// Single source of truth for Scaffold <-> Emacs string bijection.
+impl ScaffoldKind {
+  /// Single source of truth for ScaffoldKind <-> Emacs string bijection.
   const REPRS_IN_CLIENT: &'static [(&'static str, ScaffoldKind)] = &[
     ("alias",                        ScaffoldKind::Alias),
     ("aliasCol",                     ScaffoldKind::AliasCol),
@@ -171,6 +171,31 @@ impl Scaffold {
     ("id",                           ScaffoldKind::ID),
   ];
 
+  /// String representation as used in Emacs metadata sexps.
+  pub fn repr_in_client (&self) -> String {
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(_, k)| k == self )
+      . map ( |(s, _)| s . to_string() )
+      . expect ("REPRS_IN_CLIENT should cover all ScaffoldKinds") }
+
+  /// Parse a client string to a ScaffoldKind.
+  pub fn from_client_string ( s: &str ) -> Option<ScaffoldKind> {
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(cs, _)| *cs == s )
+      . map ( |(_, k)| *k ) }
+
+  /// The default title for a scaffold of this kind.
+  pub fn default_title (&self) -> &'static str {
+    match self {
+      ScaffoldKind::AliasCol                     => "its aliases",
+      ScaffoldKind::IDCol                        => "its IDs",
+      ScaffoldKind::SubscribeeCol                => "it subscribes to these",
+      ScaffoldKind::HiddenInSubscribeeCol        => "hidden from this subscription",
+      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      _                                          => "",
+    }} }
+
+impl Scaffold {
   /// Get the kind (discriminant) of this Scaffold.
   pub fn kind (&self) -> ScaffoldKind {
     match self {
@@ -191,23 +216,13 @@ impl Scaffold {
 
   /// String representation as used in Emacs metadata sexps.
   pub fn repr_in_client (&self) -> String {
-    let kind : ScaffoldKind = self . kind();
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, k)| *k == kind )
-      . map ( |(s, _)| s . to_string() )
-      . expect ("REPRS_IN_CLIENT should cover all ScaffoldKinds") }
+    self . kind () . repr_in_client () }
 
   pub fn title (&self) -> &str {
     match self {
       Scaffold::Alias { text, .. } => text,
-      Scaffold::AliasCol => "its aliases",
-      Scaffold::BufferRoot => "",
-      Scaffold::HiddenInSubscribeeCol => "hidden from this subscription",
-      Scaffold::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
-      Scaffold::SubscribeeCol => "it subscribes to these",
-      Scaffold::TextChanged => "",
-      Scaffold::IDCol => "its IDs",
-      Scaffold::ID { id, .. } => id,
+      Scaffold::ID { id, .. }      => id,
+      _                            => self . kind () . default_title (),
     }}
 
   /// A distinguishable label for use in error messages.
@@ -261,7 +276,7 @@ impl ViewNode {
       ViewNodeKind::True    (t) => &t . title,
       ViewNodeKind::Scaff   (s) => s . title (),
       ViewNodeKind::Deleted (d) => &d . title,
-      ViewNodeKind::DeletedScaff  => "",
+      ViewNodeKind::DeletedScaff (kind) => kind . default_title (),
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
@@ -270,7 +285,7 @@ impl ViewNode {
       ViewNodeKind::True    (t) => t . body . as_ref (),
       ViewNodeKind::Scaff   (_) => None,
       ViewNodeKind::Deleted (d) => d . body . as_ref (),
-      ViewNodeKind::DeletedScaff  => None,
+      ViewNodeKind::DeletedScaff (_) => None,
     }}
 }
 

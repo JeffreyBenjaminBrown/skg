@@ -60,7 +60,7 @@ pub fn naive_saveinstructions_from_tree (
       },
       ViewNodeKind::Deleted (_) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::DeletedScaff =>
+      ViewNodeKind::DeletedScaff (_) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::True (t) => {
         if let Some (instruction)
@@ -134,7 +134,7 @@ fn collect_subscribees (
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
             ViewNodeKind::Deleted (_) |
-            ViewNodeKind::DeletedScaff =>
+            ViewNodeKind::DeletedScaff (_) =>
               continue, // inert in a deleted context
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
