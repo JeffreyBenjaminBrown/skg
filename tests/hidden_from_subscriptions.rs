@@ -30,20 +30,20 @@ async fn setup_test(
              TantivyIndex),
             Box<dyn Error>> {
   let config: SkgConfig =
-    load_config_with_overrides(config_path, Some(db_name), &[])?;
+    load_config_with_overrides(config_path, Some (db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,
-  ).await?;
+  ) . await?;
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&config)?;
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+    read_all_skg_files_from_sources (&config)?;
+  overwrite_new_empty_db(db_name, &driver) . await?;
+  define_schema(db_name, &driver) . await?;
+  create_all_nodes(db_name, &driver, &nodes) . await?;
+  create_all_relationships(db_name, &driver, &nodes) . await?;
   let tantivy_index: TantivyIndex =
-    create_empty_tantivy_index(&config.tantivy_folder)?;
+    create_empty_tantivy_index(&config . tantivy_folder)?;
   Ok((config, driver, tantivy_index)) }
 
 async fn cleanup_test(
@@ -51,10 +51,10 @@ async fn cleanup_test(
   driver: &TypeDBDriver,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
-  if driver.databases().contains(db_name).await? {
-    driver.databases().get(db_name).await?.delete().await?; }
-  if tantivy_folder.exists() {
-    std::fs::remove_dir_all(tantivy_folder)?; }
+  if driver . databases() . contains (db_name) . await? {
+    driver . databases() . get (db_name) . await?. delete() . await?; }
+  if tantivy_folder . exists() {
+    std::fs::remove_dir_all (tantivy_folder)?; }
   Ok (( )) }
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
@@ -69,18 +69,18 @@ fn add_definitive_view_request_to_subscribees (
   // Process line-by-line, inserting viewRequests after indefinitive
   // for lines containing "subscribee-" in the title
   org_text
-    .lines()
-    .map(|line| {
-      if line.contains("subscribee-") && line.contains("indefinitive") {
+    . lines()
+    . map(|line| {
+      if line . contains ("subscribee-") && line . contains ("indefinitive") {
         // Insert viewRequests after indefinitive, before ) or (graphStats
-        line.replace("indefinitive)", "indefinitive (viewRequests definitiveView))")
-            .replace("indefinitive (graphStats", "indefinitive (viewRequests definitiveView) (graphStats")
+        line . replace("indefinitive)", "indefinitive (viewRequests definitiveView))")
+            . replace("indefinitive (graphStats", "indefinitive (viewRequests definitiveView) (graphStats")
       } else {
-        line.to_string()
+        line . to_string()
       }
     })
-    .collect::<Vec<_>>()
-    .join("\n") + "\n" }
+    . collect::<Vec<_>>()
+    . join ("\n") + "\n" }
 
 /// Every kind of Col:
 /// - R subscribes to E1, E2
@@ -103,14 +103,14 @@ fn test_every_kind_of_col(
     let (config, driver, tantivy) = setup_test(
       db_name,
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
-    ).await?;
+    ) . await?;
 
     let (initial_view, _map, _pids, _)
       : (String, SkgNodeMap, Vec<ID>, _)
       = single_root_view(
           &driver, &config,
-          &ID("R".to_string()), // Initial view from R ("subscribeR")
-          false ). await?;
+          &ID("R" . to_string()), // Initial view from R ("subscribeR")
+          false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -127,7 +127,7 @@ fn test_every_kind_of_col(
 
     let expanded = { // Request definitive views, then save
       let modified_view : String =
-        add_definitive_view_request_to_subscribees ( &initial_view );
+        add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
@@ -136,8 +136,8 @@ fn test_every_kind_of_col(
           &modified_view, &driver, &config, &tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
-        ). await ?;
-      response.saved_view };
+        ) . await ?;
+      response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
@@ -161,8 +161,8 @@ fn test_every_kind_of_col(
     cleanup_test(
       db_name,
       &driver,
-      &config.tantivy_folder,
-    ).await?;
+      &config . tantivy_folder,
+    ) . await?;
     Ok (( )) } ) }
 
 /// Hidden within but none hidden without:
@@ -181,12 +181,12 @@ fn test_hidden_within_but_none_without(
   block_on(async {
     let db_name = "skg-test-hidden-within-but-none-without";
     let (config, driver, tantivy) = setup_test(
-      db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ). await?;
+      db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ) . await?;
     let (initial_view, _map, _pids, _)
       : (String, SkgNodeMap, Vec<ID>, _)
       = single_root_view( &driver, &config,
-                          &ID("R".to_string()), // the root
-                          false ). await?;
+                          &ID("R" . to_string()), // the root
+                          false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -200,7 +200,7 @@ fn test_hidden_within_but_none_without(
 
     let expanded = { // request definitive views, then save
       let modified_view : String =
-        add_definitive_view_request_to_subscribees ( &initial_view );
+        add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
@@ -209,8 +209,8 @@ fn test_hidden_within_but_none_without(
           &modified_view, &driver, &config, &tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
-        ). await ?;
-      response.saved_view };
+        ) . await ?;
+      response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
@@ -231,8 +231,8 @@ fn test_hidden_within_but_none_without(
     cleanup_test(
       db_name,
       &driver,
-      &config.tantivy_folder,
-    ).await?;
+      &config . tantivy_folder,
+    ) . await?;
     Ok (( )) } ) }
 
 /// Hidden without but none hidden within:
@@ -254,12 +254,12 @@ fn test_hidden_without_but_none_within(
     let db_name = "skg-test-hidden-without-but-none-within";
     let (config, driver, tantivy) =
       setup_test(db_name,
-                 "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml").await?;
+                 "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await?;
     let (initial_view, _map, _pids, _)
       : (String, SkgNodeMap, Vec<ID>, _)
       = single_root_view( &driver, &config,
-                          &ID("R".to_string()), // origin of the view
-                          false ). await?;
+                          &ID("R" . to_string()), // origin of the view
+                          false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
@@ -274,7 +274,7 @@ fn test_hidden_without_but_none_within(
       "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indefinitive bare leaves");
     let with_subscribees_expanded = {
       let modified_view : String =
-        add_definitive_view_request_to_subscribees ( &initial_view );
+        add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
@@ -282,7 +282,7 @@ fn test_hidden_without_but_none_within(
       let response = update_from_and_rerender_buffer (
         &modified_view, &driver, &config, &tantivy, false,
         SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ). await ?;
+        &Err ( String::new () ), &mut conn_state ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
@@ -304,8 +304,8 @@ fn test_hidden_without_but_none_within(
     cleanup_test(
       db_name,
       &driver,
-      &config.tantivy_folder,
-    ).await?;
+      &config . tantivy_folder,
+    ) . await?;
     Ok (( )) } ) }
 
 /// Overlapping hidden within:
@@ -325,12 +325,12 @@ fn test_overlapping_hidden_within(
     let db_name = "skg-test-overlapping-hidden-within";
     let (config, driver, tantivy) =
       setup_test(db_name,
-                 "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml").await?;
+                 "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await?;
     let (initial_view, _map, _pids, _)
       : (String, SkgNodeMap, Vec<ID>, _)
       = single_root_view( &driver, &config,
-                          &ID("R".to_string()), // root of the view
-                          false ). await?;
+                          &ID("R" . to_string()), // root of the view
+                          false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
@@ -343,7 +343,7 @@ fn test_overlapping_hidden_within(
       "Initial view from R: indefinitive subscribees are bare leaves; H doesn't appear");
     let expanded = {
       let modified_view : String =
-        add_definitive_view_request_to_subscribees ( &initial_view );
+        add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
@@ -352,8 +352,8 @@ fn test_overlapping_hidden_within(
       let response = update_from_and_rerender_buffer (
         &modified_view, &driver, &config, &tantivy, false,
         SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ). await ?;
-      response.saved_view };
+        &Err ( String::new () ), &mut conn_state ) . await ?;
+      response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (graphStats (containers 0) (contents 1) subscribing))) R
@@ -371,6 +371,6 @@ fn test_overlapping_hidden_within(
     cleanup_test(
       db_name,
       &driver,
-      &config.tantivy_folder,
-    ).await?;
+      &config . tantivy_folder,
+    ) . await?;
     Ok (( )) } ) }

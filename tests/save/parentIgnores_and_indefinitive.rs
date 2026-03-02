@@ -26,7 +26,7 @@ fn test_parentignores_and_indefinitive(
 
   // Backup fixtures
   if backup_path . exists () {
-    fs::remove_dir_all ( &backup_path ) ?; }
+    fs::remove_dir_all (&backup_path) ?; }
   copy_dir_all ( &fixtures_path, &backup_path ) ?;
 
   // Run test with database
@@ -50,32 +50,32 @@ fn test_parentignores_and_indefinitive(
             org_text,
             config,
             driver,
-            &SkgNodeMap::new(), ). await?;
+            &SkgNodeMap::new(), ) . await?;
         update_typedb_from_saveinstructions(
-          &config.db_name,
+          &config . db_name,
           driver,
-          &save_instructions, ). await?;
+          &save_instructions, ) . await?;
         update_fs_from_saveinstructions(
           save_instructions,
-          config.clone(), )?;
+          config . clone(), )?;
 
         { // verify indefinitive is treated correctly
           let node2 : SkgNode =
             skgnode_from_id(
-              config, driver, &ID("2".to_string() ))
-            .await?;
+              config, driver, &ID("2" . to_string() ))
+            . await?;
         assert_eq!(
-          node2.contains,
-          Some(vec![ ID("3".to_string()) ]),
+          node2 . contains,
+          Some(vec![ ID("3" . to_string()) ]),
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 
         { // verify parentIgnores is treated correctly
           let node1 : SkgNode =
             skgnode_from_id(
-              config, driver, &ID("1".to_string() ))
-            .await?;
+              config, driver, &ID("1" . to_string() ))
+            . await?;
         assert_eq!(
-          node1.contains,
+          node1 . contains,
           None,
           "Node 1 should have empty contents (None when read from disk), because its child 2 has 'treatment=parentIgnores' in its metadata." ); }
 
@@ -83,9 +83,9 @@ fn test_parentignores_and_indefinitive(
     );
 
   // Restore fixtures from backup
-  fs::remove_dir_all ( &fixtures_path ) ?;
+  fs::remove_dir_all (&fixtures_path) ?;
   copy_dir_all ( &backup_path, &fixtures_path ) ?;
-  fs::remove_dir_all ( &backup_path ) ?;
+  fs::remove_dir_all (&backup_path) ?;
 
   result }
 
@@ -94,17 +94,17 @@ fn copy_dir_all(
   src: &PathBuf,
   dst: &PathBuf,
 ) -> std::io::Result<()> {
-  fs::create_dir_all(dst)?;
-  for entry in fs::read_dir(src)? {
+  fs::create_dir_all (dst)?;
+  for entry in fs::read_dir (src)? {
     let entry = entry?;
-    let ty = entry.file_type()?;
-    if ty.is_dir() {
+    let ty = entry . file_type()?;
+    if ty . is_dir() {
       copy_dir_all(
-        &entry.path(),
-        &dst.join(entry.file_name()),
+        &entry . path(),
+        &dst . join(entry . file_name()),
       )?;
     } else {
-      fs::copy( entry.path(),
-                dst.join(entry.file_name()))?; }}
+      fs::copy( entry . path(),
+                dst . join(entry . file_name()))?; }}
   Ok (( ))
 }

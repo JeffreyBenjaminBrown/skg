@@ -71,8 +71,8 @@ pub fn complete_truenode_preorder (
   deleted_by_this_save_pids       : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
-    tree, node, |vn : &ViewNode| matches!( &vn.kind,
-                                           ViewNodeKind::True( _ )),
+    tree, node, |vn : &ViewNode| matches!( &vn . kind,
+                                           ViewNodeKind::True (_)),
     "complete_truenode_preorder: expected TrueNode" ) ?;
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
@@ -84,8 +84,8 @@ pub fn complete_truenode_preorder (
       // RemovedHere) are display-only placeholders created during
       // content reconciliation. They need no further completion.
       read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) => t.is_phantom(),
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) => t . is_phantom(),
           _ => false } ) ?;
     if is_phantom { return Ok(( )); }
     let (pid, source) : (ID, SourceName) =
@@ -96,8 +96,8 @@ pub fn complete_truenode_preorder (
     (pid, source) };
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) => t.indefinitive,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) => t . indefinitive,
           _ => false } ) ?;
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
@@ -106,25 +106,25 @@ pub fn complete_truenode_preorder (
     // Degrade this TrueNode to a DeletedNode.
     let (title, body) : (String, Option<String>) =
       read_at_node_in_tree ( tree, node,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True ( t ) =>
-            ( t.title.clone(), t.body.clone() ),
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) =>
+            ( t . title . clone(), t . body . clone() ),
           _ => ( String::new(), None ) } ) ?;
     write_at_node_in_tree ( tree, node,
       |vn : &mut ViewNode| {
         vn . kind = ViewNodeKind::Deleted ( DeletedNode {
-          id     : pid.clone(),
-          source : source.clone(),
+          id     : pid . clone(),
+          source : source . clone(),
           title,
           body, } ); }
-    ) . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+    ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     return Ok(( )); }
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
-    skgnode.contains.clone().unwrap_or_default();
+    skgnode . contains . clone() . unwrap_or_default();
   let subscribes_to : Vec<ID> =
-    skgnode.subscribes_to.clone().unwrap_or_default();
+    skgnode . subscribes_to . clone() . unwrap_or_default();
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
   let is_sub : bool = is_subscribee( tree, node ) ?;
@@ -153,14 +153,14 @@ fn is_subscribee (
 ) -> Result<bool, Box<dyn Error>> {
   let not_parent_ignores : bool =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) => !t.parent_ignores,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => !t . parent_ignores,
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
-      |vn : &ViewNode| matches!( &vn.kind,
-        ViewNodeKind::Scaff( Scaffold::SubscribeeCol )))
-    .unwrap_or( false );
+      |vn : &ViewNode| matches!( &vn . kind,
+        ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
+    . unwrap_or (false);
   Ok( not_parent_ignores && parent_is_subscribee_col ) }
 
 fn content_goal_list (
@@ -173,13 +173,13 @@ fn content_goal_list (
   config        : &SkgConfig,
 ) -> Result<(Vec<ID>, HashSet<ID>, Vec<ID>), Box<dyn Error>> {
   if !is_subscribee {
-    let apparent_content_ids : Vec<ID> = content_ids.to_vec();
+    let apparent_content_ids : Vec<ID> = content_ids . to_vec();
     let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
       match node_changes {
-        None => (content_ids.to_vec(),
+        None => (content_ids . to_vec(),
                  HashSet::new()),
-        Some( nc ) =>
-          itemlist_and_removedset_from_diff( &nc.contains_diff ) };
+        Some (nc) =>
+          itemlist_and_removedset_from_diff( &nc . contains_diff ) };
     Ok(( goal_list, removed_ids, apparent_content_ids ))
   } else {
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
@@ -189,35 +189,35 @@ fn content_goal_list (
       { let grandparent_skgnode : &SkgNode =
           skgnode_from_map_or_disk(
             &grandparent_pid, &grandparent_source, map, config ) ?;
-        grandparent_skgnode.hides_from_its_subscriptions
+        grandparent_skgnode . hides_from_its_subscriptions
           . clone() . unwrap_or_default() };
     let apparent_content_ids : Vec<ID> =
       setlike_vector_subtraction (
-        content_ids.to_vec(), &worktree_hidden );
+        content_ids . to_vec(), &worktree_hidden );
     let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
       match node_changes {
-        None => (apparent_content_ids.clone(),
+        None => (apparent_content_ids . clone(),
                  HashSet::new()),
-        Some( nc ) => {
+        Some (nc) => {
           let head_hidden : Vec<ID> =
             skgnode_from_git_head(
                 &grandparent_pid, &grandparent_source, config )
               . ok()
-              . and_then( |skg| skg.hides_from_its_subscriptions )
+              . and_then( |skg| skg . hides_from_its_subscriptions )
               . unwrap_or_default();
           let head_visible : Vec<ID> =
             setlike_vector_subtraction(
-              nc . contains_diff . iter() .filter_map (
+              nc . contains_diff . iter() . filter_map (
                   |d| match d { // If it's New, it was not in HEAD.
-                    Diff_Item::Unchanged( id ) |
-                      Diff_Item::Removed( id ) => Some( id.clone() ),
-                    Diff_Item::New( _ ) => None } )
+                    Diff_Item::Unchanged (id) |
+                      Diff_Item::Removed (id) => Some( id . clone() ),
+                    Diff_Item::New (_) => None } )
                 . collect(),
               &head_hidden );
           let visible_diff : Vec<Diff_Item<ID>> =
             compute_interleaved_diff(
               &head_visible, &apparent_content_ids );
-          itemlist_and_removedset_from_diff( &visible_diff ) }, };
+          itemlist_and_removedset_from_diff (&visible_diff) }, };
     Ok(( goal_list, removed_ids, apparent_content_ids ))
   } }
 
@@ -241,30 +241,30 @@ fn complete_content_children (
       source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
-    |vn : &ViewNode| matches!( &vn.kind,
-                               ViewNodeKind::True( t )
-                               if !t.parent_ignores ),
-    |vn : &ViewNode| match &vn.kind {
-      ViewNodeKind::True( t ) => t.id.clone(),
+    |vn : &ViewNode| matches!( &vn . kind,
+                               ViewNodeKind::True (t)
+                               if !t . parent_ignores ),
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) => t . id . clone(),
       _ => panic!(
         "complete_content_children: relevant child not TrueNode" ) },
     goal_list,
     |id : &ID| {
-      let d : &ChildData = child_data.get( id ).expect(
+      let d : &ChildData = child_data . get (id) . expect(
         "complete_content_children: child data not pre-fetched" );
-      match d.kind {
+      match d . kind {
         ChildKind::Normal =>
           mk_definitive_viewnode(
-            id.clone(), d.source.clone(),
-            d.title.clone(), None ),
+            id . clone(), d . source . clone(),
+            d . title . clone(), None ),
         ChildKind::RemovedHere =>
           mk_phantom_viewnode(
-            id.clone(), d.source.clone(),
-            d.title.clone(), NodeDiffStatus::RemovedHere ),
+            id . clone(), d . source . clone(),
+            d . title . clone(), NodeDiffStatus::RemovedHere ),
         ChildKind::Removed =>
           mk_phantom_viewnode(
-            id.clone(), d.source.clone(),
-            d.title.clone(), NodeDiffStatus::Removed ) } },
+            id . clone(), d . source . clone(),
+            d . title . clone(), NodeDiffStatus::Removed ) } },
   ) }
 
 /// 'erroneous content children' are children that look like content,
@@ -279,19 +279,19 @@ fn mark_erroneous_content_children_as_parent_ignores (
   content_ids : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   let content_id_set : HashSet<ID> =
-    content_ids.iter().cloned().collect();
+    content_ids . iter() . cloned() . collect();
   treat_certain_children(
     tree, node,
-    |vn : &ViewNode| match &vn.kind {
-      ViewNodeKind::True( t ) =>
-        !t.parent_ignores
-        && !content_id_set.contains( &t.id )
-        && !t.is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) =>
+        !t . parent_ignores
+        && !content_id_set . contains( &t . id )
+        && !t . is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn.kind {
-        t.parent_ignores = true; }},
-  ).map_err( |e| -> Box<dyn Error> { e.into() } ) }
+      if let ViewNodeKind::True( ref mut t ) = vn . kind {
+        t . parent_ignores = true; }},
+  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
 /// - scaffolds first
@@ -304,17 +304,17 @@ fn order_children_as_scaffolds_then_ignored_then_content (
 ) -> Result<(), Box<dyn Error>> {
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::Scaff( _ )                    => 0,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::Scaff (_)                    => 0,
         ViewNodeKind::DeletedScaff                  => 0,
-        ViewNodeKind::True( t ) if t.parent_ignores => 1,
-        ViewNodeKind::True( _ )                     => 2,
-        ViewNodeKind::Deleted( _ )                  => 2,
-      } ).map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        ViewNodeKind::True (t) if t . parent_ignores => 1,
+        ViewNodeKind::True (_)                     => 2,
+        ViewNodeKind::Deleted (_)                  => 2,
+      } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
-  for &cid in groups.get( &0 ).unwrap_or( &empty ).iter()
-    .chain( groups.get( &1 ).unwrap_or( &empty ).iter() )
-    .chain( groups.get( &2 ).unwrap_or( &empty ).iter() )
+  for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
+    . chain( groups . get( &1 ) . unwrap_or (&empty) . iter() )
+    . chain( groups . get( &2 ) . unwrap_or (&empty) . iter() )
   { move_child_to_end( tree, node, cid ) ?; }
   Ok(( )) }
 
@@ -326,10 +326,10 @@ fn maybe_prepend_subscribee_col (
   node          : NodeId,
   subscribes_to : &[ID],
 ) -> Result<(), Box<dyn Error>> {
-  if !subscribes_to.is_empty() {
+  if !subscribes_to . is_empty() {
     if unique_scaffold_child(
       tree, node, &Scaffold::SubscribeeCol
-    ) ?.is_none() {
+    ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node, Scaffold::SubscribeeCol, true ) ?; } }
   Ok(( )) }
@@ -344,11 +344,11 @@ fn maybe_prepend_diff_view_scaffolds (
   node      : NodeId,
   node_changes : Option<&NodeChanges>,
 ) -> Result<(), Box<dyn Error>> {
-  if let Some( nc ) = node_changes {
-    if nc.text_changed {
+  if let Some (nc) = node_changes {
+    if nc . text_changed {
       if unique_scaffold_child(
         tree, node, &Scaffold::TextChanged
-      ) ?.is_none() {
+      ) ?. is_none() {
         insert_scaffold_as_child(
           tree, node, Scaffold::TextChanged, true ) ?; } }
     maybe_prepend_id_col(
@@ -365,12 +365,12 @@ fn maybe_prepend_id_col (
   node         : NodeId,
   node_changes : &NodeChanges,
 ) -> Result<(), Box<dyn Error>> {
-  let has_id_changes : bool = node_changes.ids_diff.iter()
-    .any( |d| !matches!( d, Diff_Item::Unchanged( _ )) );
+  let has_id_changes : bool = node_changes . ids_diff . iter()
+    . any( |d| !matches!( d, Diff_Item::Unchanged (_)) );
   if has_id_changes {
     if unique_scaffold_child(
       tree, node, &Scaffold::IDCol
-    ) ?.is_none() {
+    ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node, Scaffold::IDCol, true ) ?; } }
   Ok(( )) }
@@ -383,12 +383,12 @@ fn maybe_prepend_alias_col (
   node         : NodeId,
   node_changes : &NodeChanges,
 ) -> Result<(), Box<dyn Error>> {
-  let has_alias_changes : bool = node_changes.aliases_diff.iter()
-    .any( |d| !matches!( d, Diff_Item::Unchanged( _ )) );
+  let has_alias_changes : bool = node_changes . aliases_diff . iter()
+    . any( |d| !matches!( d, Diff_Item::Unchanged (_)) );
   if has_alias_changes {
     if unique_scaffold_child(
       tree, node, &Scaffold::AliasCol
-    ) ?.is_none() {
+    ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node, Scaffold::AliasCol, true ) ?; } }
   Ok(( )) }
@@ -416,30 +416,30 @@ fn build_child_creation_data (
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
-        tree.get( node )
-          .ok_or( "build_child_creation_data: node not found" ) ?;
+        tree . get (node)
+          . ok_or ("build_child_creation_data: node not found") ?;
       let mut m : HashMap<ID, SourceName> = HashMap::new();
-      for child_ref in node_ref.children() {
-        if let ViewNodeKind::True( t ) = &child_ref.value().kind {
-          m.insert( t.id.clone(), t.source.clone()); }}
+      for child_ref in node_ref . children() {
+        if let ViewNodeKind::True (t) = &child_ref . value() . kind {
+          m . insert( t . id . clone(), t . source . clone()); }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
   for id in goal_list {
-    if result.contains_key( id ) { continue; }
-    let is_phantom : bool = removed_ids.contains( id );
+    if result . contains_key (id) { continue; }
+    let is_phantom : bool = removed_ids . contains (id);
     if is_phantom {
       let phantom_source : SourceName =
         find_source_many_ways(
           id, &child_sources, deleted_since_head_pid_src_map, map, config )
-        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let kind : ChildKind =
-        match phantom_diff_status( id, &phantom_source, source_diffs.as_ref() ) {
+        match phantom_diff_status( id, &phantom_source, source_diffs . as_ref() ) {
           NodeDiffStatus::Removed     => ChildKind::Removed,
           NodeDiffStatus::RemovedHere => ChildKind::RemovedHere,
           _                           => ChildKind::RemovedHere };
       let title : String =
-        title_for_phantom( id, &phantom_source, source_diffs.as_ref(), map, config );
-      result.insert( id.clone(),
+        title_for_phantom( id, &phantom_source, source_diffs . as_ref(), map, config );
+      result . insert( id . clone(),
                      ChildData { title,
                                  source: phantom_source,
                                  kind } );
@@ -447,14 +447,14 @@ fn build_child_creation_data (
       let child_source : SourceName =
         find_source_many_ways( id, &child_sources,
                      deleted_since_head_pid_src_map, map, config )
-        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let skg : &SkgNode =
         skgnode_from_map_or_disk( id, &child_source, map, config ) ?;
-      result.insert( id.clone(),
-                     ChildData { title: skg.title.clone(),
-                                 source: skg.source.clone(),
+      result . insert( id . clone(),
+                     ChildData { title: skg . title . clone(),
+                                 source: skg . source . clone(),
                                  kind: ChildKind::Normal } ); }}
-  Ok( result ) }
+  Ok (result) }
 
 /// In diff view, set the TrueNode's 'diff' field.
 fn maybe_change_node_diff_status (
@@ -465,17 +465,17 @@ fn maybe_change_node_diff_status (
   source       : &SourceName,
 ) -> Result<(), Box<dyn Error>> {
   let source_diff : &SourceDiff =
-    match source_diffs.as_ref().and_then(|d| d.get(source)) {
-      Some(sd) => sd,
+    match source_diffs . as_ref() . and_then(|d| d . get (source)) {
+      Some (sd) => sd,
       None => return Ok(( )) };
-  if !source_diff.is_git_repo {
+  if !source_diff . is_git_repo {
     return set_truenode_diff(
       tree, node, NodeDiffStatus::NotInGit); }
   let file_path : PathBuf =
-    PathBuf::from(format!("{}.skg", pid.0));
-  if let Some(skgnode_diff)
-    = source_diff.skgnode_diffs.get(&file_path)
-    { match skgnode_diff.status {
+    PathBuf::from(format!("{}.skg", pid . 0));
+  if let Some (skgnode_diff)
+    = source_diff . skgnode_diffs . get (&file_path)
+    { match skgnode_diff . status {
         GitDiffStatus::Added =>
           return set_truenode_diff( tree, node,
                                     NodeDiffStatus::New),
@@ -488,27 +488,27 @@ fn maybe_change_node_diff_status (
     // but the file already existed (Added would have returned above).
     let is_parent_ignores : bool =
       read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) => t.parent_ignores,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) => t . parent_ignores,
           _ => true } ) ?;
     if is_parent_ignores { return Ok(( )); }
     let (parent_pid, parent_source) : (ID, SourceName) =
       match read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &ViewNode| match &vn.kind {
-          ViewNodeKind::True( t ) =>
-            Ok(( t.id.clone(), t.source.clone() )),
-          _ => Err( "not a TrueNode" ) })
-      { Ok( Ok( r ) ) => r,
-        Ok( Err( _ ) ) | Err( _ ) => return Ok(( )) };
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) =>
+            Ok(( t . id . clone(), t . source . clone() )),
+          _ => Err ("not a TrueNode") })
+      { Ok( Ok (r) ) => r,
+        Ok( Err (_) ) | Err (_) => return Ok(( )) };
     let parent_changes : Option<&NodeChanges> =
       node_changes_for_truenode(
         source_diffs, &parent_pid, &parent_source );
     let nc : &NodeChanges = match parent_changes {
-      Some( nc ) => nc,
+      Some (nc) => nc,
       None => return Ok(( )) };
     let is_new_in_contains : bool =
-      nc.contains_diff.iter().any(
-        |d| matches!( d, Diff_Item::New( id ) if id == pid ) );
+      nc . contains_diff . iter() . any(
+        |d| matches!( d, Diff_Item::New (id) if id == pid ) );
     if is_new_in_contains {
       set_truenode_diff(
         tree, node, NodeDiffStatus::NewHere )?; }
@@ -521,6 +521,6 @@ fn set_truenode_diff (
 ) -> Result<(), Box<dyn Error>> {
   write_at_node_in_tree( tree, node,
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn.kind {
-        t.diff = Some( status ); }}
-  ).map_err( |e| -> Box<dyn Error> { e.into() } ) }
+      if let ViewNodeKind::True( ref mut t ) = vn . kind {
+        t . diff = Some (status); }}
+  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }

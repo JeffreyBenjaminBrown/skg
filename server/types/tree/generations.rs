@@ -12,7 +12,7 @@ pub fn first_in_generation<T>(
   generation: usize,
 ) -> Result<Option<NodeRef<'_, T>>, Box<dyn Error>> {
   first_in_nth_generation_of_descendents(
-    tree.root(), generation) }
+    tree . root(), generation) }
 
 /// Returns the first (in the DFS sense)
 /// node at the Nth generation of descendants from a given node.
@@ -34,12 +34,12 @@ fn first_in_nth_generation_of_descendents<T>(
     target_depth: usize,
   ) -> Option<NodeRef<'_, T>> {
     if current_depth == target_depth {
-      return Some(node); }
-    for child in node.children() {
-      if let Some(found) =
+      return Some (node); }
+    for child in node . children() {
+      if let Some (found) =
         dfs_find_at_depth(
           child, current_depth + 1, target_depth)
-      { return Some(found); }}
+      { return Some (found); }}
     None }
   Ok ( dfs_find_at_depth (
     node, 0, generations )) }
@@ -56,28 +56,28 @@ fn first_in_nth_generation_of_descendents<T>(
 pub fn next_in_generation<T>(
   node: NodeRef<'_, T>
 ) -> Option<NodeRef<'_, T>> {
-  if let Some(next_sibling) = node.next_sibling() {
-    return Some(next_sibling); }
+  if let Some (next_sibling) = node . next_sibling() {
+    return Some (next_sibling); }
   let mut ancestor: NodeRef<'_, T> = node;
   let mut generations_climbed: usize = 0;
   loop {
-    ancestor = match ancestor.parent() {
-      Some(parent) => parent,
+    ancestor = match ancestor . parent() {
+      Some (parent) => parent,
       None => return None, // Can't climb any higher
     };
     generations_climbed += 1;
     // We'll try each of the ancestor's subsequent siblings,
     // but not the siblings that preceded it.
     let mut sibling_after_ancestor: Option<NodeRef<'_, T>> =
-      ancestor.next_sibling ();
-    while let Some(next_sib) = sibling_after_ancestor {
+      ancestor . next_sibling ();
+    while let Some (next_sib) = sibling_after_ancestor {
       // Try to descend back down (generations_climbed) levels
-      if let Ok(Some(result)) =
+      if let Ok(Some (result)) =
         first_in_nth_generation_of_descendents(
           next_sib,
           generations_climbed )
-      { return Some(result); }
-      sibling_after_ancestor = next_sib.next_sibling(); }
+      { return Some (result); }
+      sibling_after_ancestor = next_sib . next_sibling(); }
     // None found from this ancestor's next siblings. Climb yet higher.
   }}
 
@@ -94,9 +94,9 @@ pub fn collect_generation_ids<T>(
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
   let effective_root_noderef : NodeRef<'_, T> =
     match effective_root {
-      None => tree.root(),
-      Some(nid) => tree.get(nid)
-        . ok_or("collect_generation_ids: effective_root not in tree")? };
+      None => tree . root(),
+      Some (nid) => tree . get (nid)
+        . ok_or ("collect_generation_ids: effective_root not in tree")? };
   let mut result : Vec<NodeId> = Vec::new();
   fn collect_at_depth<T>(
     node: NodeRef<'_, T>,
@@ -105,9 +105,9 @@ pub fn collect_generation_ids<T>(
     result: &mut Vec<NodeId>,
   ) {
     if current_depth == target_depth {
-      result.push (node.id());
+      result . push (node . id());
       return; }
-    for child in node.children() {
+    for child in node . children() {
       collect_at_depth (
         child, current_depth + 1, target_depth, result); }}
   collect_at_depth (

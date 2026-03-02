@@ -41,28 +41,28 @@ async fn run_path_and_root_tests (
   match path_containerward_to_end_cycle_and_or_branches (
     & config . db_name,
     & driver,
-    & ID("4".to_string() )
-  ).await {
+    & ID("4" . to_string() )
+  ) . await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
       path,
       vec![
-        ID ( "4".to_string() ),
-        ID ( "2".to_string() ),
-        ID ( "1".to_string() ) ],
+        ID ( "4" . to_string() ),
+        ID ( "2" . to_string() ),
+        ID ( "1" . to_string() ) ],
       "Unexpected path to root container from node '4'.");
-    }, Err(e) => {
+    }, Err (e) => {
       panic!("Error finding path to root container: {}", e); } }
 
   match climb_containerward_and_fetch_rootish_context (
     & config . db_name,
     & driver,
-    & ID("4".to_string() )
-  ).await {
-    Ok(root) => { assert_eq!(
+    & ID("4" . to_string() )
+  ) . await {
+    Ok (root) => { assert_eq!(
       root,
-      ID ( "1".to_string() ),
+      ID ( "1" . to_string() ),
       "Root of node '4' should be 1." ) },
-    Err(e) => { panic!(
+    Err (e) => { panic!(
       "Error finding root container from id {}", e); } }
 
   // Test the path "to root" from node "cycle-3".
@@ -70,16 +70,16 @@ async fn run_path_and_root_tests (
   match path_containerward_to_end_cycle_and_or_branches (
     & config . db_name,
     & driver,
-    & ID("cycle-3".to_string() )
-  ).await {
+    & ID("cycle-3" . to_string() )
+  ) . await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
       path,
       vec![
-        ID ( "cycle-3".to_string() ),
-        ID ( "cycle-2".to_string() ),
-        ID ( "cycle-1".to_string() ) ],
+        ID ( "cycle-3" . to_string() ),
+        ID ( "cycle-2" . to_string() ),
+        ID ( "cycle-1" . to_string() ) ],
       "Unexpected path to \"root container\" from node 'cycle-3'.");
-    }, Err(e) => {
+    }, Err (e) => {
       panic!("Error finding path to root container: {}", e); } }
 
   // Test the path "to root" from node "cycle-1".
@@ -87,17 +87,17 @@ async fn run_path_and_root_tests (
   match path_containerward_to_end_cycle_and_or_branches (
     & config . db_name,
     & driver,
-    & ID("cycle-1".to_string() )
-  ).await {
+    & ID("cycle-1" . to_string() )
+  ) . await {
     Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
       path,
       vec![
-        ID ( "cycle-1".to_string() ),
-        ID ( "cycle-3".to_string() ),
-        ID ( "cycle-2".to_string() ),
+        ID ( "cycle-1" . to_string() ),
+        ID ( "cycle-3" . to_string() ),
+        ID ( "cycle-2" . to_string() ),
       ],
       "Unexpected path to \"root container\" from node 'cycle-1'.");
-    }, Err(e) => {
+    }, Err (e) => {
       panic!("Error finding path to root container: {}", e); } }
 
   Ok (( )) }
@@ -108,14 +108,14 @@ async fn test_multi_root_view_logic (
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   let focii : Vec<ID> = vec![
-    ID("1".to_string()),
-    ID("2".to_string()),
-    ID("1".to_string())
+    ID("1" . to_string()),
+    ID("2" . to_string()),
+    ID("1" . to_string())
   ];
   let (result, _map, _pids, _)
     : (String, SkgNodeMap, Vec<ID>, _)
     = multi_root_view ( & driver, & config, & focii, false
-                      ). await ?;
+                      ) . await ?;
 
   println!("Multi-root view result:\n{}", result);
 
@@ -141,9 +141,9 @@ fn test_single_root_view_with_cycle
       let (result, _map, _pids, _)
         : (String, SkgNodeMap, Vec<ID>, _)
         = single_root_view ( driver, config,
-                             &ID ( "a".to_string () ),
+                             &ID ( "a" . to_string () ),
                              false
-                           ). await ?;
+                           ) . await ?;
 
       println!("Single root view with cycle result:\n{}", result);
 
@@ -168,12 +168,12 @@ fn test_multi_root_view_with_shared_nodes
     |config, driver, _tantivy| Box::pin ( async move {
       // Test with multiple roots that share a node
       let focii = vec![
-        ID ( "1".to_string () ),
-        ID ( "2".to_string () )
+        ID ( "1" . to_string () ),
+        ID ( "2" . to_string () )
       ];
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, config, & focii, false
-                        ). await ?;
+                        ) . await ?;
 
       println!("Multi root view with shared nodes result:\n{}", result);
 
@@ -214,16 +214,16 @@ fn test_multi_root_view_with_node_limit
       // Tree structure: 1 -> (2, 3), 2 (standalone root)
       // Generations: 1: [1, 2], 2: [2 (repeated), 3]
       // With limit=3, should render 1, 2, then 2 and 3 are both truncated (sibling group)
-      let mut test_config = config.clone();
-      test_config.initial_node_limit = 3;
+      let mut test_config = config . clone();
+      test_config . initial_node_limit = 3;
 
       let focii = vec![
-        ID ( "1".to_string () ),
-        ID ( "2".to_string () )
+        ID ( "1" . to_string () ),
+        ID ( "2" . to_string () )
       ];
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
-                        ). await ?;
+                        ) . await ?;
 
       println!("Multi root view with limit=3 result:\n{}", result);
 
@@ -277,14 +277,14 @@ fn test_limit_with_multiple_sibling_groups
       // Stop there - do NOT truncate 121 (different parent)
       // Then truncate 12 (everything after 11 in gen 2)
 
-      let mut test_config = config.clone();
-      test_config.initial_node_limit = 4;
+      let mut test_config = config . clone();
+      test_config . initial_node_limit = 4;
 
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _)
       = single_root_view ( driver, &test_config,
-                           &ID ( "1".to_string () ),
+                           &ID ( "1" . to_string () ),
                            false
-                         ). await ?;
+                         ) . await ?;
 
       println!("Result with multiple sibling groups:\n{}", result);
 

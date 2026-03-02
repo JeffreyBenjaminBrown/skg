@@ -22,10 +22,10 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_consistent: Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input_consistent).unwrap().0;
+    org_to_uninterpreted_nodes (input_consistent) . unwrap() . 0;
   let (inconsistent_ids_consistent, _, _) =
-    find_inconsistent_instructions(&forest_consistent);
-  assert_eq!(inconsistent_ids_consistent.len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
+    find_inconsistent_instructions (&forest_consistent);
+  assert_eq!(inconsistent_ids_consistent . len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
 
   // Test case with inconsistent toDelete instructions (conflicts)
   let input_inconsistent: &str =
@@ -38,12 +38,12 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_inconsistent: Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input_inconsistent).unwrap().0;
-  let (inconsistent_ids, _, _) = find_inconsistent_instructions(&forest_inconsistent);
+    org_to_uninterpreted_nodes (input_inconsistent) . unwrap() . 0;
+  let (inconsistent_ids, _, _) = find_inconsistent_instructions (&forest_inconsistent);
 
-  assert_eq!(inconsistent_ids.len(), 2, "Should find exactly 2 conflicting IDs");
-  assert!(inconsistent_ids.contains(&ID::from("conflict1")), "Should include conflict1 ID");
-  assert!(inconsistent_ids.contains(&ID::from("conflict2")), "Should include conflict2 ID");
+  assert_eq!(inconsistent_ids . len(), 2, "Should find exactly 2 conflicting IDs");
+  assert!(inconsistent_ids . contains(&ID::from ("conflict1")), "Should include conflict1 ID");
+  assert!(inconsistent_ids . contains(&ID::from ("conflict2")), "Should include conflict2 ID");
 
   // Test case with nodes that have no IDs (should be skipped)
   let input_no_ids: &str =
@@ -54,16 +54,16 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let forest_no_ids: Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input_no_ids).unwrap().0;
-  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions(&forest_no_ids);
-  assert_eq!(inconsistent_no_ids.len(), 0, "Should have no conflicts when only one node has each ID");
+    org_to_uninterpreted_nodes (input_no_ids) . unwrap() . 0;
+  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions (&forest_no_ids);
+  assert_eq!(inconsistent_no_ids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty forest (just BufferRoot, no tree roots)
   let empty_forest: Tree<UncheckedViewNode> =
     Tree::new(unchecked_forest_root_viewnode());
   let (inconsistent_empty, _, _) =
-    find_inconsistent_instructions(&empty_forest);
-  assert_eq!(inconsistent_empty.len(), 0,
+    find_inconsistent_instructions (&empty_forest);
+  assert_eq!(inconsistent_empty . len(), 0,
              "Should have no conflicts in empty forest");
 }
 
@@ -90,19 +90,19 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<UncheckedViewNode> =
-        org_to_uninterpreted_nodes(input_with_multiple_defining_containers).unwrap().0;
+        org_to_uninterpreted_nodes (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
-      let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
-        .collect();
+      let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
+        . collect();
 
-      assert_eq!(multiple_defining_errors.len(), 1,
+      assert_eq!(multiple_defining_errors . len(), 1,
                  "Should find exactly 1 Multiple_Defining_Viewnodes error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let BufferValidationError::Multiple_Defining_Viewnodes(id) = multiple_defining_errors[0] {
-        assert_eq!(id.0, "duplicate",
+      if let BufferValidationError::Multiple_Defining_Viewnodes (id) = multiple_defining_errors[0] {
+        assert_eq!(id . 0, "duplicate",
                    "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }

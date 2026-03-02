@@ -15,36 +15,36 @@ pub fn handle_get_file_path_request (
 ) {
   let id : String = match value_from_request_sexp (
     "id", request ) {
-    Ok  ( v ) => v,
-    Err ( e ) => {
+    Ok  (v) => v,
+    Err (e) => {
       send_response ( stream,
                       &format! ( "Error: {}", e ) );
       return; } };
   let source : String = match value_from_request_sexp (
     "source", request ) {
-    Ok  ( v ) => v,
-    Err ( e ) => {
+    Ok  (v) => v,
+    Err (e) => {
       send_response ( stream,
                       &format! ( "Error: {}", e ) );
       return; } };
   let raw_path : String = path_from_pid_and_source (
     config,
-    & SourceName ( source ),
-    ID ( id ) );
-  let abs_path : PathBuf = match fs::canonicalize ( &raw_path ) {
-    Ok  ( p ) => p,
-    Err ( _ ) => {
+    & SourceName (source),
+    ID (id) );
+  let abs_path : PathBuf = match fs::canonicalize (&raw_path) {
+    Ok  (p) => p,
+    Err (_) => {
       send_response (
         stream,
         & format! ( "File not found: {}", raw_path ) );
       return; } };
   let config_dir : PathBuf = // Canonicalize to match abs_path
     // (both must be absolute for strip_prefix to work).
-    fs::canonicalize ( & config.config_dir )
-    . unwrap_or ( config.config_dir.clone () );
+    fs::canonicalize ( & config . config_dir )
+    . unwrap_or ( config . config_dir . clone () );
   let rel_path : String =
     abs_path
-    . strip_prefix ( &config_dir )
+    . strip_prefix (&config_dir)
     . map ( |p| p . to_string_lossy () . into_owned () )
     . unwrap_or_else ( |_| abs_path . to_string_lossy ()
                        . into_owned () );

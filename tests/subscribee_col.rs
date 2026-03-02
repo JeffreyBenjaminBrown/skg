@@ -21,18 +21,18 @@ async fn setup_multi_source_test(
   db_name: &str,
 ) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
   let config: SkgConfig =
-    load_config_with_overrides(CONFIG_PATH, Some(db_name), &[])?;
+    load_config_with_overrides(CONFIG_PATH, Some (db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,
-  ).await?;
+  ) . await?;
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&config)?;
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+    read_all_skg_files_from_sources (&config)?;
+  overwrite_new_empty_db(db_name, &driver) . await?;
+  define_schema(db_name, &driver) . await?;
+  create_all_nodes(db_name, &driver, &nodes) . await?;
+  create_all_relationships(db_name, &driver, &nodes) . await?;
   Ok((config, driver)) }
 
 async fn cleanup_test(
@@ -41,12 +41,12 @@ async fn cleanup_test(
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
   // Delete the database
-  if driver.databases().contains(db_name).await? {
-    driver.databases().get(db_name).await?.delete().await?;
+  if driver . databases() . contains (db_name) . await? {
+    driver . databases() . get (db_name) . await?. delete() . await?;
   }
   // Clean up tantivy folder
-  if tantivy_folder.exists() {
-    std::fs::remove_dir_all(tantivy_folder)?;
+  if tantivy_folder . exists() {
+    std::fs::remove_dir_all (tantivy_folder)?;
   }
   Ok(())
 }
@@ -57,10 +57,10 @@ fn test_subscribee_col_appears_for_subscribers(
   block_on(async {
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
-      setup_multi_source_test(db_name).await?;
+      setup_multi_source_test (db_name) . await?;
     let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
-      single_root_view( &driver, &config, &ID("1".to_string()), false
-                      ).await?;
+      single_root_view( &driver, &config, &ID("1" . to_string()), false
+                      ) . await?;
     println!("SubscribeeCol test result:\n{}", result);
 
     // Nodes 11 and 12 subscribe to something, so they get SubscribeeCol children.
@@ -84,6 +84,6 @@ fn test_subscribee_col_appears_for_subscribers(
     cleanup_test(
       db_name,
       &driver,
-      &config.tantivy_folder,
-    ).await?;
+      &config . tantivy_folder,
+    ) . await?;
     Ok (( )) } ) }

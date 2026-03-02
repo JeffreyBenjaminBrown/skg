@@ -31,7 +31,7 @@ pub async fn count_containers (
                     ids,
                     "contains",
                     "contained"
-  ). await }
+  ) . await }
 
 /// PURPOSE: Count how many nodes each node contains
 /// in a 'contains' relationship.
@@ -48,7 +48,7 @@ pub async fn count_contents (
                     ids,
                     "contains",
                     "container"
-  ). await }
+  ) . await }
 
 /// PURPOSE: Count how many nodes link to each node
 /// in a 'textlinks_to' relationship.
@@ -65,7 +65,7 @@ pub async fn count_link_sources (
                     ids,
                     "textlinks_to",
                     "dest"
-  ). await }
+  ) . await }
 
 /// Generic function to count relationships for a collection of nodes.
 /// Counts how many relationships exist where each input node plays a specified role.
@@ -123,10 +123,10 @@ async fn count_relations (
             disjunction_clauses,
             relation, input_role, other_role,
             relation, input_role, other_role );
-        query } ). await ?;
+        query } ) . await ?;
     answer }
   { // Process the nested subquery results
-    while let Some ( doc_result )
+    while let Some (doc_result)
       = stream . next () . await
     { let doc : ConceptDocument =
         doc_result ?;
@@ -134,11 +134,11 @@ async fn count_relations (
       = doc . root
       { // Extract the node_id
         let node_id_opt : Option < ID > =
-          map . get ( "node_id" )
-          . and_then ( extract_id_from_node );
-        if let Some ( node_id ) = node_id_opt {
-          if let Some ( Node::List ( related_list ) ) =
-            map . get ( "related" )
+          map . get ("node_id")
+          . and_then (extract_id_from_node);
+        if let Some (node_id) = node_id_opt {
+          if let Some ( Node::List (related_list) ) =
+            map . get ("related")
           { // count them
             result . insert ( node_id, {
               let count : usize = related_list . len ();
@@ -216,22 +216,22 @@ async fn participates_in_relation (
             relation, role_a, role_b,
             relation, role_b, role_a,
             relation, role_b, role_a );
-        query } ). await ?;
+        query } ) . await ?;
     answer }
-  { while let Some ( doc_result )
+  { while let Some (doc_result)
       = stream . next () . await
     { let doc : ConceptDocument =
         doc_result ?;
       if let Some ( Node::Map ( ref map ) )
       = doc . root
       { let node_id_opt : Option < ID > =
-          map . get ( "node_id" )
-          . and_then ( extract_id_from_node );
-        if let Some ( node_id ) = node_id_opt {
-          if let Some ( Node::List ( related_list ) ) =
-            map . get ( "related" )
+          map . get ("node_id")
+          . and_then (extract_id_from_node);
+        if let Some (node_id) = node_id_opt {
+          if let Some ( Node::List (related_list) ) =
+            map . get ("related")
           { if ! related_list . is_empty () {
-              result . insert ( node_id ); }
+              result . insert (node_id); }
           }} }} }
   Ok (result) }
 

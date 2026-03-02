@@ -16,11 +16,11 @@ pub fn compute_diff_for_source (
   source_path : &Path
 ) -> Result<SourceDiff, Box<dyn StdError>> {
   let repo : git2::Repository =
-    match open_repo ( source_path ) {
-      Some ( r ) => r,
+    match open_repo (source_path) {
+      Some (r) => r,
       None => return Ok ( SourceDiff::new_not_git_repo() ) };
   let changed_files : Vec<PathDiffStatus> =
-    get_changed_skg_files ( &repo ) ?;
+    get_changed_skg_files (&repo) ?;
   let mut skgnode_diffs : HashMap<PathBuf, SkgnodeDiff> =
     HashMap::new();
   for entry in changed_files {
@@ -28,7 +28,7 @@ pub fn compute_diff_for_source (
       compute_skgnode_diff ( source_path, &repo, &entry ) ?;
     skgnode_diffs . insert ( entry . path . clone(), skgnode_diff ); }
   let deleted_nodes : HashMap<ID, SkgNode> =
-    collect_deleted_nodes ( &skgnode_diffs );
+    collect_deleted_nodes (&skgnode_diffs);
   Ok ( SourceDiff { is_git_repo: true,
                     skgnode_diffs,
                     deleted_nodes }) }
@@ -47,15 +47,15 @@ fn compute_skgnode_diff (
     match entry . status {
       GitDiffStatus::Added => None,
       _ => get_file_content_at_head ( repo, &rel_path ) ?
-             . and_then ( |s| serde_yaml::from_str ( &s ) . ok() ) };
+             . and_then ( |s| serde_yaml::from_str (&s) . ok() ) };
   let worktree_node : Option<SkgNode> =
     match entry . status {
       GitDiffStatus::Deleted => None,
-      _ => fs::read_to_string ( &abs_path ) . ok()
-             . and_then ( |s| serde_yaml::from_str ( &s ) . ok() ) };
+      _ => fs::read_to_string (&abs_path) . ok()
+             . and_then ( |s| serde_yaml::from_str (&s) . ok() ) };
   let node_changes : Option<NodeChanges> =
     match (&head_node, &worktree_node) {
-      (Some(old), Some(new)) => {
+      (Some (old), Some (new)) => {
         Some ( compare_skgnodes ( old, new )) },
       _ => None };
   Ok ( SkgnodeDiff {
@@ -72,7 +72,7 @@ fn collect_deleted_nodes (
   for skgnode_diff in skgnode_diffs . values() {
     if skgnode_diff . status == GitDiffStatus::Deleted {
       if let Some ( ref head_node ) = skgnode_diff . head_node {
-        if let Some ( pid ) = head_node . ids . first() {
+        if let Some (pid) = head_node . ids . first() {
           result . insert ( pid . clone(), head_node . clone() ); }} }}
   result }
 

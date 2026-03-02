@@ -8,9 +8,9 @@ pub fn handle_close_view_request (
   request    : &str,
   conn_state : &mut ConnectionState,
 ) {
-  match view_uri_from_request ( request ) {
-    Ok ( uri ) => {
-      conn_state . memory . unregister_view ( &uri );
+  match view_uri_from_request (request) {
+    Ok (uri) => {
+      conn_state . memory . unregister_view (&uri);
       send_response ( stream, "view closed" ); },
-    Err ( _ ) => {
+    Err (_) => {
       send_response ( stream, "Error: missing view-uri" ); } } }

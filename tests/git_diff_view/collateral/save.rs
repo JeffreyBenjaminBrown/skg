@@ -15,8 +15,8 @@ fn test_collateral_view_preserves_diff_annotations()
   let tantivy_folder : String =
     format!("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new()?;
-  let repo_path : &Path = temp_dir.path();
-  setup_git_repo_with_fixtures(repo_path)?;
+  let repo_path : &Path = temp_dir . path();
+  setup_git_repo_with_fixtures (repo_path)?;
 
   let (_config, driver, _tantivy, save_response, initial_buffer,
        uri_2)
@@ -26,15 +26,15 @@ fn test_collateral_view_preserves_diff_annotations()
       let (config, driver, tantivy)
         : (SkgConfig, TypeDBDriver, TantivyIndex) =
         setup_test_dbs (
-          db_name, repo_path.to_str().unwrap(),
-          &tantivy_folder ). await ?;
+          db_name, repo_path . to_str() . unwrap(),
+          &tantivy_folder ) . await ?;
 
       // 1. Get an initial diff view of "a".
-      let root_ids : Vec<ID> = vec![ID("a".to_string())];
+      let root_ids : Vec<ID> = vec![ID("a" . to_string())];
       let (initial_buffer, map, pids, forest)
         : (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          &driver, &config, &root_ids, true ). await ?;
+          &driver, &config, &root_ids, true ) . await ?;
 
       // Sanity: initial view should match expected diff output.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
@@ -49,8 +49,8 @@ fn test_collateral_view_preserves_diff_annotations()
 
       // 3. Register buffer 1 and buffer 2,
       //    both viewing the same forest rooted at "a".
-      let uri_1 : ViewUri = ViewUri ( "buffer-1".to_string() );
-      let uri_2 : ViewUri = ViewUri ( "buffer-2".to_string() );
+      let uri_1 : ViewUri = ViewUri ( "buffer-1" . to_string() );
+      let uri_2 : ViewUri = ViewUri ( "buffer-2" . to_string() );
       conn_state . memory . register_view (
         uri_1 . clone (), forest . clone (), &pids );
       conn_state . memory . register_view (
@@ -66,7 +66,7 @@ fn test_collateral_view_preserves_diff_annotations()
           &save_input, &driver, &config, &tantivy,
           true, map,
           &Ok ( uri_1 . clone () ),
-          &mut conn_state ). await ?;
+          &mut conn_state ) . await ?;
 
       Result::<_, Box<dyn Error>>::Ok ((
         config, driver, tantivy, save_response,

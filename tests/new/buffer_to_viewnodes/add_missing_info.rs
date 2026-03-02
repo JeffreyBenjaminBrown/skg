@@ -51,16 +51,16 @@ async fn test_add_missing_info_logic (
         "};
   let mut after_adding_missing_info: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
-      with_missing_info).unwrap().0;
+      with_missing_info) . unwrap() . 0;
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
-    &config.db_name,
-    driver ).await ?;
+    &config . db_name,
+    driver ) . await ?;
   let expected_forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
-      without_missing_info ). unwrap().0;
+      without_missing_info ) . unwrap() . 0;
   assert_eq!(
-    expected_forest.root().children().count(),
+    expected_forest . root() . children() . count(),
     1,
     "Expected exactly one tree in the expected forest" );
   assert!(
@@ -70,7 +70,7 @@ async fn test_add_missing_info_logic (
     "add_missing_info_to_forest: Forests not equivalent modulo ID." );
 
   { let actual_root : &UncheckedViewNode =
-      after_adding_missing_info.root().first_child().unwrap().value();
+      after_adding_missing_info . root() . first_child() . unwrap() . value();
     let actual_root_id : &ID =
       actual_root . id_opt() . unwrap();
     assert_eq!(
@@ -124,18 +124,18 @@ async fn test_source_inheritance_logic (
         "};
 
   let mut actual_forest: Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes( input ).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   add_missing_info_to_forest(
     &mut actual_forest,
-    &config.db_name,
-    driver ).await ?;
+    &config . db_name,
+    driver ) . await ?;
   let expected_forest: Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes( expected ).unwrap().0;
+    org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 
   assert!(
     compare_viewnode_trees(
-      actual_forest.root(),
-      expected_forest.root()),
+      actual_forest . root(),
+      expected_forest . root()),
     "Source inheritance: Forests not equivalent.\n\
      Expected sources to inherit from parent, with explicit sources overriding." );
 

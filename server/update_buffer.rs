@@ -68,7 +68,7 @@ pub async fn update_views_after_save (
   let deleted_by_this_save_pids : HashSet<ID> = // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
     save_instructions . iter()
     . filter_map( |instr| match instr {
-      DefineNode::Delete( d ) => Some( d.id.clone() ),
+      DefineNode::Delete (d) => Some( d . id . clone() ),
       _ => None })
     . collect();
   let mut errors : Vec<String> = Vec::new ();
@@ -98,12 +98,12 @@ pub async fn update_views_after_save (
           Some (f) => f . clone (),
           None => {
             errors . push ( format! (
-              "Collateral view {}: no viewforest found", curi.0 ));
+              "Collateral view {}: no viewforest found", curi . 0 ));
             continue; } };
       let mut map : SkgNodeMap =
         seed_skgnodemap_from_pool (&curi, conn_state);
       let label : String =
-        format! ("rerender_view ({})", curi.0);
+        format! ("rerender_view ({})", curi . 0);
       match timed_async (
         config, &label,
         rerender_view (
@@ -117,7 +117,7 @@ pub async fn update_views_after_save (
           collateral_views . push (( curi, text )); },
         Err (e) => {
           errors . push ( format! (
-            "Collateral view {}: {}", curi.0, e )); } } } }
+            "Collateral view {}: {}", curi . 0, e )); } } } }
   Ok ( SaveResponse { saved_view : saved_text,
                        errors, collateral_views } ) }
 
@@ -134,7 +134,7 @@ fn find_collateral_view_uris (
     . filter_map ( |instr| match instr {
       DefineNode::Save ( SaveNode (n)) =>
         n . ids . first () . cloned (),
-      DefineNode::Delete ( dn ) =>
+      DefineNode::Delete (dn) =>
         Some ( dn . id . clone () ) } )
     . collect ();
   let uris : HashSet<ViewUri> =
@@ -185,10 +185,10 @@ async fn rerender_view (
     forest, map, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids ). await ?;
+    deleted_by_this_save_pids ) . await ?;
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_forest (
-      forest, map, config, typedb_driver ). await ?;
+      forest, map, config, typedb_driver ) . await ?;
   set_viewnodestats_in_forest (
     forest,
     &container_to_contents,
@@ -213,22 +213,22 @@ pub fn remove_branches_that_git_marked_removed (
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_forest_root_child : bool = {
         match node . parent() {
-          Some ( mut p ) =>
+          Some (mut p) =>
             matches! ( &p . value() . kind,
-                       ViewNodeKind::Scaff ( Scaffold::BufferRoot )),
+                       ViewNodeKind::Scaff (Scaffold::BufferRoot)),
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
           ViewNodeKind::True (t) => {
             matches! ( t . diff,
-                       Some ( NodeDiffStatus::Removed ) |
-                       Some ( NodeDiffStatus::RemovedHere ))
+                       Some (NodeDiffStatus::Removed) |
+                       Some (NodeDiffStatus::RemovedHere))
             && ! is_forest_root_child
             && ! t . parent_ignores },
           _ => false };
       if should_remove {
         node . detach();
-        Ok ( false ) // Prune: branch removed, so don't recurse
+        Ok (false) // Prune: branch removed, so don't recurse
       } else { Ok (true) }} )? ; // recurse into children
   Ok (( )) }
 

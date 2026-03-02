@@ -36,119 +36,119 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       let (forest, parsing_errors)
         : (Tree<UncheckedViewNode>, Vec<BufferValidationError>)
         = org_to_uninterpreted_nodes(
-            input_with_errors).unwrap();
+            input_with_errors) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
       // Combine parsing errors with validation errors
       let mut errors: Vec<BufferValidationError> = parsing_errors;
-      errors.extend(validation_errors);
+      errors . extend (validation_errors);
 
       // Collect LocalStructureViolation errors for checks below
-      let local_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
-        .collect();
+      let local_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
+        . collect();
 
       // AliasCol children must be Aliases (bad_child is a TrueNode under AliasCol)
       { let aliascol_children_re =
-          Regex::new(r"(?i)aliascol.*children.*must.*alias").unwrap();
-        let aliascol_children_errors: Vec<_> = local_errors.iter()
-          .filter(|e| matches!(
+          Regex::new(r"(?i)aliascol.*children.*must.*alias") . unwrap();
+        let aliascol_children_errors: Vec<_> = local_errors . iter()
+          . filter(|e| matches!(
             e, BufferValidationError::LocalStructureViolation(msg, _)
-            if aliascol_children_re.is_match(msg)))
-          .collect();
-        assert_eq!(aliascol_children_errors.len(), 1,
+            if aliascol_children_re . is_match (msg)))
+          . collect();
+        assert_eq!(aliascol_children_errors . len(), 1,
                    "Should find 1 'AliasCol children must be Aliases' error"); }
 
       // Alias must have no children ("Alias with body problem" has alias_child)
-      { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children").unwrap();
-        let alias_children_errors: Vec<_> = local_errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if alias_children_re.is_match(msg)))
-          .collect();
-        assert_eq!(alias_children_errors.len(), 1,
+      { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
+        let alias_children_errors: Vec<_> = local_errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                               if alias_children_re . is_match (msg)))
+          . collect();
+        assert_eq!(alias_children_errors . len(), 1,
                    "Should find 1 'Alias must have no children' error"); }
 
       // Alias must have AliasCol parent
       // (3 aliases: "Alias with body problem", "Alias under non-AliasCol", "Root level Alias")
       { let alias_parent_re =
-          Regex::new(r"(?i)alias.*must.*aliascol.*parent").unwrap();
+          Regex::new(r"(?i)alias.*must.*aliascol.*parent") . unwrap();
         let alias_parent_errors: Vec<_> =
-          local_errors.iter()
-          .filter(|e| matches!(
+          local_errors . iter()
+          . filter(|e| matches!(
             e, BufferValidationError::LocalStructureViolation(msg, _)
-            if alias_parent_re.is_match(msg)))
-          .collect();
-        assert_eq!(alias_parent_errors.len(), 3,
+            if alias_parent_re . is_match (msg)))
+          . collect();
+        assert_eq!(alias_parent_errors . len(), 3,
                    "Should find 3 'Alias must have AliasCol parent' errors"); }
 
       // AmbiguousDeletion
-      { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::AmbiguousDeletion(_)))
-          .collect();
-        assert_eq!(ambiguous_deletion_errors.len(), 1,
+      { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::AmbiguousDeletion (_)))
+          . collect();
+        assert_eq!(ambiguous_deletion_errors . len(), 1,
                    "Should find 1 AmbiguousDeletion error");
-        if let BufferValidationError::AmbiguousDeletion(id)
+        if let BufferValidationError::AmbiguousDeletion (id)
           = ambiguous_deletion_errors[0] {
-          assert_eq!(id.0, "conflict",
+          assert_eq!(id . 0, "conflict",
                      "AmbiguousDeletion error should come from conflicting ID"); }}
 
       // Multiple_Defining_Viewnodes
-      { let multiple_defining_errors: Vec<&BufferValidationError> = errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
-          .collect();
-        assert_eq!(multiple_defining_errors.len(), 1,
+      { let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
+          . collect();
+        assert_eq!(multiple_defining_errors . len(), 1,
                    "Should find 1 Multiple_Defining_Viewnodes error");
-        if let BufferValidationError::Multiple_Defining_Viewnodes(id)
+        if let BufferValidationError::Multiple_Defining_Viewnodes (id)
           = multiple_defining_errors[0] {
-          assert_eq!(id.0, "conflict",
+          assert_eq!(id . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
       // Source validation (bad_child and alias_child have no sources)
-      { let source_re = Regex::new(r"(?i)must.*source").unwrap();
-        let source_errors: Vec<_> = local_errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if source_re.is_match(msg)))
-          .collect();
-        assert_eq!(source_errors.len(), 2,
+      { let source_re = Regex::new(r"(?i)must.*source") . unwrap();
+        let source_errors: Vec<_> = local_errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                               if source_re . is_match (msg)))
+          . collect();
+        assert_eq!(source_errors . len(), 2,
                    "Should find 2 source validation errors"); }
 
       // Body_of_Scaffold (from parsing phase)
-      { let body_of_scaffold_errors: Vec<&BufferValidationError> = errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::Body_of_Scaffold(_, _)))
-          .collect();
-        assert_eq!(body_of_scaffold_errors.len(), 2,
+      { let body_of_scaffold_errors: Vec<&BufferValidationError> = errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::Body_of_Scaffold(_, _)))
+          . collect();
+        assert_eq!(body_of_scaffold_errors . len(), 2,
                    "Should find 2 Body_of_Scaffold errors");
-        assert!(body_of_scaffold_errors.iter().any(|e| {
+        assert!(body_of_scaffold_errors . iter() . any(|e| {
           matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
                    if title == "AliasCol with body problem" && kind == "aliasCol")
         }), "Should find Body_of_Scaffold error for aliasCol");
-        assert!(body_of_scaffold_errors.iter().any(|e| {
+        assert!(body_of_scaffold_errors . iter() . any(|e| {
           matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_Scaffold error for alias"); }
 
       // BufferRoot children must be TrueNodes (Root level Alias is Scaffold at root)
-      { let bufferroot_children_re = Regex::new(r"(?i)bufferroot.*children.*must.*truenode").unwrap();
-        let bufferroot_errors: Vec<_> = local_errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if bufferroot_children_re.is_match(msg)))
-          .collect();
-        assert_eq!(bufferroot_errors.len(), 1,
+      { let bufferroot_children_re = Regex::new(r"(?i)bufferroot.*children.*must.*truenode") . unwrap();
+        let bufferroot_errors: Vec<_> = local_errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                               if bufferroot_children_re . is_match (msg)))
+          . collect();
+        assert_eq!(bufferroot_errors . len(), 1,
                    "Should find 1 'BufferRoot children must be TrueNodes' error"); }
 
       // TrueNode children (root has Alias children directly, not via AliasCol)
-      { let truenode_children_re = Regex::new(r"(?i)truenode.*children.*must.*include.*only").unwrap();
-        let truenode_children_errors: Vec<_> = local_errors.iter()
-          .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if truenode_children_re.is_match(msg)))
-          .collect();
-        assert_eq!(truenode_children_errors.len(), 1,
+      { let truenode_children_re = Regex::new(r"(?i)truenode.*children.*must.*include.*only") . unwrap();
+        let truenode_children_errors: Vec<_> = local_errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                               if truenode_children_re . is_match (msg)))
+          . collect();
+        assert_eq!(truenode_children_errors . len(), 1,
                    "Should find 1 'TrueNode children' error"); }
 
       // "Alias with body problem" fails two checks (no children + AliasCol parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
-      assert_eq!(local_errors.len(), 8,
+      assert_eq!(local_errors . len(), 8,
                  "Should find exactly 8 LocalStructureViolation errors");
 
       Ok (( )) } )) }
@@ -172,11 +172,11 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
             "};
 
       let (forest, parsing_errors): (Tree<UncheckedViewNode>, Vec<BufferValidationError>) =
-        org_to_uninterpreted_nodes(valid_input).unwrap();
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver).await?;
+        org_to_uninterpreted_nodes (valid_input) . unwrap();
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
-      assert_eq!(parsing_errors.len(), 0, "Should find no parsing errors in valid input");
-      assert_eq!(errors.len(), 0, "Should find no validation errors in valid input");
+      assert_eq!(parsing_errors . len(), 0, "Should find no parsing errors in valid input");
+      assert_eq!(errors . len(), 0, "Should find no validation errors in valid input");
       Ok(())
     })
   )
@@ -191,9 +191,9 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (forest with just BufferRoot, no tree roots)
       let empty_forest: Tree<UncheckedViewNode> = Tree::new(unchecked_forest_root_viewnode());
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver).await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_forest, config, driver) . await?;
 
-      assert_eq!(errors.len(), 0, "Should find no errors in empty input");
+      assert_eq!(errors . len(), 0, "Should find no errors in empty input");
       Ok(())
     })
   )
@@ -217,19 +217,19 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<UncheckedViewNode> =
-        org_to_uninterpreted_nodes(input_with_multiple_aliascols).unwrap().0;
+        org_to_uninterpreted_nodes (input_with_multiple_aliascols) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
       // "AliasCol must be unique among its siblings"
       // Both AliasCol siblings report the error (each has a sibling AliasCol)
-      let unique_sibling_re = Regex::new(r"(?i)aliascol.*unique.*siblings").unwrap();
-      let multiple_aliascols_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                             if unique_sibling_re.is_match(msg)))
-        .collect();
+      let unique_sibling_re = Regex::new(r"(?i)aliascol.*unique.*siblings") . unwrap();
+      let multiple_aliascols_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                             if unique_sibling_re . is_match (msg)))
+        . collect();
 
-      assert_eq!(multiple_aliascols_errors.len(), 2,
+      assert_eq!(multiple_aliascols_errors . len(), 2,
                  "Should find 2 'AliasCol must be unique' errors (one per AliasCol)");
       Ok(())
     })
@@ -252,22 +252,22 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
             "};
 
       let forest: Tree<UncheckedViewNode> =
-        org_to_uninterpreted_nodes(input_with_duplicated_content).unwrap().0;
+        org_to_uninterpreted_nodes (input_with_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
       let dup_children_re =
-        Regex::new(r"(?i)non-ignored.*children.*must.*unique").unwrap();
-      let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                             if dup_children_re.is_match(msg)))
-        .collect();
+        Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
+      let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                             if dup_children_re . is_match (msg)))
+        . collect();
 
-      assert_eq!(duplicated_content_errors.len(), 1,
+      assert_eq!(duplicated_content_errors . len(), 1,
                  "Should find exactly 1 duplicate children error");
 
       if let BufferValidationError::LocalStructureViolation(_, id) = duplicated_content_errors[0] {
-        assert_eq!(id.0, "root",
+        assert_eq!(id . 0, "root",
                    "Duplicate error should be reported at the parent node (root)");
       }
       Ok(())
@@ -291,15 +291,15 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
             "};
 
       let forest: Tree<UncheckedViewNode> =
-        org_to_uninterpreted_nodes(input_without_duplicated_content).unwrap().0;
+        org_to_uninterpreted_nodes (input_without_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
-      let duplicated_content_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(|e| matches!(e, BufferValidationError::DuplicatedContent(_)))
-        .collect();
+      let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::DuplicatedContent (_)))
+        . collect();
 
-      assert_eq!(duplicated_content_errors.len(), 0,
+      assert_eq!(duplicated_content_errors . len(), 0,
                  "Should find no DuplicatedContent errors when IDs are different");
       Ok(())
     })
@@ -322,23 +322,23 @@ fn test_root_without_source_validation(
             "};
 
       let forest: Tree<UncheckedViewNode> =
-        org_to_uninterpreted_nodes(input).unwrap().0;
+        org_to_uninterpreted_nodes (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver).await?;
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
-      let source_re = Regex::new(r"(?i)must.*source").unwrap();
-      let source_errors: Vec<&BufferValidationError> = errors.iter()
-        .filter(
+      let source_re = Regex::new(r"(?i)must.*source") . unwrap();
+      let source_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(
           |e| matches!(e,
                        BufferValidationError::LocalStructureViolation(msg, _)
-                       if source_re.is_match(msg)))
-        .collect();
-      assert_eq!(source_errors.len(), 1,
+                       if source_re . is_match (msg)))
+        . collect();
+      assert_eq!(source_errors . len(), 1,
                  "Should find 1 source validation error");
 
       if let BufferValidationError::LocalStructureViolation(_, id)
         = source_errors[0]
-      { assert_eq!(id.0, "root2",
+      { assert_eq!(id . 0, "root2",
                    "Source error should be for root2"); }
       Ok(( )) } )) }
 
@@ -358,35 +358,35 @@ fn test_nonexistent_source_validation(
                   * (skg (node (id root2) (source invalid_source))) Root with nonexistent source
               "};
         let forest: Tree<UncheckedViewNode> =
-          org_to_uninterpreted_nodes(input).unwrap().0;
+          org_to_uninterpreted_nodes (input) . unwrap() . 0;
         let errors: Vec<BufferValidationError> =
-          find_buffer_errors_for_saving(&forest, config, driver).await?;
+          find_buffer_errors_for_saving(&forest, config, driver) . await?;
 
-        let source_re = Regex::new(r"(?i)must.*source").unwrap();
+        let source_re = Regex::new(r"(?i)must.*source") . unwrap();
         let nonexistent_source_errors: Vec<&BufferValidationError> =
-          errors.iter()
-          .filter(
+          errors . iter()
+          . filter(
             |e| matches!(e,
                          BufferValidationError::LocalStructureViolation(msg, _)
-                         if source_re.is_match(msg)))
-          .collect();
+                         if source_re . is_match (msg)))
+          . collect();
 
-        assert_eq!(nonexistent_source_errors.len(), 2,
+        assert_eq!(nonexistent_source_errors . len(), 2,
                    "Should find 2 source validation errors");
 
         { // Check first error (child1, with source 'nonexistent')
           let found_child_error: bool =
-            nonexistent_source_errors.iter().any(|e| {
+            nonexistent_source_errors . iter() . any(|e| {
               matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if source_re.is_match(msg) && id.0 == "child1") });
+                       if source_re . is_match (msg) && id . 0 == "child1") });
           assert!(found_child_error,
                   "Should find source error for child1"); }
 
         { // Check second error (root2, with source 'invalid_source')
           let found_root_error: bool =
-            nonexistent_source_errors.iter().any(|e| {
+            nonexistent_source_errors . iter() . any(|e| {
               matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if source_re.is_match(msg) && id.0 == "root2") });
+                       if source_re . is_match (msg) && id . 0 == "root2") });
           assert!(found_root_error,
                   "Should find source error for root2"); }}
       Ok(( )) } )) }

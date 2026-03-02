@@ -35,7 +35,7 @@ pub async fn climb_containerward_and_fetch_rootish_context (
   let ( path, _cycle_node, _multi_containers )
     : ( Vec<ID>, Option<ID>, HashSet<ID> )
     = path_containerward_to_end_cycle_and_or_branches (
-      db_name, driver, node ). await ?;
+      db_name, driver, node ) . await ?;
   path . last () . ok_or_else ( || {
       // This should never happen,
       // since the path always includes at least the input node.
@@ -64,7 +64,7 @@ pub async fn path_containerward_to_end_cycle_and_or_branches (
     "contains",
     "contained",
     "container"
-  ). await }
+  ) . await }
 
 /// See path_to_end_cycle_and_or_branches.
 /// This is the case that searches containerward.
@@ -83,7 +83,7 @@ pub async fn path_sourceward_to_end_cycle_and_or_branches (
     "textlinks_to",
     "dest",
     "source"
-  ). await }
+  ) . await }
 
 /// Runs a single TypeDB query.
 /// Returns the containing nodes' IDs.
@@ -99,7 +99,7 @@ pub async fn find_containers_of (
     "contains",
     "contained",
     "container"
-  ). await }
+  ) . await }
 
 /// Runs a single TypeDB query.
 /// Returns the IDs of nodes that link to the input node.
@@ -115,7 +115,7 @@ pub(super) async fn find_links_to (
     "textlinks_to",
     "dest",
     "source"
-  ). await }
+  ) . await }
 
 /* Follows a path via a single directed binary relation
   until reaching a cycle and/or branches.
@@ -150,38 +150,38 @@ pub(super) async fn path_to_end_cycle_and_or_branches (
       HashSet<ID> // If the path forks, these are the fork's branches.
     ), Box<dyn Error> > {
 
-  let mut path : Vec<ID> = vec![ node.clone () ];
+  let mut path : Vec<ID> = vec![ node . clone () ];
   let mut path_set : HashSet<ID> =
     // path and path_set have the same nodes.
-    HashSet::from ( [ node.clone() ] );
-  let mut current_node : ID = node.clone ();
+    HashSet::from ( [ node . clone() ] );
+  let mut current_node : ID = node . clone ();
   loop {
     let related_nodes : HashSet<ID> =
       find_related_nodes (
         db_name, driver, & [ current_node . clone () ],
-        relation, input_role, output_role ). await ?;
-    if related_nodes.is_empty () {
+        relation, input_role, output_role ) . await ?;
+    if related_nodes . is_empty () {
       // No related node found, so this is the end.
       return Ok (( path, None, HashSet::new () ));
     } else {
       let cycle_node : Option<ID> =
         // 'Some' if the related node has been seen already.
-        related_nodes.iter ()
-          .find ( |&c| path_set.contains ( c ) )
-          .cloned ();
-      if ( related_nodes.len () == 1
-           && cycle_node.is_none () ) {
+        related_nodes . iter ()
+          . find ( |&c| path_set . contains (c) )
+          . cloned ();
+      if ( related_nodes . len () == 1
+           && cycle_node . is_none () ) {
         // Add the related node to the path and continue.
         let next_node : ID =
           related_nodes . into_iter() . next() . unwrap();
-        path.push ( next_node.clone () );
-        path_set.insert ( next_node.clone () );
+        path . push ( next_node . clone () );
+        path_set . insert ( next_node . clone () );
         current_node = next_node;
       } else { // We are at a fork, or a cycle, or both.
         return Ok ((
           path,
           cycle_node,
-          ( if related_nodes.len () == 1 {
+          ( if related_nodes . len () == 1 {
             HashSet::new () }
             else {related_nodes} ) ));
         }} }}
@@ -200,15 +200,15 @@ pub async fn find_related_nodes (
   if nodes . is_empty () {
     return Ok ( HashSet::new () ); }
   let tx : Transaction =
-    driver.transaction (
+    driver . transaction (
       db_name, TransactionType::Read
-    ). await ?;
+    ) . await ?;
   let input_id_var : String =
     format!("{}_id", input_role);
   let output_id_var : String =
     format!("{}_id", output_role);
   let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx.query ( {
+    let answer : QueryAnswer = tx . query ( {
       let input_disjunction : String =
         build_id_disjunction ( nodes, &input_id_var );
       let match_clause : String =
@@ -234,12 +234,12 @@ pub async fn find_related_nodes (
       let query : String = format!(
         "{}{}", match_clause, relationship_and_select);
       query } ) . await?;
-    answer } .into_rows ();
+    answer } . into_rows ();
   let mut related_nodes : HashSet<ID> = HashSet::new ();
   while let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
-    if let Some (concept) = row.get (&output_id_var) ? {
-      related_nodes.insert ( ID (
+    if let Some (concept) = row . get (&output_id_var) ? {
+      related_nodes . insert ( ID (
         extract_payload_from_typedb_string_rep (
           &concept . to_string () )) ); }}
   Ok (related_nodes) }
@@ -252,11 +252,11 @@ pub async fn pid_and_source_from_id (
   skgid  : &ID
 ) -> Result < Option<(ID, SourceName)>, Box<dyn Error> > {
   let tx : Transaction =
-    driver.transaction (
+    driver . transaction (
       db_name, TransactionType::Read
-    ). await ?;
+    ) . await ?;
   if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
-    let answer : QueryAnswer = tx.query ( {
+    let answer : QueryAnswer = tx . query ( {
       let query : String = format! (
         r#"match
           $node isa node,
@@ -272,24 +272,24 @@ pub async fn pid_and_source_from_id (
           }};"#,
         skgid,
         skgid );
-      query } ). await ?;
+      query } ) . await ?;
     answer } {
       if let Some (doc_result) = stream . next () . await {
         let doc : ConceptDocument = doc_result ?;
         if let Some ( Node::Map ( ref map ) ) = doc . root {
           let primary_id_opt : Option < ID > =
-            map . get ( "primary_id" )
-            . and_then ( extract_id_from_node );
+            map . get ("primary_id")
+            . and_then (extract_id_from_node);
           let source_opt : Option < SourceName > =
-            map . get ( "source" )
+            map . get ("source")
             . and_then ( | node : & Node | {
-              if let Node::Leaf ( Some ( leaf ) ) = node {
-                if let Leaf::Concept ( concept ) = leaf {
+              if let Node::Leaf ( Some (leaf) ) = node {
+                if let Leaf::Concept (concept) = leaf {
                   return Some ( SourceName::from (
                     extract_payload_from_typedb_string_rep (
                       & concept . to_string () ) ) ); }}
               None } );
-          if let ( Some ( pid ), Some ( source ) )
+          if let ( Some (pid), Some (source) )
             = ( primary_id_opt, source_opt )
           { return Ok ( Some ( ( pid, source ) ) ); }} }}
   Ok (None) }

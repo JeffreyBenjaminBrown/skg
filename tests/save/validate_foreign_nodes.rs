@@ -23,22 +23,22 @@ async fn setup_multi_source_test(
   db_name: &str,
 ) -> Result<(SkgConfig, TypeDBDriver), Box<dyn Error>> {
   let config: SkgConfig =
-    load_config_with_overrides(CONFIG_PATH, Some(db_name), &[])?;
+    load_config_with_overrides(CONFIG_PATH, Some (db_name), &[])?;
 
   let driver: TypeDBDriver = TypeDBDriver::new(
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,
-  ).await?;
+  ) . await?;
 
   // Load fixtures from both sources
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&config)?;
+    read_all_skg_files_from_sources (&config)?;
 
-  overwrite_new_empty_db(db_name, &driver).await?;
-  define_schema(db_name, &driver).await?;
-  create_all_nodes(db_name, &driver, &nodes).await?;
-  create_all_relationships(db_name, &driver, &nodes).await?;
+  overwrite_new_empty_db(db_name, &driver) . await?;
+  define_schema(db_name, &driver) . await?;
+  create_all_nodes(db_name, &driver, &nodes) . await?;
+  create_all_relationships(db_name, &driver, &nodes) . await?;
 
   Ok((config, driver))
 }
@@ -46,7 +46,7 @@ async fn setup_multi_source_test(
 #[test]
 fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-unmodified").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-unmodified") . await?;
 
     let org_text = indoc! {"
       * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
@@ -54,14 +54,14 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
-    assert!(result.is_ok(), "Unmodified foreign node should be allowed");
+    assert!(result . is_ok(), "Unmodified foreign node should be allowed");
 
     let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Foreign nodes should be filtered out (no need to write)
-    assert_eq!(instructions.len(), 0,
+    assert_eq!(instructions . len(), 0,
                "Unmodified foreign nodes should be filtered out");
 
     Ok(())
@@ -71,7 +71,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-modified").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-modified") . await?;
 
     // Try to save buffer with modified foreign node (title changed)
     let org_text = indoc! {"
@@ -80,18 +80,18 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail with ModifiedForeignNode error
-    assert!(result.is_err(), "Modified foreign node should be rejected");
+    assert!(result . is_err(), "Modified foreign node should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert_eq!(errors.len(), 1, "Should have one validation error");
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert_eq!(errors . len(), 1, "Should have one validation error");
         match &errors[0] {
           BufferValidationError::ModifiedForeignNode(id, source) => {
-            assert_eq!(id.0, "foreign2");
-            assert_eq!(source.as_str(), "foreign");
+            assert_eq!(id . 0, "foreign2");
+            assert_eq!(source . as_str(), "foreign");
           }
           other => panic!("Expected ModifiedForeignNode error, got {:?}", other),
         }
@@ -106,7 +106,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-body").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-body") . await?;
 
     // Try to save buffer with modified foreign node (body changed)
     let org_text = indoc! {"
@@ -115,14 +115,14 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail with ModifiedForeignNode error
-    assert!(result.is_err(), "Foreign node with modified body should be rejected");
+    assert!(result . is_err(), "Foreign node with modified body should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert!(errors.iter().any(|e| matches!(
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert!(errors . iter() . any(|e| matches!(
           e, BufferValidationError::ModifiedForeignNode(_, _))));
       }
       other => panic!("Expected BufferValidationErrors, got {:?}", other),
@@ -135,7 +135,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-indefinitive").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-indefinitive") . await?;
 
     // Save buffer with indefinitive foreign node
     let org_text = indoc! {"
@@ -143,15 +143,15 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new()).await;
+      org_text, &config, &driver, &SkgNodeMap::new()) . await;
 
     // Should succeed - indefinitive foreign nodes are allowed but filtered
-    assert!(result.is_ok(), "Indefinitive foreign node should be allowed");
+    assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
 
     let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Indefinitive foreign nodes should be filtered out (no append)
-    assert_eq!(instructions.len(), 0,
+    assert_eq!(instructions . len(), 0,
                "Indefinitive foreign nodes should be filtered out");
 
     Ok(())
@@ -161,7 +161,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-owned").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-owned") . await?;
 
     // Save buffer with owned node
     let org_text = indoc! {"
@@ -171,15 +171,15 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should succeed - owned nodes can be modified
-    assert!(result.is_ok(), "Owned node modification should be allowed");
+    assert!(result . is_ok(), "Owned node modification should be allowed");
 
     let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Owned node should be included in instructions
-    assert!(instructions.len() > 0,
+    assert!(instructions . len() > 0,
             "Owned node should be included in save instructions");
 
     Ok(())
@@ -189,7 +189,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-delete").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-delete") . await?;
 
     // Try to delete a foreign node
     let org_text = indoc! {"
@@ -198,14 +198,14 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail with ModifiedForeignNode error
-    assert!(result.is_err(), "Deleting foreign node should be rejected");
+    assert!(result . is_err(), "Deleting foreign node should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert!(errors.iter().any(|e| matches!(
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert!(errors . iter() . any(|e| matches!(
           e, BufferValidationError::ModifiedForeignNode(_, _))),
           "Should have ModifiedForeignNode error");
       }
@@ -219,7 +219,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-new").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-new") . await?;
 
     // Try to create a new node in foreign source
     let org_text = indoc! {"
@@ -228,14 +228,14 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail with ModifiedForeignNode error
-    assert!(result.is_err(), "Creating new foreign node should be rejected");
+    assert!(result . is_err(), "Creating new foreign node should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert!(errors.iter().any(|e| matches!(
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert!(errors . iter() . any(|e| matches!(
           e, BufferValidationError::ModifiedForeignNode(_, _))),
           "Should have ModifiedForeignNode error");
       }
@@ -249,7 +249,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-foreign-mixed").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-foreign-mixed") . await?;
 
     // Save buffer with mix of owned and unmodified foreign nodes
     let org_text = indoc! {"
@@ -261,23 +261,23 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should succeed
-    assert!(result.is_ok(), "Mixed owned and unmodified foreign should be allowed");
+    assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
 
     let (_viewnode_forest, instructions, _merge_instructions) = result?;
 
     // Only owned node should be in instructions (foreign filtered out)
-    assert!(instructions.len() > 0, "Should have owned node instructions");
+    assert!(instructions . len() > 0, "Should have owned node instructions");
 
     // Verify no foreign nodes in instructions
     for instr in &instructions {
       let source : &str = match instr {
-        DefineNode::Save(SaveNode(node)) =>
-          node.source.as_str(),
+        DefineNode::Save(SaveNode (node)) =>
+          node . source . as_str(),
         DefineNode::Delete(DeleteNode { source, .. }) =>
-          source.as_str() };
+          source . as_str() };
       assert_eq!( source, "main", "Only owned (in this case from source main) nodes should be in instructions"); }
 
     Ok(())
@@ -287,7 +287,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-foreign-acquirer").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-merge-foreign-acquirer") . await?;
 
     // Try to merge where the acquirer is foreign
     // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
@@ -298,14 +298,14 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail - can't merge into foreign node (would modify it)
-    assert!(result.is_err(), "Merge into foreign acquirer should be rejected");
+    assert!(result . is_err(), "Merge into foreign acquirer should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert!(errors.iter().any(|e| matches!(
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert!(errors . iter() . any(|e| matches!(
           e, BufferValidationError::ModifiedForeignNode(_, _))),
           "Should have ModifiedForeignNode error for foreign acquirer");
       }
@@ -319,7 +319,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-foreign-acquiree").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-merge-foreign-acquiree") . await?;
 
     // Try to merge where the acquiree is foreign
     let org_text = indoc! {"
@@ -329,14 +329,14 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should fail - can't merge foreign node (would delete it)
-    assert!(result.is_err(), "Merge with foreign acquiree should be rejected");
+    assert!(result . is_err(), "Merge with foreign acquiree should be rejected");
 
-    match result.unwrap_err() {
-      SaveError::BufferValidationErrors(errors) => {
-        assert!(errors.iter().any(|e| matches!(
+    match result . unwrap_err() {
+      SaveError::BufferValidationErrors (errors) => {
+        assert!(errors . iter() . any(|e| matches!(
           e, BufferValidationError::ModifiedForeignNode(_, _))),
           "Should have ModifiedForeignNode error for foreign acquiree");
       }
@@ -350,7 +350,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let (config, driver) = setup_multi_source_test("skg-test-merge-owned").await?;
+    let (config, driver) = setup_multi_source_test ("skg-test-merge-owned") . await?;
 
     // Merge where both nodes are owned - should work
     let org_text = indoc! {"
@@ -359,10 +359,10 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
     "};
 
     let result = buffer_to_viewnode_forest_and_save_instructions(
-      org_text, &config, &driver, &SkgNodeMap::new() ). await;
+      org_text, &config, &driver, &SkgNodeMap::new() ) . await;
 
     // Should succeed - both nodes are owned
-    assert!(result.is_ok(), "Merge with both owned nodes should be allowed");
+    assert!(result . is_ok(), "Merge with both owned nodes should be allowed");
 
     Ok(())
   })

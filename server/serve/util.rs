@@ -18,12 +18,12 @@ pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
   stream   : &mut TcpStream,
   response : &str)
-{ let payload : &[u8] = response.as_bytes ();
+{ let payload : &[u8] = response . as_bytes ();
   let header : String = format! ( "Content-Length: {}\r\n\r\n",
-                           payload.len () );
+                           payload . len () );
   use std::io::Write as _;
-  stream . write_all ( header.as_bytes () ) . unwrap ();
-  stream . write_all ( payload )            . unwrap ();
+  stream . write_all ( header . as_bytes () ) . unwrap ();
+  stream . write_all (payload)            . unwrap ();
   stream . flush ()                         . unwrap ();
 }
 
@@ -31,7 +31,7 @@ pub fn request_type_from_request (
   request : &str
 ) -> Result<String, String> {
   let sexp : Sexp =
-    sexp::parse ( request )
+    sexp::parse (request)
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
   extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
@@ -40,7 +40,7 @@ pub fn view_uri_from_request (
   request : &str,
 ) -> Result<ViewUri, String> {
   value_from_request_sexp ( "view-uri", request )
-    . map ( ViewUri ) }
+    . map (ViewUri) }
 
 /// Extract a value from a request like
 /// ((request . "type") (key . 'xyz))
@@ -49,7 +49,7 @@ pub fn value_from_request_sexp (
   request : &str,
 ) -> Result<String, String> {
   let sexp : Sexp =
-    sexp::parse ( request )
+    sexp::parse (request)
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
   extract_v_from_kv_pair_in_sexp ( &sexp, key ) }
@@ -120,22 +120,22 @@ pub(super) fn read_length_prefixed_content (
     Vec::new ();
   loop { // Read header lines until reaching the empty line.
     let mut line : String = String::new();
-    reader.read_line ( &mut line )?;
+    reader . read_line (&mut line)?;
     if line == "\r\n" { break; }
-    header_lines.push (line); }
+    header_lines . push (line); }
   let content_length : usize =
     header_lines
-    .iter()
-    .find_map ( |line| {
-      if line.starts_with("Content-Length: ")
-      { line.strip_prefix("Content-Length: ")
+    . iter()
+    . find_map ( |line| {
+      if line . starts_with ("Content-Length: ")
+      { line . strip_prefix ("Content-Length: ")
         . and_then ( |s|
-                      s.trim() . parse::<usize> () . ok( ))
+                      s . trim() . parse::<usize> () . ok( ))
       } else { None }} )
     . ok_or ("Content-Length header not found") ?;
   let mut buffer : Vec<u8> = // Read content_length bytes.
     vec! [0u8; content_length] ;
-  reader.read_exact (&mut buffer) ?;
+  reader . read_exact (&mut buffer) ?;
   let content : String =
     String::from_utf8 (buffer) ?;
   Ok (content) }

@@ -27,43 +27,43 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input) . unwrap() . 0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest) . unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest) . unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 3, "Should have 3 instructions");
+  assert_eq!(instructions . len(), 3, "Should have 3 instructions");
 
   // Test root1
   let root1_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(root1_skg.title, "root node 1");
-  assert_eq!(root1_skg.body, Some("Root body content".to_string()));
-  assert_eq!(root1_skg.ids, vec![ID::from("root1")]);
-  assert_eq!(root1_skg.contains, Some(vec![ID::from("child1")]));
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(root1_skg . title, "root node 1");
+  assert_eq!(root1_skg . body, Some("Root body content" . to_string()));
+  assert_eq!(root1_skg . ids, vec![ID::from ("root1")]);
+  assert_eq!(root1_skg . contains, Some(vec![ID::from ("child1")]));
   assert!(matches!(&instructions[0],
-                   DefineNode::Save(_)));
+                   DefineNode::Save (_)));
 
   // Test child1
   let child1_skg : &SkgNode = match &instructions[1] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(child1_skg.title, "child 1");
-  assert_eq!(child1_skg.body, Some("Child body".to_string()));
-  assert_eq!(child1_skg.ids, vec![ID::from("child1")]);
-  assert_eq!(child1_skg.contains, Some(vec![])); // No children
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(child1_skg . title, "child 1");
+  assert_eq!(child1_skg . body, Some("Child body" . to_string()));
+  assert_eq!(child1_skg . ids, vec![ID::from ("child1")]);
+  assert_eq!(child1_skg . contains, Some(vec![])); // No children
   assert!(matches!(&instructions[1],
-                   DefineNode::Save(_)));
+                   DefineNode::Save (_)));
 
   // Test root2 with metadata flags
   assert!(matches!(&instructions[2],
-                   DefineNode::Delete(_)));
+                   DefineNode::Delete (_)));
   match &instructions[2] {
     DefineNode::Delete(DeleteNode { id, .. }) => {
-      assert_eq!(id, &ID::from("root2")); },
-    DefineNode::Save(_) =>
+      assert_eq!(id, &ID::from ("root2")); },
+    DefineNode::Save (_) =>
       panic!("Expected Delete, got Save") }; }
 
 #[test]
@@ -80,34 +80,34 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
   // Should have 2 instructions: main node and content_child
   // AliasCol and Alias nodes should not appear in output
-  assert_eq!(instructions.len(), 2, "Should have 2 instructions");
+  assert_eq!(instructions . len(), 2, "Should have 2 instructions");
 
   // Test main node
   let main_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(main_skg.title, "main node");
-  assert_eq!(main_skg.ids, vec![ID::from("main")]);
-  assert_eq!(main_skg.contains, Some(vec![ID::from("content_child")]));
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(main_skg . title, "main node");
+  assert_eq!(main_skg . ids, vec![ID::from ("main")]);
+  assert_eq!(main_skg . contains, Some(vec![ID::from ("content_child")]));
 
   // Test aliases collection
-  assert_eq!(main_skg.aliases, Some(vec!["first alias".to_string(), "second alias".to_string()]));
+  assert_eq!(main_skg . aliases, Some(vec!["first alias" . to_string(), "second alias" . to_string()]));
 
   // Test content child
   let content_skg : &SkgNode = match &instructions[1] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(content_skg.title, "content child");
-  assert_eq!(content_skg.ids, vec![ID::from("content_child")]);
-  assert_eq!(content_skg.aliases, None); // No aliases
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(content_skg . title, "content child");
+  assert_eq!(content_skg . ids, vec![ID::from ("content_child")]);
+  assert_eq!(content_skg . aliases, None); // No aliases
 }
 
 #[test]
@@ -121,19 +121,19 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_no_aliases() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 2);
+  assert_eq!(instructions . len(), 2);
 
   let node1_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(node1_skg.aliases, None, "Should have no aliases");
-  assert_eq!(node1_skg.contains, Some(vec![ID::from("child1")]));
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(node1_skg . aliases, None, "Should have no aliases");
+  assert_eq!(node1_skg . contains, Some(vec![ID::from ("child1")]));
 }
 
 #[test]
@@ -152,14 +152,14 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_multiple_alias_cols() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let result : Result<Vec<DefineNode>, String> =
-    naive_saveinstructions_from_tree(forest);
+    naive_saveinstructions_from_tree (forest);
 
-  assert!(result.is_err());
-  assert!(result.unwrap_err().contains("Expected at most one"));
+  assert!(result . is_err());
+  assert!(result . unwrap_err() . contains ("Expected at most one"));
 }
 
 #[test]
@@ -176,22 +176,22 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
   // Should have instructions for: root, parentIgnores, content1, content2, none_rel
   // AliasCol and Alias should be skipped
-  assert_eq!(instructions.len(), 5);
+  assert_eq!(instructions . len(), 5);
 
   let root_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(root_skg.title, "root node");
-  assert_eq!(root_skg.aliases, Some(vec!["my alias".to_string()]));
-  assert_eq!(root_skg.contains, Some(vec![ID::from("content1"), ID::from("content2")])); // Only Content relations
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(root_skg . title, "root node");
+  assert_eq!(root_skg . aliases, Some(vec!["my alias" . to_string()]));
+  assert_eq!(root_skg . contains, Some(vec![ID::from ("content1"), ID::from ("content2")])); // Only Content relations
 }
 
 #[test]
@@ -206,34 +206,34 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_deep_nesting() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 5);
+  assert_eq!(instructions . len(), 5);
 
   // Check contains relationships
   let level1_skg : &SkgNode =
     extract_skgnode_if_save_else_error(&instructions[0]);
-  assert_eq!(level1_skg.contains, Some(vec![ID::from("level2a"), ID::from("level2b")]));
+  assert_eq!(level1_skg . contains, Some(vec![ID::from ("level2a"), ID::from ("level2b")]));
 
   let level2a_skg : &SkgNode =
     extract_skgnode_if_save_else_error(&instructions[1]);
-  assert_eq!(level2a_skg.contains, Some(vec![ID::from("level3a")]));
+  assert_eq!(level2a_skg . contains, Some(vec![ID::from ("level3a")]));
 
   let level3a_skg : &SkgNode =
     extract_skgnode_if_save_else_error(&instructions[2]);
-  assert_eq!(level3a_skg.contains, Some(vec![ID::from("level4")]));
+  assert_eq!(level3a_skg . contains, Some(vec![ID::from ("level4")]));
 
   let level4_skg : &SkgNode =
     extract_skgnode_if_save_else_error(&instructions[3]);
-  assert_eq!(level4_skg.contains, Some(vec![])); // Leaf node
+  assert_eq!(level4_skg . contains, Some(vec![])); // Leaf node
 
   let level2b_skg : &SkgNode =
     extract_skgnode_if_save_else_error(&instructions[4]);
-  assert_eq!(level2b_skg.contains, Some(vec![])); // Leaf node
+  assert_eq!(level2b_skg . contains, Some(vec![])); // Leaf node
 }
 
 #[test]
@@ -245,24 +245,24 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_error_missing_id() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let result : Result<Tree<ViewNode>, String> =
     // This conversion fails because of missing ID
-    unchecked_to_checked_tree(unchecked_forest);
+    unchecked_to_checked_tree (unchecked_forest);
 
-  assert!(result.is_err(), "Should return error for missing ID");
-  let error_msg : String = result.unwrap_err();
-  assert!(error_msg.contains("node without ID") ||
-          error_msg.contains("has no ID"));
+  assert!(result . is_err(), "Should return error for missing ID");
+  let error_msg : String = result . unwrap_err();
+  assert!(error_msg . contains ("node without ID") ||
+          error_msg . contains ("has no ID"));
 }
 
 #[test]
 fn test_viewnode_forest_to_nonmerge_save_instructions_empty_input() {
   let forest: Tree<ViewNode> = Tree::new(forest_root_viewnode());
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 0, "Empty input should produce empty output");
+  assert_eq!(instructions . len(), 0, "Empty input should produce empty output");
 }
 
 #[test]
@@ -276,19 +276,19 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_only_aliases() {
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 1); // Only main node
+  assert_eq!(instructions . len(), 1); // Only main node
 
   let main_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(main_skg.aliases, Some(vec!["alias one".to_string(), "alias two".to_string()]));
-  assert_eq!(main_skg.contains, Some(vec![])); // No content children
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(main_skg . aliases, Some(vec!["alias one" . to_string(), "alias two" . to_string()]));
+  assert_eq!(main_skg . contains, Some(vec![])); // No content children
 }
 
 #[test]
@@ -309,40 +309,40 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
             ** (skg (node (id ref_section) (source main) parentIgnores)) Reference Section
         "};
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes(input).unwrap().0;
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let forest: Tree<ViewNode> =
-    unchecked_to_checked_tree(unchecked_forest).unwrap();
+    unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree(forest).unwrap();
+    naive_saveinstructions_from_tree (forest) . unwrap();
 
-  assert_eq!(instructions.len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
+  assert_eq!(instructions . len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
   // Test doc1
   let doc1_skg : &SkgNode = match &instructions[0] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(doc1_skg.title, "Document 1");
-  assert_eq!(doc1_skg.aliases,
-             Some(vec!["First Document".to_string(),
-                       "Primary Doc".to_string()]));
-  assert_eq!(doc1_skg.contains,
-             Some(vec![ID::from("section1"),
-                       ID::from("section3")]));
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(doc1_skg . title, "Document 1");
+  assert_eq!(doc1_skg . aliases,
+             Some(vec!["First Document" . to_string(),
+                       "Primary Doc" . to_string()]));
+  assert_eq!(doc1_skg . contains,
+             Some(vec![ID::from ("section1"),
+                       ID::from ("section3")]));
   assert!(matches!(&instructions[0],
-                   DefineNode::Save(_)));
+                   DefineNode::Save (_)));
 
   // Test section2 with toDelete
   assert!(matches!(&instructions[3],
-                   DefineNode::Delete(_)));
+                   DefineNode::Delete (_)));
   match &instructions[3] {
     DefineNode::Delete(DeleteNode { id, .. }) => {
-      assert_eq!(id, &ID::from("section2")); },
-    DefineNode::Save(_) =>
+      assert_eq!(id, &ID::from ("section2")); },
+    DefineNode::Save (_) =>
       panic!("Expected Delete, got Save") };
 
   // Test that subsection1a is child of section1
   let section1_skg : &SkgNode = match &instructions[1] {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") };
-  assert_eq!(section1_skg.contains, Some(vec![ID::from("subsection1a")]));
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
+  assert_eq!(section1_skg . contains, Some(vec![ID::from ("subsection1a")]));
 }

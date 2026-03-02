@@ -17,7 +17,7 @@ use std::error::Error;
 /// Get the primary ID from any DefineNode variant.
 fn get_id(instr: &DefineNode) -> &ID {
   match instr {
-    DefineNode::Save(SaveNode(node)) => &node.ids[0],
+    DefineNode::Save(SaveNode (node)) => &node . ids[0],
     DefineNode::Delete(DeleteNode { id, .. }) => id }}
 
 #[test]
@@ -27,21 +27,21 @@ fn test_inconsistent_delete() {
         * (skg (node (id 1) (source main) (editRequest delete))) 2
     "};
 
-  let unchecked_forest = org_to_uninterpreted_nodes(input).unwrap().0;
-  let (inconsistent_deletes, _, _) = find_inconsistent_instructions(&unchecked_forest);
-  assert!(!inconsistent_deletes.is_empty(),
+  let unchecked_forest = org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let (inconsistent_deletes, _, _) = find_inconsistent_instructions (&unchecked_forest);
+  assert!(!inconsistent_deletes . is_empty(),
           "Should detect inconsistent toDelete");
 
-  let forest = unchecked_to_checked_tree(unchecked_forest).unwrap();
+  let forest = unchecked_to_checked_tree (unchecked_forest) . unwrap();
   let instructions =
-    naive_saveinstructions_from_tree(forest)
+    naive_saveinstructions_from_tree (forest)
     . unwrap();
-  assert_eq!(instructions.len(), 2);
-  assert_eq!(get_id(&instructions[0]), &ID::from("1"));
-  assert_eq!(get_id(&instructions[1]), &ID::from("1"));
+  assert_eq!(instructions . len(), 2);
+  assert_eq!(get_id(&instructions[0]), &ID::from ("1"));
+  assert_eq!(get_id(&instructions[1]), &ID::from ("1"));
   // One should be Delete, the other not
-  let is_delete_0: bool = instructions[0].is_delete();
-  let is_delete_1: bool = instructions[1].is_delete();
+  let is_delete_0: bool = instructions[0] . is_delete();
+  let is_delete_1: bool = instructions[1] . is_delete();
   assert_ne!(is_delete_0, is_delete_1); }
 
 #[test]
@@ -58,24 +58,24 @@ fn test_deletions_excluded (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-      let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree(forest)?;
-      let reduced = reconcile_same_id_instructions(instructions)?;
+      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
+      let forest = unchecked_to_checked_tree (unchecked_forest)?;
+      let instructions = naive_saveinstructions_from_tree (forest)?;
+      let reduced = reconcile_same_id_instructions (instructions)?;
 
-      assert_eq!(reduced.len(), 3); // There are 3 instructions.
-      let id1_instruction = reduced.iter()
-        .find(|instr| get_id(instr) == &ID::from("1"))
-        .expect("Should have instruction for id:1");
-      let id2_instruction = reduced.iter()
-        .find(|instr| get_id(instr) == &ID::from("2"))
-        .expect("Should have instruction for id:2");
-      assert!(!id1_instruction.is_delete());
-      assert!(id2_instruction.is_delete());
+      assert_eq!(reduced . len(), 3); // There are 3 instructions.
+      let id1_instruction = reduced . iter()
+        . find(|instr| get_id (instr) == &ID::from ("1"))
+        . expect ("Should have instruction for id:1");
+      let id2_instruction = reduced . iter()
+        . find(|instr| get_id (instr) == &ID::from ("2"))
+        . expect ("Should have instruction for id:2");
+      assert!(!id1_instruction . is_delete());
+      assert!(id2_instruction . is_delete());
       assert_eq!(
         // id 1 should contain 3 and not 2 (which is being deleted)
-        extract_skgnode_if_save_else_error(id1_instruction).contains,
-        Some(vec![ID::from("3")]));
+        extract_skgnode_if_save_else_error (id1_instruction) . contains,
+        Some(vec![ID::from ("3")]));
       Ok (( )) } ) ) }
 
 #[test]
@@ -94,23 +94,23 @@ fn test_defining_node_defines (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-      let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree(forest)?;
-      let reduced = reconcile_same_id_instructions(instructions)?;
+      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
+      let forest = unchecked_to_checked_tree (unchecked_forest)?;
+      let instructions = naive_saveinstructions_from_tree (forest)?;
+      let reduced = reconcile_same_id_instructions (instructions)?;
 
-      assert_eq!(reduced.len(), 3); // 3 unique ids (id 1 is dup'd)
-      let id1_instruction = reduced.iter()
-        .find(|instr| get_id(instr) == &ID::from("1"))
-        .unwrap();
-      assert_eq!( extract_skgnode_if_save_else_error(id1_instruction).title,
+      assert_eq!(reduced . len(), 3); // 3 unique ids (id 1 is dup'd)
+      let id1_instruction = reduced . iter()
+        . find(|instr| get_id (instr) == &ID::from ("1"))
+        . unwrap();
+      assert_eq!( extract_skgnode_if_save_else_error (id1_instruction) . title,
                   "1 definer");
       { // Defining instruction should define body completely, even if None
-        assert_eq!(extract_skgnode_if_save_else_error(id1_instruction).body,
+        assert_eq!(extract_skgnode_if_save_else_error (id1_instruction) . body,
                    None); }
       { // Only definer's contents are used
-        assert_eq!(extract_skgnode_if_save_else_error(id1_instruction).contains,
-                   Some(vec![ID::from("3")])); }
+        assert_eq!(extract_skgnode_if_save_else_error (id1_instruction) . contains,
+                   Some(vec![ID::from ("3")])); }
       Ok (( )) } )) }
 
 #[test]
@@ -127,33 +127,33 @@ fn test_adding_without_definer (
             ** (skg (node (id 4) (source main))) 4
             ** (skg (node (id 4) (source main) indefinitive)) 4 again
         "};
-      let unchecked_forest = org_to_uninterpreted_nodes(input)?.0;
-      let forest = unchecked_to_checked_tree(unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree(forest)?;
+      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
+      let forest = unchecked_to_checked_tree (unchecked_forest)?;
+      let instructions = naive_saveinstructions_from_tree (forest)?;
       let reduced = reconcile_same_id_instructions(
         instructions)?;
 
       { // id:1 is indefinitive-only, so it should be filtered out
-        let id1_instruction = reduced.iter()
-          .find(|instr| get_id(instr) == &ID::from("1"));
-        assert!(id1_instruction.is_none(),
+        let id1_instruction = reduced . iter()
+          . find(|instr| get_id (instr) == &ID::from ("1"));
+        assert!(id1_instruction . is_none(),
                 "Indefinitive-only nodes should be filtered out"); }
 
       { // id:2 has a definitive instruction, so it should be present
-        let id2_instruction = reduced.iter()
-          .find(|instr| get_id(instr) == &ID::from("2"))
-          .expect("Should have instruction for id:2");
-        assert_eq!(extract_skgnode_if_save_else_error(id2_instruction).title,
+        let id2_instruction = reduced . iter()
+          . find(|instr| get_id (instr) == &ID::from ("2"))
+          . expect ("Should have instruction for id:2");
+        assert_eq!(extract_skgnode_if_save_else_error (id2_instruction) . title,
                    "2"); }
 
       { // id:4 has one definitive and one indefinitive
         // The indefinitive should be filtered, only definitive kept
-        let id4_instruction = reduced.iter()
-          .find(|instr| get_id(instr) == &ID::from("4"))
-          .expect("Should have instruction for id:4");
+        let id4_instruction = reduced . iter()
+          . find(|instr| get_id (instr) == &ID::from ("4"))
+          . expect ("Should have instruction for id:4");
         assert_eq!( // Contains should only have what the definitive specified, and no data from the indefinitive
-          extract_skgnode_if_save_else_error(id4_instruction).title, "4");
-        assert_eq!(extract_skgnode_if_save_else_error(id4_instruction).contains,
+          extract_skgnode_if_save_else_error (id4_instruction) . title, "4");
+        assert_eq!(extract_skgnode_if_save_else_error (id4_instruction) . contains,
                    Some( vec![] )); }
 
       Ok (( )) } )) }

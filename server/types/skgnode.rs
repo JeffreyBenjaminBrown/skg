@@ -40,9 +40,9 @@ pub struct SkgNode {
 
 impl SkgNode {
   /// Returns the primary ID, or an error if ids is empty.
-  pub fn primary_id(&self) -> Result<&ID, String> {
-    self.ids.get(0).ok_or_else(||
-      format!("SkgNode '{}' has no IDs", self.title)) }
+  pub fn primary_id (&self) -> Result<&ID, String> {
+    self . ids . get (0) . ok_or_else(||
+      format!("SkgNode '{}' has no IDs", self . title)) }
 }
 
 //
@@ -54,7 +54,7 @@ pub fn empty_skgnode () -> SkgNode {
   SkgNode {
     title                        : String::new (),
     aliases                      : None,
-    source                       : SourceName::from("main"),
+    source                       : SourceName::from ("main"),
     ids                          : vec![],
     body                         : None,
     contains                     : None,

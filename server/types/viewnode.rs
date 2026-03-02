@@ -28,9 +28,9 @@ pub struct ViewNode {
 
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewNodeKind {
-  True         ( TrueNode ),
-  Scaff        ( Scaffold ),
-  Deleted      ( DeletedNode ),
+  True         (TrueNode),
+  Scaff        (Scaffold),
+  Deleted      (DeletedNode),
   DeletedScaff,
 }
 
@@ -74,9 +74,9 @@ impl TrueNode {
   pub fn is_phantom (
     &self,
   ) -> bool {
-    matches!( self.diff,
-              Some( NodeDiffStatus::Removed )
-            | Some( NodeDiffStatus::RemovedHere ) ) }}
+    matches!( self . diff,
+              Some (NodeDiffStatus::Removed)
+            | Some (NodeDiffStatus::RemovedHere) ) }}
 
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
@@ -139,7 +139,7 @@ pub enum ScaffoldKind { Alias,
 /// Only one edit request is allowed per node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditRequest {
-  Merge(ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
+  Merge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
 }
 
@@ -172,7 +172,7 @@ impl Scaffold {
   ];
 
   /// Get the kind (discriminant) of this Scaffold.
-  pub fn kind ( &self ) -> ScaffoldKind {
+  pub fn kind (&self) -> ScaffoldKind {
     match self {
       Scaffold::Alias { .. }                 => ScaffoldKind::Alias,
       Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
@@ -187,17 +187,17 @@ impl Scaffold {
 
   /// Compare scaffold kinds. For Alias/ID, compares variant only (ignoring payload).
   pub fn matches_kind ( &self, other : &Scaffold ) -> bool {
-    self.kind() == other.kind() }
+    self . kind() == other . kind() }
 
   /// String representation as used in Emacs metadata sexps.
-  pub fn repr_in_client ( &self ) -> String {
-    let kind : ScaffoldKind = self.kind();
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(_, k)| *k == kind )
-      .map ( |(s, _)| s.to_string() )
-      .expect ( "REPRS_IN_CLIENT should cover all ScaffoldKinds" ) }
+  pub fn repr_in_client (&self) -> String {
+    let kind : ScaffoldKind = self . kind();
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(_, k)| *k == kind )
+      . map ( |(s, _)| s . to_string() )
+      . expect ("REPRS_IN_CLIENT should cover all ScaffoldKinds") }
 
-  pub fn title ( &self ) -> &str {
+  pub fn title (&self) -> &str {
     match self {
       Scaffold::Alias { text, .. } => text,
       Scaffold::AliasCol => "its aliases",
@@ -213,14 +213,14 @@ impl Scaffold {
   /// A distinguishable label for use in error messages.
   /// For scaffolds with payload, includes the payload.
   /// For others, uses repr_in_client().
-  pub fn error_label ( &self ) -> String {
+  pub fn error_label (&self) -> String {
     match self {
       Scaffold::Alias { text, .. } =>
         format!( "scaffold:alias({})", text ),
       Scaffold::ID { id, .. } =>
         format!( "scaffold:id({})", id ),
       _ =>
-        format!( "scaffold:{}", self.repr_in_client() ),
+        format!( "scaffold:{}", self . repr_in_client() ),
     }} }
 
 impl ViewRequest {
@@ -233,43 +233,43 @@ impl ViewRequest {
   ];
 
   /// String representation as used in client metadata.
-  pub fn repr_in_client ( &self ) -> &'static str {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(_, vr)| vr == self )
-      .map ( |(s, _)| *s )
-      .expect ( "REPRS_IN_CLIENT should cover all ViewRequest variants" ) }
+  pub fn repr_in_client (&self) -> &'static str {
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(_, vr)| vr == self )
+      . map ( |(s, _)| *s )
+      . expect ("REPRS_IN_CLIENT should cover all ViewRequest variants") }
 
   /// Parse a client string to a ViewRequest.
   pub fn from_client_string ( s: &str ) -> Option<ViewRequest> {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(cs, _)| *cs == s )
-      .map ( |(_, vr)| *vr ) }
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(cs, _)| *cs == s )
+      . map ( |(_, vr)| *vr ) }
 }
 
 impl AsRef<ViewNode> for ViewNode {
-  fn as_ref(&self) -> &ViewNode {
+  fn as_ref (&self) -> &ViewNode {
     self }}
 
 impl AsMut<ViewNode> for ViewNode {
-  fn as_mut(&mut self) -> &mut ViewNode {
+  fn as_mut (&mut self) -> &mut ViewNode {
     self }}
 
 impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
-  pub fn title ( &self ) -> &str {
+  pub fn title (&self) -> &str {
     match &self . kind {
-      ViewNodeKind::True    ( t ) => &t . title,
-      ViewNodeKind::Scaff   ( s ) => s . title (),
-      ViewNodeKind::Deleted ( d ) => &d . title,
+      ViewNodeKind::True    (t) => &t . title,
+      ViewNodeKind::Scaff   (s) => s . title (),
+      ViewNodeKind::Deleted (d) => &d . title,
       ViewNodeKind::DeletedScaff  => "",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
-  pub fn body ( &self ) -> Option < &String > {
+  pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::True    ( t ) => t . body . as_ref (),
-      ViewNodeKind::Scaff   ( _ ) => None,
-      ViewNodeKind::Deleted ( d ) => d . body . as_ref (),
+      ViewNodeKind::True    (t) => t . body . as_ref (),
+      ViewNodeKind::Scaff   (_) => None,
+      ViewNodeKind::Deleted (d) => d . body . as_ref (),
       ViewNodeKind::DeletedScaff  => None,
     }}
 }
@@ -280,7 +280,7 @@ impl fmt::Display for EditRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      EditRequest::Merge(id) => write!(f, "(merge {})", id.0),
+      EditRequest::Merge (id) => write!(f, "(merge {})", id . 0),
       EditRequest::Delete    => write!(f, "toDelete"),
     }} }
 
@@ -291,11 +291,11 @@ impl FromStr for EditRequest {
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "toDelete" => Ok ( EditRequest::Delete ),
+      "toDelete" => Ok (EditRequest::Delete),
       _ => {
         // Try to parse as "merge <id>"
-        if let Some(id_str) = s.strip_prefix("merge ") {
-          Ok ( EditRequest::Merge ( ID::from(id_str) ) )
+        if let Some (id_str) = s . strip_prefix ("merge ") {
+          Ok ( EditRequest::Merge ( ID::from (id_str) ) )
         } else {
           Err ( format! ( "Unknown EditRequest value: {}", s ))
         }} }} }
@@ -305,7 +305,7 @@ impl fmt::Display for ViewRequest {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    write!(f, "{}", self.repr_in_client()) } }
+    write!(f, "{}", self . repr_in_client()) } }
 
 impl FromStr for ViewRequest {
   type Err = String;
@@ -313,8 +313,8 @@ impl FromStr for ViewRequest {
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
-    Self::from_client_string ( s )
-      .ok_or_else ( || format! ( "Unknown ViewRequest value: {}", s ) ) } }
+    Self::from_client_string (s)
+      . ok_or_else ( || format! ( "Unknown ViewRequest value: {}", s ) ) } }
 
 //
 // Defaults
@@ -327,9 +327,9 @@ impl Default for GraphNodeStats {
       extraIDs      : false,
       overriding    : false,
       subscribing   : false,
-      numContainers : Some ( 1 ),
-      numContents   : Some ( 0 ),
-      numLinksIn    : Some ( 0 ),
+      numContainers : Some (1),
+      numContents   : Some (0),
+      numLinksIn    : Some (0),
     }} }
 
 impl Default for ViewNodeStats {
@@ -375,7 +375,7 @@ pub fn mk_phantom_viewnode (
   let mut viewnode : ViewNode =
     mk_indefinitive_viewnode ( id, source, title, false );
   if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
-    { t . diff = Some ( diff ); }
+    { t . diff = Some (diff); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -438,7 +438,7 @@ pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {
   ViewNode {
     focused : false,
     folded  : false,
-    kind    : ViewNodeKind::Scaff ( scaffold ),
+    kind    : ViewNodeKind::Scaff (scaffold),
   }}
 
 /// Helper to create a BufferRoot ViewNode.
@@ -446,5 +446,5 @@ pub fn forest_root_viewnode () -> ViewNode {
   ViewNode {
     focused : false,
     folded  : false,
-    kind    : ViewNodeKind::Scaff ( Scaffold::BufferRoot ),
+    kind    : ViewNodeKind::Scaff (Scaffold::BufferRoot),
   }}

@@ -34,11 +34,11 @@ pub async fn complete_viewtree (
     forest, root_treeid,
     map, defmap, source_diffs, config, driver,
     deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids ). await ?;
+    deleted_by_this_save_pids ) . await ?;
   complete_postorder_recursive (
     forest, root_treeid,
     map, defmap, source_diffs, config, driver,
-    errors, deleted_since_head_pid_src_map ). await ?;
+    errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 
 fn complete_preorder_recursive<'a> (
@@ -59,7 +59,7 @@ fn complete_preorder_recursive<'a> (
       deleted_since_head_pid_src_map, deleted_by_this_save_pids
     ) . await ?;
     let child_treeids : Vec<NodeId> =
-      tree . get ( treeid ) . unwrap ()
+      tree . get (treeid) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
       complete_preorder_recursive (
@@ -83,7 +83,7 @@ fn complete_postorder_recursive<'a> (
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     let child_treeids : Vec<NodeId> =
-      tree . get ( treeid ) . unwrap ()
+      tree . get (treeid) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
       complete_postorder_recursive (
@@ -112,31 +112,31 @@ async fn complete_preorder_with_limited_recursion (
   deleted_by_this_save_pids      : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
-    tree . get ( treeid ) . unwrap () . value () . kind . clone ();
-  if matches!( kind, ViewNodeKind::Scaff(_)) {
+    tree . get (treeid) . unwrap () . value () . kind . clone ();
+  if matches!( kind, ViewNodeKind::Scaff (_)) {
     // Scaff under Deleted or DeletedScaff parent becomes DeletedScaff.
     let parent_is_deleted : bool =
       read_at_ancestor_in_tree ( tree, treeid, 1,
-        |vn : &ViewNode| matches! ( &vn.kind,
-          ViewNodeKind::Deleted ( _ ) |
+        |vn : &ViewNode| matches! ( &vn . kind,
+          ViewNodeKind::Deleted (_) |
           ViewNodeKind::DeletedScaff ))
-      . unwrap_or ( false );
+      . unwrap_or (false);
     if parent_is_deleted {
       tree . get_mut (treeid) . unwrap () . value () . kind =
         ViewNodeKind::DeletedScaff;
       return Ok(( )); }}
-  if matches!( kind, ViewNodeKind::True( _ )) {
+  if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_parent_first::truenode::
     complete_truenode_preorder (
       treeid, tree, map, defmap, source_diffs, config,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids ) ?;
   } else if matches!( kind,
-      ViewNodeKind::Scaff( Scaffold::SubscribeeCol ) ) {
+      ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_parent_first::subscribee_col::
         complete_subscribee_col_preorder (
           treeid, tree, map, source_diffs, config, driver,
           deleted_since_head_pid_src_map
-        ). await ?; }
+        ) . await ?; }
   // No-op for: Deleted, DeletedScaff (whose parent is not
   // Deleted/DeletedScaff -- occurs on re-save of a buffer
   // containing them).
@@ -157,40 +157,40 @@ async fn complete_postorder_with_limited_recursion (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
-    tree . get ( treeid ) . unwrap () . value () . kind . clone ();
-  if matches!( kind, ViewNodeKind::True( _ )) {
+    tree . get (treeid) . unwrap () . value () . kind . clone ();
+  if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_child_first::truenode::
     complete_truenode (
       treeid, tree, map, defmap, config, driver,
       errors, deleted_since_head_pid_src_map ) . await ?;
   } else if matches!(
-    kind, ViewNodeKind::Scaff( Scaffold::AliasCol )) {
+    kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
       super::complete_child_first::aliascol::
       completeAliasCol ( tree, map, treeid, source_diffs ) ?;
   } else if matches!(
-      kind, ViewNodeKind::Scaff( Scaffold::IDCol )) {
+      kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
         super::complete_child_first::id_col::
         completeIDCol ( treeid, tree, map, source_diffs ) ?;
   } else if matches!(
-    kind, ViewNodeKind::Scaff( Scaffold::HiddenInSubscribeeCol )) {
+    kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
       super::complete_child_first::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
         treeid, tree, map, source_diffs, config,
         deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind,
-      ViewNodeKind::Scaff( Scaffold::HiddenOutsideOfSubscribeeCol )) {
+      ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
         super::complete_child_first::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
           treeid, tree, map, source_diffs, config,
           deleted_since_head_pid_src_map ) ?;
-  } else if matches!( kind, ViewNodeKind::Deleted( _ )) { // no-op
+  } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
   } else if matches!( kind, ViewNodeKind::DeletedScaff ) {
     // Detach self if no children remain.
     let has_children : bool =
-      tree . get ( treeid ) . unwrap ()
+      tree . get (treeid) . unwrap ()
       . children () . next () . is_some ();
     if ! has_children {
-      tree . get_mut ( treeid ) . unwrap () . detach (); }
+      tree . get_mut (treeid) . unwrap () . detach (); }
   }
   // No-op for: BufferRoot, TextChanged, Alias { .. },
   // ID { .. }, SubscribeeCol.

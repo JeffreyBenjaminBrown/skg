@@ -13,14 +13,14 @@ pub fn pid_and_source_from_ancestor (
 ) -> Result<(ID, SourceName), Box<dyn Error>> {
   read_at_ancestor_in_tree(
     tree, node, generation,
-    |vn : &ViewNode| match &vn.kind {
-      ViewNodeKind::True( t ) =>
-        Ok(( t.id.clone(), t.source.clone() )),
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) =>
+        Ok(( t . id . clone(), t . source . clone() )),
       _ => Err( format!(
         "{}: ancestor {} is not a TrueNode",
         caller, generation )) } )
-  . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
-  . map_err( |e| -> Box<dyn Error> { e.into() } ) }
+  . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
+  . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Read a value from an ancestor of a node in a tree, applying a function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -32,13 +32,13 @@ pub fn read_at_ancestor_in_tree<T, F, R>(
   generation: usize,
   f: F
 ) -> Result<R, String>
-where F: FnOnce(&T) -> R, {
-  let mut node_ref : NodeRef<T> = tree.get(treeid)
-    .ok_or("node not found")?;
+where F: FnOnce (&T) -> R, {
+  let mut node_ref : NodeRef<T> = tree . get (treeid)
+    . ok_or ("node not found")?;
   for _ in 0..generation {
-    node_ref = node_ref.parent()
-      .ok_or("cannot climb that many generations")?; }
-  Ok(f(node_ref.value() )) }
+    node_ref = node_ref . parent()
+      . ok_or ("cannot climb that many generations")?; }
+  Ok(f(node_ref . value() )) }
 
 /// Write to an ancestor of a node in a tree, applying a mutating function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -50,18 +50,18 @@ pub fn write_at_ancestor_in_tree<T, F, R>(
   generation: usize,
   f: F
 ) -> Result<R, String>
-where F: FnOnce(&mut T) -> R, {
+where F: FnOnce (&mut T) -> R, {
   let target_id : NodeId = {
     // Climb to target node via immutable reference
-    let mut node_ref : NodeRef<T> = tree.get(treeid)
-      .ok_or("node not found")?;
+    let mut node_ref : NodeRef<T> = tree . get (treeid)
+      . ok_or ("node not found")?;
     for _ in 0..generation {
-      node_ref = node_ref.parent()
-        .ok_or("cannot climb that many generations")?; }
-    node_ref.id() };
-  let mut node_mut : NodeMut<T> = tree.get_mut(target_id)
-    .ok_or("target node not found")?;
-  Ok(f(node_mut.value() )) }
+      node_ref = node_ref . parent()
+        . ok_or ("cannot climb that many generations")?; }
+    node_ref . id() };
+  let mut node_mut : NodeMut<T> = tree . get_mut (target_id)
+    . ok_or ("target node not found")?;
+  Ok(f(node_mut . value() )) }
 
 /// Error if the node does not satisfy the predicate.
 pub fn error_unless_node_satisfies<T, F>(
@@ -70,11 +70,11 @@ pub fn error_unless_node_satisfies<T, F>(
   predicate : F,
   message   : &str,
 ) -> Result<(), String>
-where F: FnOnce(&T) -> bool {
+where F: FnOnce (&T) -> bool {
   let satisfied : bool =
     read_at_node_in_tree( tree, treeid, predicate ) ?;
   if !satisfied {
-    return Err( message.to_string() ); }
+    return Err( message . to_string() ); }
   Ok(( )) }
 
 /// Read a node's value from a tree, applying a function to it.
@@ -84,7 +84,7 @@ pub fn read_at_node_in_tree<T, F, R>(
     treeid: NodeId,
     f: F
 ) -> Result<R, String>
-where F: FnOnce(&T) -> R, {
+where F: FnOnce (&T) -> R, {
   read_at_ancestor_in_tree(
     tree, treeid, 0, f) }
 
@@ -95,7 +95,7 @@ pub fn write_at_node_in_tree<T, F, R>(
     treeid: NodeId,
     f: F
 ) -> Result<R, String>
-where F: FnOnce(&mut T) -> R, {
+where F: FnOnce (&mut T) -> R, {
   write_at_ancestor_in_tree(tree, treeid, 0, f) }
 
 /// Access a node mutably for structural operations (prepend, append, detach, etc.).
@@ -108,9 +108,9 @@ pub fn with_node_mut<T, F, R>(
   f       : F
 ) -> Result<R, String>
 where F: FnOnce(NodeMut<T>) -> R {
-  let node_mut : NodeMut<T> = tree . get_mut ( node_id )
-    . ok_or ( "with_node_mut: node not found" ) ?;
-  Ok ( f ( node_mut ) ) }
+  let node_mut : NodeMut<T> = tree . get_mut (node_id)
+    . ok_or ("with_node_mut: node not found") ?;
+  Ok ( f (node_mut) ) }
 
 /// Apply a function to every node in a subtree, DFS preorder traversal.
 /// Starts at `start_node_id` and recursively visits all descendants.
@@ -141,14 +141,14 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
   let child_ids : Vec<NodeId> = {
     // Collect early so no borrow conflicts
     let node_ref : NodeRef<T> =
-      tree . get ( start_node_id ) . ok_or ( "do_everywhere_in_tree_dfs: start node not found" ) ?;
+      tree . get (start_node_id) . ok_or ("do_everywhere_in_tree_dfs: start node not found") ?;
     node_ref . children ()
       . map ( |c| c . id( ))
       . collect () };
   { // do F here
-    let node_mut : NodeMut<T> = tree . get_mut ( start_node_id )
-      . ok_or ( "do_everywhere_in_tree_dfs: node not found" ) ?;
-    f ( node_mut ) ?; }
+    let node_mut : NodeMut<T> = tree . get_mut (start_node_id)
+      . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
+    f (node_mut) ?; }
   for child_id in child_ids { // recurse
     do_everywhere_in_tree_dfs (
       tree, child_id, f ) ?; }
@@ -164,12 +164,12 @@ pub fn do_everywhere_in_tree_dfs_readonly<T, F>(
 ) -> Result<(), String>
 where F: FnMut(NodeRef<T>) -> Result<(), String> {
   let node_ref : NodeRef<T> =
-    tree . get ( start_node_id ) . ok_or (
+    tree . get (start_node_id) . ok_or (
       "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
-  f ( node_ref ) ?;
-  for child in node_ref.children() {
+  f (node_ref) ?;
+  for child in node_ref . children() {
     do_everywhere_in_tree_dfs_readonly (
-      tree, child.id(), f ) ?; }
+      tree, child . id(), f ) ?; }
   Ok (( ))}
 
 /// Like do_everywhere_in_tree_dfs, but the lambda ("f") returns:
@@ -184,16 +184,16 @@ where F: FnMut(NodeMut<T>
               ) -> Result<bool, String> {
   let child_ids : Vec<NodeId> = {
     let node_ref : NodeRef<T> =
-      tree . get ( start_node_id ) . ok_or (
+      tree . get (start_node_id) . ok_or (
         "do_everywhere_in_tree_dfs_prunable: start node not found" )?;
     node_ref . children ()
       . map ( |c| c . id() )
       . collect () };
   let should_continue : bool = {
     let node_mut : NodeMut<T> =
-      tree . get_mut ( start_node_id ) . ok_or (
+      tree . get_mut (start_node_id) . ok_or (
         "do_everywhere_in_tree_dfs_prunable: node not found" )?;
-    f ( node_mut )? };
+    f (node_mut)? };
   if should_continue {
     for child_id in child_ids {
       do_everywhere_in_tree_dfs_prunable (
@@ -206,14 +206,14 @@ pub fn eq_trees<T: PartialEq>(
   node1: ego_tree::NodeRef<T>,
   node2: ego_tree::NodeRef<T>
 ) -> bool {
-  if node1.value() != node2.value() {
+  if node1 . value() != node2 . value() {
     return false;
   }
-  let children1: Vec<_> = node1.children().collect();
-  let children2: Vec<_> = node2.children().collect();
-  if children1.len() != children2.len() {
+  let children1: Vec<_> = node1 . children() . collect();
+  let children2: Vec<_> = node2 . children() . collect();
+  if children1 . len() != children2 . len() {
     return false;
   }
-  children1.iter().zip(children2.iter())
-    .all(|(c1, c2)| eq_trees(*c1, *c2))
+  children1 . iter() . zip(children2 . iter())
+    . all(|(c1, c2)| eq_trees(*c1, *c2))
 }

@@ -11,36 +11,36 @@ use std::path::Path;
 pub fn validate_source_paths_creating_owned_ones_if_needed (
   sources: &HashMap<SourceName, SkgfileSource>
 ) -> io::Result<()> {
-  for (nickname, source) in sources.iter() {
-    if !source.path.exists() { // If it doesn't exist
-      if source.user_owns_it { // and it's owned, create it
-        fs::create_dir_all(&source.path)?;
+  for (nickname, source) in sources . iter() {
+    if !source . path . exists() { // If it doesn't exist
+      if source . user_owns_it { // and it's owned, create it
+        fs::create_dir_all(&source . path)?;
         eprintln!("Created directory for source '{}': {:?}",
-                  nickname, source.path);
+                  nickname, source . path);
       } else { // and it's foreign, fail
         return Err(io::Error::new(
           io::ErrorKind::NotFound,
           format!("Foreign source '{}' path does not exist: {:?}",
-                  nickname, source.path )) ); }} }
+                  nickname, source . path )) ); }} }
   Ok(( )) }
 
 pub fn load_config (
   path: &str )
   -> Result <SkgConfig,
              Box<dyn std::error::Error>>
-{ if !Path::new(path).exists() {
+{ if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}",
                        path)
                . into( )); }
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path) ?;
     toml::from_str (&contents) ? };
-  config.config_dir = Path::new(path)
+  config . config_dir = Path::new (path)
     . parent()
-    . unwrap_or ( Path::new(".") )
+    . unwrap_or ( Path::new (".") )
     . to_path_buf();
   validate_source_paths_creating_owned_ones_if_needed(
-    &config.sources)?;
+    &config . sources)?;
   Ok (config) }
 
 /// Load config from TOML file with optional overrides for testing.
@@ -76,26 +76,26 @@ pub fn load_config_with_overrides (
   db_name          : Option<&str>, // None for no override
   source_overrides : &[(&str, std::path::PathBuf)],
 ) -> Result <SkgConfig, Box<dyn std::error::Error>> {
-  if !Path::new(path).exists() {
-    return Err(format!("Config file not found: {}", path).into()); }
+  if !Path::new (path) . exists() {
+    return Err(format!("Config file not found: {}", path) . into()); }
   let mut config: SkgConfig = {
-    let contents: String = fs::read_to_string(path)?;
-    toml::from_str(&contents)? };
-  config.config_dir = Path::new(path)
+    let contents: String = fs::read_to_string (path)?;
+    toml::from_str (&contents)? };
+  config . config_dir = Path::new (path)
     . parent()
-    . unwrap_or ( Path::new(".") )
+    . unwrap_or ( Path::new (".") )
     . to_path_buf();
-  if let Some(name) = db_name {
-    config.db_name = name.to_string();
-    config.tantivy_folder =
+  if let Some (name) = db_name {
+    config . db_name = name . to_string();
+    config . tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (nickname, new_path) in source_overrides {
-    let key : SourceName = SourceName::from(*nickname);
-    if let Some(source) = config.sources.get_mut(&key) {
-      source.path = new_path.clone();
+    let key : SourceName = SourceName::from (*nickname);
+    if let Some (source) = config . sources . get_mut (&key) {
+      source . path = new_path . clone();
     } else {
       return Err(format!(
-        "Source '{}' not found in config", nickname).into()); }}
+        "Source '{}' not found in config", nickname) . into()); }}
   validate_source_paths_creating_owned_ones_if_needed(
-    &config.sources)?;
-  Ok(config) }
+    &config . sources)?;
+  Ok (config) }

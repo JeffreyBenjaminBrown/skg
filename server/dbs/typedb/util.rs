@@ -14,8 +14,8 @@ pub async fn delete_database (
   db_name : &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let databases : &DatabaseManager = driver . databases ();
-  if databases . contains ( db_name ) . await ? {
-    databases . get ( db_name ) . await ? . delete () . await ?;
+  if databases . contains (db_name) . await ? {
+    databases . get (db_name) . await ? . delete () . await ?;
     println! ( "Database '{}' deleted successfully", db_name ); }
   Ok (( )) }
 
@@ -44,16 +44,16 @@ pub(super) fn conjugate_binary_role (
 ) -> Result < &'static str,
                 Box < dyn Error > > {
   match ( relation, role ) {
-    ( "contains", "container" )            => Ok ( "contained" ),
-    ( "contains", "contained" )            => Ok ( "container" ),
-    ( "textlinks_to", "source" )          => Ok ( "dest" ),
-    ( "textlinks_to", "dest" )            => Ok ( "source" ),
-    ( "subscribes", "subscriber" )         => Ok ( "subscribee" ),
-    ( "subscribes", "subscribee" )         => Ok ( "subscriber" ),
-    ( "overrides_view_of", "replacement" ) => Ok ( "replaced" ),
-    ( "overrides_view_of", "replaced" )    => Ok ( "replacement" ),
-    ( "hides_from_its_subscriptions", "hider" )  => Ok ( "hidden" ),
-    ( "hides_from_its_subscriptions", "hidden" ) => Ok ( "hider" ),
+    ( "contains", "container" )            => Ok ("contained"),
+    ( "contains", "contained" )            => Ok ("container"),
+    ( "textlinks_to", "source" )          => Ok ("dest"),
+    ( "textlinks_to", "dest" )            => Ok ("source"),
+    ( "subscribes", "subscriber" )         => Ok ("subscribee"),
+    ( "subscribes", "subscribee" )         => Ok ("subscriber"),
+    ( "overrides_view_of", "replacement" ) => Ok ("replaced"),
+    ( "overrides_view_of", "replaced" )    => Ok ("replacement"),
+    ( "hides_from_its_subscriptions", "hider" )  => Ok ("hidden"),
+    ( "hides_from_its_subscriptions", "hidden" ) => Ok ("hider"),
     _ => Err (
       format! (
         "Role '{}' does not belong to relation '{}'",

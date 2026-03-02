@@ -21,21 +21,21 @@ fn test_delete_text_changed_scaffold_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the new title
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert_eq!(node_1.title, "1 has a new title.",
+      assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
       let node_11 = read_skgnode(repo_path, "11")?;
-      assert_eq!(node_11.body, Some("11 has a new body.".to_string()),
+      assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
       // BUFFER: textChanged scaffolds should respawn
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(( )) }) }) }
 
 /// Editing a node with textChanged should update the disk normally.
@@ -47,7 +47,7 @@ fn test_edit_text_changed_node_updates_disk()
   run_save_test("skg-test-save-edit-textchanged", |config, driver, tantivy, repo_path| {
     Box::pin(async move {
       // User changes the title of node 1 again
-      let input = GIT_DIFF_VIEW.replace(
+      let input = GIT_DIFF_VIEW . replace(
         "1 has a new title.", "1 has an even newer title.");
 
       let mut conn_state : ConnectionState = ConnectionState {
@@ -55,16 +55,16 @@ fn test_edit_text_changed_node_updates_disk()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should have the newest title
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert_eq!(node_1.title, "1 has an even newer title.",
+      assert_eq!(node_1 . title, "1 has an even newer title.",
         "1.skg should have the edited title");
 
       // BUFFER: textChanged scaffold should still appear (still differs from HEAD)
       assert!(
-        response . saved_view . contains("textChanged"),
+        response . saved_view . contains ("textChanged"),
         "textChanged scaffold should still appear");
       Ok(())
     })
@@ -81,7 +81,7 @@ fn test_edit_text_changed_scaffold_respawns()
     "skg-test-save-edit-scaffold",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User tries to change the title of a textChanged scaffold
-      let input = GIT_DIFF_VIEW.replace(
+      let input = GIT_DIFF_VIEW . replace(
         "** (skg textChanged)",
         "** (skg textChanged) User edited this scaffold.");
 
@@ -90,11 +90,11 @@ fn test_edit_text_changed_scaffold_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert_eq!(node_1.title, "1 has a new title.",
+      assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
       // BUFFER: textChanged scaffolds respawn with original text
@@ -127,16 +127,16 @@ fn test_move_text_changed_scaffold_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert_eq!(node_1.title, "1 has a new title.",
+      assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
       // BUFFER: textChanged scaffolds should respawn in correct locations
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -159,20 +159,20 @@ fn test_move_text_changed_to_unedited_node_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
       let node_12 = read_skgnode(repo_path, "12")?;
-      assert_eq!(node_12.title, "12",
+      assert_eq!(node_12 . title, "12",
         "12.skg should be unchanged");
-      let contains_12 = node_12.contains.unwrap_or_default();
-      assert!(contains_12.is_empty(),
+      let contains_12 = node_12 . contains . unwrap_or_default();
+      assert!(contains_12 . is_empty(),
         "12.skg should not have any children");
 
       // BUFFER: textChanged scaffolds should respawn in their correct locations
       // (under nodes 1 and 11, not under 12)
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -192,16 +192,16 @@ where
   let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir.path();
-  setup_git_repo_with_fixtures(repo_path)?;
+  let repo_path = temp_dir . path();
+  setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
     let (config, driver, tantivy) =
-      setup_test_dbs(db_name, repo_path.to_str().unwrap(), &tantivy_folder).await?;
+      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), &tantivy_folder) . await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path).await;
+    let result = test_fn(&config, &driver, &tantivy, repo_path) . await;
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(&tantivy_folder))).await?;
+    cleanup_test_dbs(db_name, &driver, Some(Path::new (&tantivy_folder))) . await?;
     result
   })
 }

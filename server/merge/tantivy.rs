@@ -11,7 +11,7 @@ pub(super) fn merge_nodes_in_tantivy (
   update_tantivy_from_saveinstructions(
     & { let flat_instructions : Vec<DefineNode> =
           merge_instructions . iter()
-          . flat_map( |m| m.to_vec() )
+          . flat_map( |m| m . to_vec() )
           . collect();
         flat_instructions },
     tantivy_index)?;

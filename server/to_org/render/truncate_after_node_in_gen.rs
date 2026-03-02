@@ -67,9 +67,9 @@ fn truncate_after_node_in_generation_in_tree (
 ) -> Result < (), Box<dyn Error> > {
   let nodes_to_truncate : Vec < NodeId > =
     nodes_after_in_generation (
-      tree, generation, node_id, Some ( effective_root ) ) ?;
+      tree, generation, node_id, Some (effective_root) ) ?;
   for id in nodes_to_truncate {
-    if let Ok ( pid ) = get_id_from_treenode ( tree, id ) {
-      visited . remove ( &pid ); }
+    if let Ok (pid) = get_id_from_treenode ( tree, id ) {
+      visited . remove (&pid); }
     makeIndefinitiveAndClobber ( tree, map, id, config ) ?; }
   Ok (( )) }

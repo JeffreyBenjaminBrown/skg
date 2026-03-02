@@ -51,7 +51,7 @@ pub async fn render_initial_forest_bfs (
     root_nodes, // the last complete generation
     1,          // the last complete generation's number
     0, // nodes_rendered (BufferRoot doesn't count)
-    config.initial_node_limit,
+    config . initial_node_limit,
     forest_root_id, // effective_root for truncation
     &mut visited,
     config,
@@ -74,7 +74,7 @@ fn render_generation_and_recurse<'a> (
 ) -> Pin<Box<dyn Future<
     Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    if gen_nodeids.is_empty() {
+    if gen_nodeids . is_empty() {
       return Ok(( )); }
     let nodes_in_gen : usize = gen_nodeids . len ();
     let rendered_count : usize = rendered_count + nodes_in_gen;
@@ -118,8 +118,8 @@ async fn add_children_and_collect_their_ids (
       Some ( (&mut *forest, parent_treeid) ),
       Some ( &mut *map ),
       &child_skgid, config, driver, visited ) . await ?;
-    child_treeids . push ( child_treeid ); }
-  Ok ( child_treeids ) }
+    child_treeids . push (child_treeid); }
+  Ok (child_treeids) }
 
 /// Collect all children IDs
 ///   from definitive nodes in the input generation.
@@ -132,7 +132,7 @@ fn collect_rels_to_children_from_generation (
 ) -> Vec < (NodeId, ID) > {
   let mut children : Vec < (NodeId, ID) > = Vec::new ();
   for treeid in nodes_in_gen {
-    if let Ok ( child_skgids ) =
+    if let Ok (child_skgids) =
       content_ids_if_definitive_else_empty (
         forest, map, *treeid )
     { for child_skgid in child_skgids {

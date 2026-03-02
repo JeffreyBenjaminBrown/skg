@@ -38,7 +38,7 @@ pub fn find_inconsistent_instructions(
       Vec<(ID, // IDs with inconsistent sources
            HashSet<SourceName>)>)
 { let (id_toDelete_instructions, id_to_definer_count, id_to_sources) =
-    collect_instructions(forest);
+    collect_instructions (forest);
   let mut inconsistent_deletion_ids: Vec<ID> = Vec::new();
   let mut problematic_defining_ids: Vec<ID> = Vec::new();
   let mut inconsistent_source_ids: Vec<(ID, HashSet<SourceName>)> =
@@ -46,19 +46,19 @@ pub fn find_inconsistent_instructions(
   { // filter to problematic instructions
     { // Collect inconsistent deletion instructions
       for (id, delete_set) in id_toDelete_instructions {
-        if delete_set.len() == 2 {
+        if delete_set . len() == 2 {
           // Size 2 means both Delete and DoNotDelete are present.
-          inconsistent_deletion_ids.push(id); }} }
+          inconsistent_deletion_ids . push (id); }} }
     { // Collect multiple defining containers
       for (id, count) in id_to_definer_count {
         if count > 1 {
           // Multiple defining containers for this ID
-          problematic_defining_ids.push(id); }} }
+          problematic_defining_ids . push (id); }} }
     { // Collect inconsistent sources
       for (id, sources) in id_to_sources {
-        if sources.len() > 1 {
+        if sources . len() > 1 {
           // Multiple different sources for this ID
-          inconsistent_source_ids.push((id, sources)); }} }}
+          inconsistent_source_ids . push((id, sources)); }} }}
   ( inconsistent_deletion_ids,
     problematic_defining_ids,
     inconsistent_source_ids ) }
@@ -79,30 +79,30 @@ fn collect_instructions(
     id_to_sources: &mut
       HashMap<ID, HashSet<SourceName>>
   ) {
-    let viewnode : &UncheckedViewNode = node_ref.value();
-    if let UncheckedViewNodeKind::True(t) = &viewnode.kind {
-      if let Some(id) = &t.id_opt {
+    let viewnode : &UncheckedViewNode = node_ref . value();
+    if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
+      if let Some (id) = &t . id_opt {
         let delete_instruction : WhetherToDelete =
-          if matches!(t.edit_request, Some(EditRequest::Delete)) {
+          if matches!(t . edit_request, Some (EditRequest::Delete)) {
             WhetherToDelete::Delete
           } else { WhetherToDelete::DoNotDelete };
         id_toDelete_instructions // record delete_instruction
-          . entry(id.clone())
-          . or_insert_with(HashSet::new)
-          . insert(delete_instruction);
-        if ! t.indefinitive {
+          . entry(id . clone())
+          . or_insert_with (HashSet::new)
+          . insert (delete_instruction);
+        if ! t . indefinitive {
           // Increment the count for this defining container
-          *id_defining_count . entry(id.clone())
-            . or_insert(0) += 1; }
-        if let Some(source_str) = &t.source_opt {
+          *id_defining_count . entry(id . clone())
+            . or_insert (0) += 1; }
+        if let Some (source_str) = &t . source_opt {
           // Collect source for this ID
           let source : SourceName =
-            SourceName::from(source_str.as_str());
+            SourceName::from(source_str . as_str());
           id_to_sources
-            . entry(id.clone())
-            . or_insert_with(HashSet::new)
-            . insert(source); }}}
-    for child in node_ref.children() { // recurse
+            . entry(id . clone())
+            . or_insert_with (HashSet::new)
+            . insert (source); }}}
+    for child in node_ref . children() { // recurse
       collect_instructions_rec(
         child,
         id_toDelete_instructions,
@@ -119,7 +119,7 @@ fn collect_instructions(
     : HashMap<ID, HashSet<SourceName>>
     = HashMap::new();
   collect_instructions_rec(
-    forest.root(),
+    forest . root(),
     &mut id_toDelete_instructions,
     &mut id_to_definer_count,
     &mut id_to_sources);

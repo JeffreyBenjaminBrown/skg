@@ -60,50 +60,50 @@ pub async fn complete_subscribee_col_preorder (
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
       tree, node,
-      |vn : &ViewNode| matches!( &vn.kind,
+      |vn : &ViewNode| matches!( &vn . kind,
                                  ViewNodeKind::Scaff(
                                    Scaffold::SubscribeeCol )),
       "complete_subscribee_col_preorder: expected SubscribeeCol"
-    ). map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+    ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let (parent_skgid, parent_source, parent_indefinitive)
     : (ID, SourceName, bool)
     = read_at_ancestor_in_tree(
       tree, node, 1,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) =>
-          Some(( t.id.clone(), t.source.clone(), t.indefinitive )),
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) =>
+          Some(( t . id . clone(), t . source . clone(), t . indefinitive )),
         _ => None } )
-    . map_err( |e| -> Box<dyn Error> { e.into() } ) ?
-    . ok_or( "complete_subscribee_col_preorder: parent is not a TrueNode" ) ?;
+    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
+    . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
-    map.get( &parent_skgid )
-      .map( |skg| skg.subscribes_to.clone().unwrap_or_default() )
-      .unwrap_or_default();
+    map . get (&parent_skgid)
+      . map( |skg| skg . subscribes_to . clone() . unwrap_or_default() )
+      . unwrap_or_default();
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     diff_aware_goal_list(
       source_diffs, &parent_source, &parent_skgid,
       config, &worktree_subscribees );
-  if goal_list.is_empty() { // delete SubscribeeCol, handling focus
+  if goal_list . is_empty() { // delete SubscribeeCol, handling focus
     let has_focus : bool =
-      subtree_satisfies( tree, node, &|n : &ViewNode| n.focused ) ?;
+      subtree_satisfies( tree, node, &|n : &ViewNode| n . focused ) ?;
     if has_focus {
       write_at_ancestor_in_tree( tree, node, 1,
-        |vn : &mut ViewNode| { vn.focused = true; } )
-      .map_err( |e| -> Box<dyn Error> { e.into() } ) ?; }
-    with_node_mut( tree, node, |mut n| { n.detach(); } )
-      .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        |vn : &mut ViewNode| { vn . focused = true; } )
+      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
+    with_node_mut( tree, node, |mut n| { n . detach(); } )
+      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     return Ok(( )); }
-  if parent_indefinitive || source_diffs.is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
-    let missing : Vec<ID> = worktree_subscribees.iter()
-      .filter( |id| !map.contains_key( id ) )
-      .cloned()
-      .collect();
-    if !missing.is_empty() { // Ensure all subscribees are in the map.
+  if parent_indefinitive || source_diffs . is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
+    let missing : Vec<ID> = worktree_subscribees . iter()
+      . filter( |id| !map . contains_key (id) )
+      . cloned()
+      . collect();
+    if !missing . is_empty() { // Ensure all subscribees are in the map.
       let fetched_missing : Vec<SkgNode> =
-        skgnodes_from_ids( config, driver, &missing ).await ?;
+        skgnodes_from_ids( config, driver, &missing ) . await ?;
       for skg in fetched_missing {
-        if let Some( id ) = skg.ids.first() {
-          map.insert( id.clone(), skg ); } } }
+        if let Some (id) = skg . ids . first() {
+          map . insert( id . clone(), skg ); } } }
     let child_data : HashMap<ID, SubscribeeChildData> =
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
       build_subscribee_child_data(
@@ -111,33 +111,33 @@ pub async fn complete_subscribee_col_preorder (
         source_diffs, map, deleted_since_head_pid_src_map, config ) ?;
     complete_relevant_children_in_viewnodetree(
       tree, node,
-      |vn : &ViewNode| matches!( &vn.kind,
-                                 ViewNodeKind::True( t )
-                                 if !t.parent_ignores ),
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) => t.id.clone(),
+      |vn : &ViewNode| matches!( &vn . kind,
+                                 ViewNodeKind::True (t)
+                                 if !t . parent_ignores ),
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . id . clone(),
         _ => panic!( "complete_subscribee_col_preorder: \
                       relevant child not TrueNode" ) },
       &goal_list,
       |id : &ID| {
         let d : &SubscribeeChildData =
-          child_data.get( id ).expect(
+          child_data . get (id) . expect(
             "complete_subscribee_col_preorder: child data not pre-fetched" );
-        match d.phantom {
+        match d . phantom {
           None =>
             mk_indefinitive_viewnode(
-              id.clone(), d.source.clone(),
-              d.title.clone(), false ),
-          Some( diff_status ) =>
+              id . clone(), d . source . clone(),
+              d . title . clone(), false ),
+          Some (diff_status) =>
             mk_phantom_viewnode(
-              id.clone(), d.source.clone(),
-              d.title.clone(), diff_status ) } }, ) ?; }
+              id . clone(), d . source . clone(),
+              d . title . clone(), diff_status ) } }, ) ?; }
   { // Ensure HiddenOutsideOfSubscribeeCol exists and is last.
     let hidden_outside : Option<NodeId> =
       unique_scaffold_child(
         tree, node, &Scaffold::HiddenOutsideOfSubscribeeCol ) ?;
     match hidden_outside {
-      Some( child ) => { move_child_to_end(
+      Some (child) => { move_child_to_end(
                            tree, node, child ) ?; },
       None => { insert_scaffold_as_child(
                   tree, node,
@@ -158,20 +158,20 @@ fn diff_aware_goal_list (
 ) -> (Vec<ID>, HashSet<ID>) {
   let head_subscribees : Option<Vec<ID>> =
     source_diffs . as_ref()
-      . and_then( |diffs| diffs.get( parent_source ) )
-      . filter( |sd| sd.is_git_repo )
+      . and_then( |diffs| diffs . get (parent_source) )
+      . filter( |sd| sd . is_git_repo )
       . and_then(
          |_| skgnode_from_git_head(
                parent_skgid, parent_source, config )
              . ok()
-             . and_then( |skg| skg.subscribes_to ) );
+             . and_then( |skg| skg . subscribes_to ) );
   match head_subscribees {
     None =>
-      (worktree_subscribees.to_vec(), HashSet::new()),
-    Some( head ) => {
+      (worktree_subscribees . to_vec(), HashSet::new()),
+    Some (head) => {
       let diff : Vec<Diff_Item<ID>> =
         compute_interleaved_diff( &head, worktree_subscribees );
-      itemlist_and_removedset_from_diff( &diff ) } } }
+      itemlist_and_removedset_from_diff (&diff) } } }
 
 /// Build a map from subscribee ID to SubscribeeChildData
 /// for use in the create_child closure argument to
@@ -199,50 +199,50 @@ fn build_subscribee_child_data (
             Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> =
     { let node_ref : NodeRef<ViewNode> =
-        tree.get( node )
-          .ok_or( "build_subscribee_child_data: node not found" ) ?;
+        tree . get (node)
+          . ok_or ("build_subscribee_child_data: node not found") ?;
       let mut m : HashMap<ID, (SourceName, String)> = HashMap::new();
-      for child_ref in node_ref.children() {
-        if let ViewNodeKind::True( t ) = &child_ref.value().kind {
-          m.insert( t.id.clone(),
-                    ( t.source.clone(), t.title.clone() )); }}
+      for child_ref in node_ref . children() {
+        if let ViewNodeKind::True (t) = &child_ref . value() . kind {
+          m . insert( t . id . clone(),
+                    ( t . source . clone(), t . title . clone() )); }}
       m };
   let child_sources : HashMap<ID, SourceName> =
-    existing_children.iter()
-      .map( |(id, (s, _))| (id.clone(), s.clone()) )
-      .collect();
+    existing_children . iter()
+      . map( |(id, (s, _))| (id . clone(), s . clone()) )
+      . collect();
   let mut result : HashMap<ID, SubscribeeChildData> = HashMap::new();
   for child_skgid in goal_list {
-    if result.contains_key( child_skgid ) { continue; }
-    if removed_ids.contains( child_skgid ) {
+    if result . contains_key (child_skgid) { continue; }
+    if removed_ids . contains (child_skgid) {
       let child_src : SourceName =
         find_source_many_ways(
           child_skgid, &child_sources,
           deleted_since_head_pid_src_map, map, config )
-        .map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let phantom : NodeDiffStatus =
-        phantom_diff_status( child_skgid, &child_src, source_diffs.as_ref() );
+        phantom_diff_status( child_skgid, &child_src, source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
-                           source_diffs.as_ref(), map, config );
-      result.insert( child_skgid.clone(),
+                           source_diffs . as_ref(), map, config );
+      result . insert( child_skgid . clone(),
                      SubscribeeChildData { source: child_src,
                                            title: child_title,
-                                           phantom: Some( phantom ) } );
+                                           phantom: Some (phantom) } );
     } else { // Normal subscribee: exists in worktree subscriptions.
-      if let Some( (s, t) ) = existing_children.get( child_skgid ) {
-        result.insert( child_skgid.clone(),
-                       SubscribeeChildData { source: s.clone(),
-                                             title: t.clone(),
+      if let Some( (s, t) ) = existing_children . get (child_skgid) {
+        result . insert( child_skgid . clone(),
+                       SubscribeeChildData { source: s . clone(),
+                                             title: t . clone(),
                                              phantom: None } );
-      } else if let Some( skg ) = map.get( child_skgid ) {
-        result.insert( child_skgid.clone(),
-                       SubscribeeChildData { source: skg.source.clone(),
-                                             title: skg.title.clone(),
+      } else if let Some (skg) = map . get (child_skgid) {
+        result . insert( child_skgid . clone(),
+                       SubscribeeChildData { source: skg . source . clone(),
+                                             title: skg . title . clone(),
                                              phantom: None } );
       } else {
         return Err( format!(
           "build_subscribee_child_data: \
            subscribee {} not found in children or map",
-          child_skgid.0 ).into() ); } } }
-  Ok( result ) }
+          child_skgid . 0 ) . into() ); } } }
+  Ok (result) }

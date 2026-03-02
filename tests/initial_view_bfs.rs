@@ -55,18 +55,18 @@ fn test_bfs_limit_across_multiple_trees
       // - Then truncate everything after parent (2) in gen 1:
       //   - Truncate node 3
 
-      let mut test_config = config.clone();
-      test_config.initial_node_limit = 7;
+      let mut test_config = config . clone();
+      test_config . initial_node_limit = 7;
 
       let focii = vec![
-        ID ( "1".to_string () ),
-        ID ( "2".to_string () ),
-        ID ( "3".to_string () )
+        ID ( "1" . to_string () ),
+        ID ( "2" . to_string () ),
+        ID ( "3" . to_string () )
       ];
 
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
-                        ). await ?;
+                        ) . await ?;
 
       println!("BFS multi-tree limit result:\n{}", result);
 
@@ -110,18 +110,18 @@ fn test_bfs_limit_9_three_branches
       // - Then truncate everything after parent (2) in gen 1:
       //   - Truncate node 3
 
-      let mut test_config = config.clone();
-      test_config.initial_node_limit = 9;
+      let mut test_config = config . clone();
+      test_config . initial_node_limit = 9;
 
       let focii = vec![
-        ID ( "1".to_string () ),
-        ID ( "2".to_string () ),
-        ID ( "3".to_string () )
+        ID ( "1" . to_string () ),
+        ID ( "2" . to_string () ),
+        ID ( "3" . to_string () )
       ];
 
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
-                        ). await ?;
+                        ) . await ?;
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
@@ -159,18 +159,18 @@ fn test_bfs_limit_8_two_branches
       // Gen 1 nodes (1, 2) should be definitive (they have all their children)
       // Gen 3 should NOT be rendered (verify we don't go beyond the limit)
 
-      let mut test_config = config.clone();
-      test_config.initial_node_limit = 8;
+      let mut test_config = config . clone();
+      test_config . initial_node_limit = 8;
 
       let focii = vec![
-        ID ( "1".to_string () ),
-        ID ( "2".to_string () )
+        ID ( "1" . to_string () ),
+        ID ( "2" . to_string () )
         // Note: node 3 and its descendants not included
       ];
 
       let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
         multi_root_view ( driver, &test_config, & focii, false
-                        ). await ?;
+                        ) . await ?;
 
       println!("BFS limit=8 two branches result:\n{}", result);
 

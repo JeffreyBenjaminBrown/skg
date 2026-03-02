@@ -35,18 +35,18 @@ pub fn completeAliasCol (
   { let is_aliascol : bool = // barf if not an aliascol
       read_at_ancestor_in_tree(
         tree, aliascol_node_id, 0,
-        |viewnode| matches!( &viewnode.kind,
-                            ViewNodeKind::Scaff( Scaffold::AliasCol )) )
-      .map_err( |e| -> Box<dyn Error> { e.into() } )?;
+        |viewnode| matches!( &viewnode . kind,
+                            ViewNodeKind::Scaff (Scaffold::AliasCol)) )
+      . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliascol { return Err(
-      "completeAliasCol: Node is not an AliasCol".into() ); }}
+      "completeAliasCol: Node is not an AliasCol" . into() ); }}
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
       "completeAliasCol" ) ?;
   let parent_skgnode : &SkgNode =
-    map.get( &parent_pid )
-    .ok_or( "completeAliasCol: Parent SkgNode not in map" )?;
+    map . get (&parent_pid)
+    . ok_or ("completeAliasCol: Parent SkgNode not in map")?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );
@@ -55,41 +55,41 @@ pub fn completeAliasCol (
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<String> =
-          parent_skgnode.aliases.clone().unwrap_or_default();
+          parent_skgnode . aliases . clone() . unwrap_or_default();
         ( goals, HashMap::new() ) }
-      Some( nc ) => { // Git diff view.
+      Some (nc) => { // Git diff view.
         let mut goals : Vec<String> = Vec::new();
         let mut dmap : HashMap<String, Option<FieldDiffStatus>> =
           HashMap::new();
-        for entry in &nc.aliases_diff {
+        for entry in &nc . aliases_diff {
           let (text, diff) : (String, Option<FieldDiffStatus>) =
             match entry {
-              Diff_Item::Unchanged( t ) =>
-                ( t.clone(), None ),
-              Diff_Item::New( t ) =>
-                ( t.clone(), Some( FieldDiffStatus::New ) ),
-              Diff_Item::Removed( t ) =>
-                ( t.clone(), Some( FieldDiffStatus::Removed ) ), };
-          goals.push( text.clone() );
-          dmap.insert( text, diff ); }
+              Diff_Item::Unchanged (t) =>
+                ( t . clone(), None ),
+              Diff_Item::New (t) =>
+                ( t . clone(), Some (FieldDiffStatus::New) ),
+              Diff_Item::Removed (t) =>
+                ( t . clone(), Some (FieldDiffStatus::Removed) ), };
+          goals . push( text . clone() );
+          dmap . insert( text, diff ); }
         ( goals, dmap ) } };
-  let is_alias : fn(&ViewNode) -> bool =
+  let is_alias : fn (&ViewNode) -> bool =
     // relevance to complete_relevant_children
-    |viewnode| matches!( &viewnode.kind,
+    |viewnode| matches!( &viewnode . kind,
                         ViewNodeKind::Scaff( Scaffold::Alias { .. } ) );
-  let view_alias_text : fn(&ViewNode) -> String =
-    |viewnode| match &viewnode.kind {
+  let view_alias_text : fn (&ViewNode) -> String =
+    |viewnode| match &viewnode . kind {
       ViewNodeKind::Scaff( Scaffold::Alias { text, .. } ) =>
-        text.clone(),
+        text . clone(),
       _ => unreachable!(), }; // relevance means Scaffold::Alias
   let create_alias = |text: &String| -> ViewNode {
     let diff : Option<FieldDiffStatus> =
-      diff_map.get( text ).copied().flatten();
+      diff_map . get (text) . copied() . flatten();
     ViewNode {
       focused : false,
       folded  : false,
       kind    : ViewNodeKind::Scaff(
-        Scaffold::Alias { text : text.clone(),
+        Scaffold::Alias { text : text . clone(),
                           diff } ), } };
   complete_relevant_children_in_viewnodetree(
     tree,
@@ -100,9 +100,9 @@ pub fn completeAliasCol (
     create_alias )?;
   treat_certain_children( // Currently unreachable: validation rejects TrueNode children under AliasCol. Left here in case validation is later relaxed.
       tree, aliascol_node_id,
-      |vn : &ViewNode| matches!( &vn.kind, ViewNodeKind::True( _ )),
+      |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_)),
       |vn : &mut ViewNode| {
-        if let ViewNodeKind::True( ref mut t ) = vn.kind {
-          t.parent_ignores = true; }},
-    ).map_err( |e| -> Box<dyn Error> { e.into() } )?;
+        if let ViewNodeKind::True( ref mut t ) = vn . kind {
+          t . parent_ignores = true; }},
+    ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

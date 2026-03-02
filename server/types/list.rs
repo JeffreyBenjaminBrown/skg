@@ -9,15 +9,15 @@ use std::collections::{HashMap, HashSet};
 
 /// An entry in a list representing
 /// the diff of a 'new' list against an 'old' list.
-#[allow(non_camel_case_types)]
+#[allow (non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Diff_Item<T> {
   /// It exists in both old and new in same relative position.
-  Unchanged(T),
+  Unchanged (T),
   /// It was in old but is not in new (at least in this position).
-  Removed(T),
+  Removed (T),
   /// It is in new but was not in old (at least in this position).
-  New(T),
+  New (T),
 }
 
 //
@@ -41,16 +41,16 @@ where
   let mut char_counter : u32 =
     0x100; // Start from extended ASCII
   for item in old . iter() . chain ( new . iter() ) {
-    if ! item_to_char . contains_key ( item ) {
-      item_to_char . insert ( item, char::from_u32 ( char_counter ) . unwrap_or ( '?' ) );
+    if ! item_to_char . contains_key (item) {
+      item_to_char . insert ( item, char::from_u32 (char_counter) . unwrap_or ('?') );
       char_counter += 1; }}
   let old_str : String =
     old . iter()
-      . map ( |item| item_to_char . get ( item ) . copied() . unwrap_or ( '?' ) )
+      . map ( |item| item_to_char . get (item) . copied() . unwrap_or ('?') )
       . collect();
   let new_str : String =
     new . iter()
-      . map ( |item| item_to_char . get ( item ) . copied() . unwrap_or ( '?' ) )
+      . map ( |item| item_to_char . get (item) . copied() . unwrap_or ('?') )
       . collect();
   let diff : TextDiff<str> = // Use similar crate for the actual diff
     TextDiff::from_chars ( &old_str, &new_str );
@@ -89,12 +89,12 @@ where T: Clone + Eq + std::hash::Hash {
   let mut removedset : HashSet<T> = HashSet::new();
   for d in diff {
     match d {
-      Diff_Item::Unchanged( x )
-      | Diff_Item::New( x ) =>
-        { itemlist.push( x.clone() ); },
-      Diff_Item::Removed( x ) =>
-        { itemlist.push( x.clone() );
-          removedset.insert( x.clone() ); }} }
+      Diff_Item::Unchanged (x)
+      | Diff_Item::New (x) =>
+        { itemlist . push( x . clone() ); },
+      Diff_Item::Removed (x) =>
+        { itemlist . push( x . clone() );
+          removedset . insert( x . clone() ); }} }
   (itemlist, removedset) }
 
 /// Removes duplicates from a vector.
@@ -106,7 +106,7 @@ where T: Clone + Eq + std::hash::Hash {
   let mut seen : HashSet<T> = HashSet::new();
   let mut result : Vec<T> = Vec::new();
   for item in vec {
-    if !seen.contains(&item) {
-      seen.insert(item.clone());
-      result.push(item); }}
+    if !seen . contains (&item) {
+      seen . insert(item . clone());
+      result . push (item); }}
   result }

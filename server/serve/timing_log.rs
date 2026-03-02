@@ -30,18 +30,18 @@ pub fn timed<T> (
   label  : &str,
   f      : impl FnOnce() -> T,
 ) -> T {
-  if ! config.timing_log { return f(); }
+  if ! config . timing_log { return f(); }
   let depth : usize =
-    TIMING_DEPTH.with ( |d| {
-      let current : usize = d.get();
-      d.set ( current + 1 );
+    TIMING_DEPTH . with ( |d| {
+      let current : usize = d . get();
+      d . set ( current + 1 );
       current } );
   let t0 : Instant = Instant::now();
   let result : T = f();
-  let duration : Duration = t0.elapsed();
+  let duration : Duration = t0 . elapsed();
   push_buffer_timing_entry ( t0, depth, label, duration );
-  TIMING_DEPTH.with ( |d| d.set ( d.get() - 1 ));
-  if depth == 0 { flush_timing_buffer ( config ); }
+  TIMING_DEPTH . with ( |d| d . set ( d . get() - 1 ));
+  if depth == 0 { flush_timing_buffer (config); }
   result }
 
 /// Like 'timed' but for async code.
@@ -51,19 +51,19 @@ pub async fn timed_async<T, F : Future<Output = T>> (
   label  : &str,
   f      : F,
 ) -> T {
-  if ! config.timing_log { return f.await; }
+  if ! config . timing_log { return f . await; }
   let depth : usize =
-    TIMING_DEPTH.with ( |d| {
-      let current : usize = d.get();
-      d.set ( current + 1 );
+    TIMING_DEPTH . with ( |d| {
+      let current : usize = d . get();
+      d . set ( current + 1 );
       current } );
   let t0 : Instant = Instant::now();
-  let result : T = f.await;
-  let duration : Duration = t0.elapsed();
+  let result : T = f . await;
+  let duration : Duration = t0 . elapsed();
   push_buffer_timing_entry ( t0, depth, label, duration );
-  TIMING_DEPTH.with ( |d| d.set ( d.get() - 1 ));
+  TIMING_DEPTH . with ( |d| d . set ( d . get() - 1 ));
   if depth == 0 {
-    flush_timing_buffer ( config ); }
+    flush_timing_buffer (config); }
   result }
 
 fn push_buffer_timing_entry (
@@ -72,44 +72,44 @@ fn push_buffer_timing_entry (
   label    : &str,
   duration : Duration,
 ) {
-  TIMING_BUFFER.with ( |buf|
-    buf.borrow_mut().push ( TimingEntry {
+  TIMING_BUFFER . with ( |buf|
+    buf . borrow_mut() . push ( TimingEntry {
       start,
       depth,
-      label    : label.to_string(),
+      label    : label . to_string(),
       duration } )) }
 
 fn flush_timing_buffer (
   config : &SkgConfig,
 ) {
   let mut entries : Vec<TimingEntry> =
-    TIMING_BUFFER.with ( |buf|
-      buf.replace ( Vec::new() ));
-  entries.sort_by_key ( |e| e.start );
+    TIMING_BUFFER . with ( |buf|
+      buf . replace ( Vec::new() ));
+  entries . sort_by_key ( |e| e . start );
   let path : std::path::PathBuf =
-    config.config_dir.join ( "timing.log" );
-  if let Ok ( mut file ) =
+    config . config_dir . join ("timing.log");
+  if let Ok (mut file) =
     OpenOptions::new()
-    .append ( true )
-    .create ( true )
-    .open ( &path )
-  { for entry in entries.iter() {
+    . append (true)
+    . create (true)
+    . open (&path)
+  { for entry in entries . iter() {
       let stars : String =
-        "*".repeat ( entry.depth + 1 );
+        "*" . repeat ( entry . depth + 1 );
       let _ : Result<(), std::io::Error> =
         writeln! ( file, "{} {}: {:.3}s",
-                   stars, entry.label,
-                   entry.duration.as_secs_f64 () ); }} }
+                   stars, entry . label,
+                   entry . duration . as_secs_f64 () ); }} }
 
 pub fn clear_timing_log (
   config : &SkgConfig
 ) {
-  if ! config.timing_log { return; }
+  if ! config . timing_log { return; }
   let path : std::path::PathBuf =
-    config.config_dir.join ( "timing.log" );
+    config . config_dir . join ("timing.log");
   let _ : Result<std::fs::File, std::io::Error> =
     OpenOptions::new()
-    .write ( true )
-    .truncate ( true )
-    .create ( true )
-    .open ( &path ); }
+    . write (true)
+    . truncate (true)
+    . create (true)
+    . open (&path); }

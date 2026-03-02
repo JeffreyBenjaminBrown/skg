@@ -31,12 +31,12 @@ pub fn initialize_dbs (
 
   println!("Reading .skg files from all sources...");
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(config)
+    read_all_skg_files_from_sources (config)
     . unwrap_or_else(|e| {
       eprintln!("Failed to read .skg files: {}", e);
-      std::process::exit(1); });
+      std::process::exit (1); });
   println!("{} .skg files were read from {} source(s)",
-           nodes.len(), config.sources.len());
+           nodes . len(), config . sources . len());
 
   let typedb_driver: Arc<TypeDBDriver> =
     initialize_typedb_from_nodes ( config, &nodes );
@@ -57,11 +57,11 @@ pub fn initialize_typedb_from_nodes (
     TypeDBDriver::new(
       "127.0.0.1:1729",
       Credentials::new("admin", "password"),
-      DriverOptions::new(false, None).unwrap() )
+      DriverOptions::new(false, None) . unwrap() )
       . await
       . unwrap_or_else ( |e| {
         eprintln!("Error connecting to TypeDB: {}", e);
-        std::process::exit(1); } ) } );
+        std::process::exit (1); } ) } );
 
   block_on ( async {
     // Recreate the database from scratch
@@ -70,14 +70,14 @@ pub fn initialize_typedb_from_nodes (
       & driver,
     ) . await {
       eprintln! ( "Failed to create empty database: {}", e );
-      std::process::exit(1); }
+      std::process::exit (1); }
 
     if let Err (e) = define_schema (
       & config . db_name,
       & driver,
     ) . await {
       eprintln! ( "Failed to define schema: {}", e );
-      std::process::exit(1); }
+      std::process::exit (1); }
 
     if let Err (e) = create_all_nodes (
       & config . db_name,
@@ -85,7 +85,7 @@ pub fn initialize_typedb_from_nodes (
       nodes,
     ) . await {
       eprintln! ( "Failed to create nodes: {}", e );
-      std::process::exit(1); }
+      std::process::exit (1); }
 
     if let Err (e) = create_all_relationships (
       & config . db_name,
@@ -93,9 +93,9 @@ pub fn initialize_typedb_from_nodes (
       nodes,
     ) . await {
       eprintln! ( "Failed to create relationships: {}", e );
-      std::process::exit(1); }} );
+      std::process::exit (1); }} );
   println!("TypeDB database initialized successfully.");
-  Arc::new( driver ) }
+  Arc::new (driver) }
 
 pub fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
@@ -107,9 +107,9 @@ pub fn initialize_tantivy_from_nodes (
     in_fs_wipe_index_then_create_it (
       nodes,
       Path::new ( & config . tantivy_folder )
-    ). unwrap_or_else(|e| {
+    ) . unwrap_or_else(|e| {
       eprintln!("Failed to create Tantivy index: {}", e);
-      std::process::exit(1); } );
+      std::process::exit (1); } );
   println!(
     "Tantivy index initialized successfully. Indexed {} files.",
     indexed_count);
@@ -119,20 +119,20 @@ pub fn initialize_tantivy_from_nodes (
 pub fn create_empty_tantivy_index (
   index_path : &Path,
 ) -> Result<TantivyIndex, Box<dyn Error>> {
-  if index_path.exists() {
+  if index_path . exists() {
     std::fs::remove_dir_all (index_path) ?; }
-  std::fs::create_dir_all ( index_path )?;
+  std::fs::create_dir_all (index_path)?;
   let schema : schema::Schema =
     crate::dbs::tantivy::mk_tantivy_schema();
   let id_field: schema::Field =
-    schema.get_field("id")
-    .ok_or("Schema missing 'id' field")?;
+    schema . get_field ("id")
+    . ok_or ("Schema missing 'id' field")?;
   let title_or_alias_field: schema::Field =
-    schema.get_field("title_or_alias")
-    .ok_or("Schema missing 'title_or_alias' field")?;
+    schema . get_field ("title_or_alias")
+    . ok_or ("Schema missing 'title_or_alias' field")?;
   let source_field: schema::Field =
-    schema.get_field("source")
-    .ok_or("Schema missing 'source' field")?;
+    schema . get_field ("source")
+    . ok_or ("Schema missing 'source' field")?;
   Ok ( TantivyIndex {
     index: Arc::new ( { let index : Index =
                           Index::create_in_dir ( index_path, schema )?;
@@ -154,7 +154,7 @@ pub fn in_fs_wipe_index_then_create_it (
              usize), // number of documents indexed
             Box<dyn Error>> {
   let tantivy_index : TantivyIndex =
-    create_empty_tantivy_index ( index_path )?;
+    create_empty_tantivy_index (index_path)?;
   let indexed_count: usize =
     update_index_with_nodes ( nodes, & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
@@ -166,15 +166,15 @@ pub async fn overwrite_new_empty_db (
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
 
-  let databases : &DatabaseManager = driver.databases ();
-  if databases.contains (db_name) . await ? {
+  let databases : &DatabaseManager = driver . databases ();
+  if databases . contains (db_name) . await ? {
     println! ( "Deleting existing database '{}'...",
                 db_name );
     { let database : Arc<Database> =
-        databases.get (db_name) . await ?;
+        databases . get (db_name) . await ?;
       database } . delete () . await ?; }
   println! ( "Creating empty database '{}'...", db_name );
-  databases.create (db_name) . await ?;
+  databases . create (db_name) . await ?;
   Ok (()) }
 
 pub async fn define_schema (
@@ -183,14 +183,14 @@ pub async fn define_schema (
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
-    driver.transaction ( db_name,
+    driver . transaction ( db_name,
                          TransactionType::Schema )
     . await ?;
-  println! ( "Defining schema ..." );
-  tx.query ( {
+  println! ("Defining schema ...");
+  tx . query ( {
     let schema : String = fs::read_to_string
       ("schema.tql")
-      . expect ( "Failed to read TypeDB schema file" );
+      . expect ("Failed to read TypeDB schema file");
     schema } ) . await ?;
-  tx.commit () . await ?;
+  tx . commit () . await ?;
   Ok (()) }

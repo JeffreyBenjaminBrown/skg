@@ -22,6 +22,7 @@
 /tests/tantivy/generated_aliases/
 Cargo.lock
 TAGS
+__pycache__
 emacs-ugly-copy/
 git-diff-view/stale
 off-topic/

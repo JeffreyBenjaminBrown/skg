@@ -39,16 +39,16 @@ pub struct SkgConfig {
   #[serde(default = "default_port")]
   pub port           : u16,  // TCP port for Rust-Emacs comms.
 
-  #[serde(default)] // defaults to false
+  #[serde (default)] // defaults to false
   pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
 
   #[serde(default = "default_initial_node_limit")]
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 
-  #[serde(default)] // defaults to false
+  #[serde (default)] // defaults to false
   pub timing_log     : bool, // Write timing data to <config_dir>/timing.log.
 
-  #[serde(skip)]
+  #[serde (skip)]
   pub config_dir     : PathBuf, // Directory containing skgconfig.toml.
 }
 
@@ -57,7 +57,7 @@ pub struct SkgConfig {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SourceName ( pub String );
 
-#[derive(Clone)]
+#[derive (Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
   pub index                : Arc<Index>,
@@ -77,14 +77,14 @@ where
   D : Deserializer<'de>
 {
   let sources_vec : Vec<SkgfileSource> =
-    Vec::deserialize ( deserializer ) ?;
+    Vec::deserialize (deserializer) ?;
   let mut map : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
   for source in sources_vec {
-    map.insert (
+    map . insert (
       source . nickname . clone (),
       source ); }
-  Ok ( map )
+  Ok (map)
 }
 
 fn default_port() -> u16 { 1730 }
@@ -98,35 +98,35 @@ fn default_initial_node_limit() -> usize { 1000 }
 
 impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {
-    ID ( s.into () ) }}
+    ID ( s . into () ) }}
 
 impl Deref for ID {
   // lets ID be used like a String in (more?) cases
   type Target = String;
-  fn deref ( &self ) -> &Self::Target {
-    &self.0 }}
+  fn deref (&self) -> &Self::Target {
+    &self . 0 }}
 
 impl AsRef<str> for ID {
-  fn as_ref(&self) -> &str {
-    &self.0 }}
+  fn as_ref (&self) -> &str {
+    &self . 0 }}
 
 impl Deref for SourceName {
   // lets SourceName be used like a String
   type Target = String;
-  fn deref ( &self ) -> &Self::Target {
-    &self.0 }}
+  fn deref (&self) -> &Self::Target {
+    &self . 0 }}
 
 impl fmt::Display for ID {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
-    write! ( f, "{}", self.0 ) }}
+    write! ( f, "{}", self . 0 ) }}
 
 impl fmt::Display for SourceName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
-    write! ( f, "{}", self.0 ) }}
+    write! ( f, "{}", self . 0 ) }}
 
 impl From<String> for ID {
   fn from ( s : String ) -> Self {
@@ -134,7 +134,7 @@ impl From<String> for ID {
 
 impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
-    ID ( s.clone () ) }}
+    ID ( s . clone () ) }}
 
 impl From<String> for SourceName {
   fn from ( s : String ) -> Self {
@@ -142,15 +142,15 @@ impl From<String> for SourceName {
 
 impl From<&String> for SourceName {
   fn from ( s : &String ) -> Self {
-    SourceName ( s.clone () ) }}
+    SourceName ( s . clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
-    ID ( s.to_string () ) }}
+    ID ( s . to_string () ) }}
 
 impl From <&str> for SourceName {
   fn from(s: &str) -> Self {
-    SourceName ( s.to_string () ) }}
+    SourceName ( s . to_string () ) }}
 
 impl SkgConfig {
   /// Creates a SkgConfig with dummy values for everything except sources.
@@ -159,14 +159,14 @@ impl SkgConfig {
     sources : HashMap<SourceName, SkgfileSource>
   ) -> Self {
     SkgConfig {
-      db_name            : "unused".to_string(),
-      tantivy_folder     : PathBuf::from("/tmp/unused"),
+      db_name            : "unused" . to_string(),
+      tantivy_folder     : PathBuf::from ("/tmp/unused"),
       sources,
       port               : 0,
       delete_on_quit     : false,
       initial_node_limit : 100,
       timing_log         : false,
-      config_dir         : PathBuf::from("."), }}
+      config_dir         : PathBuf::from ("."), }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
   /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
@@ -176,21 +176,21 @@ impl SkgConfig {
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
-      db_name            : db_name.to_string(),
-      tantivy_folder     : PathBuf::from(tantivy_folder),
+      db_name            : db_name . to_string(),
+      tantivy_folder     : PathBuf::from (tantivy_folder),
       sources,
       port               : 1730,
       delete_on_quit     : false,
       initial_node_limit : 1000,
       timing_log         : false,
-      config_dir         : PathBuf::from("."), }}
+      config_dir         : PathBuf::from ("."), }}
 
   pub fn user_owns_source (
     &self,
     nickname : &SourceName
   ) -> bool {
-    self . sources . get ( nickname )
-      . map ( |s| s.user_owns_it )
-      . unwrap_or ( false )
+    self . sources . get (nickname)
+      . map ( |s| s . user_owns_it )
+      . unwrap_or (false)
   }
 }

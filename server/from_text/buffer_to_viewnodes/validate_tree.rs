@@ -44,38 +44,38 @@ pub async fn find_buffer_errors_for_saving (
     let (ambiguous_deletion_ids,
          problematic_defining_ids,
          inconsistent_source_ids) =
-      find_inconsistent_instructions(forest);
+      find_inconsistent_instructions (forest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
-        errors.push (
-          BufferValidationError::AmbiguousDeletion(id)); }
+        errors . push (
+          BufferValidationError::AmbiguousDeletion (id)); }
       for id in problematic_defining_ids {
-        errors.push(
-          BufferValidationError::Multiple_Defining_Viewnodes(id)); }
+        errors . push(
+          BufferValidationError::Multiple_Defining_Viewnodes (id)); }
       for (id, sources) in inconsistent_source_ids {
-        errors.push(
+        errors . push(
           BufferValidationError::InconsistentSources(id, sources));
       }} }
   { // merge validation
     for error_msg in {
       let merge_errors: Vec<String> =
-        validate_merge_requests(forest, config, driver).await?;
+        validate_merge_requests(forest, config, driver) . await?;
       merge_errors }
-    { errors.push(
-        BufferValidationError::Other(error_msg)); }}
+    { errors . push(
+        BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     forest, &mut errors);
   { // local structure validation
     let _ = do_everywhere_in_tree_dfs_readonly(
-      forest, forest.root().id(),
+      forest, forest . root() . id(),
       &mut |node_ref| {
-        if let Err(e) = local::validate_local_structure(
-               forest, node_ref.id(), config) {
-          errors.push(
+        if let Err (e) = local::validate_local_structure(
+               forest, node_ref . id(), config) {
+          errors . push(
             BufferValidationError::LocalStructureViolation(
-              e.message, e.id )); }
+              e . message, e . id )); }
         Ok(( )) }); }
-  Ok(errors) }
+  Ok (errors) }
 
 /// For each node in the forest, if it has a definitive view request,
 /// verify that:
@@ -88,19 +88,19 @@ fn validate_definitive_view_requests (
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
-  for edge in forest.root().traverse()
-  { if let Edge::Open(node_ref) = edge
+  for edge in forest . root() . traverse()
+  { if let Edge::Open (node_ref) = edge
     { let viewnode : &UncheckedViewNode =
-        node_ref.value();
-      if let UncheckedViewNodeKind::True(t) = &viewnode.kind
-      { if t.view_requests.contains( &ViewRequest::Definitive )
-        { if let Some(id) = &t.id_opt {
+        node_ref . value();
+      if let UncheckedViewNodeKind::True (t) = &viewnode . kind
+      { if t . view_requests . contains (&ViewRequest::Definitive)
+        { if let Some (id) = &t . id_opt {
           { // Error: must be indefinitive
-            if ! t.indefinitive
-            { errors.push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id.clone() )); }}
+            if ! t . indefinitive
+            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}
           { // Error: must be childless
-            if node_ref.children().next().is_some()
-            { errors.push( BufferValidationError::DefinitiveRequestOnNodeWithChildren( id.clone() )); }}
+            if node_ref . children() . next() . is_some()
+            { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithChildren( id . clone() )); }}
           { // Error: at most one request per ID
-            if ! ids_with_requests.insert(id.clone())
-            { errors.push( BufferValidationError::MultipleDefinitiveRequestsForSameId( id.clone() )); }} }}} }} }
+            if ! ids_with_requests . insert(id . clone())
+            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId( id . clone() )); }} }}} }} }

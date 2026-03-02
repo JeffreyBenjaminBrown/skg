@@ -16,20 +16,20 @@ fn test_many_tantivy_things (
   let index_dir : &str =
     "/tmp/tantivy-test-many-things";
   let index_path: &Path =
-    Path::new ( index_dir );
+    Path::new (index_dir);
 
-  let config = load_config("tests/tantivy/fixtures/skgconfig.toml")?;
+  let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
   let nodes: Vec<SkgNode> =
-    read_all_skg_files_from_sources(&config)?;
+    read_all_skg_files_from_sources (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (
       &nodes,
       index_path )?;
   let id_field: schema::Field =
-    tantivy_index.id_field;
+    tantivy_index . id_field;
   let title_or_alias_field: schema::Field =
-    tantivy_index.title_or_alias_field;
+    tantivy_index . title_or_alias_field;
   assert!( indexed_count > 0,
            "Expected to index at least one title" );
 
@@ -38,20 +38,20 @@ fn test_many_tantivy_things (
     = search_index(
       &tantivy_index,
       "test second")?; // the search query
-  assert!(!best_matches.is_empty(),
+  assert!(!best_matches . is_empty(),
           "Expected to find at least one match");
 
   print_search_results (
-    best_matches.clone(), &searcher, id_field, title_or_alias_field)?;
+    best_matches . clone(), &searcher, id_field, title_or_alias_field)?;
 
-  if !best_matches.is_empty() {
+  if !best_matches . is_empty() {
     let (_top_score, top_doc_address): (f32, tantivy::DocAddress) =
       best_matches[0];
     let top_doc: tantivy::Document =
-      searcher.doc(top_doc_address)?;
+      searcher . doc (top_doc_address)?;
     let top_id: &str =
-      top_doc.get_first(id_field)
-      .unwrap().as_text().unwrap();
+      top_doc . get_first (id_field)
+      . unwrap() . as_text() . unwrap();
     assert!(
       top_id == "5",
       "Expected primary ID '5' to have highest score, but got: {}",
@@ -65,16 +65,16 @@ fn test_many_tantivy_things (
     : (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher)
     = search_index(&tantivy_index, "This is one big tuna.")?;
 
-  assert!(!initial_matches.is_empty(),
+  assert!(!initial_matches . is_empty(),
          "Expected to find at least one match for 'This is one big tuna.'");
 
   let (_initial_score, initial_top_address): (f32, tantivy::DocAddress) =
     initial_matches[0];
   let initial_top_doc: tantivy::Document =
-    initial_searcher.doc(initial_top_address)?;
+    initial_searcher . doc (initial_top_address)?;
   let initial_top_id: &str =
-    initial_top_doc.get_first(id_field)
-    .unwrap().as_text().unwrap();
+    initial_top_doc . get_first (id_field)
+    . unwrap() . as_text() . unwrap();
 
   assert_eq!(initial_top_id, "1",
             "Expected node 1 to be top result initially, but got: {}",
@@ -84,8 +84,8 @@ fn test_many_tantivy_things (
   // Create a new SkgNode with ID 6 and title "This is one big tuna."
   let mut new_node : SkgNode =
     empty_skgnode ();
-  { new_node.title = "This is one big tuna.".to_string();
-    new_node.ids = vec![ID::new("6")]; }
+  { new_node . title = "This is one big tuna." . to_string();
+    new_node . ids = vec![ID::new ("6")]; }
 
   // Update the index with the new node
   let update_count: usize =
@@ -100,18 +100,18 @@ fn test_many_tantivy_things (
     : (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher)
     = search_index(&tantivy_index, "This is one big tuna.")?;
 
-  assert!(final_matches.len() >= 2,
+  assert!(final_matches . len() >= 2,
          "Expected at least 2 matches after update, but got: {}",
-         final_matches.len());
+         final_matches . len());
 
   // Check first result is node 6
   let (_final_score1, final_address1): (f32, tantivy::DocAddress) =
     final_matches[0];
   let final_doc1: tantivy::Document =
-    final_searcher.doc(final_address1)?;
+    final_searcher . doc (final_address1)?;
   let final_id1: &str =
-    final_doc1.get_first(tantivy_index.id_field)
-    .unwrap().as_text().unwrap();
+    final_doc1 . get_first(tantivy_index . id_field)
+    . unwrap() . as_text() . unwrap();
 
   assert_eq!(final_id1, "6",
             "Expected node 6 to be first result after update, but got: {}",
@@ -122,10 +122,10 @@ fn test_many_tantivy_things (
   let (_final_score2, final_address2): (f32, tantivy::DocAddress) =
     final_matches[1];
   let final_doc2: tantivy::Document =
-    final_searcher.doc(final_address2)?;
+    final_searcher . doc (final_address2)?;
   let final_id2: &str =
-    final_doc2.get_first(tantivy_index.id_field)
-    .unwrap().as_text().unwrap();
+    final_doc2 . get_first(tantivy_index . id_field)
+    . unwrap() . as_text() . unwrap();
 
   assert_eq!(final_id2, "1",
             "Expected node 1 to be second result after update, but got: {}",
@@ -141,24 +141,24 @@ pub fn print_search_results(
   id_field: schema::Field,
   title_or_alias_field: schema::Field
 ) -> Result<(), Box<dyn std::error::Error>> {
-  if best_matches.is_empty() {
+  if best_matches . is_empty() {
     println!("No matches found.");
   } else {
     let mut path_to_results: HashMap <String, Vec<(f32, String)>> =
       HashMap::new();
     for (score, doc_address) in best_matches {
       let retrieved_doc: tantivy::Document =
-        searcher.doc(doc_address)?;
+        searcher . doc (doc_address)?;
       let path_value: &str =
-        retrieved_doc.get_first(id_field)
-        .unwrap().as_text().unwrap();
+        retrieved_doc . get_first (id_field)
+        . unwrap() . as_text() . unwrap();
       let title_value: &str =
-        retrieved_doc.get_first(title_or_alias_field)
-        .unwrap().as_text().unwrap();
+        retrieved_doc . get_first (title_or_alias_field)
+        . unwrap() . as_text() . unwrap();
       path_to_results
-        .entry(path_value.to_string())
-        .or_insert_with(Vec::new)
-        .push((score, title_value.to_string())); }
+        . entry(path_value . to_string())
+        . or_insert_with (Vec::new)
+        . push((score, title_value . to_string())); }
     for (path, titles) in path_to_results {
       println!("File: {}", path);
       for (score, title) in titles {
@@ -170,20 +170,20 @@ pub fn print_search_results(
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let empty_node : SkgNode = empty_skgnode ();
-  let mut apple  = empty_node.clone();
-  { apple.ids      = vec![ID::new( "apple")];
-    apple.title    =               "eat apple".to_string();
-    apple.aliases  = Some(vec![    "munch apple".to_string(),
-                                    "chomp apple".to_string() ]); }
-  let mut banana = empty_node.clone();
-  { banana.ids     = vec![ID::new( "banana")];
-    banana.title   =               "eat banana".to_string();
-    banana.aliases = Some(vec![    "chomp banana".to_string(),
-                                    "throw banana".to_string()]); }
-  let mut kiwi   = empty_node.clone();
-  { kiwi.ids       = vec![ID::new( "kiwi")];
-    kiwi.title     =               "eat kiwi".to_string();
-    kiwi.aliases   = Some(vec![    "munch kiwi".to_string()]); }
+  let mut apple  = empty_node . clone();
+  { apple . ids      = vec![ID::new ("apple")];
+    apple . title    =               "eat apple" . to_string();
+    apple . aliases  = Some(vec![    "munch apple" . to_string(),
+                                    "chomp apple" . to_string() ]); }
+  let mut banana = empty_node . clone();
+  { banana . ids     = vec![ID::new ("banana")];
+    banana . title   =               "eat banana" . to_string();
+    banana . aliases = Some(vec![    "chomp banana" . to_string(),
+                                    "throw banana" . to_string()]); }
+  let mut kiwi   = empty_node . clone();
+  { kiwi . ids       = vec![ID::new ("kiwi")];
+    kiwi . title     =               "eat kiwi" . to_string();
+    kiwi . aliases   = Some(vec![    "munch kiwi" . to_string()]); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -193,7 +193,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it(
       &nodes,
-      Path::new(index_dir) )?;
+      Path::new (index_dir) )?;
 
   println!("Indexed {} documents", _indexed_count);
 
@@ -202,19 +202,19 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     search_index(
       &tantivy_index, "eat apple")?;
   let ids1: Vec<String> =
-    matches1.iter()
-    .map(|(_score, doc_address)| {
+    matches1 . iter()
+    . map(|(_score, doc_address)| {
       let doc = searcher1 . doc (*doc_address) . unwrap();
-      doc . get_first(tantivy_index.id_field) . unwrap()
+      doc . get_first(tantivy_index . id_field) . unwrap()
         . as_text() . unwrap() . to_string() })
-    .collect();
+    . collect();
 
   // Should return apple as top hit, and also banana and kiwi somewhere
   assert_eq!(ids1[0], "apple",
              "'eat apple' search should return apple as top hit");
-  assert!(ids1.contains(&"banana".to_string()),
+  assert!(ids1 . contains(&"banana" . to_string()),
           "'eat apple' search should include banana");
-  assert!(ids1.contains(&"kiwi".to_string()),
+  assert!(ids1 . contains(&"kiwi" . to_string()),
           "'eat apple' search should include kiwi");
   println!("✓ Test 1 passed: 'eat apple' returned {:?}",
            ids1);
@@ -222,29 +222,29 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   // Test 2: Search for "chomp apple"
   let (matches2, searcher2) =
     search_index(&tantivy_index, "chomp apple")?;
-  let ids2: Vec<String> = matches2.iter()
-    .map(|(_score, doc_address)| {
-      let doc = searcher2.doc(*doc_address).unwrap();
-      doc.get_first(tantivy_index.id_field).unwrap().as_text().unwrap().to_string()
+  let ids2: Vec<String> = matches2 . iter()
+    . map(|(_score, doc_address)| {
+      let doc = searcher2 . doc (*doc_address) . unwrap();
+      doc . get_first(tantivy_index . id_field) . unwrap() . as_text() . unwrap() . to_string()
     })
-    .collect();
+    . collect();
 
   // Should return apple as top hit, banana somewhere, but not kiwi
   assert_eq!(ids2[0], "apple", "chomp apple search should return apple as top hit");
-  assert!(ids2.contains(&"banana".to_string()), "chomp apple search should include banana");
-  assert!(!ids2.contains(&"kiwi".to_string()), "chomp apple search should not include kiwi");
+  assert!(ids2 . contains(&"banana" . to_string()), "chomp apple search should include banana");
+  assert!(!ids2 . contains(&"kiwi" . to_string()), "chomp apple search should not include kiwi");
   println!("✓ Test 2 passed: 'chomp apple' returned {:?}", ids2);
 
   // Test 3: Search for "throw banana"
   let (matches3, searcher3) = search_index(&tantivy_index, "throw banana")?;
-  let ids3: Vec<String> = matches3.iter()
-    .map(|(_score, doc_address)| {
-      let doc = searcher3.doc(*doc_address).unwrap();
-      doc.get_first(tantivy_index.id_field).unwrap().as_text().unwrap().to_string()
+  let ids3: Vec<String> = matches3 . iter()
+    . map(|(_score, doc_address)| {
+      let doc = searcher3 . doc (*doc_address) . unwrap();
+      doc . get_first(tantivy_index . id_field) . unwrap() . as_text() . unwrap() . to_string()
     })
-    .collect();
+    . collect();
 
-  assert_eq!(ids3.len(), 3,
+  assert_eq!(ids3 . len(), 3,
              "'throw banana' search should return only three results (the ones for banana)");
   assert_eq!(ids3[0], "banana",
              "'throw banana' search should return banana (via the alias 'throw banana'");

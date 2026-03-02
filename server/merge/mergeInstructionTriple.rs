@@ -24,15 +24,15 @@ pub async fn instructiontriples_from_the_merges_in_an_viewnode_forest(
             Box<dyn Error>> {
   let mut merges: Vec<Merge> =
     Vec::new();
-  for edge in forest.root().traverse() {
-    if let ego_tree::iter::Edge::Open(node_ref) = edge {
-      if let Some(merge) =
+  for edge in forest . root() . traverse() {
+    if let ego_tree::iter::Edge::Open (node_ref) = edge {
+      if let Some (merge) =
         optmerge_from_viewnode(
-          { let viewnode : &ViewNode = node_ref.value();
+          { let viewnode : &ViewNode = node_ref . value();
             viewnode },
-          config, driver ). await?
-        { merges.push(merge); }} }
-  Ok(merges) }
+          config, driver ) . await?
+        { merges . push (merge); }} }
+  Ok (merges) }
 
 /// Returns Some(Merge) if the viewnode has a merge instruction,
 /// None otherwise.
@@ -43,29 +43,29 @@ async fn optmerge_from_viewnode (
 ) -> Result<Option<Merge>,
             Box<dyn Error>> {
   let t : &TrueNode = match &node . kind {
-    ViewNodeKind::True(t) => t,
-    _ => return Ok(None) };
+    ViewNodeKind::True (t) => t,
+    _ => return Ok (None) };
   let acquiree_id = match &t . edit_request {
-    Some(EditRequest::Merge(id)) => id,
-    _ => return Ok(None) };
+    Some(EditRequest::Merge (id)) => id,
+    _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;
   let acquirer_from_disk : SkgNode =
     skgnode_from_id(
-      config, driver, acquirer_id ). await?;
+      config, driver, acquirer_id ) . await?;
   let acquiree_from_disk : SkgNode =
     skgnode_from_id(
-      config, driver, &acquiree_id ). await?;
+      config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : SkgNode =
-    create_acquiree_text_preserver ( &acquiree_from_disk );
+    create_acquiree_text_preserver (&acquiree_from_disk);
   let updated_acquirer : SkgNode =
     three_merged_skgnodes( &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver)?;
   Ok(Some(Merge {
     acquiree_text_preserver :
-      SaveNode(acquiree_text_preserver),
+      SaveNode (acquiree_text_preserver),
     updated_acquirer :
-      SaveNode(updated_acquirer),
+      SaveNode (updated_acquirer),
     acquiree_to_delete :
       DeleteNode {
         id     : acquiree_id . clone(),
@@ -84,66 +84,66 @@ fn three_merged_skgnodes(
   acquiree_text_preserver: &SkgNode,
 ) -> Result<SkgNode, String> {
   let mut updated_acquirer: SkgNode =
-    acquirer_from_disk.clone();
+    acquirer_from_disk . clone();
   { // Append acquiree's IDs to acquirer's.
     let mut combined_ids : Vec<ID> =
-      acquirer_from_disk.ids.clone();
-    combined_ids.extend(
-      acquiree_from_disk.ids.clone() );
-    updated_acquirer.ids = (
+      acquirer_from_disk . ids . clone();
+    combined_ids . extend(
+      acquiree_from_disk . ids . clone() );
+    updated_acquirer . ids = (
       // this dedup is kind of absurdly defensive, but cheap
-      dedup_vector(combined_ids) ); }
+      dedup_vector (combined_ids) ); }
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
-      vec![ acquiree_text_preserver.primary_id()? . clone() ];
-    combined.extend(
-      acquirer_from_disk.contains.clone().unwrap_or_default() );
-    combined.extend(
-      acquiree_from_disk.contains.clone().unwrap_or_default() );
-    dedup_vector(combined) };
-  updated_acquirer.contains = // update 'contains'
-    Some(new_contains.clone());
+      vec![ acquiree_text_preserver . primary_id()? . clone() ];
+    combined . extend(
+      acquirer_from_disk . contains . clone() . unwrap_or_default() );
+    combined . extend(
+      acquiree_from_disk . contains . clone() . unwrap_or_default() );
+    dedup_vector (combined) };
+  updated_acquirer . contains = // update 'contains'
+    Some(new_contains . clone());
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
-      acquirer_from_disk.subscribes_to.clone().unwrap_or_default();
-    combined.extend(
-      acquiree_from_disk.subscribes_to.clone().unwrap_or_default() );
-    updated_acquirer.subscribes_to = Some(dedup_vector(combined)); }
+      acquirer_from_disk . subscribes_to . clone() . unwrap_or_default();
+    combined . extend(
+      acquiree_from_disk . subscribes_to . clone() . unwrap_or_default() );
+    updated_acquirer . subscribes_to = Some(dedup_vector (combined)); }
   { // Combine hides_from_its_subscriptions,
     // filtering to hide nothing that the acquirer contains.
     let mut combined : Vec<ID> =
       acquirer_from_disk . hides_from_its_subscriptions
       . clone() . unwrap_or_default();
-    combined.extend(
+    combined . extend(
       acquiree_from_disk . hides_from_its_subscriptions
         . clone() . unwrap_or_default() );
     updated_acquirer . hides_from_its_subscriptions =
       Some( { let deduped_and_filtered : Vec<ID> =
                 // if it's in 'new_contains', then it's not here
                 setlike_vector_subtraction(
-                    dedup_vector(combined),
+                    dedup_vector (combined),
                     &new_contains);
               deduped_and_filtered } ); }
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
       acquirer_from_disk . overrides_view_of
       . clone() . unwrap_or_default();
-    combined.extend(
+    combined . extend(
       acquiree_from_disk . overrides_view_of
         . clone() . unwrap_or_default() );
     updated_acquirer . overrides_view_of =
-      Some(dedup_vector(combined)); }
-  Ok(updated_acquirer) }
+      Some(dedup_vector (combined)); }
+  Ok (updated_acquirer) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
   SkgNode {
-    title: format!("MERGED: {}", acquiree.title),
+    title: format!("MERGED: {}", acquiree . title),
     aliases: None,
     source: acquiree . source . clone(),
-    ids: vec![ID(uuid::Uuid::new_v4().to_string())],
-    body: acquiree.body.clone(),
+    ids: vec![ID(uuid::Uuid::new_v4() . to_string())],
+    body: acquiree . body . clone(),
     contains                     : Some(vec![]),
     subscribes_to                : Some(vec![]),
     hides_from_its_subscriptions : Some(vec![]),

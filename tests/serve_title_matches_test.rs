@@ -27,7 +27,7 @@ fn test_title_matches_org_format (
       let mut node1 : SkgNode = // the best match
         empty_skgnode ();
       node1 . ids =
-        vec! [ ID::new ( "id_1" ) ];
+        vec! [ ID::new ("id_1") ];
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
@@ -39,14 +39,14 @@ fn test_title_matches_org_format (
       let mut node2 : SkgNode = // matches, but less well
         empty_skgnode ();
       node2 . ids =
-        vec! [ ID::new ( "id_2" ) ];
+        vec! [ ID::new ("id_2") ];
       node2 . title =
         "cheese makes me happy" . to_string ();
 
       let mut node3 : SkgNode = // will not match
         empty_skgnode ();
       node3 . ids =
-        vec! [ ID::new ( "id_3" ) ];
+        vec! [ ID::new ("id_3") ];
       node3 . title =
         "aliens evade silently" . to_string ();
 
@@ -56,7 +56,7 @@ fn test_title_matches_org_format (
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         in_fs_wipe_index_then_create_it (
           &nodes,
-          Path::new ( index_dir ) ) ?;
+          Path::new (index_dir) ) ?;
       let search_terms : &str =
         "the bear eats cheese";
       let result : String =
@@ -69,13 +69,13 @@ fn test_title_matches_org_format (
       // Extract just the links from each line
       fn extract_link ( line: &str
       ) -> Option < (String, String) > {
-        if let Some ( start ) = line . find ( "[[id:" ) {
+        if let Some (start) = line . find ("[[id:") {
           let link_part : &str =
             &line [ start.. ];
-          if let Some ( id_end ) = link_part . find ( "][" ) {
+          if let Some (id_end) = link_part . find ("][") {
             let id : String =
               link_part [ 5..id_end ] . to_string ();
-            if let Some ( title_end ) = link_part . find ( "]]" ) {
+            if let Some (title_end) = link_part . find ("]]") {
               let title : String =
                 link_part [ id_end + 2..title_end ] . to_string ();
               return Some ( (id, title) ); }} }
@@ -90,22 +90,22 @@ fn test_title_matches_org_format (
         Vec::new ();
 
       for line in lines {
-        if line . starts_with ( "** " ) {
+        if line . starts_with ("** ") {
           if ! level3_under_current . is_empty () {
             // Save any accumulated level-3 headlines
             all_level3_groups . push (
               level3_under_current . clone () );
             level3_under_current . clear (); }
-          if let Some ( link ) = extract_link ( line ) {
+          if let Some (link) = extract_link (line) {
             // Extract this level-2 headline
-            level2_headlines . push ( link ); }
-        } else if line . starts_with ( "*** " ) {
+            level2_headlines . push (link); }
+        } else if line . starts_with ("*** ") {
           // Extract level-3 headline
-          if let Some ( link ) = extract_link ( line ) {
-            level3_under_current . push ( link ); }} }
+          if let Some (link) = extract_link (line) {
+            level3_under_current . push (link); }} }
       if ! level3_under_current . is_empty () {
         // Don't forget the last group
-        all_level3_groups . push ( level3_under_current ); }
+        all_level3_groups . push (level3_under_current); }
 
       // Verify the structure
       assert_eq! ( level2_headlines . len (), 2,
@@ -143,7 +143,7 @@ fn test_title_matches_org_format (
                      "All level-3 headlines should have same ID as parent" );
       }
 
-      println! ( "✓ Org-mode format verified successfully" );
+      println! ("✓ Org-mode format verified successfully");
       Ok ( () )
     }) ();
 
@@ -151,15 +151,15 @@ fn test_title_matches_org_format (
   match test_result {
     Ok ( () ) => {
       // Test passed, clean up
-      if Path::new ( index_dir ) . exists () {
-        fs::remove_dir_all ( index_dir ) ?;
+      if Path::new (index_dir) . exists () {
+        fs::remove_dir_all (index_dir) ?;
       }
       Ok ( () )
     },
-    Err ( e ) => {
+    Err (e) => {
       // Test failed, preserve directory
       println! ( "Test failed. Preserving index directory at {} for debugging.", index_dir );
-      Err ( e )
+      Err (e)
     }
   }
 }

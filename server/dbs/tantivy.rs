@@ -23,13 +23,13 @@ use std::error::Error;
 pub(super) fn mk_tantivy_schema() -> schema::Schema {
   let mut schema_builder : schema::SchemaBuilder =
     schema::Schema::builder();
-  schema_builder.add_text_field(
+  schema_builder . add_text_field(
     "id", schema::STRING | schema::STORED);
-  schema_builder.add_text_field(
+  schema_builder . add_text_field(
     "title_or_alias", schema::TEXT | schema::STORED);
-  schema_builder.add_text_field(
+  schema_builder . add_text_field(
     "source", schema::STRING | schema::STORED);
-  schema_builder.build() }
+  schema_builder . build() }
 
 /// Returns the top 10 matching Tantivy "Documents"
 /// (see glossary, above).
@@ -47,17 +47,17 @@ pub fn search_index (
     query_text);
   let searcher : Searcher = {
     let reader : IndexReader =
-      tantivy_index.index.reader () ?;
-    reader } .searcher();
+      tantivy_index . index . reader () ?;
+    reader } . searcher();
   let query : Box < dyn Query > = {
     let query_parser : QueryParser =
       QueryParser::for_index (
-        &tantivy_index.index,
-        vec! [ tantivy_index.title_or_alias_field ] );
-    query_parser } .parse_query ( query_text ) ?;
+        &tantivy_index . index,
+        vec! [ tantivy_index . title_or_alias_field ] );
+    query_parser } . parse_query (query_text) ?;
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
-      searcher.search (
+      searcher . search (
         &query, &TopDocs::with_limit (10) )?;
     best_matches },
        searcher )) }
@@ -72,10 +72,10 @@ pub fn update_index_with_nodes (
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
-    tantivy_index.index.writer(50_000_000)?;
+    tantivy_index . index . writer (50_000_000)?;
   delete_nodes_from_index(
     // Delete those IDs from the index. (They'll come back.)
-    nodes.iter(), &mut writer, tantivy_index)?;
+    nodes . iter(), &mut writer, tantivy_index)?;
   let processed_count: usize = // Add new associations.
     add_documents_to_tantivy_writer (
       nodes, &mut writer, tantivy_index)?;
@@ -90,11 +90,11 @@ pub fn delete_nodes_from_index<'a, I>(
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a SkgNode>, {
   for node in nodes_iter {
-    if !node.ids.is_empty() {
-      let primary_id : &ID = node.primary_id()?;
+    if !node . ids . is_empty() {
+      let primary_id : &ID = node . primary_id()?;
       writer . delete_term (
-        Term::from_field_text( tantivy_index.id_field,
-                               primary_id.as_str() ) ); }}
+        Term::from_field_text( tantivy_index . id_field,
+                               primary_id . as_str() ) ); }}
   Ok (( )) }
 
 pub fn delete_nodes_by_id_from_index<'a, I>(
@@ -106,8 +106,8 @@ where I: Iterator<Item = Result<&'a ID, String>>, {
   for id_result in ids_iter {
     let id : &ID = id_result?;
     writer . delete_term (
-      Term::from_field_text( tantivy_index.id_field,
-                             id.as_str() ) ); }
+      Term::from_field_text( tantivy_index . id_field,
+                             id . as_str() ) ); }
   Ok (( )) }
 
 pub fn add_documents_to_tantivy_writer<'a, I> (
@@ -123,7 +123,7 @@ where I: IntoIterator<Item = &'a SkgNode>, {
       create_documents_from_node(
         node, tantivy_index )?;
     for document in documents {
-      writer.add_document (document)?;
+      writer . add_document (document)?;
       indexed_count += 1; }}
   Ok (indexed_count) }
 
@@ -136,25 +136,25 @@ fn create_documents_from_node (
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {
 
-  let primary_id : &ID = node.primary_id()?;
+  let primary_id : &ID = node . primary_id()?;
   let mut documents: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =
-    vec![node.title.clone()];
-  if let Some(aliases) = &node.aliases {
+    vec![node . title . clone()];
+  if let Some (aliases) = &node . aliases {
     titles_and_aliases . extend(
-      aliases.clone () ); }
+      aliases . clone () ); }
   for title_or_alias in titles_and_aliases {
-    documents.push (
+    documents . push (
       doc!(
         tantivy_index . id_field =>
-          primary_id.as_str (),
+          primary_id . as_str (),
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
             & title_or_alias ),
         tantivy_index . source_field =>
-          node.source.as_str() ) ); }
-  Ok ( documents ) }
+          node . source . as_str() ) ); }
+  Ok (documents) }
 
 pub fn commit_with_status (
   writer: &mut IndexWriter,
@@ -164,7 +164,7 @@ pub fn commit_with_status (
   if indexed_count > 0 {
     println!( "{} {} documents. Committing changes...",
               operation, indexed_count );
-    writer.commit () ?;
+    writer . commit () ?;
   } else {
     println!("No documents to process found."); }
   Ok (( )) }

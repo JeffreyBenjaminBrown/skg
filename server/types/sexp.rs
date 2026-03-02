@@ -30,9 +30,9 @@ pub fn atom_to_string (
   atom : &Sexp
 ) -> Result<String, String> {
   match atom {
-    Sexp::Atom ( Atom::S ( s ) ) => Ok ( s . clone () ),
-    Sexp::Atom ( Atom::I ( i ) ) => Ok ( i . to_string () ),
-    Sexp::Atom ( Atom::F ( f ) ) => Ok ( f . to_string () ),
+    Sexp::Atom ( Atom::S (s) ) => Ok ( s . clone () ),
+    Sexp::Atom ( Atom::I (i) ) => Ok ( i . to_string () ),
+    Sexp::Atom ( Atom::F (f) ) => Ok ( f . to_string () ),
     _ => Err ( "Expected atom (string, integer, or float)"
                 . to_string () ), }}
 
@@ -43,16 +43,16 @@ pub fn extract_v_from_kv_pair_in_sexp (
   key  : &str,
 ) -> Result<String, String> {
   match sexp {
-    Sexp::List ( items ) => {
+    Sexp::List (items) => {
       for item in items {
-        if let Sexp::List ( pair ) = item {
-          if pair.len() == 3 {
-            if let ( Sexp::Atom ( Atom::S ( k ) ),
-                     Sexp::Atom ( Atom::S ( dot ) ),
-                     Sexp::Atom ( Atom::S ( value ) ) ) =
+        if let Sexp::List (pair) = item {
+          if pair . len() == 3 {
+            if let ( Sexp::Atom ( Atom::S (k) ),
+                     Sexp::Atom ( Atom::S (dot) ),
+                     Sexp::Atom ( Atom::S (value) ) ) =
               ( &pair[0], &pair[1], &pair[2] )
             { if k == key && dot == "." {
-              return Ok ( value.clone() ); }} }} }
+              return Ok ( value . clone() ); }} }} }
       Err ( format! (
         "No {} field found in S-expression", key ) ) },
     _ => Err ( "Expected list as top-level S-expression"

@@ -30,17 +30,17 @@ pub fn validate_local_structure (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result<(), LocalStructureError> {
-  let Some(node_ref) = tree.get(node_id)
+  let Some (node_ref) = tree . get (node_id)
     else { return Err(LocalStructureError {
-      message: "node not found".to_string(),
-      id: ID::from("<unknown>"),
+      message: "node not found" . to_string(),
+      id: ID::from ("<unknown>"),
     }); };
 
   let errors : Vec<String> =
-    match &node_ref.value().kind
-    { UncheckedViewNodeKind::True(t) =>
+    match &node_ref . value() . kind
+    { UncheckedViewNodeKind::True (t) =>
         validate_truenode(tree, node_id, t, config),
-      UncheckedViewNodeKind::Scaff(s) => match s {
+      UncheckedViewNodeKind::Scaff (s) => match s {
         Scaffold::BufferRoot =>
           validate_buffer_root(tree, node_id),
         Scaffold::Alias { .. } =>
@@ -59,17 +59,17 @@ pub fn validate_local_structure (
           validate_idcol(tree, node_id),
         Scaffold::ID { .. } =>
           validate_idscaffold(tree, node_id), },
-      UncheckedViewNodeKind::Deleted ( _ ) => Vec::new(),
+      UncheckedViewNodeKind::Deleted (_) => Vec::new(),
       UncheckedViewNodeKind::DeletedScaff => Vec::new() };
 
-  if errors.is_empty() {
+  if errors . is_empty() {
     Ok (( ))
   } else {
     let id : ID =
       id_from_self_or_nearest_ancestor(tree, node_id)
-      . unwrap_or_else(|_| ID::from("<no ancestor ID>"));
+      . unwrap_or_else(|_| ID::from ("<no ancestor ID>"));
     Err(LocalStructureError {
-      message: errors.join("; "),
+      message: errors . join ("; "),
       id,
     } ) }}
 
@@ -80,13 +80,13 @@ fn validate_buffer_root (
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(
     tree, node_id, -1, false)
-  { errors.push("BufferRoot must have no parent.".to_string() ); }
+  { errors . push("BufferRoot must have no parent." . to_string() ); }
   if !generation_includes_only(
     tree, node_id, 1, false,
-    |node| matches!(&node.kind,
-                    UncheckedViewNodeKind::True(_) |
-                    UncheckedViewNodeKind::Deleted(_) ))
- { errors.push("BufferRoot's children must be TrueNodes."
+    |node| matches!(&node . kind,
+                    UncheckedViewNodeKind::True (_) |
+                    UncheckedViewNodeKind::Deleted (_) ))
+ { errors . push("BufferRoot's children must be TrueNodes."
                 . to_string() ); }
   errors }
 
@@ -96,10 +96,10 @@ fn validate_alias (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors.push("Alias must have no (non-ignored) children.".to_string()); }
+    errors . push("Alias must have no (non-ignored) children." . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::AliasCol))) {
-    errors.push("Alias must have an AliasCol parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::AliasCol))) {
+    errors . push("Alias must have an AliasCol parent." . to_string()); }
   errors }
 
 fn validate_aliascol (
@@ -108,15 +108,15 @@ fn validate_aliascol (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::Alias { .. }))) {
-    errors.push("AliasCol's (non-ignored) children must include only Aliases."
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff(Scaffold::Alias { .. }))) {
+    errors . push("AliasCol's (non-ignored) children must include only Aliases."
                 . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("AliasCol must have a TrueNode parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("AliasCol must have a TrueNode parent." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::AliasCol))) {
-    errors.push("AliasCol must be unique among its siblings.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::AliasCol))) {
+    errors . push("AliasCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_hidden_in_subscribee_col (
@@ -125,14 +125,14 @@ fn validate_hidden_in_subscribee_col (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)" . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden).".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden)." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::HiddenInSubscribeeCol))) {
-    errors.push("HiddenInSubscribeeCol must be unique among its siblings.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol))) {
+    errors . push("HiddenInSubscribeeCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_hidden_outside_of_subscribee_col (
@@ -141,14 +141,14 @@ fn validate_hidden_outside_of_subscribee_col (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::SubscribeeCol))) {
-    errors.push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol))) {
+    errors . push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors.push("HiddenOutsideOfSubscribeeCol must be unique among its siblings.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
+    errors . push("HiddenOutsideOfSubscribeeCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_subscribeecol (
@@ -157,15 +157,15 @@ fn validate_subscribeecol (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("SubscribeeCol must have a TrueNode parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("SubscribeeCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind,
-         UncheckedViewNodeKind::True(_) |
-         UncheckedViewNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors.push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol.".to_string()); }
+       matches!(&node . kind,
+         UncheckedViewNodeKind::True (_) |
+         UncheckedViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
+    errors . push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors.push("SubscribeeCol must not have duplicate TrueNode children.".to_string()); }
+    errors . push("SubscribeeCol must not have duplicate TrueNode children." . to_string()); }
   errors }
 
 fn validate_text_changed (
@@ -174,13 +174,13 @@ fn validate_text_changed (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("TextChanged must have a TrueNode parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("TextChanged must have a TrueNode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors.push("TextChanged must have no (non-ignroed) children.".to_string()); }
+    errors . push("TextChanged must have no (non-ignroed) children." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::TextChanged))) {
-    errors.push("TextChanged must be unique among its siblings.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::TextChanged))) {
+    errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idcol (
@@ -189,15 +189,15 @@ fn validate_idcol (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::True(_))) {
-    errors.push("IDCol must have a TrueNode parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+    errors . push("IDCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::ID { .. } )) ) {
-    errors.push("IDCol's (non-ignored) children can only be ID scaffolds."
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff(Scaffold::ID { .. } )) ) {
+    errors . push("IDCol's (non-ignored) children can only be ID scaffolds."
                 . to_string() ); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::IDCol))) {
-    errors.push("IDCol must be unique among its siblings.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::IDCol))) {
+    errors . push("IDCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idscaffold (
@@ -206,10 +206,10 @@ fn validate_idscaffold (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors.push("ID scaffold must have no (non-ignored) children.".to_string()); }
+    errors . push("ID scaffold must have no (non-ignored) children." . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node.kind, UncheckedViewNodeKind::Scaff(Scaffold::IDCol))) {
-    errors.push("ID scaffold must have an IDCol parent.".to_string()); }
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::IDCol))) {
+    errors . push("ID scaffold must have an IDCol parent." . to_string()); }
   errors }
 
 fn validate_truenode (
@@ -219,38 +219,38 @@ fn validate_truenode (
   config  : &SkgConfig,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
-  if !has_id(t) {
-    errors.push("TrueNode must have an ID.".to_string()); }
+  if !has_id (t) {
+    errors . push("TrueNode must have an ID." . to_string()); }
   if !has_valid_source(t, config) {
-    errors.push("TrueNode must have a source that exists in the config."
+    errors . push("TrueNode must have a source that exists in the config."
                 . to_string() ); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node.kind,
-         UncheckedViewNodeKind::True(_)                        |
-         UncheckedViewNodeKind::Scaff(Scaffold::AliasCol)      |
-         UncheckedViewNodeKind::Scaff(Scaffold::IDCol)         |
-         UncheckedViewNodeKind::Scaff(Scaffold::SubscribeeCol) |
-         UncheckedViewNodeKind::Scaff(Scaffold::TextChanged)   |
-         UncheckedViewNodeKind::Deleted(_)                     |
+       matches!(&node . kind,
+         UncheckedViewNodeKind::True (_)                        |
+         UncheckedViewNodeKind::Scaff (Scaffold::AliasCol)      |
+         UncheckedViewNodeKind::Scaff (Scaffold::IDCol)         |
+         UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol) |
+         UncheckedViewNodeKind::Scaff (Scaffold::TextChanged)   |
+         UncheckedViewNodeKind::Deleted (_)                     |
          UncheckedViewNodeKind::DeletedScaff                   )) {
-    errors.push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff".to_string()); }
+    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors.push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).".to_string()); }
-  if t.indefinitive && t.edit_request.is_some() {
-    errors.push("Indefinitive node must not have an edit request.".to_string()); }
+    errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
+  if t . indefinitive && t . edit_request . is_some() {
+    errors . push("Indefinitive node must not have an edit request." . to_string()); }
   errors }
 
 /// Check if an UncheckedTrueNode has an ID.
 pub fn has_id ( t : &UncheckedTrueNode ) -> bool {
-  t.id_opt.is_some() }
+  t . id_opt . is_some() }
 
 /// Check if an UncheckedTrueNode has a source and it exists in the config.
 pub fn has_valid_source (
   t      : &UncheckedTrueNode,
   config : &SkgConfig,
 ) -> bool {
-  t.source_opt.as_ref()
-    .is_some_and( |s| config.sources.contains_key(s) ) }
+  t . source_opt . as_ref()
+    . is_some_and( |s| config . sources . contains_key (s) ) }
 
 /// Check that all non-ignored TrueNode children have distinct IDs.
 /// "Non-ignored" means parent_ignores == false.
@@ -260,13 +260,13 @@ pub fn nonignored_children_have_distinct_ids (
   tree    : &Tree<UncheckedViewNode>,
   node_id : NodeId,
 ) -> bool {
-  let Some(node_ref) = tree.get(node_id)
+  let Some (node_ref) = tree . get (node_id)
     else { return true; };
   let mut seen : HashSet<ID> = HashSet::new();
-  for child in node_ref.children() {
-    if let UncheckedViewNodeKind::True(t) = &child.value().kind {
-      if !t.parent_ignores {
-        if let Some(id) = &t.id_opt {
-          if !seen.insert(id.clone()) {
+  for child in node_ref . children() {
+    if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
+      if !t . parent_ignores {
+        if let Some (id) = &t . id_opt {
+          if !seen . insert(id . clone()) {
             return false; }} }} }
   true }

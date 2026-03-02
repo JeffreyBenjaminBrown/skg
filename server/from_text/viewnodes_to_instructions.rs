@@ -28,12 +28,12 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
     naive_saveinstructions_from_tree (
       forest . clone( )) ?;
   let instructions_without_dups : Vec<DefineNode> =
-    reconcile_same_id_instructions ( naive_instructions ) ?;
+    reconcile_same_id_instructions (naive_instructions) ?;
   let mut result : Vec<DefineNode> = // Mapping supplement_none_fields_from_disk_if_save over instructions_without_dups would be simpler, but async functions can't be mapped.
-    Vec::with_capacity ( instructions_without_dups.len() );
+    Vec::with_capacity ( instructions_without_dups . len() );
   for instr in instructions_without_dups {
     result . push (
       supplement_none_fields_from_disk_if_save (
         config, driver, pool, instr
-      ). await ? ); }
+      ) . await ? ); }
   Ok (result) }

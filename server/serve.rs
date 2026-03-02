@@ -37,28 +37,28 @@ pub fn serve (
 
   { // Set up signal handler for Ctrl+C and SIGTERM,
     // for graceful shutdown with database cleanup.
-    let driver_for_signal : Arc<TypeDBDriver> = Arc::clone ( &typedb_driver );
+    let driver_for_signal : Arc<TypeDBDriver> = Arc::clone (&typedb_driver);
     let config_for_signal : SkgConfig = config . clone ();
     ctrlc::set_handler ( move || {
-      println! ( "\nReceived shutdown signal..." );
+      println! ("\nReceived shutdown signal...");
       cleanup_and_shutdown (
         &driver_for_signal,
         &config_for_signal );
-    } ) . expect ( "Error setting Ctrl+C handler" ); }
+    } ) . expect ("Error setting Ctrl+C handler"); }
 
   // Bind to TCP port for Rust-Emacs API communication.
   let emacs_listener : TcpListener =
     TcpListener::bind (
-      & format!("0.0.0.0:{}", config.port) )?;
+      & format!("0.0.0.0:{}", config . port) )?;
   println!("Listening on port {} for Emacs connections...",
-           config.port);
+           config . port);
 
-  for stream_res in emacs_listener.incoming() { // the loop
+  for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {
-      Ok(stream) => {
+      Ok (stream) => {
         let stream : TcpStream = stream; // for type sig
         let typedb_driver_clone : Arc<TypeDBDriver> =
-          Arc::clone( &typedb_driver ); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
+          Arc::clone (&typedb_driver); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
         let tantivy_index_clone : TantivyIndex =
           tantivy_index . clone ();
         let config_clone : SkgConfig =
@@ -69,7 +69,7 @@ pub fn serve (
             typedb_driver_clone,
             tantivy_index_clone,
             & config_clone, ) } ); }
-      Err(e) => {
+      Err (e) => {
         eprintln!("Connection failed: {e}"); }} }
   Ok (( )) }
 
@@ -96,13 +96,13 @@ fn handle_emacs (
     = BufReader::new (
       stream . try_clone() . unwrap() );
   let mut request_header : String = String::new();
-  while let Ok(n) =
-    reader.read_line( &mut request_header ) { // reads until a newline
+  while let Ok (n) =
+    reader . read_line (&mut request_header) { // reads until a newline
       if n == 0 { break; } // emacs disconnected
-      println! ( "Received request: {}", request_header.trim_end () );
-      match request_type_from_request( &request_header ) {
+      println! ( "Received request: {}", request_header . trim_end () );
+      match request_type_from_request (&request_header) {
         // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
-        Ok(request_type) => {
+        Ok (request_type) => {
           if request_type == "single root content view" {
             handle_single_root_view_request (
               &mut stream,
@@ -151,14 +151,14 @@ fn handle_emacs (
                          request_type );
             println!("{}", error_msg);
             send_response ( &mut stream, &error_msg ); }}
-        Err(err) => {
+        Err (err) => {
           println!("Error determining request type: {}",
                    err);
           send_response(
             &mut stream, &format!(
               "Error determining request type: {}",
               err)); } };
-      request_header.clear(); }
+      request_header . clear(); }
   println!("Emacs disconnected: {peer}"); }
 
 /// Handle git diff mode toggle request.
@@ -204,14 +204,14 @@ fn cleanup_and_shutdown (
     // Wait briefly to allow any pending operations to complete.
     // This helps ensure the database isn't marked as "in use".
     std::thread::sleep (
-      std::time::Duration::from_millis ( 100 ) );
+      std::time::Duration::from_millis (100) );
 
     futures::executor::block_on ( async {
-      if let Err ( e ) =
+      if let Err (e) =
         delete_database (
           typedb_driver, & config . db_name )
         . await {
           eprintln! ( "Failed to delete database: {}", e );
         }} ); }
-  println! ( "Shutdown complete." );
+  println! ("Shutdown complete.");
   std::process::exit (0); }

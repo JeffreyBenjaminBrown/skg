@@ -30,8 +30,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let mut config: SkgConfig =
       load_config(
         "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config.db_name = "skg-test-multi-source-errors-1".to_string();
-    config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-1");
+    config . db_name = "skg-test-multi-source-errors-1" . to_string();
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-1");
 
     // Set up TypeDB driver
     let driver: TypeDBDriver =
@@ -39,15 +39,15 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
         "127.0.0.1:1729",
         Credentials::new("admin", "password"),
         DriverOptions::new(false, None)?
-      ).await?;
+      ) . await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    overwrite_new_empty_db(&config . db_name, &driver) . await?;
+    define_schema(&config . db_name, &driver) . await?;
+    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
@@ -61,62 +61,62 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
     let mut forest: Tree<UncheckedViewNode> =
-      org_to_uninterpreted_nodes (&buffer_text)?.0;
+      org_to_uninterpreted_nodes (&buffer_text)?. 0;
     add_missing_info_to_forest(
-      &mut forest, &config.db_name, &driver).await?;
+      &mut forest, &config . db_name, &driver) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
-        &forest, &config, &driver).await?;
+        &forest, &config, &driver) . await?;
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
       // and one for pub-1 (no source at all).
-      let source_re = Regex::new(r"(?i)truenod.*must.*source").unwrap();
+      let source_re = Regex::new(r"(?i)truenod.*must.*source") . unwrap();
       let source_errors: Vec<&BufferValidationError>
-      = ( errors.iter()
+      = ( errors . iter()
           . filter(
             |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                         if source_re.is_match(msg)))
+                         if source_re . is_match (msg)))
           . collect() );
-      assert_eq!(source_errors.len(), 2,
+      assert_eq!(source_errors . len(), 2,
                  "Expected 2 source validation errors (pub-1 and dub-1)");
-      let ids: Vec<&str> = source_errors.iter()
-        .filter_map(|e| {
+      let ids: Vec<&str> = source_errors . iter()
+        . filter_map(|e| {
           if let BufferValidationError::LocalStructureViolation(_, id) = e {
-            Some(id.0.as_str())
+            Some(id . 0 . as_str())
           } else { None } })
-        .collect();
-      assert!(ids.contains(&"dub-1"), "Source error should include dub-1");
-      assert!(ids.contains(&"pub-1"), "Source error should include pub-1"); }
+        . collect();
+      assert!(ids . contains(&"dub-1"), "Source error should include dub-1");
+      assert!(ids . contains(&"pub-1"), "Source error should include pub-1"); }
 
     { let multiple_defining_errors: Vec<&BufferValidationError>
-      = ( errors.iter()
+      = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes(_)))
+            |e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
           . collect() );
-      assert_eq!(multiple_defining_errors.len(), 1,
+      assert_eq!(multiple_defining_errors . len(), 1,
                  "Expected exactly 1 Multiple_Defining_Viewnodes error for priv-1");
-      if let BufferValidationError::Multiple_Defining_Viewnodes(id) = multiple_defining_errors[0] {
-        assert_eq!(id.0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
+      if let BufferValidationError::Multiple_Defining_Viewnodes (id) = multiple_defining_errors[0] {
+        assert_eq!(id . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
     { let inconsistent_source_errors: Vec<&BufferValidationError>
-      = ( errors.iter()
+      = ( errors . iter()
           . filter(
             |e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
           . collect() );
-      assert_eq!(inconsistent_source_errors.len(), 1,
+      assert_eq!(inconsistent_source_errors . len(), 1,
                  "Expected exactly 1 InconsistentSources error for priv-1");
       if let BufferValidationError::InconsistentSources(id, sources) = inconsistent_source_errors[0] {
-        assert_eq!(id.0, "priv-1", "InconsistentSources should be for priv-1");
-        assert_eq!(sources.len(), 2, "Should have 2 different sources for priv-1"); }}
+        assert_eq!(id . 0, "priv-1", "InconsistentSources should be for priv-1");
+        assert_eq!(sources . len(), 2, "Should have 2 different sources for priv-1"); }}
 
-    assert_eq!(errors.len(), 4,
+    assert_eq!(errors . len(), 4,
                "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
 
     cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
+      &config . db_name,
       &driver,
-      Some(config.tantivy_folder.as_path())
-    ).await?;
+      Some(config . tantivy_folder . as_path())
+    ) . await?;
     Ok(( )) } ) }
 
 #[test]
@@ -126,22 +126,22 @@ fn test_foreign_node_modification_errors(
     let mut config: SkgConfig =
       load_config(
         "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config.db_name = "skg-test-multi-source-errors-2".to_string();
-    config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-2");
+    config . db_name = "skg-test-multi-source-errors-2" . to_string();
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-2");
     let driver: TypeDBDriver =
       TypeDBDriver::new(
         "127.0.0.1:1729",
         Credentials::new("admin", "password"),
         DriverOptions::new(false, None)?
-      ).await?;
+      ) . await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    overwrite_new_empty_db(&config . db_name, &driver) . await?;
+    define_schema(&config . db_name, &driver) . await?;
+    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -168,27 +168,27 @@ fn test_foreign_node_modification_errors(
         &config,
         &driver,
         &SkgNodeMap::new()
-      ).await;
+      ) . await;
 
-      assert!(result.is_err(), "Expected errors for foreign node modifications");
+      assert!(result . is_err(), "Expected errors for foreign node modifications");
 
-      if let Err(e) = result {
-        if let SaveError::BufferValidationErrors(errors) = e {
-          println!("\n=== Foreign node modification errors ({} total) ===", errors.len());
-          for (i, error) in errors.iter().enumerate() {
+      if let Err (e) = result {
+        if let SaveError::BufferValidationErrors (errors) = e {
+          println!("\n=== Foreign node modification errors ({} total) ===", errors . len());
+          for (i, error) in errors . iter() . enumerate() {
             println!("{}: {:?}", i + 1, error);
           }
 
           // Check for ModifiedForeignNode errors
           let modified_foreign_errors: Vec<&BufferValidationError> =
-            errors.iter()
+            errors . iter()
             . filter(|e| matches!(e, BufferValidationError::ModifiedForeignNode(_, _)))
             . collect();
 
           println!("\nModifiedForeignNode errors: {}",
-                   modified_foreign_errors.len());
+                   modified_foreign_errors . len());
 
-          assert_eq!(modified_foreign_errors.len(), 7, // namely:
+          assert_eq!(modified_foreign_errors . len(), 7, // namely:
                      // ext-1 (aliases modified)
                      // ext-2 (title modified)
                      // ext-3 (body modified)
@@ -198,22 +198,22 @@ fn test_foreign_node_modification_errors(
                      // ext-7 (deletion)
                      "Expected exactly 7 ModifiedForeignNode errors");
 
-          let error_ids: Vec<String> = modified_foreign_errors.iter()
-            .filter_map(|e| {
+          let error_ids: Vec<String> = modified_foreign_errors . iter()
+            . filter_map(|e| {
               if let BufferValidationError::ModifiedForeignNode(id, _) = e {
-                Some(id.0.clone())
+                Some(id . 0 . clone())
               } else { None }
-            } ).collect();
+            } ) . collect();
 
           println!("Errors for IDs: {:?}", error_ids);
 
-          assert!(error_ids.contains(&"ext-1".to_string()), "Expected error for ext-1 (aliases)");
-          assert!(error_ids.contains(&"ext-2".to_string()), "Expected error for ext-2 (title)");
-          assert!(error_ids.contains(&"ext-3".to_string()), "Expected error for ext-3 (body)");
-          assert!(error_ids.contains(&"ext-4".to_string()), "Expected error for ext-4 (content)");
-          assert!(error_ids.contains(&"ext-new".to_string()), "Expected error for ext-new (new node)");
-          assert!(error_ids.contains(&"ext-6".to_string()), "Expected error for ext-6 (deletion)");
-          assert!(error_ids.contains(&"ext-7".to_string()), "Expected error for ext-7 (deletion)");
+          assert!(error_ids . contains(&"ext-1" . to_string()), "Expected error for ext-1 (aliases)");
+          assert!(error_ids . contains(&"ext-2" . to_string()), "Expected error for ext-2 (title)");
+          assert!(error_ids . contains(&"ext-3" . to_string()), "Expected error for ext-3 (body)");
+          assert!(error_ids . contains(&"ext-4" . to_string()), "Expected error for ext-4 (content)");
+          assert!(error_ids . contains(&"ext-new" . to_string()), "Expected error for ext-new (new node)");
+          assert!(error_ids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
+          assert!(error_ids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
         }
@@ -235,38 +235,38 @@ fn test_foreign_node_modification_errors(
         &config,
         &driver,
         &SkgNodeMap::new()
-      ).await;
+      ) . await;
 
-      assert!(result.is_err(),
+      assert!(result . is_err(),
               "Expected errors for foreign merge operations");
 
-      if let Err(e) = result {
-        if let SaveError::BufferValidationErrors(errors) = e {
-          println!("\n=== Foreign merge errors ({} total) ===", errors.len());
-          for (i, error) in errors.iter().enumerate() {
+      if let Err (e) = result {
+        if let SaveError::BufferValidationErrors (errors) = e {
+          println!("\n=== Foreign merge errors ({} total) ===", errors . len());
+          for (i, error) in errors . iter() . enumerate() {
             println!("{}: {:?}", i + 1, error);
           }
 
           // Both merges should generate ModifiedForeignNode errors
           let merge_foreign_errors: Vec<&BufferValidationError> =
-            errors.iter()
+            errors . iter()
             . filter(|e| matches!(e, BufferValidationError::ModifiedForeignNode(_, _)))
             . collect();
 
-          assert_eq!(merge_foreign_errors.len(), 2,
+          assert_eq!(merge_foreign_errors . len(), 2,
                      "Expected exactly 2 ModifiedForeignNode errors for merges");
 
-          let error_ids: Vec<String> = merge_foreign_errors.iter()
-            .filter_map(|e| {
+          let error_ids: Vec<String> = merge_foreign_errors . iter()
+            . filter_map(|e| {
               if let BufferValidationError::ModifiedForeignNode(id, _) = e {
-                Some(id.0.clone())
+                Some(id . 0 . clone())
               } else { None }
-            } ).collect();
+            } ) . collect();
 
           println!("Merge errors for IDs: {:?}", error_ids);
 
-          assert!(error_ids.contains(&"ext-8".to_string()), "Expected error for ext-8 (foreign acquirer)");
-          assert!(error_ids.contains(&"ext-9".to_string()), "Expected error for ext-9 (foreign acquiree)");
+          assert!(error_ids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
+          assert!(error_ids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
         }
@@ -275,10 +275,10 @@ fn test_foreign_node_modification_errors(
 
     // Cleanup
     cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
+      &config . db_name,
       &driver,
-      Some(config.tantivy_folder.as_path())
-    ).await?;
+      Some(config . tantivy_folder . as_path())
+    ) . await?;
 
     Ok(())
   })
@@ -290,23 +290,23 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Load config from file and override db_name for this test
     let mut config: SkgConfig = load_config(
       "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config.db_name = "skg-test-multi-source-errors-3".to_string();
-    config.tantivy_folder = PathBuf::from("/tmp/tantivy-test-multi-source-errors-3");
+    config . db_name = "skg-test-multi-source-errors-3" . to_string();
+    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-3");
 
     // Set up TypeDB driver
     let driver: TypeDBDriver = TypeDBDriver::new(
       "127.0.0.1:1729",
       Credentials::new("admin", "password"),
       DriverOptions::new(false, None)?
-    ).await?;
+    ) . await?;
 
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
-    overwrite_new_empty_db(&config.db_name, &driver).await?;
-    define_schema(&config.db_name, &driver).await?;
-    create_all_nodes(&config.db_name, &driver, &nodes).await?;
-    create_all_relationships(&config.db_name, &driver, &nodes).await?;
+    overwrite_new_empty_db(&config . db_name, &driver) . await?;
+    define_schema(&config . db_name, &driver) . await?;
+    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
 
     // Test 1: DiskSourceBufferSourceConflict
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
@@ -323,25 +323,25 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &config,
         &driver,
         &SkgNodeMap::new()
-      ).await;
+      ) . await;
 
-      assert!(result.is_err(), "Expected DiskSourceBufferSourceConflict error");
+      assert!(result . is_err(), "Expected DiskSourceBufferSourceConflict error");
 
-      if let Err(e) = result {
+      if let Err (e) = result {
         println!("\n=== DiskSourceBufferSourceConflict test ===");
         println!("Error: {:?}", e);
 
         // Should be a BufferValidationError wrapped in SaveError
         match e {
-          SaveError::BufferValidationErrors(errors) => {
-            let conflict_errors: Vec<&BufferValidationError> = errors.iter()
-              .filter(|e| matches!(e, BufferValidationError::DiskSourceBufferSourceConflict(_, _, _)))
-              .collect();
-            assert!(!conflict_errors.is_empty(),
+          SaveError::BufferValidationErrors (errors) => {
+            let conflict_errors: Vec<&BufferValidationError> = errors . iter()
+              . filter(|e| matches!(e, BufferValidationError::DiskSourceBufferSourceConflict(_, _, _)))
+              . collect();
+            assert!(!conflict_errors . is_empty(),
                     "Expected DiskSourceBufferSourceConflict error");
-            println!("Found {} DiskSourceBufferSourceConflict error(s)", conflict_errors.len());
+            println!("Found {} DiskSourceBufferSourceConflict error(s)", conflict_errors . len());
           }
-          SaveError::DatabaseError(_) => {
+          SaveError::DatabaseError (_) => {
             // Could also be wrapped in DatabaseError
             println!("Got DatabaseError (may contain DiskSourceBufferSourceConflict)");
           }
@@ -367,22 +367,22 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &config,
         &driver,
         &SkgNodeMap::new()
-      ).await;
+      ) . await;
 
       println!("\n=== InconsistentSources test ===");
 
-      assert!(result.is_err(), "Expected InconsistentSources error");
+      assert!(result . is_err(), "Expected InconsistentSources error");
 
-      if let Err(e) = result {
+      if let Err (e) = result {
         println!("Error: {:?}", e);
 
         match e {
-          SaveError::BufferValidationErrors(errors) => {
+          SaveError::BufferValidationErrors (errors) => {
             // Should contain InconsistentSources error
-            let source_errors: Vec<&BufferValidationError> = errors.iter()
-              .filter(|e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
-              .collect();
-            assert!(!source_errors.is_empty(),
+            let source_errors: Vec<&BufferValidationError> = errors . iter()
+              . filter(|e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
+              . collect();
+            assert!(!source_errors . is_empty(),
                     "Expected InconsistentSources error in validation");
             println!("Successfully caught InconsistentSources error during validation");
           }
@@ -393,10 +393,10 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
     // Cleanup
     cleanup_test_tantivy_and_typedb_dbs(
-      &config.db_name,
+      &config . db_name,
       &driver,
-      Some(config.tantivy_folder.as_path())
-    ).await?;
+      Some(config . tantivy_folder . as_path())
+    ) . await?;
 
     Ok(())
   })

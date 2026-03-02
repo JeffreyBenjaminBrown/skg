@@ -47,7 +47,7 @@ pub async fn execute_view_requests (
         execute_definitive_view_request (
           forest, map, node_id, config, typedb_driver,
           visited, errors,
-          deleted_since_head_pid_src_map ). await ?; }, }}
+          deleted_since_head_pid_src_map ) . await ?; }, }}
   Ok (( )) }
 
 /// BEHAVIOR:
@@ -76,15 +76,15 @@ async fn execute_definitive_view_request (
     read_at_node_in_tree (
       forest, node_id,
       |n| match &n . kind {
-        ViewNodeKind::True ( t ) =>
+        ViewNodeKind::True (t) =>
           matches! (t . diff,
                     Some (NodeDiffStatus::Removed)),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
     get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;
-  if let Some ( &preexisting_node_id ) =
-    visited . get ( & node_pid )
+  if let Some (&preexisting_node_id) =
+    visited . get (& node_pid)
   { if preexisting_node_id != node_id {
     indefinitize_content_subtree ( forest, map,
                                    preexisting_node_id,
@@ -99,27 +99,27 @@ async fn execute_definitive_view_request (
     write_at_node_in_tree (
       forest, node_id,
       |viewnode| {
-        let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
-          &mut viewnode.kind
-          else { panic! ( "execute_definitive_view_request: expected TrueNode" ) };
-        t . view_requests . remove ( & ViewRequest::Definitive );
+        let ViewNodeKind::True (t) : &mut ViewNodeKind =
+          &mut viewnode . kind
+          else { panic! ("execute_definitive_view_request: expected TrueNode") };
+        t . view_requests . remove (& ViewRequest::Definitive);
         t . indefinitive = false; } )
-      . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
-    visited . insert ( node_pid.clone(), node_id ); }
+      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    visited . insert ( node_pid . clone(), node_id ); }
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
-      forest, map, node_id, config.initial_node_limit,
+      forest, map, node_id, config . initial_node_limit,
       visited, config, &hidden_ids, typedb_driver,
-      deleted_since_head_pid_src_map ). await ?; }
+      deleted_since_head_pid_src_map ) . await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
-      forest, map, node_id, config.initial_node_limit,
-      visited, config, typedb_driver, &hidden_ids ). await ?;
+      forest, map, node_id, config . initial_node_limit,
+      visited, config, typedb_driver, &hidden_ids ) . await ?;
     if type_and_parent_type_consistent_with_subscribee (
       forest, node_id ) ?
     { maybe_add_hiddenInSubscribeeCol_branch (
         forest, map, node_id, config, typedb_driver
-      ). await ?; } }
+      ) . await ?; } }
   Ok (( )) }
 
 /// If the node is a Subscribee
@@ -132,8 +132,8 @@ fn get_hidden_ids_if_subscribee (
   node_id : NodeId,
 ) -> Result < HashSet < ID >, Box<dyn Error> > {
   let node_ref : NodeRef < ViewNode > =
-    tree . get ( node_id )
-    . ok_or ( "get_hidden_ids_if_subscribee: node not found" ) ?;
+    tree . get (node_id)
+    . ok_or ("get_hidden_ids_if_subscribee: node not found") ?;
   if !type_and_parent_type_consistent_with_subscribee (
        tree, node_id )?
   { // Don't throw an error: 'if_subscribee' is in the function name.
@@ -141,17 +141,17 @@ fn get_hidden_ids_if_subscribee (
   else {
     let subscribee_col : NodeRef < ViewNode > =
       node_ref . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)" ) ?;
+      . ok_or ("get_hidden_ids_if_subscribee: Subscribee has no parent (SubscribeeCol)") ?;
     let subscriber : NodeRef < ViewNode > =
       subscribee_col . parent ()
-      . ok_or ( "get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)" ) ?;
+      . ok_or ("get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)") ?;
     let subscriber_id : ID =
-      get_id_from_treenode ( tree, subscriber.id() ) ?;
+      get_id_from_treenode ( tree, subscriber . id() ) ?;
     let hidden_ids : HashSet < ID > =
-      map . get ( &subscriber_id ) . and_then (
-        |skgnode| skgnode .hides_from_its_subscriptions .clone ( ))
+      map . get (&subscriber_id) . and_then (
+        |skgnode| skgnode . hides_from_its_subscriptions . clone ( ))
       . unwrap_or_default () . into_iter () . collect ();
-    Ok ( hidden_ids ) }}
+    Ok (hidden_ids) }}
 
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
@@ -177,13 +177,13 @@ fn indefinitize_content_subtree (
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewNodeKind::True(t)
-                                  if !t.parent_ignores ))
+                                  ViewNodeKind::True (t)
+                                  if !t . parent_ignores ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
   if ! truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
-    visited . remove ( &node_pid );
+    visited . remove (&node_pid);
     makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
@@ -228,7 +228,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
     content_ids_if_definitive_else_empty (
       tree, map, effective_root ) ?
     . into_iter ()
-    . filter ( |skgid| ! hidden_ids . contains ( skgid ) )
+    . filter ( |skgid| ! hidden_ids . contains (skgid) )
     . map ( |child_skgid| (effective_root, child_skgid) )
     . collect ();
   let mut nodes_rendered : usize = 0;
@@ -246,8 +246,8 @@ async fn extendDefinitiveSubtreeFromLeaf (
     for (parent_treeid, child_skgid) in gen_with_children {
       let new_treeid : NodeId = build_node_branch_minus_content (
         Some((tree, parent_treeid)),
-        Some(map),
-        &child_skgid, config, driver, visited ). await ?;
+        Some (map),
+        &child_skgid, config, driver, visited ) . await ?;
       nodes_rendered += 1;
       if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
@@ -279,12 +279,12 @@ fn from_disk_replace_title_body_and_skgnode (
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
   write_at_node_in_tree ( tree, node_id, |viewnode| { // Update viewnode
-    let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+    let ViewNodeKind::True (t) : &mut ViewNodeKind =
       &mut viewnode . kind
-      else { panic! ( "rebuild_pair_from_disk: expected TrueNode" ) };
+      else { panic! ("rebuild_pair_from_disk: expected TrueNode") };
     t . title = title;
     t . body = body; } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
 /// Expand children for a removed node,
@@ -313,26 +313,26 @@ async fn extendDefinitiveSubtree_fromGit (
         skgnode . contains . unwrap_or_default();
       let not_hidden : BTreeSet<String> =
         contents . iter()
-        . filter ( |id| ! hidden_ids . contains ( id ) )
-        . take ( limit )
+        . filter ( |id| ! hidden_ids . contains (id) )
+        . take (limit)
         . map ( |id| id . 0 . clone() )
         . collect();
       let contents_in_worktree : HashSet<String> =
         which_ids_exist (
           &config . db_name, typedb_driver, &not_hidden
-        ). await ?;
+        ) . await ?;
       (contents, contents_in_worktree) };
-  for child_id in contents . iter() . take ( limit ) {
-    if hidden_ids . contains ( child_id ) { continue; }
+  for child_id in contents . iter() . take (limit) {
+    if hidden_ids . contains (child_id) { continue; }
     let child_viewnode : ViewNode =
       mk_removed_child_viewnode (
         child_id, &src, &contents_in_worktree,
         deleted_since_head_pid_src_map,
-        config, typedb_driver ). await ?;
+        config, typedb_driver ) . await ?;
     let mut parent_mut : NodeMut<ViewNode> = // Add child to tree
-      tree . get_mut ( effective_root ) . ok_or (
+      tree . get_mut (effective_root) . ok_or (
         "Parent not found" ) ?;
-    parent_mut . append ( child_viewnode );
+    parent_mut . append (child_viewnode);
     visited . insert ( child_id . clone(), effective_root ); }
   Ok (( )) }
 
@@ -367,7 +367,7 @@ async fn mk_removed_child_viewnode (
       child_id ) ) ?;
   let child_source : Option<SourceName> =
     if in_worktree { Some ( child_skgnode . source . clone() ) }
-    else           { deleted_since_head_pid_src_map . get ( child_id )
+    else           { deleted_since_head_pid_src_map . get (child_id)
                        . cloned() };
   let mut child_viewnode : ViewNode =
     mk_indefinitive_viewnode (
@@ -376,10 +376,10 @@ async fn mk_removed_child_viewnode (
       child_skgnode . title . clone(),
       false );                // parent_ignores
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
-    if let Some ( source ) = child_source {
+    if let Some (source) = child_source {
       t . source = source; }
-    t . diff = Some ( child_diff ); }
-  Ok ( child_viewnode ) }
+    t . diff = Some (child_diff); }
+  Ok (child_viewnode) }
 
 /// Load title and body from git HEAD for a removed node.
 /// This is used when expanding a definitive view
@@ -397,10 +397,10 @@ fn from_git_replace_title_body (
   write_at_node_in_tree (
     tree, node_id,
     |viewnode| {
-      let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
+      let ViewNodeKind::True (t) : &mut ViewNodeKind =
         &mut viewnode . kind
-        else { panic! ( "from_git_replace_title_body: expected TrueNode" ) };
-      t . title = skgnode.title;
-      t . body = skgnode.body; } )
-    . map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+        else { panic! ("from_git_replace_title_body: expected TrueNode") };
+      t . title = skgnode . title;
+      t . body = skgnode . body; } )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

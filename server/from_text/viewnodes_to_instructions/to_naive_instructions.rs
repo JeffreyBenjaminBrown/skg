@@ -41,31 +41,31 @@ pub fn naive_saveinstructions_from_tree (
     ) -> Result<(), String> {
       for child_treeid in
         { let child_treeids: Vec<NodeId> =
-            tree . get(node_id) . unwrap() . children()
-            . map(|c| c.id()) . collect();
+            tree . get (node_id) . unwrap() . children()
+            . map(|c| c . id()) . collect();
           child_treeids }
         { mauybe_defineonenode_and_maybe_recurse(
             tree, child_treeid, result)?; }
       Ok(( )) }
 
     let node_kind: ViewNodeKind = read_at_node_in_tree(
-        tree, node_id, |node| node.kind.clone())?;
+        tree, node_id, |node| node . kind . clone())?;
     match node_kind {
-      ViewNodeKind::Scaff ( Scaffold::BufferRoot ) =>
+      ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Scaff ( Scaffold::SubscribeeCol ) =>
+      ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Scaff ( _ ) => {
+      ViewNodeKind::Scaff (_) => {
         // TODO ? Recurse into more Scaffolds.
       },
-      ViewNodeKind::Deleted ( _ ) =>
+      ViewNodeKind::Deleted (_) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::DeletedScaff =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::True ( t ) => {
-        if let Some(instruction)
+      ViewNodeKind::True (t) => {
+        if let Some (instruction)
           = maybe_instruction_from_treenode( tree, node_id, &t )?
-          { result . push(instruction); }
+          { result . push (instruction); }
         recurse_on_children( tree, node_id, result )?; }}
     Ok(( )) }
 
@@ -82,23 +82,23 @@ fn maybe_instruction_from_treenode (
   node_id : NodeId,
   t       : &TrueNode
 ) -> Result<Option<DefineNode>, String> {
-  if t.indefinitive { return Ok(None); }
-  if t.edit_request == Some(EditRequest::Delete) {
+  if t . indefinitive { return Ok (None); }
+  if t . edit_request == Some (EditRequest::Delete) {
     return Ok(Some(DefineNode::Delete(DeleteNode {
-      id     : t.id    .clone(),
-      source : t.source.clone() } )) ); }
+      id     : t . id    . clone(),
+      source : t . source . clone() } )) ); }
   let node_ref : NodeRef<ViewNode> =
-    tree . get(node_id) . ok_or(
+    tree . get (node_id) . ok_or(
       "maybe_instruction_from_treenode: node not found")?;
   Ok(Some(DefineNode::Save(SaveNode(SkgNode {
-    title:   t.title.clone(),
+    title:   t . title . clone(),
     aliases: collect_grandchild_aliases_for_viewnode(
       tree, node_id)?,
-    source:  t.source.clone(),
-    ids:     vec![t.id.clone()],
-    body:    t.body.clone(),
+    source:  t . source . clone(),
+    ids:     vec![t . id . clone()],
+    body:    t . body . clone(),
     contains: Some(
-      collect_contents_to_save_from_children(&node_ref) ),
+      collect_contents_to_save_from_children (&node_ref) ),
     subscribes_to:
       collect_subscribees( tree, node_id )?,
     hides_from_its_subscriptions: None,
@@ -117,28 +117,28 @@ fn collect_subscribees (
   let subscribee_col_id : Option<NodeId> =
     unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )
-    . map_err ( |e| e.to_string() ) ?;
+    . map_err ( |e| e . to_string() ) ?;
   match subscribee_col_id {
-    None => Ok(None),
-    Some(col_id) => {
+    None => Ok (None),
+    Some (col_id) => {
       let subscribees : Vec<ID> = {
-        let col_ref : NodeRef<ViewNode> = tree.get(col_id).expect(
+        let col_ref : NodeRef<ViewNode> = tree . get (col_id) . expect(
           "collect_subscribees: SubscribeeCol not found");
         let mut subscribees : Vec<ID> = Vec::new();
-        for subscribeecol_child in col_ref.children() {
-          let child_node : &ViewNode = subscribeecol_child.value();
-          match &child_node.kind {
-            ViewNodeKind::True(t) => {
-              if !t.parent_ignores {
-                subscribees.push(t.id.clone()); }},
-            ViewNodeKind::Scaff(Scaffold::HiddenOutsideOfSubscribeeCol) =>
+        for subscribeecol_child in col_ref . children() {
+          let child_node : &ViewNode = subscribeecol_child . value();
+          match &child_node . kind {
+            ViewNodeKind::True (t) => {
+              if !t . parent_ignores {
+                subscribees . push(t . id . clone()); }},
+            ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
-            ViewNodeKind::Deleted ( _ ) |
+            ViewNodeKind::Deleted (_) |
             ViewNodeKind::DeletedScaff =>
               continue, // inert in a deleted context
-            ViewNodeKind::Scaff(s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
+            ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
-      Ok( Some(dedup_vector(subscribees)) ) }} }
+      Ok( Some(dedup_vector (subscribees)) ) }} }
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
@@ -150,19 +150,19 @@ fn collect_contents_to_save_from_children<'a> (
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();
-  for child_ref in node_ref.children() {
+  for child_ref in node_ref . children() {
     let child : &ViewNode = child_ref . value();
-    match &child.kind {
-      ViewNodeKind::True(t) => {
+    match &child . kind {
+      ViewNodeKind::True (t) => {
         let is_phantom : bool =
           // In diff view, skip phantom (Removed/RemovedHere) nodes
           matches!( t . diff,
-                    Some(NodeDiffStatus::Removed) |
-                    Some(NodeDiffStatus::RemovedHere) );
-        if ! t.parent_ignores
+                    Some (NodeDiffStatus::Removed) |
+                    Some (NodeDiffStatus::RemovedHere) );
+        if ! t . parent_ignores
            && ! is_phantom
            && ! matches!( t . edit_request,
-                          Some(EditRequest::Delete))
-        { contents.push( t.id.clone() ); }},
+                          Some (EditRequest::Delete))
+        { contents . push( t . id . clone() ); }},
       _ => continue }}
   contents }

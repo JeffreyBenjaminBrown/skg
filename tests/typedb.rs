@@ -96,14 +96,14 @@ async fn test_all_relationships (
         select $ni, $ei;"#,
     "ni",
     "ei"
-  ).await?;
+  ) . await?;
   let expected_has_extra_id: HashSet<_> = [
     ("2", "22"),
     ("3", "33"),
     ("4", "44"),
-    ("5", "55"), ].iter()
-    .map(|(a, b)| (a.to_string(), b.to_string()))
-    .collect();
+    ("5", "55"), ] . iter()
+    . map(|(a, b)| (a . to_string(), b . to_string()))
+    . collect();
   assert_eq!(has_extra_id_pairs, expected_has_extra_id);
 
   let contains_pairs = collect_all_of_some_binary_rel(
@@ -117,13 +117,13 @@ async fn test_all_relationships (
         select $container_id, $contained_id;"#,
     "container_id",
     "contained_id"
-  ).await?;
+  ) . await?;
   let mut expected_contains = HashSet::new();
-  expected_contains.insert(("1".to_string(), "2".to_string()));
-  expected_contains.insert(("1".to_string(), "3".to_string()));
-  expected_contains.insert(("a".to_string(), "b".to_string()));
-  expected_contains.insert(("b".to_string(), "c".to_string()));
-  expected_contains.insert(("c".to_string(), "b".to_string()));
+  expected_contains . insert(("1" . to_string(), "2" . to_string()));
+  expected_contains . insert(("1" . to_string(), "3" . to_string()));
+  expected_contains . insert(("a" . to_string(), "b" . to_string()));
+  expected_contains . insert(("b" . to_string(), "c" . to_string()));
+  expected_contains . insert(("c" . to_string(), "b" . to_string()));
   assert_eq!(contains_pairs, expected_contains);
 
   let textlink_pairs = collect_all_of_some_binary_rel(
@@ -137,11 +137,11 @@ async fn test_all_relationships (
         select $source_id, $dest_id;"#,
     "source_id",
     "dest_id"
-  ).await?;
+  ) . await?;
   let mut expected_textlinks = HashSet::new();
-  expected_textlinks.insert(("5".to_string(), "2".to_string()));
-  expected_textlinks.insert(("5".to_string(), "3".to_string()));
-  expected_textlinks.insert(("5".to_string(), "5".to_string()));
+  expected_textlinks . insert(("5" . to_string(), "2" . to_string()));
+  expected_textlinks . insert(("5" . to_string(), "3" . to_string()));
+  expected_textlinks . insert(("5" . to_string(), "5" . to_string()));
   assert_eq!(textlink_pairs, expected_textlinks);
 
   let subscribes_pairs = collect_all_of_some_binary_rel(
@@ -155,14 +155,14 @@ async fn test_all_relationships (
         select $from, $to;"#,
     "from",
     "to"
-  ).await?;
+  ) . await?;
   let expected_subscribes : HashSet<_> = [
     ("2", "4"),
     ("2", "5"),
     ("3", "4"),
-    ("3", "5"), ].iter()
-    .map(|(a, b)| (a.to_string(), b.to_string()))
-    .collect();
+    ("3", "5"), ] . iter()
+    . map(|(a, b)| (a . to_string(), b . to_string()))
+    . collect();
   assert_eq!(subscribes_pairs, expected_subscribes);
 
   let hides_pairs = collect_all_of_some_binary_rel(
@@ -177,12 +177,12 @@ async fn test_all_relationships (
         select $from, $to;"#,
     "from",
     "to"
-  ).await?;
+  ) . await?;
   let mut expected_hides_from_its_subscriptions = HashSet::new();
-  expected_hides_from_its_subscriptions.insert((
-    "1".to_string(), "4".to_string()));
-  expected_hides_from_its_subscriptions.insert((
-    "1".to_string(), "5".to_string()));
+  expected_hides_from_its_subscriptions . insert((
+    "1" . to_string(), "4" . to_string()));
+  expected_hides_from_its_subscriptions . insert((
+    "1" . to_string(), "5" . to_string()));
   assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
   let replacement_pairs = collect_all_of_some_binary_rel(
@@ -196,12 +196,12 @@ async fn test_all_relationships (
         select $from, $to;"#,
     "from",
     "to"
-  ).await?;
+  ) . await?;
   let mut expected_replacements = HashSet::new();
-  expected_replacements.insert((
-    "5".to_string(), "3".to_string()));
-  expected_replacements.insert((
-    "5".to_string(), "4".to_string()));
+  expected_replacements . insert((
+    "5" . to_string(), "3" . to_string()));
+  expected_replacements . insert((
+    "5" . to_string(), "4" . to_string()));
   assert_eq!(replacement_pairs, expected_replacements);
 
   Ok (( )) }
@@ -223,12 +223,12 @@ async fn test_delete_out_links_contains_container (
         select $inner_id, $outer_id;"#,
     "inner_id",
     "outer_id"
-  ).await?;
+  ) . await?;
   let mut expected_before = std::collections::HashSet::new();
-  expected_before.insert(("1".to_string(), "2".to_string()));
-  expected_before.insert(("1".to_string(), "3".to_string()));
-  expected_before.insert(("3".to_string(), "4".to_string()));
-  expected_before.insert(("3".to_string(), "5".to_string()));
+  expected_before . insert(("1" . to_string(), "2" . to_string()));
+  expected_before . insert(("1" . to_string(), "3" . to_string()));
+  expected_before . insert(("3" . to_string(), "4" . to_string()));
+  expected_before . insert(("3" . to_string(), "5" . to_string()));
   assert_eq!(before_pairs, expected_before);
 
   // Delete relationship to contents for nodes 3, 4, 5.
@@ -236,9 +236,9 @@ async fn test_delete_out_links_contains_container (
     delete_out_links (
       db_name,
       driver,
-      &vec![ ID::from("3"),
-             ID::from("4"),
-             ID::from("5") ],
+      &vec![ ID::from ("3"),
+             ID::from ("4"),
+             ID::from ("5") ],
       "contains",
       "container"
     ) . await ?;
@@ -256,10 +256,10 @@ async fn test_delete_out_links_contains_container (
         select $container_id, $contained_id;"#,
     "container_id",
     "contained_id"
-  ).await?;
+  ) . await?;
   let mut expected_after = std::collections::HashSet::new();
-  expected_after.insert(("1".to_string(), "2".to_string()));
-  expected_after.insert(("1".to_string(), "3".to_string()));
+  expected_after . insert(("1" . to_string(), "2" . to_string()));
+  expected_after . insert(("1" . to_string(), "3" . to_string()));
   assert_eq!(after_pairs, expected_after);
   Ok (( )) }
 
@@ -275,12 +275,12 @@ async fn test_create_only_nodes_with_no_ids_present (
   // Prepare two SkgNodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
   let mut fn_a : SkgNode = empty_skgnode ();
-  { fn_a.title = "ignore this string" . to_string ();
-    fn_a.ids   = vec![ ID::from ( "a" ) ]; }
+  { fn_a . title = "ignore this string" . to_string ();
+    fn_a . ids   = vec![ ID::from ("a") ]; }
 
   let mut fn_new : SkgNode = empty_skgnode ();
-  { fn_new.title = "ignore this string" . to_string ();
-    fn_new.ids   = vec![ ID::from ( "new" ) ]; }
+  { fn_new . title = "ignore this string" . to_string ();
+    fn_new . ids   = vec![ ID::from ("new") ]; }
 
   // Attempt to create only unknown nodes among { "a", "new" }.
   // Expect exactly 1 creation (the id "new").
@@ -288,7 +288,7 @@ async fn test_create_only_nodes_with_no_ids_present (
     create_only_nodes_with_no_ids_present (
       db_name,
       driver,
-      &vec! [ fn_a.clone (), fn_new.clone () ]
+      &vec! [ fn_a . clone (), fn_new . clone () ]
     ) . await ?;
   assert_eq! (
     created_count, 1,
@@ -299,17 +299,17 @@ async fn test_create_only_nodes_with_no_ids_present (
   // - 'new' should now exist (just created)
   // - 'absent' should not exist
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "a" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ("a") )
       . await . unwrap () . is_some (),
     "Expected lookup of existing id 'a' to return Some." );
 
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "new" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ("new") )
       . await . unwrap () . is_some (),
     "Expected lookup of newly created id 'new' to return Some." );
 
   assert! (
-    pid_and_source_from_id ( db_name, driver, &ID::from ( "absent" ) )
+    pid_and_source_from_id ( db_name, driver, &ID::from ("absent") )
       . await . unwrap () . is_none (),
     "Expected lookup of missing id 'absent' to return None." );
 
@@ -343,12 +343,12 @@ async fn count_nodes (
          select $id;"#
     ) . await ?;
 
-  let mut rows : ConceptRowStream = answer.into_rows ();
+  let mut rows : ConceptRowStream = answer . into_rows ();
   let mut n : usize = 0;
-  while let Some ( row_res ) = rows . next () . await {
+  while let Some (row_res) = rows . next () . await {
     let _row : ConceptRow = row_res ?;
     n += 1; }
-  Ok ( n ) }
+  Ok (n) }
 
 async fn test_recursive_document (
   driver  : &TypeDBDriver,
@@ -357,82 +357,82 @@ async fn test_recursive_document (
   let (result_org_text, _map, _pids, _)
     : (String, SkgNodeMap, Vec<ID>, _)
     = single_root_view (
-          driver, config, &ID ( "a".to_string () ), false
-        ). await ?;
+          driver, config, &ID ( "a" . to_string () ), false
+        ) . await ?;
   let unchecked_forest : Tree<UncheckedViewNode> =
-    org_to_uninterpreted_nodes ( & result_org_text )
+    org_to_uninterpreted_nodes (& result_org_text)
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
   let result_forest : Tree<ViewNode> =
-    unchecked_to_checked_tree ( unchecked_forest )
+    unchecked_to_checked_tree (unchecked_forest)
     . map_err ( |e| format! ( "Check error: {}", e ) ) ?;
 
   let tree_roots : Vec<_> =
-    result_forest.root().children().collect();
-  assert_eq! ( tree_roots.len (), 1,
+    result_forest . root() . children() . collect();
+  assert_eq! ( tree_roots . len (), 1,
     "Expected exactly 1 root node" );
 
   let root_node_ref = &tree_roots[0];
   let root_node : &ViewNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert! ( matches! ( &root_node.kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &root_node . kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let ViewNodeKind::True ( root_t ) = &root_node.kind
+  let ViewNodeKind::True (root_t) = &root_node . kind
     else { unreachable!() };
-  assert_eq! ( &root_t.id, &ID::from ("a"),
+  assert_eq! ( &root_t . id, &ID::from ("a"),
     "Root node should have id 'a'" );
-  assert_eq! ( root_node.title(), "a",
+  assert_eq! ( root_node . title(), "a",
     "Root node should have title 'a'" );
 
   // Root should have 1 child: "b"
   let mut root_children = root_node_ref . children ();
   let b_node_ref = root_children . next ()
-    . expect ( "Root should have child 'b'" );
+    . expect ("Root should have child 'b'");
   let b_node : &ViewNode = b_node_ref . value ();
 
-  assert! ( matches! ( &b_node.kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_node . kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let ViewNodeKind::True ( b_t ) = &b_node.kind
+  let ViewNodeKind::True (b_t) = &b_node . kind
     else { unreachable!() };
-  assert_eq! ( &b_t.id, &ID::from ("b"),
+  assert_eq! ( &b_t . id, &ID::from ("b"),
     "First child should have id 'b'" );
-  assert_eq! ( b_node.title(), "b",
+  assert_eq! ( b_node . title(), "b",
     "First child should have title 'b'" );
-  assert_eq! ( b_node.body(), Some ( &"b has a body" . to_string () ),
+  assert_eq! ( b_node . body(), Some ( &"b has a body" . to_string () ),
     "Node 'b' should have body 'b has a body'" );
-  assert! ( ! b_t.indefinitive,
+  assert! ( ! b_t . indefinitive,
     "First occurrence of 'b' should not be marked as indefinitive" );
 
   // "b" should have 1 child: "c"
   let mut b_children = b_node_ref . children ();
   let c_node_ref = b_children . next ()
-    . expect ( "Node 'b' should have child 'c'" );
+    . expect ("Node 'b' should have child 'c'");
   let c_node : &ViewNode = c_node_ref . value ();
 
-  assert! ( matches! ( &c_node.kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &c_node . kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let ViewNodeKind::True ( c_t ) = &c_node.kind
+  let ViewNodeKind::True (c_t) = &c_node . kind
     else { unreachable!() };
-  assert_eq! ( &c_t.id, &ID::from ("c"),
+  assert_eq! ( &c_t . id, &ID::from ("c"),
     "Child of 'b' should have id 'c'" );
-  assert_eq! ( c_node.title(), "c",
+  assert_eq! ( c_node . title(), "c",
     "Child of 'b' should have title 'c'" );
 
   // "c" should have 1 child: "b" (repeated)
   let mut c_children = c_node_ref . children ();
   let b_repeat_ref = c_children . next ()
-    . expect ( "Node 'c' should have child 'b' (repeated)" );
+    . expect ("Node 'c' should have child 'b' (repeated)");
   let b_repeat : &ViewNode = b_repeat_ref . value ();
 
-  assert! ( matches! ( &b_repeat.kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_repeat . kind, ViewNodeKind::True (_) ),
     "should be TrueNode" );
-  let ViewNodeKind::True ( b_repeat_t ) = &b_repeat.kind
+  let ViewNodeKind::True (b_repeat_t) = &b_repeat . kind
     else { unreachable!() };
-  assert_eq! ( &b_repeat_t.id, &ID::from ("b"),
+  assert_eq! ( &b_repeat_t . id, &ID::from ("b"),
     "Child of 'c' should have id 'b'" );
-  assert_eq! ( b_repeat.title(), "b",
+  assert_eq! ( b_repeat . title(), "b",
     "Repeated node should have title 'b'" );
-  assert! ( b_repeat_t.indefinitive,
+  assert! ( b_repeat_t . indefinitive,
     "Second occurrence of 'b' should be marked as indefinitive" );
 
   // Repeated "b" should have no children (body and children ignored for repeated nodes)
@@ -448,24 +448,24 @@ async fn collect_all_of_some_binary_rel(
   member1_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
   member2_variable: &str, // PITFALL: Must correspond to `query`. It's not the role name, but rather a variable, i.e. preceded with `$`.
 ) -> Result<HashSet<(String, String)>, Box<dyn Error>> {
-  let tx = driver.transaction(
-    db_name, TransactionType::Read).await?;
-  let answer = tx.query(query).await?;
-  let mut stream : ConceptRowStream = answer.into_rows();
+  let tx = driver . transaction(
+    db_name, TransactionType::Read) . await?;
+  let answer = tx . query (query) . await?;
+  let mut stream : ConceptRowStream = answer . into_rows();
   let mut results: HashSet<(String, String)> = HashSet::new();
 
-  while let Some(row_result) = stream.next().await {
+  while let Some (row_result) = stream . next() . await {
     let row = row_result?;
-    let id1_raw = match row.get(member1_variable)? {
-      Some(c) => c.to_string(),
-      None => "unknown".to_string() };
-    let id2_raw = match row.get(member2_variable)? {
-      Some(c) => c.to_string(),
-      None => "unknown".to_string() };
+    let id1_raw = match row . get (member1_variable)? {
+      Some (c) => c . to_string(),
+      None => "unknown" . to_string() };
+    let id2_raw = match row . get (member2_variable)? {
+      Some (c) => c . to_string(),
+      None => "unknown" . to_string() };
     let id1 = ID ( extract_payload_from_typedb_string_rep (
       &id1_raw) );
     let id2 = ID ( extract_payload_from_typedb_string_rep (
       &id2_raw) );
-    results.insert ( (id1.to_string(),
-                      id2.to_string() ) ); }
+    results . insert ( (id1 . to_string(),
+                      id2 . to_string() ) ); }
   Ok (results) }

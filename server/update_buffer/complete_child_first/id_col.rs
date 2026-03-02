@@ -20,7 +20,7 @@ use std::error::Error;
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
-#[allow(non_snake_case)]
+#[allow (non_snake_case)]
 pub fn completeIDCol (
   idcol_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
@@ -29,17 +29,17 @@ pub fn completeIDCol (
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, idcol_node_id,
-    |viewnode| matches!( &viewnode.kind,
-                         ViewNodeKind::Scaff( Scaffold::IDCol ) ),
+    |viewnode| matches!( &viewnode . kind,
+                         ViewNodeKind::Scaff (Scaffold::IDCol) ),
     "completeIDCol: Node is not an IDCol" )
-    .map_err( |e| -> Box<dyn Error> { e.into() } )?;
+    . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, idcol_node_id, 1,
       "completeIDCol" ) ?;
   let parent_skgnode : &SkgNode =
-    map.get( &parent_pid )
-    .ok_or( "completeIDCol: Parent SkgNode not in map" )?;
+    map . get (&parent_pid)
+    . ok_or ("completeIDCol: Parent SkgNode not in map")?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );
@@ -48,39 +48,39 @@ pub fn completeIDCol (
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<ID> =
-          parent_skgnode.ids.iter()
-            .cloned()
-            .collect();
+          parent_skgnode . ids . iter()
+            . cloned()
+            . collect();
         ( goals, HashMap::new() ) }
-      Some( nc ) => { // Git diff view.
+      Some (nc) => { // Git diff view.
         let mut goals : Vec<ID> = Vec::new();
         let mut dmap : HashMap<ID, Option<FieldDiffStatus>> =
           HashMap::new();
-        for entry in &nc.ids_diff {
+        for entry in &nc . ids_diff {
           let (id, diff) : (ID, Option<FieldDiffStatus>) =
             match entry {
-              Diff_Item::Unchanged( id ) =>
-                ( id.clone(), None ),
-              Diff_Item::New( id ) =>
-                ( id.clone(), Some( FieldDiffStatus::New ) ),
-              Diff_Item::Removed( id ) =>
-                ( id.clone(), Some( FieldDiffStatus::Removed ) ), };
-          goals.push( id.clone() );
-          dmap.insert( id, diff ); }
+              Diff_Item::Unchanged (id) =>
+                ( id . clone(), None ),
+              Diff_Item::New (id) =>
+                ( id . clone(), Some (FieldDiffStatus::New) ),
+              Diff_Item::Removed (id) =>
+                ( id . clone(), Some (FieldDiffStatus::Removed) ), };
+          goals . push( id . clone() );
+          dmap . insert( id, diff ); }
         ( goals, dmap ) } };
-  let is_id : fn(&ViewNode) -> bool =
-    |viewnode| matches!( &viewnode.kind,
+  let is_id : fn (&ViewNode) -> bool =
+    |viewnode| matches!( &viewnode . kind,
                          ViewNodeKind::Scaff( Scaffold::ID { .. } ) );
-  let view_id_text : fn(&ViewNode) -> ID =
-    |viewnode| match &viewnode.kind {
+  let view_id_text : fn (&ViewNode) -> ID =
+    |viewnode| match &viewnode . kind {
       ViewNodeKind::Scaff( Scaffold::ID { id, .. } ) =>
-        id.clone(),
+        id . clone(),
       _ => unreachable!(), };
   let create_id = |id: &ID| -> ViewNode {
     let diff : Option<FieldDiffStatus> =
-      diff_map.get( id ).copied().flatten();
+      diff_map . get (id) . copied() . flatten();
     viewnode_from_scaffold(
-      Scaffold::ID { id: id.clone(), diff } ) };
+      Scaffold::ID { id: id . clone(), diff } ) };
   complete_relevant_children_in_viewnodetree(
     tree,
     idcol_node_id,

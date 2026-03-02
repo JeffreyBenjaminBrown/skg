@@ -20,8 +20,8 @@ pub enum DefineNode {
   // PITFALL: Save(SaveNode) might smell funny, but consider that
   // some functions and type fields require specifically a SaveNode,
   // not a DefineNode.
-  Save(SaveNode),
-  Delete(DeleteNode),
+  Save (SaveNode),
+  Delete (DeleteNode),
 }
 
 /// A Save instruction.
@@ -55,23 +55,23 @@ impl std::fmt::Display for SaveError {
     f : &mut std::fmt::Formatter<'_>
   ) -> std::fmt::Result {
     match self {
-      SaveError::ParseError(msg) =>
+      SaveError::ParseError (msg) =>
         write!(f, "Parse error: {}", msg),
-      SaveError::DatabaseError(err) =>
+      SaveError::DatabaseError (err) =>
         write!(f, "Database error: {}", err),
-      SaveError::IoError(err) =>
+      SaveError::IoError (err) =>
         write!(f, "IO error: {}", err),
-      SaveError::BufferValidationErrors(errors) => {
+      SaveError::BufferValidationErrors (errors) => {
         write!(f, "Buffer validation errors: {} error(s) found",
-               errors.len()) }} }}
+               errors . len()) }} }}
 
 impl std::error::Error for SaveError {
   fn source (
     &self
   ) -> Option<&(dyn std::error::Error + 'static)> {
     match self {
-      SaveError::DatabaseError(err) => Some(err.as_ref()),
-      SaveError::IoError(err) => Some(err),
+      SaveError::DatabaseError (err) => Some(err . as_ref()),
+      SaveError::IoError (err) => Some (err),
       _ => None, }} }
 
 /// Formats a SaveError as an org-mode buffer content for the client.
@@ -79,24 +79,24 @@ pub fn format_save_error_as_org (
   error : &SaveError
 ) -> String {
   match error {
-    SaveError::ParseError(msg) => {
+    SaveError::ParseError (msg) => {
       format!("* NOTHING WAS SAVED\n\nParse error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               msg) },
-    SaveError::DatabaseError(err) => {
+    SaveError::DatabaseError (err) => {
       format!("* NOTHING WAS SAVED\n\nDatabase error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
-    SaveError::IoError(err) => {
+    SaveError::IoError (err) => {
       format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
-    SaveError::BufferValidationErrors(errors) => {
+    SaveError::BufferValidationErrors (errors) => {
       let mut content : String =
-        String::from("* NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n");
-      for (i, error) in errors.iter().enumerate() {
-        content.push_str(&format!("** Error {}\n", i + 1));
-        content.push_str(&format_buffer_validation_error(error));
-        content.push('\n'); }
-      content.push_str("** Resolution\n");
-      content.push_str("Please fix these errors and try saving again.\n");
+        String::from ("* NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n");
+      for (i, error) in errors . iter() . enumerate() {
+        content . push_str(&format!("** Error {}\n", i + 1));
+        content . push_str(&format_buffer_validation_error (error));
+        content . push ('\n'); }
+      content . push_str ("** Resolution\n");
+      content . push_str ("Please fix these errors and try saving again.\n");
       content }} }
 
 fn format_buffer_validation_error (
@@ -106,63 +106,63 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_Scaffold(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::Multiple_Defining_Viewnodes(id) => {
+    BufferValidationError::Multiple_Defining_Viewnodes (id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
-              id.0) },
-    BufferValidationError::AmbiguousDeletion(id) => {
+              id . 0) },
+    BufferValidationError::AmbiguousDeletion (id) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
-              id.0) },
-    BufferValidationError::DuplicatedContent(id) => {
+              id . 0) },
+    BufferValidationError::DuplicatedContent (id) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
-              id.0) },
+              id . 0) },
     BufferValidationError::InconsistentSources(id, sources) => {
       let source_list: Vec<String> =
-        sources.iter().map(|s| s.0.clone()).collect();
+        sources . iter() . map(|s| s . 0 . clone()) . collect();
       format!( "Multiple viewnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
-              id.0, source_list) },
+              id . 0, source_list) },
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
-              id.0, source) },
+              id . 0, source) },
     BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) => {
       format!("Source mismatch for node:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- Nodes cannot be moved between sources.\n",
-              id.0, disk_source, buffer_source) },
+              id . 0, disk_source, buffer_source) },
     BufferValidationError::SourceNotInConfig(id, source) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
-              id.0, source) },
-    BufferValidationError::DefinitiveRequestOnDefinitiveNode(id) => {
+              id . 0, source) },
+    BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) => {
       format!("Definitive view request on a node that is already definitive:\n- ID: {}\n- The node already shows its content; no expansion needed.\n",
-              id.0) },
-    BufferValidationError::DefinitiveRequestOnNodeWithChildren(id) => {
+              id . 0) },
+    BufferValidationError::DefinitiveRequestOnNodeWithChildren (id) => {
       format!("Definitive view request on a node with children:\n- ID: {}\n- The expansion would clobber those children.\n- Save without the request first, then delete children and retry.\n",
-              id.0) },
-    BufferValidationError::MultipleDefinitiveRequestsForSameId(id) => {
+              id . 0) },
+    BufferValidationError::MultipleDefinitiveRequestsForSameId (id) => {
       format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
-              id.0) },
+              id . 0) },
     BufferValidationError::LocalStructureViolation(msg, id) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
-              id.0, msg) },
-    BufferValidationError::Other(msg) => {
+              id . 0, msg) },
+    BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 
 impl DefineNode {
-  pub fn is_delete(&self) -> bool {
-    matches!(self, DefineNode::Delete(_))
+  pub fn is_delete (&self) -> bool {
+    matches!(self, DefineNode::Delete (_))
   }
 
-  pub fn is_save(&self) -> bool {
-    matches!(self, DefineNode::Save(_))
+  pub fn is_save (&self) -> bool {
+    matches!(self, DefineNode::Save (_))
   }
 }
 
 impl From<SaveNode> for DefineNode {
   fn from(save: SaveNode) -> Self {
-    DefineNode::Save(save)
+    DefineNode::Save (save)
   }
 }
 
 impl From<DeleteNode> for DefineNode {
   fn from(del: DeleteNode) -> Self {
-    DefineNode::Delete(del)
+    DefineNode::Delete (del)
   }
 }
 
@@ -171,21 +171,21 @@ impl Merge {
     &self
   ) -> Vec<DefineNode> {
     vec![
-      self.acquiree_text_preserver.clone().into(),
-      self.updated_acquirer.clone().into(),
-      self.acquiree_to_delete.clone().into(),
+      self . acquiree_text_preserver . clone() . into(),
+      self . updated_acquirer . clone() . into(),
+      self . acquiree_to_delete . clone() . into(),
     ] }
 
   pub fn acquirer_id (
     &self
   ) -> Result<&ID, String> {
-    self.updated_acquirer.0.primary_id()
+    self . updated_acquirer . 0 . primary_id()
   }
 
   pub fn acquiree_id (
     &self
   ) -> &ID {
-    &self.acquiree_to_delete.id
+    &self . acquiree_to_delete . id
   }
 
   /// Extracts the three targets from a Merge:
@@ -195,8 +195,8 @@ impl Merge {
   pub fn targets_from_merge (
     &self
   ) -> (&SkgNode, &SkgNode, (&ID, &SourceName)) {
-    ( &self.acquiree_text_preserver.0,
-      &self.updated_acquirer.0,
-      (&self.acquiree_to_delete.id, &self.acquiree_to_delete.source) )
+    ( &self . acquiree_text_preserver . 0,
+      &self . updated_acquirer . 0,
+      (&self . acquiree_to_delete . id, &self . acquiree_to_delete . source) )
   }
 }

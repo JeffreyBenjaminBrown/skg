@@ -89,9 +89,9 @@ pub fn viewnode_from_metadata (
       } else if metadata . is_deleted_node {
         ( UncheckedViewNodeKind::Deleted ( DeletedNode {
             id     : metadata . id . clone ()
-                       . unwrap_or_else ( || ID::from ( "" )),
+                       . unwrap_or_else ( || ID::from ("")),
             source : metadata . source . clone ()
-                       . unwrap_or_else ( || SourceName::from ( "" )),
+                       . unwrap_or_else ( || SourceName::from ("")),
             title,
             body,
           } ), None )
@@ -111,7 +111,7 @@ pub fn viewnode_from_metadata (
                               id: title . clone () . into (),
                               diff: metadata . scaffold_diff },
           other => other . clone () };
-        ( UncheckedViewNodeKind::Scaff ( scaffold_with_title ), error )
+        ( UncheckedViewNodeKind::Scaff (scaffold_with_title), error )
       } else {
       // UncheckedTrueNode
       ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
@@ -128,8 +128,8 @@ pub fn viewnode_from_metadata (
           diff             : metadata . truenode_diff, } ),
         None )
     };
-  ( UncheckedViewNode { focused : metadata.focused,
-                       folded  : metadata.folded,
+  ( UncheckedViewNode { focused : metadata . focused,
+                       folded  : metadata . folded,
                        kind },
     error ) }
 
@@ -143,26 +143,26 @@ pub fn parse_metadata_to_viewnodemd (
     default_metadata ();
 
   let parsed : Sexp =
-    sexp::parse ( sexp_str )
+    sexp::parse (sexp_str)
     . map_err ( |e| format! ( "Failed to parse metadata as s-expression: {}", e ) ) ?;
 
   // Extract the list of elements from (skg ...)
   let elements : &[Sexp] =
     match &parsed {
-      Sexp::List ( items ) => {
+      Sexp::List (items) => {
         // First element should be the symbol 'skg'
         if items . is_empty () {
-          return Err ( "Empty metadata s-expression".to_string () ); }
+          return Err ( "Empty metadata s-expression" . to_string () ); }
         // Skip the 'skg' symbol and return the rest
         &items[1..]
       },
-      _ => return Err ( "Expected metadata to be a list".to_string () ),
+      _ => return Err ( "Expected metadata to be a list" . to_string () ),
     };
 
   // Process each element
   for element in elements {
     match element {
-      Sexp::List ( items ) if items . len () >= 1 => {
+      Sexp::List (items) if items . len () >= 1 => {
         let first : String =
           atom_to_string ( &items[0] ) ?;
         match first . as_str () {
@@ -174,11 +174,11 @@ pub fn parse_metadata_to_viewnodemd (
           "diff" => {
             // (diff <value>) at top level is for Scaffolds (Alias/ID)
             if items . len () != 2 {
-              return Err ( "diff requires exactly one value".to_string () ); }
+              return Err ( "diff requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &items[1] ) ?;
             result . scaffold_diff = Some (
-              FieldDiffStatus::from_client_string ( &value )
+              FieldDiffStatus::from_client_string (&value)
                 . ok_or_else ( || format! ( "Invalid FieldDiffStatus value: {}", value ))? ); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
@@ -191,26 +191,26 @@ pub fn parse_metadata_to_viewnodemd (
               first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
-      Sexp::Atom ( _ ) => {
+      Sexp::Atom (_) => {
         let bare_value : String =
-          atom_to_string ( element ) ?;
+          atom_to_string (element) ?;
         match bare_value . as_str () {
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), diff: None } ),
-          "aliasCol" => result . scaffold = Some ( Scaffold::AliasCol ),
-          "forestRoot" => result . scaffold = Some ( Scaffold::BufferRoot ),
+          "aliasCol" => result . scaffold = Some (Scaffold::AliasCol),
+          "forestRoot" => result . scaffold = Some (Scaffold::BufferRoot),
           "hiddenInSubscribeeCol" =>
-            result . scaffold = Some ( Scaffold::HiddenInSubscribeeCol ),
+            result . scaffold = Some (Scaffold::HiddenInSubscribeeCol),
           "hiddenOutsideOfSubscribeeCol" =>
-            result . scaffold = Some ( Scaffold::HiddenOutsideOfSubscribeeCol ),
+            result . scaffold = Some (Scaffold::HiddenOutsideOfSubscribeeCol),
           "subscribeeCol" =>
-            result . scaffold = Some ( Scaffold::SubscribeeCol ),
+            result . scaffold = Some (Scaffold::SubscribeeCol),
           "textChanged" =>
-            result . scaffold = Some ( Scaffold::TextChanged ),
+            result . scaffold = Some (Scaffold::TextChanged),
           "idCol" =>
-            result . scaffold = Some ( Scaffold::IDCol ),
+            result . scaffold = Some (Scaffold::IDCol),
           "id" =>
             result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
           "deletedScaffold" =>
@@ -221,7 +221,7 @@ pub fn parse_metadata_to_viewnodemd (
       _ => { return Err ( format! (
         "Unexpected element in metadata sexp: {}",
         sexp_str )); }} }
-  Ok ( result ) }
+  Ok (result) }
 
 
 /// Parse the (node ...) s-expression contents.
@@ -231,22 +231,22 @@ fn parse_node_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::List ( subitems ) if subitems . len () >= 1 => {
+      Sexp::List (subitems) if subitems . len () >= 1 => {
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         match key . as_str () {
           "id" => {
             if subitems . len () != 2 {
-              return Err ( "id requires exactly one value".to_string () ); }
+              return Err ( "id requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . id = Some ( ID::from ( value )); },
+            metadata . id = Some ( ID::from (value)); },
           "source" => {
             if subitems . len () != 2 {
-              return Err ( "source requires exactly one value".to_string () ); }
+              return Err ( "source requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . source = Some ( SourceName::from ( value ) ); },
+            metadata . source = Some ( SourceName::from (value) ); },
           "graphStats" => {
             parse_graphstats_sexp ( &subitems[1..], &mut metadata . graphStats ) ?; },
           "viewStats" => {
@@ -258,17 +258,17 @@ fn parse_node_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
           "diff" => {
             if subitems . len () != 2 {
-              return Err ( "diff requires exactly one value".to_string () ); }
+              return Err ( "diff requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . truenode_diff = Some (
-              NodeDiffStatus::from_client_string ( &value )
+              NodeDiffStatus::from_client_string (&value)
                 . ok_or_else ( || format! ( "Invalid NodeDiffStatus value: {}", value ))? ); },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
-      Sexp::Atom ( _ ) => {
+      Sexp::Atom (_) => {
         let bare_value : String =
-          atom_to_string ( element ) ?;
+          atom_to_string (element) ?;
         match bare_value . as_str () {
           "parentIgnores" => metadata . parent_ignores = true,
           "indefinitive"  => metadata . indefinitive = true,
@@ -286,7 +286,7 @@ fn parse_deleted_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::List ( subitems ) if subitems . len () >= 1 => {
+      Sexp::List (subitems) if subitems . len () >= 1 => {
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         match key . as_str () {
@@ -295,13 +295,13 @@ fn parse_deleted_sexp (
               return Err ( "deleted id requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . id = Some ( ID::from ( value )); },
+            metadata . id = Some ( ID::from (value)); },
           "source" => {
             if subitems . len () != 2 {
               return Err ( "deleted source requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . source = Some ( SourceName::from ( value )); },
+            metadata . source = Some ( SourceName::from (value)); },
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -316,8 +316,8 @@ fn parse_graphstats_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::Atom ( _ ) => {
-        let key : String = atom_to_string ( element ) ?;
+      Sexp::Atom (_) => {
+        let key : String = atom_to_string (element) ?;
         match key . as_str () {
           "aliasing"    => { stats . aliasing    = true; },
           "extraIDs"    => { stats . extraIDs    = true; },
@@ -325,7 +325,7 @@ fn parse_graphstats_sexp (
           "subscribing" => { stats . subscribing = true; },
           _ => { return Err ( format! (
             "Unknown graphStats atom: {}", key )); }} },
-      Sexp::List ( kv_pair ) if kv_pair . len () == 2 => {
+      Sexp::List (kv_pair) if kv_pair . len () == 2 => {
         let key : String =
           atom_to_string ( &kv_pair[0] ) ?;
         let value : String =
@@ -333,17 +333,17 @@ fn parse_graphstats_sexp (
         match key . as_str () {
           "containers" => {
             stats . numContainers = Some (
-              value.parse::<usize>()
+              value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid containers value: {}", value )) ? ); },
           "contents" => {
             stats . numContents = Some (
-              value.parse::<usize>()
+              value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid contents value: {}", value )) ? ); },
           "linksIn" => {
             stats . numLinksIn = Some (
-              value.parse::<usize>()
+              value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid linksIn value: {}", value )) ? ); },
           _ => { return Err ( format! ( "Unknown graphStats key: {}",
@@ -360,9 +360,9 @@ fn parse_viewstats_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::Atom ( _ ) => {
+      Sexp::Atom (_) => {
         let bare_value : String =
-          atom_to_string ( element ) ?;
+          atom_to_string (element) ?;
         match bare_value . as_str () {
           "cycle"          => stats . cycle = true,
           "notInParent"    => stats . parentIsContainer = false,
@@ -382,22 +382,22 @@ fn parse_editrequest_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::List ( subitems ) if subitems . len () == 2 => {
+      Sexp::List (subitems) if subitems . len () == 2 => {
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         if key == "merge" {
           let id_str : String =
             atom_to_string ( &subitems[1] ) ?;
           metadata . edit_request = Some (
-            EditRequest::Merge ( ID::from ( id_str )));
+            EditRequest::Merge ( ID::from (id_str)));
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },
-      Sexp::Atom ( _ ) => {
+      Sexp::Atom (_) => {
         let bare_value : String =
-          atom_to_string ( element ) ?;
+          atom_to_string (element) ?;
         match bare_value . as_str () {
-          "delete" => metadata . edit_request = Some ( EditRequest::Delete ),
+          "delete" => metadata . edit_request = Some (EditRequest::Delete),
           _ => {
             return Err ( format! ( "Unknown editRequest value: {}",
                                     bare_value )); }} },
@@ -413,14 +413,14 @@ fn parse_viewrequests_sexp (
 ) -> Result<(), String> {
   for request_element in items {
     match request_element {
-      Sexp::Atom ( _ ) => {
+      Sexp::Atom (_) => {
         let request_str : String =
-          atom_to_string ( request_element ) ?;
+          atom_to_string (request_element) ?;
         let request : ViewRequest =
-          ViewRequest::from_str ( &request_str )
+          ViewRequest::from_str (&request_str)
           . map_err (
             | e | format! ( "Invalid view request: {}", e )) ?;
-        requests . insert ( request ); },
+        requests . insert (request); },
       _ => { return Err (
         "Unexpected element in viewRequests (expected atoms)"
           . to_string () ); }} }

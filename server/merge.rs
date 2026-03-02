@@ -24,21 +24,21 @@ pub async fn merge_nodes (
 ) -> Result < (), Box<dyn Error> > {
   println!(
     "Merging nodes in TypeDB, FS, and Tantivy, in that order ..." );
-  let db_name : &str = &config.db_name;
+  let db_name : &str = &config . db_name;
   { println!( "1) Merging in TypeDB database '{}' ...", db_name );
     typedb::merge_nodes_in_typedb (
       db_name,
       driver,
       &merge_instructions
-    ). await ?;
-    println!( "   TypeDB merge complete." ); }
-  { println!( "2) Merging in filesystem ..." );
+    ) . await ?;
+    println!("   TypeDB merge complete."); }
+  { println!("2) Merging in filesystem ...");
     fs::merge_nodes_in_fs (
-      config.clone (),
+      config . clone (),
       &merge_instructions ) ?;
-    println!( "   Filesystem merge complete." ); }
-  { println!( "3) Merging in Tantivy ..." );
+    println!("   Filesystem merge complete."); }
+  { println!("3) Merging in Tantivy ...");
     tantivy::merge_nodes_in_tantivy (
       &merge_instructions, tantivy_index ) ?;
-    println!( "   Tantivy merge complete." ); }
+    println!("   Tantivy merge complete."); }
   Ok (( )) }

@@ -21,22 +21,22 @@ fn test_delete_removed_node_respawns()
       let response = update_from_and_rerender_buffer(
           &input, driver, config, tantivy, true, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
-        ). await?;
+        ) . await?;
 
       // DISK: gets-removed.skg should still not exist
-      assert!(!repo_path.join("gets-removed.skg").exists(),
+      assert!(!repo_path . join ("gets-removed.skg") . exists(),
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
       let node_11 = read_skgnode(repo_path, "11")?;
-      let contains_11 = node_11.contains.unwrap_or_default();
-      assert!(contains_11.contains(&ID("moves".to_string())),
+      let contains_11 = node_11 . contains . unwrap_or_default();
+      assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
-      assert!(!contains_11.contains(&ID("gets-removed".to_string())),
+      assert!(!contains_11 . contains(&ID("gets-removed" . to_string())),
         "11.skg should not contain gets-removed");
 
       // BUFFER: gets-removed should respawn with (diff removed)
-      assert_buffer_contains(&response.saved_view,
+      assert_buffer_contains(&response . saved_view,
                              GIT_DIFF_VIEW);
       Ok (( )) } ) } ) }
 
@@ -58,16 +58,16 @@ fn test_delete_removed_here_node_respawns()
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state
-      ).await?;
+      ) . await?;
 
       // DISK: 12.skg should still have empty contains
       let node_12 = read_skgnode(repo_path, "12")?;
-      let contains_12 = node_12.contains.unwrap_or_default();
-      assert!(!contains_12.contains(&ID("moves".to_string())),
+      let contains_12 = node_12 . contains . unwrap_or_default();
+      assert!(!contains_12 . contains(&ID("moves" . to_string())),
         "12.skg should not contain moves");
 
       // DISK: moves.skg should still exist
-      assert!(repo_path.join("moves.skg").exists(),
+      assert!(repo_path . join ("moves.skg") . exists(),
         "moves.skg should still exist");
 
       // BUFFER: phantom moves should respawn under 12
@@ -92,22 +92,22 @@ fn test_delete_new_here_updates_disk()
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state
-      ).await?;
+      ) . await?;
 
       // DISK: 11.skg should no longer contain moves
       let node_11 = read_skgnode(repo_path, "11")?;
-      let contains_11 = node_11.contains.unwrap_or_default();
-      assert!(!contains_11.contains(&ID("moves".to_string())),
+      let contains_11 = node_11 . contains . unwrap_or_default();
+      assert!(!contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should no longer contain moves");
 
       // DISK: moves.skg should still exist
-      assert!(repo_path.join("moves.skg").exists(),
+      assert!(repo_path . join ("moves.skg") . exists(),
         "moves.skg should still exist");
 
       // BUFFER: moves gone from 11, still under 12 as removed-here
       let expected = without_lines_containing(
         GIT_DIFF_VIEW, "new-here");
-      assert_buffer_contains(&response.saved_view,
+      assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())
     })
@@ -133,28 +133,28 @@ fn test_add_new_child_creates_on_disk()
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state
-      ).await?;
+      ) . await?;
 
       // DISK: newer.skg should be created with correct id and title
-      assert!(repo_path.join("newer.skg").exists(),
+      assert!(repo_path . join ("newer.skg") . exists(),
         "newer.skg should be created");
       let node_newer = read_skgnode(repo_path, "newer")?;
-      assert!(node_newer.ids.contains(&ID("newer".to_string())),
+      assert!(node_newer . ids . contains(&ID("newer" . to_string())),
         "newer.skg should have id 'newer'");
-      assert_eq!(node_newer.title, "newer",
+      assert_eq!(node_newer . title, "newer",
         "newer.skg should have title 'newer'");
 
       // DISK: 12.skg should contain newer
       let node_12 = read_skgnode(repo_path, "12")?;
-      let contains_12 = node_12.contains.unwrap_or_default();
-      assert!(contains_12.contains(&ID("newer".to_string())),
+      let contains_12 = node_12 . contains . unwrap_or_default();
+      assert!(contains_12 . contains(&ID("newer" . to_string())),
         "12.skg should contain newer");
 
       // BUFFER: 12 has moves (removed-here) and newer (new).
       // PITFALL: I'm not sure 12's children will be in this order.
       let expected = insert_after(GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer) (diff new))) newer");
-      assert_buffer_contains(&response.saved_view,
+      assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())
     })
@@ -177,16 +177,16 @@ where
   let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir.path();
-  setup_git_repo_with_fixtures(repo_path)?;
+  let repo_path = temp_dir . path();
+  setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
     let (config, driver, tantivy) =
-      setup_test_dbs(db_name, repo_path.to_str().unwrap(), &tantivy_folder).await?;
+      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), &tantivy_folder) . await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path).await;
+    let result = test_fn(&config, &driver, &tantivy, repo_path) . await;
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(&tantivy_folder))).await?;
+    cleanup_test_dbs(db_name, &driver, Some(Path::new (&tantivy_folder))) . await?;
     result
   })
 }

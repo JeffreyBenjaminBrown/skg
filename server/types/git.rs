@@ -92,8 +92,8 @@ impl SourceDiff {
     pid : &ID,
   ) -> Option<&SkgnodeDiff> {
     let file_path : PathBuf =
-      PathBuf::from( format!( "{}.skg", pid.0 ) );
-    self.skgnode_diffs.get( &file_path ) }}
+      PathBuf::from( format!( "{}.skg", pid . 0 ) );
+    self . skgnode_diffs . get (&file_path) }}
 
 impl NodeDiffStatus {
   /// Single source of truth for NodeDiffStatus <-> client string bijection.
@@ -106,17 +106,17 @@ impl NodeDiffStatus {
   ];
 
   /// String representation as used in client metadata.
-  pub fn repr_in_client ( &self ) -> &'static str {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(_, nd)| nd == self )
-      .map ( |(s, _)| *s )
-      .expect ( "REPRS_IN_CLIENT should cover all NodeDiffStatus variants" ) }
+  pub fn repr_in_client (&self) -> &'static str {
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(_, nd)| nd == self )
+      . map ( |(s, _)| *s )
+      . expect ("REPRS_IN_CLIENT should cover all NodeDiffStatus variants") }
 
   /// Parse a client string to a NodeDiffStatus.
   pub fn from_client_string ( s: &str ) -> Option<NodeDiffStatus> {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(cs, _)| *cs == s )
-      .map ( |(_, nd)| *nd ) }
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(cs, _)| *cs == s )
+      . map ( |(_, nd)| *nd ) }
 }
 
 impl fmt::Display for NodeDiffStatus {
@@ -124,7 +124,7 @@ impl fmt::Display for NodeDiffStatus {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    write!(f, "{}", self.repr_in_client()) } }
+    write!(f, "{}", self . repr_in_client()) } }
 
 impl FromStr for NodeDiffStatus {
   type Err = String;
@@ -132,8 +132,8 @@ impl FromStr for NodeDiffStatus {
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
-    Self::from_client_string ( s )
-      .ok_or_else ( || format! ( "Unknown NodeDiffStatus value: {}", s ) ) } }
+    Self::from_client_string (s)
+      . ok_or_else ( || format! ( "Unknown NodeDiffStatus value: {}", s ) ) } }
 
 impl FieldDiffStatus {
   /// Single source of truth for FieldDiffStatus <-> client string bijection.
@@ -143,17 +143,17 @@ impl FieldDiffStatus {
   ];
 
   /// String representation as used in client metadata.
-  pub fn repr_in_client ( &self ) -> &'static str {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(_, fd)| fd == self )
-      .map ( |(s, _)| *s )
-      .expect ( "REPRS_IN_CLIENT should cover all FieldDiffStatus variants" ) }
+  pub fn repr_in_client (&self) -> &'static str {
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(_, fd)| fd == self )
+      . map ( |(s, _)| *s )
+      . expect ("REPRS_IN_CLIENT should cover all FieldDiffStatus variants") }
 
   /// Parse a client string to a FieldDiffStatus.
   pub fn from_client_string ( s: &str ) -> Option<FieldDiffStatus> {
-    Self::REPRS_IN_CLIENT.iter()
-      .find ( |(cs, _)| *cs == s )
-      .map ( |(_, fd)| *fd ) }
+    Self::REPRS_IN_CLIENT . iter()
+      . find ( |(cs, _)| *cs == s )
+      . map ( |(_, fd)| *fd ) }
 }
 
 impl fmt::Display for FieldDiffStatus {
@@ -161,7 +161,7 @@ impl fmt::Display for FieldDiffStatus {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    write!(f, "{}", self.repr_in_client()) } }
+    write!(f, "{}", self . repr_in_client()) } }
 
 impl FromStr for FieldDiffStatus {
   type Err = String;
@@ -169,8 +169,8 @@ impl FromStr for FieldDiffStatus {
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
-    Self::from_client_string ( s )
-      .ok_or_else ( || format! ( "Unknown FieldDiffStatus value: {}", s ) ) } }
+    Self::from_client_string (s)
+      . ok_or_else ( || format! ( "Unknown FieldDiffStatus value: {}", s ) ) } }
 
 //
 // Functions
@@ -184,9 +184,9 @@ pub fn node_changes_for_truenode<'a> (
   pid          : &ID,
   source       : &SourceName,
 ) -> Option<&'a NodeChanges> {
-  source_diffs.as_ref().and_then(
+  source_diffs . as_ref() . and_then(
     |diffs| {
-      let sourcediff : &SourceDiff = diffs.get( source ) ?;
-      if !sourcediff.is_git_repo { return None; }
-      sourcediff.skgnode_diff_for_pid( pid ) ?
-        .node_changes.as_ref() } ) }
+      let sourcediff : &SourceDiff = diffs . get (source) ?;
+      if !sourcediff . is_git_repo { return None; }
+      sourcediff . skgnode_diff_for_pid (pid) ?
+        . node_changes . as_ref() } ) }

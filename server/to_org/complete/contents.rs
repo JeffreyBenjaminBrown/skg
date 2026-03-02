@@ -29,13 +29,13 @@ pub fn clobberIndefinitiveViewnode (
   let title : String = skgnode . title . clone();
   let source : SourceName = skgnode . source . clone();
   write_at_node_in_tree ( tree, treeid, |viewnode| {
-    let ViewNodeKind::True ( t ) : &mut ViewNodeKind =
-      &mut viewnode.kind
+    let ViewNodeKind::True (t) : &mut ViewNodeKind =
+      &mut viewnode . kind
       else { panic! (
              "clobberIndefinitiveViewnode: expected TrueNode" ) };
     t . title = title;
     t . source = source;
     t . body = None; }
-  ). map_err ( |e| -> Box<dyn Error> { e.into() } ) ?;
+  ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
 
   Ok (( )) }

@@ -26,15 +26,15 @@ pub async fn complete_truenode (
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
-    |vn : &ViewNode| matches!( &vn.kind, ViewNodeKind::True( _ ) ),
+    |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_) ),
     "complete_truenode: expected TrueNode" )
-    .map_err( |e| -> Box<dyn Error> { e.into() } )?;
+    . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests_definitive_first( tree, node ) ?;
-  if requests.is_empty() { return Ok(( )); }
+  if requests . is_empty() { return Ok(( )); }
   execute_view_requests(
     tree, map, requests, config, driver,
-    visited, errors, deleted_since_head_pid_src_map ). await ?;
+    visited, errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 
 /// Read the node's view_requests set and return them as a Vec
@@ -45,14 +45,14 @@ fn extract_view_requests_definitive_first (
 ) -> Result<Vec<(NodeId, ViewRequest)>, Box<dyn Error>> {
   let view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn.kind {
-        ViewNodeKind::True( t ) => t.view_requests.clone(),
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . view_requests . clone(),
         _ => HashSet::new() } )
-    .map_err( |e| -> Box<dyn Error> { e.into() } )?;
+    . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let mut result : Vec<(NodeId, ViewRequest)> = Vec::new();
-  if view_requests.contains( &ViewRequest::Definitive ) {
-    result.push( (node, ViewRequest::Definitive) ); }
+  if view_requests . contains (&ViewRequest::Definitive) {
+    result . push( (node, ViewRequest::Definitive) ); }
   for req in &view_requests {
     if *req != ViewRequest::Definitive {
-      result.push( (node, *req) ); } }
-  Ok( result ) }
+      result . push( (node, *req) ); } }
+  Ok (result) }

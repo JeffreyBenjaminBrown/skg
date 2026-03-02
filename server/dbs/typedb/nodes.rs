@@ -28,7 +28,7 @@ pub async fn create_all_nodes (
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
-    driver.transaction ( db_name,
+    driver . transaction ( db_name,
                          TransactionType::Write )
     . await ?;
   println!("Creating nodes ...");
@@ -49,7 +49,7 @@ pub async fn create_only_nodes_with_no_ids_present (
   let mut all_pids : BTreeSet < String > =
     BTreeSet::new ();
   for node in nodes {
-    all_pids.insert (
+    all_pids . insert (
       node . primary_id()? . to_string() ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
@@ -60,9 +60,9 @@ pub async fn create_only_nodes_with_no_ids_present (
   let mut to_create : Vec < &SkgNode > =
     Vec::new ();
   for node in nodes {
-    if ! known_ids.contains (
-      node.primary_id()? . as_str () )
-    { to_create.push ( node ); }}
+    if ! known_ids . contains (
+      node . primary_id()? . as_str () )
+    { to_create . push (node); }}
   { // Create them.
     let tx : Transaction =
       driver . transaction (
@@ -70,11 +70,11 @@ pub async fn create_only_nodes_with_no_ids_present (
         TransactionType::Write
       ) . await ?;
     println! ( "Creating {} new nodes ...",
-                to_create.len () );
+                to_create . len () );
     for node in &to_create {
       create_node ( node, &tx ) . await ?; }
     tx . commit () . await ?; }
-  Ok ( to_create.len () ) }
+  Ok ( to_create . len () ) }
 
 /// Batch existence check:
 /// Given a set of candidate ID *strings*,
@@ -85,7 +85,7 @@ pub async fn which_ids_exist (
   ids     : &BTreeSet < String >
 ) -> Result < HashSet < String >, Box<dyn Error> > {
 
-  if ids.is_empty () {
+  if ids . is_empty () {
     return Ok ( HashSet::new () ); }
   let tx : Transaction =
     driver . transaction (
@@ -97,7 +97,7 @@ pub async fn which_ids_exist (
       tx . query ( {
         let or_block : String =
           build_disjunction(
-            ids.iter(),
+            ids . iter(),
             |v| format!("{{$found == \"{}\";}}", v) );
         let query : String = format! (
           "match $found isa id;\n{};\nselect $found;",
@@ -106,16 +106,16 @@ pub async fn which_ids_exist (
     answer } . into_rows ();
   let mut found : HashSet < String > =
     HashSet::new ();
-  while let Some ( row_res ) = rows . next () . await {
+  while let Some (row_res) = rows . next () . await {
     let row : ConceptRow = row_res ?;
-    if let Some ( concept ) =
-      row . get ( "found" ) ? {
-        found.insert ( {
+    if let Some (concept) =
+      row . get ("found") ? {
+        found . insert ( {
           let payload : String =
             extract_payload_from_typedb_string_rep (
               & concept . to_string () );
           payload } ); }}
-  Ok ( found ) }
+  Ok (found) }
 
 pub async fn create_node (
   // Creates: the `node`,
@@ -126,7 +126,7 @@ pub async fn create_node (
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id : &ID = node.primary_id()?;
+  let primary_id : &ID = node . primary_id()?;
   tx . query ( {
     let insert_node_query : String = format! (
       r#"insert $n isa node,
@@ -143,12 +143,12 @@ async fn insert_extra_ids (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  if node.ids.len () > 1 {
-    let primary_id : &ID = node.primary_id()?;
+  if node . ids . len () > 1 {
+    let primary_id : &ID = node . primary_id()?;
     for extra_id in { let extra_ids: Vec < &ID > =
-                        node . ids . iter() . skip(1) . collect();
+                        node . ids . iter() . skip (1) . collect();
                       extra_ids } {
-      tx.query (
+      tx . query (
         format! ( r#"
                     match
                         $n isa node, has id "{}";
@@ -158,7 +158,7 @@ async fn insert_extra_ids (
                            ( node: $n,
                              extra_id: $e ); "#,
                     primary_id . as_str (),
-                    extra_id.as_str () ))
+                    extra_id . as_str () ))
         . await ?; }}
   Ok (()) }
 
@@ -170,11 +170,11 @@ pub async fn delete_nodes_from_pids (
   driver  : &TypeDBDriver,
   ids     : &[ID]
 ) -> Result < (), Box<dyn Error> > {
-  if ids.is_empty() { return Ok ( () ); }
+  if ids . is_empty() { return Ok ( () ); }
   let tx : Transaction =
-    driver.transaction (
+    driver . transaction (
       db_name, TransactionType::Write
-    ). await ?;
+    ) . await ?;
   let pid_or_clause : String =
     build_has_id_disjunction(ids, "node");
   let answer : QueryAnswer = {
@@ -187,29 +187,29 @@ pub async fn delete_nodes_from_pids (
         $e has id $extra_id_value;
         select $extra_id_value;"#,
       pid_or_clause );
-    tx.query ( extra_ids_query ). await ? };
+    tx . query (extra_ids_query) . await ? };
   let mut extra_id_values : Vec<String> =
     Vec::new();
-  let mut rows : ConceptRowStream = answer.into_rows();
-  while let Some(row_res) = rows.next().await {
+  let mut rows : ConceptRowStream = answer . into_rows();
+  while let Some (row_res) = rows . next() . await {
     let row : ConceptRow = row_res?;
-    if let Some(concept) = row.get("extra_id_value")? {
-      extra_id_values.push ( {
+    if let Some (concept) = row . get ("extra_id_value")? {
+      extra_id_values . push ( {
         let extra_id_value : String =
           extract_payload_from_typedb_string_rep(
-            &concept.to_string());
+            &concept . to_string());
         extra_id_value } ); }}
   { // delete nodes
-    let _answer : QueryAnswer = tx.query ( {
+    let _answer : QueryAnswer = tx . query ( {
       let delete_nodes_from_pids_query : String = format! (
         r#"match $node isa node;
         {};
         delete $node;"#,
         pid_or_clause );
-      delete_nodes_from_pids_query } ). await ?; }
+      delete_nodes_from_pids_query } ) . await ?; }
   { // Delete extra_ids
-    if !extra_id_values.is_empty() {
-      let _answer : QueryAnswer = tx.query ( {
+    if !extra_id_values . is_empty() {
+      let _answer : QueryAnswer = tx . query ( {
         let extra_id_or_clause : String =
           build_has_id_disjunction(&extra_id_values, "e");
         let delete_extra_ids_query : String = format! (
@@ -217,6 +217,6 @@ pub async fn delete_nodes_from_pids (
           {};
           delete $e;"#,
           extra_id_or_clause );
-        delete_extra_ids_query } ). await ?; }}
-  tx . commit (). await ?;
+        delete_extra_ids_query } ) . await ?; }}
+  tx . commit () . await ?;
   Ok ( () ) }

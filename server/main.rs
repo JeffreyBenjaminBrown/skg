@@ -15,23 +15,23 @@ use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 fn main() -> Result<(), Box<dyn Error>> {
-  let args: Vec<String> = env::args().collect();
+  let args: Vec<String> = env::args() . collect();
 
   let config: SkgConfig = load_config (
     & { let config_path: String =
-          if args.len() > 1 { // config from command line, if given
-            args[1].clone()
+          if args . len() > 1 { // config from command line, if given
+            args[1] . clone()
           } else { // default config
-            "data/skgconfig.toml".to_string() };
+            "data/skgconfig.toml" . to_string() };
         config_path } ) ?;
 
-  clear_timing_log ( &config );
+  clear_timing_log (&config);
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
     = timed ( &config, "initialize_dbs",
-              || initialize_dbs ( &config ));
+              || initialize_dbs (&config));
 
   serve (config, typedb_driver, tantivy_index)
-    . map_err ( |e| Box::new(e)
+    . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }

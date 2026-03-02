@@ -26,21 +26,21 @@ pub fn viewnode_forest_to_string (
         & render_node_subtree_to_org (
           child,
           level + 1 )? ); }
-    Ok ( out ) }
+    Ok (out) }
   let root_ref : NodeRef<ViewNode> = forest . root ();
   let is_forest_root : bool =
     matches! (
       & root_ref . value () . kind,
-      ViewNodeKind::Scaff ( Scaffold::BufferRoot ));
+      ViewNodeKind::Scaff (Scaffold::BufferRoot));
   if ! is_forest_root {
     return Err (
-      "viewnode_forest_to_string: root is not a BufferRoot".into() ); }
+      "viewnode_forest_to_string: root is not a BufferRoot" . into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {
     result . push_str (
       & render_node_subtree_to_org ( child, 1 )? ); }
-  Ok ( result ) }
+  Ok (result) }
 
 /// Renders an ViewNode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
@@ -50,7 +50,7 @@ pub fn viewnode_to_text (
   viewnode : &ViewNode
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string ( viewnode )?;
+    viewnode_to_string (viewnode)?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -60,34 +60,34 @@ pub fn viewnode_to_text (
   let mut result : String =
     String::new ();
   result . push_str (
-    &org_bullet ( level ));
+    &org_bullet (level));
   if ! metadata_str . is_empty () {
-    result . push ( ' ' );
-    result . push_str ( "(skg " );
-    result . push_str ( &metadata_str );
-    result . push ( ')' ); }
+    result . push (' ');
+    result . push_str ("(skg ");
+    result . push_str (&metadata_str);
+    result . push (')'); }
   if ! title . is_empty () {
-    result . push ( ' ' );
-    result . push_str ( title ); }
-  result . push ( '\n' );
-  if let Some ( body_text ) = body {
+    result . push (' ');
+    result . push_str (title); }
+  result . push ('\n');
+  if let Some (body_text) = body {
     if ! body_text . is_empty () {
-      result . push_str ( body_text );
-      if ! body_text . ends_with ( '\n' ) {
-        result . push ( '\n' ); }} }
-  Ok ( result ) }
+      result . push_str (body_text);
+      if ! body_text . ends_with ('\n') {
+        result . push ('\n'); }} }
+  Ok (result) }
 
 pub fn viewnode_to_string (
   viewnode : &ViewNode
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::Scaff ( scaffold ) =>
+    ViewNodeKind::Scaff (scaffold) =>
       scaffold_metadata_to_string (
         viewnode . focused, viewnode . folded, scaffold ),
-    ViewNodeKind::True ( true_node ) =>
+    ViewNodeKind::True (true_node) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded, true_node )),
-    ViewNodeKind::Deleted ( deleted_node ) =>
+    ViewNodeKind::Deleted (deleted_node) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded, deleted_node )),
     ViewNodeKind::DeletedScaff =>
@@ -109,8 +109,8 @@ fn scaffold_metadata_to_string (
   match scaffold {
     Scaffold::Alias { diff, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some ( d ) = diff {
-        parts . push ( format! ( "(diff {})", d.repr_in_client() ) ); }}
+      if let Some (d) = diff {
+        parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
     Scaffold::AliasCol =>
       parts . push ( "aliasCol" . to_string () ),
     Scaffold::BufferRoot =>
@@ -127,10 +127,10 @@ fn scaffold_metadata_to_string (
       parts . push ( "idCol" . to_string () ),
     Scaffold::ID { diff, .. } => {
       parts . push ( "id" . to_string () );
-      if let Some ( d ) = diff {
-        parts . push ( format! ( "(diff {})", d.repr_in_client() ) ); }}
+      if let Some (d) = diff {
+        parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
   }
-  Ok ( parts . join ( " " )) }
+  Ok ( parts . join (" ")) }
 
 /// Render metadata for a TrueNode:
 ///   (skg [focused] [folded] (node ...))
@@ -143,13 +143,13 @@ fn true_node_metadata_to_string (
 
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
-      if true_node . graphStats . numContainers != Some ( 1 ) {
+      if true_node . graphStats . numContainers != Some (1) {
         if let Some (count) = true_node . graphStats . numContainers {
           parts . push ( format! ( "(containers {})", count )); }}
-      if true_node . graphStats . numContents != Some ( 0 ) {
+      if true_node . graphStats . numContents != Some (0) {
         if let Some (count) = true_node . graphStats . numContents {
           parts . push ( format! ( "(contents {})", count )); }}
-      if true_node . graphStats . numLinksIn != Some ( 0 ) {
+      if true_node . graphStats . numLinksIn != Some (0) {
         if let Some (count) = true_node . graphStats . numLinksIn {
           parts . push ( format! ( "(linksIn {})", count )); }}
       if true_node . graphStats . aliasing {
@@ -204,22 +204,22 @@ fn true_node_metadata_to_string (
       parts . push ( "parentIgnores" . to_string () ); }
     if true_node . indefinitive {
       parts . push ( "indefinitive" . to_string () ); }
-    if let Some ( s ) = graph_stats ( true_node )
-    { parts . push ( s ); }
-    if let Some ( s ) = view_stats ( true_node )
-    { parts . push ( s ); }
-    if let Some ( s ) = edit_request ( true_node )
-    { parts . push ( s ); }
-    if let Some ( s ) = view_requests ( true_node )
-    { parts . push ( s ); }
-    if let Some ( s ) = diff_status ( true_node )
-    { parts . push ( s ); }
-    format! ( "({})", parts . join ( " " )) }
+    if let Some (s) = graph_stats (true_node)
+    { parts . push (s); }
+    if let Some (s) = view_stats (true_node)
+    { parts . push (s); }
+    if let Some (s) = edit_request (true_node)
+    { parts . push (s); }
+    if let Some (s) = view_requests (true_node)
+    { parts . push (s); }
+    if let Some (s) = diff_status (true_node)
+    { parts . push (s); }
+    format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
-  parts . push ( node_sexp ( true_node ));
-  parts . join ( " " ) }
+  parts . push ( node_sexp (true_node));
+  parts . join (" ") }
 
 /// Render metadata for a DeletedNode:
 ///   (skg [focused] [folded] (deleted (id X) (source S)))
@@ -234,7 +234,7 @@ fn deleted_node_metadata_to_string (
   parts . push ( format! ( "(deleted (id {}) (source {}))",
                             deleted_node . id . 0,
                             deleted_node . source ));
-  parts . join ( " " ) }
+  parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:
 ///   (skg [focused] [folded] deletedScaffold)
@@ -246,7 +246,7 @@ fn deleted_scaff_metadata_to_string (
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
   parts . push ( "deletedScaffold" . to_string () );
-  parts . join ( " " ) }
+  parts . join (" ") }
 
 fn org_bullet ( level: usize ) -> String {
-  "*" . repeat ( level.max ( 1 )) }
+  "*" . repeat ( level . max (1)) }

@@ -17,12 +17,12 @@ fn create_test_node(
     contains: Vec<ID>
 ) -> SkgNode {
     SkgNode {
-        title: title.to_string(),
+        title: title . to_string(),
         aliases,
-        source: SourceName::from("main"),
-        ids: vec![ID::from(id)],
+        source: SourceName::from ("main"),
+        ids: vec![ID::from (id)],
         body,
-        contains: Some(contains),
+        contains: Some (contains),
         subscribes_to: None,
         hides_from_its_subscriptions: None,
         overrides_view_of: None,
@@ -36,10 +36,10 @@ fn create_instruction(
 ) -> DefineNode {
   if to_delete {
     DefineNode::Delete(DeleteNode {
-      id: node.ids.first().unwrap().clone(),
-      source: node.source.clone() })
+      id: node . ids . first() . unwrap() . clone(),
+      source: node . source . clone() })
   } else {
-    DefineNode::Save(SaveNode(node)) }}
+    DefineNode::Save(SaveNode (node)) }}
 
 #[test]
 fn test_collect_dup_instructions_no_duplicates() {
@@ -55,17 +55,17 @@ fn test_collect_dup_instructions_no_duplicates() {
                           false), ];
 
     let grouped : HashMap<ID, Vec<DefineNode>> =
-      collect_dup_instructions(instructions).unwrap();
+      collect_dup_instructions (instructions) . unwrap();
 
-    assert_eq!(grouped.len(), 3,
+    assert_eq!(grouped . len(), 3,
                "Should have 3 groups with no duplicates");
-    assert!(grouped.contains_key(&ID::from("id1")));
-    assert!(grouped.contains_key(&ID::from("id2")));
-    assert!(grouped.contains_key(&ID::from("id3")));
+    assert!(grouped . contains_key(&ID::from ("id1")));
+    assert!(grouped . contains_key(&ID::from ("id2")));
+    assert!(grouped . contains_key(&ID::from ("id3")));
 
     // Each group should have exactly one instruction
     for (_, group) in grouped {
-        assert_eq!(group.len(), 1);
+        assert_eq!(group . len(), 1);
     }
 }
 
@@ -89,31 +89,31 @@ fn test_collect_dup_instructions_with_duplicates() {
                            false), ];
 
     let grouped : HashMap<ID, Vec<DefineNode>> =
-      collect_dup_instructions(instructions).unwrap();
+      collect_dup_instructions (instructions) . unwrap();
 
-    assert_eq!(grouped.len(), 3, "Should have 3 unique IDs");
+    assert_eq!(grouped . len(), 3, "Should have 3 unique IDs");
 
     // id1 should have 3 instructions
     let id1_group : &Vec<DefineNode> =
-      grouped.get(&ID::from("id1")).unwrap();
-    assert_eq!(id1_group.len(), 3, "id1 should have 3 instructions");
+      grouped . get(&ID::from ("id1")) . unwrap();
+    assert_eq!(id1_group . len(), 3, "id1 should have 3 instructions");
 
     // id2 and id3 should have 1 instruction each
     let id2_group : &Vec<DefineNode> =
-      grouped.get(&ID::from("id2")).unwrap();
-    assert_eq!(id2_group.len(), 1, "id2 should have 1 instruction");
+      grouped . get(&ID::from ("id2")) . unwrap();
+    assert_eq!(id2_group . len(), 1, "id2 should have 1 instruction");
 
     let id3_group : &Vec<DefineNode> =
-      grouped.get(&ID::from("id3")).unwrap();
-    assert_eq!(id3_group.len(), 1, "id3 should have 1 instruction");
+      grouped . get(&ID::from ("id3")) . unwrap();
+    assert_eq!(id3_group . len(), 1, "id3 should have 1 instruction");
 }
 
 #[test]
 fn test_collect_dup_instructions_empty_input() {
     let instructions : Vec<DefineNode> = vec![];
     let grouped : HashMap<ID, Vec<DefineNode>> =
-      collect_dup_instructions(instructions).unwrap();
-    assert!(grouped.is_empty(), "Empty input should produce empty output");
+      collect_dup_instructions (instructions) . unwrap();
+    assert!(grouped . is_empty(), "Empty input should produce empty output");
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn test_reconcile_same_id_instructions_for_one_id_error_empty() {
   // The function should return an error for empty instructions
   // We can't directly test the async function here without TypeDB setup,
   // but we can verify the logic structure
-  assert!(instructions.is_empty());
+  assert!(instructions . is_empty());
 }
 
 #[test]
@@ -139,8 +139,8 @@ fn test_consistent_to_delete_values() {
 
     // All have Delete action, so should be consistent
     let has_delete : bool =
-        instructions_consistent.iter()
-        .all(|instr| instr.is_delete());
+        instructions_consistent . iter()
+        . all(|instr| instr . is_delete());
     assert!(has_delete, "All actions should be Delete");
 }
 
@@ -154,11 +154,11 @@ fn test_inconsistent_to_delete_values() {
 
     // Mixed delete/non-delete values should be detected
     let has_delete : bool =
-        instructions_inconsistent.iter()
-        .any(|instr| instr.is_delete());
+        instructions_inconsistent . iter()
+        . any(|instr| instr . is_delete());
     let has_non_delete : bool =
-        instructions_inconsistent.iter()
-        .any(|instr| !instr.is_delete());
+        instructions_inconsistent . iter()
+        . any(|instr| !instr . is_delete());
     assert!(has_delete && has_non_delete, "Should detect inconsistent delete status");
 }
 
@@ -167,15 +167,15 @@ fn test_alias_collection_and_deduplication() {
     // Test that aliases are collected and deduplicated correctly
     let node1 : SkgNode = create_test_node(
       "id1", "Node 1",
-      Some(vec!["alias1".to_string(), "alias2".to_string() ] ),
+      Some(vec!["alias1" . to_string(), "alias2" . to_string() ] ),
       None, vec![]);
     let node2 : SkgNode = create_test_node(
       "id1", "Node 1 Again",
-      Some(vec!["alias2".to_string(), "alias3".to_string() ] ),
+      Some(vec!["alias2" . to_string(), "alias3" . to_string() ] ),
       None, vec![]);
     let node3 : SkgNode = create_test_node(
       "id1", "Node 1 Third",
-      Some(vec!["alias1".to_string(), "alias4".to_string() ] ),
+      Some(vec!["alias1" . to_string(), "alias4" . to_string() ] ),
       None, vec![]);
 
     let instructions : Vec<DefineNode> = vec![
@@ -187,13 +187,13 @@ fn test_alias_collection_and_deduplication() {
     // Collect all aliases
     let mut all_aliases : Vec<String> = vec![];
     for instr in &instructions {
-      if let Some(aliases)
-        = &extract_skgnode_if_save_else_error(instr).aliases
-        { all_aliases.extend( aliases.iter() . cloned() ); }}
+      if let Some (aliases)
+        = &extract_skgnode_if_save_else_error (instr) . aliases
+        { all_aliases . extend( aliases . iter() . cloned() ); }}
 
     // Deduplicate
-    all_aliases.sort();
-    all_aliases.dedup();
+    all_aliases . sort();
+    all_aliases . dedup();
 
     assert_eq!(all_aliases,
                vec!["alias1", "alias2", "alias3", "alias4"]);
@@ -202,53 +202,53 @@ fn test_alias_collection_and_deduplication() {
 #[test]
 fn test_content_merging_logic() {
     // Test the logic for merging definitive and appendable content
-    let definitive_content : Vec<ID> = vec![ID::from("def1"), ID::from("def2")];
-    let appendable_content : Vec<ID> = vec![ID::from("app1"), ID::from("def1"), ID::from("app2")];
+    let definitive_content : Vec<ID> = vec![ID::from ("def1"), ID::from ("def2")];
+    let appendable_content : Vec<ID> = vec![ID::from ("app1"), ID::from ("def1"), ID::from ("app2")];
 
     // Remove appendable items that are already in definitive
     let definitive_set : std::collections::HashSet<ID> =
-        definitive_content.iter().cloned().collect();
+        definitive_content . iter() . cloned() . collect();
     let filtered_appendable : Vec<ID> = appendable_content
-        .into_iter()
-        .filter(|id| !definitive_set.contains(id))
-        .collect();
+        . into_iter()
+        . filter(|id| !definitive_set . contains (id))
+        . collect();
 
-    assert_eq!(filtered_appendable, vec![ID::from("app1"), ID::from("app2")]);
+    assert_eq!(filtered_appendable, vec![ID::from ("app1"), ID::from ("app2")]);
 
     // Build final contents
     let mut final_contents : Vec<ID> = definitive_content;
-    final_contents.extend(filtered_appendable);
+    final_contents . extend (filtered_appendable);
 
     assert_eq!(final_contents, vec![
-        ID::from("def1"), ID::from("def2"),
-        ID::from("app1"), ID::from("app2")
+        ID::from ("def1"), ID::from ("def2"),
+        ID::from ("app1"), ID::from ("app2")
     ]);
 }
 
 #[test]
 fn test_title_and_body_precedence() {
     // Test that definitive values take precedence over maybe values
-    let maybe_title : Option<String> = Some("Last Title".to_string());
-    let definite_title : Option<String> = Some("Definite Title".to_string());
+    let maybe_title : Option<String> = Some("Last Title" . to_string());
+    let definite_title : Option<String> = Some("Definite Title" . to_string());
 
-    let maybe_body : Option<String> = Some("Last Body".to_string());
-    let definite_body : Option<String> = Some("Definite Body".to_string());
+    let maybe_body : Option<String> = Some("Last Body" . to_string());
+    let definite_body : Option<String> = Some("Definite Body" . to_string());
 
     // Test precedence logic: defining > last > default
     assert_eq!(
-        definite_title.as_ref().or(maybe_title.as_ref()),
-        Some(&"Definite Title".to_string())
+        definite_title . as_ref() . or(maybe_title . as_ref()),
+        Some(&"Definite Title" . to_string())
     );
     assert_eq!(
-        definite_body.as_ref().or(maybe_body.as_ref()),
-        Some(&"Definite Body".to_string())
+        definite_body . as_ref() . or(maybe_body . as_ref()),
+        Some(&"Definite Body" . to_string())
     );
 
     // Test fallback when no definitive value
     let no_definite_title : Option<String> = None;
     assert_eq!(
-        no_definite_title.as_ref().or(maybe_title.as_ref()),
-        Some(&"Last Title".to_string())
+        no_definite_title . as_ref() . or(maybe_title . as_ref()),
+        Some(&"Last Title" . to_string())
     );
 }
 
@@ -260,14 +260,14 @@ fn test_last_instruction_defines_title_and_body() {
     let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "First Title", None,
-                         Some("First Body".to_string()), vec![]),
+                         Some("First Body" . to_string()), vec![]),
         false),
       create_instruction(
         create_test_node("id1", "Middle Title", None, None, vec![]),
         false),
       create_instruction(
         create_test_node("id1", "Last Title", None,
-                         Some("Last Body".to_string()), vec![]),
+                         Some("Last Body" . to_string()), vec![]),
         false), ];
 
     // Simulate the logic: last instruction should win for both title and body
@@ -276,15 +276,15 @@ fn test_last_instruction_defines_title_and_body() {
 
     for instr in &instructions {
         let skg_node : &SkgNode =
-          extract_skgnode_if_save_else_error(instr);
-        maybe_title = Some(skg_node.title.clone());
-        if skg_node.body.is_some() {
-            maybe_body = skg_node.body.clone();
+          extract_skgnode_if_save_else_error (instr);
+        maybe_title = Some(skg_node . title . clone());
+        if skg_node . body . is_some() {
+            maybe_body = skg_node . body . clone();
         }
     }
 
-    assert_eq!(maybe_title, Some("Last Title".to_string()));
-    assert_eq!(maybe_body, Some("Last Body".to_string()));
+    assert_eq!(maybe_title, Some("Last Title" . to_string()));
+    assert_eq!(maybe_body, Some("Last Body" . to_string()));
 }
 
 #[test]
@@ -295,18 +295,18 @@ fn test_defining_instruction_takes_precedence() {
     let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "First Title", None,
-                         Some("First Body".to_string()),
-                         vec![ID::from("content1")]),
+                         Some("First Body" . to_string()),
+                         vec![ID::from ("content1")]),
         false),
       create_instruction( // This is the defining instruction.
         create_test_node("id1", "Defining Title", None,
-                         Some("Defining Body".to_string()),
-                         vec![ID::from("content2")]),
+                         Some("Defining Body" . to_string()),
+                         vec![ID::from ("content2")]),
         false),
       create_instruction(
         create_test_node("id1", "Last Title", None,
-                         Some("Last Body".to_string()),
-                         vec![ID::from("content3")]),
+                         Some("Last Body" . to_string()),
+                         vec![ID::from ("content3")]),
         false), ];
 
     // Simulate the logic: last Save instruction should win
@@ -315,19 +315,19 @@ fn test_defining_instruction_takes_precedence() {
     let mut last_content : Option<Vec<ID>> = None;
 
     for instr in &instructions {
-        if instr.is_save() {
+        if instr . is_save() {
             let skg_node : &SkgNode =
-              extract_skgnode_if_save_else_error(instr);
-            last_title = Some(skg_node.title.clone());
-            last_body = skg_node.body.clone();
-            last_content = skg_node.contains.clone();
+              extract_skgnode_if_save_else_error (instr);
+            last_title = Some(skg_node . title . clone());
+            last_body = skg_node . body . clone();
+            last_content = skg_node . contains . clone();
         }
     }
 
     // Last Save instruction should win
-    assert_eq!(last_title, Some("Last Title".to_string()));
-    assert_eq!(last_body, Some("Last Body".to_string()));
-    assert_eq!(last_content, Some(vec![ID::from("content3")]));
+    assert_eq!(last_title, Some("Last Title" . to_string()));
+    assert_eq!(last_body, Some("Last Body" . to_string()));
+    assert_eq!(last_content, Some(vec![ID::from ("content3")]));
 }
 
 #[test]
@@ -338,25 +338,25 @@ fn test_initial_content_from_disk_when_no_defining() {
     let instructions : Vec<DefineNode> = vec![
       create_instruction(
         create_test_node("id1", "Title 1", None, None,
-                         vec![ID::from("append1")]),
+                         vec![ID::from ("append1")]),
         false),
       create_instruction(
         create_test_node("id1", "Title 2", None, None,
-                         vec![ID::from("append2")]),
+                         vec![ID::from ("append2")]),
         false), ];
 
     // Collect all contents from all Save instructions
     let mut all_contents : Vec<ID> = Vec::new();
 
     for instr in &instructions {
-      if instr.is_save() {
-        if let Some(contents)
-          = &extract_skgnode_if_save_else_error(instr).contains
-          { all_contents.extend(contents.iter().cloned()); }} }
+      if instr . is_save() {
+        if let Some (contents)
+          = &extract_skgnode_if_save_else_error (instr) . contains
+          { all_contents . extend(contents . iter() . cloned()); }} }
 
     // Should collect content from both instructions
     assert_eq!(all_contents,
-               vec![ID::from("append1"), ID::from("append2")]);
+               vec![ID::from ("append1"), ID::from ("append2")]);
 }
 
 #[test]
@@ -375,20 +375,20 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 
     for instr in &instructions {
       let skg_node : &SkgNode =
-        extract_skgnode_if_save_else_error(instr);
-      if skg_node.body.is_some() {
-        maybe_body = skg_node.body.clone(); }}
+        extract_skgnode_if_save_else_error (instr);
+      if skg_node . body . is_some() {
+        maybe_body = skg_node . body . clone(); }}
 
     // No instruction had a body
-    assert!(maybe_body.is_none());
+    assert!(maybe_body . is_none());
 
     // Simulate reading from disk
     let disk_body : Option<String> =
-      Some("Body from disk".to_string());
+      Some("Body from disk" . to_string());
     let final_body : Option<String> =
-      maybe_body.or(disk_body);
+      maybe_body . or (disk_body);
 
-    assert_eq!(final_body, Some("Body from disk".to_string()));
+    assert_eq!(final_body, Some("Body from disk" . to_string()));
 }
 
 #[test]
@@ -403,28 +403,28 @@ fn test_save_vs_delete() {
         create_test_node("id2", "Title", None, None, vec![]),
         true);
 
-    assert!(save_instr.is_save());
-    assert!(delete_instr.is_delete());
+    assert!(save_instr . is_save());
+    assert!(delete_instr . is_delete());
 }
 
 #[test]
 fn test_id_merging() {
     // Test that IDs from instructions and disk are merged without duplicates
     let instruction_ids : Vec<ID> =
-      vec![ID::from("id1"), ID::from("id2")];
+      vec![ID::from ("id1"), ID::from ("id2")];
     let disk_ids : Vec<ID> =
-      vec![ID::from("id2"), ID::from("id3"), ID::from("id4")];
+      vec![ID::from ("id2"), ID::from ("id3"), ID::from ("id4")];
 
-    let mut final_ids : Vec<ID> = instruction_ids.clone();
+    let mut final_ids : Vec<ID> = instruction_ids . clone();
     for disk_id in &disk_ids {
-        if !final_ids.contains(disk_id) {
-            final_ids.push(disk_id.clone());
+        if !final_ids . contains (disk_id) {
+            final_ids . push(disk_id . clone());
         }
     }
 
     assert_eq!(final_ids,
-               vec![ID::from("id1"), ID::from("id2"),
-                    ID::from("id3"), ID::from("id4")]);
+               vec![ID::from ("id1"), ID::from ("id2"),
+                    ID::from ("id3"), ID::from ("id4")]);
 }
 
 // Note: Integration tests for reconcile_same_id_instructions_for_one_id and reconcile_same_id_instructions

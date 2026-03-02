@@ -20,12 +20,12 @@ pub async fn create_all_relationships (
 )-> Result < (), Box<dyn Error> > {
 
   let tx : Transaction =
-    driver.transaction ( db_name,
+    driver . transaction ( db_name,
                          TransactionType::Write )
     . await ?;
-  println! ( "Creating relationships ..." );
+  println! ("Creating relationships ...");
   for node in nodes {
-    let primary_id : &ID = node.primary_id()?;
+    let primary_id : &ID = node . primary_id()?;
     create_relationships_from_node (node, &tx)
       . await . map_err(
         |e| format!(
@@ -41,10 +41,10 @@ pub async fn create_relationships_from_node (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id : &ID = node.primary_id()?;
+  let primary_id : &ID = node . primary_id()?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node.contains.as_ref().unwrap_or(&vec![]),
+    node . contains . as_ref() . unwrap_or(&vec![]),
     "contains",
     "container",
     "contained",
@@ -52,39 +52,39 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'contains' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    & ( textlinks_from_node ( &node )
+    & ( textlinks_from_node (&node)
         . iter ()
         . map ( |textlink|
-                 ID::from ( textlink.id.clone() ) )
+                 ID::from ( textlink . id . clone() ) )
         . collect::<Vec<ID>>() ),
     "textlinks_to",
     "source",
     "dest",
-    tx ). await
+    tx ) . await
     . map_err(|e| format!("Failed to create 'textlinks_to' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node.subscribes_to.as_ref().unwrap_or(&vec![]),
+    node . subscribes_to . as_ref() . unwrap_or(&vec![]),
     "subscribes",
     "subscriber",
     "subscribee",
-    tx ). await
+    tx ) . await
     . map_err(|e| format!("Failed to create 'subscribes' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node.hides_from_its_subscriptions.as_ref().unwrap_or(&vec![]),
+    node . hides_from_its_subscriptions . as_ref() . unwrap_or(&vec![]),
     "hides_from_its_subscriptions",
     "hider",
     "hidden",
-    tx ). await
+    tx ) . await
     . map_err(|e| format!("Failed to create 'hides_from_its_subscriptions' relationships: {}", e))?;
   insert_relationship_from_list(
     primary_id . as_str (),
-    node.overrides_view_of.as_ref().unwrap_or(&vec![]),
+    node . overrides_view_of . as_ref() . unwrap_or(&vec![]),
     "overrides_view_of",
     "replacement",
     "replaced",
-    tx ). await
+    tx ) . await
     . map_err(|e| format!("Failed to create 'overrides_view_of' relationships: {}", e))?;
   Ok (()) }
 
@@ -112,16 +112,16 @@ pub async fn insert_relationship_from_list (
                     ({}: $from,
                      {}: $to);"#,
                 primary_id,
-                target_id.as_str(),
-                target_id.as_str(),
+                target_id . as_str(),
+                target_id . as_str(),
                 relation_name,
                 from_role,
                 to_role );
 
-    tx.query(query.clone()).await
-      .map_err(|e| format!(
+    tx . query(query . clone()) . await
+      . map_err(|e| format!(
         "TypeQL query failed for relationship '{}' from '{}' to '{}': {}\nQuery was: {}",
-        relation_name, primary_id, target_id.as_str(), e, query))?; }
+        relation_name, primary_id, target_id . as_str(), e, query))?; }
   Ok (( )) }
 
 /// Delete every instance of `relation`
@@ -148,9 +148,9 @@ pub async fn delete_out_links (
            $n   isa node, has id "{}";
            $rel isa {} ( {}: $n );
          delete $rel; "#,
-      id.as_str (),
+      id . as_str (),
       relation,
       role )
-    ). await ?; }
+    ) . await ?; }
   tx . commit () . await ?;
-  Ok ( ids.len () ) }
+  Ok ( ids . len () ) }

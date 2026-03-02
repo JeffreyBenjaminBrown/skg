@@ -38,7 +38,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_containerward_path (
-      tree, map, node_id, config, typedb_driver ). await;
+      tree, map, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
@@ -65,7 +65,7 @@ pub async fn build_and_integrate_containerward_path (
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
     tree, map, node_id, path, branches, cycle_node, config, driver
-  ). await }
+  ) . await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
@@ -106,7 +106,7 @@ pub async fn build_and_integrate_sourceward_path (
       & terminus_pid ) . await ?;
   integrate_path_that_might_fork_or_cycle (
     tree, map, node_id, path, branches, cycle_node, config, driver
-  ). await }
+  ) . await }
 
 /// Integrate a (maybe forked or cyclic) path into an ViewNode tree,
 /// using provided backpath data.
@@ -137,7 +137,7 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   if ! branches . is_empty () {
     integrate_branches_in_node (
       tree, map, last_node_id, branches, config, driver ) . await ?;
-  } else if let Some ( cycle_id ) = cycle_node {
+  } else if let Some (cycle_id) = cycle_node {
     // PITFALL: If there are branches, the cycle node is ignored.
     integrate_cycle_in_node (
       tree, map, last_node_id, cycle_id, config, driver ) . await ?; }
@@ -157,15 +157,15 @@ fn integrate_linear_portion_of_path<'a> (
                                         Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
     if path . is_empty () {
-      return Ok ( node_id ); }
+      return Ok (node_id); }
     let path_head : &ID = &path[0];
     let path_tail : &[ID] = &path[1..];
     let next_node_id : NodeId =
       match find_child_by_id ( tree, node_id, path_head ) {
-        Some ( child_treeid ) => child_treeid,
+        Some (child_treeid) => child_treeid,
         None => { prepend_indefinitive_child_with_parent_ignores (
                     tree, map, node_id, path_head, config, driver
-                  ). await ? } };
+                  ) . await ? } };
     integrate_linear_portion_of_path ( // recurse
       tree,
       map,
@@ -190,13 +190,13 @@ async fn integrate_branches_in_node (
   let mut branches_to_add : Vec < ID > =
     branches . into_iter ()
     . filter ( | b |
-                 ! found_children . contains_key ( b ) )
+                 ! found_children . contains_key (b) )
     . collect ();
   { // Simplifies testing. Not necessary in production.
     branches_to_add . sort (); }
   for branch_id in branches_to_add {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, map, node_id, &branch_id, config, driver ). await ?; }
+      tree, map, node_id, &branch_id, config, driver ) . await ?; }
   Ok (( )) }
 
 /// Add a cycle node as a child of the specified node.
@@ -211,7 +211,7 @@ async fn integrate_cycle_in_node (
 ) -> Result < (), Box<dyn Error> > {
   if find_child_by_id ( tree, node_id, &cycle_id ) . is_none () {
     prepend_indefinitive_child_with_parent_ignores (
-      tree, map, node_id, &cycle_id, config, driver ). await ?; }
+      tree, map, node_id, &cycle_id, config, driver ) . await ?; }
   Ok (( )) }
 
 async fn prepend_indefinitive_child_with_parent_ignores (
@@ -225,18 +225,18 @@ async fn prepend_indefinitive_child_with_parent_ignores (
   let ( _, child_viewnode ) : ( _, ViewNode ) =
     skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map
-    ). await ?;
+    ) . await ?;
   let (id, source, title) : (ID, SourceName, String)
-  = match &child_viewnode.kind
-  { ViewNodeKind::True(t) => (
+  = match &child_viewnode . kind
+  { ViewNodeKind::True (t) => (
       t . id . clone(),
       t . source . clone(),
       t . title . clone() ),
     _ =>
-      return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode".into()) };
+      return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode" . into()) };
   let viewnode : ViewNode = mk_indefinitive_viewnode (
     id, source, title, true );
   let new_child_treeid : NodeId =
-    tree . get_mut ( parent_treeid ) . unwrap ()
-    . prepend ( viewnode ) . id ();
-  Ok ( new_child_treeid ) }
+    tree . get_mut (parent_treeid) . unwrap ()
+    . prepend (viewnode) . id ();
+  Ok (new_child_treeid) }

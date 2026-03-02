@@ -66,31 +66,31 @@ where
 {
   // Copy fixtures to temp so saves don't corrupt originals
   let temp_fixtures : PathBuf = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
-  if temp_fixtures.exists() {
-    fs::remove_dir_all(&temp_fixtures)?;
+  if temp_fixtures . exists() {
+    fs::remove_dir_all (&temp_fixtures)?;
   }
   copy_dir_all(
-    &PathBuf::from(fixtures_folder),
+    &PathBuf::from (fixtures_folder),
     &temp_fixtures)?;
 
   let result : Result<(), Box<dyn Error>> = block_on(async {
     let (config, driver, tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
       setup_test_tantivy_and_typedb_dbs(
         db_name,
-        temp_fixtures.to_str().unwrap(),
-        tantivy_folder ). await?;
-    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy).await;
+        temp_fixtures . to_str() . unwrap(),
+        tantivy_folder ) . await?;
+    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &tantivy) . await;
     cleanup_test_tantivy_and_typedb_dbs(
       db_name,
       &driver,
-      Some(config.tantivy_folder.as_path())
-    ).await?;
+      Some(config . tantivy_folder . as_path())
+    ) . await?;
     result
   });
 
   // Clean up temp fixtures
-  if temp_fixtures.exists() {
-    fs::remove_dir_all(&temp_fixtures)?;
+  if temp_fixtures . exists() {
+    fs::remove_dir_all (&temp_fixtures)?;
   }
 
   result
@@ -98,13 +98,13 @@ where
 
 /// Recursively copy a directory and its contents.
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
-  fs::create_dir_all(dst)?;
-  for entry in fs::read_dir(src)? {
+  fs::create_dir_all (dst)?;
+  for entry in fs::read_dir (src)? {
     let entry : fs::DirEntry = entry?;
-    let ty : fs::FileType = entry.file_type()?;
-    let src_path : PathBuf = entry.path();
-    let dst_path : PathBuf = dst.join(entry.file_name());
-    if ty.is_dir() {
+    let ty : fs::FileType = entry . file_type()?;
+    let src_path : PathBuf = entry . path();
+    let dst_path : PathBuf = dst . join(entry . file_name());
+    if ty . is_dir() {
       copy_dir_all(&src_path, &dst_path)?;
     } else {
       fs::copy(&src_path, &dst_path)?;
@@ -121,22 +121,22 @@ pub async fn populate_test_db_from_fixtures (
 ) -> Result<(), Box<dyn Error>> {
   let nodes: Vec<SkgNode> = {
     let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
-    sources.insert(
-      SourceName::from("main"),
+    sources . insert(
+      SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from("main"),
-        path: PathBuf::from(data_folder),
+        nickname: SourceName::from ("main"),
+        path: PathBuf::from (data_folder),
         user_owns_it: true, } );
     read_all_skg_files_from_sources(
-      &SkgConfig::dummyFromSources( sources ))? };
+      &SkgConfig::dummyFromSources (sources))? };
   overwrite_new_empty_db (
-    db_name, driver ). await ?;
+    db_name, driver ) . await ?;
   define_schema (
-    db_name, driver ). await?;
+    db_name, driver ) . await?;
   create_all_nodes (
-    db_name, driver, &nodes ). await ?;
+    db_name, driver, &nodes ) . await ?;
   create_all_relationships (
-    db_name, driver, &nodes ). await ?;
+    db_name, driver, &nodes ) . await ?;
   Ok (( )) }
 
 /* PURPOSE: Set up test dbs (Tantivy and TypeDB)
@@ -158,11 +158,11 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
   // not via delete_on_quit, because there's no server to quit.
   let config: SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
-    sources.insert (
-      SourceName::from("main"),
+    sources . insert (
+      SourceName::from ("main"),
       SkgfileSource {
-        nickname     : SourceName::from("main"),
-        path         : PathBuf::from ( fixtures_folder ),
+        nickname     : SourceName::from ("main"),
+        path         : PathBuf::from (fixtures_folder),
         user_owns_it : true, });
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
@@ -170,14 +170,14 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     "127.0.0.1:1729",
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?
-  ). await ?;
+  ) . await ?;
   populate_test_db_from_fixtures(
     fixtures_folder,
     db_name,
     &driver
-  ). await?;
+  ) . await?;
   let tantivy_index: TantivyIndex =
-    create_empty_tantivy_index(&config.tantivy_folder)?;
+    create_empty_tantivy_index(&config . tantivy_folder)?;
   Ok ((config, driver, tantivy_index)) }
 
 /// Clean up test database and tantivy index after a test completes.
@@ -193,15 +193,15 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   // Delete TypeDB database
-  let databases : &DatabaseManager = driver.databases();
-  if databases.contains(db_name).await? {
-    let database : Arc<Database> = databases.get(db_name).await?;
-    database.delete().await?; }
+  let databases : &DatabaseManager = driver . databases();
+  if databases . contains (db_name) . await? {
+    let database : Arc<Database> = databases . get (db_name) . await?;
+    database . delete() . await?; }
 
   // Delete Tantivy index if path provided and exists
-  if let Some(tantivy_path) = tantivy_folder {
-    if tantivy_path.exists() {
-      fs::remove_dir_all(tantivy_path)?; }}
+  if let Some (tantivy_path) = tantivy_folder {
+    if tantivy_path . exists() {
+      fs::remove_dir_all (tantivy_path)?; }}
 
   Ok (( )) }
 
@@ -212,28 +212,28 @@ pub fn compare_headlines_modulo_id(
   headline2: &str
 ) -> bool {
   let info1: Result<HeadlineInfo, String> =
-    headline_to_triple(headline1);
+    headline_to_triple (headline1);
   let info2: Result<HeadlineInfo, String> =
-    headline_to_triple(headline2);
+    headline_to_triple (headline2);
 
   match (info1, info2) {
     (Ok((level1, metadata1, title1)),
      Ok((level2, metadata2, title2))) => {
       let has_id1: bool =
-        metadata1.as_ref().map_or(false, |m| m.id.is_some());
+        metadata1 . as_ref() . map_or(false, |m| m . id . is_some());
       let has_id2: bool =
-        metadata2.as_ref().map_or(false, |m| m.id.is_some());
+        metadata2 . as_ref() . map_or(false, |m| m . id . is_some());
       if has_id1 != has_id2 {
         // One has an ID and the other doesn't, so they are unequal.
         return false; }
       // Strip IDs from both (no-op if no ID present) and compare
       let stripped_metadata1: Option<ViewnodeMetadata> =
-        strip_id_from_metadata_struct(metadata1);
+        strip_id_from_metadata_struct (metadata1);
       let stripped_metadata2: Option<ViewnodeMetadata> =
-        strip_id_from_metadata_struct(metadata2);
+        strip_id_from_metadata_struct (metadata2);
       (level1, stripped_metadata1, title1) ==
         (level2, stripped_metadata2, title2) },
-    (Err(e1), Err(e2)) if (e1 == "__NOT_A_HEADLINE__" &&
+    (Err (e1), Err (e2)) if (e1 == "__NOT_A_HEADLINE__" &&
                            e2 == "__NOT_A_HEADLINE__")
       => { // Both are not headlines, so compare directly
         headline1 == headline2 },
@@ -268,12 +268,12 @@ pub fn compare_viewnode_trees_modulo_id(
   forest2: &Tree<UncheckedViewNode>
 ) -> bool {
   let root1 : Vec < NodeRef < '_, UncheckedViewNode >> =
-    forest1.root().children().collect();
+    forest1 . root() . children() . collect();
   let root2 : Vec < NodeRef < '_, UncheckedViewNode >> =
-    forest2.root().children().collect();
-  if root1.len() != root2.len() {
+    forest2 . root() . children() . collect();
+  if root1 . len() != root2 . len() {
     return false; }
-  for (tree1, tree2) in root1.iter().zip(root2.iter()) {
+  for (tree1, tree2) in root1 . iter() . zip(root2 . iter()) {
     if !compare_two_viewnode_branches_recursively_modulo_id(
       *tree1, *tree2 )
     { return false; }}
@@ -284,22 +284,22 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   node1: NodeRef<UncheckedViewNode>,
   node2: NodeRef<UncheckedViewNode>
 ) -> bool {
-  let n1 : &UncheckedViewNode = node1.value();
-  let n2 : &UncheckedViewNode = node2.value();
-  match (&n1.kind, &n2.kind) {
-    ( UncheckedViewNodeKind::True(_),
-      UncheckedViewNodeKind::True(t2)) =>
+  let n1 : &UncheckedViewNode = node1 . value();
+  let n2 : &UncheckedViewNode = node2 . value();
+  match (&n1 . kind, &n2 . kind) {
+    ( UncheckedViewNodeKind::True (_),
+      UncheckedViewNodeKind::True (t2)) =>
     { // Copy the ID from one to the other, then compare.
       let mut n1_copy : UncheckedViewNode =
-        n1.clone();
-      if let UncheckedViewNodeKind::True(t) = &mut n1_copy.kind {
-        t.id_opt = t2.id_opt.clone(); }
+        n1 . clone();
+      if let UncheckedViewNodeKind::True (t) = &mut n1_copy . kind {
+        t . id_opt = t2 . id_opt . clone(); }
       if n1_copy != *n2 { return false; }}
-    ( UncheckedViewNodeKind::Scaff(_),
-      UncheckedViewNodeKind::Scaff(_)) =>
+    ( UncheckedViewNodeKind::Scaff (_),
+      UncheckedViewNodeKind::Scaff (_)) =>
     { if n1 != n2 { return false; }}
-    ( UncheckedViewNodeKind::Deleted(_),
-      UncheckedViewNodeKind::Deleted(_)) =>
+    ( UncheckedViewNodeKind::Deleted (_),
+      UncheckedViewNodeKind::Deleted (_)) =>
     { if n1 != n2 { return false; }}
     ( UncheckedViewNodeKind::DeletedScaff,
       UncheckedViewNodeKind::DeletedScaff) =>
@@ -308,11 +308,11 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   }
   { // Recurse on children
     let children1 : Vec < NodeRef < '_, UncheckedViewNode >> =
-      node1.children().collect();
+      node1 . children() . collect();
     let children2 : Vec < NodeRef < '_, UncheckedViewNode >> =
-      node2.children().collect();
-    ( children1.len() == children2.len() &&
-      children1 . iter() . zip(children2.iter())
+      node2 . children() . collect();
+    ( children1 . len() == children2 . len() &&
+      children1 . iter() . zip(children2 . iter())
       . all (|(c1, c2)|
              compare_two_viewnode_branches_recursively_modulo_id(
                *c1, *c2)) ) }}
@@ -321,8 +321,8 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
 fn strip_id_from_metadata_struct(
   metadata: Option<ViewnodeMetadata>
 ) -> Option<ViewnodeMetadata> {
-  metadata.map(|mut meta| {
-    meta.id = None;
+  metadata . map(|mut meta| {
+    meta . id = None;
     meta
   } ) }
 
@@ -332,21 +332,21 @@ pub async fn all_pids_from_typedb(
   db_name: &str,
   driver: &TypeDBDriver,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver.transaction(
-    db_name, TransactionType::Read ). await ?;
+  let tx: Transaction = driver . transaction(
+    db_name, TransactionType::Read ) . await ?;
   let query: String =
     "match $node isa node, has id $node_id; select $node_id;"
-    .to_string();
-  let answer: QueryAnswer = tx.query(query).await?;
+    . to_string();
+  let answer: QueryAnswer = tx . query (query) . await?;
   let mut node_ids: HashSet<ID> = HashSet::new();
-  let mut stream : ConceptRowStream = answer.into_rows();
-  while let Some(row_result) = stream.next().await {
+  let mut stream : ConceptRowStream = answer . into_rows();
+  while let Some (row_result) = stream . next() . await {
     let row : ConceptRow = row_result?;
-    if let Some(concept) = row.get("node_id")? {
+    if let Some (concept) = row . get ("node_id")? {
       let node_id_str: String =
         extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      node_ids.insert(ID(node_id_str)); }}
+          &concept . to_string());
+      node_ids . insert(ID (node_id_str)); }}
   Ok (node_ids) }
 
 /// Query all extra_ids for a given primary node ID from TypeDB.
@@ -356,27 +356,27 @@ pub async fn extra_ids_from_pid(
   driver: &TypeDBDriver,
   skgid: &ID,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver.transaction(
-    db_name, TransactionType::Read ). await?;
+  let tx: Transaction = driver . transaction(
+    db_name, TransactionType::Read ) . await?;
   let query : String = format!(
     r#"match $node isa node, has id "{}";
        $e isa extra_id;
        $rel isa has_extra_id (node: $node, extra_id: $e);
        $e has id $extra_id_value;
        select $extra_id_value;"#,
-    skgid.0 );
-  let answer: QueryAnswer = tx.query(query).await?;
+    skgid . 0 );
+  let answer: QueryAnswer = tx . query (query) . await?;
   let mut extra_ids : Vec<ID> = Vec::new();
-  let mut stream : ConceptRowStream = answer.into_rows();
-  while let Some(row_result) = stream.next().await {
+  let mut stream : ConceptRowStream = answer . into_rows();
+  while let Some (row_result) = stream . next() . await {
     let row : ConceptRow = row_result?;
-    if let Some(concept) = row.get("extra_id_value")? {
+    if let Some (concept) = row . get ("extra_id_value")? {
       let extra_id_str : String =
         extract_payload_from_typedb_string_rep(
-          &concept.to_string());
-      extra_ids.push(
-        ID(extra_id_str)); }}
-  Ok(extra_ids) }
+          &concept . to_string());
+      extra_ids . push(
+        ID (extra_id_str)); }}
+  Ok (extra_ids) }
 
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.
@@ -389,13 +389,13 @@ pub fn tantivy_contains_id(
     : (Vec<(f32, DocAddress)>, Searcher)
     = search_index(tantivy_index, query)?;
   for (_score, doc_address) in matches {
-    let doc: tantivy::Document = searcher.doc(doc_address)?;
+    let doc: tantivy::Document = searcher . doc (doc_address)?;
     let id_value: Option<String> =
-      doc.get_first(tantivy_index.id_field)
-      .and_then(|v| v.as_text().map(String::from));
-    if id_value == Some(expected_id.to_string()) {
-      return Ok(true); }}
-  Ok(false) }
+      doc . get_first(tantivy_index . id_field)
+      . and_then(|v| v . as_text() . map (String::from));
+    if id_value == Some(expected_id . to_string()) {
+      return Ok (true); }}
+  Ok (false) }
 
 /// Strips comments from an org-buffer string.
 ///
@@ -410,30 +410,30 @@ pub fn tantivy_contains_id(
 /// assert_eq!(result, "  * (skg (id 1)) title 1\n  ** (skg (id 2)) title 2");
 /// ```
 pub fn strip_org_comments(s: &str) -> String {
-  s.lines()
-    .map(|line| {
-      if let Some(hash_pos) = line.find('#') {
+  s . lines()
+    . map(|line| {
+      if let Some (hash_pos) = line . find ('#') {
         // Remove everything from '#' onwards, then trim trailing whitespace
         line[..hash_pos] . trim_end() . to_string()
       } else { line . to_string() }} )
-    .collect::<Vec<String>>()
-    .join("\n") }
+    . collect::<Vec<String>>()
+    . join ("\n") }
 
 /// Example SkgNode for use in tests.
 pub fn skgnode_example () -> SkgNode {
   SkgNode {
-    title: "This text gets indexed.".to_string(),
+    title: "This text gets indexed." . to_string(),
     aliases: None,
-    source: SourceName::from("main"),
-    ids: vec![ ID::new("example") ],
+    source: SourceName::from ("main"),
+    ids: vec![ ID::new ("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: Some(vec![ ID::new("1"),
-                         ID::new("2"),
-                         ID::new("3")]),
-    subscribes_to: Some(vec![ID::new("11"),
-                             ID::new("12"),
-                             ID::new("13")]),
+    contains: Some(vec![ ID::new ("1"),
+                         ID::new ("2"),
+                         ID::new ("3")]),
+    subscribes_to: Some(vec![ID::new ("11"),
+                             ID::new ("12"),
+                             ID::new ("13")]),
     hides_from_its_subscriptions: None,
     overrides_view_of: None, }}
 
@@ -442,5 +442,5 @@ pub fn extract_skgnode_if_save_else_error(
   instr: &DefineNode
 ) -> &SkgNode {
   match instr {
-    DefineNode::Save(SaveNode(node)) => node,
-    DefineNode::Delete(_) => panic!("Expected Save, got Delete") }}
+    DefineNode::Save(SaveNode (node)) => node,
+    DefineNode::Delete (_) => panic!("Expected Save, got Delete") }}

@@ -27,17 +27,17 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
   let node_ref : NodeRef < ViewNode > =
-    tree . get ( node_id )
-    . ok_or ( "type_and_parent_type_consistent_with_subscribee: node not found" ) ?;
+    tree . get (node_id)
+    . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
   let is_truenode : bool = matches! (
     & node_ref . value () . kind,
-    ViewNodeKind::True ( _ ));
+    ViewNodeKind::True (_));
   let parent_is_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
-              ViewNodeKind::Scaff ( Scaffold::SubscribeeCol )))
-    . unwrap_or ( false );
+              ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
+    . unwrap_or (false);
   Ok ( is_truenode && parent_is_subscribee_col ) }
 
 /// If appropriate, prepend a SubscribeeCol child containing:
@@ -53,14 +53,14 @@ pub async fn maybe_add_subscribeeCol_branch (
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
-    |vn| matches!( &vn.kind, ViewNodeKind::True( _ ) ),
+    |vn| matches!( &vn . kind, ViewNodeKind::True (_) ),
     "maybe_add_subscribeeCol_branch: expected TrueNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
-        |vn| matches!( &vn.kind,
-                        ViewNodeKind::True( t ) if t.indefinitive ) )
-      . map_err( |e| -> Box<dyn Error> { e.into() } ) ?;
+        |vn| matches!( &vn . kind,
+                        ViewNodeKind::True (t) if t . indefinitive ) )
+      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   { // Skip if there already is one.
     // PITFALL: If this code were used in the save-buffer pathway, we could not assume the existing SubscribeeCol is correct, and would instead have to 'integrate' it, as happens elsewhere for something similar. But so far it is only used for creating a new buffer, not updating one.
@@ -76,12 +76,12 @@ pub async fn maybe_add_subscribeeCol_branch (
     // hidden IDs that are outside all subscribee content
     let r_hides : HashSet < ID > =
       what_node_hides (
-        &config.db_name, driver, & subscriber_pid ) . await ?;
+        &config . db_name, driver, & subscriber_pid ) . await ?;
     let all_subscribee_content : HashSet < ID > =
       what_nodes_contain (
-        &config.db_name, driver, & subscribee_ids ) . await ?;
+        &config . db_name, driver, & subscribee_ids ) . await ?;
     r_hides . iter ()
-      . filter ( | id | ! all_subscribee_content . contains ( id ) )
+      . filter ( | id | ! all_subscribee_content . contains (id) )
       . cloned () . collect () };
 
   let subscribee_col_nid : NodeId =
@@ -98,12 +98,12 @@ pub async fn maybe_add_subscribeeCol_branch (
         append_indefinitive_from_disk_as_child (
           tree, map, hidden_outside_col_nid, & hidden_id,
           false, config, driver
-        ). await ?; }}
+        ) . await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
         tree, map, subscribee_col_nid, & subscribee_id,
         false, config, driver
-      ). await ?; }}
+      ) . await ?; }}
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -132,7 +132,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
-        & config.db_name, driver,
+        & config . db_name, driver,
         & subscriber_pid, & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
     return Ok (( )); }
@@ -144,5 +144,5 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     // populate the collection
     append_indefinitive_from_disk_as_child (
       tree, map, hidden_col_nid, & hidden_id,
-      false, config, driver ). await ?; }
+      false, config, driver ) . await ?; }
   Ok (( )) }

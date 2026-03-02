@@ -54,7 +54,7 @@ pub async fn build_and_integrate_aliases (
     return Ok (( )); }
   let aliases : Vec < String > =
     fetch_aliases_from_file (
-      config, driver, node_id_val ). await;
+      config, driver, node_id_val ) . await;
   let aliascol_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
       Scaffold::AliasCol, true ) ?;

@@ -21,22 +21,22 @@ fn test_delete_id_col_scaffold_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1.ids.contains(&ID("1".to_string())),
+      assert!(node_1 . ids . contains(&ID("1" . to_string())),
         "1.skg should still have id '1'");
-      assert!(node_1.ids.contains(&ID("2'".to_string())),
+      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(node_1.ids.contains(&ID("3".to_string())),
+      assert!(node_1 . ids . contains(&ID("3" . to_string())),
         "1.skg should still have id '3'");
-      assert!(!node_1.ids.contains(&ID("2".to_string())),
+      assert!(!node_1 . ids . contains(&ID("2" . to_string())),
         "1.skg should not have id '2'");
 
       // BUFFER: idCol scaffold should respawn
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -58,16 +58,16 @@ fn test_delete_id_scaffolds_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1.ids.contains(&ID("2'".to_string())),
+      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
         "1.skg should still have id '2''");
 
       // BUFFER: id scaffolds should respawn
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -81,7 +81,7 @@ fn test_edit_id_scaffold_respawns()
     "skg-test-save-edit-id",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
-      let input = GIT_DIFF_VIEW.replace(
+      let input = GIT_DIFF_VIEW . replace(
         "(diff new)) 2'", "(diff new)) 2-modified");
 
       let mut conn_state : ConnectionState = ConnectionState {
@@ -89,18 +89,18 @@ fn test_edit_id_scaffold_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1.ids.contains(&ID("2'".to_string())),
+      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(!node_1.ids.contains(&ID("2-modified".to_string())),
+      assert!(!node_1 . ids . contains(&ID("2-modified" . to_string())),
         "1.skg should not have the modified id");
 
       // BUFFER: id scaffolds should respawn with original values
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -129,23 +129,23 @@ fn test_move_id_scaffolds_to_child_respawns()
         memory            : SkgnodesInMemory::new () };
       let response = update_from_and_rerender_buffer(
         &input, driver, config, tantivy, true, SkgNodeMap::new(),
-        &Err ( String::new () ), &mut conn_state ).await?;
+        &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: child.skg should not have any new ids
       let node_child = read_skgnode(repo_path, "child")?;
-      assert_eq!(node_child.ids.len(), 1,
+      assert_eq!(node_child . ids . len(), 1,
         "child.skg should still only have its original id");
-      assert!(node_child.ids.contains(&ID("child".to_string())),
+      assert!(node_child . ids . contains(&ID("child" . to_string())),
         "child.skg should still have id 'child'");
 
       // DISK: 1.skg should still have its ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1.ids.contains(&ID("2'".to_string())),
+      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
         "1.skg should still have id '2''");
 
       // BUFFER: id scaffolds should respawn under node 1
       assert_buffer_contains(
-        &response.saved_view, GIT_DIFF_VIEW);
+        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
@@ -165,16 +165,16 @@ where
   let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir.path();
-  setup_git_repo_with_fixtures(repo_path)?;
+  let repo_path = temp_dir . path();
+  setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
     let (config, driver, tantivy) =
-      setup_test_dbs(db_name, repo_path.to_str().unwrap(), &tantivy_folder).await?;
+      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), &tantivy_folder) . await?;
 
-    let result = test_fn(&config, &driver, &tantivy, repo_path).await;
+    let result = test_fn(&config, &driver, &tantivy, repo_path) . await;
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(&tantivy_folder))).await?;
+    cleanup_test_dbs(db_name, &driver, Some(Path::new (&tantivy_folder))) . await?;
     result
   })
 }

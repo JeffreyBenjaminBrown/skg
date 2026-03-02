@@ -53,9 +53,9 @@ pub async fn multi_root_view (
                     root_ids, config, driver )) . await ?;
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
-      compute_diff_for_every_source ( config );
+      compute_diff_for_every_source (config);
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-      deleted_ids_to_source ( &source_diffs );
+      deleted_ids_to_source (&source_diffs);
     apply_diff_to_forest (
       &mut forest, &source_diffs,
       &deleted_since_head_pid_src_map, config ) ?; }
@@ -70,10 +70,10 @@ pub async fn multi_root_view (
     // Collect PIDs from forest before rendering to string.
     let mut ids : Vec<ID> = Vec::new ();
     for node_ref in forest . root () . descendants () {
-      if let ViewNodeKind::True ( t ) = &node_ref . value () . kind
+      if let ViewNodeKind::True (t) = &node_ref . value () . kind
         { ids . push ( t . id . clone () ); }}
     ids };
   let buffer_content : String =
     timed ( config, "viewnode_forest_to_string",
-            || viewnode_forest_to_string ( & forest )) ?;
+            || viewnode_forest_to_string (& forest)) ?;
   Ok ((buffer_content, map, pids, forest)) }

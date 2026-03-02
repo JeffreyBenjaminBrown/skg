@@ -35,13 +35,13 @@ fn test_update_nodes_and_relationships2 (
     "};
 
     let unchecked_forest : Tree<UncheckedViewNode> =
-      org_to_uninterpreted_nodes ( org_text )?.0;
+      org_to_uninterpreted_nodes (org_text)?. 0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
-      find_inconsistent_instructions ( & unchecked_forest );
+      find_inconsistent_instructions (& unchecked_forest);
     let forest : Tree<ViewNode> =
-      unchecked_to_checked_tree ( unchecked_forest )?;
+      unchecked_to_checked_tree (unchecked_forest)?;
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
              inconsistent_deletions );
@@ -55,19 +55,19 @@ fn test_update_nodes_and_relationships2 (
     // Convert to instructions (adds missing info and reconciles)
     let reconciled_instructions : Vec<DefineNode> =
       viewnode_forest_to_nonmerge_save_instructions (
-        & forest, & config, & driver, & SkgNodeMap::new() ). await ?;
+        & forest, & config, & driver, & SkgNodeMap::new() ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (
       & config . db_name,
       & driver,
-      & reconciled_instructions ). await ?;
+      & reconciled_instructions ) . await ?;
 
     // Node 3 should not exist (deleted)
     let existing_node3_ids : HashSet<String> = which_ids_exist (
       & config . db_name,
       & driver,
-      & ["3", "33"].iter().map(|s| s.to_string()).collect()
+      & ["3", "33"] . iter() . map(|s| s . to_string()) . collect()
     ) . await ?;
     assert!(
       existing_node3_ids . is_empty (),
@@ -78,7 +78,7 @@ fn test_update_nodes_and_relationships2 (
     let existing_node4_ids : HashSet<String> = which_ids_exist (
       & config . db_name,
       & driver,
-      & ["4"].iter().map(|s| s.to_string()).collect()
+      & ["4"] . iter() . map(|s| s . to_string()) . collect()
     ) . await ?;
     assert!( ! existing_node4_ids . is_empty (),
                "Node 4 should still exist." );
@@ -87,14 +87,14 @@ fn test_update_nodes_and_relationships2 (
     let node1_contains : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & [ ID("1".to_string()) ],
+      & [ ID("1" . to_string()) ],
       "contains",
       "container",
       "contained"
     ) . await ?;
     assert!(
       node1_contains . contains (
-        & ID("2".to_string()) ),
+        & ID("2" . to_string()) ),
       "Node 1 should contain node 2" );
     assert_eq!(
       node1_contains . len (), 1,
@@ -104,12 +104,12 @@ fn test_update_nodes_and_relationships2 (
     let node2_contains : HashSet<ID> = find_related_nodes (
       & config . db_name,
       & driver,
-      & [ ID("2".to_string()) ],
+      & [ ID("2" . to_string()) ],
       "contains",
       "container",
       "contained"
     ) . await ?;
-    assert!( node2_contains . contains ( & ID("1".to_string()) ),
+    assert!( node2_contains . contains ( & ID("1" . to_string()) ),
              "Node 2 should contain node 1" );
     assert_eq!(
       node2_contains . len (),

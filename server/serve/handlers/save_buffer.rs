@@ -40,7 +40,7 @@ pub struct SaveResponse {
 
 impl SaveResponse {
   /// Format: ((content "...") (errors (...)) (other-views-to-update (("URI1" "c1") ...)))
-  fn to_sexp_string ( &self ) -> String {
+  fn to_sexp_string (&self) -> String {
     format_buffer_response_sexp_with_updates (
       & self . saved_view,
       & self . errors,
@@ -61,14 +61,14 @@ pub fn handle_save_buffer_request (
   conn_state    : &mut ConnectionState,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
-    view_uri_from_request ( request );
+    view_uri_from_request (request);
   let saveview_skgnodes_pre_save : SkgNodeMap = {
     // the skgnodes already in memory for this view
     let mut it : SkgNodeMap = SkgNodeMap::new ();
     if let Ok (ref uri) = viewuri_from_request_result {
       for pid in conn_state . memory . viewuri_to_pids (uri) {
         if let Some (skgnode)
-          = conn_state . memory . pool . get ( &pid )
+          = conn_state . memory . pool . get (&pid)
           { it . insert ( pid, skgnode . clone () ); }} }
     it };
   match read_length_prefixed_content (reader) {
@@ -90,16 +90,16 @@ pub fn handle_save_buffer_request (
                     format! ( "Content-Length: {}\r\n\r\n",
                                  response_sexp . len () );
                   format! ( "{}{}", header, response_sexp ) }
-                . as_bytes() ). unwrap ();
+                . as_bytes() ) . unwrap ();
             stream . flush() . unwrap (); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
-            if let Some(save_error) = err.downcast_ref::<SaveError>() {
-              stream.write_all(
+            if let Some (save_error) = err . downcast_ref::<SaveError>() {
+              stream . write_all(
                 { let response_sexp : String =
                     { let response : Sexp =
                         empty_response_sexp (
                           & { let error_buffer_content : String =
-                                format_save_error_as_org(save_error);
+                                format_save_error_as_org (save_error);
                               error_buffer_content } );
                       response }
                     . to_string ();
@@ -112,14 +112,14 @@ pub fn handle_save_buffer_request (
                         header },
                       response_sexp );
                   full_response
-                } .as_bytes( )) . unwrap();
-              stream.flush().unwrap();
+                } . as_bytes( )) . unwrap();
+              stream . flush() . unwrap();
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
               println!("{}", error_msg);
               send_response(stream, &error_msg); }} }} ); }
-    Err(err) => {
+    Err (err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
       println! ( "{}", error_msg );
@@ -171,8 +171,8 @@ pub async fn update_from_and_rerender_buffer (
         buffer_to_viewnode_forest_and_save_instructions (
           org_buffer_text, config, typedb_driver,
           &saveview_skgnodes_pre_save )
-      ). await . map_err (
-        |e| Box::new(e) as Box<dyn Error> ) ?;
+      ) . await . map_err (
+        |e| Box::new (e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
@@ -183,17 +183,17 @@ pub async fn update_from_and_rerender_buffer (
                             save_instructions . clone(),
                             config . clone(),
                             tantivy_index,
-                            typedb_driver ). await ?;
+                            typedb_driver ) . await ?;
                           Result::<(), Box<dyn Error>>::Ok (( )) }
-                ). await ?;
+                ) . await ?;
     timed_async ( config, "merge_nodes",
                   async { merge_nodes (
                             merge_instructions,
                             config . clone(),
                             tantivy_index,
-                            typedb_driver ). await ?;
+                            typedb_driver ) . await ?;
                           Result::<(), Box<dyn Error>>::Ok (( )) }
-                ). await ?; }
+                ) . await ?; }
 
   update_views_after_save (
     forest,
@@ -203,7 +203,7 @@ pub async fn update_from_and_rerender_buffer (
     config,
     typedb_driver,
     viewuri_from_request_result,
-    conn_state ). await }
+    conn_state ) . await }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,
@@ -213,17 +213,17 @@ pub fn validate_no_merge_commits (
   config  : &SkgConfig,
 ) -> Result<(), String> {
   for source in sources { // Get the source path from config
-    if let Some ( source_config ) = config . sources . get ( source ) {
+    if let Some (source_config) = config . sources . get (source) {
       let source_path : &Path =
         Path::new ( &source_config . path );
-      if let Some ( repo ) = open_repo ( source_path ) {
-        match head_is_merge_commit ( &repo ) {
-          Ok ( true ) => {
+      if let Some (repo) = open_repo (source_path) {
+        match head_is_merge_commit (&repo) {
+          Ok (true) => {
             return Err ( format! (
               "Cannot compute diff: HEAD is a merge commit in source '{}'.",
               source )); },
-          Ok ( false ) => {},
-          Err ( e ) => { // Git error - log but continue
+          Ok (false) => {},
+          Err (e) => { // Git error - log but continue
             eprintln! ( "Warning: Could not check merge commit status for '{}': {}",
                         source, e ); }} }} }
   Ok (( )) }
@@ -236,10 +236,10 @@ pub fn compute_diff_for_every_source (
   for (source_name, source_config) in &config . sources {
     let source_path : &Path =
       Path::new ( &source_config . path );
-    match compute_diff_for_source ( source_path ) {
-      Ok ( diff ) => {
+    match compute_diff_for_source (source_path) {
+      Ok (diff) => {
         source_diffs . insert ( source_name . clone(), diff ); },
-      Err ( e ) => { // Log error but continue with other sources
+      Err (e) => { // Log error but continue with other sources
         eprintln! (
           "Warning: Failed to compute diff for source '{}': {}",
           source_name, e ); }} }
@@ -256,7 +256,7 @@ pub fn deleted_ids_to_source (
   for (source_name, source_diff) in source_diffs {
     for (path, skgnode_diff) in &source_diff . skgnode_diffs {
       if skgnode_diff . status == GitDiffStatus::Deleted {
-        if let Some ( stem ) = path . file_stem() {
+        if let Some (stem) = path . file_stem() {
           let id : ID = ID ( stem . to_string_lossy()
                              . into_owned() );
           result . insert ( id,

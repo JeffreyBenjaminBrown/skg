@@ -27,30 +27,30 @@ pub async fn update_graph_minus_merges (
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  println!( "Updating (1) TypeDB, (2) FS, and (3) Tantivy ..." );
+  println!("Updating (1) TypeDB, (2) FS, and (3) Tantivy ...");
 
-  let db_name : &str = &config.db_name;
+  let db_name : &str = &config . db_name;
 
   { println!( "1) Updating TypeDB database '{}' ...", db_name );
     timed_async ( &config, "update_typedb_from_saveinstructions",
                   update_typedb_from_saveinstructions (
                     db_name, driver, &instructions )) . await ?;
-    println!( "   TypeDB update complete." ); }
+    println!("   TypeDB update complete."); }
 
   { // filesystem
     // TODO: Print per-source write information
     println!( "2) Writing {} instruction(s) to disk ...",
-               { let total_input : usize = instructions.len ();
+               { let total_input : usize = instructions . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
       timed ( &config, "update_fs_from_saveinstructions",
               || update_fs_from_saveinstructions (
-                   instructions.clone (), config.clone () )) ?;
+                   instructions . clone (), config . clone () )) ?;
     println!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
   { // Tantivy
-    println!( "3) Updating Tantivy index ..." );
+    println!("3) Updating Tantivy index ...");
     let indexed_count : usize =
       timed ( &config, "update_tantivy_from_saveinstructions",
               || update_tantivy_from_saveinstructions (
@@ -58,7 +58,7 @@ pub async fn update_graph_minus_merges (
     println!( "   Tantivy updated for {} document(s).",
               indexed_count ); }
 
-  println!( "All updates finished successfully." );
+  println!("All updates finished successfully.");
   Ok (( )) }
 
 /// Update the DB from a batch of `DefineNode`s:
@@ -86,42 +86,42 @@ pub async fn update_typedb_from_saveinstructions (
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = instructions . iter() . cloned() . partition_map (
       |instr| match instr {
-        DefineNode::Delete(d) => Either::Left(d),
-        DefineNode::Save(s)   => Either::Right(s) } );
+        DefineNode::Delete (d) => Either::Left (d),
+        DefineNode::Save (s)   => Either::Right (s) } );
 
   { // delete
     let to_delete_pids : Vec<ID> =
       to_delete . iter ()
-      . map ( |DeleteNode { id, .. }| id.clone() )
+      . map ( |DeleteNode { id, .. }| id . clone() )
       . collect ();
     if ! to_delete_pids . is_empty () {
       println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
       delete_nodes_from_pids (
         // PITFALL: deletions cascade in TypeDB by default,
         // so we are left with no incomplete relationships.
-        db_name, driver, & to_delete_pids ). await ?; }}
+        db_name, driver, & to_delete_pids ) . await ?; }}
 
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
       to_save . iter ()
-      . map ( |SaveNode(node)| node.clone() )
+      . map ( |SaveNode (node) | node . clone() )
       . collect ();
     let to_write_pids : Vec<ID> =
       to_write_skgnodes . iter ()
       . filter_map ( |n|
                       n . ids
-                      . get(0)
+                      . get (0)
                       . cloned() )
       . collect ();
     create_only_nodes_with_no_ids_present (
-      db_name, driver, & to_write_skgnodes ). await ?;
+      db_name, driver, & to_write_skgnodes ) . await ?;
     delete_out_links (
       db_name, driver,
       & to_write_pids, // Will barf if nonempty, which is good.
       "contains",
-      "container" ). await ?;
+      "container" ) . await ?;
     create_all_relationships (
-      db_name, driver, & to_write_skgnodes ). await ?; }
+      db_name, driver, & to_write_skgnodes ) . await ?; }
 
   Ok (( )) }
 
@@ -131,10 +131,10 @@ pub fn update_fs_from_saveinstructions (
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = instructions.into_iter().partition_map(
+    = instructions . into_iter() . partition_map(
       |instr| match instr {
-        DefineNode::Delete(d) => Either::Left(d),
-        DefineNode::Save(s)   => Either::Right(s) } );
+        DefineNode::Delete (d) => Either::Left (d),
+        DefineNode::Save (s)   => Either::Right (s) } );
   let deleted : usize = {
     let delete_targets : Vec<(ID, SourceName)> =
       to_delete . into_iter ()
@@ -147,7 +147,7 @@ pub fn update_fs_from_saveinstructions (
   let written : usize = {
     let nodes_to_write : Vec<SkgNode> =
       to_save . into_iter ()
-      . map ( |SaveNode(node)| node )
+      . map ( |SaveNode (node) | node )
       . collect ();
     if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
@@ -166,13 +166,13 @@ pub(super) fn update_tantivy_from_saveinstructions (
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
-    tantivy_index.index.writer(50_000_000)?;
+    tantivy_index . index . writer (50_000_000)?;
   delete_nodes_by_id_from_index(
     // Delete all IDs, be they from Saves or Deletes.
     // (The entry for each Save is then recreated.)
-    instructions.iter().map(|instr| match instr {
-      DefineNode::Save(SaveNode(node)) => node.primary_id(),
-      DefineNode::Delete(DeleteNode { id, .. }) => Ok(id) }),
+    instructions . iter() . map(|instr| match instr {
+      DefineNode::Save(SaveNode (node)) => node . primary_id(),
+      DefineNode::Delete(DeleteNode { id, .. }) => Ok (id) }),
     &mut writer,
     tantivy_index)?;
   let processed_count: usize =
@@ -181,8 +181,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
         let nodes_to_add: Vec<&SkgNode> =
           instructions . iter()
           . filter_map( |instr| match instr {
-              DefineNode::Save(SaveNode(node)) => Some(node),
-              DefineNode::Delete(_) => None } )
+              DefineNode::Save(SaveNode (node)) => Some (node),
+              DefineNode::Delete (_) => None } )
           . collect();
         nodes_to_add },
       &mut writer, tantivy_index )? ;

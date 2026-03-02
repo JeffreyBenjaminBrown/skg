@@ -10,7 +10,7 @@ pub fn option_vec_is_empty_or_none<T> (
 ) -> bool {
   match option_vec {
     None => true,
-    Some(vec) => vec.is_empty(), }}
+    Some (vec) => vec . is_empty(), }}
 
 pub fn path_from_pid_and_source (
   config : &SkgConfig,
@@ -18,11 +18,11 @@ pub fn path_from_pid_and_source (
   pid    : ID,
 ) -> String {
   let source_config : &SkgfileSource =
-    config . sources . get ( source )
+    config . sources . get (source)
     . expect ( &format!("Source '{}' not found in config",
                         source) );
   let f : PathBuf = source_config . path . clone() ;
-  let s: String = pid.0;
+  let s: String = pid . 0;
   f . join (s)
     . with_extension ("skg")
     . to_string_lossy ()
@@ -39,5 +39,5 @@ where T: Clone + Eq + Hash {
   let subtracting_set : HashSet<T> =
     subtracting . iter() . cloned() . collect();
   subtracting_from . into_iter()
-    . filter( |item| !subtracting_set.contains(item) )
+    . filter( |item| !subtracting_set . contains (item) )
     . collect() }

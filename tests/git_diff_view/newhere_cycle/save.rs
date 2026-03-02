@@ -14,17 +14,17 @@ fn test_newhere_cycle_survives_save()
   let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save";
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir.path();
-  setup_git_repo_with_fixtures(repo_path)?;
+  let repo_path = temp_dir . path();
+  setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
     let (config, driver, tantivy) =
-      setup_test_dbs(db_name, repo_path.to_str().unwrap(), tantivy_folder).await?;
+      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
-    let root_ids = vec![ID("1".to_string())];
+    let root_ids = vec![ID("1" . to_string())];
     let (initial_view, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
-      multi_root_view(&driver, &config, &root_ids, true).await?;
+      multi_root_view(&driver, &config, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
     let mut conn_state : ConnectionState = ConnectionState {
@@ -32,12 +32,12 @@ fn test_newhere_cycle_survives_save()
       memory            : SkgnodesInMemory::new () };
     let response = update_from_and_rerender_buffer(
       &initial_view, &driver, &config, &tantivy, true, SkgNodeMap::new(),
-      &Err ( String::new () ), &mut conn_state ).await?;
+      &Err ( String::new () ), &mut conn_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,
                             GIT_DIFF_VIEW);
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new(tantivy_folder))).await?;
+    cleanup_test_dbs(db_name, &driver, Some(Path::new (tantivy_folder))) . await?;
     Ok(())
   })
 }

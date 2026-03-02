@@ -25,12 +25,12 @@ pub async fn replace_ids_with_pids(
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   let mut ids_to_lookup: Vec<ID> = Vec::new();
-  collect_ids_in_tree( forest.root(),
+  collect_ids_in_tree( forest . root(),
                        &mut ids_to_lookup );
   let pid_map: HashMap<ID, Option<ID>> =
     pids_from_ids( db_name, driver, &ids_to_lookup
-    ). await?;
-  if let Some(root_mut) = forest.get_mut(root_id) {
+    ) . await?;
+  if let Some (root_mut) = forest . get_mut (root_id) {
     assign_pids_throughout_tree_from_map(
       root_mut, &pid_map); }
   Ok(( )) }
@@ -40,9 +40,9 @@ pub fn collect_ids_in_tree (
   node_ref : NodeRef < UncheckedViewNode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let UncheckedViewNodeKind::True ( t ) =
+  if let UncheckedViewNodeKind::True (t) =
     &node_ref . value () . kind
-  { if let Some ( id ) = &t . id_opt
+  { if let Some (id) = &t . id_opt
     { ids_to_lookup . push ( id . clone () ); }}
   for child in node_ref . children () { // Recurse
     collect_ids_in_tree (
@@ -53,24 +53,24 @@ pub fn assign_pids_throughout_tree_from_map (
   mut node_ref : NodeMut < UncheckedViewNode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let UncheckedViewNodeKind::True(t)
+  if let UncheckedViewNodeKind::True (t)
     = &mut node_ref . value() . kind
     { let pid_opt : Option < ID > = t . id_opt . as_ref ()
-        . and_then ( |id| pid_map . get ( id ) )
+        . and_then ( |id| pid_map . get (id) )
         . and_then ( |opt| opt . clone () );
-      if let Some ( pid ) = pid_opt {
-        t . id_opt = Some ( pid ); }}
+      if let Some (pid) = pid_opt {
+        t . id_opt = Some (pid); }}
   { // Recurse into children
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
         let tree : &Tree<UncheckedViewNode> = node_ref . tree ();
-        tree . get ( treeid ) . unwrap ()
+        tree . get (treeid) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };
       child_treeids } {
-      if let Some ( child_mut )
-        = node_ref . tree () . get_mut ( child_treeid )
+      if let Some (child_mut)
+        = node_ref . tree () . get_mut (child_treeid)
       { assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
@@ -129,7 +129,7 @@ pub async fn pids_from_ids (
     // Each document has the structure:
     //   {"id": <some-id>, "primary_ids": [{"primary_id": <pid>}]}
     // The nested "primary_ids" list comes from the inner match/fetch.
-    while let Some ( doc_result )
+    while let Some (doc_result)
       = stream . next () . await
     { let doc : ConceptDocument =
         doc_result ?;
@@ -141,17 +141,17 @@ pub async fn pids_from_ids (
 
         // Extract the ID from the outer fetch
         let id_opt : Option < ID > =
-          map . get ( "id" )
-          . and_then ( extract_id_from_node );
+          map . get ("id")
+          . and_then (extract_id_from_node);
 
         // Extract the primary_id from the nested subquery result.
         // The value at "primary_ids" is a Node::List with one Map.
         let primary_id_opt : Option < ID > =
-          map . get ( "primary_ids" )
+          map . get ("primary_ids")
           . and_then (
             | node : & Node |
             // Unwrap Node::List, get first element
-            if let Node::List ( list ) = node
+            if let Node::List (list) = node
             { list . first () }
             else { None } )
           . and_then (
@@ -159,6 +159,6 @@ pub async fn pids_from_ids (
             // Extract "primary_id" from the map
             extract_id_from_map ( first_node, "primary_id" ) );
 
-        if let Some ( id ) = id_opt {
+        if let Some (id) = id_opt {
           result . insert ( id, primary_id_opt ); }} }}
-  Ok ( result ) }
+  Ok (result) }

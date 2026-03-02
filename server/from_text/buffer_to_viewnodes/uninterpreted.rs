@@ -47,32 +47,32 @@ pub fn org_to_uninterpreted_nodes(
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
-    let forest_root_treeid: NodeId = forest.root().id();
+    let forest_root_treeid: NodeId = forest . root() . id();
     forest_root_treeid } ];
   for view_node_line_col in & {
     let view_node_line_cols: Vec<ViewNodeLineCol> =
-      divide_into_viewNodeLineCols(input)?;
+      divide_into_viewNodeLineCols (input)?;
     view_node_line_cols } {
     let (level, viewnode, error_opt)
       : (usize, UncheckedViewNode, Option<BufferValidationError>)
-      = linecol_to_viewnode(view_node_line_col)?;
-    if let Some ( error ) = error_opt {
-      parsing_errors . push ( error ); }
+      = linecol_to_viewnode (view_node_line_col)?;
+    if let Some (error) = error_opt {
+      parsing_errors . push (error); }
     // Adjust treeid_stack to proper level (BufferRoot is level 0, tree roots are level 1)
-    while treeid_stack.len() > level {
-      treeid_stack.pop(); }
+    while treeid_stack . len() > level {
+      treeid_stack . pop(); }
     // Check for orphaned headlines (e.g., ** without preceding *)
     // treeid_stack.len() should equal level (because BufferRoot is at level 0)
-    if treeid_stack.len() < level {
+    if treeid_stack . len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-        viewnode.error_label(), level, level - 1)); }
-    treeid_stack.push( {
-      let parent_treeid: NodeId = *treeid_stack.last().unwrap();
+        viewnode . error_label(), level, level - 1)); }
+    treeid_stack . push( {
+      let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
         let mut parent_mut : NodeMut<UncheckedViewNode> =
-          forest.get_mut(parent_treeid).unwrap();
-        parent_mut.append(viewnode).id() };
+          forest . get_mut (parent_treeid) . unwrap();
+        parent_mut . append (viewnode) . id() };
       new_treeid } ); }
   Ok ( ( forest, parsing_errors ) ) }
 
@@ -82,35 +82,35 @@ pub fn org_to_uninterpreted_nodes(
 fn divide_into_viewNodeLineCols (
   input: &str
 ) -> Result<Vec<ViewNodeLineCol>, String> {
-  let lines: Vec<&str> = input.lines().collect();
+  let lines: Vec<&str> = input . lines() . collect();
   let mut result: Vec<ViewNodeLineCol> = Vec::new();
   let mut i: usize = 0;
-  while i < lines.len() {
+  while i < lines . len() {
     match headline_to_triple( lines[i] ) {
-      Ok(headline_info) => {
+      Ok (headline_info) => {
         // Found a headline. Now collect its body lines.
         let mut body_lines: Vec<String> = Vec::new();
         i += 1; // Move past the headline
-        while i < lines.len() {
+        while i < lines . len() {
           match headline_to_triple( lines[i] ) {
-            Ok(_) => break, // Found another headline
-            Err(e) if e == "__NOT_A_HEADLINE__" => {
+            Ok (_) => break, // Found another headline
+            Err (e) if e == "__NOT_A_HEADLINE__" => {
               // Not a headline, it's a body line
-              body_lines.push( lines[i] . to_string() );
+              body_lines . push( lines[i] . to_string() );
               i += 1;
             },
-            Err(e) => return Err(e), // Invalid metadata
+            Err (e) => return Err (e), // Invalid metadata
           }
         }
-        result.push ( ViewNodeLineCol {
+        result . push ( ViewNodeLineCol {
           headline: headline_info,
           body: body_lines, } );
       },
-      Err(e) if e == "__NOT_A_HEADLINE__" => {
+      Err (e) if e == "__NOT_A_HEADLINE__" => {
         // Skip non-headline lines at the beginning of the document
         i += 1;
       },
-      Err(e) => return Err(e), // Invalid metadata
+      Err (e) => return Err (e), // Invalid metadata
     }
   }
   Ok (result) }
@@ -123,13 +123,13 @@ fn linecol_to_viewnode(
 ) -> Result < ( usize, UncheckedViewNode, Option<BufferValidationError> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
-    view_node_line_col.headline.clone();
-  let body_lines: &[String] = &view_node_line_col.body;
+    view_node_line_col . headline . clone();
+  let body_lines: &[String] = &view_node_line_col . body;
   let body_text: Option<String> =
-    if body_lines.is_empty() { None
-    } else { Some(body_lines.join("\n")) };
+    if body_lines . is_empty() { None
+    } else { Some(body_lines . join ("\n")) };
   let metadata : ViewnodeMetadata =
-    if let Some(parsed_metadata) = metadata_option {
+    if let Some (parsed_metadata) = metadata_option {
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
@@ -150,48 +150,48 @@ pub fn headline_to_triple (
   static HEADLINE_REGEX
     : LazyLock<Regex>
     = LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(.+)").unwrap()
+      Regex::new(r"^\s*(\*+)\s+(.+)") . unwrap()
     });
-  if let Some(captures) = HEADLINE_REGEX.captures(headline) {
-    let asterisks: &str = captures.get(1).unwrap().as_str();
-    let level: usize = asterisks.len();
-    let remainder: &str = captures.get(2).unwrap().as_str().trim();
+  if let Some (captures) = HEADLINE_REGEX . captures (headline) {
+    let asterisks: &str = captures . get (1) . unwrap() . as_str();
+    let level: usize = asterisks . len();
+    let remainder: &str = captures . get (2) . unwrap() . as_str() . trim();
 
     // Check if remainder starts with metadata
-    if remainder.starts_with("(skg") {
+    if remainder . starts_with ("(skg") {
       // Find the end of the s-expression
-      if let Some(sexp_end) = find_sexp_end(remainder) {
+      if let Some (sexp_end) = find_sexp_end (remainder) {
         // Extract the s-expression substring
         let sexp_str: &str = &remainder[..sexp_end];
 
         // Verify it's valid by attempting to parse it
-        if let Err(e) = sexp::parse(sexp_str) {
+        if let Err (e) = sexp::parse (sexp_str) {
           return Err(format!("Invalid s-expression syntax: {}", e));
         }
 
         // Parse the metadata from the s-expression
         let metadata: Option<ViewnodeMetadata> =
-          match parse_metadata_to_viewnodemd(sexp_str) {
-            Ok(parsed_metadata) => Some(parsed_metadata),
-            Err(e) => return Err(e), // Invalid metadata with specific error
+          match parse_metadata_to_viewnodemd (sexp_str) {
+            Ok (parsed_metadata) => Some (parsed_metadata),
+            Err (e) => return Err (e), // Invalid metadata with specific error
           };
 
         // The title is everything after the s-expression
         let title: String =
-          remainder[sexp_end..].trim().to_string();
+          remainder[sexp_end..] . trim() . to_string();
 
         return Ok((level, metadata, title));
       } else {
-        return Err("Unclosed metadata parentheses".to_string());
+        return Err("Unclosed metadata parentheses" . to_string());
       }
     }
 
     // No metadata, just title
-    let title: String = remainder.to_string();
+    let title: String = remainder . to_string();
     Ok((level, None, title))
   } else {
     // Not a headline - this is OK (it's a valid non-headline line)
     // We use a special error to signal "not a headline"
     // This is a bit of a hack, but maintains backward compatibility
-    Err("__NOT_A_HEADLINE__".to_string())
+    Err("__NOT_A_HEADLINE__" . to_string())
   }}

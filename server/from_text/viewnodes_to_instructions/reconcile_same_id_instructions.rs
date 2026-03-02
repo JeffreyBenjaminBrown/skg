@@ -44,16 +44,16 @@ pub fn collect_dup_instructions(
     HashMap::new();
   for instr in instructions {
     let primary_id : ID = match &instr {
-      DefineNode::Save(SaveNode(node)) =>
+      DefineNode::Save(SaveNode (node)) =>
         node . ids . first()
-        . ok_or("DefineNode::Save has no ID")? . clone(),
+        . ok_or ("DefineNode::Save has no ID")? . clone(),
       DefineNode::Delete(DeleteNode { id, .. }) =>
         id . clone() };
     grouped
       . entry (primary_id)
       . or_insert_with (Vec::new)
       . push (instr); }
-  Ok(grouped) }
+  Ok (grouped) }
 
 /// Processes a group of DefineNodes with the same ID.
 /// Thanks to validation, the 'instructions' input contains either:
@@ -64,25 +64,25 @@ pub fn collect_dup_instructions(
 pub fn reconcile_same_id_instructions_for_one_id(
   instructions: Vec<DefineNode>
 ) -> Result<DefineNode, Box<dyn Error>> {
-  if instructions.is_empty() {
-    return Err("Cannot process empty instruction list".into()); }
+  if instructions . is_empty() {
+    return Err("Cannot process empty instruction list" . into()); }
   let mut save_opt: Option<SaveNode> = None;
   let mut delete_opt: Option<DeleteNode> = None;
   for instr in instructions {
     match instr {
-      DefineNode::Save(save) => {
-        if save_opt.is_some() {
-          return Err("Multiple save instructions for same ID (should be caught by validation)".into( )); }
-        save_opt = Some(save); }
-      DefineNode::Delete(del) => {
+      DefineNode::Save (save) => {
+        if save_opt . is_some() {
+          return Err("Multiple save instructions for same ID (should be caught by validation)" . into( )); }
+        save_opt = Some (save); }
+      DefineNode::Delete (del) => {
         // Multiple deletes are harmless; keep either one.
-        if delete_opt.is_none() {
-          delete_opt = Some(del); }} }}
-  if let Some(delete_instr) = delete_opt { // Return a Delete.
-    if save_opt.is_some() {
+        if delete_opt . is_none() {
+          delete_opt = Some (del); }} }}
+  if let Some (delete_instr) = delete_opt { // Return a Delete.
+    if save_opt . is_some() {
       return Err("Cannot have both Delete and Save for same ID"
                  . into() ); }
-    return Ok(DefineNode::Delete(delete_instr)); }
+    return Ok(DefineNode::Delete (delete_instr)); }
   let save : SaveNode =
-    save_opt . ok_or("No delete and no save instruction found. This should not be possible.")?;
-  Ok(DefineNode::Save(save)) }
+    save_opt . ok_or ("No delete and no save instruction found. This should not be possible.")?;
+  Ok(DefineNode::Save (save)) }

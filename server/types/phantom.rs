@@ -20,14 +20,14 @@ pub fn title_for_phantom (
   config       : &SkgConfig,
 ) -> String {
   source_diffs
-    .and_then( |diffs| diffs.get( source ) )
-    .and_then( |sd| sd.deleted_nodes.get( id ) )
-    .map( |n| n.title.clone() )
-    .or_else( || map.get( id ).map( |n| n.title.clone() ))
-    .or_else( || skgnode_from_pid_and_source(
-                    config, id.clone(), source )
-                  .ok().map( |n| n.title ) )
-    .unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id.0 )) }
+    . and_then( |diffs| diffs . get (source) )
+    . and_then( |sd| sd . deleted_nodes . get (id) )
+    . map( |n| n . title . clone() )
+    . or_else( || map . get (id) . map( |n| n . title . clone() ))
+    . or_else( || skgnode_from_pid_and_source(
+                    config, id . clone(), source )
+                  . ok() . map( |n| n . title ) )
+    . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 
 /// Unified diff status for phantom nodes.
 /// Returns Removed if source_diffs[source].deleted_nodes has id,
@@ -38,9 +38,9 @@ pub fn phantom_diff_status (
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
 ) -> NodeDiffStatus {
   if source_diffs
-    .and_then( |diffs| diffs.get( source ) )
-    .map( |sd| sd.deleted_nodes.contains_key( id ) )
-    .unwrap_or( false )
+    . and_then( |diffs| diffs . get (source) )
+    . map( |sd| sd . deleted_nodes . contains_key (id) )
+    . unwrap_or (false)
   { NodeDiffStatus::Removed } else { NodeDiffStatus::RemovedHere } }
 
 /// Find the source for a node by checking which source directory
@@ -49,10 +49,10 @@ pub fn source_from_disk (
   id     : &ID,
   config : &SkgConfig,
 ) -> Option<SourceName> {
-  let filename : String = format!( "{}.skg", id.0 );
-  for (source_name, source_config) in &config.sources {
+  let filename : String = format!( "{}.skg", id . 0 );
+  for (source_name, source_config) in &config . sources {
     let path : PathBuf =
-      PathBuf::from( &source_config.path ).join( &filename );
-    if path.exists() {
-      return Some( source_name.clone() ); }}
+      PathBuf::from( &source_config . path ) . join (&filename);
+    if path . exists() {
+      return Some( source_name . clone() ); }}
   None }

@@ -39,7 +39,7 @@ pub async fn set_graphnodestats_in_forest (
              Box<dyn Error> > {
   let pids : Vec < ID > =
     timed ( config, "collect_ids_from_tree",
-            || collect_ids_from_tree ( forest ));
+            || collect_ids_from_tree (forest));
   let rel_data : MapsFromIdForView =
     timed_async ( config, "fetch_relationship_data",
                   fetch_relationship_data (
@@ -96,40 +96,40 @@ fn set_metadata_relationships_in_node_recursive (
   // PITFALL: Aliasing and extraIDs are computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
   let ( aliasing, extra_ids ) : ( bool, bool ) =
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
-      if let ViewNodeKind::True ( t )
-        = & tree . get ( treeid ) . unwrap () . value () . kind
+      if let ViewNodeKind::True (t)
+        = & tree . get (treeid) . unwrap () . value () . kind
         { let skgnode_opt = skgnode_from_map_or_disk (
-              &t.id, &t.source, map, config
-            ). ok ();
+              &t . id, &t . source, map, config
+            ) . ok ();
           let aliasing = skgnode_opt . as_ref ()
             . and_then ( |n| n . aliases . as_ref () )
             . map ( |a| ! a . is_empty () )
-            . unwrap_or ( false );
+            . unwrap_or (false);
           let extra_ids = skgnode_opt . as_ref ()
             . map ( |n| n . ids . len () > 1 )
-            . unwrap_or ( false );
+            . unwrap_or (false);
           ( aliasing, extra_ids ) }
         else { ( false, false ) } // Scaff, Deleted, DeletedScaff
     };
-  if let ViewNodeKind::True ( t )
-    = &mut tree . get_mut ( treeid ) . unwrap () . value () . kind
+  if let ViewNodeKind::True (t)
+    = &mut tree . get_mut (treeid) . unwrap () . value () . kind
     { // Write all graphStats fields.
       // PITFALL: These booleans are not populated for phantom nodes. Populating those would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
-      let node_pid : &ID = &t.id;
+      let node_pid : &ID = &t . id;
       t . graphStats . aliasing = aliasing;
       t . graphStats . extraIDs = extra_ids;
       t . graphStats . overriding =
-        rel_data . has_overrides . contains ( node_pid );
+        rel_data . has_overrides . contains (node_pid);
       t . graphStats . subscribing =
-        rel_data . has_subscribes . contains ( node_pid );
+        rel_data . has_subscribes . contains (node_pid);
       t . graphStats . numContainers =
-        rel_data . num_containers . get ( node_pid ) . copied ();
+        rel_data . num_containers . get (node_pid) . copied ();
       t . graphStats . numContents =
-        rel_data . num_contents . get ( node_pid ) . copied ();
+        rel_data . num_contents . get (node_pid) . copied ();
       t . graphStats . numLinksIn =
-        rel_data . num_links_in . get ( node_pid ) . copied (); }
+        rel_data . num_links_in . get (node_pid) . copied (); }
   let child_treeids : Vec < NodeId > =
-    tree . get ( treeid ) . unwrap ()
+    tree . get (treeid) . unwrap ()
     . children () . map ( | c | c . id () ) . collect ();
   for child_treeid in child_treeids {
     set_metadata_relationships_in_node_recursive (

@@ -51,7 +51,7 @@ impl SkgnodesInMemory {
     &self,
     uri : &ViewUri,
   ) -> Vec<ID> {
-    self . views . get ( uri )
+    self . views . get (uri)
       . map ( |vs| vs . pids . iter () . cloned () . collect () )
       . unwrap_or_default () }
 
@@ -59,7 +59,7 @@ impl SkgnodesInMemory {
     &self,
     uri : &ViewUri,
   ) -> Option<&Tree<ViewNode>> {
-    self . views . get ( uri )
+    self . views . get (uri)
       . map ( |vs| &vs . forest ) }
 
   pub fn register_view (
@@ -96,7 +96,7 @@ impl SkgnodesInMemory {
   pub fn unregister_view (
     &mut self,
     uri : &ViewUri,
-  ) { self . views . remove ( uri );
+  ) { self . views . remove (uri);
       self . gc (); }
 
   pub fn views_containing (
@@ -104,7 +104,7 @@ impl SkgnodesInMemory {
     pid : &ID,
   ) -> Vec<ViewUri> {
     self . views . iter ()
-      . filter ( |(_, vs)| vs . pids . contains ( pid ) )
+      . filter ( |(_, vs)| vs . pids . contains (pid) )
       . map ( |(uri, _)| uri . clone () )
       . collect () }
 
@@ -117,9 +117,9 @@ impl SkgnodesInMemory {
       self . views . values ()
       . flat_map ( |vs| vs . pids . iter () . cloned () )
       . collect ();
-    self . pool . retain ( |pid, _| referenced . contains ( pid ));
+    self . pool . retain ( |pid, _| referenced . contains (pid));
     self . id_resolver . retain (
-      |_, (target_pid, _)| referenced . contains ( target_pid )); }
+      |_, (target_pid, _)| referenced . contains (target_pid)); }
 }
 
 //
@@ -134,13 +134,13 @@ pub fn skgnode_for_viewnode<'a> (
   map     : &'a mut SkgNodeMap,
   config  : &SkgConfig,
 ) -> Result<Option<&'a SkgNode>, Box<dyn Error>>
-{ match &viewnode.kind {
-    ViewNodeKind::True(t) => {
+{ match &viewnode . kind {
+    ViewNodeKind::True (t) => {
       let skgnode : &SkgNode =
         skgnode_from_map_or_disk(
-          &t.id, &t.source, map, config)?;
-      Ok(Some(skgnode)) },
-    _ => Ok(None) }}
+          &t . id, &t . source, map, config)?;
+      Ok(Some (skgnode)) },
+    _ => Ok (None) }}
 
 /// Build a SkgNodeMap from DefineNodes.
 /// Each SkgNode is indexed by its first ID.
@@ -152,13 +152,13 @@ pub fn skgnode_for_viewnode<'a> (
 pub fn skgnode_map_from_save_instructions (
   instructions : &Vec<DefineNode>,
 ) -> SkgNodeMap
-{ instructions.iter()
+{ instructions . iter()
     . filter_map( |instr| match instr {
-        DefineNode::Save(SaveNode(skgnode)) =>
+        DefineNode::Save(SaveNode (skgnode)) =>
           skgnode . ids . first()
             . map( |id : &ID| (id . clone(),
                                skgnode . clone() )),
-        DefineNode::Delete(_) => None } )
+        DefineNode::Delete (_) => None } )
     . collect() }
 
 /// Fetches (batched) SkgNodes from disk for all IDs in the tree.
@@ -174,9 +174,9 @@ pub async fn skgnode_map_from_forest (
     config, driver, &all_tree_ids ) . await ?;
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   for node in nodes {
-    if let Some ( id ) = node . ids . first () {
+    if let Some (id) = node . ids . first () {
     map . insert ( id . clone (), node ); }}
-  Ok ( map ) }
+  Ok (map) }
 
 /// Get a SkgNode from the map, or from disk if it's not there.
 /// Updates the map.
@@ -186,23 +186,23 @@ pub fn skgnode_from_map_or_disk<'a>(
   map: &'a mut SkgNodeMap,
   config: &SkgConfig,
 ) -> Result<&'a SkgNode, Box<dyn Error>> {
-  if !map.contains_key(id) {
+  if !map . contains_key (id) {
     let skgnode: SkgNode = skgnode_from_pid_and_source(
-      config, id.clone(), source)?;
-    map.insert(id.clone(), skgnode); }
-  map . get(id) . ok_or_else(
-    || "SkgNode should be in map after fetch".into( )) }
+      config, id . clone(), source)?;
+    map . insert(id . clone(), skgnode); }
+  map . get (id) . ok_or_else(
+    || "SkgNode should be in map after fetch" . into( )) }
 
 fn collect_ids_from_subtree (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
   ids_out : &mut Vec<ID>, )
 { let node_ref : NodeRef<ViewNode> =
-    tree . get ( node_id ) . unwrap ();
+    tree . get (node_id) . unwrap ();
   match &node_ref . value () . kind {
-    ViewNodeKind::True ( t )    =>
+    ViewNodeKind::True (t)    =>
       ids_out . push ( t . id . clone () ),
-    ViewNodeKind::Deleted ( d ) =>
+    ViewNodeKind::Deleted (d) =>
       ids_out . push ( d . id . clone () ),
     _ => {} }
   for child in node_ref . children () {
@@ -232,7 +232,7 @@ pub fn find_source_many_ways (
   let source : SourceName =
     source_from_disk ( id, config )
     . ok_or_else ( || format! (
-      "find_source_many_ways: no source found for {}", id.0 )) ?;
+      "find_source_many_ways: no source found for {}", id . 0 )) ?;
   skgnode_from_map_or_disk ( id, &source, map, config )
     . map_err ( |e| e . to_string () ) ?;
   Ok (source) }

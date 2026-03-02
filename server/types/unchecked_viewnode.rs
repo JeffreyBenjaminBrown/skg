@@ -30,9 +30,9 @@ pub struct UncheckedViewNode {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UncheckedViewNodeKind {
-  True         ( UncheckedTrueNode ),
-  Scaff        ( Scaffold ),  // Scaffold is shared - scaffolds never have IDs
-  Deleted      ( DeletedNode ),
+  True         (UncheckedTrueNode),
+  Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
+  Deleted      (DeletedNode),
   DeletedScaff,
 }
 
@@ -60,22 +60,22 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
   type Error = String;
 
   fn try_from(u: UncheckedTrueNode) -> Result<Self, Self::Error> {
-    let id = u.id_opt.ok_or_else(
-      || format!("Node '{}' has no ID", u.title))?;
-    let source = u.source_opt.ok_or_else(
-      || format!("Node '{}' has no source", u.title))?;
+    let id = u . id_opt . ok_or_else(
+      || format!("Node '{}' has no ID", u . title))?;
+    let source = u . source_opt . ok_or_else(
+      || format!("Node '{}' has no source", u . title))?;
     Ok(TrueNode {
-      title          : u.title,
-      body           : u.body,
+      title          : u . title,
+      body           : u . body,
       id,
       source,
-      parent_ignores : u.parent_ignores,
-      indefinitive   : u.indefinitive,
-      graphStats     : u.graphStats,
-      viewStats      : u.viewStats,
-      edit_request   : u.edit_request,
-      view_requests  : u.view_requests,
-      diff           : u.diff,
+      parent_ignores : u . parent_ignores,
+      indefinitive   : u . indefinitive,
+      graphStats     : u . graphStats,
+      viewStats      : u . viewStats,
+      edit_request   : u . edit_request,
+      view_requests  : u . view_requests,
+      diff           : u . diff,
     })
   }
 }
@@ -85,14 +85,14 @@ impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
 
   fn try_from(u: UncheckedViewNodeKind) -> Result<Self, Self::Error> {
     match u {
-      UncheckedViewNodeKind::True(t) =>
-        Ok(ViewNodeKind::True(TrueNode::try_from(t)?)),
-      UncheckedViewNodeKind::Scaff(s) =>
-        Ok(ViewNodeKind::Scaff(s)),
-      UncheckedViewNodeKind::Deleted(d) =>
-        Ok(ViewNodeKind::Deleted(d)),
+      UncheckedViewNodeKind::True (t) =>
+        Ok(ViewNodeKind::True(TrueNode::try_from (t)?)),
+      UncheckedViewNodeKind::Scaff (s) =>
+        Ok(ViewNodeKind::Scaff (s)),
+      UncheckedViewNodeKind::Deleted (d) =>
+        Ok(ViewNodeKind::Deleted (d)),
       UncheckedViewNodeKind::DeletedScaff =>
-        Ok(ViewNodeKind::DeletedScaff) }}
+        Ok (ViewNodeKind::DeletedScaff) }}
 }
 
 impl TryFrom<UncheckedViewNode> for ViewNode {
@@ -100,9 +100,9 @@ impl TryFrom<UncheckedViewNode> for ViewNode {
 
   fn try_from(u: UncheckedViewNode) -> Result<Self, Self::Error> {
     Ok(ViewNode {
-      focused : u.focused,
-      folded  : u.folded,
-      kind    : ViewNodeKind::try_from(u.kind)?,
+      focused : u . focused,
+      folded  : u . folded,
+      kind    : ViewNodeKind::try_from(u . kind)?,
     })
   }
 }
@@ -112,17 +112,17 @@ impl TryFrom<UncheckedViewNode> for ViewNode {
 impl From<TrueNode> for UncheckedTrueNode {
   fn from(t: TrueNode) -> Self {
     UncheckedTrueNode {
-      title          : t.title,
-      body           : t.body,
-      id_opt         : Some(t.id),
-      source_opt     : Some(t.source),
-      parent_ignores : t.parent_ignores,
-      indefinitive   : t.indefinitive,
-      graphStats     : t.graphStats,
-      viewStats      : t.viewStats,
-      edit_request   : t.edit_request,
-      view_requests  : t.view_requests,
-      diff           : t.diff,
+      title          : t . title,
+      body           : t . body,
+      id_opt         : Some(t . id),
+      source_opt     : Some(t . source),
+      parent_ignores : t . parent_ignores,
+      indefinitive   : t . indefinitive,
+      graphStats     : t . graphStats,
+      viewStats      : t . viewStats,
+      edit_request   : t . edit_request,
+      view_requests  : t . view_requests,
+      diff           : t . diff,
     }
   }
 }
@@ -130,12 +130,12 @@ impl From<TrueNode> for UncheckedTrueNode {
 impl From<ViewNodeKind> for UncheckedViewNodeKind {
   fn from(k: ViewNodeKind) -> Self {
     match k {
-      ViewNodeKind::True(t) =>
-        UncheckedViewNodeKind::True(UncheckedTrueNode::from(t)),
-      ViewNodeKind::Scaff(s) =>
-        UncheckedViewNodeKind::Scaff(s),
-      ViewNodeKind::Deleted(d) =>
-        UncheckedViewNodeKind::Deleted(d),
+      ViewNodeKind::True (t) =>
+        UncheckedViewNodeKind::True(UncheckedTrueNode::from (t)),
+      ViewNodeKind::Scaff (s) =>
+        UncheckedViewNodeKind::Scaff (s),
+      ViewNodeKind::Deleted (d) =>
+        UncheckedViewNodeKind::Deleted (d),
       ViewNodeKind::DeletedScaff =>
       UncheckedViewNodeKind::DeletedScaff }}
 }
@@ -143,9 +143,9 @@ impl From<ViewNodeKind> for UncheckedViewNodeKind {
 impl From<ViewNode> for UncheckedViewNode {
   fn from(o: ViewNode) -> Self {
     UncheckedViewNode {
-      focused : o.focused,
-      folded  : o.folded,
-      kind    : UncheckedViewNodeKind::from(o.kind),
+      focused : o . focused,
+      folded  : o . folded,
+      kind    : UncheckedViewNodeKind::from(o . kind),
     }
   }
 }
@@ -185,11 +185,11 @@ pub fn unchecked_to_checked_tree (
       let parent_checked_id: NodeId =
         *id_map . get (
           &node_ref . parent() . unwrap() . id()
-        ). unwrap();
+        ) . unwrap();
       let checked_id: NodeId = {
         let mut parent_mut: NodeMut<ViewNode> =
-          checked . get_mut(parent_checked_id) . unwrap();
-        parent_mut . append(checked_node) . id() };
+          checked . get_mut (parent_checked_id) . unwrap();
+        parent_mut . append (checked_node) . id() };
       id_map . insert( node_ref . id(),
                        checked_id );
       Ok (( )) } )?;
@@ -208,25 +208,25 @@ pub fn checked_to_unchecked_tree(
   ) {
     let child_ids : Vec<NodeId> =
       checked_tree
-      .get(checked_id)
-      .unwrap()
-      .children()
-      .map(|c| c.id())
-      .collect();
+      . get (checked_id)
+      . unwrap()
+      . children()
+      . map(|c| c . id())
+      . collect();
 
     for checked_child_id in child_ids {
       let checked_child : &ViewNode =
         checked_tree
-        .get(checked_child_id)
-        .unwrap()
-        .value();
+        . get (checked_child_id)
+        . unwrap()
+        . value();
       let unchecked_child : UncheckedViewNode =
-        UncheckedViewNode::from(checked_child.clone());
+        UncheckedViewNode::from(checked_child . clone());
 
       let unchecked_child_id : NodeId =
         { let mut parent_mut : NodeMut<UncheckedViewNode> =
-           unchecked_tree.get_mut(unchecked_id).unwrap();
-         parent_mut.append(unchecked_child).id() };
+           unchecked_tree . get_mut (unchecked_id) . unwrap();
+         parent_mut . append (unchecked_child) . id() };
 
       convert_children(
         checked_tree,
@@ -237,16 +237,16 @@ pub fn checked_to_unchecked_tree(
   }
 
   let root_checked : &ViewNode =
-    checked.root().value();
+    checked . root() . value();
   let root_unchecked : UncheckedViewNode =
-    UncheckedViewNode::from(root_checked.clone());
+    UncheckedViewNode::from(root_checked . clone());
   let mut unchecked : Tree<UncheckedViewNode> =
-    Tree::new(root_unchecked);
+    Tree::new (root_unchecked);
 
   let checked_root_id : NodeId =
-    checked.root().id();
+    checked . root() . id();
   let unchecked_root_id : NodeId =
-    unchecked.root().id();
+    unchecked . root() . id();
   convert_children(&checked, &mut unchecked, checked_root_id, unchecked_root_id);
 
   unchecked
@@ -290,41 +290,41 @@ impl Default for UncheckedViewNode {
 
 impl UncheckedViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
-  pub fn title(&self) -> &str {
-    match &self.kind {
-      UncheckedViewNodeKind::True(t)    => &t.title,
-      UncheckedViewNodeKind::Scaff(s)   => s.title(),
-      UncheckedViewNodeKind::Deleted(d) => &d.title,
+  pub fn title (&self) -> &str {
+    match &self . kind {
+      UncheckedViewNodeKind::True (t)    => &t . title,
+      UncheckedViewNodeKind::Scaff (s)   => s . title(),
+      UncheckedViewNodeKind::Deleted (d) => &d . title,
       UncheckedViewNodeKind::DeletedScaff => "",
     }
   }
 
   /// A distinguishable label for error messages.
-  pub fn error_label(&self) -> String {
-    match &self.kind {
-      UncheckedViewNodeKind::True(t)    => t.title.clone(),
-      UncheckedViewNodeKind::Scaff(s)   => s.error_label(),
-      UncheckedViewNodeKind::Deleted(d) => format!("deleted:{}", d.id.0),
-      UncheckedViewNodeKind::DeletedScaff => "deletedScaffold".to_string(),
+  pub fn error_label (&self) -> String {
+    match &self . kind {
+      UncheckedViewNodeKind::True (t)    => t . title . clone(),
+      UncheckedViewNodeKind::Scaff (s)   => s . error_label(),
+      UncheckedViewNodeKind::Deleted (d) => format!("deleted:{}", d . id . 0),
+      UncheckedViewNodeKind::DeletedScaff => "deletedScaffold" . to_string(),
     }
   }
 
   /// Reasonable for both TrueNodes and Scaffolds.
-  pub fn body(&self) -> Option<&String> {
-    match &self.kind {
-      UncheckedViewNodeKind::True(t)    => t.body.as_ref(),
-      UncheckedViewNodeKind::Scaff(_)   => None,
-      UncheckedViewNodeKind::Deleted(d) => d.body.as_ref(),
+  pub fn body (&self) -> Option<&String> {
+    match &self . kind {
+      UncheckedViewNodeKind::True (t)    => t . body . as_ref(),
+      UncheckedViewNodeKind::Scaff (_)   => None,
+      UncheckedViewNodeKind::Deleted (d) => d . body . as_ref(),
       UncheckedViewNodeKind::DeletedScaff => None,
     }
   }
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
-  pub fn id_opt(&self) -> Option<&ID> {
-    match &self.kind {
-      UncheckedViewNodeKind::True(t)    => t.id_opt.as_ref(),
-      UncheckedViewNodeKind::Scaff(_)   => None,
-      UncheckedViewNodeKind::Deleted(d) => Some(&d.id),
+  pub fn id_opt (&self) -> Option<&ID> {
+    match &self . kind {
+      UncheckedViewNodeKind::True (t)    => t . id_opt . as_ref(),
+      UncheckedViewNodeKind::Scaff (_)   => None,
+      UncheckedViewNodeKind::Deleted (d) => Some(&d . id),
       UncheckedViewNodeKind::DeletedScaff => None,
     }
   }
@@ -338,7 +338,7 @@ pub fn unchecked_forest_root_viewnode() -> UncheckedViewNode {
   UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff(Scaffold::BufferRoot),
+    kind    : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot),
   }
 }
 
@@ -346,6 +346,6 @@ pub fn unchecked_viewnode_from_scaffold(scaffold: Scaffold) -> UncheckedViewNode
   UncheckedViewNode {
     focused : false,
     folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff(scaffold),
+    kind    : UncheckedViewNodeKind::Scaff (scaffold),
   }
 }

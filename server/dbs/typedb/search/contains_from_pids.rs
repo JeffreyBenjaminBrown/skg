@@ -98,40 +98,40 @@ pub async fn contains_from_pids (
   { // Process the nested subquery results.
     // Each document has the structure:
     //   {"node_id": <id>, "contains": [...], "contained_by": [...]}
-    while let Some ( doc_result )
+    while let Some (doc_result)
       = stream . next () . await
     { let doc : ConceptDocument =
         doc_result ?;
       if let Some ( Node::Map ( ref map ) )
       = doc . root
       { let node_id_opt : Option < ID > =
-          map . get ( "node_id" )
-          . and_then ( extract_id_from_node );
-        if let Some ( node_id ) = node_id_opt {
-          if let Some ( Node::List ( contains_list ) ) = (
+          map . get ("node_id")
+          . and_then (extract_id_from_node);
+        if let Some (node_id) = node_id_opt {
+          if let Some ( Node::List (contains_list) ) = (
             // Extract contained nodes (what this node contains)
-            map . get ( "contains" ))
+            map . get ("contains"))
           { for item in contains_list {
-            if let Some ( contained_id ) =
+            if let Some (contained_id) =
               extract_id_from_map ( item, "contained_id" )
             { // Only track if contained_id is in our input set
-              if pid_set . contains ( & contained_id ) {
+              if pid_set . contains (& contained_id) {
                 container_to_contents
                   . entry ( node_id . clone () )
-                  . or_insert_with ( HashSet::new )
-                  . insert ( contained_id );
+                  . or_insert_with (HashSet::new)
+                  . insert (contained_id);
               }} }}
-          if let Some ( Node::List ( contained_by_list ) ) = (
+          if let Some ( Node::List (contained_by_list) ) = (
             // Extract containers (what contains this node)
-            map . get ( "contained_by" ))
+            map . get ("contained_by"))
           { for item in contained_by_list {
-            if let Some ( container_id ) =
+            if let Some (container_id) =
               extract_id_from_map ( item, "container_id" )
             { // Only track if container_id is in our input set
-              if pid_set . contains ( & container_id ) {
+              if pid_set . contains (& container_id) {
                 content_to_containers
                   . entry ( node_id . clone () )
-                  . or_insert_with ( HashSet::new )
-                  . insert ( container_id ); }} }} }} }}
+                  . or_insert_with (HashSet::new)
+                  . insert (container_id); }} }} }} }}
   Ok (( container_to_contents,
         content_to_containers )) }

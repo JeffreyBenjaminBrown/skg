@@ -51,9 +51,9 @@ async fn test_completeAliasCol_logic (
     " };
 
   let unchecked_forest =
-    org_to_uninterpreted_nodes ( org_text ) ?.0;
+    org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut forest : Tree < ViewNode > =
-    unchecked_to_checked_tree ( unchecked_forest ) ?;
+    unchecked_to_checked_tree (unchecked_forest) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
@@ -63,12 +63,12 @@ async fn test_completeAliasCol_logic (
 
   // Find the NodeIds for the AliasCol nodes
   let aliascol_1_id : NodeId = {
-    forest . get ( tree_a_id ) . unwrap ()
+    forest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
   let aliascol_2_id : NodeId = {
-    forest . get ( tree_a_id ) . unwrap ()
+    forest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
@@ -84,7 +84,7 @@ async fn test_completeAliasCol_logic (
 
   {
     let aliascol_1_ref =
-      forest . get ( aliascol_1_id ) . unwrap ();
+      forest . get (aliascol_1_id) . unwrap ();
     let children : Vec < String > =
       aliascol_1_ref . children () . map (
         |n| n . value() . title() . to_string() )
@@ -117,7 +117,7 @@ async fn test_completeAliasCol_logic (
 
   {
     let aliascol_2_ref =
-      forest . get ( aliascol_2_id ) . unwrap ();
+      forest . get (aliascol_2_id) . unwrap ();
     let aliascol_2_new : &ViewNode = aliascol_2_ref . value ();
     let children : Vec < String > =
       aliascol_2_ref . children () . map (
@@ -176,7 +176,7 @@ fn test_completeAliasCol_duplicate_aliases_different_orders
     "/tmp/tantivy-test-complete-aliascol-duplicates",
     |config, driver, _tantivy| Box::pin ( async move {
       test_completeAliasCol_duplicate_aliases_different_orders_logic (
-        config, driver ). await } )) }
+        config, driver ) . await } )) }
 
 async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
@@ -197,9 +197,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
     " };
 
   let unchecked_forest =
-    org_to_uninterpreted_nodes ( org_text ) ?.0;
+    org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut forest : Tree < ViewNode > =
-    unchecked_to_checked_tree ( unchecked_forest ) ?;
+    unchecked_to_checked_tree (unchecked_forest) ?;
   let mut map : SkgNodeMap =
     skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
@@ -208,12 +208,12 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   // Find the NodeIds for both AliasCol nodes
   let first_aliascol_id : NodeId = {
-    forest . get ( tree_root_id ) . unwrap ()
+    forest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
   let second_aliascol_id : NodeId = {
-    forest . get ( tree_root_id ) . unwrap ()
+    forest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
@@ -229,7 +229,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   {
     let aliascol_ref =
-      forest . get ( first_aliascol_id ) . unwrap ();
+      forest . get (first_aliascol_id) . unwrap ();
     let aliascol_vn : &ViewNode = aliascol_ref . value ();
     let children_new : Vec < &ViewNode > =
       aliascol_ref . children ()
@@ -275,7 +275,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
 
   {
     let aliascol_ref =
-      forest . get ( second_aliascol_id ) . unwrap ();
+      forest . get (second_aliascol_id) . unwrap ();
     let children : Vec < &ViewNode > =
       aliascol_ref . children ()
       . map ( |n| n . value () )

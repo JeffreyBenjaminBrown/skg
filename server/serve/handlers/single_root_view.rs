@@ -28,8 +28,8 @@ pub fn handle_single_root_view_request (
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
-  match node_id_from_single_root_view_request ( request ) {
-    Ok ( node_id ) => {
+  match node_id_from_single_root_view_request (request) {
+    Ok (node_id) => {
       let response_sexp : String =
         timed ( config, "single_root_view", || {
           block_on ( async {
@@ -39,7 +39,7 @@ pub fn handle_single_root_view_request (
               &node_id,
               conn_state . diff_mode_enabled ) . await
             { Ok ( (buffer_content, map, pids, forest) ) => {
-                if let Ok ( view_uri ) = &view_uri_result {
+                if let Ok (view_uri) = &view_uri_result {
                   for (pid, skgnode) in map {
                     conn_state . memory . pool . insert (
                       pid, skgnode ); }
@@ -59,7 +59,7 @@ pub fn handle_single_root_view_request (
       send_response_with_length_prefix (
         stream,
         & response_sexp ); },
-    Err ( err ) => {
+    Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
       println! ( "{}", error_msg ) ;
@@ -70,9 +70,9 @@ pub fn node_id_from_single_root_view_request (
 ) -> Result<ID, String> {
   extract_v_from_kv_pair_in_sexp (
     & { let sexp : Sexp =
-          sexp::parse ( request )
+          sexp::parse (request)
           . map_err ( |e| format! (
             "Failed to parse S-expression: {}", e ) ) ?;
         sexp },
     "id"
-  ). map(ID) }
+  ) . map (ID) }

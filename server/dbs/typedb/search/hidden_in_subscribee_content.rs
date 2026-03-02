@@ -33,12 +33,12 @@ pub async fn partition_subscribee_content_for_subscriber (
       db_name, driver, & [ subscribee_pid . clone () ] ) . await ?;
   Ok (( { let visible : HashSet < ID > =
             subscribee_content . iter () //  (rust-mode--indent-line)
-            . filter ( | id | ! subscriber_hides . contains ( id ) )
+            . filter ( | id | ! subscriber_hides . contains (id) )
             . cloned () . collect ();
           visible },
         { let hidden : HashSet < ID > =
             subscribee_content . iter ()
-            . filter ( | id | subscriber_hides . contains ( id ) )
+            . filter ( | id | subscriber_hides . contains (id) )
             . cloned () . collect ();
           hidden } )) }
 
