@@ -1,13 +1,28 @@
 pub mod pids_from_ids;
 pub mod concept_document;
 
+use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
+
+use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{TypeDBDriver, DatabaseManager};
 use typedb_driver::answer::ConceptRow;
+use typedb_driver::{Credentials, DatabaseManager, DriverOptions, TypeDBDriver};
 
 pub type ConceptRowStream =
   futures::stream::BoxStream<'static,
                              typedb_driver::Result<ConceptRow>>;
+
+pub(crate) fn connect_to_typedb () -> TypeDBDriver {
+  println! ("Connecting to TypeDB...");
+  block_on ( async {
+    TypeDBDriver::new (
+      "127.0.0.1:1729",
+      Credentials::new ("admin", "password"),
+      DriverOptions::new (false, None) . unwrap() )
+      . await
+      . unwrap_or_else ( |e| {
+        eprintln! ("Error connecting to TypeDB: {}", e);
+        std::process::exit (1); } ) } ) }
 
 pub async fn delete_database (
   driver  : &TypeDBDriver,
@@ -43,21 +58,11 @@ pub(super) fn conjugate_binary_role (
   role     : &str
 ) -> Result < &'static str,
                 Box < dyn Error > > {
-  match ( relation, role ) {
-    ( "contains", "container" )            => Ok ("contained"),
-    ( "contains", "contained" )            => Ok ("container"),
-    ( "textlinks_to", "source" )          => Ok ("dest"),
-    ( "textlinks_to", "dest" )            => Ok ("source"),
-    ( "subscribes", "subscriber" )         => Ok ("subscribee"),
-    ( "subscribes", "subscribee" )         => Ok ("subscriber"),
-    ( "overrides_view_of", "replacement" ) => Ok ("replaced"),
-    ( "overrides_view_of", "replaced" )    => Ok ("replacement"),
-    ( "hides_from_its_subscriptions", "hider" )  => Ok ("hidden"),
-    ( "hides_from_its_subscriptions", "hidden" ) => Ok ("hider"),
-    _ => Err (
-      format! (
-        "Role '{}' does not belong to relation '{}'",
-        role, relation
-      ) . into () )
-  }
-}
+  for (rel, left, right) in OUTBOUND_RELATIONSHIP_TYPES {
+    if *rel == relation {
+      if role == *left { return Ok (right); }
+      if role == *right { return Ok (left); }}}
+  Err ( format! (
+    "Role '{}' does not belong to relation '{}'",
+    role, relation
+  ) . into () ) }

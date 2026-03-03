@@ -1,76 +1,198 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
+use crate::dbs::tantivy::open_existing_tantivy_index;
 use crate::dbs::tantivy::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
+use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
+use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::skgnode::SkgNode;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
 use std::error::Error;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use tantivy::{schema, Index};
 use typedb_driver::{
-  Credentials,
   Database,
   DatabaseManager,
-  DriverOptions,
   Transaction,
   TransactionType,
   TypeDBDriver,
 };
 
-/// Reads all SkgNodes from disk, then uses that data
-/// to initialize both databases (TypeDB and Tantivy).
+/// Initializes TypeDB and Tantivy databases.
+/// If a marker file exists, the TypeDB database exists,
+/// and the schema hasn't changed,
+/// it rebuilds incrementally (only re-reading modified .skg files).
+/// Otherwise rebuilds completely.
+/// Ends by touching the marker file.
 pub fn initialize_dbs (
   config : & SkgConfig,
 ) -> (Arc<TypeDBDriver>, TantivyIndex) {
+  let driver : TypeDBDriver = connect_to_typedb();
+  let marker_path : PathBuf =
+    config . config_dir . join (".skg_init_marker");
+  let can_incremental : bool = block_on ( async {
+    can_do_incremental_init (
+      &driver, &config . db_name, &marker_path
+    ) . await } );
+  if can_incremental {
+    let marker_mtime : std::time::SystemTime =
+      fs::metadata (&marker_path)
+      . and_then ( |m| m . modified() )
+      . unwrap(); // safe: can_do_incremental_init confirmed it exists
+    match incremental_init (
+      config, &driver, marker_mtime )
+      { Ok (( tantivy_index )) => {
+          println! ("Incremental init succeeded.");
+          touch_init_marker (&marker_path);
+          return ( Arc::new (driver), tantivy_index ); }
+        Err (e) => {
+          println! ("Incremental init failed ({}), \
+                     falling back to full rebuild.", e); }} }
+  let (tantivy_index) : (TantivyIndex) =
+    full_init (config, &driver);
+  touch_init_marker (&marker_path);
+  ( Arc::new (driver), tantivy_index ) }
 
-  println!("Reading .skg files from all sources...");
-  let nodes: Vec<SkgNode> =
+/// Checks the three preconditions for incremental init:
+/// 1. TypeDB database exists
+/// 2. Marker file exists
+/// 3. schema.tql mtime <= marker mtime
+async fn can_do_incremental_init (
+  driver      : &TypeDBDriver,
+  db_name     : &str,
+  marker_path : &Path,
+) -> bool {
+  let db_exists : bool =
+    match driver . databases() . contains (db_name) . await {
+      Ok (b)  => b,
+      Err (_) => false, };
+  if ! db_exists { return false; }
+  let marker_mtime : std::time::SystemTime =
+    match fs::metadata (marker_path)
+      . and_then ( |m| m . modified() )
+    {
+      Ok (t)  => t,
+      Err (_) => return false, };
+  // PITFALL: "schema.tql" is a relative path, resolved from the CWD.
+  // If the server is started from an unexpected directory the file
+  // won't be found, which triggers a full rebuild -- a safe fallback.
+  let schema_mtime : std::time::SystemTime =
+    match fs::metadata ("schema.tql")
+      . and_then ( |m| m . modified() )
+    {
+      Ok (t)  => t,
+      Err (_) => return false, };
+  schema_mtime <= marker_mtime }
+
+/// PITFALL: Deleted .skg files are not detected by this path.
+/// Their nodes remain as orphans in TypeDB. This doesn't happen in
+/// the normal `cargo watch` workflow (deletions go through the save
+/// pipeline while the server is running). For manual deletions,
+/// restart with delete_on_quit = true, or delete the TypeDB database
+/// manually, to force a clean full rebuild.
+fn incremental_init (
+  config       : &SkgConfig,
+  driver       : &TypeDBDriver,
+  marker_mtime : std::time::SystemTime,
+) -> Result<TantivyIndex, Box<dyn Error>> {
+  let tantivy_index : TantivyIndex =
+    open_existing_tantivy_index (
+      Path::new ( &config . tantivy_folder )) ?;
+  println! ("Reading modified .skg files...");
+  let nodes : Vec<SkgNode> =
+    read_modified_skg_files_from_sources (
+      config, marker_mtime ) ?;
+  if nodes . is_empty() {
+    println! ("No modified .skg files found.");
+    return Ok (tantivy_index); }
+  println! ("{} modified .skg file(s) found.", nodes . len());
+  block_on ( async {
+    let t0 : Instant = Instant::now();
+    let created : usize =
+      create_only_nodes_with_no_ids_present (
+        &config . db_name, driver, &nodes ) . await ?;
+    println! ("  new nodes: {} ({:.1}s)",
+              created, t0 . elapsed() . as_secs_f64());
+    let t1 : Instant = Instant::now();
+    let pids : Vec<crate::types::misc::ID> =
+      nodes . iter()
+      . map ( |n| n . primary_id()
+              . map ( |id| id . clone() ) )
+      . collect::<Result<Vec<_>, _>>()
+      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    delete_all_outbound_relationships (
+      &config . db_name, driver, &pids ) . await ?;
+    println! ("  deleted stale relationships ({:.1}s)",
+              t1 . elapsed() . as_secs_f64());
+    let t2 : Instant = Instant::now();
+    create_all_relationships (
+      &config . db_name, driver, &nodes ) . await ?;
+    println! ("  recreated relationships ({:.1}s)",
+              t2 . elapsed() . as_secs_f64());
+    Ok::<(), Box<dyn Error>> (( )) } ) ?;
+  let t3 : Instant = Instant::now();
+  let indexed : usize =
+    update_index_with_nodes (&nodes, &tantivy_index) ?;
+  println! ("  tantivy: updated {} documents ({:.1}s)",
+            indexed, t3 . elapsed() . as_secs_f64());
+  Ok (tantivy_index) }
+
+/// Full rebuild: reads all .skg files, populates both databases.
+fn full_init (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> TantivyIndex {
+  println! ("Performing full init...");
+  println! ("Reading .skg files from all sources...");
+  let nodes : Vec<SkgNode> =
     read_all_skg_files_from_sources (config)
-    . unwrap_or_else(|e| {
-      eprintln!("Failed to read .skg files: {}", e);
-      std::process::exit (1); });
-  println!("{} .skg files were read from {} source(s)",
-           nodes . len(), config . sources . len());
+    . unwrap_or_else ( |e| {
+      eprintln! ("Failed to read .skg files: {}", e);
+      std::process::exit (1); } );
+  println! ("{} .skg files were read from {} source(s)",
+            nodes . len(), config . sources . len());
+  block_on ( async {
+    if let Err (e) = populate_typedb_from_nodes (
+      config, driver, &nodes
+    ) . await {
+      eprintln! ("Failed to populate TypeDB: {}", e);
+      std::process::exit (1); }} );
+  println! ("TypeDB database initialized successfully.");
+  let tantivy_index : TantivyIndex =
+    initialize_tantivy_from_nodes (config, &nodes);
+  tantivy_index }
 
-  let typedb_driver: Arc<TypeDBDriver> =
-    initialize_typedb_from_nodes ( config, &nodes );
-  let tantivy_index: TantivyIndex =
-    initialize_tantivy_from_nodes ( config, &nodes );
-
-  (typedb_driver, tantivy_index) }
+fn touch_init_marker (
+  path : &Path,
+) {
+  if let Err (e) = fs::write (path, b"") {
+    eprintln! ("Warning: could not touch init marker {:?}: {}",
+               path, e); } }
 
 pub fn initialize_typedb_from_nodes (
   config : & SkgConfig,
-  nodes: &[SkgNode],
+  nodes  : &[SkgNode],
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
   // then populates it with the provided SkgNodes.
-
-  println!("Initializing TypeDB database...");
-  let driver: TypeDBDriver = block_on ( async {
-    TypeDBDriver::new(
-      "127.0.0.1:1729",
-      Credentials::new("admin", "password"),
-      DriverOptions::new(false, None) . unwrap() )
-      . await
-      . unwrap_or_else ( |e| {
-        eprintln!("Error connecting to TypeDB: {}", e);
-        std::process::exit (1); } ) } );
-
+  println! ("Initializing TypeDB database...");
+  let driver : TypeDBDriver = connect_to_typedb();
   block_on ( async {
     if let Err (e) = populate_typedb_from_nodes (
       config, &driver, nodes
     ) . await {
       eprintln! ( "Failed to populate TypeDB: {}", e );
       std::process::exit (1); }} );
-  println!("TypeDB database initialized successfully.");
+  println! ("TypeDB database initialized successfully.");
   Arc::new (driver) }
 
 /// Destroys and rebuilds the TypeDB database from .skg files on disk.
@@ -112,20 +234,20 @@ async fn populate_typedb_from_nodes (
   println! ("  relationships: {:.1}s", t1 . elapsed() . as_secs_f64());
   Ok (( )) }
 
-pub fn initialize_tantivy_from_nodes (
+fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
   nodes  : & [SkgNode],
 ) -> TantivyIndex {
-  println!("Initializing Tantivy index...");
+  println! ("Initializing Tantivy index...");
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
     in_fs_wipe_index_then_create_it (
       nodes,
       Path::new ( & config . tantivy_folder )
-    ) . unwrap_or_else(|e| {
-      eprintln!("Failed to create Tantivy index: {}", e);
+    ) . unwrap_or_else ( |e| {
+      eprintln! ("Failed to create Tantivy index: {}", e);
       std::process::exit (1); } );
-  println!(
+  println! (
     "Tantivy index initialized successfully. Indexed {} files.",
     indexed_count);
   tantivy_index }

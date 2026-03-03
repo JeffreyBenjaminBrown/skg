@@ -94,7 +94,7 @@ cleanup() {
 find_available_port() {
   local attempts=0
   local max_attempts=100
-  local min_port=1000
+  local min_port=1024
   local max_port=9000
 
   while [ $attempts -lt $max_attempts ]; do
@@ -143,6 +143,12 @@ start_skg_server() {
     if grep -q "Server ready\." "$TEST_DIR/server.log" 2>/dev/null; then
       echo "✓ Server is ready on port $AVAILABLE_PORT"
       return 0
+    fi
+    if ! kill -0 $CARGO_PID 2>/dev/null; then
+      echo "ERROR: Server process died during startup"
+      echo "Server log:"
+      cat "$TEST_DIR/server.log"
+      return 1
     fi
     sleep 0.2
     attempt=$(( attempt + 1 ))

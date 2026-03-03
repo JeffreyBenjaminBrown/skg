@@ -18,6 +18,16 @@ use typedb_driver::{
 /// See tools/init-perf-investigation.org for benchmarks.
 const BATCH_SIZE : usize = 200;
 
+/// The 5 outbound relationship types and their two roles.
+/// Each triple is (relation, role_a, role_b).
+pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
+  ("contains",                      "container",   "contained"),
+  ("textlinks_to",                  "source",      "dest"),
+  ("subscribes",                    "subscriber",  "subscribee"),
+  ("hides_from_its_subscriptions",  "hider",       "hidden"),
+  ("overrides_view_of",             "replacement", "replaced"),
+];
+
 pub async fn create_all_relationships (
   // Maps `create_relationships_from_node` over `nodes`,
   // then commits.
@@ -169,6 +179,19 @@ pub async fn insert_relationship_from_list (
       . map_err(|e| format!(
         "TypeQL query failed for relationship '{}' from '{}' to '{}': {}\nQuery was: {}",
         relation_name, primary_id, target_id . as_str(), e, query))?; }
+  Ok (( )) }
+
+/// Delete all 5 outbound relationship types
+/// for the given IDs.
+pub async fn delete_all_outbound_relationships (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  ids     : &Vec<ID>,
+) -> Result<(), Box<dyn Error>> {
+  for (relation, role, _) in OUTBOUND_RELATIONSHIP_TYPES {
+    delete_out_links (
+      db_name, driver, ids, relation, role
+    ) . await ?; }
   Ok (( )) }
 
 /// Delete every instance of `relation`

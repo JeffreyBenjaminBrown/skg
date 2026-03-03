@@ -1,9 +1,9 @@
-use crate::dbs::filesystem::one_node::{read_skgnode, write_skgnode};
+use crate::dbs::filesystem::one_node::{read_skgnode, validate_pid_matches_filename, write_skgnode};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
@@ -99,9 +99,48 @@ fn read_skg_files_from_folder (
            |ext| ext == "skg") ) { // Some
       let mut skgnode: SkgNode =
         read_skgnode (&path) ?;
+      validate_pid_matches_filename (&skgnode, &path) ?;
       skgnode . source = source_nickname . clone();
       nodes . push (skgnode); }}
   Ok (nodes) }
+
+/// Like `read_all_skg_files_from_sources` but only reads files
+/// whose mtime is more recent than `since`.
+pub fn read_modified_skg_files_from_sources (
+  config : &SkgConfig,
+  since  : std::time::SystemTime,
+) -> io::Result<Vec<SkgNode>> {
+  let mut all_nodes : Vec<SkgNode> = Vec::new();
+  let mut seen_ids  : HashSet<String> = HashSet::new();
+  for (nickname, source) in config . sources . iter() {
+    let entries : ReadDir =
+      fs::read_dir (&source . path) ?;
+    for entry in entries {
+      let entry : DirEntry = entry ?;
+      let path  : PathBuf  = entry . path();
+      if !( path . is_file() &&
+            path . extension()
+              . map_or (false, |ext| ext == "skg") ) {
+        continue; }
+      let mtime : std::time::SystemTime =
+        fs::metadata (&path) ? . modified() ?;
+      if mtime <= since { continue; }
+      let mut skgnode : SkgNode =
+        read_skgnode (&path) ?;
+      validate_pid_matches_filename (&skgnode, &path) ?;
+      let pid_str : String =
+        skgnode . primary_id()
+        . map_err ( |e| io::Error::new (
+          io::ErrorKind::InvalidData, e )) ?
+        . to_string();
+      if ! seen_ids . insert (pid_str . clone()) {
+        return Err ( io::Error::new (
+          io::ErrorKind::InvalidData,
+          format! ("Duplicate primary ID '{}' within batch",
+                   pid_str )) ); }
+      skgnode . source = nickname . clone();
+      all_nodes . push (skgnode); }}
+  Ok (all_nodes) }
 
 /// Reports duplicate IDs found across sources.
 /// If ≤10 duplicates: reports to stderr only.
@@ -186,7 +225,6 @@ pub fn write_all_nodes_to_fs (
 ) -> io  ::Result<usize> { // number of files written
 
   // Collect unique source directories and ensure they exist
-  use std::collections::HashSet;
   for source_name in {
     let unique_sources : HashSet<&SourceName> =
       nodes . iter()

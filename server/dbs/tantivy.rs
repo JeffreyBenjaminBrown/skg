@@ -8,12 +8,39 @@ use crate::types::textlinks::replace_each_link_with_its_label;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::skgnode::SkgNode;
 
-use tantivy::{IndexWriter, doc, Term, IndexReader, Searcher, Document};
+use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
 use tantivy::schema;
 use std::error::Error;
+use std::path::Path;
+use std::sync::Arc;
 
+
+/// Opens an existing Tantivy index at `index_path`.
+/// Returns Err if the directory doesn't exist or the
+/// index can't be opened (caller falls back to full rebuild).
+pub(crate) fn open_existing_tantivy_index (
+  index_path : &Path,
+) -> Result<TantivyIndex, Box<dyn Error>> {
+  let index : Index =
+    Index::open_in_dir (index_path) ?;
+  let schema : schema::Schema =
+    index . schema();
+  let id_field : schema::Field =
+    schema . get_field ("id")
+    . ok_or ("Schema missing 'id' field") ?;
+  let title_or_alias_field : schema::Field =
+    schema . get_field ("title_or_alias")
+    . ok_or ("Schema missing 'title_or_alias' field") ?;
+  let source_field : schema::Field =
+    schema . get_field ("source")
+    . ok_or ("Schema missing 'source' field") ?;
+  Ok ( TantivyIndex {
+    index              : Arc::new (index),
+    id_field,
+    title_or_alias_field,
+    source_field, } ) }
 
 /// The only Tantivy schema used so far.
 /// It includes three fields:

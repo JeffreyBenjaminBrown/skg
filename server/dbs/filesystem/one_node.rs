@@ -98,6 +98,31 @@ pub fn write_skgnode_to_source (
     & path_from_pid_and_source(
         config, &skgnode . source, pid . clone() ) ) }
 
+
+/// Checks that a node's primary ID matches the filename stem.
+/// This property is assumed by `path_from_pid_and_source` and
+/// elsewhere but was never validated on read.
+pub(super) fn validate_pid_matches_filename (
+  node : &SkgNode,
+  path : &Path,
+) -> io::Result<()> {
+  let pid : &ID = node . primary_id()
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::InvalidData, e )) ?;
+  let stem : &str = path . file_stem()
+    . and_then ( |s| s . to_str() )
+    . ok_or_else ( || io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ("Cannot extract filename stem from {:?}",
+               path )) ) ?;
+  if pid . as_str() != stem {
+    return Err ( io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! (
+        "PID '{}' does not match filename stem '{}' in {:?}",
+        pid . as_str(), stem, path )) ); }
+  Ok (( )) }
+
 /// Effectively private.
 pub(super) fn read_skgnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
