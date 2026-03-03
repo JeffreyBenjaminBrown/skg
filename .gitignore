@@ -2,6 +2,7 @@
 *~
 /**/index.tantivy
 /.bash_history
+/.cache
 /.claude*
 /.codex
 /.config
@@ -13,9 +14,12 @@
 /bash/kill-servers.sh
 /call-trees
 /claude-tries-skg
-/data/*/*/skg
-/data/*/skg
+/data/*.skg
+/data/*/*.skg
+/data/*/*/*.skg
+/data/*/*/*/*.skg
 /data/default/skg2/
+/data/real/
 /devel-handy/temp.org
 /plans-done
 /rust-indent/

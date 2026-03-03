@@ -1,3 +1,6 @@
+mod guard;
+pub use guard::TestDbGuard;
+
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::tantivy::search_index;
@@ -12,12 +15,14 @@ use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
 
 use ego_tree::{Tree, NodeRef};
+use futures::FutureExt;
 use futures::StreamExt;
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
@@ -79,13 +84,24 @@ where
         db_name,
         temp_fixtures . to_str() . unwrap(),
         tantivy_folder ) . await?;
-    let result : Result<(), Box<dyn Error>> = test_fn(&config, &driver, &mut tantivy) . await;
-    cleanup_test_tantivy_and_typedb_dbs(
-      db_name,
-      &driver,
-      Some(config . tantivy_folder . as_path())
-    ) . await?;
-    result
+    let mut guard: TestDbGuard = TestDbGuard::new(
+      db_name, Some(config . tantivy_folder . clone()));
+    let test_result: Result<Result<(), Box<dyn Error>>, _> =
+      AssertUnwindSafe(test_fn(&config, &driver, &mut tantivy))
+      . catch_unwind() . await;
+    let cleanup_result: Result<(), Box<dyn Error>> =
+      cleanup_test_tantivy_and_typedb_dbs(
+        db_name,
+        &driver,
+        Some(config . tantivy_folder . as_path()),
+      ) . await;
+    guard . disarm();
+    match test_result {
+      Ok (inner) => { cleanup_result?; inner },
+      Err (panic_payload) => {
+        if let Err (e) = cleanup_result {
+          eprintln!("Cleanup error after test panic: {}", e); }
+        std::panic::resume_unwind(panic_payload) }, }
   });
 
   // Clean up temp fixtures
