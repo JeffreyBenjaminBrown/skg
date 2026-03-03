@@ -7,19 +7,7 @@ and to keep it in decent sync with the master on github
 I hope to use this, and not
   org-roam where they are most recently from,
 to edit it.
-* Next, let's import it.
-  This will be a commitment for me --
-  translating changes I make in skg to changes in org-roam seems hard.
-
-  org-roam data maps onto
-  the containment and hyperlink relationships in typedb,
-  and what would be the synonym relationship in Tantivy
-    (:ROAM_ALIASES:)
-    if it reified relationships.
-  A UUID will need to be made for every headline.
-* AWAITS
-** ? Let's round-trip it.
-* DONE [[./docs/done.org]]
+* Next, please read and act on [[./feasible-now-probably.org]]
 * I find you easiest to read
   in an org file on disk, rather than in this screen.
   Anything longer than a couple paragraphs, please refer me there.

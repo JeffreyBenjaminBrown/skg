@@ -9,6 +9,7 @@
 /.lesshst
 /.npm
 /.ssh/
+/_burying
 /bash/kill-servers.sh
 /call-trees
 /claude-tries-skg
