@@ -20,7 +20,8 @@
 (defun skg-client-init (file)
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
-  (skg-tcp-connect-to-rust))
+  (skg-tcp-connect-to-rust)
+  (skg-verify-connection))
 
 (defun skg-port-from-toml (file)
   "Return the integer value of `port = ...` from FILE (a TOML config)."

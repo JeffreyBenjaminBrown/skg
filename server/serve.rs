@@ -33,6 +33,7 @@ pub fn serve (
   config        : SkgConfig,
   typedb_driver : Arc<TypeDBDriver>,
   tantivy_index : TantivyIndex,
+  emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
   { // Set up signal handler for Ctrl+C and SIGTERM,
@@ -45,13 +46,6 @@ pub fn serve (
         &driver_for_signal,
         &config_for_signal );
     } ) . expect ("Error setting Ctrl+C handler"); }
-
-  // Bind to TCP port for Rust-Emacs API communication.
-  let emacs_listener : TcpListener =
-    TcpListener::bind (
-      & format!("0.0.0.0:{}", config . port) )?;
-  println!("Listening on port {} for Emacs connections...",
-           config . port);
 
   for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {

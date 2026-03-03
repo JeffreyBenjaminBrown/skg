@@ -1,3 +1,6 @@
+* TODO don't default to rebuilding TypeDB
+Instead only rebuild those nodes whose files
+have been modified more recently than the db.
 * new AI testing strategy
   I specify a feature. AI codes it.
   Commit it *without reviewing*,

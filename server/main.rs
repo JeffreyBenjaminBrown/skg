@@ -15,8 +15,11 @@ use skg::types::misc::{SkgConfig, SourceName, TantivyIndex};
 
 use std::error::Error;
 use std::env;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use typedb_driver::TypeDBDriver;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -33,16 +36,83 @@ fn main() -> Result<(), Box<dyn Error>> {
             "data/skgconfig.toml" . to_string() };
         config_path } ) ?;
 
+  let listener: TcpListener = // precedes initialize_dbs so Emacs can connect during init
+    TcpListener::bind (
+      & format! ("0.0.0.0:{}", config . port) ) ?;
+  println! ("Listening on port {} for Emacs connections...",
+            config . port);
+  listener . set_nonblocking (true) ?;
+
+  // The "busy signal". See definition of 'busysignal_accept_loop'.
+  let init_done: Arc<AtomicBool> =
+    Arc::new (AtomicBool::new (false));
+  let init_done_clone: Arc<AtomicBool> =
+    Arc::clone (&init_done);
+  let busysignal_listener: TcpListener =
+    listener . try_clone () ?;
+  let busysignal_handle: std::thread::JoinHandle<()> =
+    std::thread::spawn ( move || {
+      busysignal_accept_loop (
+        busysignal_listener,
+        init_done_clone ); } );
+
   clear_timing_log (&config);
   let (typedb_driver, tantivy_index)
     : (Arc<TypeDBDriver>, TantivyIndex)
     = timed ( &config, "initialize_dbs",
               || initialize_dbs (&config));
 
-  serve (config, typedb_driver, tantivy_index)
+  init_done . store (true, Ordering::Release);
+  busysignal_handle . join ()
+    . expect ("busysignal thread panicked");
+  listener . set_nonblocking (false) ?;
+
+  serve (config, typedb_driver, tantivy_index, listener)
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }
+
+/// During initialization, accept connections and reply
+/// with an "initializing" message to every request line.
+fn busysignal_accept_loop (
+  listener  : TcpListener,
+  init_done : Arc<AtomicBool>,
+) {
+  let init_msg: &str =
+    "Server is initializing, please wait. \
+     See logs/skg.log for progress.\n";
+  while ! init_done . load (Ordering::Acquire) {
+    match listener . accept () {
+      Ok (( stream, addr )) => {
+        let mut stream: std::net::TcpStream = stream;
+        println! ("Busysignal: connection from {}", addr);
+        stream . set_nonblocking (false)
+          . ok ();
+        // Set a read timeout so we don't block forever
+        // if init finishes while we're mid-read.
+        stream . set_read_timeout (
+          Some (std::time::Duration::from_millis (500)) )
+          . ok ();
+        let mut reader: BufReader<std::net::TcpStream> =
+          BufReader::new (
+            stream . try_clone ()
+              . expect ("try_clone in busysignal") );
+        let mut line: String = String::new ();
+        while let Ok (n) =
+          reader . read_line (&mut line) {
+            if n == 0 { break; }
+            let _: Result<(), _> =
+              stream . write_all (init_msg . as_bytes ());
+            line . clear ();
+            if init_done . load (Ordering::Acquire) {
+              break; } } }
+      Err (ref e)
+        if e . kind ()
+           == std::io::ErrorKind::WouldBlock => {
+          std::thread::sleep (
+            std::time::Duration::from_millis (100) ); }
+      Err (e) => {
+        eprintln! ("Busysignal accept error: {}", e); } } } }
 
 fn run_import (
   args : &[String],
