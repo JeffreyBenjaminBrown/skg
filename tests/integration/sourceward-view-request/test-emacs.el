@@ -1,6 +1,7 @@
 ;;; Integration test for sourceward-view request functionality
 
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
@@ -43,7 +44,7 @@ LINE-NUMBER is zero-based."
             (format "requesting-sourceward-view-line-%d" line-number))
       (skg-request-sourceward-view)
       (skg-request-save-buffer) ;; save to send request to server
-      (sleep-for 0.5)
+      (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
 (defun skg-sourceward--verify-view (line-number expected-full expected-stripped)

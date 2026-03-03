@@ -66,6 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   busysignal_handle . join ()
     . expect ("busysignal thread panicked");
   listener . set_nonblocking (false) ?;
+  println! ("Server ready.");
 
   serve (config, typedb_driver, tantivy_index, listener)
     . map_err ( |e| Box::new (e)
@@ -79,8 +80,8 @@ fn busysignal_accept_loop (
   init_done : Arc<AtomicBool>,
 ) {
   let init_msg: &str =
-    "Server is initializing, please wait. \
-     See logs/skg.log for progress.\n";
+    "((busy . \"Server is initializing, please wait. \
+     See logs/skg.log for progress.\"))\n";
   while ! init_done . load (Ordering::Acquire) {
     match listener . accept () {
       Ok (( stream, addr )) => {

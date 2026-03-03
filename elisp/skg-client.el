@@ -61,9 +61,16 @@ TODO: So far the only response handlers are these:
   skg-display-search-results
   skg-open-org-buffer-from-rust-s-exp
 and neither of them uses the `tcp-proc` argument. Unless it will be used by later handlers, it should be deleted."
-  (if skg-doc--response-handler
-      (funcall skg-doc--response-handler tcp-proc string)
-    (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )
+  (let ((trimmed (string-trim-left string)))
+    (if (string-prefix-p "((busy" trimmed) ;; the busy signal
+        (let ((parsed (car (read-from-string trimmed))))
+          (message "%s" (cdr (assq 'busy parsed)))
+          (setq skg-doc--response-handler nil
+                skg-lp--buf             (unibyte-string)
+                skg-lp--bytes-left      nil))
+      (if skg-doc--response-handler
+          (funcall skg-doc--response-handler tcp-proc string)
+        (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )) )
 
 (defun skg-doc-disconnect ()
   "Manually close the connection to the Rust server."

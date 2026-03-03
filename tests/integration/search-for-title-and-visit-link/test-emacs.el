@@ -4,6 +4,7 @@
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
 (load-file "../../../elisp/skg-test-utils.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -15,8 +16,8 @@
   (skg-request-title-matches "apples")
   (message "Called skg-request-title-matches")
 
-  ;; Wait a moment for the response to be processed
-  (sleep-for 0.25)
+  ;; Wait for the search buffer to be created
+  (skg-test-wait-for-buffer (skg-search-buffer-name "apples"))
 
   ;; Check if the title search buffer was created and contains expected content
   (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
@@ -61,8 +62,9 @@
                 (message "Calling skg-visit-link...")
                 (skg-visit-link)
 
-                ;; Wait a moment for the content view to be created
-                (sleep-for 0.25)
+                ;; Wait for the content view buffer to be created
+                (skg-test-wait-for
+                 (lambda () (find-skg-content-buffer)))
 
                 (let ;; Check if the content view buffer was created successfully
                     ((content-buffer (find-skg-content-buffer)))
@@ -99,9 +101,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (test-title-search)
   (test-visit-link)

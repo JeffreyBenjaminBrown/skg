@@ -9,6 +9,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -55,7 +56,7 @@
       (skg-request-save-buffer)
 
       ;; Wait for save to complete
-      (sleep-for 2.0)
+      (skg-test-wait-for-response)
 
       (message "✓ Relationships established on disk")
       (setq integration-test-phase "relationships-established"))))
@@ -92,7 +93,7 @@
     (skg-request-save-buffer) ;; save to send request to server
 
     ;; Wait for response
-    (sleep-for 2.0)
+    (skg-test-wait-for-response)
 
     (setq integration-test-phase "containerward-request-complete")))
 
@@ -153,9 +154,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (test-establish-relationships)
   (test-create-new-buffer)

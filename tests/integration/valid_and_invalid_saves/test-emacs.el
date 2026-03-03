@@ -7,6 +7,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -32,7 +33,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 0.5)
+  (skg-test-wait-for-response)
 
   ;; Check if error buffer was created
   (let ((error-buffer (get-buffer "*SKG Save Errors - Inconsistencies Found*"))
@@ -92,7 +93,7 @@
   (skg-request-save-buffer)
 
   ;; Wait for response
-  (sleep-for 0.5)
+  (skg-test-wait-for-response)
 
   ;; Check the updated content
   (with-current-buffer "*skg-content-view*"
@@ -120,9 +121,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (test-invalid-save)
   (test-valid-save)

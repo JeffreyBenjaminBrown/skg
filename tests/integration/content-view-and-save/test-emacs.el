@@ -9,6 +9,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -21,8 +22,8 @@
   (skg-request-single-root-content-view-from-id "1")
   (message "Called skg-request-single-root-content-view-from-id")
 
-  ;; Wait for the response
-  (sleep-for 0.25)
+  ;; Wait for the buffer to be created
+  (skg-test-wait-for-buffer "*skg: 1*")
 
   ;; Check if the content view buffer was created with expected content
   (let ((content-buffer ;; The buffer name is based on the extracted title, so it will be "*skg: 1*"
@@ -80,7 +81,7 @@
           (skg-request-save-buffer)
 
           ;; Wait for save response
-          (sleep-for 0.5)
+          (skg-test-wait-for-response)
 
           ;; Check the updated content
           (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
@@ -119,9 +120,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (test-content-view)
   (test-save-content)

@@ -9,22 +9,27 @@ So far there are these endpoints:
 - Verify connection
   - Request: ((request . "verify connection"))
   - Response: Plain text with newline termination: "This is the skg server verifying the connection."
+
 - Search in titles
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
   - Response: Plain text with newline termination.
+
 - Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
+
 - Save buffer
   - Request: First `((request . \"save buffer\"))\n"`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` has length `LENGTH`.
   - Response: success/failure indicator followed by length-prefixed content:
     - Success: `save: success\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains the processed buffer content
     - Failure: `save: failure\nContent-Length: LENGTH\r\n\r\nPAYLOAD` where PAYLOAD contains org-mode formatted error details
+
 - Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
   - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
   - Errors: If the file does not exist on disk, responds with "File not found: <path>".
   - Does not require TypeDB or Tantivy -- only the config.
+
 - Git diff mode toggle
   - Request: ((request . "git diff mode toggle"))
   - Response: Plain text with newline termination.
@@ -33,12 +38,19 @@ So far there are these endpoints:
     subsequent `single root content view` and `save buffer`
     responses include diff annotations showing changes
     between git HEAD and the worktree.
+
 - Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
   - Response: "Server shutting down..."
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
+
+- Busy signal (server initializing)
+  - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
+  - Response: ((busy . "human-readable status message"))
+  - Emacs should display the message and retry the request (or let the user retry manually).
+  - No request triggers this specifically; any request sent during initialization may receive it.
 
 Error responses are sent as simple text.
 

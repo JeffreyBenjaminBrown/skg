@@ -7,6 +7,7 @@
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -21,9 +22,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   ;; Run the test
   (test-fold-preservation)
@@ -93,8 +91,8 @@
       (message "Calling skg-request-save-buffer...")
       (skg-request-save-buffer)
 
-      ;; Wait for response
-      (sleep-for 0.5)
+      ;; Wait for save response
+      (skg-test-wait-for-response)
 
       (setq integration-test-phase "buffer-saved")
 

@@ -17,6 +17,7 @@
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
 (load-file "../save_collateral_break_cycle/test-helpers.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -48,7 +49,7 @@ Uses headline-titles style parsing. Returns t if found, nil otherwise."
   (message "=== PHASE 1: Open buffer 1 (content view of node 1) ===")
   (setq integration-test-phase "phase-1-open-buffer-1")
   (skg-request-single-root-content-view-from-id "1")
-  (sleep-for 2.0)
+  (skg-test-wait-for-buffer "*skg: 1*")
   (let ((buf (get-buffer "*skg: 1*")))
     (unless buf
       (message "✗ FAIL [phase 1]: Buffer *skg: 1* was not created")
@@ -78,7 +79,7 @@ contains to [], overwriting subee.skg on disk."
     (insert "* (skg (node (id subee) (source main))) subee\n")
     (insert "** (skg (node (id subee-1) (source main))) subee-1")
     (skg-request-save-buffer))
-  (sleep-for 2.0)
+  (skg-test-wait-for-response)
   (let ((buf (get-buffer "*skg: 1*")))
     (message "Buffer 1 after multi-root save:\n%s"
              (with-current-buffer buf
@@ -113,7 +114,7 @@ takes priority over subee.skg on disk."
       (insert "* (skg (node (id subee) (source main))) subee\n")
       (insert "** (skg (node (id subee-1) (source main))) subee-1")
       (skg-request-save-buffer))
-    (sleep-for 2.0)
+    (skg-test-wait-for-response)
     (message "Buffer 2 after save:\n%s"
              (with-current-buffer buf
                (buffer-substring-no-properties (point-min) (point-max))))
@@ -136,7 +137,7 @@ takes priority over subee.skg on disk."
     (message "Buffer 2 after metadata edit:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
-  (sleep-for 2.0))
+  (skg-test-wait-for-response))
 
 (defun phase-5-verify-after-delete ()
   "Verify both buffers after deleting 11."
@@ -209,7 +210,7 @@ takes priority over subee.skg on disk."
     (message "Buffer 1 after inserting subee-2:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
-  (sleep-for 2.0))
+  (skg-test-wait-for-response))
 
 (defun phase-7-verify-after-add ()
   "Verify both buffers after adding subee-2."
@@ -285,7 +286,7 @@ required because the parent (DeletedScaff) has no source to inherit."
     (message "Buffer 1 after inserting new-root:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
-  (sleep-for 2.0))
+  (skg-test-wait-for-response))
 
 (defun phase-9-verify-after-new-root ()
   "Verify both buffers after saving with new-root under a deletedScaff."
@@ -327,9 +328,6 @@ required because the parent (DeletedScaff) has no source to inherit."
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (phase-1-open-buffer-1)
   (phase-2-extend-buffer-1-with-second-root-and-alias)

@@ -134,21 +134,21 @@ start_skg_server() {
   echo "  Server logs: $TEST_DIR/server.log"
   echo "Waiting for server to be ready..."
 
-  # Wait for server to actually start listening on the port
-  # This is especially important when tests run in parallel and compete for cargo locks
-  local max_attempts=100
+  # Wait for "Server ready." in the log, which is printed after
+  # TypeDB + Tantivy initialization completes. Checking the port alone
+  # is not enough — the port is bound before init, for the busy signal.
+  local max_attempts=300
   local attempt=0
   while [ $attempt -lt $max_attempts ]; do
-    # Use ss (socket statistics) which is more commonly available than netstat
-    if ss -tln 2>/dev/null | grep -q ":$AVAILABLE_PORT "; then
-      echo "✓ Server is listening on port $AVAILABLE_PORT"
+    if grep -q "Server ready\." "$TEST_DIR/server.log" 2>/dev/null; then
+      echo "✓ Server is ready on port $AVAILABLE_PORT"
       return 0
     fi
     sleep 0.2
     attempt=$(( attempt + 1 ))
   done
 
-  echo "ERROR: Server failed to start listening on port $AVAILABLE_PORT after 20 seconds"
+  echo "ERROR: Server did not become ready after 60 seconds"
   echo "Last 30 lines of server log:"
   tail -30 "$TEST_DIR/server.log"
   return 1

@@ -182,9 +182,6 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
 
-  ;; Wait for server
-  (sit-for 0.25)
-
   (phase-0-search)
   (phase-1-visit-src)
   (phase-2-visit-dest)

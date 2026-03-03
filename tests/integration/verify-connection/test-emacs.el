@@ -36,9 +36,6 @@
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
 
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
-
   ;; Send the request with our custom handler
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (request-sexp "((request . \"verify connection\"))\n"))

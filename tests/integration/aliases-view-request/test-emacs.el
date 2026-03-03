@@ -1,6 +1,7 @@
 ;;; Integration test for aliases-view request functionality
 
 (load-file "../../../elisp/skg-init.el")
+(load-file "../test-wait.el")
 
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
@@ -33,7 +34,7 @@ LINE-NUMBER is zero-based."
   ;; Load the node from server using single-root-content-view
   (message "Loading node from server...")
   (skg-request-single-root-content-view-from-id "test-node")
-  (sleep-for 0.5)
+  (skg-test-wait-for-buffer "*skg: Test Node*")
 
   (let ((buffer (get-buffer "*skg: Test Node*")))
     (unless buffer
@@ -46,7 +47,7 @@ LINE-NUMBER is zero-based."
             (format "requesting-aliases-view-line-%d" line-number))
       (skg-request-aliases-view)
       (skg-request-save-buffer) ;; save to send request to server
-      (sleep-for 0.5)
+      (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
 (defun skg-aliases--verify-view (line-number expected-full expected-stripped)

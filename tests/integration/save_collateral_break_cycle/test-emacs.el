@@ -11,6 +11,7 @@
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
 (load-file "test-helpers.el")
+(load-file "../test-wait.el")
 
 ;; Test result tracking
 (defvar integration-test-phase "starting")
@@ -21,7 +22,7 @@
   (message "=== PHASE 1: Open buffer A ===")
   (setq integration-test-phase "phase-1-open-buffer-a")
   (skg-request-single-root-content-view-from-id "a")
-  (sleep-for 0.5)
+  (skg-test-wait-for-buffer "*skg: a*")
   (let ((buf (get-buffer "*skg: a*")))
     (unless buf
       (message "✗ FAIL [phase 1]: Buffer *skg: a* was not created")
@@ -36,7 +37,7 @@
   (message "=== PHASE 2: Open buffer B ===")
   (setq integration-test-phase "phase-2-open-buffer-b")
   (skg-request-single-root-content-view-from-id "b")
-  (sleep-for 0.5)
+  (skg-test-wait-for-buffer "*skg: b*")
   (let ((buf (get-buffer "*skg: b*")))
     (unless buf
       (message "✗ FAIL [phase 2]: Buffer *skg: b* was not created")
@@ -57,7 +58,7 @@
     (message "Buffer B after edit: %S"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
-  (sleep-for 1.0))
+  (skg-test-wait-for-response))
 
 (defun phase-4-verify-collateral ()
   "Verify that collateral buffer A was updated."
@@ -84,9 +85,6 @@
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-
-  ;; Wait a moment for server to be fully ready
-  (sleep-for 0.25)
 
   (phase-1-open-buffer-a)
   (phase-2-open-buffer-b)
