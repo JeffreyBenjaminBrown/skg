@@ -19,7 +19,7 @@ to edit it.
   A UUID will need to be made for every headline.
 * AWAITS
 ** ? Let's round-trip it.
-* DONE [[./done.org]]
+* DONE [[./docs/done.org]]
 * I find you easiest to read
   in an org file on disk, rather than in this screen.
   Anything longer than a couple paragraphs, please refer me there.

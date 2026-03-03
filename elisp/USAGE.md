@@ -12,7 +12,7 @@ by evaluating the following (here, in Emacs):
 ```elisp
 (progn
   (load-file "skg-init.el")
-  (skg-client-init "../data/default/skgconfig.toml"))
+  (skg-client-init "../data/real/skgconfig.toml"))
 ```
 
 # Commands you can run
@@ -21,8 +21,8 @@ by evaluating the following (here, in Emacs):
 
 Now these commands can be evaluated (here, in Emacs):
 ```
-  (skg-request-single-root-content-view-from-id "1")
-  (skg-request-title-matches "1")
+  (skg-request-single-root-content-view-from-id "wut")
+  (skg-request-title-matches "doing")
     ;; try match, title, or second
   (skg-git-diff-toggle)
   (skg-verify-connection)

@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::error::Error;
 
 use crate::types::misc::ID;
@@ -6,9 +7,16 @@ use crate::types::textlinks::textlinks_from_node;
 
 use typedb_driver::{
   Transaction,
+  TransactionOptions,
   TransactionType,
   TypeDBDriver,
 };
+
+/// TypeDB match-insert cost scales with uncommitted write-buffer size.
+/// A single transaction for ~32k queries would degrade to ~135ms/query.
+/// Committing every ~BATCH_SIZE queries keeps per-query cost at ~1.5ms.
+/// See tools/init-perf-investigation.org for benchmarks.
+const BATCH_SIZE : usize = 200;
 
 pub async fn create_all_relationships (
   // Maps `create_relationships_from_node` over `nodes`,
@@ -19,19 +27,40 @@ pub async fn create_all_relationships (
   nodes      : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
 
+  let options : TransactionOptions =
+    TransactionOptions::new() . transaction_timeout (
+      Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
-    driver . transaction ( db_name,
-                         TransactionType::Write )
+    driver . transaction_with_options ( db_name,
+                                       TransactionType::Write,
+                                       options )
     . await ?;
   println! ("Creating relationships ...");
+  let batch_size : usize = BATCH_SIZE;
+  let mut queries_in_tx : usize = 0;
+  let mut tx : Transaction = tx;
   for node in nodes {
     let primary_id : &ID = node . primary_id()?;
+    let rel_count : usize =
+      count_relationships (node);
+    if queries_in_tx > 0 && queries_in_tx + rel_count > batch_size {
+      tx . commit () . await . map_err(
+        |e| format!("Failed to commit relationships batch: {}", e))?;
+      let options : TransactionOptions =
+        TransactionOptions::new() . transaction_timeout (
+          Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
+      tx = driver . transaction_with_options ( db_name,
+                                               TransactionType::Write,
+                                               options )
+        . await ?;
+      queries_in_tx = 0; }
     create_relationships_from_node (node, &tx)
       . await . map_err(
         |e| format!(
           "Failed to create relationships for node '{}': {}",
           primary_id . as_str (),
-          e ))? ; }
+          e ))? ;
+    queries_in_tx += rel_count; }
   tx . commit () . await
     . map_err(|e| format!("Failed to commit relationships transaction: {}", e))?;
   Ok (()) }
@@ -87,6 +116,24 @@ pub async fn create_relationships_from_node (
     tx ) . await
     . map_err(|e| format!("Failed to create 'overrides_view_of' relationships: {}", e))?;
   Ok (()) }
+
+/// Total relationship queries that will be issued for `node`.
+/// Used by `create_all_relationships` to decide when to commit
+/// a batch and start a new transaction.
+fn count_relationships (
+  node : &SkgNode,
+) -> usize {
+  let contains : usize =
+    node . contains . as_ref() . map_or (0, |v| v . len());
+  let textlinks : usize =
+    textlinks_from_node (node) . len();
+  let subscribes : usize =
+    node . subscribes_to . as_ref() . map_or (0, |v| v . len());
+  let hides : usize =
+    node . hides_from_its_subscriptions . as_ref() . map_or (0, |v| v . len());
+  let overrides : usize =
+    node . overrides_view_of . as_ref() . map_or (0, |v| v . len());
+  contains + textlinks + subscribes + hides + overrides }
 
 pub async fn insert_relationship_from_list (
   // Instantiates a relationship in the database. Does not commit.

@@ -2,6 +2,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 
 use std::path::Path;
+use uuid::Uuid;
 
 //
 // Intermediate data structures
@@ -40,8 +41,10 @@ pub fn parse_org_file (
   if sections . is_empty() { return vec![]; }
   // The file-level section must have an :ID:.
   if sections[0] . id . is_none() { return vec![]; }
-  let forest : Vec<SectionTree> =
+  let mut forest : Vec<SectionTree> =
     build_section_forest (sections, lines . len());
+  for st in &mut forest {
+    assign_missing_ids (st); }
   let mut nodes : Vec<SkgNode> = Vec::new();
   for st in &forest {
     collect_skgnodes (st, &lines, &mut nodes); }
@@ -138,16 +141,21 @@ fn build_section_forest (
 // SkgNode collection
 //
 
+fn assign_missing_ids (
+  tree : &mut SectionTree,
+) {
+  if tree . section . id . is_none() {
+    tree . section . id = Some (Uuid::new_v4() . to_string()); }
+  for child in &mut tree . children {
+    assign_missing_ids (child); }}
+
 fn collect_skgnodes (
   tree  : &SectionTree,
   lines : &[String],
   out   : &mut Vec<SkgNode>,
 ) {
-  if tree . section . id . is_some() {
-    let node : SkgNode = skgnode_from_section_tree (tree, lines);
-    out . push (node); }
-  // Recurse into children regardless —
-  // a non-:ID: section might have :ID: descendants.
+  let node : SkgNode = skgnode_from_section_tree (tree, lines);
+  out . push (node);
   for child in &tree . children {
     collect_skgnodes (child, lines, out); }}
 
@@ -155,20 +163,22 @@ fn skgnode_from_section_tree (
   tree  : &SectionTree,
   lines : &[String],
 ) -> SkgNode {
+  // All sections have IDs after assign_missing_ids pre-pass.
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
-  // Collect :ID:-bearing children (transitively through non-:ID: intermediaries)
-  let mut contained_ids : Vec<ID> = Vec::new();
-  for child in &tree . children {
-    collect_contained_ids (child, &mut contained_ids); }
-  // Collect the line ranges of :ID:-bearing descendants to exclude from body.
-  let mut excluded_ranges : Vec<(usize, usize)> = Vec::new();
-  for child in &tree . children {
-    collect_id_descendant_ranges (child, &mut excluded_ranges); }
-  // Collect body: lines in [body_start..extent_end) not in excluded ranges.
+  let contained_ids : Vec<ID> =
+    tree . children . iter() . map (|child| {
+      let cid : &str =
+        child . section . id . as_ref() . unwrap();
+      ID::new (cid)
+    }) . collect();
+  // Body: lines from body_start to first child's headline (or extent_end).
+  let body_end : usize =
+    tree . children . first()
+      . map (|c| c . section . headline_line)
+      . unwrap_or (tree . extent_end);
   let body : Option<String> =
-    collect_body (lines, tree . section . body_start,
-                  tree . extent_end, &excluded_ranges);
+    collect_body (lines, tree . section . body_start, body_end);
   let aliases : Option<Vec<String>> =
     tree . section . roam_aliases . clone();
   SkgNode {
@@ -184,55 +194,14 @@ fn skgnode_from_section_tree (
     hides_from_its_subscriptions : None,
     overrides_view_of            : None, }}
 
-/// Collect IDs of :ID:-bearing descendants, transitively through
-/// non-:ID: intermediaries. Only the nearest :ID: descendants are
-/// collected — deeper :ID: sections are contained by their closest
-/// :ID: ancestor.
-fn collect_contained_ids (
-  tree : &SectionTree,
-  out  : &mut Vec<ID>,
-) {
-  if tree . section . id . is_some() {
-    let id_str : &str =
-      tree . section . id . as_ref() . unwrap();
-    out . push ( ID::new (id_str) ); }
-  else {
-    // No :ID: — look through to its children
-    for child in &tree . children {
-      collect_contained_ids (child, out); }}}
-
-/// Collect the [headline_line, extent_end) ranges of all
-/// :ID:-bearing descendant sections (at any depth).
-fn collect_id_descendant_ranges (
-  tree : &SectionTree,
-  out  : &mut Vec<(usize, usize)>,
-) {
-  if tree . section . id . is_some() {
-    // The entire extent of this :ID: section is excluded
-    // from the parent's body.
-    out . push ( (tree . section . headline_line,
-                  tree . extent_end) ); }
-  else {
-    // Non-:ID: section — recurse into children
-    // (the non-:ID: section's own lines stay in the parent's body)
-    for child in &tree . children {
-      collect_id_descendant_ranges (child, out); }}}
-
-/// Collect body text from lines[start..end), excluding any lines
-/// whose index falls in one of the excluded ranges.
 fn collect_body (
-  lines           : &[String],
-  start           : usize,
-  end             : usize,
-  excluded_ranges : &[( usize, usize )],
+  lines : &[String],
+  start : usize,
+  end   : usize,
 ) -> Option<String> {
   let mut body_lines : Vec<&str> = Vec::new();
   for i in start .. end . min (lines . len()) {
-    let excluded : bool =
-      excluded_ranges . iter() . any (
-        |(ex_start, ex_end)| i >= *ex_start && i < *ex_end );
-    if ! excluded {
-      body_lines . push (&lines[i]); }}
+    body_lines . push (&lines[i]); }
   // Trim trailing empty lines
   while body_lines . last() . map_or (false, |l| l . trim() . is_empty() ) {
     body_lines . pop(); }
@@ -465,7 +434,7 @@ More body text.
                 Some ("  Child two body.") ); }
 
   #[test]
-  fn test_non_id_headline_folded_into_body () {
+  fn test_non_id_headline_becomes_node () {
     let content : &str = "\
 :PROPERTIES:
 :ID:       file-id
@@ -480,19 +449,29 @@ More body text.
       write_temp_org (content, "non-id-hl");
     let nodes : Vec<SkgNode> =
       parse_org_file (f . path());
-    assert_eq! (nodes . len(), 1);
+    // 3 nodes: file + headline + sub-headline
+    assert_eq! (nodes . len(), 3);
     assert_eq! (nodes[0] . title, "Parent");
-    // The non-:ID: headline and its contents become body
-    let body : &str = nodes[0] . body . as_ref() . unwrap();
-    assert! (body . contains ("just a regular headline"));
-    assert! (body . contains ("Some text under it."));
-    assert! (body . contains ("sub-headline"));
-    assert! (body . contains ("More text.")); }
+    assert_eq! (nodes[0] . ids, vec![ ID::new ("file-id") ]);
+    let contained : &Vec<ID> =
+      nodes[0] . contains . as_ref() . unwrap();
+    assert_eq! (contained . len(), 1);
+    assert! (nodes[0] . body . is_none());
+    // Headline node (generated ID)
+    assert_eq! (nodes[1] . title, "just a regular headline");
+    assert_eq! (nodes[1] . body . as_deref(),
+                Some ("  Some text under it.") );
+    let hl_contained : &Vec<ID> =
+      nodes[1] . contains . as_ref() . unwrap();
+    assert_eq! (hl_contained . len(), 1);
+    // Sub-headline node
+    assert_eq! (nodes[2] . title, "sub-headline");
+    assert_eq! (nodes[2] . body . as_deref(),
+                Some ("   More text.") ); }
 
   #[test]
   fn test_id_headline_under_non_id_headline () {
-    // :ID: child under a non-:ID: intermediary is still
-    // contained by the nearest :ID: ancestor.
+    // Every headline is a node. file→intermediary→deep-child.
     let content : &str = "\
 :PROPERTIES:
 :ID:       file-id
@@ -509,16 +488,24 @@ More body text.
       write_temp_org (content, "transitive");
     let nodes : Vec<SkgNode> =
       parse_org_file (f . path());
-    assert_eq! (nodes . len(), 2);
-    // Root should contain deep-child transitively
-    let contained : &Vec<ID> =
+    // 3 nodes: file, intermediary, deep-child
+    assert_eq! (nodes . len(), 3);
+    // Root contains intermediary (generated ID)
+    let root_contained : &Vec<ID> =
       nodes[0] . contains . as_ref() . unwrap();
-    assert_eq! (contained, &vec![ ID::new ("deep-child") ]);
-    // The intermediary headline is in root's body
-    let body : &str = nodes[0] . body . as_ref() . unwrap();
-    assert! (body . contains ("intermediary (no ID)"));
-    // But the deep-child section is NOT in root's body
-    assert! (! body . contains ("Deep child body.")); }
+    assert_eq! (root_contained . len(), 1);
+    assert! (nodes[0] . body . is_none());
+    // Intermediary contains deep-child
+    assert_eq! (nodes[1] . title, "intermediary (no ID)");
+    let mid_contained : &Vec<ID> =
+      nodes[1] . contains . as_ref() . unwrap();
+    assert_eq! (mid_contained . len(), 1);
+    assert_eq! (mid_contained[0], ID::new ("deep-child"));
+    // Deep child
+    assert_eq! (nodes[2] . title, "actual child");
+    assert_eq! (nodes[2] . ids, vec![ ID::new ("deep-child") ]);
+    assert_eq! (nodes[2] . body . as_deref(),
+                Some ("   Deep child body.") ); }
 
   #[test]
   fn test_roam_aliases () {
@@ -615,8 +602,7 @@ Some text.
 
   #[test]
   fn test_power_org_structure () {
-    // Simulates the structure of power.org:
-    // file-level :ID:, with some :ID: headlines and some without.
+    // Every headline becomes a node: file + 5 headlines = 6 nodes.
     let content : &str = "\
 :PROPERTIES:
 :ID:       b9775088-1bd9-490f-a062-c6cfd189b65d
@@ -637,25 +623,73 @@ Some text.
       write_temp_org (content, "power");
     let nodes : Vec<SkgNode> =
       parse_org_file (f . path());
-    // Should produce 2 nodes: file-level and "the feeling of forcing it"
-    assert_eq! (nodes . len(), 2);
+    assert_eq! (nodes . len(), 6);
     // File-level node
     assert_eq! (nodes[0] . title, "energy");
     assert_eq! (nodes[0] . aliases . as_ref() . unwrap(),
                 &vec!["energy", "power", "force", "work", "strength"]);
+    let file_contained : &Vec<ID> =
+      nodes[0] . contains . as_ref() . unwrap();
+    assert_eq! (file_contained . len(), 3);
+    // The :ID: child's contained ID is known
+    assert_eq! (file_contained[1],
+                ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90"));
+    assert! (nodes[0] . body . is_none());
+    // "see also" headline
+    assert_eq! (nodes[1] . title,
+                "see also [[id:80cfe814][constraint]]");
+    assert! (nodes[1] . body . is_none());
+    assert! (nodes[1] . contains . is_none());
+    // "the feeling of forcing it" — has :ID: and 2 sub-headlines
+    assert_eq! (nodes[2] . title, "the feeling of forcing it");
+    assert_eq! (nodes[2] . ids,
+                vec![ ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90") ]);
+    let forcing_contained : &Vec<ID> =
+      nodes[2] . contains . as_ref() . unwrap();
+    assert_eq! (forcing_contained . len(), 2);
+    assert! (nodes[2] . body . is_none());
+    // Sub-headlines of "the feeling of forcing it"
+    assert_eq! (nodes[3] . title, "It might be entirely avoidable.");
+    assert_eq! (nodes[4] . title,
+                "It might be a useful last resort sometimes.");
+    // "etymology" headline
+    assert_eq! (nodes[5] . title, "etymology : sociology, physics");
+    assert_eq! (nodes[5] . body . as_deref(),
+                Some ("  Power implies choice; energy, only possibility.") );
+    assert! (nodes[5] . contains . is_none()); }
+
+  #[test]
+  fn test_music_and_consciousness () {
+    let content : &str = "\
+:PROPERTIES:
+:ID:       01104862
+:END:
+#+title: music & consciousness
+= things about consciousness that music highlights
+* [[id:39029f2f][Effort and observation are somewhat disjunctive.]]
+* [[id:681da8ea][Music illuminates (the?) infinite nature of want.]]
+";
+    let f : tempfile::NamedTempFile =
+      write_temp_org (content, "music");
+    let nodes : Vec<SkgNode> =
+      parse_org_file (f . path());
+    // 3 nodes: file + 2 headlines
+    assert_eq! (nodes . len(), 3);
+    // File node
+    assert_eq! (nodes[0] . title, "music & consciousness");
+    assert_eq! (nodes[0] . ids, vec![ ID::new ("01104862") ]);
+    assert_eq! (nodes[0] . body . as_deref(),
+                Some ("= things about consciousness that music highlights") );
     let contained : &Vec<ID> =
       nodes[0] . contains . as_ref() . unwrap();
-    assert_eq! (contained . len(), 1);
-    assert_eq! (contained[0],
-                ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90"));
-    // File body should include non-:ID: headlines but not :ID: sections
-    let body : &str = nodes[0] . body . as_ref() . unwrap();
-    assert! (body . contains ("see also"));
-    assert! (body . contains ("etymology"));
-    assert! (! body . contains ("entirely avoidable"));
-    // :ID: child node
-    assert_eq! (nodes[1] . title, "the feeling of forcing it");
-    let child_body : &str = nodes[1] . body . as_ref() . unwrap();
-    assert! (child_body . contains ("entirely avoidable"));
-    assert! (child_body . contains ("useful last resort")); }
+    assert_eq! (contained . len(), 2);
+    // Headline nodes — titles preserve the [[id:...][...]] links
+    assert_eq! (nodes[1] . title,
+                "[[id:39029f2f][Effort and observation are somewhat disjunctive.]]");
+    assert! (nodes[1] . body . is_none());
+    assert! (nodes[1] . contains . is_none());
+    assert_eq! (nodes[2] . title,
+                "[[id:681da8ea][Music illuminates (the?) infinite nature of want.]]");
+    assert! (nodes[2] . body . is_none());
+    assert! (nodes[2] . contains . is_none()); }
 }

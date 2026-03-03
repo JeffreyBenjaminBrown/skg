@@ -12,6 +12,7 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 use tantivy::{schema, Index};
 use typedb_driver::{
   Credentials,
@@ -97,14 +98,18 @@ async fn populate_typedb_from_nodes (
   define_schema (
     & config . db_name,
     driver ) . await ?;
+  let t0 : Instant = Instant::now();
   create_all_nodes (
     & config . db_name,
     driver,
     nodes ) . await ?;
+  println! ("  nodes: {:.1}s", t0 . elapsed() . as_secs_f64());
+  let t1 : Instant = Instant::now();
   create_all_relationships (
     & config . db_name,
     driver,
     nodes ) . await ?;
+  println! ("  relationships: {:.1}s", t1 . elapsed() . as_secs_f64());
   Ok (( )) }
 
 pub fn initialize_tantivy_from_nodes (

@@ -12,6 +12,7 @@
 /bash/kill-servers.sh
 /call-trees
 /claude-tries-skg
+/data/*/*/skg
 /data/*/skg
 /data/default/skg2/
 /devel-handy/temp.org

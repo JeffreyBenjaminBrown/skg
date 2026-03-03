@@ -11,6 +11,7 @@ use std::collections::{ HashSet, BTreeSet };
 use std::error::Error;
 use typedb_driver::{
   Transaction,
+  TransactionOptions,
   TransactionType,
   TypeDBDriver,
 };
@@ -27,9 +28,13 @@ pub async fn create_all_nodes (
   nodes   : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
 
+  let options : TransactionOptions =
+    TransactionOptions::new()
+      . transaction_timeout (std::time::Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
-    driver . transaction ( db_name,
-                         TransactionType::Write )
+    driver . transaction_with_options ( db_name,
+                                       TransactionType::Write,
+                                       options )
     . await ?;
   println!("Creating nodes ...");
   for node in nodes {

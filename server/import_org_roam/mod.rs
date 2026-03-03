@@ -6,7 +6,7 @@ use crate::types::skgnode::SkgNode;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 //
@@ -39,6 +39,11 @@ pub fn import_org_roam_directory (
   source     : &SourceName,
 ) -> Result<ImportStats, Box<dyn Error>> {
   fs::create_dir_all (output_dir)?;
+  for entry in fs::read_dir (output_dir)? { // Wipe existing .skg files to avoid orphans from previous runs.
+    let entry : fs::DirEntry = entry?;
+    let path : PathBuf = entry . path();
+    if path . extension() . map_or (false, |e| e == "skg") {
+      fs::remove_file (&path)?; }}
   let mut stats : ImportStats = ImportStats {
     files_read    : 0,
     nodes_written : 0,

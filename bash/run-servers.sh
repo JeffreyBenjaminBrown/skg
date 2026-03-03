@@ -1,12 +1,12 @@
 # USAGE:
 #   Default:
 #     ./bash/run-servers.sh
-#       uses data/default/skgconfig.toml
+#       uses data/real/skgconfig.toml
 #   Override, general:
 #     SKG_CONFIG=another_skg_config ./bash/run-servers.sh
-#   Override, my usual:
-#     SKG_CONFIG=data/subscribe/skgconfig.toml ./bash/run-servers.sh
-SKG_CONFIG="${SKG_CONFIG:-data/default/skgconfig.toml}"
+#   Override, for dev/test data:
+#     SKG_CONFIG=data/default/skgconfig.toml ./bash/run-servers.sh
+SKG_CONFIG="${SKG_CONFIG:-data/real/skgconfig.toml}"
 
 # USAGE:
 #   Start

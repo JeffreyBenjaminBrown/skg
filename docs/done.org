@@ -1,10 +1,78 @@
-* Next, let's import it.
-  This will be a commitment for me --
-  translating changes I make in skg to changes in org-roam seems hard.
+* org-roam import
+** first ask
+   Next, let's import it.
 
-  org-roam data maps onto
-  the containment and hyperlink relationships in typedb,
-  and what would be the synonym relationship in Tantivy
-    (:ROAM_ALIASES:)
-    if it reified relationships.
-  A UUID will need to be made for every headline.
+   This will be a commitment for me --
+   translating changes I make in skg to changes in org-roam seems hard.
+
+   org-roam data maps onto
+   the containment and hyperlink relationships in typedb,
+   and what would be the synonym relationship in Tantivy
+     (:ROAM_ALIASES:)
+     if it reified relationships.
+   A UUID will need to be made for every headline.
+** second
+Here's a file I opened from the result:
+```
+  title: music & consciousness
+  ids:
+  - 01104862-9949-4373-a7d3-5472596d0f99
+  body: |-
+    = things about consciousness that music highlights
+    * [[id:39029f2f-0f39-49fd-b6ad-e8be09859729][Effort and observation are somewhat disjunctive.]]
+    * [[id:681da8ea-6f33-4f55-9d47-67256f576955][Music illuminates (the?) infinite nature of want.]]
+```
+
+That came from this .org file:
+```
+  :PROPERTIES:
+  :ID:       01104862-9949-4373-a7d3-5472596d0f99
+  :END:
+  #+title: music & consciousness
+  = things about consciousness that music highlights
+  * [[id:39029f2f-0f39-49fd-b6ad-e8be09859729][Effort and observation are somewhat disjunctive.]]
+  * [[id:681da8ea-6f33-4f55-9d47-67256f576955][Music illuminates (the?) infinite nature of want.]]
+```
+
+You've treated every headline as if it's body text.
+
+That one source .org file should instead become three files.
+One is 'music & consciousness', which has an ID.
+The other two will need IDs generated.
+This is true of every headline without a property bucket.
+The link in the text of the headline is not its ID;
+rather, that entire link (so ID and label)
+should become the title text of the resulting new node,
+which needs an ID generated.
+
+The relationship from file title to top-level headlines
+is the same as the relationship from headlines to their children.
+That is the containment relationship in TypeDB.
+The distinction between file and node will vanish.
+** third
+   Great! Now can you set me up to use data/real/
+   You'll have to set it up like data/default/?
+   with a config aware of the (for now) one repo public/.
+   Also please modify
+     elisp/USAGE.md
+     and
+     bash/run-servers.sh
+   to default to that data now.
+** fourth
+   I restarted the servers (./bash/run-servers.sh)
+   and for the first time in this Emacs session
+   initialized (elisp/USAGE.md) and ran
+   (skg-request-title-matches "the")
+   I get "No matches found." no matter what I search for.
+   Both the titles and the ROAM_ALIASES field should be indexed.
+   The title should index as a single title,
+   but the ROAM_ALIASES field should parse as any number of them,
+   as delineated by whitespace:
+   :ROAM_ALIASES: jbb
+   would give a single title, 'jbb';
+   :ROAM_ALIASES: jbb cats
+   would give two, and
+   :ROAM_ALIASES: jbb "a b" cats "c d"
+   would give four.
+** fifth
+   Hahaha my bad, on it.
