@@ -1,3 +1,4 @@
+pub mod all_graphnodestats;
 pub mod contains_from_pids;
 pub mod count_relationships;
 pub mod hidden_in_subscribee_content;

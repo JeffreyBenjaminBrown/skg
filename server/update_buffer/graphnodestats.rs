@@ -1,10 +1,4 @@
-use crate::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use crate::dbs::typedb::search::count_relationships::{
-  count_containers,
-  count_contents,
-  count_link_sources,
-  has_subscribes,
-  has_overrides};
+use crate::dbs::typedb::search::all_graphnodestats::{fetch_all_graphnodestats, AllGraphNodeStats};
 use crate::serve::timing_log::{timed, timed_async};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
@@ -15,16 +9,6 @@ use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use ego_tree::{NodeId, Tree};
 use typedb_driver::TypeDBDriver;
-
-/// Each of these describes some kind of relationship,
-/// for each of a view's nodes.
-struct MapsFromIdForView {
-  has_subscribes : HashSet < ID >,
-  has_overrides  : HashSet < ID >,
-  num_containers : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'contained' role
-  num_contents : HashMap < ID, usize >, // number of contains relationships for which the node plays the 'container' role
-  num_links_in : HashMap < ID, usize >, // number of textlinks relationship for which the node plays the 'target' role
-}
 
 /// Enrich all nodes in a forest with graphStats from TypeDB.
 /// Also fetches and returns the containment maps, which callers
@@ -40,75 +24,27 @@ pub async fn set_graphnodestats_in_forest (
   let pids : Vec < ID > =
     timed ( config, "collect_ids_from_tree",
             || collect_ids_from_tree (forest));
-  let ( rel_data,
-        ( container_to_contents, content_to_containers ))
-    : ( MapsFromIdForView,
-        ( HashMap < ID, HashSet < ID > >,
-          HashMap < ID, HashSet < ID > > ))
-    = tokio::try_join! (
-        timed_async ( config, "fetch_relationship_data",
-          fetch_relationship_data (
-            driver, & config . db_name, & pids, config )),
-        timed_async ( config, "contains_from_pids",
-          contains_from_pids (
-            & config . db_name, driver, & pids )),
-      ) ?;
+  let stats : AllGraphNodeStats =
+    timed_async ( config, "fetch_all_graphnodestats",
+      fetch_all_graphnodestats (
+        & config . db_name, driver, & pids )) . await ?;
   let root_treeid : NodeId = forest . root () . id ();
   timed ( config, "set_graphnodestats_recursive",
           || set_metadata_relationships_in_node_recursive (
                forest,
                root_treeid,
-               & rel_data,
+               & stats,
                map,
                config ));
-  Ok (( container_to_contents,
-        content_to_containers )) }
-
-/// Run five batch queries IN PARALLEL to fetch all relationship data
-/// for the given PIDs. Before parallelisation these ran sequentially
-/// at ~4s each, totalling ~20s.
-async fn fetch_relationship_data (
-  driver  : &TypeDBDriver,
-  db_name : &str,
-  pids    : &[ID],
-  config  : &SkgConfig,
-) -> Result < MapsFromIdForView, Box<dyn Error> > {
-  let ( num_containers,
-        num_contents,
-        num_links_in,
-        has_subscribes_map,
-        has_overrides_map )
-    : ( HashMap < ID, usize >,
-        HashMap < ID, usize >,
-        HashMap < ID, usize >,
-        HashSet < ID >,
-        HashSet < ID > )
-    = tokio::try_join! (
-        timed_async ( config, "count_containers",
-          count_containers ( db_name, driver, pids )),
-        timed_async ( config, "count_contents",
-          count_contents ( db_name, driver, pids )),
-        timed_async ( config, "count_link_sources",
-          count_link_sources ( db_name, driver, pids )),
-        timed_async ( config, "has_subscribes",
-          has_subscribes ( db_name, driver, pids )),
-        timed_async ( config, "has_overrides",
-          has_overrides ( db_name, driver, pids )),
-      ) ?;
-  Ok ( MapsFromIdForView {
-    has_subscribes : has_subscribes_map,
-    has_overrides  : has_overrides_map,
-    num_containers,
-    num_contents,
-    num_links_in,
-  }) }
+  Ok (( stats . container_to_contents,
+        stats . content_to_containers )) }
 
 fn set_metadata_relationships_in_node_recursive (
-  tree     : &mut Tree<ViewNode>,
-  treeid   : NodeId,
-  rel_data : &MapsFromIdForView,
-  map      : &mut SkgNodeMap,
-  config   : &SkgConfig,
+  tree   : &mut Tree<ViewNode>,
+  treeid : NodeId,
+  stats  : &AllGraphNodeStats,
+  map    : &mut SkgNodeMap,
+  config : &SkgConfig,
 ) {
   // PITFALL: Aliasing and extraIDs are computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
   let ( aliasing, extra_ids ) : ( bool, bool ) =
@@ -136,15 +72,15 @@ fn set_metadata_relationships_in_node_recursive (
       t . graphStats . aliasing = aliasing;
       t . graphStats . extraIDs = extra_ids;
       t . graphStats . overriding =
-        rel_data . has_overrides . contains (node_pid);
+        stats . has_overrides . contains (node_pid);
       t . graphStats . subscribing =
-        rel_data . has_subscribes . contains (node_pid);
+        stats . has_subscribes . contains (node_pid);
       t . graphStats . numContainers =
-        rel_data . num_containers . get (node_pid) . copied ();
+        stats . num_containers . get (node_pid) . copied ();
       t . graphStats . numContents =
-        rel_data . num_contents . get (node_pid) . copied ();
+        stats . num_contents . get (node_pid) . copied ();
       t . graphStats . numLinksIn =
-        rel_data . num_links_in . get (node_pid) . copied (); }
+        stats . num_links_in . get (node_pid) . copied (); }
   let child_treeids : Vec < NodeId > =
     tree . get (treeid) . unwrap ()
     . children () . map ( | c | c . id () ) . collect ();
@@ -152,6 +88,6 @@ fn set_metadata_relationships_in_node_recursive (
     set_metadata_relationships_in_node_recursive (
       tree,
       child_treeid,
-      rel_data,
+      stats,
       map,
       config ); } }

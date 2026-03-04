@@ -217,3 +217,38 @@ query complexity.
 
 For repeated views of the same node (common during editing),
 cache per-PID stats and invalidate on save.
+
+** Experiment 3: single combined query (fetch_all_graphnodestats)
+
+*** Changes made
+
+Replaced 6 separate TypeDB queries with a single combined
+query in 'all_graphnodestats.rs'. One match/fetch that returns
+all 5 relationship types per node, plus derives the
+contains_from_pids data from the same results.
+
+Simplifications over the old queries:
+- No extra_id disjunction (PIDs are always primary IDs here)
+- Uses $node directly in relationship match (no re-match by id)
+- One transaction instead of 6
+- No contention between concurrent reads
+
+*** Results
+
+#+begin_example
+* single_root_view: 4.424s
+** render_initial_forest_bfs: 0.107s
+** set_graphnodestats_in_forest: 4.316s
+*** collect_ids_from_tree: 0.000s
+*** fetch_all_graphnodestats: 4.315s    <<< single query
+*** set_graphnodestats_recursive: 0.000s
+** viewnode_forest_to_string: 0.000s
+#+end_example
+
+6.2s → 4.4s. Cumulative: 23.4s → 4.4s (5.3× speedup).
+
+*** Remaining bottleneck
+
+The single query still takes 4.3s. At this point, the
+bottleneck is TypeDB v3 query execution for a 24-way
+disjunction with 7 nested subqueries against ~28.7K nodes.
