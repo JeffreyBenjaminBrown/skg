@@ -34,11 +34,19 @@ pub async fn add_missing_info_to_forest(
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
       inherit_parent_source_if_possible (&mut node)?;
-      assign_new_id_if_absent (&mut node)?;
       Ok (( )) } )?;
   let root_id: NodeId = forest . root() . id();
   replace_ids_with_pids(
-    forest, root_id, db_name, driver, pool ) . await }
+    forest, root_id, db_name, driver, pool ) . await ?;
+  do_everywhere_in_tree_dfs(
+    // Assign new IDs after PID replacement, not before,
+    // so that fresh UUIDs don't trigger a pointless TypeDB lookup.
+    forest,
+    forest . root() . id(),
+    &mut |mut node| {
+      assign_new_id_if_absent (&mut node)?;
+      Ok (( )) } )?;
+  Ok (( )) }
 
 /// Make this a Scaffold::Alias
 /// if this is a TrueNode

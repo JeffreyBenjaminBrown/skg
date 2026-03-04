@@ -9,7 +9,7 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* saving is slow now
+* DONE saving is slow now
 ** 1
   If I add a child to the root of a view and save,
   the Emacs buffer updates by giving it (skg focused) metadata,
