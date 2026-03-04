@@ -1,9 +1,12 @@
-use crate::dbs::typedb::search::all_graphnodestats::{fetch_all_graphnodestats, AllGraphNodeStats};
+use crate::dbs::typedb::search::all_graphnodestats::{
+  fetch_all_graphnodestats,
+  graphnodestats_for_pid,
+  AllGraphNodeStats};
 use crate::serve::timing_log::{timed, timed_async};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -46,41 +49,22 @@ fn set_metadata_relationships_in_node_recursive (
   map    : &mut SkgNodeMap,
   config : &SkgConfig,
 ) {
-  // PITFALL: Aliasing and extraIDs are computed in a separate block, because skgnode_from_map_or_disk mutably borrows map, which prevents simultaneously holding a mutable borrow of tree (needed to write fields below).
-  let ( aliasing, extra_ids ) : ( bool, bool ) =
+  // PITFALL: Disk lookup (skgnode_from_map_or_disk) mutably borrows map, so it must happen in a separate block from the mutable tree borrow below.
+  let new_stats : Option < GraphNodeStats > =
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       if let ViewNodeKind::True (t)
         = & tree . get (treeid) . unwrap () . value () . kind
         { let skgnode_opt = skgnode_from_map_or_disk (
               &t . id, &t . source, map, config
             ) . ok ();
-          let aliasing = skgnode_opt . as_ref ()
-            . and_then ( |n| n . aliases . as_ref () )
-            . map ( |a| ! a . is_empty () )
-            . unwrap_or (false);
-          let extra_ids = skgnode_opt . as_ref ()
-            . map ( |n| n . ids . len () > 1 )
-            . unwrap_or (false);
-          ( aliasing, extra_ids ) }
-        else { ( false, false ) } // Scaff, Deleted, DeletedScaff
+          Some ( graphnodestats_for_pid (
+            &t . id, stats, skgnode_opt )) }
+        else { None } // Scaff, Deleted, DeletedScaff
     };
-  if let ViewNodeKind::True (t)
-    = &mut tree . get_mut (treeid) . unwrap () . value () . kind
-    { // Write all graphStats fields.
-      // PITFALL: These booleans are not populated for phantom nodes. Populating those would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
-      let node_pid : &ID = &t . id;
-      t . graphStats . aliasing = aliasing;
-      t . graphStats . extraIDs = extra_ids;
-      t . graphStats . overriding =
-        stats . has_overrides . contains (node_pid);
-      t . graphStats . subscribing =
-        stats . has_subscribes . contains (node_pid);
-      t . graphStats . numContainers =
-        stats . num_containers . get (node_pid) . copied ();
-      t . graphStats . numContents =
-        stats . num_contents . get (node_pid) . copied ();
-      t . graphStats . numLinksIn =
-        stats . num_links_in . get (node_pid) . copied (); }
+  if let Some (gs) = new_stats {
+    if let ViewNodeKind::True (t)
+      = &mut tree . get_mut (treeid) . unwrap () . value () . kind
+      { t . graphStats = gs; } }
   let child_treeids : Vec < NodeId > =
     tree . get (treeid) . unwrap ()
     . children () . map ( | c | c . id () ) . collect ();

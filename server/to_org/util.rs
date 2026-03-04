@@ -325,7 +325,7 @@ pub async fn build_node_branch_minus_content (
       _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
     };
   if config . timing_log {
-    push_manual_timing (
+    push_buffer_timing_entry_manually (
       config, &format! ("build_node_branch_minus_content({})", skgid),
       t0 . elapsed () ); }
   result }

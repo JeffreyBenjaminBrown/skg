@@ -14,6 +14,8 @@ use crate::dbs::typedb::util::concept_document::{
   extract_id_from_node,
   extract_id_from_map};
 use crate::types::misc::ID;
+use crate::types::skgnode::SkgNode;
+use crate::types::viewnode::GraphNodeStats;
 
 use futures::StreamExt;
 use std::collections::{HashMap, HashSet};
@@ -36,6 +38,33 @@ pub struct AllGraphNodeStats {
   pub container_to_contents : HashMap < ID, HashSet < ID > >,
   pub content_to_containers : HashMap < ID, HashSet < ID > >,
 }
+
+/// Extract GraphNodeStats for a single PID
+/// from AllGraphNodeStats and an optional disk SkgNode.
+pub fn graphnodestats_for_pid (
+  pid     : &ID,
+  stats   : &AllGraphNodeStats,
+  skgnode : Option<&SkgNode>,
+) -> GraphNodeStats {
+  let aliasing : bool =
+    skgnode
+    . and_then ( |n| n . aliases . as_ref () )
+    . map ( |a| ! a . is_empty () )
+    . unwrap_or (false);
+  let extra_ids : bool =
+    skgnode
+    . map ( |n| n . ids . len () > 1 )
+    . unwrap_or (false);
+  GraphNodeStats {
+    aliasing,
+    extraIDs      : extra_ids,
+    overriding    : stats . has_overrides  . contains (pid),
+    subscribing   : stats . has_subscribes . contains (pid),
+    numContainers : stats . num_containers . get (pid) . copied (),
+    numContents   : stats . num_contents   . get (pid) . copied (),
+    numLinksIn    : stats . num_links_in   . get (pid) . copied (),
+    containerwardPath : None,
+  } }
 
 /// Stats for a single PID, returned by 'fetch_one_pid_stats'.
 struct OnePidStats {

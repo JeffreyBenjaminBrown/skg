@@ -1,6 +1,8 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::search::all_graphnodestats::fetch_all_graphnodestats;
+use crate::dbs::typedb::search::all_graphnodestats::{
+  fetch_all_graphnodestats,
+  graphnodestats_for_pid};
 use crate::dbs::typedb::search::containerward_path_stats_bulk;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
@@ -77,16 +79,18 @@ fn generate_title_matches_response (
             best_matches,
             searcher,
             tantivy_index );
-        let stats_by_id : HashMap < String, GraphNodeStats > =
-          build_graphnodestats_for_ids (
-            & matches_by_id,
-            & source_by_id,
-            driver,
-            config );
-        format_matches_as_org_mode (
-          search_terms,
-          matches_by_id,
-          & stats_by_id ) }},
+        match build_graphnodestats_for_ids (
+          & matches_by_id,
+          & source_by_id,
+          driver,
+          config )
+        { Ok (stats_by_id) =>
+            format_matches_as_org_mode (
+              search_terms,
+              matches_by_id,
+              & stats_by_id ),
+          Err (e) =>
+            format! ("Error fetching graph stats: {}", e) } }},
     Err (e) => {
       format!("Error searching index: {}", e) }} }
 
@@ -136,7 +140,8 @@ fn build_graphnodestats_for_ids (
   source_by_id  : &HashMap < String, String >,
   driver        : &TypeDBDriver,
   config        : &SkgConfig,
-) -> HashMap < String, GraphNodeStats > {
+) -> Result < HashMap < String, GraphNodeStats >,
+             Box < dyn std::error::Error > > {
   let pids : Vec < ID > =
     matches_by_id . keys ()
     . map ( |id| ID::from ( id . clone () ))
@@ -153,48 +158,27 @@ fn build_graphnodestats_for_ids (
         containerward_path_stats_bulk (
           & config . db_name, driver, & pids );
       futures::join! ( typedb_future, path_future ) });
+  let ts = typedb_stats ?;
   let mut result : HashMap < String, GraphNodeStats > =
     HashMap::new ();
   for id_str in matches_by_id . keys () {
     let pid : ID = ID::from ( id_str . clone () );
-    // Disk stats: aliasing, extraIDs.
-    let ( aliasing, extra_ids ) : ( bool, bool ) =
+    let skgnode_opt =
       source_by_id . get (id_str)
-      . and_then ( |src| {
+      . and_then ( |src|
         skgnode_from_pid_and_source (
           config,
           pid . clone (),
           & SourceName::from ( src . clone () )
-        ) . ok () })
-      . map ( |node| {
-        let aliasing : bool =
-          node . aliases . as_ref ()
-          . map ( |a| ! a . is_empty () )
-          . unwrap_or (false);
-        let extra_ids : bool =
-          node . ids . len () > 1;
-        ( aliasing, extra_ids ) })
-      . unwrap_or (( false, false ));
+        ) . ok () );
     let mut stats : GraphNodeStats =
-      GraphNodeStats::default ();
-    stats . aliasing = aliasing;
-    stats . extraIDs = extra_ids;
-    if let Ok ( ref ts ) = typedb_stats {
-      stats . overriding =
-        ts . has_overrides . contains (&pid);
-      stats . subscribing =
-        ts . has_subscribes . contains (&pid);
-      stats . numContainers =
-        ts . num_containers . get (&pid) . copied ();
-      stats . numContents =
-        ts . num_contents . get (&pid) . copied ();
-      stats . numLinksIn =
-        ts . num_links_in . get (&pid) . copied (); }
+      graphnodestats_for_pid (
+        &pid, &ts, skgnode_opt . as_ref () );
     if let Ok ( ref pm ) = path_stats_map {
       if let Some (cp) = pm . get (&pid) {
         stats . containerwardPath = Some ( cp . clone () ); } }
     result . insert ( id_str . clone (), stats ); }
-  result }
+  Ok (result) }
 
 /// Formats grouped matches as an org-mode document.
 /// Sorts IDs by best score, and matches within each ID by score.
