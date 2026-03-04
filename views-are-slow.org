@@ -252,3 +252,30 @@ Simplifications over the old queries:
 The single query still takes 4.3s. At this point, the
 bottleneck is TypeDB v3 query execution for a 24-way
 disjunction with 7 nested subqueries against ~28.7K nodes.
+
+** Experiment 4: per-PID parallel queries (the breakthrough)
+
+*** Insight
+
+Single-node query: 15ms. 24-node disjunction query: 4300ms.
+TypeDB's disjunction handling scales very non-linearly.
+Instead of one big disjunction, run 24 tiny queries in parallel.
+
+*** Changes made
+
+Rewrote 'fetch_all_graphnodestats' to spawn one future per PID
+using 'futures::future::join_all'. Each future runs a single
+TypeDB query matching exactly one node (no disjunction at all).
+
+*** Results
+
+#+begin_example
+* single_root_view: 0.159s
+** render_initial_forest_bfs: 0.089s
+** set_graphnodestats_in_forest: 0.069s
+*** fetch_all_graphnodestats: 0.068s      <<< 24 parallel queries
+** viewnode_forest_to_string: 0.000s
+#+end_example
+
+23.4s → 0.16s total. 147× speedup.
+set_graphnodestats: 23.3s → 0.069s (338× speedup).

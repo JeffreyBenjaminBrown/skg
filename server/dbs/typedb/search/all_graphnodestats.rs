@@ -1,16 +1,16 @@
-/// PURPOSE: Fetch all graph-node statistics for a set of PIDs
-/// in a SINGLE TypeDB query with nested subqueries.
+/// PURPOSE: Fetch all graph-node statistics for a set of PIDs.
 ///
-/// Replaces 6 separate queries (count_containers, count_contents,
-/// count_link_sources, has_subscribes, has_overrides, contains_from_pids)
-/// with one combined fetch.
+/// Runs one TypeDB query PER PID, all in parallel.
+/// Each individual query is fast (~15ms) because it matches
+/// exactly one node. The old approach used a single query with
+/// an N-way disjunction, which scaled very non-linearly
+/// (1 PID: 15ms, 24 PIDs: 4300ms).
 ///
 /// PITFALL: Assumes input IDs are primary IDs, not extra IDs.
 /// This is always true for the graphnodestats path, which collects
 /// PIDs from the already-built viewnode tree.
 
 use crate::dbs::typedb::util::concept_document::{
-  build_id_disjunction,
   extract_id_from_node,
   extract_id_from_map};
 use crate::types::misc::ID;
@@ -26,8 +26,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-/// Everything 'set_graphnodestats_in_forest' needs from TypeDB,
-/// fetched in a single round-trip.
+/// Everything 'set_graphnodestats_in_forest' needs from TypeDB.
 pub struct AllGraphNodeStats {
   pub num_containers : HashMap < ID, usize >,
   pub num_contents   : HashMap < ID, usize >,
@@ -36,6 +35,18 @@ pub struct AllGraphNodeStats {
   pub has_overrides  : HashSet < ID >,
   pub container_to_contents : HashMap < ID, HashSet < ID > >,
   pub content_to_containers : HashMap < ID, HashSet < ID > >,
+}
+
+/// Stats for a single PID, returned by 'fetch_one_pid_stats'.
+struct OnePidStats {
+  pid            : ID,
+  num_containers : usize,
+  num_contents   : usize,
+  num_links_in   : usize,
+  subscribes     : bool,
+  overrides      : bool,
+  container_ids  : Vec < ID >,
+  content_ids    : Vec < ID >,
 }
 
 pub async fn fetch_all_graphnodestats (
@@ -55,6 +66,12 @@ pub async fn fetch_all_graphnodestats (
     }); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
+  let futures : Vec < _ > =
+    pids . iter ()
+    . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) )
+    . collect ();
+  let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
+    futures::future::join_all (futures) . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
   let mut num_links_in   : HashMap < ID, usize > = HashMap::new ();
@@ -64,22 +81,50 @@ pub async fn fetch_all_graphnodestats (
     HashMap::new ();
   let mut content_to_containers : HashMap < ID, HashSet < ID > > =
     HashMap::new ();
-  for pid in pids {
-    num_containers . insert ( pid . clone (), 0 );
-    num_contents   . insert ( pid . clone (), 0 );
-    num_links_in   . insert ( pid . clone (), 0 ); }
+  for result in results {
+    let s : OnePidStats = result ?;
+    num_containers . insert ( s . pid . clone (), s . num_containers );
+    num_contents   . insert ( s . pid . clone (), s . num_contents );
+    num_links_in   . insert ( s . pid . clone (), s . num_links_in );
+    if s . subscribes {
+      has_subscribes . insert ( s . pid . clone () ); }
+    if s . overrides {
+      has_overrides . insert ( s . pid . clone () ); }
+    for cid in s . container_ids {
+      if pid_set . contains (&cid) {
+        content_to_containers
+          . entry ( s . pid . clone () )
+          . or_insert_with (HashSet::new)
+          . insert (cid); }}
+    for cid in s . content_ids {
+      if pid_set . contains (&cid) {
+        container_to_contents
+          . entry ( s . pid . clone () )
+          . or_insert_with (HashSet::new)
+          . insert (cid); }}}
+  Ok ( AllGraphNodeStats {
+    num_containers,
+    num_contents,
+    num_links_in,
+    has_subscribes,
+    has_overrides,
+    container_to_contents,
+    content_to_containers,
+  }) }
+
+async fn fetch_one_pid_stats (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pid     : &ID,
+) -> Result < OnePidStats, Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-  let disjunction_clauses : String =
-    build_id_disjunction ( pids, "node_id" );
   let query : String =
     format! ( r#"match
-        $node isa node, has id $node_id;
-        {};
+        $node isa node, has id "{}";
         fetch {{
-          "node_id": $node_id,
           "containers": [
             match
               $c1 isa node, has id $c1id;
@@ -120,54 +165,47 @@ pub async fn fetch_all_graphnodestats (
             fetch {{ "id": $ovid }};
           ]
         }};"#,
-      disjunction_clauses );
+      pid );
+  let mut container_ids : Vec < ID > = Vec::new ();
+  let mut content_ids   : Vec < ID > = Vec::new ();
+  let mut num_containers : usize = 0;
+  let mut num_contents   : usize = 0;
+  let mut num_links_in   : usize = 0;
+  let mut subscribes     : bool = false;
+  let mut overrides      : bool = false;
   if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
     tx . query (query) . await ?
   { while let Some (doc_result) = stream . next () . await {
       let doc : ConceptDocument = doc_result ?;
       if let Some ( Node::Map ( ref map ) ) = doc . root {
-        let node_id_opt : Option < ID > =
-          map . get ("node_id")
-          . and_then (extract_id_from_node);
-        if let Some (node_id) = node_id_opt {
-          if let Some ( Node::List (list) ) =
-            map . get ("containers")
-          { num_containers . insert ( node_id . clone (), list . len () );
-            for item in list {
-              if let Some (cid) = extract_id_from_map ( item, "id" ) {
-                if pid_set . contains (&cid) {
-                  content_to_containers
-                    . entry ( node_id . clone () )
-                    . or_insert_with (HashSet::new)
-                    . insert (cid); }}}}
-          if let Some ( Node::List (list) ) =
-            map . get ("contents")
-          { num_contents . insert ( node_id . clone (), list . len () );
-            for item in list {
-              if let Some (cid) = extract_id_from_map ( item, "id" ) {
-                if pid_set . contains (&cid) {
-                  container_to_contents
-                    . entry ( node_id . clone () )
-                    . or_insert_with (HashSet::new)
-                    . insert (cid); }}}}
-          if let Some ( Node::List (list) ) =
-            map . get ("link_sources")
-          { num_links_in . insert ( node_id . clone (), list . len () ); }
-          if let Some ( Node::List (list) ) =
-            map . get ("subscribes_related")
-          { if ! list . is_empty () {
-              has_subscribes . insert ( node_id . clone () ); }}
-          if let Some ( Node::List (list) ) =
-            map . get ("overrides_related")
-          { if ! list . is_empty () {
-              has_overrides . insert ( node_id . clone () ); }}
-        }}}}
-  Ok ( AllGraphNodeStats {
+        if let Some ( Node::List (list) ) =
+          map . get ("containers")
+        { num_containers = list . len ();
+          for item in list {
+            if let Some (cid) = extract_id_from_map ( item, "id" ) {
+              container_ids . push (cid); }}}
+        if let Some ( Node::List (list) ) =
+          map . get ("contents")
+        { num_contents = list . len ();
+          for item in list {
+            if let Some (cid) = extract_id_from_map ( item, "id" ) {
+              content_ids . push (cid); }}}
+        if let Some ( Node::List (list) ) =
+          map . get ("link_sources")
+        { num_links_in = list . len (); }
+        if let Some ( Node::List (list) ) =
+          map . get ("subscribes_related")
+        { subscribes = ! list . is_empty (); }
+        if let Some ( Node::List (list) ) =
+          map . get ("overrides_related")
+        { overrides = ! list . is_empty (); }}}}
+  Ok ( OnePidStats {
+    pid : pid . clone (),
     num_containers,
     num_contents,
     num_links_in,
-    has_subscribes,
-    has_overrides,
-    container_to_contents,
-    content_to_containers,
+    subscribes,
+    overrides,
+    container_ids,
+    content_ids,
   }) }
