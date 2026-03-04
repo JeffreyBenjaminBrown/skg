@@ -8,6 +8,31 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* Containerward path graphnodestat.
+  There's currently code to get a containerward path.
+  Each can be described by three statistics:
+  the path length (minimum 0),
+  how many nodes are at the fork end (minimum 1),
+  and whether it cycles.
+
+  Let's add an optional field to graphnodestats
+  to convey those three values,
+  and for search results, compute them.
+  Also add a way to request them from any node,
+  similar to skg-request-containerward-view.
+  (Extract the duplicate code so that both definitions
+  can be in terms of the same higher-level function,
+  and swallow any similar definitions into the same HLF.)
+
+  Let's also explain to herald-minor-mode how to display them.
+  The token should be a blue 'fork\length',
+  where fork and length are integers,
+  and the \ is instead some symbol indicative of cycling
+  if there's a cycle, and 'fork' is omitted entirely if unity.
+* DONE skg search graphnodestats
+  When someone searches for a title,
+  the search results should include graphnodestats
+  in the metadata for each hit.
 * DONE skg-visit-next-id
 Let's have a function 'skg-visit-next-id'
 that just gets the next id like skg-next-id,

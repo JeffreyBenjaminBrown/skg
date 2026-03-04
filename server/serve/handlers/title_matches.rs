@@ -1,16 +1,20 @@
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::tantivy::search_index;
+use crate::dbs::typedb::search::all_graphnodestats::fetch_all_graphnodestats;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
-use crate::types::misc::{TantivyIndex, ID, SourceName};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, default_truenode};
+use crate::types::misc::{TantivyIndex, ID, SourceName, SkgConfig};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, GraphNodeStats, default_truenode};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 
+use futures::executor::block_on;
 use sexp::Sexp;
 use std::collections::HashMap;
-use std::net::TcpStream; // handles two-way communication
+use std::net::TcpStream;
 use tantivy::{Document, Searcher};
+use typedb_driver::TypeDBDriver;
 
-type MatchGroups =
+pub type MatchGroups =
   HashMap < String,              // ID
             Vec < ( f32,         // score
                     String ) >>; // title or alias
@@ -21,15 +25,19 @@ type MatchGroups =
 pub fn handle_title_matches_request (
   stream        : &mut TcpStream,
   request       : &str,
-  tantivy_index : &TantivyIndex ) {
-
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+  config        : &SkgConfig,
+) {
   match search_terms_from_request (request) {
     Ok (search_terms) => {
       send_response (
         stream,
         & generate_title_matches_response (
           &search_terms,
-          tantivy_index ) ); },
+          tantivy_index,
+          driver,
+          config )); },
     Err (err) => {
       let error_msg : String =
         format! (
@@ -50,34 +58,46 @@ pub fn handle_title_matches_request (
 /// each level-2 headline is a distinct matching node,
 /// and each level-3 headline is a distinct matching alias
 /// for its parent, if any exist.
-pub fn generate_title_matches_response (
+fn generate_title_matches_response (
   search_terms  : &str,
-  tantivy_index : &TantivyIndex)
-  -> String {
-
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+  config        : &SkgConfig,
+) -> String {
   match search_index ( tantivy_index,
                        search_terms ) {
     Ok (( best_matches, searcher )) => {
       if best_matches . is_empty () {
         "No matches found." . to_string ()
       } else {
-        format_matches_as_org_mode (
-          search_terms,
+        let ( matches_by_id, source_by_id )
+          : ( MatchGroups, HashMap < String, String > ) =
           group_matches_by_id (
             best_matches,
             searcher,
-            tantivy_index )) }},
+            tantivy_index );
+        let stats_by_id : HashMap < String, GraphNodeStats > =
+          build_graphnodestats_for_ids (
+            & matches_by_id,
+            & source_by_id,
+            driver,
+            config );
+        format_matches_as_org_mode (
+          search_terms,
+          matches_by_id,
+          & stats_by_id ) }},
     Err (e) => {
       format!("Error searching index: {}", e) }} }
 
-fn group_matches_by_id (
+pub fn group_matches_by_id (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
-  tantivy_index : &TantivyIndex )
-  -> MatchGroups {
-
+  tantivy_index : &TantivyIndex,
+) -> ( MatchGroups, HashMap < String, String > ) {
   let mut result_acc : MatchGroups =
     HashMap::new();
+  let mut source_acc : HashMap < String, String > =
+    HashMap::new ();
   for (score, doc_address) in best_matches {
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
@@ -92,22 +112,87 @@ fn group_matches_by_id (
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_text() )
             . map ( |s| s . to_string() );
+        let source_opt : Option < String > =
+          retrieved_doc
+            . get_first ( tantivy_index . source_field )
+            . and_then ( |v| v . as_text() )
+            . map ( |s| s . to_string() );
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
+          if let Some (source) = source_opt {
+            source_acc . entry (id . clone ())
+              . or_insert (source); }
           result_acc
             . entry (id)
             . or_insert_with (Vec::new)
             . push (( score, title )); }},
       Err (e) => { eprintln! (
         "Error retrieving document: {}", e ); }} }
-  result_acc }
+  ( result_acc, source_acc ) }
+
+/// Fetch graphnodestats from TypeDB and disk for all matched IDs.
+fn build_graphnodestats_for_ids (
+  matches_by_id : &MatchGroups,
+  source_by_id  : &HashMap < String, String >,
+  driver        : &TypeDBDriver,
+  config        : &SkgConfig,
+) -> HashMap < String, GraphNodeStats > {
+  let pids : Vec < ID > =
+    matches_by_id . keys ()
+    . map ( |id| ID::from ( id . clone () ))
+    . collect ();
+  // TypeDB stats: numContainers, numContents, numLinksIn,
+  // overriding, subscribing.
+  let typedb_stats =
+    block_on ( async {
+      fetch_all_graphnodestats (
+        & config . db_name, driver, & pids ) . await });
+  let mut result : HashMap < String, GraphNodeStats > =
+    HashMap::new ();
+  for id_str in matches_by_id . keys () {
+    let pid : ID = ID::from ( id_str . clone () );
+    // Disk stats: aliasing, extraIDs.
+    let ( aliasing, extra_ids ) : ( bool, bool ) =
+      source_by_id . get (id_str)
+      . and_then ( |src| {
+        skgnode_from_pid_and_source (
+          config,
+          pid . clone (),
+          & SourceName::from ( src . clone () )
+        ) . ok () })
+      . map ( |node| {
+        let aliasing : bool =
+          node . aliases . as_ref ()
+          . map ( |a| ! a . is_empty () )
+          . unwrap_or (false);
+        let extra_ids : bool =
+          node . ids . len () > 1;
+        ( aliasing, extra_ids ) })
+      . unwrap_or (( false, false ));
+    let mut stats : GraphNodeStats =
+      GraphNodeStats::default ();
+    stats . aliasing = aliasing;
+    stats . extraIDs = extra_ids;
+    if let Ok ( ref ts ) = typedb_stats {
+      stats . overriding =
+        ts . has_overrides . contains (&pid);
+      stats . subscribing =
+        ts . has_subscribes . contains (&pid);
+      stats . numContainers =
+        ts . num_containers . get (&pid) . copied ();
+      stats . numContents =
+        ts . num_contents . get (&pid) . copied ();
+      stats . numLinksIn =
+        ts . num_links_in . get (&pid) . copied (); }
+    result . insert ( id_str . clone (), stats ); }
+  result }
 
 /// Formats grouped matches as an org-mode document.
 /// Sorts IDs by best score, and matches within each ID by score.
-fn format_matches_as_org_mode (
+pub fn format_matches_as_org_mode (
   search_terms  : &str,
-  matches_by_id : MatchGroups
+  matches_by_id : MatchGroups,
+  stats_by_id   : &HashMap < String, GraphNodeStats >,
 ) -> String {
-
   let mut result : String =
     String::new();
   result . push_str (
@@ -125,14 +210,14 @@ fn format_matches_as_org_mode (
               SourceName::from ("search"),
               search_terms . to_string() ) } ), } )
     . expect ("TrueNode rendering never fails"));
-  let mut id_entries // Not a MatchGroups, b/c Vec != HashMap
+  let mut id_entries
     : Vec < ( String,               // ID
               Vec < ( f32,          // score
                       String ) >) > // title or alias
     = ( matches_by_id . into_iter()
         . map ( | (id, mut matches) | {
           // Sort matches within each ID by score
-          // (descending, os the first is the best).
+          // (descending, so the first is the best).
           matches . sort_by( |a, b|
                               b . 0 . partial_cmp (&a . 0) . unwrap() );
           (id, matches) } )
@@ -148,6 +233,10 @@ fn format_matches_as_org_mode (
           score_a }
     ) . unwrap () } );
   for (id, matches) in id_entries {
+    let graph_stats : GraphNodeStats =
+      stats_by_id . get (&id)
+      . cloned ()
+      . unwrap_or_default ();
     // First (best) match becomes level-2 headline
     let (score, title) : &(f32, String) = &matches[0];
     result . push_str (
@@ -159,6 +248,7 @@ fn format_matches_as_org_mode (
           kind    : ViewNodeKind::True (
             TrueNode {
               indefinitive : true,
+              graphStats : graph_stats . clone (),
               .. default_truenode (
                 ID::from(id . clone()),
                 SourceName::from ("search"),
@@ -176,6 +266,7 @@ fn format_matches_as_org_mode (
             kind    : ViewNodeKind::True (
               TrueNode {
                 indefinitive : true,
+                graphStats : graph_stats . clone (),
                 .. default_truenode (
                   ID::from(id . clone()),
                   SourceName::from ("search"),

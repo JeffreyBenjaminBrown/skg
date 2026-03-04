@@ -123,7 +123,9 @@ fn handle_emacs (
           } else if request_type == "title matches" {
             handle_title_matches_request( &mut stream,
                                           &request_header,
-                                          &tantivy_index);
+                                          &tantivy_index,
+                                          &typedb_driver,
+                                          config);
           } else if request_type == "verify connection" {
             handle_verify_connection_request(
               &mut stream);

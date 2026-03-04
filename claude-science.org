@@ -10,3 +10,17 @@ use (put 'mode-name 'completion-predicate #'ignore) after defining it.
 (defalias 'skg-id-copy 'skg-push-id-to-stack) makes skg-id-copy
 available as M-x skg-id-copy, inheriting the interactive spec
 from the target function. Both names work.
+
+** Methods
+
+*** Adding data to an existing pipeline
+When enriching an existing pipeline (e.g. adding graphnodestats to
+search results), the pattern is:
+1. Extract the new data source's IDs from the existing intermediate results
+2. Fetch the new data in bulk (parallel per-PID queries for TypeDB,
+   disk reads for .skg files)
+3. Build a lookup map (HashMap<ID, NewData>)
+4. Pass the map to the formatter, which looks up each ID
+
+This avoids restructuring the existing pipeline; the new data
+flows alongside it via a parallel map.
