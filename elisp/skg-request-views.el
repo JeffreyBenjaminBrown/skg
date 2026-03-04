@@ -22,9 +22,11 @@
   (skg--request-view 'aliases))
 
 (defun skg-request-containerward-view ()
-  "Edit metadata to request a containerward view for the headline at point." ;
+  "Edit metadata to request a containerward view for the headline at point,
+then immediately save the buffer so Rust processes the request."
   (interactive)
-  (skg--request-view 'containerwardView))
+  (skg--request-view 'containerwardView)
+  (skg-request-save-buffer))
 
 (defun skg-request-sourceward-view ()
   "Edit metadata to request a sourceward view for the headline at point."
