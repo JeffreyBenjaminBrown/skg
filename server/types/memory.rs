@@ -1,4 +1,5 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
+use crate::types::many_to_many::ManyToMany;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::{ViewUri, ViewNode, ViewNodeKind};
@@ -26,6 +27,7 @@ pub struct SkgnodesInMemory {
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewUri>> maintained alongside this one) for O(1) reverse lookups.
   pub id_resolver : HashMap<ID, (ID, SourceName)>, // TODO ? OPTIMIZE:
   // id_resolver is not yet wired into the render pipeline (which would require threading &mut SkgnodesInMemory through render_initial_forest_bfs and complete_viewtree). If pid_and_source_from_id remains a bottleneck after pool seeding, wire id_resolver into skgnode_and_viewnode_from_id, or apply the batch-query optimization from typedb-batching.org.
+  root_ids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 
 /// Invariant: all forest mutations must go through register_view /
@@ -45,7 +47,8 @@ impl SkgnodesInMemory {
     SkgnodesInMemory {
       pool        : HashMap::new (),
       views       : HashMap::new (),
-      id_resolver : HashMap::new () }}
+      id_resolver : HashMap::new (),
+      root_ids    : ManyToMany::new () }}
 
   pub fn viewuri_to_pids (
     &self,
@@ -62,12 +65,24 @@ impl SkgnodesInMemory {
     self . views . get (uri)
       . map ( |vs| &vs . forest ) }
 
+  pub fn view_uri_for_root_id (
+    &self,
+    id : &ID,
+  ) -> Option<&ViewUri> {
+    self . root_ids . get_right (id)
+      . and_then ( |uris| uris . iter () . next () ) }
+
   pub fn register_view (
     &mut self,
     uri    : ViewUri,
     forest : Tree<ViewNode>,
     pids   : &[ID],
-  ) { let state : ViewState =
+  ) { let rids : HashSet<ID> =
+        root_ids_from_forest ( &forest, &self . pool );
+      for rid in &rids {
+        self . root_ids . insert (
+          rid . clone (), uri . clone () ); }
+      let state : ViewState =
         ViewState { forest,
                     pids : pids . iter () . cloned () . collect () };
       self . views . insert ( uri, state ); }
@@ -83,6 +98,12 @@ impl SkgnodesInMemory {
           ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
           _ => None } )
         . collect ();
+      self . root_ids . remove_right (uri);
+      let rids : HashSet<ID> =
+        root_ids_from_forest ( &new_forest, &self . pool );
+      for rid in &rids {
+        self . root_ids . insert (
+          rid . clone (), uri . clone () ); }
       if let Some (vs)
         = self . views . get_mut (uri)
         { vs . forest = new_forest;
@@ -96,7 +117,8 @@ impl SkgnodesInMemory {
   pub fn unregister_view (
     &mut self,
     uri : &ViewUri,
-  ) { self . views . remove (uri);
+  ) { self . root_ids . remove_right (uri);
+      self . views . remove (uri);
       self . gc (); }
 
   pub fn views_containing (
@@ -125,6 +147,21 @@ impl SkgnodesInMemory {
 //
 // Functions
 //
+
+/// Collect all IDs (primary + extras) for every root TrueNode in a forest.
+/// A root TrueNode is a direct child of the BufferRoot scaffold.
+fn root_ids_from_forest (
+  forest : &Tree<ViewNode>,
+  pool   : &HashMap<ID, SkgNode>,
+) -> HashSet<ID> {
+  let mut ids : HashSet<ID> = HashSet::new ();
+  for child in forest . root () . children () {
+    if let ViewNodeKind::True (t) = &child . value () . kind {
+      ids . insert ( t . id . clone () );
+      if let Some (skgnode) = pool . get ( &t . id ) {
+        for extra_id in &skgnode . ids {
+          ids . insert ( extra_id . clone () ); }}}}
+  ids }
 
 /// Extract SkgNode for an ViewNode from the map (tried first) or disk.
 /// Updates the map if needed.

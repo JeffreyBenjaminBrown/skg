@@ -9,10 +9,47 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* no clobbering views when visiting a link
+* saving is slow now
+  If I add a child to the root of a view and save,
+  the Emacs buffer updates by giving it (skg focused) metadata,
+  and then waits a few seconds before the server responds.
+  This requires a profiling investigation.
+  Feel free to add timing inquiries to more code,
+  to extend how things are logged,
+  to run standalone experiments (e.g. to explore TypeDB behavior).
+  Be creative. Periodically consider changing tack.
+  Build claude-science.org as you go.
+  If any branch of that (e.g. the typedb language exploration)
+  gets big enough to start slowing you down,
+  feel free to move that stuff to a new .org file in claude-science/,
+  leaving a link to it in claude-science.org.
+* more things should probably preserve preexisting views
+  the way 'skg-visit-link' does.
+* replace term: 'integration' -> 'assimilation'
+  The term 'integrate' is used in a few different senses in this code.
+  One of them is to integrate another user's notes into your own.
+  Whenever it is used that way, I would like to change it
+  to use the word 'assimilate'. (And similarly for the same root word
+  with different endings.) This is mostly in the documentation --
+  I'm not sure 'inegration' in that sense has ever been used
+  in the code itself. Anyway, please search
+  (fuzzily, because I make typos)
+  for every instance of the string 'integra',
+  and replace it when it is used that way.
+* DONE no clobbering views when visiting a link
   Currently 'skg-visit-link' opens a new buffer.
   If the new buffer has the same title as a preexisting one,
   it clobbers the old one.
+
+  Better would be if the memory (see server/types/memory.rs)
+  kept a list of all the IDs (primary and, if any, extra)
+  associated with every root in a given view.
+  (So far the user can only open a view with one root,
+  but they can edit it to have multiple roots.)
+  'skg-visit-link' should only open a new view
+  if the ID is not one of the root IDs of any open view.
+  If it is, the server should just tell the client
+  to return to that view.
 * DONE override the ordinary save command
   In a skg content view (but not a skg search results buffer),
   C-x C-s should call skg-request-save-buffer,

@@ -28,6 +28,9 @@
 (defun skg-visit-link ()
   "If point is on an org-mode link like [[id:THE_ID][label]],
 request a single root content view from that ID.
+If that ID is already a root of an open view,
+switch to that view's buffer instead of opening a new one.
+(The server figures that out.)
 If point is not on a link, print a message and do nothing."
   (interactive)
   (let* ( ( pos ( point ))
