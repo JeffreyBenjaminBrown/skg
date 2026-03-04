@@ -8,7 +8,19 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* Containerward path graphnodestat.
+* containerwardPath
+  Currently a root is assigned a containerwardPath length of 1.
+  It sohuld be zero. In general, the value should be length - 1 --
+  that is, the length of the path after excluding its origin.
+
+  The metadata should not mention 'containerwardPath' at all for roots
+  -- that is, where length=0, fork=false and cycle=false.
+* DONE graphnodestats in herald minor mode are weird
+  They look likee  '\342\244\212'.
+  I suspect unicode is being degraded to ASCII and not reverted.
+  (My emacs is able to show funny symbols,
+  so I don't *think* it's a client config problem.)
+* DONE containerward path graphnodestat
   There's currently code to get a containerward path.
   Each can be described by three statistics:
   the path length (minimum 0),
@@ -29,6 +41,21 @@ If anything blocks your progress that needs my attention, ping me.
   where fork and length are integers,
   and the \ is instead some symbol indicative of cycling
   if there's a cycle, and 'fork' is omitted entirely if unity.
+** recursive properties in TypeQL
+   Does TypeQL have a good way to express these functions?
+   I'll use Haskell notation
+   - root :: node -> bool, true if node plays not the content role
+   - fork :: node -> bool, true if it plays that role more than once
+   - cycle :: node -> bool, true if it is its own contains-ancestor
+   - self-contained :: node -> bool, true if it contains itself
+   - end-of-containerward-path :: node -> node. For any n, if root n, self-contained n, or fork n, then end-of-containerward-path n = n. Otherwise, it is equal to distinct-end-of-containerward-path n
+   - distinct-end-of-containerward-path :: node -> node. For any n, if root n or fork n or cycle m n, then distinct-end-of-containerward-path m = n. Otherwise it equals distinct-end-of-containerward-path m (container n), which we know exists because n is not a root or a fork.
+** containerward path typedb optimization
+ I suspect TypeDB can climb containerward in one query.
+ That would be cool. We would have to create a (rule? property?)
+ for identifying a root and a fork,
+ and then climb until whichever comes first:
+ a root, a fork or the origin.
 * DONE skg search graphnodestats
   When someone searches for a title,
   the search results should include graphnodestats

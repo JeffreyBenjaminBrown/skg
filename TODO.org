@@ -1,19 +1,21 @@
-* TODO don't default to rebuilding TypeDB
-Instead only rebuild those nodes whose files
-have been modified more recently than the db.
-* new AI testing strategy
-  I specify a feature. AI codes it.
-  Commit it *without reviewing*,
-    with UNREVIEWED prominent in the commit message.
-  I specify tests. AI debugs with the tests.
-  *Then* I review the code,
-    and maybe squash the last few commits into one.
+* to reload skg in Emacs
+(mapc (lambda (f) (load f t t)) (directory-files "~/hodal/skg/elisp" t "\\.el$"))
+* figure out how to work in parallel with Claude
+  Need two copies of the repo.
+  Claude advances features while I review older code.
+  When I commit, Claude pulls in those changes,
+  and fixes any merges that break.
 * TODO merge & export these notes
 ** DONE "TODO" items in this repo
 ** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
 ** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * internalizing
+** It is legitimate to commit before testing.
+   Even AI-generated code.
+   Just mark it so and test it in a later commit.
+   The later test will help straighten out the code
+   so that it is easier to review thereafter.
 ** don't erase discussion in plan until it is settled
 ** move 'merge' into the type containing 'save' and 'delete'.
 ** identify relevant extant tooling when asking for a given task

@@ -31,10 +31,11 @@
   "Display title search results from the Rust server."
   (with-current-buffer
       (get-buffer-create (skg-search-buffer-name search-terms))
-    (let ((inhibit-read-only t))
+    (let* ((inhibit-read-only t)
+           (decoded (string-trim (decode-coding-string string 'utf-8 t))))
       (erase-buffer)
-      (insert (string-trim string))
-      (when (> (length (string-trim string)) 0)
+      (insert decoded)
+      (when (> (length decoded) 0)
         (insert "\n"))
       (org-mode)
       (heralds-minor-mode)
