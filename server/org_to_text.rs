@@ -161,9 +161,10 @@ fn true_node_metadata_to_string (
       if true_node . graphStats . subscribing {
         parts . push ( "subscribing" . to_string () ); }
       if let Some (ref cp) = true_node . graphStats . containerwardPath {
-        parts . push (
-          format! ( "(containerwardPath {})",
-                    cp . to_display_atom () )); }
+        if cp . length > 0 || cp . forks > 1 || cp . cycles { // If none of those fires, the node is a root, so don't report is containerwardPath stats.
+          parts . push (
+            format! ( "(containerwardPath {})",
+                      cp . to_display_atom () )); }}
       if parts . is_empty () { None }
       else { Some ( format! (
                "(graphStats {})", parts . join (" ") )) }}

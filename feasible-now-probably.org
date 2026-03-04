@@ -1,17 +1,18 @@
 Each of these should be a separate commit.
 Mark one 'DONE' and leave it in place you finish it.
 It is valid to mark nested headlines DONE,
-and to commit at subheadlines if the changes seem big enough to deserve it.
+and even to commit upon completing a subheadline,
+if the changes seem big enough to deserve it.
 Better to work through the top-level headlines sequentially, though,
 so that ranges in the git commit history do not needlessly mix topics.
 
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* containerwardPath
+* DONE containerwardPath
   Currently a root is assigned a containerwardPath length of 1.
-  It sohuld be zero. In general, the value should be length - 1 --
-  that is, the length of the path after excluding its origin.
+  It sohuld be zero. In general, the stat should be length(path) - 1,
+  because we exclude the origin from the length of the path.
 
   The metadata should not mention 'containerwardPath' at all for roots
   -- that is, where length=0, fork=false and cycle=false.

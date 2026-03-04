@@ -1,18 +1,18 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::search::all_graphnodestats::{
-  fetch_all_graphnodestats,
-  graphnodestats_for_pid};
+use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats, graphnodestats_for_pid, };
 use crate::dbs::typedb::search::containerward_path_stats_bulk;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
 use crate::types::misc::{TantivyIndex, ID, SourceName, SkgConfig};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, GraphNodeStats, default_truenode};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::skgnode::SkgNode;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, GraphNodeStats, ContainerwardPathStats, default_truenode};
 
 use futures::executor::block_on;
 use sexp::Sexp;
 use std::collections::HashMap;
+use std::error::Error;
 use std::net::TcpStream;
 use tantivy::{Document, Searcher};
 use typedb_driver::TypeDBDriver;
@@ -150,6 +150,9 @@ fn build_graphnodestats_for_ids (
   // overriding, subscribing.
   // Also compute containerward path stats in parallel.
   let ( typedb_stats, path_stats_map )
+    : ( Result < AllGraphNodeStats, Box < dyn Error > >,
+        Result < HashMap < ID, ContainerwardPathStats >,
+                 Box < dyn Error > > )
     = block_on ( async {
       let typedb_future =
         fetch_all_graphnodestats (
@@ -158,12 +161,12 @@ fn build_graphnodestats_for_ids (
         containerward_path_stats_bulk (
           & config . db_name, driver, & pids );
       futures::join! ( typedb_future, path_future ) });
-  let ts = typedb_stats ?;
+  let ts : AllGraphNodeStats = typedb_stats ?;
   let mut result : HashMap < String, GraphNodeStats > =
     HashMap::new ();
   for id_str in matches_by_id . keys () {
     let pid : ID = ID::from ( id_str . clone () );
-    let skgnode_opt =
+    let skgnode_opt : Option < SkgNode > =
       source_by_id . get (id_str)
       . and_then ( |src|
         skgnode_from_pid_and_source (

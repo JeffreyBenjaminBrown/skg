@@ -22,7 +22,7 @@ by evaluating the following (here, in Emacs):
 Now these commands can be evaluated (here, in Emacs):
 ```
   (skg-request-single-root-content-view-from-id "wut")
-  (skg-request-title-matches "doing")
+  (skg-request-title-matches "science")
     ;; try match, title, or second
   (skg-git-diff-toggle)
   (skg-verify-connection)
