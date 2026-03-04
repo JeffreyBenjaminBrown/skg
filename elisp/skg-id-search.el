@@ -8,7 +8,7 @@
 ;;;   skg-visit-previous-id
 ;;;   skg-next-id
 ;;;   skg-previous-id
-;;;   skg-push-id-to-stack
+;;;   skg-push-id-to-stack (alias: skg-id-copy)
 ;;;   skg-validate-id-stack-buffer
 ;;;   skg-replace-id-stack-from-buffer
 ;;;   skg-edit-id-stack
@@ -168,6 +168,8 @@ Does nothing if point is not within metadata or a link."
           (message "pushed (%s, %s) to skg-id-stack"
                    (skg--truncate-id id) label) )
       (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
+
+(defalias 'skg-id-copy 'skg-push-id-to-stack)
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
@@ -357,5 +359,9 @@ Head of stack (most recently pushed) appears at top of buffer."
 Overrides save to update `skg-id-stack' instead of writing to a file."
   :lighter " ID-Stack"
   :keymap skg-id-stack-mode-map)
+
+;; Hide from M-x: this mode is only activated
+;; programmatically by 'skg-edit-id-stack'.
+(put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)

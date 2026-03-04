@@ -1,0 +1,13 @@
+* Why skg-id-stack-mode appeared in M-x
+
+'define-minor-mode' always creates an interactive command — that's
+how Emacs minor modes work (users toggle them with M-x). There's no
+built-in way to make a minor mode non-interactive at definition time.
+
+Fixed by adding a completion-predicate after the definition:
+
+  (put 'skg-id-stack-mode 'completion-predicate #'ignore)
+
+This tells Emacs's completion machinery to exclude it from M-x
+results, while still letting 'skg-edit-id-stack' activate it
+programmatically.
