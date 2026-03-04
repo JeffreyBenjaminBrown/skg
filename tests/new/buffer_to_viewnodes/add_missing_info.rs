@@ -6,6 +6,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_f
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::misc::{SkgConfig, ID};
+use skg::types::memory::SkgNodeMap;
 use ego_tree::Tree;
 
 use std::error::Error;
@@ -55,7 +56,8 @@ async fn test_add_missing_info_logic (
   add_missing_info_to_forest(
     &mut after_adding_missing_info,
     &config . db_name,
-    driver ) . await ?;
+    driver,
+    &SkgNodeMap::new() ) . await ?;
   let expected_forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
@@ -128,7 +130,8 @@ async fn test_source_inheritance_logic (
   add_missing_info_to_forest(
     &mut actual_forest,
     &config . db_name,
-    driver ) . await ?;
+    driver,
+    &SkgNodeMap::new() ) . await ?;
   let expected_forest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 

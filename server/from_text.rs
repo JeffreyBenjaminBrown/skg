@@ -48,7 +48,7 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
     // For why, see the header comment of one of them,
     // 'find_buffer_errors_for_saving'.
     add_missing_info_to_forest (
-      & mut unchecked_forest, & config . db_name, driver )
+      & mut unchecked_forest, & config . db_name, driver, pool )
   ) . await . map_err (SaveError::DatabaseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =

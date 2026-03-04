@@ -6,6 +6,7 @@
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::viewnode::Scaffold;
 use crate::types::misc::{ID, SourceName};
+use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -22,9 +23,10 @@ use uuid::Uuid;
 /// 'supplement_none_fields_from_disk_if_save' does some of that, too,
 /// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_forest(
-  forest: &mut Tree<UncheckedViewNode>, // has BufferRoot at root
-  db_name: &str,
-  driver: &TypeDBDriver
+  forest  : &mut Tree<UncheckedViewNode>, // has BufferRoot at root
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pool    : &SkgNodeMap,
 ) -> Result<(), Box<dyn Error>> {
   do_everywhere_in_tree_dfs(
     forest,
@@ -36,7 +38,7 @@ pub async fn add_missing_info_to_forest(
       Ok (( )) } )?;
   let root_id: NodeId = forest . root() . id();
   replace_ids_with_pids(
-    forest, root_id, db_name, driver ) . await }
+    forest, root_id, db_name, driver, pool ) . await }
 
 /// Make this a Scaffold::Alias
 /// if this is a TrueNode

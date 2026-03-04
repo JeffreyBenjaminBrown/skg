@@ -63,7 +63,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let mut forest: Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (&buffer_text)?. 0;
     add_missing_info_to_forest(
-      &mut forest, &config . db_name, &driver) . await?;
+      &mut forest, &config . db_name, &driver,
+      &SkgNodeMap::new() ) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
         &forest, &config, &driver) . await?;
