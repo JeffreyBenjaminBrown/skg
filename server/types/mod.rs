@@ -8,6 +8,7 @@ pub mod phantom;
 pub mod viewnode;
 pub mod unchecked_viewnode;
 pub mod skgnode;
+pub mod many_to_many;
 pub mod memory;
 pub mod save;
 pub mod tree;

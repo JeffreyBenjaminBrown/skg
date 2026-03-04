@@ -38,22 +38,31 @@ Optional TCP-PROC allows reusing an existing connection."
 
 (defun skg-handle-content-view-sexp (tcp-proc sexp-string view-uri)
   "Parse and handle content view response s-exp: ((content ...) (errors ...)).
+If the server returns ((switch-to-view URI)) instead, switch to the
+existing buffer for that view rather than opening a new one.
 VIEW-URI is the pre-generated UUID to assign to the new buffer."
   (condition-case err
       (let* ((response (read sexp-string))
-             (content-value (cadr (assoc 'content response)))
-             (errors-list (cadr (assoc 'errors response))))
-        (when content-value ;; If content is not nil, open the buffer
-          (skg-open-org-buffer-from-text
-           tcp-proc content-value (skg-content-view-buffer-name
-                                   content-value)
-           view-uri))
-        (when ;; If there are errors, show them
-            (and errors-list (not (equal errors-list nil)))
-          (let ((errors-text (if (listp errors-list)
-                                 (mapconcat 'identity errors-list "\n\n")
-                               errors-list)))
-            (skg-show-save-warnings errors-text))))
+             (switch-uri (cadr (assoc 'switch-to-view response))))
+        (if switch-uri
+            ;; The requested ID is already a root of an open view.
+            (let ((buf (skg-find-buffer-by-uri switch-uri)))
+              (if buf
+                  (switch-to-buffer buf)
+                (message "skg: server said switch to view %s, but no buffer found" switch-uri)))
+          ;; Normal content view response.
+          (let ((content-value (cadr (assoc 'content response)))
+                (errors-list (cadr (assoc 'errors response))))
+            (when content-value
+              (skg-open-org-buffer-from-text
+               tcp-proc content-value (skg-content-view-buffer-name
+                                       content-value)
+               view-uri))
+            (when (and errors-list (not (equal errors-list nil)))
+              (let ((errors-text (if (listp errors-list)
+                                     (mapconcat 'identity errors-list "\n\n")
+                                   errors-list)))
+                (skg-show-save-warnings errors-text)) ))))
     (error
      (message "ERROR parsing content view response: %S" err)
      (message "Sexp string was: %S" sexp-string))))

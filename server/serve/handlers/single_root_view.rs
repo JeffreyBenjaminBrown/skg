@@ -11,7 +11,7 @@ use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewUri;
 
 use futures::executor::block_on;
-use sexp::Sexp;
+use sexp::{Sexp, Atom};
 use std::net::TcpStream; // handles two-way communication
 use typedb_driver::TypeDBDriver;
 
@@ -19,6 +19,8 @@ use typedb_driver::TypeDBDriver;
 /// generates an org view of that id's content (recursively),
 /// and sends the response to Emacs (length-prefixed).
 /// Response format: ((content "...") (errors ("error1" "error2" ...)))
+/// If the requested ID is already a root of an open view,
+/// returns ((switch-to-view "VIEW_URI")) instead of rendering.
 pub fn handle_single_root_view_request (
   stream        : &mut TcpStream,
   request       : &str,
@@ -30,6 +32,19 @@ pub fn handle_single_root_view_request (
     view_uri_from_request (request);
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
+      if let Some (existing_uri)
+        = conn_state . memory . view_uri_for_root_id ( &node_id )
+      { let switch_sexp : String =
+          Sexp::List ( vec! [
+            Sexp::List ( vec! [
+              Sexp::Atom ( Atom::S (
+                "switch-to-view" . to_string () )),
+              Sexp::Atom ( Atom::S (
+                existing_uri . 0 . clone () )) ] ) ] )
+          . to_string ();
+        send_response_with_length_prefix (
+          stream, &switch_sexp );
+        return; }
       let response_sexp : String =
         timed ( config, "single_root_view", || {
           block_on ( async {
