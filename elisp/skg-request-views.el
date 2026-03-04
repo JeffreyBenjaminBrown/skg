@@ -1,12 +1,14 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; Functions for requesting views (aliases, containerward, sourceward, definitive)
+;;; and stats (containerward stats)
 ;;; by adding metadata to the current headline and saving the buffer,
 ;;; allowing Rust to process the request during completion.
 ;;;
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-request-aliases-view ()
 ;;;   skg-request-containerward-view ()
+;;;   skg-request-containerward-stats ()
 ;;;   skg-request-sourceward-view ()
 ;;;   skg-request-definitive-view ()
 
@@ -22,11 +24,14 @@
   (skg--request-view 'aliases))
 
 (defun skg-request-containerward-view ()
-  "Edit metadata to request a containerward view for the headline at point,
-then immediately save the buffer so Rust processes the request."
+  "Request containerward view and save."
   (interactive)
-  (skg--request-view 'containerwardView)
-  (skg-request-save-buffer))
+  (skg--request-view-and-save 'containerwardView))
+
+(defun skg-request-containerward-stats ()
+  "Request containerward path stats and save."
+  (interactive)
+  (skg--request-view-and-save 'containerwardStats))
 
 (defun skg-request-sourceward-view ()
   "Edit metadata to request a sourceward view for the headline at point."
@@ -38,6 +43,11 @@ then immediately save the buffer so Rust processes the request."
 The node must be indefinitive and childless."
   (interactive)
   (skg--request-view 'definitiveView))
+
+(defun skg--request-view-and-save (view-token)
+  "Request VIEW-TOKEN and immediately save."
+  (skg--request-view view-token)
+  (skg-request-save-buffer))
 
 (defun skg--request-view
     (view-token) ;; 'aliases, 'containerwardView, or 'sourcewardView

@@ -160,6 +160,10 @@ fn true_node_metadata_to_string (
         parts . push ( "overriding" . to_string () ); }
       if true_node . graphStats . subscribing {
         parts . push ( "subscribing" . to_string () ); }
+      if let Some (ref cp) = true_node . graphStats . containerwardPath {
+        parts . push (
+          format! ( "(containerwardPath {})",
+                    cp . to_display_atom () )); }
       if parts . is_empty () { None }
       else { Some ( format! (
                "(graphStats {})", parts . join (" ") )) }}

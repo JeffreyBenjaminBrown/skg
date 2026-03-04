@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -355,6 +355,9 @@ fn parse_graphstats_sexp (
               value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid linksIn value: {}", value )) ? ); },
+          "containerwardPath" => {
+            stats . containerwardPath =
+              ContainerwardPathStats::from_display_atom (&value); },
           _ => { return Err ( format! ( "Unknown graphStats key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in graphStats"

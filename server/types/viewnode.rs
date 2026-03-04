@@ -78,18 +78,50 @@ impl TrueNode {
               Some (NodeDiffStatus::Removed)
             | Some (NodeDiffStatus::RemovedHere) ) }}
 
+/// Containerward path statistics: how a node relates to the
+/// container hierarchy (path length, fork count, cycle detection).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContainerwardPathStats {
+  pub length : usize,
+  pub forks  : usize,
+  pub cycles : bool,
+}
+
+impl ContainerwardPathStats {
+  pub fn to_display_atom (&self) -> String {
+    let sep : &str =
+      if self . cycles { "↻" } else { "⤊" };
+    if self . forks <= 1
+      { format! ( "{}{}", sep, self . length ) }
+    else
+      { format! ( "{}{}{}", self . forks, sep, self . length ) } }
+  pub fn from_display_atom (s: &str) -> Option<Self> {
+    // Parse "2⤊5", "⤊3", "2↻5", "↻3"
+    let (before, after, cycles) : (&str, &str, bool) =
+      if let Some (pos) = s . find ('⤊')
+        { ( &s[..pos], &s[pos + '⤊' . len_utf8 ()..], false ) }
+      else if let Some (pos) = s . find ('↻')
+        { ( &s[..pos], &s[pos + '↻' . len_utf8 ()..], true ) }
+      else { return None; };
+    let length : usize = after . parse () . ok () ?;
+    let forks : usize =
+      if before . is_empty () { 1 }
+      else { before . parse () . ok () ? };
+    Some ( ContainerwardPathStats { length, forks, cycles } ) } }
+
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
 /// regardless of where/how the node appears in a view.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphNodeStats {
-  pub aliasing      : bool, // whether it has aliases
-  pub extraIDs      : bool, // whether it has extra IDs (from merging)
-  pub overriding    : bool, // overrides *or* overridden, anywhere
-  pub subscribing   : bool, // subscriber *or* subscribee, anywhere
-  pub numContainers : Option<usize>,
-  pub numContents   : Option<usize>,
-  pub numLinksIn    : Option<usize>,
+  pub aliasing          : bool, // whether it has aliases
+  pub extraIDs          : bool, // whether it has extra IDs (from merging)
+  pub overriding        : bool, // overrides *or* overridden, anywhere
+  pub subscribing       : bool, // subscriber *or* subscribee, anywhere
+  pub numContainers     : Option<usize>,
+  pub numContents       : Option<usize>,
+  pub numLinksIn        : Option<usize>,
+  pub containerwardPath : Option<ContainerwardPathStats>,
 }
 
 /// View-specific statistics about a node.
@@ -149,6 +181,7 @@ pub enum EditRequest {
 pub enum ViewRequest {
   Aliases,
   Containerward,
+  ContainerwardStats,
   Sourceward,
   Definitive,
 }
@@ -241,10 +274,11 @@ impl Scaffold {
 impl ViewRequest {
   /// Single source of truth for ViewRequest <-> client string bijection.
   const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
-    ("aliases",          ViewRequest::Aliases),
-    ("containerwardView", ViewRequest::Containerward),
-    ("sourcewardView",   ViewRequest::Sourceward),
-    ("definitiveView",   ViewRequest::Definitive),
+    ("aliases",            ViewRequest::Aliases),
+    ("containerwardView",  ViewRequest::Containerward),
+    ("containerwardStats", ViewRequest::ContainerwardStats),
+    ("sourcewardView",     ViewRequest::Sourceward),
+    ("definitiveView",     ViewRequest::Definitive),
   ];
 
   /// String representation as used in client metadata.
@@ -338,13 +372,14 @@ impl FromStr for ViewRequest {
 impl Default for GraphNodeStats {
   fn default () -> Self {
     GraphNodeStats {
-      aliasing      : false,
-      extraIDs      : false,
-      overriding    : false,
-      subscribing   : false,
-      numContainers : Some (1),
-      numContents   : Some (0),
-      numLinksIn    : Some (0),
+      aliasing          : false,
+      extraIDs          : false,
+      overriding        : false,
+      subscribing       : false,
+      numContainers     : Some (1),
+      numContents       : Some (0),
+      numLinksIn        : Some (0),
+      containerwardPath : None,
     }} }
 
 impl Default for ViewNodeStats {

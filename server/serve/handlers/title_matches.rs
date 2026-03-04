@@ -1,6 +1,7 @@
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::search::all_graphnodestats::fetch_all_graphnodestats;
+use crate::dbs::typedb::search::containerward_path_stats_bulk;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
 use crate::types::misc::{TantivyIndex, ID, SourceName, SkgConfig};
@@ -142,10 +143,16 @@ fn build_graphnodestats_for_ids (
     . collect ();
   // TypeDB stats: numContainers, numContents, numLinksIn,
   // overriding, subscribing.
-  let typedb_stats =
-    block_on ( async {
-      fetch_all_graphnodestats (
-        & config . db_name, driver, & pids ) . await });
+  // Also compute containerward path stats in parallel.
+  let ( typedb_stats, path_stats_map )
+    = block_on ( async {
+      let typedb_future =
+        fetch_all_graphnodestats (
+          & config . db_name, driver, & pids );
+      let path_future =
+        containerward_path_stats_bulk (
+          & config . db_name, driver, & pids );
+      futures::join! ( typedb_future, path_future ) });
   let mut result : HashMap < String, GraphNodeStats > =
     HashMap::new ();
   for id_str in matches_by_id . keys () {
@@ -183,6 +190,9 @@ fn build_graphnodestats_for_ids (
         ts . num_contents . get (&pid) . copied ();
       stats . numLinksIn =
         ts . num_links_in . get (&pid) . copied (); }
+    if let Ok ( ref pm ) = path_stats_map {
+      if let Some (cp) = pm . get (&pid) {
+        stats . containerwardPath = Some ( cp . clone () ); } }
     result . insert ( id_str . clone (), stats ); }
   result }
 

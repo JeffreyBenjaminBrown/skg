@@ -11,6 +11,242 @@ use (put 'mode-name 'completion-predicate #'ignore) after defining it.
 available as M-x skg-id-copy, inheriting the interactive spec
 from the target function. Both names work.
 
+*** TypeQL v3: defining and querying node properties
+
+**** Value types
+TypeDB v3 supports: =string=, =integer=, =double=, =boolean=, =datetime=.
+NOT =long= (use =integer=). NOT =float= (use =double=).
+
+**** Attribute definition
+#+begin_example
+define
+  attribute depth, value integer;
+  entity node,
+    owns depth;
+#+end_example
+
+**** Cardinality
+Default =owns= is =@card(0..1)= — one value per attribute type.
+Adding a second value causes commit error [CNT5].
+For multi-valued: =owns nickname @card(0..);=.
+
+**** Reserved words
+=label= is reserved in TypeQL v3. Cannot use as identifier. ([DEX31])
+
+**** Querying by property value
+Exact match: =has tag "leaf"=
+Bind and compare: =has depth $d; $d > 1;=
+Boolean: =has is_root true=
+
+**** Bulk container lookup (key for optimization)
+Single query returning (contained, container) pairs for N nodes:
+#+begin_example
+match
+  $child isa node, has id $child_id;
+  {$child_id == "c";} or {$child_id == "d";} or {$child_id == "f";};
+  $parent isa node, has id $parent_id;
+  $rel isa contains (container: $parent, contained: $child);
+select $child_id, $parent_id;
+#+end_example
+Nodes with no container simply don't appear in results (root detection).
+Performance: 5 nodes ~143ms, 20 nodes ~156ms (nearly flat scaling).
+
+**** Fetch syntax (clean JSON output)
+#+begin_example
+fetch {
+  "contained": $child_id,
+  "container": $parent_id
+};
+#+end_example
+Returns ={ "contained": "c", "container": "a" }= per row.
+Nested subqueries return arrays:
+#+begin_example
+fetch {
+  "contents": [
+    match $child isa node, has id $cid;
+          $rel isa contains (container: $n, contained: $child);
+    fetch { "child_id": $cid };
+  ]
+};
+#+end_example
+
+**** Disjunction patterns and performance
+=$child_id == "x"= style (bind then compare) ~143ms for 5 nodes.
+=$contained has id "x"= style (attribute lookup) ~181ms for 5 nodes.
+The == style is faster because it compares already-bound values.
+
+PITFALL from all_graphnodestats.rs: complex nested fetch + large
+disjunction scales nonlinearly (1 PID: 15ms, 24 PIDs: 4300ms).
+Simple select + disjunction scales nearly linearly IN CONSOLE TESTS,
+but in-process the =or= pattern for extra_id fallback dominates:
+=find_containers_of_bulk= (N-way disjunction + =or= for extra_id):
+  10 nodes: ~4.2 seconds per query.
+=find_containers_of= (single node, =or= for extra_id):
+  10 nodes via join_all: ~450ms per level (~200ms per query).
+=find_container_ids_of_pid= (single node, no =or=, direct =has id=):
+  10 nodes via join_all: total path stats in ~500ms for 5 levels.
+Lesson: the extra_id =or= clause is very expensive.
+When you know inputs are primary IDs, skip it.
+
+**** Reduce (aggregation)
+=reduce $count = count;= — global count.
+=reduce $count = count groupby $child_id;= — grouped (one word: groupby).
+
+**** Update syntax (v3)
+Delete uses =has $var of $entity=:
+#+begin_example
+match $n isa node, has id "e", has tag $old_tag;
+delete has $old_tag of $n;
+insert $n has tag "leaf";
+#+end_example
+
+**** Computed values with let
+=let $doubled = $d * 2;= works after match clause.
+
+**** Optional match (try)
+#+begin_example
+try {
+  $parent isa node, has id $pid;
+  $rel isa contains (container: $parent, contained: $n);
+};
+#+end_example
+Returns empty $pid for nodes with no container. Both matched
+and unmatched rows are included in results.
+
+**** Shared variable joins
+Two entities sharing a variable are joined:
+=has depth $d= on both =$target= and =$sibling= finds same-depth nodes.
+
+**** Relation properties
+Relations can own attributes:
+=relation contains, owns weight;=
+Query: =$rel isa contains (...), has weight $w;=
+
+**** Identity vs equality
+=not { $c1 is $c2; }= tests identity (different instances).
+=$child_id == "c"= tests value equality.
+
+**** Entity inheritance
+=entity special_node sub node;= — subtypes inherit all owns/plays.
+
+*** TypeQL v3: recursive functions (=fun=)
+
+TypeDB v3.7.0 has NO rules (removed from v2). Instead it has =fun=.
+No =function= keyword — it's =fun=.
+
+**** Syntax
+#+begin_example
+define
+  fun ancestors($n: node) -> { node }:
+    match
+      { $rel isa contains (container: $anc, contained: $n); }
+      or {
+        let $mid in ancestors($n);
+        $rel2 isa contains (container: $anc, contained: $mid);
+      };
+    return { $anc };
+#+end_example
+
+**** Return types
+- Stream (multiple results): =-> { node }:= with =return { $var };=
+- Single value: =-> integer:= with =return first $var;=
+- Cannot return literals (=return { true };= fails — must return a variable)
+
+**** Recursive tabling
+TypeDB automatically tables recursive functions to break cycles.
+For a cycle h→i→h, =ancestors(h)= returns ={i, h}= — finite.
+The tabling mechanism prevents infinite recursion.
+
+**** Variable scoping in disjunctions
+Variables inside =not { }= or =try { }= or disjunction branches are locally scoped.
+Cannot reuse the same variable name across different =try= or =not= blocks.
+Must use unique names per branch ($r0, $r1a, $r2a, etc.).
+
+**** root, fork, end-of-containerward-path: all expressible
+
+**root** (uncontained):
+#+begin_example
+fun roots() -> { node }:
+  match
+    $n isa node;
+    not { $rel isa contains (contained: $n); };
+  return { $n };
+#+end_example
+
+**fork** (multiply contained):
+#+begin_example
+fun forks() -> { node }:
+  match
+    $n isa node;
+    $r1 isa contains (container: $c1, contained: $n);
+    $r2 isa contains (container: $c2, contained: $n);
+    not { $c1 is $c2; };
+  return { $n };
+#+end_example
+
+**end-of-containerward-path** (climb until root or fork):
+#+begin_example
+fun end_of_containerward_path_v2($n: node) -> { node }:
+  match
+    { not { $r0 isa contains (contained: $n); };
+      $n is $result;
+    } or
+    { $r1a isa contains (container: $c1a, contained: $n);
+      $r2a isa contains (container: $c2a, contained: $n);
+      not { $c1a is $c2a; };
+      $n is $result;
+    } or
+    { $r3 isa contains (container: $parent, contained: $n);
+      not {
+        $r4 isa contains (container: $c1b, contained: $n);
+        $r5 isa contains (container: $c2b, contained: $n);
+        not { $c1b is $c2b; };
+      };
+      let $result in end_of_containerward_path_v2($parent);
+    };
+  return { $result };
+#+end_example
+Exclusivity: the recursive branch fires only when the node is
+neither root nor fork. Without this, TypeQL's non-exclusive =or=
+causes ALL matching branches to contribute, returning spurious
+results (e.g. fork node returns itself AND its ancestors' endpoints).
+
+**distinct-end-of-containerward-path** (also stops at cycles):
+Pass the origin node as an extra parameter. Add a fourth branch:
+"if container equals origin, return self (cycle detected)."
+#+begin_example
+fun distinct_end($origin: node, $n: node) -> { node }:
+  match
+    { not { $r0 isa contains (contained: $n); };
+      $n is $result;
+    } or
+    { ... fork detection ...; $n is $result;
+    } or
+    { $r3 isa contains (container: $parent, contained: $n);
+      $parent is $origin;
+      $n is $result;
+    } or
+    { $r4 isa contains (container: $parent2, contained: $n);
+      not { $parent2 is $origin; };
+      ... not fork guard ...;
+      let $result in distinct_end($origin, $parent2);
+    };
+  return { $result };
+#+end_example
+Called as =distinct_end($n, $n)=. Results:
+| input  | result | reason                       |
+|--------+--------+------------------------------|
+| c      | root1  | climbs c→b→a→root1           |
+| f      | f      | fork returns itself          |
+| root1  | root1  | root returns itself          |
+| h      | i      | h→i, i's container=h=origin  |
+| i      | h      | i→h, h's container=i=origin  |
+
+LIMITATION: This only detects cycles back to the *origin node*.
+A cycle not involving the origin would not be caught this way.
+For the skg use case this is sufficient (we always start from
+the queried node itself).
+
 ** Methods
 
 *** Adding data to an existing pipeline
@@ -24,3 +260,12 @@ search results), the pattern is:
 
 This avoids restructuring the existing pipeline; the new data
 flows alongside it via a parallel map.
+
+*** TypeDB query performance: avoid N-way disjunctions with `or` patterns
+N-way disjunctions (={$id == "a";} or {$id == "b";} or ...=) combined
+with `or` patterns (like the extra_id fallback) scale very poorly.
+Instead, run one query per ID in parallel via =join_all=.
+Each individual query is fast (~15ms); N of them interleave
+on a single-threaded executor with minimal overhead.
+This is why both =all_graphnodestats= and =containerward_path_stats_bulk=
+use per-PID parallel queries rather than single bulk queries.

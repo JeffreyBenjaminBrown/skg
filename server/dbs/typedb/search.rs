@@ -4,7 +4,7 @@ pub mod count_relationships;
 pub mod hidden_in_subscribee_content;
 
 use futures::StreamExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer, ConceptDocument,
@@ -18,6 +18,7 @@ use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_id_from_node};
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::{ID, SourceName};
+use crate::types::viewnode::ContainerwardPathStats;
 
 /// Searches containerward recursively until reaching the first node
 /// which is either uncontained or multiply contained.
@@ -47,6 +48,148 @@ pub async fn climb_containerward_and_fetch_rootish_context (
           node )) . into ()
     } ) . cloned ()
 }
+
+/// Compute containerward path stats for multiple nodes at once.
+/// Level-by-level traversal: each round issues one TypeDB query
+/// per frontier node (in parallel via join_all), then advances.
+/// Convergent paths merge (shared containers queried only once).
+///
+/// PITFALL: Uses per-node queries rather than a single bulk query
+/// with N-way disjunction, because TypeDB's disjunction scaling
+/// is non-linear (see all_graphnodestats.rs).
+pub async fn containerward_path_stats_bulk (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  nodes   : &[ID],
+) -> Result < HashMap<ID, ContainerwardPathStats>,
+              Box<dyn Error> > {
+  struct TrackedPath {
+    original : ID,
+    depth    : usize,
+    visited  : HashSet<ID>,
+  }
+  let mut result : HashMap<ID, ContainerwardPathStats> =
+    HashMap::new ();
+  let mut frontier : Vec<(ID, TrackedPath)> =
+    nodes . iter ()
+    . map ( |id| {
+      let visited : HashSet<ID> =
+        HashSet::from ( [ id . clone () ] );
+      ( id . clone (),
+        TrackedPath {
+          original : id . clone (),
+          depth    : 0,
+          visited } ) } )
+    . collect ();
+  while ! frontier . is_empty () {
+    // Deduplicate frontier IDs so each distinct node
+    // is queried only once (multiple tracked paths may
+    // have converged onto the same frontier node).
+    let unique_frontier_ids : Vec<ID> = {
+      let mut seen : HashSet<ID> = HashSet::new ();
+      frontier . iter ()
+        . filter_map ( |(id, _)| {
+          if seen . insert ( id . clone () ) {
+            Some ( id . clone () )
+          } else { None } } )
+        . collect () };
+    let futures : Vec<_> =
+      unique_frontier_ids . iter ()
+      . map ( |pid|
+        find_container_ids_of_pid ( db_name, driver, pid ) )
+      . collect ();
+    let results : Vec < Result < HashSet<ID>,
+                                 Box<dyn Error> > > =
+      futures::future::join_all (futures) . await;
+    let mut containers_map : HashMap<ID, HashSet<ID>> =
+      HashMap::new ();
+    for ( id, r ) in unique_frontier_ids . into_iter ()
+                     . zip ( results )
+    { containers_map . insert (
+        id, r . unwrap_or_default () ); }
+    let mut next_frontier : Vec<(ID, TrackedPath)> =
+      Vec::new ();
+    for (current_id, tracked) in frontier {
+      let containers : HashSet<ID> =
+        containers_map . get (& current_id)
+        . cloned ()
+        . unwrap_or_default ();
+      if containers . is_empty () {
+        // Root: no containers.
+        result . insert (
+          tracked . original,
+          ContainerwardPathStats {
+            length : tracked . depth,
+            forks  : 1,
+            cycles : false } );
+      } else if containers . len () > 1 {
+        // Fork: multiple containers.
+        let cycles : bool =
+          containers . iter ()
+          . any ( |c| tracked . visited . contains (c) );
+        result . insert (
+          tracked . original,
+          ContainerwardPathStats {
+            length : tracked . depth,
+            forks  : containers . len (),
+            cycles } );
+      } else {
+        // Exactly one container.
+        let container : ID =
+          containers . into_iter () . next () . unwrap ();
+        if tracked . visited . contains (& container) {
+          // Cycle detected.
+          result . insert (
+            tracked . original,
+            ContainerwardPathStats {
+              length : tracked . depth,
+              forks  : 1,
+              cycles : true } );
+        } else {
+          // Advance: continue climbing.
+          let mut next_visited : HashSet<ID> =
+            tracked . visited;
+          next_visited . insert ( container . clone () );
+          next_frontier . push ((
+            container,
+            TrackedPath {
+              original : tracked . original,
+              depth    : tracked . depth + 1,
+              visited  : next_visited } )); } } }
+    frontier = next_frontier; }
+  Ok (result) }
+
+/// Fast container lookup by primary ID.
+/// Assumes the input is a primary ID (not an extra ID).
+/// Skips the extra_id `or` pattern used by find_related_nodes,
+/// which is the dominant cost in that query.
+async fn find_container_ids_of_pid (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pid     : &ID,
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Read
+    ) . await ?;
+  let mut stream : ConceptRowStream = {
+    let answer : QueryAnswer = tx . query (
+      format! ( r#"match
+        $contained isa node, has id "{}";
+        $container isa node, has id $container_id;
+        $rel isa contains ( container: $container,
+                            contained: $contained );
+        select $container_id;"#,
+        pid ) ) . await ?;
+    answer } . into_rows ();
+  let mut result : HashSet<ID> = HashSet::new ();
+  while let Some (row_result) = stream . next () . await {
+    let row : ConceptRow = row_result ?;
+    if let Some (concept) = row . get ("container_id") ? {
+      result . insert ( ID (
+        extract_payload_from_typedb_string_rep (
+          & concept . to_string () )) ); } }
+  Ok (result) }
 
 /// See path_to_end_cycle_and_or_branches.
 /// This is the case that searches sourceward.

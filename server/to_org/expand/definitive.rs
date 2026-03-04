@@ -1,5 +1,6 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
+use crate::dbs::typedb::search::containerward_path_stats_bulk;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
@@ -8,7 +9,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
@@ -47,7 +48,42 @@ pub async fn execute_view_requests (
         execute_definitive_view_request (
           forest, map, node_id, config, typedb_driver,
           visited, errors,
-          deleted_since_head_pid_src_map ) . await ?; }, }}
+          deleted_since_head_pid_src_map ) . await ?; },
+      ViewRequest::ContainerwardStats => {
+        compute_and_set_containerward_stats (
+          forest, node_id, config, typedb_driver ) . await ?; }, }}
+  Ok (( )) }
+
+/// Compute containerward path stats for a node and store them,
+/// then remove the view request.
+async fn compute_and_set_containerward_stats (
+  tree          : &mut Tree<ViewNode>,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let node_pid : ID =
+    get_id_from_treenode ( tree, node_id ) ?;
+  let cp_map : HashMap<ID, ContainerwardPathStats> =
+    containerward_path_stats_bulk (
+      & config . db_name, typedb_driver,
+      & [ node_pid . clone () ] ) . await ?;
+  let cp : ContainerwardPathStats =
+    cp_map . get (& node_pid)
+    . cloned ()
+    . unwrap_or ( ContainerwardPathStats {
+      length : 0,
+      forks  : 1,
+      cycles : false } );
+  write_at_node_in_tree (
+    tree, node_id,
+    |viewnode| {
+      let ViewNodeKind::True (t) : &mut ViewNodeKind =
+        &mut viewnode . kind
+        else { panic! ("compute_and_set_containerward_stats: expected TrueNode") };
+      t . graphStats . containerwardPath = Some (cp);
+      t . view_requests . remove (& ViewRequest::ContainerwardStats); } )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
 /// BEHAVIOR:
