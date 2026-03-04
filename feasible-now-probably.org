@@ -1,0 +1,29 @@
+Each of these should be a separate commit.
+Mark one 'DONE' and leave it in place you finish it.
+It is valid to mark nested headlines DONE,
+and to commit at subheadlines if the changes seem big enough to deserve it.
+Better to work through the top-level headlines sequentially, though,
+so that ranges in the git commit history do not needlessly mix topics.
+
+As you work, please accumulate a file, 'claude-science.org',
+where you accumulate questions, hypotheses, discoveries and methods.
+If anything blocks your progress that needs my attention, ping me.
+* DONE skg-visit-next-id
+Let's have a function 'skg-visit-next-id'
+that just gets the next id like skg-next-id,
+and then opens a new buffer with that root.
+
+After committing,
+please give me an s-exp to evaluate in Emacs
+to reload all the Emacs code.
+
+Oh and similarly for previous.
+* user-facing Emacs functions
+** add better user-facing names to the user-facing functions
+   Both names should be available in the M-x window,
+   but others should not.
+
+   alias for skg-push-id-to-stack : skg-id-copy
+
+** Why is skg-id-stack-mode available to me in the M-x window? It's not supposed to be user-facing.
+   Please put the response in claude-to-jeff.org

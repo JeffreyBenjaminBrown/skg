@@ -7,6 +7,17 @@ and to keep it in decent sync with the master on github
 I hope to use this, and not
   org-roam where they are most recently from,
 to edit it.
+* To know about the project,
+  These resources cover the space decently, with some redundacy.
+  Definitely not all relevant at all times.
+
+** README.org
+** TODO.org
+** api-and-formats.md
+** ai-agents.md and coding-advice/
+** schema.tql
+** https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+** anything the above link to
 * Next, please read and act on [[./feasible-now-probably.org]]
 * I find you easiest to read
   in an org file on disk, rather than in this screen.

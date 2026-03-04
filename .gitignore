@@ -4,6 +4,7 @@
 /.bash_history
 /.cache
 /.claude*
+/.claude/settings.json
 /.codex
 /.config
 /.emacs*
@@ -14,12 +15,7 @@
 /bash/kill-servers.sh
 /call-trees
 /claude-tries-skg
-/data/*.skg
-/data/*/*.skg
-/data/*/*/*.skg
-/data/*/*/*/*.skg
-/data/default/skg2/
-/data/real/
+/data
 /devel-handy/temp.org
 /plans-done
 /rust-indent/
