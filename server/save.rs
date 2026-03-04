@@ -5,7 +5,7 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
-use crate::serve::timing_log::{timed, timed_async};
+use crate::serve::timing_log::{timed, timed_async, push_buffer_timing_entry_manually};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::skgnode::SkgNode;
@@ -13,6 +13,7 @@ use crate::types::skgnode::SkgNode;
 use itertools::{Itertools, Either};
 use std::error::Error;
 use std::io;
+use std::time::{Duration, Instant};
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
@@ -43,10 +44,23 @@ pub async fn update_graph_minus_merges (
     println!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
+  // Steps 2 & 3: TypeDB (async) and Tantivy (sync) in parallel.
+  // Both are independent after the FS update.
+  let tantivy_instructions : Vec<DefineNode> = instructions . clone ();
+  let tantivy_idx : TantivyIndex = tantivy_index . clone ();
+  let tantivy_handle : std::thread::JoinHandle<(Result<usize, String>, Duration)> =
+    std::thread::spawn ( move || {
+      let t0 : Instant = Instant::now ();
+      let result : Result<usize, String> =
+        update_tantivy_from_saveinstructions (
+          &tantivy_instructions, &tantivy_idx )
+        . map_err ( |e| e . to_string () );
+      (result, t0 . elapsed ()) });
+
   if let Err (e) = timed_async ( // Step 2: TypeDB
     &config, "update_typedb_from_saveinstructions",
     update_typedb_from_saveinstructions (
-      db_name, driver, &instructions )) . await
+      db_name, driver, &instructions, &config )) . await
     { eprintln!("TypeDB update failed: {}. Rebuilding from disk...", e);
       rebuild_typedb_from_disk (&config, driver) . await
         . map_err (|e2| -> Box<dyn Error> {
@@ -56,10 +70,16 @@ pub async fn update_graph_minus_merges (
     } else {
       println!("   TypeDB update complete."); }
 
-  match timed ( // Step 3: Tantivy
+  // Step 3: collect Tantivy result from its thread
+  let (tantivy_result, tantivy_duration)
+    : (Result<usize, String>, Duration) =
+    tantivy_handle . join ()
+    . map_err (|_| -> Box<dyn Error> {
+      "Tantivy thread panicked" . into () }) ?;
+  push_buffer_timing_entry_manually (
     &config, "update_tantivy_from_saveinstructions",
-    || update_tantivy_from_saveinstructions (
-         &instructions, tantivy_index ))
+    tantivy_duration );
+  match tantivy_result
     { Ok (indexed_count) => {
         println!( "   Tantivy updated for {} document(s).",
                   indexed_count );
@@ -88,7 +108,8 @@ pub async fn update_graph_minus_merges (
 pub async fn update_typedb_from_saveinstructions (
   db_name : &str,
   driver  : &TypeDBDriver,
-  instructions : &Vec<DefineNode>
+  instructions : &Vec<DefineNode>,
+  config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -110,10 +131,13 @@ pub async fn update_typedb_from_saveinstructions (
       . collect ();
     if ! to_delete_pids . is_empty () {
       println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
-      delete_nodes_from_pids (
+      timed_async (
+        config, "delete_nodes_from_pids",
         // PITFALL: deletions cascade in TypeDB by default,
         // so we are left with no incomplete relationships.
-        db_name, driver, & to_delete_pids ) . await ?; }}
+        delete_nodes_from_pids (
+          db_name, driver, & to_delete_pids )
+      ) . await ?; }}
 
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
@@ -127,15 +151,24 @@ pub async fn update_typedb_from_saveinstructions (
                       . get (0)
                       . cloned() )
       . collect ();
-    create_only_nodes_with_no_ids_present (
-      db_name, driver, & to_write_skgnodes ) . await ?;
-    delete_out_links (
-      db_name, driver,
-      & to_write_pids, // Will barf if nonempty, which is good.
-      "contains",
-      "container" ) . await ?;
-    create_all_relationships (
-      db_name, driver, & to_write_skgnodes ) . await ?; }
+    timed_async (
+      config, "create_only_nodes_with_no_ids_present",
+      create_only_nodes_with_no_ids_present (
+        db_name, driver, & to_write_skgnodes )
+    ) . await ?;
+    timed_async (
+      config, "delete_out_links",
+      delete_out_links (
+        db_name, driver,
+        & to_write_pids, // Will barf if nonempty, which is good.
+        "contains",
+        "container" )
+    ) . await ?;
+    timed_async (
+      config, "create_all_relationships",
+      create_all_relationships (
+        db_name, driver, & to_write_skgnodes )
+    ) . await ?; }
 
   Ok (( )) }
 

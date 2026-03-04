@@ -269,3 +269,53 @@ Each individual query is fast (~15ms); N of them interleave
 on a single-threaded executor with minimal overhead.
 This is why both =all_graphnodestats= and =containerward_path_stats_bulk=
 use per-PID parallel queries rather than single bulk queries.
+
+* Parallelizing TypeDB and Tantivy updates in the save pipeline
+
+** Context
+
+The save pipeline (~update_graph_minus_merges~) updates three stores
+sequentially: FS (source of truth), TypeDB, and Tantivy.
+TypeDB and Tantivy are independent after the FS write completes.
+
+** Baseline (sequential, from tests/profiling/simple-edit)
+
+  update_graph_minus_merges:                     1.392s
+    update_fs_from_saveinstructions:             0.026s  (2%)
+    update_typedb_from_saveinstructions:          0.760s  (55%)
+    update_tantivy_from_saveinstructions:         0.606s  (44%)
+
+** Changes
+
+1. Added ~config~ parameter to ~update_typedb_from_saveinstructions~
+   and wrapped its 4 sub-operations with ~timed_async~:
+   - ~delete_nodes_from_pids~
+   - ~create_only_nodes_with_no_ids_present~
+   - ~delete_out_links~
+   - ~create_all_relationships~
+
+2. Parallelized TypeDB (async) and Tantivy (sync) using
+   ~std::thread::spawn~ for Tantivy. The spawned thread runs
+   the sync Tantivy work while the async TypeDB work runs
+   on the main thread. After both complete, Tantivy's duration
+   is recorded via ~push_buffer_timing_entry_manually~.
+
+** Post-parallelization profiling (781-node dataset)
+
+  update_graph_minus_merges:                          6.779s
+    update_fs_from_saveinstructions:                  0.050s
+    update_typedb_from_saveinstructions:              6.728s
+      create_only_nodes_with_no_ids_present:          1.504s  (22%)
+      delete_out_links:                               1.195s  (18%)
+      create_all_relationships:                       4.027s  (60%)
+    update_tantivy_from_saveinstructions:             1.020s
+
+Tantivy (1.020s) ran concurrently with TypeDB (6.728s).
+Total wall time equals TypeDB time (6.779s), not TypeDB + Tantivy
+(would have been ~7.748s). Savings: ~1s on this dataset.
+
+** Sub-step breakdown insight
+
+~create_all_relationships~ dominates TypeDB time at 60%.
+This is the next target for optimization if TypeDB remains the
+bottleneck (e.g., batching relationship creation queries).
