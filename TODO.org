@@ -178,10 +178,6 @@ fold-preservation
 ** If I need to graft a forest's trees onto a false root,
    rctree can
    egotree can't
-* save for posterity?
-** planning docs for multi-source branch
-   were deleted in this commit:
-   2dfa2c764202138bb75cc247ffdeedddad8347d0
 * dubious
 ** fold body into false headline
    there in Emacs but (at worst ignored) when Rust rebuilds
