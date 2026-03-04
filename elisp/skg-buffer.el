@@ -5,6 +5,7 @@
 
 (require 'org-id)
 (require 'cl-lib)
+(require 'heralds-minor-mode)
 (require 'skg-sexpr-search)
 
 (defvar-local skg-view-uri nil
@@ -68,7 +69,8 @@ otherwise generate a new UUID."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert org-text)
-        (org-mode))
+        (org-mode)
+        (heralds-minor-mode))
       (setq skg-view-uri uri)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook
