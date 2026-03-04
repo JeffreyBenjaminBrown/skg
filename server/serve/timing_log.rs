@@ -70,7 +70,7 @@ pub async fn timed_async<T, F : Future<Output = T>> (
 /// Use when 'timed' / 'timed_async' can't wrap the code
 /// (e.g. because of borrow-checker constraints).
 /// Does not increment/decrement the depth counter.
-pub fn push_manual_timing (
+pub fn push_buffer_timing_entry_manually (
   config   : &SkgConfig,
   label    : &str,
   duration : Duration,

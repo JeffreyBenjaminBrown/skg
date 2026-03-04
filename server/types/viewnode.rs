@@ -68,16 +68,6 @@ pub struct TrueNode {
   pub diff          : Option < NodeDiffStatus >,
 }
 
-impl TrueNode {
-  /// A phantom is a display-only placeholder for a removed node
-  /// in git diff view. Identified by Removed or RemovedHere status.
-  pub fn is_phantom (
-    &self,
-  ) -> bool {
-    matches!( self . diff,
-              Some (NodeDiffStatus::Removed)
-            | Some (NodeDiffStatus::RemovedHere) ) }}
-
 /// Containerward path statistics: how a node relates to the
 /// container hierarchy (path length, fork count, cycle detection).
 #[derive(Debug, Clone, PartialEq)]
@@ -86,28 +76,6 @@ pub struct ContainerwardPathStats {
   pub forks  : usize,
   pub cycles : bool,
 }
-
-impl ContainerwardPathStats {
-  pub fn to_display_atom (&self) -> String {
-    let sep : &str =
-      if self . cycles { "↻" } else { "⤊" };
-    if self . forks <= 1
-      { format! ( "{}{}", sep, self . length ) }
-    else
-      { format! ( "{}{}{}", self . forks, sep, self . length ) } }
-  pub fn from_display_atom (s: &str) -> Option<Self> {
-    // Parse "2⤊5", "⤊3", "2↻5", "↻3"
-    let (before, after, cycles) : (&str, &str, bool) =
-      if let Some (pos) = s . find ('⤊')
-        { ( &s[..pos], &s[pos + '⤊' . len_utf8 ()..], false ) }
-      else if let Some (pos) = s . find ('↻')
-        { ( &s[..pos], &s[pos + '↻' . len_utf8 ()..], true ) }
-      else { return None; };
-    let length : usize = after . parse () . ok () ?;
-    let forks : usize =
-      if before . is_empty () { 1 }
-      else { before . parse () . ok () ? };
-    Some ( ContainerwardPathStats { length, forks, cycles } ) } }
 
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
@@ -189,6 +157,38 @@ pub enum ViewRequest {
 //
 // Implementations
 //
+
+impl TrueNode {
+  /// A phantom is a display-only placeholder for a removed node
+  /// in git diff view. Identified by Removed or RemovedHere status.
+  pub fn is_phantom (
+    &self,
+  ) -> bool {
+    matches!( self . diff,
+              Some (NodeDiffStatus::Removed)
+            | Some (NodeDiffStatus::RemovedHere) ) }}
+
+impl ContainerwardPathStats {
+  pub fn to_display_atom (&self) -> String {
+    let sep : &str =
+      if self . cycles { "↻" } else { "⤊" };
+    if self . forks <= 1
+      { format! ( "{}{}", sep, self . length ) }
+    else
+      { format! ( "{}{}{}", self . forks, sep, self . length ) } }
+  pub fn from_display_atom (s: &str) -> Option<Self> {
+    // Parse "2⤊5", "⤊3", "2↻5", "↻3"
+    let (before, after, cycles) : (&str, &str, bool) =
+      if let Some (pos) = s . find ('⤊')
+        { ( &s[..pos], &s[pos + '⤊' . len_utf8 ()..], false ) }
+      else if let Some (pos) = s . find ('↻')
+        { ( &s[..pos], &s[pos + '↻' . len_utf8 ()..], true ) }
+      else { return None; };
+    let length : usize = after . parse () . ok () ?;
+    let forks : usize =
+      if before . is_empty () { 1 }
+      else { before . parse () . ok () ? };
+    Some ( ContainerwardPathStats { length, forks, cycles } ) } }
 
 impl ScaffoldKind {
   /// Single source of truth for ScaffoldKind <-> Emacs string bijection.

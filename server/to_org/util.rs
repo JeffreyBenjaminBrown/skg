@@ -1,15 +1,14 @@
-use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
-use crate::serve::timing_log::timed_async;
+use crate::serve::timing_log::{timed_async, push_buffer_timing_entry_manually};
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{
-    mk_definitive_viewnode, ViewNode, ViewNodeKind, forest_root_viewnode };
-use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::tree::generations::collect_generation_ids;
+use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::viewnode::ViewRequest;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, forest_root_viewnode, mk_definitive_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -326,7 +325,7 @@ pub async fn build_node_branch_minus_content (
       _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
     };
   if config . timing_log {
-    crate::serve::timing_log::push_manual_timing (
+    push_manual_timing (
       config, &format! ("build_node_branch_minus_content({})", skgid),
       t0 . elapsed () ); }
   result }

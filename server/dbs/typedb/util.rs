@@ -1,10 +1,7 @@
 pub mod pids_from_ids;
 pub mod concept_document;
 
-use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
-
 use futures::executor::block_on;
-use std::error::Error;
 use typedb_driver::answer::ConceptRow;
 use typedb_driver::{Credentials, DatabaseManager, DriverOptions, TypeDBDriver};
 
@@ -50,19 +47,3 @@ pub fn extract_payload_from_typedb_string_rep (
   panic! ( "Failed to extract payload from TypeDB output: {}",
             attribute_str ) }
 
-/// Conjugates a binary role within a specified relation.
-/// Given a relation name and one role, returns the other role.
-/// Returns an error if the role doesn't belong to the relation.
-pub(super) fn conjugate_binary_role (
-  relation : &str,
-  role     : &str
-) -> Result < &'static str,
-                Box < dyn Error > > {
-  for (rel, left, right) in OUTBOUND_RELATIONSHIP_TYPES {
-    if *rel == relation {
-      if role == *left { return Ok (right); }
-      if role == *right { return Ok (left); }}}
-  Err ( format! (
-    "Role '{}' does not belong to relation '{}'",
-    role, relation
-  ) . into () ) }

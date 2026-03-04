@@ -50,13 +50,13 @@ pub async fn execute_view_requests (
           visited, errors,
           deleted_since_head_pid_src_map ) . await ?; },
       ViewRequest::ContainerwardStats => {
-        compute_and_set_containerward_stats (
+        execute_containerwardstats_request (
           forest, node_id, config, typedb_driver ) . await ?; }, }}
   Ok (( )) }
 
 /// Compute containerward path stats for a node and store them,
 /// then remove the view request.
-async fn compute_and_set_containerward_stats (
+async fn execute_containerwardstats_request (
   tree          : &mut Tree<ViewNode>,
   node_id       : NodeId,
   config        : &SkgConfig,
@@ -80,7 +80,7 @@ async fn compute_and_set_containerward_stats (
     |viewnode| {
       let ViewNodeKind::True (t) : &mut ViewNodeKind =
         &mut viewnode . kind
-        else { panic! ("compute_and_set_containerward_stats: expected TrueNode") };
+        else { unreachable! ("complete_truenode already verified this is a TrueNode") };
       t . graphStats . containerwardPath = Some (cp);
       t . view_requests . remove (& ViewRequest::ContainerwardStats); } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -137,7 +137,7 @@ async fn execute_definitive_view_request (
       |viewnode| {
         let ViewNodeKind::True (t) : &mut ViewNodeKind =
           &mut viewnode . kind
-          else { panic! ("execute_definitive_view_request: expected TrueNode") };
+          else { unreachable! ("complete_truenode already verified this is a TrueNode") };
         t . view_requests . remove (& ViewRequest::Definitive);
         t . indefinitive = false; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -317,7 +317,7 @@ fn from_disk_replace_title_body_and_skgnode (
   write_at_node_in_tree ( tree, node_id, |viewnode| { // Update viewnode
     let ViewNodeKind::True (t) : &mut ViewNodeKind =
       &mut viewnode . kind
-      else { panic! ("rebuild_pair_from_disk: expected TrueNode") };
+      else { unreachable! ("complete_truenode already verified this is a TrueNode") };
     t . title = title;
     t . body = body; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -435,7 +435,7 @@ fn from_git_replace_title_body (
     |viewnode| {
       let ViewNodeKind::True (t) : &mut ViewNodeKind =
         &mut viewnode . kind
-        else { panic! ("from_git_replace_title_body: expected TrueNode") };
+        else { unreachable! ("complete_truenode already verified this is a TrueNode") };
       t . title = skgnode . title;
       t . body = skgnode . body; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;

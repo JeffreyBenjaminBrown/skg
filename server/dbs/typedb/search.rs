@@ -1,6 +1,5 @@
 pub mod all_graphnodestats;
 pub mod contains_from_pids;
-pub mod count_relationships;
 pub mod hidden_in_subscribee_content;
 
 use futures::StreamExt;
@@ -19,35 +18,6 @@ use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_i
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::{ID, SourceName};
 use crate::types::viewnode::ContainerwardPathStats;
-
-/// Searches containerward recursively until reaching the first node
-/// which is either uncontained or multiply contained.
-/// Returns that node's ID.
-/// So for instance, if the input is uncontained,
-/// it just returns the input.
-/// .
-/// PITFALL: This just takes the last element of the path
-/// returned by `path_containerward_to_end_cycle_and_or_branches`,
-/// throwing away the rest of the information.
-pub async fn climb_containerward_and_fetch_rootish_context (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node    : &ID
-) -> Result < ID, Box<dyn Error> > {
-  let ( path, _cycle_node, _multi_containers )
-    : ( Vec<ID>, Option<ID>, HashSet<ID> )
-    = path_containerward_to_end_cycle_and_or_branches (
-      db_name, driver, node ) . await ?;
-  path . last () . ok_or_else ( || {
-      // This should never happen,
-      // since the path always includes at least the input node.
-      std::io::Error::new (
-        std::io::ErrorKind::InvalidData,
-        format!(
-          "Empty path from path_containerward_to_end_cycle_and_or_branches for node '{}'",
-          node )) . into ()
-    } ) . cloned ()
-}
 
 /// Compute containerward path stats for multiple nodes at once.
 /// Level-by-level traversal: each round issues one TypeDB query
@@ -224,38 +194,6 @@ pub async fn path_sourceward_to_end_cycle_and_or_branches (
     db_name,
     driver,
     node,
-    "textlinks_to",
-    "dest",
-    "source"
-  ) . await }
-
-/// Runs a single TypeDB query.
-/// Returns the containing nodes' IDs.
-pub async fn find_containers_of (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node    : &ID
-) -> Result < HashSet<ID>, Box<dyn Error> > {
-  find_related_nodes (
-    db_name,
-    driver,
-    & [ node . clone () ],
-    "contains",
-    "contained",
-    "container"
-  ) . await }
-
-/// Runs a single TypeDB query.
-/// Returns the IDs of nodes that link to the input node.
-pub(super) async fn find_links_to (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node    : &ID
-) -> Result < HashSet<ID>, Box<dyn Error> > {
-  find_related_nodes (
-    db_name,
-    driver,
-    & [ node . clone () ],
     "textlinks_to",
     "dest",
     "source"
