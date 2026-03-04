@@ -40,16 +40,19 @@ pub async fn set_graphnodestats_in_forest (
   let pids : Vec < ID > =
     timed ( config, "collect_ids_from_tree",
             || collect_ids_from_tree (forest));
-  let rel_data : MapsFromIdForView =
-    timed_async ( config, "fetch_relationship_data",
-                  fetch_relationship_data (
-                    driver, & config . db_name, & pids )) . await ?;
-  let ( container_to_contents, content_to_containers )
-    : ( HashMap < ID, HashSet < ID > >,
-        HashMap < ID, HashSet < ID > > )
-    = timed_async ( config, "contains_from_pids",
-                    contains_from_pids (
-                      & config . db_name, driver, & pids )) . await ?;
+  let ( rel_data,
+        ( container_to_contents, content_to_containers ))
+    : ( MapsFromIdForView,
+        ( HashMap < ID, HashSet < ID > >,
+          HashMap < ID, HashSet < ID > > ))
+    = tokio::try_join! (
+        timed_async ( config, "fetch_relationship_data",
+          fetch_relationship_data (
+            driver, & config . db_name, & pids, config )),
+        timed_async ( config, "contains_from_pids",
+          contains_from_pids (
+            & config . db_name, driver, & pids )),
+      ) ?;
   let root_treeid : NodeId = forest . root () . id ();
   timed ( config, "set_graphnodestats_recursive",
           || set_metadata_relationships_in_node_recursive (
@@ -61,23 +64,37 @@ pub async fn set_graphnodestats_in_forest (
   Ok (( container_to_contents,
         content_to_containers )) }
 
-/// Run three batch queries to fetch all relationship data
-/// for the given PIDs.
+/// Run five batch queries IN PARALLEL to fetch all relationship data
+/// for the given PIDs. Before parallelisation these ran sequentially
+/// at ~4s each, totalling ~20s.
 async fn fetch_relationship_data (
   driver  : &TypeDBDriver,
   db_name : &str,
   pids    : &[ID],
+  config  : &SkgConfig,
 ) -> Result < MapsFromIdForView, Box<dyn Error> > {
-  let num_containers : HashMap < ID, usize > =
-    count_containers ( db_name, driver, pids ) . await ?;
-  let num_contents : HashMap < ID, usize > =
-    count_contents ( db_name, driver, pids ) . await ?;
-  let num_links_in : HashMap < ID, usize > =
-    count_link_sources ( db_name, driver, pids ) . await ?;
-  let has_subscribes_map : HashSet < ID > =
-    has_subscribes ( db_name, driver, pids ) . await ?;
-  let has_overrides_map : HashSet < ID > =
-    has_overrides ( db_name, driver, pids ) . await ?;
+  let ( num_containers,
+        num_contents,
+        num_links_in,
+        has_subscribes_map,
+        has_overrides_map )
+    : ( HashMap < ID, usize >,
+        HashMap < ID, usize >,
+        HashMap < ID, usize >,
+        HashSet < ID >,
+        HashSet < ID > )
+    = tokio::try_join! (
+        timed_async ( config, "count_containers",
+          count_containers ( db_name, driver, pids )),
+        timed_async ( config, "count_contents",
+          count_contents ( db_name, driver, pids )),
+        timed_async ( config, "count_link_sources",
+          count_link_sources ( db_name, driver, pids )),
+        timed_async ( config, "has_subscribes",
+          has_subscribes ( db_name, driver, pids )),
+        timed_async ( config, "has_overrides",
+          has_overrides ( db_name, driver, pids )),
+      ) ?;
   Ok ( MapsFromIdForView {
     has_subscribes : has_subscribes_map,
     has_overrides  : has_overrides_map,

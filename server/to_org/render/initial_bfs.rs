@@ -17,6 +17,7 @@
 /// Then navigate up to L's parent P,
 /// and re-render as indefinitive every node in P's generation after P.
 
+use crate::serve::timing_log::timed_async;
 use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
@@ -38,8 +39,9 @@ pub async fn render_initial_forest_bfs (
 ) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
   let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
-    stub_forest_from_root_ids (
-      root_ids, config, driver, &mut visited ) . await ?;
+    timed_async ( config, "stub_forest_from_root_ids",
+      stub_forest_from_root_ids (
+        root_ids, config, driver, &mut visited )) . await ?;
   let forest_root_id : NodeId = forest . root () . id ();
   let root_nodes : Vec < NodeId > =
     forest . root () . children ()
@@ -84,10 +86,13 @@ fn render_generation_and_recurse<'a> (
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count < limit {
+      let label : String =
+        format! ("add_children gen={} count={}", gen_int + 1, next_gen_count);
       let next_gen : Vec < NodeId > =
-        add_children_and_collect_their_ids (
-          forest, map, parent_child_rels_to_add, visited, config, driver
-        ) . await ?;
+        timed_async ( config, &label,
+          add_children_and_collect_their_ids (
+            forest, map, parent_child_rels_to_add, visited, config, driver
+        )) . await ?;
       render_generation_and_recurse (
         forest, map, next_gen, gen_int + 1,
         rendered_count, limit, effective_root,

@@ -1,5 +1,6 @@
 use crate::types::tree::generations::collect_generation_ids;
 use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::serve::timing_log::timed_async;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::viewnode::ViewRequest;
@@ -43,9 +44,11 @@ pub async fn skgnode_and_viewnode_from_id (
   skgid  : &ID,
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
+  let label : String = format! ("skgnode_and_viewnode_from_id({})", skgid);
   let (pid_resolved, source) : (ID, SourceName) =
-    pid_and_source_from_id( // Query TypeDB for them
-      &config . db_name, driver, skgid) . await?
+    timed_async ( config, &label,
+      pid_and_source_from_id(
+        &config . db_name, driver, skgid)) . await?
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
   skgnode_and_viewnode_from_pid_and_source (
@@ -117,8 +120,9 @@ pub async fn complete_branch_minus_content (
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
       tree, map, node_id, config ) ?; }
-  maybe_add_subscribeeCol_branch (
-    tree, map, node_id, config, driver ) . await ?;
+  timed_async ( config, "maybe_add_subscribeeCol_branch",
+    maybe_add_subscribeeCol_branch (
+      tree, map, node_id, config, driver )) . await ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -289,36 +293,43 @@ pub async fn build_node_branch_minus_content (
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
 ) -> Result < NodeId, Box<dyn Error> > {
-  match (tree_and_parent, map) {
-    (Some ( (tree, parent_treeid) ), Some (map)) => {
-      let (_skgnode, viewnode) : (SkgNode, ViewNode) =
-        skgnode_and_viewnode_from_id (
-          config, driver, skgid, map ) . await ?;
-      let child_treeid : NodeId = // Add ViewNode to tree
-        with_node_mut (
-          tree, parent_treeid,
-          ( |mut parent_mut|
-            parent_mut . append (viewnode) . id () ))
-        . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-      complete_branch_minus_content (
-        tree, map, child_treeid, visited,
-        config, driver ) . await ?;
-      Ok (child_treeid) },
-    (None, None) => {
-      let mut map : SkgNodeMap =
-        SkgNodeMap::new ();
-      let (_skgnode, viewnode) : (SkgNode, ViewNode) =
-        skgnode_and_viewnode_from_id (
-          config, driver, skgid, &mut map ) . await ?;
-      let mut tree : Tree<ViewNode> =
-        Tree::new (viewnode);
-      let root_treeid : NodeId = tree . root () . id ();
-      complete_branch_minus_content (
-        &mut tree, &mut map, root_treeid, visited,
-        config, driver ) . await ?;
-      Ok (root_treeid) },
-    _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
-  } }
+  let t0 : std::time::Instant = std::time::Instant::now();
+  let result : Result < NodeId, Box<dyn Error> > =
+    match (tree_and_parent, map) {
+      (Some ( (tree, parent_treeid) ), Some (map)) => {
+        let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+          skgnode_and_viewnode_from_id (
+            config, driver, skgid, map ) . await ?;
+        let child_treeid : NodeId = // Add ViewNode to tree
+          with_node_mut (
+            tree, parent_treeid,
+            ( |mut parent_mut|
+              parent_mut . append (viewnode) . id () ))
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+        complete_branch_minus_content (
+          tree, map, child_treeid, visited,
+          config, driver ) . await ?;
+        Ok (child_treeid) },
+      (None, None) => {
+        let mut map : SkgNodeMap =
+          SkgNodeMap::new ();
+        let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+          skgnode_and_viewnode_from_id (
+            config, driver, skgid, &mut map ) . await ?;
+        let mut tree : Tree<ViewNode> =
+          Tree::new (viewnode);
+        let root_treeid : NodeId = tree . root () . id ();
+        complete_branch_minus_content (
+          &mut tree, &mut map, root_treeid, visited,
+          config, driver ) . await ?;
+        Ok (root_treeid) },
+      _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
+    };
+  if config . timing_log {
+    crate::serve::timing_log::push_manual_timing (
+      config, &format! ("build_node_branch_minus_content({})", skgid),
+      t0 . elapsed () ); }
+  result }
 
 /// Collect content child IDs from a node.
 /// Returns empty vec if the node is indefinitive or has no SkgNode.

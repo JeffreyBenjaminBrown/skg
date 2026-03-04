@@ -1,0 +1,219 @@
+* Views are slow — profiling the content-view pipeline
+
+** Symptom
+
+Loading the 'kindness' node (0d863b6d-1652-4ffb-897a-99e73198ce16)
+takes ~24 seconds. The node has 15 direct children and ~24 nodes
+reachable via BFS.
+
+** Pipeline (single root content view)
+
+| step                        | timed? | TypeDB? | disk? |
+|-----------------------------+--------+---------+-------|
+| render_initial_forest_bfs   | yes    | yes     | yes   |
+|   stub_forest_from_root_ids | yes    | yes     | yes   |
+|   render_generation_recurse | yes    | yes     | yes   |
+|     build_node_branch(×N)   | yes    | yes     | yes   |
+|       pid_and_source_from_id| yes    | 1 query |       |
+|       skgnode_from_disk      | no     |         | yes   |
+|       maybe_add_subscribeeCol| yes   | 0-2 q   |       |
+| set_graphnodestats_in_forest| yes    | yes     | yes   |
+|   collect_ids_from_tree     | yes    |         |       |
+|   fetch_relationship_data   | yes    | 5 q     |       |
+|     count_containers        | yes    | 1 q     |       |
+|     count_contents          | yes    | 1 q     |       |
+|     count_link_sources      | yes    | 1 q     |       |
+|     has_subscribes          | yes    | 1 q     |       |
+|     has_overrides           | yes    | 1 q     |       |
+|   contains_from_pids        | yes    | 1 q     |       |
+|   set_graphnodestats_recur  | yes    |         | yes   |
+| viewnode_forest_to_string   | yes    |         |       |
+
+** Experiment 1: timing results for 'kindness' (24 nodes, ~28K total in DB)
+
+#+begin_example
+* single_root_view: 23.449s
+** render_initial_forest_bfs: 0.151s                 <<<  0.6% — NOT the problem
+*** stub_forest_from_root_ids: 0.020s
+*** add_children gen=2 count=15: 0.086s
+*** add_children gen=3 count=5: 0.028s
+*** add_children gen=4 count=2: 0.012s
+*** add_children gen=5 count=1: 0.005s
+*** add_children gen=6 count=0: 0.000s
+** set_graphnodestats_in_forest: 23.297s             <<< 99.4% — THE BOTTLENECK
+*** collect_ids_from_tree: 0.000s
+*** fetch_relationship_data: 19.502s                 <<< 83.2% — 5 sequential queries
+**** count_containers: 3.983s
+**** count_contents: 3.930s
+**** count_link_sources: 3.769s
+**** has_subscribes: 3.981s
+**** has_overrides: 3.839s
+*** contains_from_pids: 3.795s                       <<< 16.2% — 1 more query
+*** set_graphnodestats_recursive: 0.000s
+** viewnode_forest_to_string: 0.000s
+#+end_example
+
+** Diagnosis
+
+*** What is slow
+
+'set_graphnodestats_in_forest' runs 6 TypeDB queries sequentially,
+each taking ~3.8-4.0s, totalling ~23.3s. Each query uses a
+24-way disjunction against a ~28,698-node database with nested
+subqueries (fetch within match).
+
+*** Why each query is slow
+
+Each of the 6 queries:
+1. Opens a new read transaction
+2. Sends a match/fetch with 24-branch OR disjunction
+3. Each branch matches a node by ID, then runs a nested
+   subquery to find/count relationships
+4. The nested subquery patterns are complex: disjunctions
+   within disjunctions (for extra_id support)
+
+With ~28.7K nodes and complex nested patterns,
+TypeDB v3 spends ~3.8s per query — likely dominated by
+query planning and/or scanning.
+
+*** Why the total is so high
+
+The 5 queries in 'fetch_relationship_data' run SEQUENTIALLY:
+
+  count_containers       3.983s  ─┐
+  count_contents         3.930s   │
+  count_link_sources     3.769s   ├── 19.502s total (sequential)
+  has_subscribes         3.981s   │
+  has_overrides          3.839s  ─┘
+
+  contains_from_pids     3.795s  ── 6th query, also sequential
+
+These could run in parallel (they are independent read queries).
+
+** Proposed optimizations (by expected impact)
+
+*** 1. Parallelize the 6 independent TypeDB queries (~4× speedup)
+
+All 6 queries in 'set_graphnodestats_in_forest' are independent
+read-only queries. Using 'tokio::join!' or 'tokio::try_join!',
+they could all run concurrently.
+
+Expected: 23.3s → ~4.0s (limited by the slowest single query).
+
+Implementation: in 'set_graphnodestats_in_forest', use
+'tokio::try_join!' for 'fetch_relationship_data' and
+'contains_from_pids'; within 'fetch_relationship_data',
+use 'tokio::try_join!' for its 5 sub-queries.
+
+*** 2. Merge queries to reduce round-trips (~2× on top of #1)
+
+Instead of 5 separate fetch_relationship_data queries, combine
+into 1 or 2 queries that fetch all relationship types at once.
+The 'count_relations' function already parameterises the
+relation/role; a combined query could fetch all 5 in one
+nested structure.
+
+Similarly, 'contains_from_pids' could be folded into the
+combined query.
+
+Expected: 1 round-trip × ~4s = ~4s, vs 6 × ~4s = ~24s.
+But combined with #1 the marginal gain is smaller
+(~4s → ~4s), so this is most valuable if #1 is insufficient.
+
+*** 3. Index tuning / query simplification
+
+The extra_id disjunction pattern (supporting lookup by
+non-primary IDs) doubles the query complexity. If extra_id
+lookups are rare in the graphnodestats path, they could be
+dropped or handled separately.
+
+Also: the 'has_subscribes' and 'has_overrides' queries use
+'participates_in_relation', which checks BOTH roles (subscriber
+and subscribee, replacement and replaced) via a 4-branch OR.
+For the graphnodestats use case, we might only need to check
+one role direction.
+
+*** 4. Caching relationship data
+
+If the same node is viewed repeatedly, caching graphnodestats
+per-PID would avoid redundant queries. A simple HashMap<ID,
+GraphNodeStats> with invalidation on save would suffice.
+
+*** 5. Lazy loading of relationship stats
+
+Instead of computing all stats before rendering, render the
+view immediately with placeholder stats and fill them in
+asynchronously. This would give instant visual response.
+
+** Experiment 2: parallelize the 6 queries with tokio::try_join!
+
+*** Changes made
+
+In 'set_graphnodestats_in_forest':
+- 'fetch_relationship_data' and 'contains_from_pids'
+  now run concurrently via 'tokio::try_join!'.
+
+In 'fetch_relationship_data':
+- The 5 inner queries now run concurrently via 'tokio::try_join!'.
+
+*** Results
+
+#+begin_example
+* single_root_view: 6.225s
+** render_initial_forest_bfs: 0.103s
+** set_graphnodestats_in_forest: 6.121s
+*** collect_ids_from_tree: 0.000s
+*** fetch_relationship_data: 5.609s
+**** count_containers: 4.494s      ─┐
+**** count_contents: 4.016s         │
+**** count_link_sources: 4.204s     ├── all concurrent
+**** has_subscribes: 4.609s         │
+**** has_overrides: 5.608s         ─┘
+*** contains_from_pids: 6.120s      ── concurrent with fetch_rel_data
+*** set_graphnodestats_recursive: 0.000s
+** viewnode_forest_to_string: 0.000s
+#+end_example
+
+23.4s → 6.2s — a 3.8× speedup. Wall-clock time is now limited
+by the slowest single query (~6.1s for 'contains_from_pids').
+
+Individual query times are slightly higher than before (~4-6s vs
+~3.8-4.0s), probably due to TypeDB contention from 6 concurrent
+read transactions.
+
+*** Remaining bottleneck
+
+A single TypeDB query against ~28.7K nodes with a 24-way
+disjunction and nested subqueries takes ~4-6 seconds. Further
+improvement requires either faster queries (simplification,
+indexing) or fewer round-trips (query merging).
+
+** Further optimizations to consider
+
+*** Merge into fewer queries (may help with contention)
+
+Combining the 5 'count_relations' / 'participates_in' queries
+into a single query that fetches all relationship types would:
+- Reduce transactions from 6 to 2 (or 1)
+- Eliminate contention between concurrent reads
+- Each individual query might be faster without competition
+
+*** Simplify the extra_id disjunction
+
+The graphnodestats queries match by PID. PIDs are always the
+primary ID. The extra_id OR branch adds complexity for a case
+that cannot occur in this code path. Removing it would halve
+the disjunction size inside the nested subqueries.
+
+*** Simplify has_subscribes / has_overrides
+
+'participates_in_relation' checks BOTH roles (4-branch OR).
+For graphnodestats we only need to know "does this node
+subscribe?" or "does this node override?", not whether it's
+the subscribee/replaced side. Checking one role halves the
+query complexity.
+
+*** Cache graphnodestats results
+
+For repeated views of the same node (common during editing),
+cache per-PID stats and invalidate on save.

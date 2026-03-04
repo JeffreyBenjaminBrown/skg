@@ -66,6 +66,22 @@ pub async fn timed_async<T, F : Future<Output = T>> (
     flush_timing_buffer (config); }
   result }
 
+/// Record a manually-timed span at the current depth.
+/// Use when 'timed' / 'timed_async' can't wrap the code
+/// (e.g. because of borrow-checker constraints).
+/// Does not increment/decrement the depth counter.
+pub fn push_manual_timing (
+  config   : &SkgConfig,
+  label    : &str,
+  duration : Duration,
+) {
+  if ! config . timing_log { return; }
+  let depth : usize =
+    TIMING_DEPTH . with ( |d| d . get() );
+  push_buffer_timing_entry (
+    Instant::now() - duration, depth, label, duration );
+  if depth == 0 { flush_timing_buffer (config); } }
+
 fn push_buffer_timing_entry (
   start    : Instant,
   depth    : usize,
