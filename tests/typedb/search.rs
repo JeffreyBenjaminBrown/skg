@@ -1,10 +1,9 @@
 // cargo test typedb::search
 
 pub mod contains_from_pids;
-pub mod count_relationships;
 
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::find_containers_of;
+use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::misc::{ID, SkgConfig};
 
@@ -32,62 +31,80 @@ async fn test_find_containers_of (
 ) -> Result<(), Box<dyn Error>> {
 
   let containers_of_1 : HashSet<ID> =
-    find_containers_of ( // 1 has no containers
+    find_related_nodes ( // 1 has no containers
       & config . db_name, & driver,
-      & ID("1" . to_string() )) . await ?;
+      &[ID("1" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_1,
                HashSet::new() );
 
   let containers_of_2 : HashSet<ID> =
-    find_containers_of ( // 2 is in 211
+    find_related_nodes ( // 2 is in 211
       & config . db_name, & driver,
-      & ID("2" . to_string() )) . await ?;
+      &[ID("2" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_2,
                HashSet::from([ID("211" . to_string())]) );
   let containers_of_11 : HashSet<ID> =
-    find_containers_of ( // 11 is in 1
+    find_related_nodes ( // 11 is in 1
       & config . db_name, & driver,
-      & ID("11" . to_string() )) . await ?;
+      &[ID("11" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_11,
                HashSet::from([ID("1" . to_string())]) );
   let containers_of_21 : HashSet<ID> =
-    find_containers_of ( // 21 is in 1
+    find_related_nodes ( // 21 is in 1
       & config . db_name, & driver,
-      & ID("21" . to_string() )) . await ?;
+      &[ID("21" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_21,
                HashSet::from([ID("2" . to_string())]) );
   let containers_of_211 : HashSet<ID> =
-    find_containers_of ( // 211 is in 21
+    find_related_nodes ( // 211 is in 21
       & config . db_name, & driver,
-      & ID("211" . to_string() )) . await ?;
+      &[ID("211" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_211,
                HashSet::from([ID("21" . to_string())]) );
   let containers_of_shared_1 : HashSet<ID> =
-    find_containers_of ( // shared_1 is in shared
+    find_related_nodes ( // shared_1 is in shared
       & config . db_name, & driver,
-      & ID("shared_1" . to_string() )) . await ?;
+      &[ID("shared_1" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_shared_1,
                HashSet::from([ID("shared" . to_string())]) );
   let containers_of_shared_2 : HashSet<ID> =
-    find_containers_of ( // shared_2 is in shared
+    find_related_nodes ( // shared_2 is in shared
       & config . db_name, & driver,
-      & ID("shared_2" . to_string() )) . await ?;
+      &[ID("shared_2" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_shared_2,
                HashSet::from([ID("shared" . to_string())]) );
 
   let containers_of_shared : HashSet<ID> =
-    find_containers_of( // shared is in 1 *and* 2
+    find_related_nodes ( // shared is in 1 *and* 2
       & config . db_name, & driver,
-      & ID("shared" . to_string() )) . await ?;
+      &[ID("shared" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_shared,
                HashSet::from ( [ ID("1" . to_string() ),
                                  ID("2" . to_string() )] ) );
 
   let containers_of_11_extra : HashSet<ID> =
-    find_containers_of(
+    find_related_nodes (
       // '11-extra-id' and '11' give the same result
       & config . db_name, & driver,
-      & ID("11-extra-id" . to_string() )) . await ?;
+      &[ID("11-extra-id" . to_string() )],
+      "contains", "contained", "container"
+    ) . await ?;
   assert_eq! ( containers_of_11_extra,
                containers_of_11 );
 

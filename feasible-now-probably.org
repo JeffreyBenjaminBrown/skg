@@ -34,16 +34,16 @@ everything else:                      ~0.1s
 Sweet! Okay so we just need to discard save instructions iwth no new info. This is a pinch harder than it sounds, because None in a SkgNode indicates 'no opinion' (whereas Some([]) indicates 'this should really be empty'). But basically we've got our solution. For each SkgNode, before computing a SaveInstruction for it, we test whether it would modify the SkgNode in the pool. If it is, and it has None for some vector field that is Some in the pool, that's not a meaningful difference. (But having a None body is different -- if the body in the pool is Some, that's a meaningful difference, and should get a SaveInstruction.) If it's not in the pool, it gets an instruction.
 
 There's already code somewhere for distinguishing None from Some([]) in a SkgNode. If possible, let's use existing functions or extract common functions rather than duplicating that logic.
-* import error in tests/
+* DONE import error in tests/
   revealed by nextest. the git history should reveal
   when the relevant definition was replaced.
 * in emacs, 'block buffer-locally' while awaiting save-buffer
-  Display a message to that effect
-  if the user tries to edit an affected buffer.
   The user should be able to edit other buffers,
   but until that response is received.
   unable to edit the saved buffer *or* any collateral ones.
   Emacs has a buffer-local 'read only' mode that will be useful.
+  Display a message explaining why they can't
+  if the user tries to edit an affected buffer.
 
   This will require Rust to immediately tell Emacs
   which views are collateral,

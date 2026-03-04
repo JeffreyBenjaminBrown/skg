@@ -1,5 +1,10 @@
 * Potential further optimizations
 
+** Following a path to its first nonlinearity
+   Soon, this will be doable from within TypeDB.
+   See [[https://github.com/typedb/typeql/issues/434#issuecomment-3996777918][this GitHub issue]].
+   Relevant to functions like
+   'path_containerward_to_end_cycle_and_or_branches'.
 ** Content view pipeline (currently ~0.16s server-side)
 
 *** Parallelize BFS node lookups in render_initial_forest_bfs

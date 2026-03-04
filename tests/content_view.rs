@@ -5,7 +5,6 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::climb_containerward_and_fetch_rootish_context;
 use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::memory::SkgNodeMap;
@@ -53,14 +52,14 @@ async fn run_path_and_root_tests (
     }, Err (e) => {
       panic!("Error finding path to root container: {}", e); } }
 
-  match climb_containerward_and_fetch_rootish_context (
+  match path_containerward_to_end_cycle_and_or_branches (
     & config . db_name,
     & driver,
     & ID("4" . to_string() )
   ) . await {
-    Ok (root) => { assert_eq!(
-      root,
-      ID ( "1" . to_string() ),
+    Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
+      path . last () . cloned (),
+      Some ( ID ( "1" . to_string() ) ),
       "Root of node '4' should be 1." ) },
     Err (e) => { panic!(
       "Error finding root container from id {}", e); } }
