@@ -12,12 +12,6 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-/// TypeDB match-insert cost scales with uncommitted write-buffer size.
-/// A single transaction for ~32k queries would degrade to ~135ms/query.
-/// Committing every ~BATCH_SIZE queries keeps per-query cost at ~1.5ms.
-/// See tools/init-perf-investigation.org for benchmarks.
-const BATCH_SIZE : usize = 200;
-
 /// The 5 outbound relationship types and their two roles.
 /// Each triple is (relation, role_a, role_b).
 pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
@@ -29,50 +23,49 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
 ];
 
 pub async fn create_all_relationships (
-  // Maps `create_relationships_from_node` over `nodes`,
-  // then commits.
+  // Maps `create_relationships_for_one_node` over `nodes` in parallel,
+  // each node in its own transaction.
   // PITFALL : Does not create `has_extra_id` relationships.
   db_name    : &str,
   driver     : &TypeDBDriver,
   nodes      : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
+  println! ("Creating relationships ...");
+  let futures : Vec < _ > =
+    nodes . iter ()
+    . map ( |node| create_relationships_for_one_node (
+              db_name, driver, node ))
+    . collect ();
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    futures::future::join_all (futures) . await;
+  for result in results {
+    result ?; }
+  Ok (()) }
 
+async fn create_relationships_for_one_node (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &SkgNode,
+) -> Result < (), Box<dyn Error> > {
+  if count_relationships (node) == 0 { return Ok (()); }
+  let primary_id : &ID = node . primary_id ()?;
   let options : TransactionOptions =
     TransactionOptions::new() . transaction_timeout (
       Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
-    driver . transaction_with_options ( db_name,
-                                       TransactionType::Write,
-                                       options )
+    driver . transaction_with_options (
+      db_name, TransactionType::Write, options )
     . await ?;
-  println! ("Creating relationships ...");
-  let batch_size : usize = BATCH_SIZE;
-  let mut queries_in_tx : usize = 0;
-  let mut tx : Transaction = tx;
-  for node in nodes {
-    let primary_id : &ID = node . primary_id()?;
-    let rel_count : usize =
-      count_relationships (node);
-    if queries_in_tx > 0 && queries_in_tx + rel_count > batch_size {
-      tx . commit () . await . map_err(
-        |e| format!("Failed to commit relationships batch: {}", e))?;
-      let options : TransactionOptions =
-        TransactionOptions::new() . transaction_timeout (
-          Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
-      tx = driver . transaction_with_options ( db_name,
-                                               TransactionType::Write,
-                                               options )
-        . await ?;
-      queries_in_tx = 0; }
-    create_relationships_from_node (node, &tx)
-      . await . map_err(
-        |e| format!(
-          "Failed to create relationships for node '{}': {}",
-          primary_id . as_str (),
-          e ))? ;
-    queries_in_tx += rel_count; }
+  create_relationships_from_node (node, &tx)
+    . await . map_err (
+      |e| format! (
+        "Failed to create relationships for node '{}': {}",
+        primary_id . as_str (), e )) ?;
   tx . commit () . await
-    . map_err(|e| format!("Failed to commit relationships transaction: {}", e))?;
+    . map_err (
+      |e| format! (
+        "Failed to commit relationships for node '{}': {}",
+        primary_id . as_str (), e )) ?;
   Ok (()) }
 
 pub async fn create_relationships_from_node (
@@ -195,7 +188,7 @@ pub async fn delete_all_outbound_relationships (
   Ok (( )) }
 
 /// Delete every instance of `relation`
-/// where one of the ipnut IDs plays `role`.
+/// where one of the input IDs plays `role`.
 /// Returns the number of IDs processed
 /// (not the number of relations deleted,
 /// which would be more work).
@@ -206,21 +199,33 @@ pub async fn delete_out_links (
   relation : &str,   // e.g. "contains"
   role     : &str,   // e.g. "container"
 ) -> Result < usize, Box<dyn Error> > {
+  let futures : Vec < _ > =
+    ids . iter ()
+    . map ( |id| delete_out_links_for_one_id (
+              db_name, driver, id, relation, role ))
+    . collect ();
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    futures::future::join_all (futures) . await;
+  for result in results {
+    result ?; }
+  Ok ( ids . len () ) }
 
+async fn delete_out_links_for_one_id (
+  db_name  : &str,
+  driver   : &TypeDBDriver,
+  id       : &ID,
+  relation : &str,
+  role     : &str,
+) -> Result < (), Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
-      db_name,
-      TransactionType::Write
-    ) . await ?;
-  for id in ids {
-    tx . query ( format! (
-      r#"match
-           $n   isa node, has id "{}";
-           $rel isa {} ( {}: $n );
-         delete $rel; "#,
-      id . as_str (),
-      relation,
-      role )
-    ) . await ?; }
+      db_name, TransactionType::Write ) . await ?;
+  tx . query ( format! (
+    r#"match
+         $n   isa node, has id "{}";
+         $rel isa {} ( {}: $n );
+       delete $rel; "#,
+    id . as_str (), relation, role )
+  ) . await ?;
   tx . commit () . await ?;
-  Ok ( ids . len () ) }
+  Ok (()) }

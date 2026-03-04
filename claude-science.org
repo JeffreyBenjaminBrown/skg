@@ -314,8 +314,74 @@ Tantivy (1.020s) ran concurrently with TypeDB (6.728s).
 Total wall time equals TypeDB time (6.779s), not TypeDB + Tantivy
 (would have been ~7.748s). Savings: ~1s on this dataset.
 
-** Sub-step breakdown insight
+** Per-node parallel TypeDB operations (join_all)
 
-~create_all_relationships~ dominates TypeDB time at 60%.
-This is the next target for optimization if TypeDB remains the
-bottleneck (e.g., batching relationship creation queries).
+Applied the same ~futures::future::join_all~ pattern from
+~fetch_all_graphnodestats~ to three TypeDB write operations:
+
+1. ~create_all_relationships~: each node gets its own write
+   transaction, all run concurrently. 4.027s → 0.735s (5.5×).
+2. ~delete_out_links~: each ID gets its own write transaction.
+   1.275s → 0.499s (2.6×).
+3. ~create_only_nodes_with_no_ids_present~: each new node gets
+   its own transaction. No improvement (0.97s) because most
+   nodes already exist; the bulk ~which_ids_exist~ check dominates.
+
+Final numbers:
+
+  update_from_and_rerender_buffer:                    3.987s
+    update_graph_minus_merges:                        2.231s
+      update_fs_from_saveinstructions:                0.025s
+      update_typedb_from_saveinstructions:            2.206s
+        create_only_nodes_with_no_ids_present:        0.971s  (44%)
+        delete_out_links:                             0.499s  (23%)
+        create_all_relationships:                     0.735s  (33%)
+      update_tantivy_from_saveinstructions:           0.710s  (parallel)
+
+Overall: ~update_from_and_rerender_buffer~ 16.2s → 4.0s (4× speedup).
+
+** Per-ID parallel reads: attempted and reverted
+
+Tried converting ~which_ids_exist~ and ~pids_from_ids~ from
+bulk disjunction queries to per-ID parallel queries (same
+pattern that worked for write operations). Both regressed or
+showed no improvement:
+
+- ~which_ids_exist~: 0.97s → 1.3s (no benefit)
+- ~pids_from_ids~: 0.90s → 2.8s (significant regression)
+- ~fetch_all_graphnodestats~ (unchanged): 0.7s → 4.4s in same run
+
+The regression was confirmed as TypeDB server contention:
+too many concurrent read transactions. The bulk disjunction
+pattern is already efficient for these read queries. Reverted.
+
+** Insight: when per-ID parallel queries help vs. hurt
+
+Per-ID parallel queries (via ~join_all~) work well for:
+- *Write* transactions (~create_all_relationships~, ~delete_out_links~)
+  where the sequential write-buffer buildup is the bottleneck.
+
+They do NOT help for:
+- *Read* queries that already use efficient bulk disjunctions
+  (~which_ids_exist~, ~pids_from_ids~).
+- Complex nested queries where the per-query overhead is high
+  (~pids_from_ids~ with nested match/fetch).
+
+The TypeDB server shows significant run-to-run variance
+(~fetch_all_graphnodestats~ varies 0.7s–4.4s without code changes),
+likely due to internal GC, connection pool state, or I/O scheduling.
+
+** Stable results (representative run, 781-node dataset)
+
+  update_from_and_rerender_buffer:                    ~4-5s
+    buffer_to_viewnode_forest_and_save_instructions:  ~1.0s
+      add_missing_info_to_forest:                     ~0.9s  (pids_from_ids bulk query)
+    update_graph_minus_merges:                        ~2.1s
+      update_fs_from_saveinstructions:                ~0.02s
+      update_typedb_from_saveinstructions:             ~2.1s
+        create_only_nodes_with_no_ids_present:         ~0.9s  (which_ids_exist bulk query)
+        delete_out_links:                              ~0.4s  (join_all)
+        create_all_relationships:                      ~0.8s  (join_all)
+      update_tantivy_from_saveinstructions:            ~0.6s  (parallel thread)
+    rerender_view (saved):                             ~0.7-2s (varies)
+      fetch_all_graphnodestats:                        ~0.7-2s (join_all, variable)

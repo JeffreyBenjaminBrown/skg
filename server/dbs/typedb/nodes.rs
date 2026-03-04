@@ -68,18 +68,30 @@ pub async fn create_only_nodes_with_no_ids_present (
     if ! known_ids . contains (
       node . primary_id()? . as_str () )
     { to_create . push (node); }}
-  { // Create them.
-    let tx : Transaction =
-      driver . transaction (
-        db_name,
-        TransactionType::Write
-      ) . await ?;
-    println! ( "Creating {} new nodes ...",
-                to_create . len () );
-    for node in &to_create {
-      create_node ( node, &tx ) . await ?; }
-    tx . commit () . await ?; }
+  println! ( "Creating {} new nodes ...",
+              to_create . len () );
+  let futures : Vec < _ > =
+    to_create . iter ()
+    . map ( |node| create_one_node_in_own_tx (
+              db_name, driver, node ))
+    . collect ();
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    futures::future::join_all (futures) . await;
+  for result in results {
+    result ?; }
   Ok ( to_create . len () ) }
+
+async fn create_one_node_in_own_tx (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &SkgNode,
+) -> Result < (), Box<dyn Error> > {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Write ) . await ?;
+  create_node ( node, &tx ) . await ?;
+  tx . commit () . await ?;
+  Ok (()) }
 
 /// Batch existence check:
 /// Given a set of candidate ID *strings*,

@@ -23,6 +23,20 @@ If anything blocks your progress that needs my attention, ping me.
   gets big enough to start slowing you down,
   feel free to move that stuff to a new .org file in claude-science/,
   leaving a link to it in claude-science.org.
+* import error in tests/
+  revealed by nextest. the git history should reveal
+  when the relevant definition was replaced.
+* in emacs, 'block buffer-locally' while awaiting save-buffer
+  Display a message to that effect
+  if the user tries to edit an affected buffer.
+  The user should be able to edit other buffers,
+  but until that response is received.
+  unable to edit the saved buffer *or* any collateral ones.
+  Emacs has a buffer-local 'read only' mode that will be useful.
+
+  This will require Rust to immediately tell Emacs
+  which views are collateral,
+  before computing how to update things.
 * more things should probably preserve preexisting views
   the way 'skg-visit-link' does.
 * replace term: 'integration' -> 'assimilation'
