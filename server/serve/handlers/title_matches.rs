@@ -11,6 +11,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, GraphNodeStats, C
 
 use futures::executor::block_on;
 use sexp::Sexp;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::TcpStream;
@@ -220,15 +221,17 @@ pub fn format_matches_as_org_mode (
           (id, matches) } )
         . collect() );
   id_entries . sort_by ( |a, b| {
-    // Sort IDs by each one's best (and now first) match score.
-    { let score_b : f32 =
-        b . 1 . first() . map( |(s, _)| *s) . unwrap_or (0.0);
-      score_b
-    } . partial_cmp (
-      & { let score_a : f32 =
-            a . 1 . first() . map( |(s, _)| *s) . unwrap_or (0.0);
-          score_a }
-    ) . unwrap () } );
+    let score_a : f32 =
+      a . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+    let score_b : f32 =
+      b . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+    let score_ord : Ordering =
+      score_b . partial_cmp (& score_a) . unwrap ();
+    if score_ord != Ordering::Equal {
+      return score_ord; }
+    compare_graphnodestats_for_search_ranking (
+      stats_by_id . get (& a . 0),
+      stats_by_id . get (& b . 0) ) } );
   for (id, matches) in id_entries {
     let graph_stats : GraphNodeStats =
       stats_by_id . get (&id)
@@ -271,6 +274,28 @@ pub fn format_matches_as_org_mode (
                             score, id, title )) } ), } )
         . expect ("TrueNode rendering never fails")); }}
   result }
+
+/// Tie-breaker for search results with equal scores:
+/// shorter containerward path first, then more contents first.
+fn compare_graphnodestats_for_search_ranking (
+  a : Option < &GraphNodeStats >,
+  b : Option < &GraphNodeStats >,
+) -> Ordering {
+  let path_len_a : usize =
+    a . and_then ( |s| s . containerwardPath . as_ref () )
+    . map ( |cp| cp . length ) . unwrap_or (usize::MAX);
+  let path_len_b : usize =
+    b . and_then ( |s| s . containerwardPath . as_ref () )
+    . map ( |cp| cp . length ) . unwrap_or (usize::MAX);
+  let path_ord : Ordering =
+    path_len_a . cmp (& path_len_b);
+  if path_ord != Ordering::Equal {
+    return path_ord; }
+  let contents_a : usize =
+    a . and_then ( |s| s . numContents ) . unwrap_or (0);
+  let contents_b : usize =
+    b . and_then ( |s| s . numContents ) . unwrap_or (0);
+  contents_b . cmp (& contents_a) }
 
 pub fn search_terms_from_request (
   request : &str

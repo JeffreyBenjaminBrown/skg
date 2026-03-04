@@ -9,6 +9,12 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* DONE search result sort order
+  To break ties when search results have the same score,
+  let's sort within those groups by, first,
+  the length of the containerward path (smaller = better, higher)
+  and if there's still a tie,
+  by the number of content (more = better, higher).
 * DONE containerwardPath
   Currently a root is assigned a containerwardPath length of 1.
   It sohuld be zero. In general, the stat should be length(path) - 1,
