@@ -1,0 +1,58 @@
+* Potential further optimizations
+
+** Content view pipeline (currently ~0.16s server-side)
+
+*** Parallelize BFS node lookups in render_initial_forest_bfs
+
+Currently 'build_node_branch_minus_content' is called
+sequentially for each node in each BFS generation (~3-4ms each,
+~90ms total for 24 nodes). These could be parallelized per
+generation using 'futures::future::join_all', similar to
+what was done for graphnodestats. Expected: ~90ms → ~5ms.
+
+Complication: each call mutates the shared tree and map.
+Would need to fetch (skgnode, viewnode) pairs in parallel,
+then append them to the tree sequentially. The TypeDB query
+(pid_and_source_from_id) is the slow part; the tree mutation
+is instant.
+
+*** Cache pid_and_source_from_id results
+
+Every node lookup queries TypeDB for its PID and source.
+These rarely change. A HashMap<ID, (ID, SourceName)> cache,
+invalidated on save, would eliminate ~24 TypeDB round-trips
+per view load.
+
+*** Cache graphnodestats per PID
+
+For repeated views of the same node (common during editing),
+cache the AllGraphNodeStats results. Invalidate on save.
+Would make subsequent views of the same node near-instant.
+
+** Save pipeline
+
+*** Profile the save path
+
+The save pipeline ('save_buffer.rs') has not been profiled.
+It runs 'complete_viewtree' (preorder + postorder) which
+issues TypeDB queries per node. The same per-PID
+parallelization pattern likely applies.
+
+** TypeDB query patterns generally
+
+*** Avoid disjunctions for batch lookups
+
+TypeDB v3 disjunctions scale non-linearly: 1 branch takes
+15ms, 24 branches takes 4300ms. Wherever batch lookups use
+disjunctions, consider per-item parallel queries instead.
+
+This applies to any code using 'build_id_disjunction' or
+'build_has_id_disjunction' — grep for those to find
+candidates.
+
+*** Drop extra_id branches from PID-only paths
+
+Several queries include extra_id disjunction branches for
+generality, but many callers only ever pass primary IDs.
+Specialized PID-only query variants (as done in
+'all_graphnodestats.rs') are simpler and may be faster.
