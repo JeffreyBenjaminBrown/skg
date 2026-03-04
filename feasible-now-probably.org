@@ -10,6 +10,7 @@ As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
 * saving is slow now
+** 1
   If I add a child to the root of a view and save,
   the Emacs buffer updates by giving it (skg focused) metadata,
   and then waits a few seconds before the server responds.
@@ -23,6 +24,16 @@ If anything blocks your progress that needs my attention, ping me.
   gets big enough to start slowing you down,
   feel free to move that stuff to a new .org file in claude-science/,
   leaving a link to it in claude-science.org.
+** stats
+add_missing_info_to_forest:           ~0.9s   (TypeDB: pids_from_ids)
+update_typedb_from_saveinstructions:  ~2.1s   (TypeDB: all 3 sub-steps)
+update_tantivy_from_saveinstructions: ~0.6s   (Tantivy, parallel)
+fetch_all_graphnodestats:             ~0.7-2s (TypeDB: per-PID stats)
+everything else:                      ~0.1s
+** DONE reducing update_typedb_from_saveinstructions
+Sweet! Okay so we just need to discard save instructions iwth no new info. This is a pinch harder than it sounds, because None in a SkgNode indicates 'no opinion' (whereas Some([]) indicates 'this should really be empty'). But basically we've got our solution. For each SkgNode, before computing a SaveInstruction for it, we test whether it would modify the SkgNode in the pool. If it is, and it has None for some vector field that is Some in the pool, that's not a meaningful difference. (But having a None body is different -- if the body in the pool is Some, that's a meaningful difference, and should get a SaveInstruction.) If it's not in the pool, it gets an instruction.
+
+There's already code somewhere for distinguishing None from Some([]) in a SkgNode. If possible, let's use existing functions or extract common functions rather than duplicating that logic.
 * import error in tests/
   revealed by nextest. the git history should reveal
   when the relevant definition was replaced.

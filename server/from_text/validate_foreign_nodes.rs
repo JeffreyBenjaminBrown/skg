@@ -112,7 +112,7 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
 /// subscribes_to, hides_from_its_subscriptions): None means "no opinion"
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
-fn buffernode_differs_from_disknode(
+pub(crate) fn buffernode_differs_from_disknode(
   buffer_node: &crate::types::skgnode::SkgNode,
   disk_node: &crate::types::skgnode::SkgNode,
 ) -> bool {
@@ -140,7 +140,7 @@ fn buffernode_differs_from_disknode(
                            &disk_node . overrides_view_of)) }
 
 /// Lets us treat Some([]) and None as equivalent.
-fn flatten_opt_vec<T: Clone>(
+pub(crate) fn flatten_opt_vec<T: Clone>(
   v: &Option<Vec<T>>
 ) -> Option<Vec<T>> {
   match v {
