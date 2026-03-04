@@ -9,6 +9,14 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* no clobbering views when visiting a link
+  Currently 'skg-visit-link' opens a new buffer.
+  If the new buffer has the same title as a preexisting one,
+  it clobbers the old one.
+* DONE override the ordinary save command
+  In a skg content view (but not a skg search results buffer),
+  C-x C-s should call skg-request-save-buffer,
+  rather than the ordinary save command.
 * DONE search result sort order
   To break ties when search results have the same score,
   let's sort within those groups by, first,

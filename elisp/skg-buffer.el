@@ -8,6 +8,14 @@
 (require 'heralds-minor-mode)
 (require 'skg-sexpr-search)
 
+(define-minor-mode skg-content-view-mode
+  "Minor mode for skg content view buffers.
+Rebinds C-x C-s to save via the skg server."
+  :lighter nil
+  :keymap (let ((map (make-sparse-keymap)))
+            (define-key map (kbd "C-x C-s") #'skg-request-save-buffer)
+            map))
+
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")
 (put 'skg-view-uri
@@ -71,6 +79,7 @@ otherwise generate a new UUID."
         (insert org-text)
         (org-mode)
         (heralds-minor-mode))
+      (skg-content-view-mode 1)
       (setq skg-view-uri uri)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook
