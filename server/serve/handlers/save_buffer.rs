@@ -8,6 +8,7 @@ use crate::serve::timing_log::{timed, timed_async};
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp_with_updates,
+  format_collateral_uris_sexp,
   read_length_prefixed_content,
   send_response,
   send_response_with_length_prefix};
@@ -22,7 +23,7 @@ use crate::update_buffer::update_views_after_save;
 use ego_tree::Tree;
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -74,6 +75,14 @@ pub fn handle_save_buffer_request (
     it };
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
+      { // Send early lock message before the expensive pipeline.
+        let uris_to_lock : Vec<ViewUri> =
+          uris_of_views_to_lock (
+            &viewuri_from_request_result, conn_state );
+        let lock_sexp : String =
+          format_collateral_uris_sexp ( &uris_to_lock );
+        send_response_with_length_prefix (
+          stream, &lock_sexp ); }
       timed ( config, "update_from_and_rerender_buffer", || {
         match block_on(
           update_from_and_rerender_buffer (
@@ -247,3 +256,23 @@ pub fn deleted_ids_to_source (
           result . insert ( id,
                             source_name . clone() ); }} }}
   result }
+
+/// Every other open view sharing at least one PID with the saved view.
+/// Over-approximates true collateral (which requires parsing the buffer
+/// to know which PIDs actually changed). This is intentional: locking
+/// too many buffers briefly is harmless; missing one could lose edits.
+fn uris_of_views_to_lock (
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  conn_state                  : &ConnectionState,
+) -> Vec<ViewUri> {
+  let saved_uri : &ViewUri = match viewuri_from_request_result {
+    Ok (uri) => uri,
+    Err (_)  => return Vec::new () };
+  let pids : Vec<ID> =
+    conn_state . memory . viewuri_to_pids (saved_uri);
+  let mut collateral : HashSet<ViewUri> = HashSet::new ();
+  for pid in &pids {
+    for uri in conn_state . memory . views_containing (pid) {
+      if &uri != saved_uri {
+        collateral . insert (uri); } } }
+  collateral . into_iter () . collect () }

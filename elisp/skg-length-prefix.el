@@ -8,9 +8,11 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   (none)
 
-(defun skg-lp-handle-generic-chunk (completion-handler tcp-proc chunk)
+(defun skg-lp-handle-generic-chunk (tcp-proc chunk)
   "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
-COMPLETION-HANDLER is called with the final payload when parsing completes."
+Reads the completion handler from `skg-lp--completion-handler'.
+After :done, if the handler installed a successor and there is
+buffered data, continues the loop."
   ;; Append bytes
   (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk))
   ;; Repeatedly advance the state machine; stop when it returns a terminal result.
@@ -29,20 +31,24 @@ COMPLETION-HANDLER is called with the final payload when parsing completes."
                skg-lp--bytes-left left)
          (cl-return nil))
 
-        ;; Completed a full body → call completion handler, clear handler, keep any remainder in the accumulator, and stop.
+        ;; Completed a full body → call completion handler, keep any remainder.
+        ;; If the handler installed a successor and there is buffered data,
+        ;; continue the loop to process the next LP message.
         (`(:done ,payload ,remainder)
          (setq skg-lp--buf        remainder
                skg-lp--bytes-left nil)
-         (funcall completion-handler tcp-proc payload)
-         ;; One response per request.
-         (setq skg-doc--response-handler nil)
-         (cl-return nil))
+         (funcall skg-lp--completion-handler tcp-proc payload)
+         (if (and skg-lp--completion-handler
+                  (> (length skg-lp--buf) 0))
+             nil ; continue loop -- more data and a successor handler
+           (cl-return nil)))
 
         ;; Hard error → reset state and signal.
         (`(:error ,msg)
-         (setq skg-lp--buf        (unibyte-string)
-               skg-lp--bytes-left nil
-               skg-doc--response-handler nil)
+         (setq skg-lp--buf                (unibyte-string)
+               skg-lp--bytes-left         nil
+               skg-lp--completion-handler  nil
+               skg-doc--response-handler   nil)
          (error "%s" msg)))))
 
 (defun skg-lp-step (buf bytes-left)

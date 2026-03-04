@@ -14,7 +14,8 @@
 (when load-file-name
   (let ((elisp-dir (file-name-directory load-file-name)))
     (add-to-list 'load-path elisp-dir)
-    (add-to-list 'load-path (expand-file-name "skg-sexpr" elisp-dir))))
+    (add-to-list 'load-path (expand-file-name "skg-sexpr" elisp-dir))
+    (add-to-list 'load-path (expand-file-name "skg-request-save" elisp-dir))))
 
 (defun find-skg-content-buffer ()
   "Find a *skg:* buffer that's not a search buffer."

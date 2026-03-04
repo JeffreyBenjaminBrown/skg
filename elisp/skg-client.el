@@ -10,6 +10,7 @@
 (require 'heralds-minor-mode)
 (require 'skg-metadata)
 (require 'skg-request-views)
+(require 'skg-lock-buffers)
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)
@@ -49,7 +50,12 @@
            :filter ;; handles the response
            #'skg-handle-rust-response
            :coding 'binary
-           :nowait nil )) )
+           :nowait nil ))
+    (set-process-sentinel
+     ;; What sentinels do: When Emacs detects that a process changes state — it exits, is killed, the TCP connection closes (maybe abnormally), etc. — Emacs calls that process's sentinel function with the process and a string describing the event (e.g. "deleted\n", "connection broken by remote peer\n").
+     ;; What this sentinel does: If the server crashes or the connection drops mid-save, skg--tcp-sentinel fires and unlocks all save-locked buffers. Without it, a server crash would leave buffers permanently locked.
+     skg-rust-tcp-proc
+     #'skg--tcp-sentinel) )
   skg-rust-tcp-proc)
 
 (defun skg-handle-rust-response (tcp-proc string)
@@ -65,12 +71,20 @@ and neither of them uses the `tcp-proc` argument. Unless it will be used by late
     (if (string-prefix-p "((busy" trimmed) ;; the busy signal
         (let ((parsed (car (read-from-string trimmed))))
           (message "%s" (cdr (assq 'busy parsed)))
-          (setq skg-doc--response-handler nil
-                skg-lp--buf             (unibyte-string)
-                skg-lp--bytes-left      nil))
+          (skg--unlock-all-save-locked)
+          (setq skg-doc--response-handler  nil
+                skg-lp--completion-handler nil
+                skg-lp--buf               (unibyte-string)
+                skg-lp--bytes-left        nil))
       (if skg-doc--response-handler
           (funcall skg-doc--response-handler tcp-proc string)
         (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )) )
+
+(defun skg--tcp-sentinel (_proc event)
+  "Unlock all save-locked buffers when the TCP connection closes.
+Prevents permanently locked buffers if the server crashes mid-save."
+  (when (not (string-prefix-p "open" event))
+    (skg--unlock-all-save-locked)) )
 
 (defun skg-doc-disconnect ()
   "Manually close the connection to the Rust server."

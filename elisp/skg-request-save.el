@@ -8,18 +8,23 @@
 (require 'skg-focus)
 (require 'skg-metadata)
 (require 'skg-buffer)
+(require 'skg-lock-buffers)
 
 (defun skg-request-save-buffer ()
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
-Rust will prepend a line and send the modified content back,
-which will replace the current buffer contents."
+The server sends two LP messages:
+  1. Early lock message with collateral view URIs.
+  2. Full save response (content + errors + collateral updates).
+All skg buffers are locked immediately; non-collateral buffers are
+unlocked when the early response arrives."
   (interactive)
   ;; Add metadata markers before capturing buffer contents
   (skg-add-folded-markers)
   (skg-add-focused-marker)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (save-buffer (current-buffer))
+         (saved-uri skg-view-uri)
          (buffer-contents (buffer-string))
          (request-s-exp (concat (prin1-to-string
                                  `((request . "save buffer")
@@ -29,19 +34,19 @@ which will replace the current buffer contents."
          (content-length (length content-bytes))
          (header (format "Content-Length: %d\r\n\r\n" content-length)))
 
-    (setq ;; Prepare LP state and handler for the response.
-     ;; The TCP process filter may fire in an arbitrary buffer,
-     ;; so we capture save-buffer and switch into it for the handler.
+    ;; Lock ALL skg content-view buffers immediately, before sending.
+    ;; This eliminates the race window between the send and the
+    ;; server's early response.
+    (skg--lock-all-skg-buffers)
+
+    (setq
      skg-lp--buf (unibyte-string)
      skg-lp--bytes-left nil
+     skg-lp--completion-handler
+     (lambda (_tcp-proc payload)
+       (skg--save-phase-1-handler saved-uri save-buffer payload))
      skg-doc--response-handler
-     (lambda (tcp-proc chunk)
-       (skg-lp-handle-generic-chunk
-        (lambda (_tcp-proc payload)
-          (with-current-buffer save-buffer
-            (skg-handle-save-sexp payload))
-          (setq skg-doc--response-handler nil))
-        tcp-proc chunk)))
+     #'skg-lp-handle-generic-chunk)
 
     ;; Send the request line first
     (process-send-string tcp-proc request-s-exp)
@@ -49,6 +54,46 @@ which will replace the current buffer contents."
     ;; Send the length-prefixed buffer contents
     (process-send-string tcp-proc header)
     (process-send-string tcp-proc buffer-contents)))
+
+(defun skg--save-phase-1-handler (saved-uri save-buffer payload)
+  "Auto-detecting handler for the first LP message of a save response.
+If PAYLOAD contains 'lock-collateral-views', it is the early lock
+message: unlock non-collateral buffers and install phase 2.
+Otherwise it is a direct save response (e.g. server error before
+the early message was sent): handle it as the phase 2 response.
+(There are only two phases.)"
+  (condition-case err
+      (let* ((response (read payload))
+             (collateral-entry (assoc 'lock-collateral-views response)))
+        (if collateral-entry
+            (let ((collateral-uris (cadr collateral-entry)))
+              (skg--unlock-non-collateral-buffers
+               saved-uri collateral-uris)
+              (setq skg-lp--completion-handler
+                    (lambda (_tcp-proc payload)
+                      (skg--save-phase-2-handler
+                       save-buffer payload)) ))
+          (skg--save-phase-2-handler save-buffer payload)))
+    (error
+     (skg--unlock-all-save-locked)
+     (setq skg-lp--completion-handler nil
+           skg-doc--response-handler  nil)
+     (message "ERROR in save phase 1 handler: %S" err)) ))
+
+(defun skg--save-phase-2-handler (save-buffer payload)
+  "Handle the full save response.
+Unlocks all save-locked buffers, then processes the save response.
+Unlock MUST happen before `skg-handle-save-sexp' because
+`skg-replace-buffer-with-new-content' calls erase-buffer + insert,
+which would trigger overlay modification-hooks if still present."
+  (unwind-protect
+      (progn
+        (skg--unlock-all-save-locked)
+        (with-current-buffer save-buffer
+          (skg-handle-save-sexp payload)))
+    (skg--unlock-all-save-locked)
+    (setq skg-lp--completion-handler nil
+          skg-doc--response-handler  nil)) )
 
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp: ((content ...) (errors (...)) (other-views-to-update ((URI_1 CONTENT_1) ...)))."

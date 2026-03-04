@@ -26,7 +26,14 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
   (defvar skg-lp--buf (unibyte-string)
     "Unibyte byte accumulator for length-prefixed responses.")
   (defvar skg-lp--bytes-left nil
-    "If nil, expecting header. If an integer, number of body bytes remaining."))
+    "If nil, expecting header. If an integer, number of body bytes remaining.")
+  (defvar skg-lp--completion-handler nil
+    "What to do with a fully-assembled LP payload.
+Called by `skg-lp-handle-generic-chunk' as
+  (funcall skg-lp--completion-handler tcp-proc payload).
+Set by the code that initiates the request (e.g. `skg-request-save-buffer').
+For multi-message protocols (e.g. save's early-lock then full-response),
+the handler replaces itself with a successor for the next message."))
 
 (defvar skg-config-dir nil
   "Directory containing the skgconfig.toml file.

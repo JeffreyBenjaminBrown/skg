@@ -89,8 +89,7 @@
 
   (with-current-buffer "*skg-content-view*"
     (message "Calling skg-request-containerward-view...")
-    (skg-request-containerward-view)
-    (skg-request-save-buffer) ;; save to send request to server
+    (skg-request-containerward-view) ;; this also saves the buffer
 
     ;; Wait for response
     (skg-test-wait-for-response)

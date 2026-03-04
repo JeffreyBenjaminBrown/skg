@@ -111,6 +111,20 @@ pub(super) fn format_buffer_response_sexp_with_updates (
     collateral_views_sexp ] )
     . to_string () }
 
+/// Format: ((lock-collateral-views ("URI1" "URI2" ...)))
+pub(super) fn format_collateral_uris_sexp (
+  uris : &[ViewUri],
+) -> String {
+  let uri_sexps : Vec<Sexp> =
+    uris . iter ()
+    . map ( |u| Sexp::Atom ( Atom::S ( u . 0 . clone () )) )
+    . collect ();
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "lock-collateral-views" . to_string () )),
+      Sexp::List ( uri_sexps ) ] ) ] )
+    . to_string () }
+
 /// Reads length-prefixed content from the stream.
 /// Expected format:
 ///   "Content-Length: N\r\n\r\n" followed by N bytes of content.

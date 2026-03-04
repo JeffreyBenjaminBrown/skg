@@ -28,12 +28,13 @@ Optional TCP-PROC allows reusing an existing connection."
     (setq ;; Prepare LP state and handler
      skg-lp--buf               (unibyte-string) ;; empty string
      skg-lp--bytes-left        nil
+     skg-lp--completion-handler
+     (lambda (tcp-proc payload)
+       (skg-handle-content-view-sexp tcp-proc payload view-uri)
+       (setq skg-lp--completion-handler nil
+             skg-doc--response-handler  nil))
      skg-doc--response-handler
-     (lambda (tcp-proc chunk)
-       (skg-lp-handle-generic-chunk
-        (lambda (tcp-proc payload)
-          (skg-handle-content-view-sexp tcp-proc payload view-uri))
-         tcp-proc chunk)))
+     #'skg-lp-handle-generic-chunk)
     (process-send-string tcp-proc request-s-exp)) )
 
 (defun skg-handle-content-view-sexp (tcp-proc sexp-string view-uri)

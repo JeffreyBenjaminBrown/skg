@@ -37,7 +37,7 @@ There's already code somewhere for distinguishing None from Some([]) in a SkgNod
 * DONE import error in tests/
   revealed by nextest. the git history should reveal
   when the relevant definition was replaced.
-* in emacs, 'block buffer-locally' while awaiting save-buffer
+* DONE in emacs, 'block buffer-locally' while awaiting save-buffer
   The user should be able to edit other buffers,
   but until that response is received.
   unable to edit the saved buffer *or* any collateral ones.
@@ -48,6 +48,8 @@ There's already code somewhere for distinguishing None from Some([]) in a SkgNod
   This will require Rust to immediately tell Emacs
   which views are collateral,
   before computing how to update things.
+* update elisp/COMMANDS.org with any new user-facing commands
+  (or aliases) introduced in the last week
 * more things should probably preserve preexisting views
   the way 'skg-visit-link' does.
 * replace term: 'integration' -> 'assimilation'
