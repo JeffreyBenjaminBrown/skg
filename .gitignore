@@ -20,6 +20,7 @@
 /plans-done
 /rust-indent/
 /target
+/tests/results
 /tests/**/generated/
 /tests/tantivy/generated_aliases/
 Cargo.lock
