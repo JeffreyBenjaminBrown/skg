@@ -9,6 +9,375 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* skg import must preserve and define contexts
+** an easier algorithm
+*** a 'context' is an (ID, Set (ID)) pair.
+    The single ID is the context 'origin'.
+    (Think 'root', but it really can be other things too.)
+    The Set of IDs is its recursive content,
+      truncated without inclusion at other origins.
+*** a 'treelike context'
+    is a pair (O, S)
+    such that S is a connected set
+      including O and all of its recursive content
+      truncated without inclusion at other context origins.
+
+    So for instance, suppose our graph contains two containment chains
+      A  { B  { C { D
+      A' { B' { C { E
+    and no other relationships. Since C is multiply contained,
+    it is an origin. Since A and A' are roots,
+    they are origins, too.
+    The context from origin C
+      includes C, D and E (C's recursive content).
+    The one from A includes A and B, but not C,
+    because C is an origin.
+    Similarly, context A' includes A' and B'.
+*** a "treelike context origin" is
+    any link target
+    any root
+    anything multiply contained
+**** Sidebar: Why 'treelike'?
+    Because Any of these qualities
+    indicates there is something sufficiently focal about the node
+    that it deserves to stand out in the index.
+    It is not just the continuation of a containment tree
+      started somewhere else -- in that case,
+      the somewhere else desreves index priority.
+    That's what the 'is a context' property on nodes does;
+    it singles out some of them as particularly interesting
+    in search results.
+    We will index the text of every node,
+    but in search results we will give priority to contexts.
+*** to construct all the treelike contexts
+    First find all the treelike context origins,
+      via three TypeDB queries:
+      all roots, all link targets, all multiply contained
+
+    Then "grow" each origin in the contentward direction.
+    That is, the origin (left member of pair)
+      will be paired with  subset of
+        its recursive content including itself,
+      where the subset is defined via truncation
+      wherever we run into one of the other context origins.
+
+    Procedurally: Collect all its content nodes.
+      Discard those that are origins,
+      and any that were already in this context.
+      Whichever survive that filter, add to this context.
+      Then repeat the procedure
+        by recursing on the immediate content of what we just added.
+      DFS, BFS, shouldn't matter for correctness
+      (although maybe it does for speed).
+*** a cycles-extended context is
+**** Any normal context.
+**** Any connected set distinct from the normal contexts.
+     These are all, I believe, cycles.
+     For now we will highlight each node from the cycles
+     with the same 'context' property.
+     To find them, I think we just subtract the union of all contexts
+     from the entire graph,
+     and then run a connected-set algorithm.
+** feedback and response
+*** Critique: "skg import must preserve and define contexts"
+
+**** The big picture is sound.
+     The new algorithm is dramatically better than the old one.
+     Three TypeDB queries + contentward growth + cycle cleanup
+     replaces the bimap/climbing/parallelism machinery.
+     The criticisms below are refinements, not objections.
+
+**** "preserve" is undefined
+     The headline says "preserve and define contexts."
+     "Define" is clear — identify origins, grow contexts.
+     But what does "preserve" mean?
+     That existing context marks survive re-import?
+     That import doesn't destroy context-relevant structure?
+     It is never explained.
+
+***** TODO right! I forgot
+      I described how to construct contexts in skg,
+      with no other information.
+      But in org-roam we have other information:
+      Some nodes are special because the have an ID.
+      Even if nothing links to them,
+      I want to mark those nodes as treelike context origins,
+      because there was something special enough about them
+      to warrant having an ID.
+
+**** The remainder after subtraction is not all cycles
+     The spec says: subtract the union of all treelike contexts
+     from the graph, and "these are all, I believe, cycles."
+
+     Almost. Consider: A contains B, B contains C, C contains A,
+     and C also contains D. None of A, B, C, D are roots
+     (all have containers), link targets, or multiply contained
+     (each has exactly 1 container). So none are origins.
+     No treelike context reaches them. They all land in the remainder.
+     {A, B, C} form a cycle, but D is a tail hanging off C.
+     D is in the connected set but is not part of the cycle.
+
+     The practical question: should D be marked as a context?
+     Probably yes — it's otherwise unreachable from any context.
+     But the spec says "highlight each node from the cycles,"
+     implying cycle membership is the reason for marking.
+     D's reason is different (orphaned by a cycle).
+     Worth being explicit about this case.
+
+***** TODO you're right!
+      For every such connected set,
+      pick any node and climb contentward until forming a cycle.
+      Call the nodes in that cycle its origins.
+      So a context is really two sets:
+      - a set of origins
+      - a set of recursive content reachable from those origins,
+        truncating without inclusion at any other origins.
+**** Contentward growth needs a data source
+     "Grow each origin in the contentward direction."
+     This requires knowing every node's contents.
+     During import, is the full containment graph already in TypeDB?
+     Or are we building it as we import?
+     If it's in TypeDB, contentward growth could be a recursive query.
+     If it's in memory (from parsing .skg files), it's a simple BFS.
+     The spec doesn't say.
+***** TODO There's already TypeDB data, and the user can import more from org-roam.
+      The user starts the server.
+      It loads whatever graph might already be in the user's skg data.
+      Maybe there's no data. If there is, computes contexts from it.
+      (This should become a standard part of startup --
+      but the context property could be built in the background,
+      and search results need not use it until it is available.)
+
+      The user can then import org-roam data.
+      The import creates .skg files and populates TypeDB --
+      and after all that normal, already-implemented stuff,
+      the import grows the set of contexts to include the new data.
+      The new data can link to (or even theoretically contain)
+      data that was already in the user's skg graph.
+      (The former is indeed likely,
+      if one imports multiple org-roam repos over time.)
+**** Search-time priority mechanism is unspecified
+     "We will index the text of every node,
+     but in search results we will give priority to contexts."
+     How? Tantivy supports document boosting, field boosting,
+     and custom scoring. A boolean 'is_context' field
+     with a boost multiplier would work,
+     but the spec doesn't discuss the mechanism.
+     This matters because it determines what gets stored in Tantivy.
+***** TODO I think a boolean 'is context' is most natural.
+**** Context utility degrades for dense/shallow graphs
+     The heuristic assumes deep trees where
+     structural importance varies by position.
+     In org-roam / Zettelkasten style notes:
+     - Trees are often 1-3 levels deep (nearly everything is near a root)
+     - Heavy internal linking means many nodes are link targets
+     In such graphs, most nodes are context origins.
+     The distinction provides little filtering.
+     This is not a flaw in the algorithm —
+     it might just mean that for densely-linked shallow data,
+     almost everything IS context, and that's honest.
+     But worth knowing before expecting the feature
+     to meaningfully narrow search results.
+***** TODO I need it.
+      My search results are full of uninteresting leaves.
+**** "Discard those that were already in this context" — when does this trigger?
+     During contentward growth from a single origin,
+     can you reach the same node twice?
+     Only if there are two paths from origin O to node X,
+     with neither passing through another origin.
+     That requires X to be multiply contained
+     (by two non-origin ancestors), but then X IS an origin
+     and would be discarded for that reason, not this one.
+     Unless the two paths converge at a node higher than X
+     and X is below that convergence —
+     but that convergence point would be multiply contained
+     and thus an origin, so growth would have stopped there.
+     I believe this check is dead code.
+     (Not harmful, just worth noting.)
+***** TODO it's for cycles
+      Even if the origin is a true root,
+      one of its descendents might be in a cycle.
+      This check prevents infinite regress.
+**** Minor: the concern about skg-made links
+     "Maybe this will be unwanted for links made in skg"
+     is only in the old (DONE) section.
+     If it's still a live concern,
+     it should appear in the new algorithm.
+     If the new algorithm resolved it, worth noting how.
+***** TODO it deserves a comment in the code
+      Without having much experience using this app yet
+      I don't have a sense for which is better.
+      Maybe we'll just let the user manually tweak this property.
+      But we don't need to worry about it yet.
+*** TODO actually there should be a hierarchy of context types
+    True root = score * 100
+    Cycle origin = score * 30
+    Link target = score * 10
+    Multiply contained = score * 3
+
+    These score multipliers let us dispense with
+    the recently-made cruder change to search result priority
+    (see commit 7488d6383ad1b9e7bbcdf68fe562ba93dcc56bd7).
+** feedback, round 2
+
+*** DONE You were right about the "already in this context" check. I was wrong.
+    A root's contentward growth can reach into a cycle
+    buried among its descendants. Without the visited-set check,
+    BFS/DFS would loop forever. Not dead code at all.
+
+*** "Climb contentward until forming a cycle" — did you mean containerward?
+    In your response to the cycle/tail criticism, you wrote:
+    "pick any node and climb contentward until forming a cycle."
+    But contentward = toward children. If you pick a leaf
+    in the remainder (like D in the example), it has no content;
+    climbing contentward goes nowhere.
+    Containerward works: from any node in the remainder,
+    follow the unique container chain
+    (each has exactly 1, since none are multiply contained),
+    and you must eventually revisit a node (finite graph, no roots in remainder).
+    That revisited node is where the cycle begins.
+    The cycle is the set of nodes between the two visits.
+
+**** TODO right! containerward
+
+*** The scoring hierarchy raises three questions
+**** Do multipliers stack?
+     A root that is also a link target: score * 100 * 10 = * 1000?
+     Or max-of-applicable = * 100?
+     Stacking lets rare combinations dominate;
+     max-of-applicable is more predictable.
+     (I'd lean toward max, but either is defensible.)
+***** TODO use only the max
+**** Where do org-roam IDs fit?
+     You added "has an org-roam ID" as a context origin criterion,
+     but it's absent from the scoring table.
+     It seems like it would sit between link target and multiply contained —
+     less focal than a link target (nothing references it),
+     more focal than mere multiply-containedness.
+     Maybe score * 5?
+***** treat it like being a link target
+      since that's probably why it was given an ID
+**** Tantivy storage: boolean → numeric
+     The boolean 'is_context' from earlier is now superseded
+     by the numeric multiplier. Store the context type
+     (or the multiplier directly) as a numeric field in Tantivy.
+     Apply it at query time so the multipliers can be tuned
+     without re-indexing. (If you bake the boost at index time
+     via set_boost, changing the multipliers means re-indexing everything.)
+***** TODO better to store a meaningful label
+      ContextOrigin = Root | Target | CycleMember | MultiContained
+*** Background computation at startup is wise
+    If the context property is computed in the background,
+    search works immediately (without context boosting)
+    and improves once computation finishes.
+    But: if the user imports data and immediately searches,
+    newly-imported nodes won't have context info yet.
+    Consider: should import block until contexts are computed
+    for the imported subset? Or is eventual consistency fine?
+**** TODO include those results in the search results without multipliers
+     and include a message in the search results,
+     explaining that some things might deserve higher priority
+     if they're from the org-roam data being imported
+     because the context set has not been extended
+     to cover that data yet
+*** A context is now (Set<Origin>, Set<Member>) — nice generalization
+    The original spec had one origin per context.
+    Your cycle-origin proposal makes it a set of origins.
+    This is cleaner: treelike contexts just happen to have
+    a singleton origin set.
+    Worth noting in the spec for clarity.
+** DONE earlier
+*** instead index every node, but also whether it is a context
+    The user can choose to search over contexts or over everything.
+*** goal
+    We index only the text in the titles of contexts.
+    A context is a nonlinearity in the
+      containerward or link-sourceward direction.
+
+    One kind of context is a root:
+      the countainerward boundary of the tree it defines.
+      Every root is a context.
+
+    Anything linked to is also context.
+    (Maybe this will be unwanted for links made in skg,
+    but it is a desirable property of links from org-roam.)
+
+    If containerward traversal hits a cycle
+      -- which perhaps should be discouraged --
+      index every node in it.
+*** algorithm
+    Start a 'to_context' bimap from ID to ID.
+      IDs on the right are contexts.
+      Each context will map to itself,
+      and every ID in the bimap will appear on the left.
+      A value on either side might be associated with many in the other.
+      (If our BiMap implementation only supports
+        set-values in one direction, have it support both.)
+      The set of values (not keys) in this map
+      is the set of 'recognized contexts'.
+      We will grow it.
+
+    First mark all link targets as contexts.
+      Each maps to itself.
+
+    We're done processing links.
+    Next and last, we process the containment relationship.
+
+    Define a 'discovery' as a type with two fields:
+    - a set of nodes that starts empty
+    - and an optional context node that start None
+      and when Some must be a member of the discovery's set of nodes.
+
+    Subtract the set of contexts (right values in the bimap)
+    from the set of all IDs,
+    and call the result not_recognized_contexts.
+    Some of them are in fact contexts, and others aren't.
+    We will consume this set.
+
+    Pick some (64? I don't have feng shui for parallelism)
+    nodes at random, running in parallel.
+    We consume each of these 64 nodes from not_recognized_contexts.
+
+    To start, we create a discovery with
+      context = None and
+      nodes = the singleton set with that node in it
+
+    Now we repeatedly process the latest node added to each discovery.
+
+    To process the first node,
+    which is treated a bit differently from all the subsequent nodes,
+    first check if it is a containerward nonlinearity --
+    that is, if it plays the role of content 0 or more than 1 time.
+    If so, context!
+    Map it to itself, end this one and start a new discovery.
+
+    If not, then it has a container.
+    Make that the newest member of the discovery's nodes.
+
+    The way we treat that second
+    and every subsequent node in the discovery is this:
+    Ccheck whether it appears in the left side of the bimap.
+    - If it does, let S be the set of IDs that it maps to on the right.
+      Each node in this discovery must map to each node in S.
+      End this one and start a new discovery.
+    - If it doesn't, check whether it is a nonlinearity.
+      That can happen in eiither of two ways:
+      - If it was already in this discoveries nodes
+        before we climbed containerward to it, that's a nonlinearity.
+      - If it has 0 or more than 1 container, that's a nonlinearity.
+      In either case, it is a context.
+      Add it to nodes, and map every node in nodes to it
+      (that is, it maps to itself, and they all do to).
+      End this one and start a new discovery.
+
+    If this discovery has not ended,
+    start again with the container of
+    the newest member of this discovery's nodes.
+* 'request backpaths from all children'
+* precompute graph centrality ~yields contexts
+  count recursive content
+  truncate at first nonlinearity,
+  then keep going upward to find the next ?'context'
 * DONE saving is slow now
 ** 1
   If I add a child to the root of a view and save,
