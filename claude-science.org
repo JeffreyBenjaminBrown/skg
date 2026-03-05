@@ -490,10 +490,33 @@ The in-memory strategy costs ~34s total (dominated by two TypeDB reads:
 origin identification and contains map loading). The per-query approach
 would take ~9.6 hours. The growth phase itself is negligible at 0.1s.
 
-Optimization priority:
-1. (Done) Load full contains map + in-memory growth — 1,019x speedup
-2. (Future) Optimize the roots query (13.7s, single biggest query)
-3. (Future) Optimize contains map loading (22s)
+Optimization priority and results:
+1. (Done) In-memory growth — 1,019x speedup (per-query → in-memory)
+2. (Done) Derive roots + multi-contained from contains map — saves ~17s
+3. (Done) Build contains maps from SkgNodes instead of TypeDB — saves ~22s
+4. (Done) Return had_id_set from init — avoids re-reading 28k .skg files
+
+** Final optimized pipeline
+
+After all optimizations, the only TypeDB query remaining is
+=find_all_link_targets= (~2.5s on 28k nodes). Everything else
+is computed from the already-loaded SkgNodes during init:
+
+| Step                        | Source       | Time    |
+|-----------------------------+--------------+---------|
+| Read .skg files             | disk (init)  | ~few s  |
+| Build contains maps         | SkgNodes     | ~0.001s |
+| Derive roots, multi-cont.   | maps         | ~0.001s |
+| Compute had_id_set          | SkgNodes     | ~0.001s |
+| Find link targets           | TypeDB       | ~2.5s   |
+| Grow contexts               | in-memory    | ~0.1s   |
+| Detect cycles               | in-memory    | ~0.001s |
+| Update Tantivy              | Tantivy      | ~varies |
+| Total context computation   |              | ~2.5s   |
+
+Total went from ~34,664s (original per-query) → ~34s (in-memory growth)
+→ ~22s (derive origins from maps) → ~2.5s (build maps from SkgNodes).
+Overall speedup: ~13,866x from the original design.
 
 ** TypeDB v3 compatibility fix
 
