@@ -6,19 +6,10 @@
 use crate::dbs::tantivy::update_context_origin_types;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::skgnode::{FileProperty, SkgNode};
+use crate::types::textlinks::textlinks_from_node;
 
-use futures::StreamExt;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::{
-  answer::{ConceptRow, QueryAnswer},
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
-
-use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::dbs::typedb::util::ConceptRowStream;
 
 //
 // Types
@@ -65,35 +56,21 @@ pub fn multiplier_for_label (
     _                =>   1.0, } }
 
 //
-// TypeDB queries (parallelized in the top-level function)
+// In-memory data extraction from SkgNodes
 //
 
-/// Find all link targets: nodes that play 'dest'
-/// in a 'textlinks_to' relation.
-async fn find_all_link_targets (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query (
-      r#"match
-        $node isa node, has id $nid;
-        $rel isa textlinks_to ( dest: $node );
-        select $nid;"# . to_string()
-    ) . await ?;
-    answer } . into_rows ();
-  let mut result : HashSet<ID> = HashSet::new ();
-  while let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some (concept) = row . get ("nid") ? {
-      result . insert ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () )) ); } }
-  Ok (result) }
+/// Collect all link target IDs from the text of all nodes.
+/// Parses [[id:...][...]] patterns from titles and bodies,
+/// eliminating the TypeDB link_targets query (~2.5s on 28k nodes).
+pub fn link_targets_from_nodes (
+  nodes : &[SkgNode],
+) -> HashSet<ID> {
+  nodes . iter ()
+  . flat_map ( |node| {
+    textlinks_from_node (node)
+    . into_iter ()
+    . map ( |tl| tl . id ) } )
+  . collect () }
 
 //
 // In-memory origin identification
@@ -317,32 +294,26 @@ fn handle_cycles (
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Accepts pre-built contains maps and node IDs (built from SkgNodes
-/// during init), so the only TypeDB query needed is for link targets.
-/// On a 28k-node dataset: ~2.5s (link targets query) + negligible
-/// in-memory work, vs ~34s before (3 TypeDB queries + contains map).
-pub async fn compute_and_store_context_types (
-  db_name        : &str,
-  driver         : &TypeDBDriver,
+/// Fully in-memory: all data is pre-computed from SkgNodes at init.
+/// No TypeDB queries, no async. On a 28k-node dataset this is
+/// near-instantaneous (sub-second).
+pub fn compute_and_store_context_types (
   tantivy_index  : &TantivyIndex,
   had_id_set     : &HashSet<ID>,
   all_node_ids   : &HashSet<ID>,
+  link_targets   : &HashSet<ID>,
   contains_map   : &ContainsMap,
   reverse_map    : &ReverseContainsMap,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   println! ("Computing context origin types...");
-  // Only TypeDB query: link targets (can't be derived from .skg files
-  // because textlinks_to is computed by the save pipeline, not stored).
-  let targets : HashSet<ID> =
-    find_all_link_targets (db_name, driver) . await ?;
   let edge_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();
   println! ("  {} nodes, {} edges, {} link targets.",
-            all_node_ids . len (), edge_count, targets . len ());
+            all_node_ids . len (), edge_count, link_targets . len ());
   // Derive origins in-memory.
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      all_node_ids, reverse_map, &targets, had_id_set );
+      all_node_ids, reverse_map, link_targets, had_id_set );
   println! ("  {} origins identified.", origin_types . len ());
   // Grow treelike contexts (in-memory).
   let mut all_contexts : Vec<HashSet<ID>> =
@@ -437,6 +408,24 @@ mod tests {
     let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
     assert_eq! (result . len (), 1);
     assert! (result . contains (&ID::new ("has-id"))); }
+
+  #[test]
+  fn test_link_targets_from_nodes () {
+    let mut node1 : SkgNode = empty_skgnode ();
+    node1 . ids = vec![ID::new ("src")];
+    node1 . title =
+      "see [[id:tgt1][target one]]" . to_string ();
+    node1 . body = Some (
+      "also [[id:tgt2][target two]]" . to_string () );
+    let mut node2 : SkgNode = empty_skgnode ();
+    node2 . ids = vec![ID::new ("other")];
+    node2 . title = "no links here" . to_string ();
+    let nodes : Vec<SkgNode> = vec![node1, node2];
+    let targets : HashSet<ID> =
+      link_targets_from_nodes (&nodes);
+    assert_eq! (targets . len (), 2);
+    assert! (targets . contains (&ID::new ("tgt1")));
+    assert! (targets . contains (&ID::new ("tgt2"))); }
 
   #[test]
   fn test_origin_type_priority () {

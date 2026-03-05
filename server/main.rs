@@ -65,24 +65,20 @@ fn main() -> Result<(), Box<dyn Error>> {
   let tantivy_index : TantivyIndex = init . tantivy_index;
 
   // Compute context origin types for search ranking.
-  // Runs after TypeDB is populated, before accepting requests.
-  // Contains maps and node IDs are pre-computed from the loaded
-  // .skg files, so only one TypeDB query (link_targets) is needed.
+  // Fully in-memory: all data is pre-computed from SkgNodes at init.
   timed ( &config, "context_computation", || {
-    futures::executor::block_on ( async {
-      match compute_and_store_context_types (
-        &config . db_name,
-        &typedb_driver,
-        &tantivy_index,
-        &init . had_id_set,
-        &init . all_node_ids,
-        &init . contains_map,
-        &init . reverse_map ) . await
-      { Ok (_) => {}
-        Err (e) => {
-          eprintln! (
-            "Warning: context computation failed: {}. \
-             Search results will not have context-based ranking.", e); } } } ) } );
+    match compute_and_store_context_types (
+      &tantivy_index,
+      &init . had_id_set,
+      &init . all_node_ids,
+      &init . link_targets,
+      &init . contains_map,
+      &init . reverse_map )
+    { Ok (_) => {}
+      Err (e) => {
+        eprintln! (
+          "Warning: context computation failed: {}. \
+           Search results will not have context-based ranking.", e); } } } );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()

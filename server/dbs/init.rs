@@ -2,6 +2,7 @@
 
 use crate::context::{ContainsMap, ReverseContainsMap};
 use crate::context::{contains_maps_from_nodes, had_id_set_from_nodes};
+use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
@@ -33,12 +34,13 @@ use typedb_driver::{
 /// Data computed during init that is needed by context computation.
 /// Avoids re-reading .skg files or re-querying TypeDB.
 pub struct InitData {
-  pub driver       : Arc<TypeDBDriver>,
+  pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
-  pub had_id_set   : HashSet<ID>,
-  pub all_node_ids : HashSet<ID>,
-  pub contains_map : ContainsMap,
-  pub reverse_map  : ReverseContainsMap,
+  pub had_id_set    : HashSet<ID>,
+  pub all_node_ids  : HashSet<ID>,
+  pub link_targets  : HashSet<ID>,
+  pub contains_map  : ContainsMap,
+  pub reverse_map   : ReverseContainsMap,
 }
 
 /// Initializes TypeDB and Tantivy databases.
@@ -79,6 +81,8 @@ pub fn initialize_dbs (
             nodes . iter ()
             . filter_map ( |n| n . primary_id () . ok () . cloned () )
             . collect ();
+          let link_targets : HashSet<ID> =
+            link_targets_from_nodes (&nodes);
           let ( contains_map, reverse_map )
             : ( ContainsMap, ReverseContainsMap )
             = contains_maps_from_nodes (&nodes);
@@ -87,6 +91,7 @@ pub fn initialize_dbs (
             tantivy_index,
             had_id_set,
             all_node_ids,
+            link_targets,
             contains_map,
             reverse_map }; }
         Err (e) => {
@@ -203,6 +208,8 @@ fn full_init (
     nodes . iter ()
     . filter_map ( |n| n . primary_id () . ok () . cloned () )
     . collect ();
+  let link_targets : HashSet<ID> =
+    link_targets_from_nodes (&nodes);
   let ( contains_map, reverse_map )
     : ( ContainsMap, ReverseContainsMap )
     = contains_maps_from_nodes (&nodes);
@@ -220,6 +227,7 @@ fn full_init (
     tantivy_index,
     had_id_set,
     all_node_ids,
+    link_targets,
     contains_map,
     reverse_map } }
 
