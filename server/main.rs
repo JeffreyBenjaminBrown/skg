@@ -12,8 +12,9 @@ use skg::dbs::init::{InitData, initialize_dbs};
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
 use skg::serve::timing_log::{clear_timing_log, timed};
-use skg::types::misc::{SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
@@ -66,19 +67,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   // Compute context origin types for search ranking.
   // Fully in-memory: all data is pre-computed from SkgNodes at init.
-  timed ( &config, "context_computation", || {
-    match compute_and_store_context_types (
-      &tantivy_index,
-      &init . had_id_set,
-      &init . all_node_ids,
-      &init . link_targets,
-      &init . contains_map,
-      &init . reverse_map )
-    { Ok (_) => {}
-      Err (e) => {
-        eprintln! (
-          "Warning: context computation failed: {}. \
-           Search results will not have context-based ranking.", e); } } } );
+  { let had_id_set : HashSet<ID> = init . had_id_set;
+    let all_node_ids : HashSet<ID> = init . all_node_ids;
+    let link_targets : HashSet<ID> = init . link_targets;
+    let contains_map : skg::context::ContainsMap = init . contains_map;
+    let reverse_map : skg::context::ReverseContainsMap = init . reverse_map;
+    timed ( &config, "context_computation", || {
+      match compute_and_store_context_types (
+        &tantivy_index,
+        &had_id_set,
+        &all_node_ids,
+        &link_targets,
+        &contains_map,
+        &reverse_map )
+      { Ok (_) => {}
+        Err (e) => {
+          eprintln! (
+            "Warning: context computation failed: {}. \
+             Search results will not have context-based ranking.", e); } } } ); }
+  // had_id_set, all_node_ids, link_targets, contains_map, reverse_map
+  // are dropped here, freeing memory before the serve loop.
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
