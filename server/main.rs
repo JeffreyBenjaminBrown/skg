@@ -6,15 +6,13 @@
 /// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-nickname>
 /// Converts org-roam .org files to .skg files.
 
-use skg::context::{compute_and_store_context_types, had_id_set_from_nodes};
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::context::compute_and_store_context_types;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::initialize_dbs;
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
 use skg::serve::timing_log::{clear_timing_log, timed};
-use skg::types::misc::{SkgConfig, SourceName, TantivyIndex};
-use skg::types::skgnode::SkgNode;
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -61,19 +59,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         init_done_clone ); } );
 
   clear_timing_log (&config);
-  let (typedb_driver, tantivy_index)
-    : (Arc<TypeDBDriver>, TantivyIndex)
+  let (typedb_driver, tantivy_index, had_id_set)
+    : (Arc<TypeDBDriver>, TantivyIndex, HashSet<ID>)
     = timed ( &config, "initialize_dbs",
               || initialize_dbs (&config));
 
   // Compute context origin types for search ranking.
   // Runs after TypeDB is populated, before accepting requests.
   timed ( &config, "context_computation", || {
-    let had_id_set : HashSet<skg::types::misc::ID> = {
-      let nodes : Vec<SkgNode> =
-        read_all_skg_files_from_sources (&config)
-        . unwrap_or_else (|_| Vec::new ());
-      had_id_set_from_nodes (&nodes) };
     futures::executor::block_on ( async {
       match compute_and_store_context_types (
         &config . db_name,

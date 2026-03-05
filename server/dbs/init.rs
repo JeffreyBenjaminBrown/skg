@@ -1,5 +1,6 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
+use crate::context::had_id_set_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
@@ -9,10 +10,11 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::dbs::typedb::util::connect_to_typedb;
+use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::skgnode::SkgNode;
-use crate::types::misc::{SkgConfig, TantivyIndex};
 
 use futures::executor::block_on;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,9 +35,12 @@ use typedb_driver::{
 /// it rebuilds incrementally (only re-reading modified .skg files).
 /// Otherwise rebuilds completely.
 /// Ends by touching the marker file.
+/// Returns (driver, tantivy_index, had_id_set).
+/// The had_id_set is computed from the nodes read during init,
+/// avoiding a second full read of all .skg files.
 pub fn initialize_dbs (
   config : & SkgConfig,
-) -> (Arc<TypeDBDriver>, TantivyIndex) {
+) -> (Arc<TypeDBDriver>, TantivyIndex, HashSet<ID>) {
   let driver : TypeDBDriver = connect_to_typedb();
   let marker_path : PathBuf =
     config . config_dir . join (".skg_init_marker");
@@ -53,14 +58,23 @@ pub fn initialize_dbs (
       { Ok (( tantivy_index )) => {
           println! ("Incremental init succeeded.");
           touch_init_marker (&marker_path);
-          return ( Arc::new (driver), tantivy_index ); }
+          // Incremental init only reads modified files,
+          // so we must read all files for the full had_id_set.
+          let had_id_set : HashSet<ID> =
+            read_all_skg_files_from_sources (config)
+            . map ( |nodes| had_id_set_from_nodes (&nodes) )
+            . unwrap_or_default ();
+          return ( Arc::new (driver),
+                   tantivy_index,
+                   had_id_set ); }
         Err (e) => {
           println! ("Incremental init failed ({}), \
                      falling back to full rebuild.", e); }} }
-  let (tantivy_index) : (TantivyIndex) =
-    full_init (config, &driver);
+  let ( tantivy_index, had_id_set )
+    : ( TantivyIndex, HashSet<ID> )
+    = full_init (config, &driver);
   touch_init_marker (&marker_path);
-  ( Arc::new (driver), tantivy_index ) }
+  ( Arc::new (driver), tantivy_index, had_id_set ) }
 
 /// Checks the three preconditions for incremental init:
 /// 1. TypeDB database exists
@@ -147,10 +161,12 @@ fn incremental_init (
   Ok (tantivy_index) }
 
 /// Full rebuild: reads all .skg files, populates both databases.
+/// Also computes had_id_set from the already-loaded nodes,
+/// avoiding a second full read.
 fn full_init (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-) -> TantivyIndex {
+) -> (TantivyIndex, HashSet<ID>) {
   println! ("Performing full init...");
   println! ("Reading .skg files from all sources...");
   let nodes : Vec<SkgNode> =
@@ -160,6 +176,8 @@ fn full_init (
       std::process::exit (1); } );
   println! ("{} .skg files were read from {} source(s)",
             nodes . len(), config . sources . len());
+  let had_id_set : HashSet<ID> =
+    had_id_set_from_nodes (&nodes);
   block_on ( async {
     if let Err (e) = populate_typedb_from_nodes (
       config, driver, &nodes
@@ -169,7 +187,7 @@ fn full_init (
   println! ("TypeDB database initialized successfully.");
   let tantivy_index : TantivyIndex =
     initialize_tantivy_from_nodes (config, &nodes);
-  tantivy_index }
+  ( tantivy_index, had_id_set ) }
 
 fn touch_init_marker (
   path : &Path,
