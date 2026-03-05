@@ -3,12 +3,10 @@
 use skg::dbs::tantivy::search_index;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
-use skg::types::viewnode::GraphNodeStats;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
   group_matches_by_id, format_matches_as_org_mode};
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
 
@@ -66,16 +64,13 @@ fn test_title_matches_org_format (
         "the bear eats cheese";
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, search_terms ) ?;
-      let ( matches_by_id, _source_by_id ) =
+      let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index );
-      let empty_stats : HashMap < String, GraphNodeStats > =
-        HashMap::new ();
       let result : String =
         format_matches_as_org_mode (
           search_terms,
-          matches_by_id,
-          & empty_stats );
+          matches_by_id );
       let lines : Vec < &str > =
         result . lines () . collect ();
 

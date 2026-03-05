@@ -141,6 +141,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     hides_from_its_subscriptions :
       node . hides_from_its_subscriptions        . clone(),
     overrides_view_of : node . overrides_view_of . clone(),
+    misc              : node . misc              . clone(),
   }}
 
 #[test]

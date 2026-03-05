@@ -148,4 +148,5 @@ fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
     subscribes_to                : Some(vec![]),
     hides_from_its_subscriptions : Some(vec![]),
     overrides_view_of            : Some(vec![]),
+    misc                         : Vec::new (),
   }}

@@ -1,0 +1,248 @@
+* Context: why this change
+  Search results are full of uninteresting leaves.
+  Every node's title is indexed in Tantivy,
+  but structurally important nodes deserve priority.
+  A "context" is a node focal enough to stand out:
+  a root, a link target, a multiply-contained node,
+  or a member of a containment cycle.
+
+  Currently search results are sorted by BM25 score,
+  with ties broken by containerward path length
+  and number of contents
+  (see 'compare_graphnodestats_for_search_ranking'
+  in [[./server/serve/handlers/title_matches.rs]]).
+  That crude heuristic will be replaced
+  by context-aware score multipliers.
+
+* What a context is
+** Context origin types (from most to least focal)
+   | Type               | Multiplier | Meaning                                  |
+   |--------------------+------------+------------------------------------------|
+   | Root               |        100 | No container; top of a tree              |
+   | Cycle member       |         30 | Part of a containment cycle              |
+   | Link target        |         10 | Target of a textlinks_to relation        |
+   | Has org-roam ID    |         10 | Had an :ID: property in org-roam         |
+   | Multiply contained |          3 | Plays the 'contained' role more than once |
+
+   When a node qualifies as multiple types,
+   use only the maximum multiplier (do not stack).
+
+   "Has org-roam ID" is treated like "link target"
+   because having an ID usually means
+   the node was considered worth linking to.
+
+** Treelike context = (Set<Origin>, Set<Member>)
+   A context is a pair:
+   - a set of origin IDs (usually a singleton;
+     a set for cycle-based contexts)
+   - a set of member IDs: the origins
+     plus their recursive content,
+     truncated without inclusion at other origins.
+
+   Example:
+     A  { B  { C { D
+     A' { B' { C { E
+   C is multiply contained, so C is an origin.
+   A and A' are roots, so they are origins.
+   Context(A) = {A, B}. Context(A') = {A', B'}.
+   Context(C) = {C, D, E}.
+
+** Cycle-based contexts
+   After constructing all treelike contexts,
+   subtract their union from the full node set.
+   Any remainder consists of nodes
+   reachable only through containment cycles
+   (plus tails hanging off those cycles).
+
+   For each connected set in the remainder:
+   pick any node, climb containerward
+   (each node has exactly 1 container,
+   since none are multiply contained and none are roots)
+   until revisiting a node.
+   The nodes between the two visits form the cycle;
+   those are the origins.
+
+   Then grow contentward from those origins
+   (same truncation rules as treelike contexts)
+   to pick up any tails.
+
+* Algorithm
+** Step 1: identify all origins
+   Four TypeDB queries (three structural, one import-specific):
+   1. All roots: nodes that do not play 'contained'
+      in any 'contains' relation.
+   2. All link targets: nodes that play 'dest'
+      in a 'textlinks_to' relation.
+   3. All multiply contained: nodes that play 'contained'
+      in more than one 'contains' relation.
+   4. All nodes with Had_ID_Before_Import in their misc field
+      (relevant only after org-roam import).
+
+   Collect these into a HashSet<ID> called 'origins'.
+   Also record each origin's type (for the multiplier).
+
+** Step 2: grow treelike contexts (parallel)
+   Grow 64 origins concurrently, each contentward, one layer at a time.
+   When one context completes, start another,
+   keeping 64 active at all times until all origins are grown.
+
+   At each layer of growth from an origin:
+   collect the node's immediate contents.
+   Discard any that are themselves origins.
+   Discard any already visited in THIS context
+   (prevents infinite loops when a descendant
+   is part of a containment cycle).
+   Add survivors to this context's member set.
+   Recurse on the survivors' contents.
+
+   Data source: TypeDB already holds the containment graph.
+   Each parallel growth issues its own TypeDB queries.
+   (Loading the full contains map into memory is an alternative,
+   but per-origin queries parallelize naturally
+   and avoid holding the entire graph in RAM.)
+
+** Step 3: handle cycles
+   Compute: all_node_ids - union(all context member sets).
+   If nonempty, these nodes are in or adjacent to cycles.
+
+   For each connected component of the remainder
+   (using undirected containment edges):
+   1. Pick any node. Climb containerward,
+      recording the path in a Vec.
+   2. When a node is revisited, the cycle is the subpath
+      from its first occurrence to just before its second.
+   3. Mark cycle members as origins (type = CycleMember).
+   4. Grow contentward from the cycle members
+      (same rules as step 2) to capture tails.
+
+** Step 4: store context type in Tantivy
+   Add a new field to 'mk_tantivy_schema'
+   in [[./server/dbs/tantivy.rs]]:
+   a stored STRING field called "context_origin_type"
+   with values like "Root", "Target", "CycleMember",
+   "MultiContained", or "" (empty for non-origins).
+
+   Store a meaningful label rather than a numeric multiplier.
+   The multiplier is applied at query time,
+   so tuning multipliers does not require re-indexing.
+
+** Step 5: apply multipliers at search time
+   In [[./server/serve/handlers/title_matches.rs]],
+   replace the current tie-breaking logic.
+   After retrieving Tantivy results,
+   multiply each result's BM25 score by the multiplier
+   corresponding to its context_origin_type.
+   Non-origins keep their raw score (multiplier = 1).
+   Re-sort by the adjusted score.
+
+   This replaces the cruder containerward-path
+   and numContents tie-breaking
+   (see commit 7488d6383ad1b9e7bbcdf68fe562ba93dcc56bd7).
+
+* When context computation runs
+** At startup
+   After loading .skg data into TypeDB,
+   compute contexts in the background.
+   Search works immediately without boosting;
+   once context computation finishes, boosting activates.
+** After org-roam import
+   Import creates .skg files and populates TypeDB
+   (already implemented in [[./server/import_org_roam/mod.rs]]).
+   After the existing import pipeline completes,
+   extend the context set to cover new data.
+   New data can link to pre-existing skg nodes
+   (likely if importing multiple org-roam repos over time).
+
+   If a user searches before context computation finishes,
+   show results without multipliers
+   and include a header line at the top of the
+   org-mode search results buffer, e.g.:
+   "# Note: context-based ranking pending for recently imported data."
+
+* TODO add a note to play with the numbers and architecture for speed
+  I don't know what connection pools or semaphores are,
+  but comment prominently that we should play with those,
+  and the batch size,
+  in the lowest-level (callerward) function that puts them all to use.
+
+* Tracking org-roam IDs: the Misc field
+  Add a field to SkgNode:
+    misc: Vec<FileProperty>
+  where
+    enum FileProperty { Had_ID_Before_Import }
+
+  'assign_missing_ids' in [[./server/import_org_roam/parse.rs]]
+  currently generates UUIDs for nodes lacking :ID: properties.
+  Nodes that already had an :ID: get Had_ID_Before_Import
+  added to their misc field.
+
+  The .skg serialization omits the misc field entirely
+  when the Vec is empty (no clutter for the common case).
+  More variants can be added to FileProperty later
+  without disrupting existing data.
+
+* Files to modify
+  - [[./server/dbs/tantivy.rs]] : add 'context_origin_type' field to schema,
+    update 'create_documents_from_node' to populate it
+  - [[./server/serve/handlers/title_matches.rs]] :
+    replace 'compare_graphnodestats_for_search_ranking'
+    with multiplier-based scoring
+  - [[./server/import_org_roam/parse.rs]] :
+    mark nodes that had :ID: with Had_ID_Before_Import
+    in the new misc field
+  - [[./server/import_org_roam/mod.rs]] :
+    after import, trigger context computation
+  - SkgNode type definition: add misc: Vec<FileProperty>
+  - SkgNode serialization: omit misc when empty
+  - [[./schema.tql]] : likely no change needed
+    (context type is a Tantivy concern, not a TypeDB one)
+  - New file(s) under server/ for context computation logic
+    (origin identification, contentward growth, cycle detection)
+
+* Verification
+  1. Write unit tests for context identification:
+     - a root with a linear chain beneath it
+       (root is origin, chain members are non-origins)
+     - a multiply-contained node
+       (it and each branch get separate contexts)
+     - a containment cycle with a tail
+     - a link target with no other special status
+  2. After org-roam import, verify context_origin_type
+     is populated in Tantivy for appropriate nodes.
+  3. Search for a term that appears in both a root's title
+     and a leaf's title; verify the root ranks higher.
+  4. Run 'cargo nextest run' for the full suite.
+
+* Problems
+** "link target" may be too generous for skg-native links
+   In a heavily-linked graph, most nodes are link targets,
+   making the multiplier nearly universal.
+   For org-roam imports this is right
+   (org-roam IDs are given deliberately).
+   For skg-native links it might be less meaningful,
+   since users create links more casually.
+   This deserves a code comment for now.
+   Possible future fix: only grant origin status
+   above some threshold of incoming links,
+   or let the user manually tweak the context property.
+
+** The multipliers are arbitrary
+   100 / 30 / 10 / 3 are chosen by feel.
+   Easy to tune later (label is stored, multiplier applied at query time).
+   Worth revisiting once there is enough data to evaluate.
+
+** 64-way parallel growth: synchronization
+   Each of the 64 concurrent growths
+   reads the shared origins set (immutable after step 1)
+   and writes to its own context's member set (disjoint by construction).
+   No write contention between growths.
+   But if using per-origin TypeDB queries,
+   64 concurrent query streams may stress the TypeDB connection.
+   May need a connection pool or a semaphore
+   to cap concurrent TypeDB queries.
+
+** Whether context should live in TypeDB vs. only Tantivy
+   The plan stores context_origin_type only in Tantivy.
+   If other features ever need "is this node a context origin?"
+   from TypeDB, it would need a schema change.
+   For now, Tantivy-only is sufficient.

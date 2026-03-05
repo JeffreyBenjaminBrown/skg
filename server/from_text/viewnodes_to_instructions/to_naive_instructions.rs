@@ -102,7 +102,8 @@ fn maybe_instruction_from_treenode (
     subscribes_to:
       collect_subscribees( tree, node_id )?,
     hides_from_its_subscriptions: None,
-    overrides_view_of: None } )) )) }
+    overrides_view_of: None,
+    misc: Vec::new () } )) )) }
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,

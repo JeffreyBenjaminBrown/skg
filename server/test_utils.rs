@@ -451,7 +451,8 @@ It better be okay with newlines."# . to_string() ),
                              ID::new ("12"),
                              ID::new ("13")]),
     hides_from_its_subscriptions: None,
-    overrides_view_of: None, }}
+    overrides_view_of: None,
+    misc: Vec::new (), }}
 
 /// Extract SkgNode from Save variant; panics on Delete.
 pub fn extract_skgnode_if_save_else_error(

@@ -1,3 +1,4 @@
+pub mod context;
 pub mod from_text;
 pub mod dbs;
 pub mod git_ops;

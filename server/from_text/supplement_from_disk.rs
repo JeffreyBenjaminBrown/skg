@@ -60,5 +60,7 @@ pub async fn supplement_none_fields_from_disk_if_save (
         disk_node . hides_from_its_subscriptions; }
     if from_buffer . overrides_view_of . is_none() {
       from_buffer . overrides_view_of =
-        disk_node . overrides_view_of; }}
+        disk_node . overrides_view_of; }
+    if from_buffer . misc . is_empty() {
+      from_buffer . misc = disk_node . misc; }}
   Ok(DefineNode::Save(SaveNode (from_buffer) )) }

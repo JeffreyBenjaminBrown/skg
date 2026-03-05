@@ -284,13 +284,17 @@ pub fn create_empty_tantivy_index (
   let source_field: schema::Field =
     schema . get_field ("source")
     . ok_or ("Schema missing 'source' field")?;
+  let context_origin_type_field: schema::Field =
+    schema . get_field ("context_origin_type")
+    . ok_or ("Schema missing 'context_origin_type' field")?;
   Ok ( TantivyIndex {
     index: Arc::new ( { let index : Index =
                           Index::create_in_dir ( index_path, schema )?;
                         index } ),
     id_field,
     title_or_alias_field,
-    source_field, }) }
+    source_field,
+    context_origin_type_field, }) }
 
 /// Removes any existing index at given path,
 /// creates a new one there,

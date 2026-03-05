@@ -1,26 +1,19 @@
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use crate::context::multiplier_for_label;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats, graphnodestats_for_pid, };
-use crate::dbs::typedb::search::containerward_path_stats_bulk;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
-use crate::types::misc::{TantivyIndex, ID, SourceName, SkgConfig};
+use crate::types::misc::{TantivyIndex, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, GraphNodeStats, ContainerwardPathStats, default_truenode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, default_truenode};
 
-use futures::executor::block_on;
 use sexp::Sexp;
-use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::error::Error;
 use std::net::TcpStream;
 use tantivy::{Document, Searcher};
-use typedb_driver::TypeDBDriver;
 
 pub type MatchGroups =
   HashMap < String,              // ID
-            Vec < ( f32,         // score
+            Vec < ( f32,         // score (after multiplier)
                     String ) >>; // title or alias
 
 /// Extracts search terms from request,
@@ -30,8 +23,8 @@ pub fn handle_title_matches_request (
   stream        : &mut TcpStream,
   request       : &str,
   tantivy_index : &TantivyIndex,
-  driver        : &TypeDBDriver,
-  config        : &SkgConfig,
+  _driver       : &typedb_driver::TypeDBDriver,
+  _config       : &crate::types::misc::SkgConfig,
 ) {
   match search_terms_from_request (request) {
     Ok (search_terms) => {
@@ -39,9 +32,7 @@ pub fn handle_title_matches_request (
         stream,
         & generate_title_matches_response (
           &search_terms,
-          tantivy_index,
-          driver,
-          config )); },
+          tantivy_index )); },
     Err (err) => {
       let error_msg : String =
         format! (
@@ -65,8 +56,6 @@ pub fn handle_title_matches_request (
 fn generate_title_matches_response (
   search_terms  : &str,
   tantivy_index : &TantivyIndex,
-  driver        : &TypeDBDriver,
-  config        : &SkgConfig,
 ) -> String {
   match search_index ( tantivy_index,
                        search_terms ) {
@@ -74,36 +63,29 @@ fn generate_title_matches_response (
       if best_matches . is_empty () {
         "No matches found." . to_string ()
       } else {
-        let ( matches_by_id, source_by_id )
-          : ( MatchGroups, HashMap < String, String > ) =
+        let matches_by_id : MatchGroups =
           group_matches_by_id (
             best_matches,
             searcher,
             tantivy_index );
-        match build_graphnodestats_for_ids (
-          & matches_by_id,
-          & source_by_id,
-          driver,
-          config )
-        { Ok (stats_by_id) =>
-            format_matches_as_org_mode (
-              search_terms,
-              matches_by_id,
-              & stats_by_id ),
-          Err (e) =>
-            format! ("Error fetching graph stats: {}", e) } }},
+        format_matches_as_org_mode (
+          search_terms,
+          matches_by_id ) }},
     Err (e) => {
       format!("Error searching index: {}", e) }} }
 
+/// Groups raw Tantivy results by ID.
+/// Applies context-based score multipliers:
+/// each result's BM25 score is multiplied by the multiplier
+/// corresponding to its context_origin_type.
+/// Non-origins keep their raw score (multiplier = 1).
 pub fn group_matches_by_id (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
   tantivy_index : &TantivyIndex,
-) -> ( MatchGroups, HashMap < String, String > ) {
+) -> MatchGroups {
   let mut result_acc : MatchGroups =
     HashMap::new();
-  let mut source_acc : HashMap < String, String > =
-    HashMap::new ();
   for (score, doc_address) in best_matches {
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
@@ -118,78 +100,29 @@ pub fn group_matches_by_id (
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_text() )
             . map ( |s| s . to_string() );
-        let source_opt : Option < String > =
+        let context_type : String =
           retrieved_doc
-            . get_first ( tantivy_index . source_field )
-            . and_then ( |v| v . as_text() )
-            . map ( |s| s . to_string() );
+            . get_first ( tantivy_index . context_origin_type_field )
+            . and_then ( |v| v . as_text () )
+            . unwrap_or ("")
+            . to_string ();
+        let multiplier : f32 =
+          multiplier_for_label (&context_type);
+        let adjusted_score : f32 = score * multiplier;
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
-          if let Some (source) = source_opt {
-            source_acc . entry (id . clone ())
-              . or_insert (source); }
           result_acc
             . entry (id)
             . or_insert_with (Vec::new)
-            . push (( score, title )); }},
+            . push (( adjusted_score, title )); }},
       Err (e) => { eprintln! (
         "Error retrieving document: {}", e ); }} }
-  ( result_acc, source_acc ) }
-
-/// Fetch graphnodestats from TypeDB and disk for all matched IDs.
-fn build_graphnodestats_for_ids (
-  matches_by_id : &MatchGroups,
-  source_by_id  : &HashMap < String, String >,
-  driver        : &TypeDBDriver,
-  config        : &SkgConfig,
-) -> Result < HashMap < String, GraphNodeStats >,
-             Box < dyn std::error::Error > > {
-  let pids : Vec < ID > =
-    matches_by_id . keys ()
-    . map ( |id| ID::from ( id . clone () ))
-    . collect ();
-  // TypeDB stats: numContainers, numContents, numLinksIn,
-  // overriding, subscribing.
-  // Also compute containerward path stats in parallel.
-  let ( typedb_stats, path_stats_map )
-    : ( Result < AllGraphNodeStats, Box < dyn Error > >,
-        Result < HashMap < ID, ContainerwardPathStats >,
-                 Box < dyn Error > > )
-    = block_on ( async {
-      let typedb_future =
-        fetch_all_graphnodestats (
-          & config . db_name, driver, & pids );
-      let path_future =
-        containerward_path_stats_bulk (
-          & config . db_name, driver, & pids );
-      futures::join! ( typedb_future, path_future ) });
-  let ts : AllGraphNodeStats = typedb_stats ?;
-  let mut result : HashMap < String, GraphNodeStats > =
-    HashMap::new ();
-  for id_str in matches_by_id . keys () {
-    let pid : ID = ID::from ( id_str . clone () );
-    let skgnode_opt : Option < SkgNode > =
-      source_by_id . get (id_str)
-      . and_then ( |src|
-        skgnode_from_pid_and_source (
-          config,
-          pid . clone (),
-          & SourceName::from ( src . clone () )
-        ) . ok () );
-    let mut stats : GraphNodeStats =
-      graphnodestats_for_pid (
-        &pid, &ts, skgnode_opt . as_ref () );
-    if let Ok ( ref pm ) = path_stats_map {
-      if let Some (cp) = pm . get (&pid) {
-        stats . containerwardPath = Some ( cp . clone () ); } }
-    result . insert ( id_str . clone (), stats ); }
-  Ok (result) }
+  result_acc }
 
 /// Formats grouped matches as an org-mode document.
-/// Sorts IDs by best score, and matches within each ID by score.
+/// Sorts IDs by best (adjusted) score, and matches within each ID by score.
 pub fn format_matches_as_org_mode (
   search_terms  : &str,
   matches_by_id : MatchGroups,
-  stats_by_id   : &HashMap < String, GraphNodeStats >,
 ) -> String {
   let mut result : String =
     String::new();
@@ -225,18 +158,9 @@ pub fn format_matches_as_org_mode (
       a . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     let score_b : f32 =
       b . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
-    let score_ord : Ordering =
-      score_b . partial_cmp (& score_a) . unwrap ();
-    if score_ord != Ordering::Equal {
-      return score_ord; }
-    compare_graphnodestats_for_search_ranking (
-      stats_by_id . get (& a . 0),
-      stats_by_id . get (& b . 0) ) } );
+    score_b . partial_cmp (& score_a)
+    . unwrap_or (std::cmp::Ordering::Equal) } );
   for (id, matches) in id_entries {
-    let graph_stats : GraphNodeStats =
-      stats_by_id . get (&id)
-      . cloned ()
-      . unwrap_or_default ();
     // First (best) match becomes level-2 headline
     let (score, title) : &(f32, String) = &matches[0];
     result . push_str (
@@ -248,7 +172,6 @@ pub fn format_matches_as_org_mode (
           kind    : ViewNodeKind::True (
             TrueNode {
               indefinitive : true,
-              graphStats : graph_stats . clone (),
               .. default_truenode (
                 ID::from(id . clone()),
                 SourceName::from ("search"),
@@ -266,7 +189,6 @@ pub fn format_matches_as_org_mode (
             kind    : ViewNodeKind::True (
               TrueNode {
                 indefinitive : true,
-                graphStats : graph_stats . clone (),
                 .. default_truenode (
                   ID::from(id . clone()),
                   SourceName::from ("search"),
@@ -274,28 +196,6 @@ pub fn format_matches_as_org_mode (
                             score, id, title )) } ), } )
         . expect ("TrueNode rendering never fails")); }}
   result }
-
-/// Tie-breaker for search results with equal scores:
-/// shorter containerward path first, then more contents first.
-fn compare_graphnodestats_for_search_ranking (
-  a : Option < &GraphNodeStats >,
-  b : Option < &GraphNodeStats >,
-) -> Ordering {
-  let path_len_a : usize =
-    a . and_then ( |s| s . containerwardPath . as_ref () )
-    . map ( |cp| cp . length ) . unwrap_or (usize::MAX);
-  let path_len_b : usize =
-    b . and_then ( |s| s . containerwardPath . as_ref () )
-    . map ( |cp| cp . length ) . unwrap_or (usize::MAX);
-  let path_ord : Ordering =
-    path_len_a . cmp (& path_len_b);
-  if path_ord != Ordering::Equal {
-    return path_ord; }
-  let contents_a : usize =
-    a . and_then ( |s| s . numContents ) . unwrap_or (0);
-  let contents_b : usize =
-    b . and_then ( |s| s . numContents ) . unwrap_or (0);
-  contents_b . cmp (& contents_a) }
 
 pub fn search_terms_from_request (
   request : &str

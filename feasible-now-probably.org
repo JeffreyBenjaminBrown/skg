@@ -10,6 +10,7 @@ As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
 * skg import must preserve and define contexts
+** full plan saved at [[./.claude/plans/beautiful/contexts-on-init-and-import.org]]
 ** an easier algorithm
 *** a 'context' is an (ID, Set (ID)) pair.
     The single ID is the context 'origin'.
@@ -286,6 +287,73 @@ If anything blocks your progress that needs my attention, ping me.
     This is cleaner: treelike contexts just happen to have
     a singleton origin set.
     Worth noting in the spec for clarity.
+** feedback, round 3
+*** "link target" may be too generous as a context criterion
+    In a heavily-linked graph, most nodes are link targets,
+    making the multiplier nearly universal.
+    Whether this is a problem depends on the data.
+    For org-roam imports it seems right
+    (org-roam IDs are given deliberately).
+    For skg-native links it might be less meaningful,
+    since users create links more casually.
+    The spec defers this ("deserves a comment in the code")
+    but it could undermine the feature for mature skg graphs.
+    Possible future fix: distinguish
+    "is a link target with N incoming links"
+    and only grant origin status above some threshold.
+
+*** The multipliers are arbitrary
+    100 / 30 / 10 / 3 are chosen by feel.
+    There is no empirical basis.
+    This is fine for now (easy to tune later,
+    since the label is stored and the multiplier
+    is applied at query time), but worth revisiting
+    once there is enough data to evaluate.
+
+*** Org-roam ID tracking adds import complexity
+    Currently 'assign_missing_ids' in [[./server/import_org_roam/parse.rs]]
+    generates UUIDs for nodes that lack :ID: properties.
+    To distinguish "had an org-roam ID" from "was assigned one at import,"
+    we need a flag or a separate set.
+    This is a small change but an easy place to introduce bugs
+    if the distinction is lost downstream.
+
+**** TODO let's add a 'Misc' field to SkgNode
+     Misc = List (FileProperty)
+     enum FileProperty = Had_ID_Before_Import
+     Maybe we'll add more values to that enum later.
+     Maybe we'll never use it.
+     It won't hurt anything,
+     as long as the .skg representation omits the field entirely
+     when it is empty.
+*** Context computation cost is unclear
+    Step 2 (contentward growth) visits every node once
+    (each node belongs to exactly one context).
+    Step 3 (cycle detection) visits only remainder nodes.
+    Total is O(N) in nodes.
+    But if using per-node TypeDB queries instead of a batch load,
+    it becomes O(N) round trips, which could be slow.
+    The batch approach (load full contains map into memory) is safer
+    but requires memory proportional to the graph.
+**** TODO I thought we could batch these?
+     Pick 64 of the treelike context roots.
+     Grow each one contentward, one layer at a time.
+     Each time one of those contexts is completed,
+     start growing a new one,
+     such that 64 are always running at once.
+*** Whether context should live in TypeDB vs. only Tantivy
+    The plan stores context_origin_type only in Tantivy.
+    If other features ever need to query
+    "is this node a context origin?" from TypeDB
+    (e.g., for view rendering or containerward path display),
+    it would need to be stored there too,
+    requiring a schema change (new attribute on node).
+    For now, Tantivy-only is sufficient.
+
+*** The "message in search results" UX is vague
+    "Include a message explaining that context-based ranking
+    is not yet available" — where exactly?
+**** TODO A header line in the org-mode search results buffer
 ** DONE earlier
 *** instead index every node, but also whether it is a context
     The user can choose to search over contexts or over everything.

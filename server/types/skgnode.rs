@@ -3,6 +3,12 @@ use serde::{Serialize, Deserialize};
 use crate::util::option_vec_is_empty_or_none;
 use super::misc::{ID, SourceName};
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum FileProperty {
+  Had_ID_Before_Import, // Node had an :ID: property before org-roam import.
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SkgNode {
   // There is a 1-to-1 correspondence between SkgNodes and actual .skg files -- a file can be read to a SkgNode, and a SkgNode can be written to a file. The files are the only permanent data. SkgNode is the format used to initialize the TypeDB and Tantivy databases.
@@ -36,6 +42,9 @@ pub struct SkgNode {
 
   #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
   pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
+
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub misc: Vec<FileProperty>,
 }
 
 impl SkgNode {
@@ -61,4 +70,5 @@ pub fn empty_skgnode () -> SkgNode {
     subscribes_to                : None,
     hides_from_its_subscriptions : None,
     overrides_view_of            : None,
+    misc                         : Vec::new (),
   }}

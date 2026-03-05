@@ -1,5 +1,5 @@
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::skgnode::{FileProperty, SkgNode};
 
 use std::path::Path;
 use uuid::Uuid;
@@ -13,6 +13,7 @@ struct OrgSection {
   headline_line : usize,          // line index of the headline (0 for file-level)
   headline      : String,         // text after "* ", or #+title: value
   id            : Option<String>,
+  had_id        : bool,           // true if section already had an :ID: property
   roam_aliases  : Option<Vec<String>>,
   body_start    : usize,          // first line of body (after headline + props)
 }
@@ -66,11 +67,13 @@ fn extract_sections (
   let (file_title, title_line_end)
     : (String, usize)
     = find_title (lines, props_end, path);
+  let file_had_id : bool = file_id . is_some ();
   sections . push ( OrgSection {
     level         : 0,
     headline_line : 0,
     headline      : file_title,
     id            : file_id,
+    had_id        : file_had_id,
     roam_aliases  : file_aliases,
     body_start    : title_line_end, });
   // Headline sections
@@ -81,6 +84,7 @@ fn extract_sections (
     let (hl_id, hl_aliases, hl_props_end)
       : (Option<String>, Option<Vec<String>>, usize)
       = parse_properties_block (lines, i + 1);
+    let hl_had_id : bool = hl_id . is_some ();
     let body_start : usize =
       if hl_props_end > i + 1 { hl_props_end }
       else { i + 1 };
@@ -89,6 +93,7 @@ fn extract_sections (
       headline_line : i,
       headline      : headline_text,
       id            : hl_id,
+      had_id        : hl_had_id,
       roam_aliases  : hl_aliases,
       body_start, }); }
   sections }
@@ -192,7 +197,11 @@ fn skgnode_from_section_tree (
       else { Some (contained_ids) },
     subscribes_to                : None,
     hides_from_its_subscriptions : None,
-    overrides_view_of            : None, }}
+    overrides_view_of            : None,
+    misc :
+      if tree . section . had_id {
+        vec![FileProperty::Had_ID_Before_Import] }
+      else { Vec::new () }, }}
 
 fn collect_body (
   lines : &[String],
@@ -692,4 +701,35 @@ Some text.
                 "[[id:681da8ea][Music illuminates (the?) infinite nature of want.]]");
     assert! (nodes[2] . body . is_none());
     assert! (nodes[2] . contains . is_none()); }
+
+  #[test]
+  fn test_had_id_before_import () {
+    // Nodes with :ID: get Had_ID_Before_Import in misc.
+    // Nodes without :ID: (assigned UUIDs) get empty misc.
+    let content : &str = "\
+:PROPERTIES:
+:ID:       file-id
+:END:
+#+title: Parent
+* child with ID
+  :PROPERTIES:
+  :ID:       child-id
+  :END:
+  Body.
+* child without ID
+  Just text.
+";
+    let f : tempfile::NamedTempFile =
+      write_temp_org (content, "had-id");
+    let nodes : Vec<SkgNode> =
+      parse_org_file (f . path());
+    assert_eq! (nodes . len(), 3);
+    // File-level node had :ID: → Had_ID_Before_Import.
+    assert_eq! (nodes[0] . misc,
+                vec![FileProperty::Had_ID_Before_Import]);
+    // Child with :ID: → Had_ID_Before_Import.
+    assert_eq! (nodes[1] . misc,
+                vec![FileProperty::Had_ID_Before_Import]);
+    // Child without :ID: → empty misc.
+    assert! (nodes[2] . misc . is_empty()); }
 }

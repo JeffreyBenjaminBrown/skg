@@ -26,6 +26,7 @@ fn create_test_node(
         subscribes_to: None,
         hides_from_its_subscriptions: None,
         overrides_view_of: None,
+        misc: Vec::new (),
     }
 }
 
