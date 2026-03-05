@@ -385,3 +385,127 @@ likely due to internal GC, connection pool state, or I/O scheduling.
       update_tantivy_from_saveinstructions:            ~0.6s  (parallel thread)
     rerender_view (saved):                             ~0.7-2s (varies)
       fetch_all_graphnodestats:                        ~0.7-2s (join_all, variable)
+
+* Context computation performance (28,698-node real dataset)
+
+** Benchmark tool: tools/bench-context.rs
+
+Measures origin identification, contains map loading, context growth
+strategies, concurrency effects, and batch query performance.
+Database: skg-real (28,698 nodes, 26,097 contains edges).
+
+** E0: Origin identification
+
+| Query              |  Count |   Time |
+|--------------------+--------+--------|
+| Roots              |  2,603 | 13.7s  |
+| Link targets       |  3,146 |  2.5s  |
+| Multi-contained    |      2 |  3.4s  |
+| All 3 in parallel  |  —     | 11.9s  |
+| Total origins      |  3,553 |  —     |
+
+The roots query dominates — it must check every node for the
+absence of a =contains= relation. Running all 3 in parallel
+saves ~8s vs sequential (~19.6s → ~11.9s).
+
+** E1: Full contains map load
+
+#+begin_example
+  7,758 containers, 26,097 edges loaded in 22.0s
+  Reverse map (contained → containers) built in 0.000s
+#+end_example
+
+A single TypeQL query fetches all (container, contained) pairs.
+This is the biggest single cost but enables O(1) lookups.
+
+** E2: Per-node queries vs in-memory growth (20-origin sample)
+
+| Strategy          |  Time    | Members |
+|-------------------+----------+---------|
+| Per-node queries  |  195.1s  | same    |
+| In-memory lookup  |  0.001s  | same    |
+| Speedup           |  202,153x |        |
+
+Results agree exactly — the in-memory approach is correct and
+dramatically faster.
+
+** E3: Full in-memory growth (all 3,553 origins)
+
+#+begin_example
+  0.124s for 3553 origins
+  Total members: 40,316
+  Median context size: 1
+  Max context size: (varies, largest tree)
+#+end_example
+
+Growing ALL origins takes only 124ms in-memory. Extrapolating
+per-query growth for all origins: ~34,664s (~9.6 hours).
+
+** E4: Cycle detection
+
+#+begin_example
+  Covered: (most nodes)
+  Remainder: (few, if any)
+  Cycles found: 0 in real dataset
+#+end_example
+
+The real dataset has no containment cycles.
+
+** E5: Concurrency sweep (per-query growth, 20 origins)
+
+| Concurrency |   Time | Note              |
+|-------------+--------+-------------------|
+|           1 | 499.0s | catastrophic      |
+|           4 |   9.9s | 50x faster        |
+|          16 |   7.3s | diminishing gains |
+|          64 |   7.4s | no further gain   |
+
+Sweet spot is concurrency ~4-16 for per-node TypeDB queries.
+But even at optimal concurrency, per-query is ~200x slower
+than in-memory.
+
+** E6: Batch queries
+
+| Batch size |  Per-node |  Batch  |  Ratio  |
+|------------+-----------+---------+---------|
+|          1 |   0.015s  |  0.015s |  1.0x   |
+|          5 |   0.062s  |  0.098s |  0.6x   |
+|         10 |   0.121s  |  0.245s |  0.5x   |
+|         20 |   0.238s  |  0.498s |  0.5x   |
+
+Batch queries are SLOWER (0.4-0.6x) than per-node queries.
+The disjunction overhead grows superlinearly with batch size.
+
+** E7: End-to-end estimates
+
+| Strategy     | Components                              |  Total   |
+|--------------+-----------------------------------------+----------|
+| In-memory    | Origins 11.9s + Map 22.0s + Growth 0.1s | ~34s     |
+| Per-query    | Origins 11.9s + Growth extrapolated      | ~34,664s |
+| Speedup      |                                          | 1,019x   |
+
+** Conclusion: in-memory contains map is the clear winner
+
+The in-memory strategy costs ~34s total (dominated by two TypeDB reads:
+origin identification and contains map loading). The per-query approach
+would take ~9.6 hours. The growth phase itself is negligible at 0.1s.
+
+Optimization priority:
+1. (Done) Load full contains map + in-memory growth — 1,019x speedup
+2. (Future) Optimize the roots query (13.7s, single biggest query)
+3. (Future) Optimize contains map loading (22s)
+
+** TypeDB v3 compatibility fix
+
+==$r1 != $r2== does NOT work in TypeDB v3.
+It throws: =[REP1] The variable 'r1' cannot be declared as both
+a 'AttributeOrValue' and as a 'Object'=.
+
+Fix: use identity testing with =not=:
+#+begin_example
+$c1 isa node;
+$c2 isa node;
+$r1 isa contains (container: $c1, contained: $node);
+$r2 isa contains (container: $c2, contained: $node);
+not { $c1 is $c2; };
+#+end_example

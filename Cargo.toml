@@ -30,6 +30,10 @@ name = "smsn-keywords"
 path = "thoughts/smsn/find-keywords.rs"
 
 [[bin]]
+name = "bench-context"
+path = "tools/bench-context.rs"
+
+[[bin]]
 name = "function_conversions_for_refactor"
 path = "tools/function_conversions_for_refactor/function_conversions_for_refactor.rs"
 
