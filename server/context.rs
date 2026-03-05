@@ -65,35 +65,8 @@ pub fn multiplier_for_label (
     _                =>   1.0, } }
 
 //
-// Step 1: identify all origins
+// TypeDB queries (parallelized in the top-level function)
 //
-
-/// Find all roots: nodes that do not play 'contained'
-/// in any 'contains' relation.
-async fn find_all_roots (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query (
-      r#"match
-        $node isa node, has id $nid;
-        not { $rel isa contains ( contained: $node ); };
-        select $nid;"# . to_string()
-    ) . await ?;
-    answer } . into_rows ();
-  let mut result : HashSet<ID> = HashSet::new ();
-  while let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some (concept) = row . get ("nid") ? {
-      result . insert ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () )) ); } }
-  Ok (result) }
 
 /// Find all link targets: nodes that play 'dest'
 /// in a 'textlinks_to' relation.
@@ -110,38 +83,6 @@ async fn find_all_link_targets (
       r#"match
         $node isa node, has id $nid;
         $rel isa textlinks_to ( dest: $node );
-        select $nid;"# . to_string()
-    ) . await ?;
-    answer } . into_rows ();
-  let mut result : HashSet<ID> = HashSet::new ();
-  while let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some (concept) = row . get ("nid") ? {
-      result . insert ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () )) ); } }
-  Ok (result) }
-
-/// Find all multiply-contained nodes: nodes that play 'contained'
-/// in more than one 'contains' relation.
-async fn find_all_multiply_contained (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  // Find nodes appearing as contained in ≥2 distinct contains relations.
-  let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query (
-      r#"match
-        $node isa node, has id $nid;
-        $c1 isa node;
-        $c2 isa node;
-        $r1 isa contains ( container: $c1, contained: $node );
-        $r2 isa contains ( container: $c2, contained: $node );
-        not { $c1 is $c2; };
         select $nid;"# . to_string()
     ) . await ?;
     answer } . into_rows ();
@@ -179,55 +120,69 @@ async fn find_all_node_ids (
           & concept . to_string () )) ); } }
   Ok (result) }
 
-/// Find all nodes with Had_ID_Before_Import in their misc field.
-/// These are identified by reading .skg files, not TypeDB.
-/// We pass the set in from the caller (who reads .skg files at startup).
-// No TypeDB query needed; the caller supplies the set.
+//
+// In-memory origin identification
+// Roots and multiply-contained are derived from the contains maps,
+// eliminating two TypeDB queries (~17s saved on 28k-node dataset).
+//
 
-/// Identify all origins and their types.
-/// Returns a map from origin ID to the highest-priority ContextOriginType.
-async fn identify_origins (
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  had_id_set : &HashSet<ID>,
-) -> Result<HashMap<ID, ContextOriginType>, Box<dyn Error>> {
-  // Run all four queries in parallel.
-  let ( roots_result,
-        targets_result,
-        multi_result )
-    : ( Result < HashSet<ID>, Box<dyn Error> >,
-        Result < HashSet<ID>, Box<dyn Error> >,
-        Result < HashSet<ID>, Box<dyn Error> > )
-    = futures::join! (
-      find_all_roots (db_name, driver),
-      find_all_link_targets (db_name, driver),
-      find_all_multiply_contained (db_name, driver) );
-  let roots   : HashSet<ID> = roots_result ?;
-  let targets : HashSet<ID> = targets_result ?;
-  let multi   : HashSet<ID> = multi_result ?;
-  // Assign types. When a node qualifies for multiple types,
-  // use only the highest-priority (largest multiplier).
-  // Priority order: Root > CycleMember > Target = HadID > MultiContained.
-  // CycleMember is assigned later (step 3).
+/// Derive roots from all_node_ids and reverse_map.
+/// A root is a node that never appears as contained.
+fn find_roots_from_maps (
+  all_node_ids : &HashSet<ID>,
+  reverse_map  : &ReverseContainsMap,
+) -> HashSet<ID> {
+  all_node_ids . iter ()
+  . filter ( |id| ! reverse_map . contains_key (id) )
+  . cloned ()
+  . collect () }
+
+/// Derive multiply-contained nodes from reverse_map.
+/// A node is multiply-contained if it has >1 distinct container.
+fn find_multiply_contained_from_maps (
+  reverse_map : &ReverseContainsMap,
+) -> HashSet<ID> {
+  reverse_map . iter ()
+  . filter ( |(_, containers)| {
+    // Deduplicate containers (in case of duplicate edges).
+    let unique : HashSet<&ID> =
+      containers . iter () . collect ();
+    unique . len () > 1 } )
+  . map ( |(id, _)| id . clone () )
+  . collect () }
+
+/// Build origin_types map from in-memory data + one TypeDB query result.
+/// Priority order: Root > CycleMember > Target = HadID > MultiContained.
+/// CycleMember is assigned later (step 3).
+fn identify_origins (
+  all_node_ids : &HashSet<ID>,
+  reverse_map  : &ReverseContainsMap,
+  targets      : &HashSet<ID>,
+  had_id_set   : &HashSet<ID>,
+) -> HashMap<ID, ContextOriginType> {
+  let roots : HashSet<ID> =
+    find_roots_from_maps (all_node_ids, reverse_map);
+  let multi : HashSet<ID> =
+    find_multiply_contained_from_maps (reverse_map);
+  // Start from lowest priority and overwrite with higher.
   let mut origin_types : HashMap<ID, ContextOriginType> =
     HashMap::new ();
-  // Start from lowest priority and overwrite with higher.
   for id in &multi {
     origin_types . insert (
       id . clone (), ContextOriginType::MultiContained ); }
   for id in had_id_set {
     origin_types . insert (
       id . clone (), ContextOriginType::HadID ); }
-  for id in &targets {
+  for id in targets {
     origin_types . insert (
       id . clone (), ContextOriginType::Target ); }
   for id in &roots {
     origin_types . insert (
       id . clone (), ContextOriginType::Root ); }
-  Ok (origin_types) }
+  origin_types }
 
 //
-// Step 1.5: load full contains map into memory (one TypeDB query)
+// Load full contains map into memory (one TypeDB query)
 //
 
 /// Container → contained mapping, loaded in one query.
@@ -409,9 +364,11 @@ fn handle_cycles (
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Strategy: load the full containment graph into memory (one query),
-/// then do all context growth and cycle detection in-memory.
-/// Benchmarked at ~34s total vs ~34,664s with per-query growth (1,019x).
+/// Strategy: run 3 TypeDB queries in parallel (all node IDs,
+/// contains map, link targets), then derive roots and multiply-contained
+/// in-memory, grow contexts in-memory, detect cycles in-memory.
+/// Estimated ~22s (dominated by contains map query) vs ~34s before
+/// and ~34,664s with the original per-query growth.
 pub async fn compute_and_store_context_types (
   db_name        : &str,
   driver         : &TypeDBDriver,
@@ -419,25 +376,36 @@ pub async fn compute_and_store_context_types (
   had_id_set     : &HashSet<ID>,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   println! ("Computing context origin types...");
-  // Step 1: identify origins (3 TypeDB queries in parallel).
-  let mut origin_types : HashMap<ID, ContextOriginType> =
-    identify_origins (db_name, driver, had_id_set) . await ?;
-  println! ("  {} origins identified.", origin_types . len ());
-  // Step 1.5: load full containment graph into memory.
+  // Step 1: run all 3 TypeDB queries in parallel.
+  let ( node_ids_result,
+        maps_result,
+        targets_result )
+    : ( Result < HashSet<ID>, Box<dyn Error> >,
+        Result < (ContainsMap, ReverseContainsMap), Box<dyn Error> >,
+        Result < HashSet<ID>, Box<dyn Error> > )
+    = futures::join! (
+      find_all_node_ids (db_name, driver),
+      load_contains_maps (db_name, driver),
+      find_all_link_targets (db_name, driver) );
+  let all_node_ids : HashSet<ID> = node_ids_result ?;
   let ( contains_map, reverse_map )
     : ( ContainsMap, ReverseContainsMap )
-    = load_contains_maps (db_name, driver) . await ?;
+    = maps_result ?;
+  let targets : HashSet<ID> = targets_result ?;
   let edge_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();
-  println! ("  Contains map loaded: {} containers, {} edges.",
-            contains_map . len (), edge_count);
-  // Step 2: grow treelike contexts (in-memory).
+  println! ("  {} nodes, {} edges, {} link targets loaded.",
+            all_node_ids . len (), edge_count, targets . len ());
+  // Step 2: derive origins in-memory.
+  let mut origin_types : HashMap<ID, ContextOriginType> =
+    identify_origins (
+      &all_node_ids, &reverse_map, &targets, had_id_set );
+  println! ("  {} origins identified.", origin_types . len ());
+  // Step 3: grow treelike contexts (in-memory).
   let mut all_contexts : Vec<HashSet<ID>> =
     grow_all_contexts (&origin_types, &contains_map);
   println! ("  {} treelike contexts grown.", all_contexts . len ());
-  // Step 3: handle cycles (in-memory).
-  let all_node_ids : HashSet<ID> =
-    find_all_node_ids (db_name, driver) . await ?;
+  // Step 4: handle cycles (in-memory).
   handle_cycles (
     &all_node_ids,
     &contains_map,
@@ -446,7 +414,7 @@ pub async fn compute_and_store_context_types (
     &mut all_contexts );
   println! ("  {} total contexts after cycle detection.",
             all_contexts . len ());
-  // Step 4: build the map from ID to label for Tantivy.
+  // Step 5: build the map from ID to label for Tantivy.
   let context_types_by_id : HashMap<ID, String> =
     origin_types . iter ()
     . map ( |(id, ct)| (id . clone (), ct . label () . to_string ()) )
@@ -545,6 +513,37 @@ mod tests {
     assert_eq! (
       origin_types . get (&ID::new ("a")),
       Some (&ContextOriginType::Root) ); }
+
+  #[test]
+  fn test_find_roots_from_maps () {
+    // a → b, a → c. d is a root (not contained).
+    let all_ids : HashSet<ID> =
+      HashSet::from ([
+        ID::new ("a"), ID::new ("b"),
+        ID::new ("c"), ID::new ("d") ]);
+    let mut reverse : ReverseContainsMap = HashMap::new ();
+    reverse . insert (
+      ID::new ("b"), vec![ID::new ("a")] );
+    reverse . insert (
+      ID::new ("c"), vec![ID::new ("a")] );
+    let roots : HashSet<ID> =
+      find_roots_from_maps (&all_ids, &reverse);
+    assert_eq! (roots . len (), 2);
+    assert! (roots . contains (&ID::new ("a")));
+    assert! (roots . contains (&ID::new ("d"))); }
+
+  #[test]
+  fn test_find_multiply_contained_from_maps () {
+    // b is contained by both a and c.
+    let mut reverse : ReverseContainsMap = HashMap::new ();
+    reverse . insert (
+      ID::new ("b"), vec![ID::new ("a"), ID::new ("c")] );
+    reverse . insert (
+      ID::new ("d"), vec![ID::new ("a")] );
+    let multi : HashSet<ID> =
+      find_multiply_contained_from_maps (&reverse);
+    assert_eq! (multi . len (), 1);
+    assert! (multi . contains (&ID::new ("b"))); }
 
   #[test]
   fn test_grow_context_simple_tree () {
