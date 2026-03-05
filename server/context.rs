@@ -95,31 +95,6 @@ async fn find_all_link_targets (
           & concept . to_string () )) ); } }
   Ok (result) }
 
-/// Find all node IDs in the graph.
-async fn find_all_node_ids (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query (
-      r#"match
-        $node isa node, has id $nid;
-        select $nid;"# . to_string()
-    ) . await ?;
-    answer } . into_rows ();
-  let mut result : HashSet<ID> = HashSet::new ();
-  while let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    if let Some (concept) = row . get ("nid") ? {
-      result . insert ( ID (
-        extract_payload_from_typedb_string_rep (
-          & concept . to_string () )) ); } }
-  Ok (result) }
-
 //
 // In-memory origin identification
 // Roots and multiply-contained are derived from the contains maps,
@@ -182,54 +157,32 @@ fn identify_origins (
   origin_types }
 
 //
-// Load full contains map into memory (one TypeDB query)
+// Contains maps: built from SkgNodes or loaded from TypeDB
 //
 
-/// Container → contained mapping, loaded in one query.
+/// Container → contained mapping.
 pub type ContainsMap = HashMap<ID, Vec<ID>>;
 /// Contained → container mapping (reverse of ContainsMap).
 pub type ReverseContainsMap = HashMap<ID, Vec<ID>>;
 
-/// Load the full containment graph into memory.
-/// Returns (container→contained, contained→container) maps.
-async fn load_contains_maps (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<(ContainsMap, ReverseContainsMap), Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query (
-      r#"match
-        $container isa node, has id $cid;
-        $contained isa node, has id $did;
-        $rel isa contains ( container: $container,
-                            contained: $contained );
-        select $cid, $did;"# . to_string ()
-    ) . await ?;
-    answer } . into_rows ();
+/// Build (forward, reverse) contains maps from loaded SkgNodes.
+/// This avoids a ~22s TypeDB query on 28k-node datasets.
+pub fn contains_maps_from_nodes (
+  nodes : &[SkgNode],
+) -> (ContainsMap, ReverseContainsMap) {
   let mut forward : ContainsMap = HashMap::new ();
   let mut reverse : ReverseContainsMap = HashMap::new ();
-  while let Some (row_result) = stream . next () . await {
-    let row : ConceptRow = row_result ?;
-    let container_id : Option<ID> =
-      row . get ("cid") ?
-      . map ( |c| ID (
-        extract_payload_from_typedb_string_rep (
-          & c . to_string () )) );
-    let contained_id : Option<ID> =
-      row . get ("did") ?
-      . map ( |c| ID (
-        extract_payload_from_typedb_string_rep (
-          & c . to_string () )) );
-    if let (Some (cid), Some (did)) = (container_id, contained_id) {
-      forward . entry (cid . clone ())
-        . or_insert_with (Vec::new) . push (did . clone ());
-      reverse . entry (did)
-        . or_insert_with (Vec::new) . push (cid); } }
-  Ok (( forward, reverse )) }
+  for node in nodes {
+    if let Ok (pid) = node . primary_id () {
+      if let Some (children) = &node . contains {
+        for child_id in children {
+          forward . entry (pid . clone ())
+            . or_insert_with (Vec::new)
+            . push (child_id . clone ());
+          reverse . entry (child_id . clone ())
+            . or_insert_with (Vec::new)
+            . push (pid . clone ()); } } } }
+  ( forward, reverse ) }
 
 //
 // Step 2: grow treelike contexts (in-memory)
@@ -364,57 +317,47 @@ fn handle_cycles (
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Strategy: run 3 TypeDB queries in parallel (all node IDs,
-/// contains map, link targets), then derive roots and multiply-contained
-/// in-memory, grow contexts in-memory, detect cycles in-memory.
-/// Estimated ~22s (dominated by contains map query) vs ~34s before
-/// and ~34,664s with the original per-query growth.
+/// Accepts pre-built contains maps and node IDs (built from SkgNodes
+/// during init), so the only TypeDB query needed is for link targets.
+/// On a 28k-node dataset: ~2.5s (link targets query) + negligible
+/// in-memory work, vs ~34s before (3 TypeDB queries + contains map).
 pub async fn compute_and_store_context_types (
   db_name        : &str,
   driver         : &TypeDBDriver,
   tantivy_index  : &TantivyIndex,
   had_id_set     : &HashSet<ID>,
+  all_node_ids   : &HashSet<ID>,
+  contains_map   : &ContainsMap,
+  reverse_map    : &ReverseContainsMap,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   println! ("Computing context origin types...");
-  // Step 1: run all 3 TypeDB queries in parallel.
-  let ( node_ids_result,
-        maps_result,
-        targets_result )
-    : ( Result < HashSet<ID>, Box<dyn Error> >,
-        Result < (ContainsMap, ReverseContainsMap), Box<dyn Error> >,
-        Result < HashSet<ID>, Box<dyn Error> > )
-    = futures::join! (
-      find_all_node_ids (db_name, driver),
-      load_contains_maps (db_name, driver),
-      find_all_link_targets (db_name, driver) );
-  let all_node_ids : HashSet<ID> = node_ids_result ?;
-  let ( contains_map, reverse_map )
-    : ( ContainsMap, ReverseContainsMap )
-    = maps_result ?;
-  let targets : HashSet<ID> = targets_result ?;
+  // Only TypeDB query: link targets (can't be derived from .skg files
+  // because textlinks_to is computed by the save pipeline, not stored).
+  let targets : HashSet<ID> =
+    find_all_link_targets (db_name, driver) . await ?;
   let edge_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();
-  println! ("  {} nodes, {} edges, {} link targets loaded.",
+  println! ("  {} nodes, {} edges, {} link targets.",
             all_node_ids . len (), edge_count, targets . len ());
-  // Step 2: derive origins in-memory.
+  // Derive origins in-memory.
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      &all_node_ids, &reverse_map, &targets, had_id_set );
+      all_node_ids, reverse_map, &targets, had_id_set );
   println! ("  {} origins identified.", origin_types . len ());
-  // Step 3: grow treelike contexts (in-memory).
+  // Grow treelike contexts (in-memory).
   let mut all_contexts : Vec<HashSet<ID>> =
-    grow_all_contexts (&origin_types, &contains_map);
+    grow_all_contexts (&origin_types, contains_map);
   println! ("  {} treelike contexts grown.", all_contexts . len ());
-  // Step 4: handle cycles (in-memory).
+  // Handle cycles (in-memory).
   handle_cycles (
-    &all_node_ids,
-    &contains_map,
-    &reverse_map,
+    all_node_ids,
+    contains_map,
+    reverse_map,
     &mut origin_types,
     &mut all_contexts );
   println! ("  {} total contexts after cycle detection.",
             all_contexts . len ());
-  // Step 5: build the map from ID to label for Tantivy.
+  // Build the map from ID to label for Tantivy.
   let context_types_by_id : HashMap<ID, String> =
     origin_types . iter ()
     . map ( |(id, ct)| (id . clone (), ct . label () . to_string ()) )
