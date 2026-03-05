@@ -1,0 +1,13 @@
+[package]
+name = "change-forest"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "change-forest"
+path = "change-forest.rs"
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+walkdir = "2"
