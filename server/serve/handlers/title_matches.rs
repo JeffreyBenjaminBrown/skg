@@ -23,8 +23,6 @@ pub fn handle_title_matches_request (
   stream        : &mut TcpStream,
   request       : &str,
   tantivy_index : &TantivyIndex,
-  _driver       : &typedb_driver::TypeDBDriver,
-  _config       : &crate::types::misc::SkgConfig,
 ) {
   match search_terms_from_request (request) {
     Ok (search_terms) => {
