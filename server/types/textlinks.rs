@@ -1,10 +1,19 @@
 use regex::{Regex, Match};
 use std::fmt;
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use crate::types::misc::ID;
 use crate::types::errors::TextLinkParseError;
 use crate::types::skgnode::SkgNode;
+
+static TEXTLINK_PATTERN : LazyLock<Regex> =
+  LazyLock::new ( || Regex::new (
+    r"\[\[id:(.*?)\]\[(.*?)\]\]") . unwrap () );
+
+static LINK_LABEL_PATTERN : LazyLock<Regex> =
+  LazyLock::new ( || Regex::new (
+    r"\[\[.*?\]\[(.*?)\]\]") . unwrap () );
 
 //
 // Type Definitions
@@ -79,12 +88,8 @@ pub fn textlinks_from_node (
 pub fn textlinks_from_text (
   text: &str )
   -> Vec <TextLink> {
-
-  let textlink_pattern : Regex = Regex::new (
-    // non-greedy .*? pattern avoids capturing too much.
-    r"\[\[id:(.*?)\]\[(.*?)\]\]") . unwrap();
   let mut textlinks : Vec<TextLink> = Vec::new ();
-  for capture in textlink_pattern . captures_iter (text) {
+  for capture in TEXTLINK_PATTERN . captures_iter (text) {
     if capture . len () >= 3 { // capture group 0 is the entire match
       let skgid : String = capture [1] . to_string ();
       let label  : String = capture [2] . to_string ();
@@ -97,12 +102,9 @@ pub fn replace_each_link_with_its_label (
   -> String {
   // Replaces each textlink with that textlink's label.
   // Strips some text from each textlink while adding nothing.
-
-  let textlink_re : Regex = Regex::new (
-    r"\[\[.*?\]\[(.*?)\]\]") . unwrap (); // capture the label but not the ID
   let mut result : String = String::from (text);
   let mut input_offset : usize = 0; // offset in the input string
-  for cap in textlink_re . captures_iter (text) {
+  for cap in LINK_LABEL_PATTERN . captures_iter (text) {
     let whole_match : Match =
       cap . get (0) . unwrap ();
     let textlink_label : Match =

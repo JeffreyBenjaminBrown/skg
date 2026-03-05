@@ -7,10 +7,7 @@
  * with the named database already populated.
  */
 
-use skg::context::{
-  compute_and_store_context_types,
-  ContextOriginType,
-};
+use skg::context::ContextOriginType;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::types::misc::ID;

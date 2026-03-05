@@ -502,17 +502,15 @@ Optimization priority and results:
 Zero TypeDB queries. Everything is computed from the SkgNodes
 that are already loaded during =initialize_dbs=:
 
-| Step                        | Source       | Time    |
-|-----------------------------+--------------+---------|
-| Read .skg files             | disk (init)  | ~few s  |
-| Build contains maps         | SkgNodes     | ~0.001s |
-| Derive roots, multi-cont.   | maps         | ~0.001s |
-| Compute had_id_set          | SkgNodes     | ~0.001s |
-| Parse link targets          | SkgNodes     | ~0.001s |
-| Grow contexts               | in-memory    | ~0.1s   |
-| Detect cycles               | in-memory    | ~0.001s |
-| Update Tantivy              | Tantivy      | ~varies |
-| Total context computation   |              | <1s     |
+| Step                        | Source       | Measured  |
+|-----------------------------+--------------+-----------|
+| Read .skg files             | disk (init)  | 0.865s    |
+| Build contains maps         | SkgNodes     | 0.037s    |
+| Derive roots, multi-cont.   | maps         | (in 0.6s) |
+| Compute had_id_set          | SkgNodes     | 0.001s    |
+| Parse link targets          | SkgNodes     | 0.183s    |
+| Grow+detect+update Tantivy  | in-memory    | 0.615s    |
+| Total context computation   |              | 0.615s    |
 
 =compute_and_store_context_types= is now fully synchronous.
 No async, no TypeDB driver parameter.
@@ -520,6 +518,51 @@ No async, no TypeDB driver parameter.
 Total went from ~34,664s (original per-query) → ~34s (in-memory growth)
 → ~22s (derive origins from maps) → ~2.5s (build maps from SkgNodes)
 → <1s (parse link targets from text). Overall: ~34,664x from original.
+
+** Regex compilation bug in textlinks (discovered via benchmark)
+
+When =link_targets_from_nodes= was introduced (optimization #5), it called
+=textlinks_from_text= which compiled =Regex::new(...)= on every call.
+With 28,698 nodes, this compiled the regex 28,698 times.
+
+Additionally, =replace_each_link_with_its_label= (used by Tantivy
+indexing) had the same bug. Called for each of 29,438 Tantivy documents.
+
+Fix: moved both regexes to =static LazyLock<Regex>= (compiled once).
+
+*** Benchmark: link_targets extraction
+
+| Metric              | Before fix | After fix | Speedup |
+|---------------------+------------+-----------+---------|
+| link_targets        | 20.413s    | 0.183s    | 112x    |
+| Extract total       | 20.481s    | 0.249s    | 82x     |
+| Tantivy populate    | 21.052s    | 0.651s    | 32x     |
+
+*** Benchmark: full pipeline (28,698 nodes, in-memory context)
+
+| Step                        | Time   | % of total |
+|-----------------------------+--------+------------|
+| Read .skg files             | 0.865s | 36%        |
+| Extract context data        | 0.249s | 10.5%      |
+| Populate Tantivy            | 0.651s | 27%        |
+| Context computation         | 0.615s | 26%        |
+| Total                       | 2.380s | 100%       |
+
+Context computation across repeated runs: 0.601s, 0.610s, 0.615s, 0.715s, 0.767s, 0.777s.
+
+*** Impact beyond context computation
+
+The fix also speeds up:
+- Tantivy indexing at init (~21s → ~0.7s for 29k docs)
+- =replace_each_link_with_its_label= in the save pipeline
+- =textlinks_from_text= in TypeDB relationship creation
+
+*** Lesson
+
+When moving computation from DB queries to in-process code,
+watch for per-call initialization costs (regex compilation,
+connection setup, etc.) that were invisible when each query
+was already expensive.
 
 ** TypeDB v3 compatibility fix
 

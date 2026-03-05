@@ -12,6 +12,7 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::dbs::typedb::util::connect_to_typedb;
+use crate::serve::timing_log::timed;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::skgnode::SkgNode;
 
@@ -194,34 +195,44 @@ fn full_init (
   driver : TypeDBDriver,
 ) -> InitData {
   println! ("Performing full init...");
-  println! ("Reading .skg files from all sources...");
   let nodes : Vec<SkgNode> =
-    read_all_skg_files_from_sources (config)
-    . unwrap_or_else ( |e| {
-      eprintln! ("Failed to read .skg files: {}", e);
-      std::process::exit (1); } );
+    timed ( config, "read_all_skg_files", || {
+      println! ("Reading .skg files from all sources...");
+      read_all_skg_files_from_sources (config)
+      . unwrap_or_else ( |e| {
+        eprintln! ("Failed to read .skg files: {}", e);
+        std::process::exit (1); } ) } );
   println! ("{} .skg files were read from {} source(s)",
             nodes . len(), config . sources . len());
-  let had_id_set : HashSet<ID> =
-    had_id_set_from_nodes (&nodes);
-  let all_node_ids : HashSet<ID> =
-    nodes . iter ()
-    . filter_map ( |n| n . primary_id () . ok () . cloned () )
-    . collect ();
-  let link_targets : HashSet<ID> =
-    link_targets_from_nodes (&nodes);
-  let ( contains_map, reverse_map )
-    : ( ContainsMap, ReverseContainsMap )
-    = contains_maps_from_nodes (&nodes);
-  block_on ( async {
-    if let Err (e) = populate_typedb_from_nodes (
-      config, &driver, &nodes
-    ) . await {
-      eprintln! ("Failed to populate TypeDB: {}", e);
-      std::process::exit (1); }} );
+  let ( had_id_set, all_node_ids, link_targets,
+        contains_map, reverse_map )
+    : ( HashSet<ID>, HashSet<ID>, HashSet<ID>,
+        ContainsMap, ReverseContainsMap )
+    = timed ( config, "extract_context_data_from_nodes", || {
+        let had_id_set : HashSet<ID> =
+          had_id_set_from_nodes (&nodes);
+        let all_node_ids : HashSet<ID> =
+          nodes . iter ()
+          . filter_map ( |n| n . primary_id () . ok () . cloned () )
+          . collect ();
+        let link_targets : HashSet<ID> =
+          link_targets_from_nodes (&nodes);
+        let ( contains_map, reverse_map )
+          : ( ContainsMap, ReverseContainsMap )
+          = contains_maps_from_nodes (&nodes);
+        ( had_id_set, all_node_ids, link_targets,
+          contains_map, reverse_map ) } );
+  timed ( config, "populate_typedb", || {
+    block_on ( async {
+      if let Err (e) = populate_typedb_from_nodes (
+        config, &driver, &nodes
+      ) . await {
+        eprintln! ("Failed to populate TypeDB: {}", e);
+        std::process::exit (1); }} ) } );
   println! ("TypeDB database initialized successfully.");
   let tantivy_index : TantivyIndex =
-    initialize_tantivy_from_nodes (config, &nodes);
+    timed ( config, "initialize_tantivy", || {
+      initialize_tantivy_from_nodes (config, &nodes) } );
   InitData {
     driver : Arc::new (driver),
     tantivy_index,
