@@ -24,6 +24,7 @@
 /plans-done
 /rust-indent/
 /target
+/tests/results
 /tests/**/generated/
 /tests/results
 /tests/tantivy/generated_aliases/
