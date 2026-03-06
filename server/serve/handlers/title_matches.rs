@@ -1,4 +1,4 @@
-use crate::context::multiplier_for_label;
+use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
 use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
@@ -98,14 +98,12 @@ pub fn group_matches_by_id (
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_text() )
             . map ( |s| s . to_string() );
-        let context_type : String =
+        let multiplier : f32 =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )
             . and_then ( |v| v . as_text () )
-            . unwrap_or ("")
-            . to_string ();
-        let multiplier : f32 =
-          multiplier_for_label (&context_type);
+            . and_then ( ContextOriginType::from_label )
+            . map_or ( 1.0, |t| t . multiplier() );
         let adjusted_score : f32 = score * multiplier;
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
           result_acc

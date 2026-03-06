@@ -6,7 +6,7 @@
 /// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-nickname>
 /// Converts org-roam .org files to .skg files.
 
-use skg::context::compute_and_store_context_types;
+use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitData, initialize_dbs};
 use skg::import_org_roam::import_org_roam_directory;
@@ -67,25 +67,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   // Compute context origin types for search ranking.
   // Fully in-memory: all data is pre-computed from SkgNodes at init.
-  { let had_id_set : HashSet<ID> = init . had_id_set;
+  { let had_id_set   : HashSet<ID> = init . had_id_set;
     let all_node_ids : HashSet<ID> = init . all_node_ids;
     let link_targets : HashSet<ID> = init . link_targets;
-    let contains_map : skg::context::ContainsMap = init . contains_map;
-    let reverse_map : skg::context::ReverseContainsMap = init . reverse_map;
+    let map_to_content    : MapToContent    = init . map_to_content;
+    let map_to_containers : MapToContainers = init . map_to_containers;
     timed ( &config, "context_computation", || {
       match compute_and_store_context_types (
         &tantivy_index,
         &had_id_set,
         &all_node_ids,
         &link_targets,
-        &contains_map,
-        &reverse_map )
+        &map_to_content,
+        &map_to_containers )
       { Ok (_) => {}
-        Err (e) => {
-          eprintln! (
-            "Warning: context computation failed: {}. \
-             Search results will not have context-based ranking.", e); } } } ); }
-  // had_id_set, all_node_ids, link_targets, contains_map, reverse_map
+        Err (e) => { eprintln! (
+          "Warning: context computation failed: {}. \
+           Search results will not have context-based ranking.", e
+        ); }} } ); }
+  // had_id_set, all_node_ids, link_targets, map_to_content, map_to_containers
   // are dropped here, freeing memory before the serve loop.
 
   init_done . store (true, Ordering::Release);

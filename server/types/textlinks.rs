@@ -7,10 +7,10 @@ use crate::types::misc::ID;
 use crate::types::errors::TextLinkParseError;
 use crate::types::skgnode::SkgNode;
 
+// LazyLock<Regex> ensures each regex is compiled exactly once, on first use, rather than per call.
 static TEXTLINK_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[id:(.*?)\]\[(.*?)\]\]") . unwrap () );
-
 static LINK_LABEL_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[.*?\]\[(.*?)\]\]") . unwrap () );

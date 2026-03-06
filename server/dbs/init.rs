@@ -1,6 +1,6 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
-use crate::context::{ContainsMap, ReverseContainsMap};
+use crate::context::{MapToContent, MapToContainers};
 use crate::context::{contains_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -32,16 +32,16 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-/// Data computed during init that is needed by context computation.
-/// Avoids re-reading .skg files or re-querying TypeDB.
+/// Computed during init. Needed by context computation,
+/// to avoid re-reading .skg files or re-querying TypeDB.
 pub struct InitData {
   pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
   pub had_id_set    : HashSet<ID>,
   pub all_node_ids  : HashSet<ID>,
   pub link_targets  : HashSet<ID>,
-  pub contains_map  : ContainsMap,
-  pub reverse_map   : ReverseContainsMap,
+  pub map_to_content    : MapToContent,
+  pub map_to_containers : MapToContainers,
 }
 
 /// Initializes TypeDB and Tantivy databases.
@@ -71,30 +71,13 @@ pub fn initialize_dbs (
       { Ok (( tantivy_index )) => {
           println! ("Incremental init succeeded.");
           touch_init_marker (&marker_path);
-          // Incremental init only reads modified files,
-          // so we must read all files for the full set.
+          // Incremental init only reads modified files.
+          // We must read all files for the full set.
           let nodes : Vec<SkgNode> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
-          let had_id_set : HashSet<ID> =
-            had_id_set_from_nodes (&nodes);
-          let all_node_ids : HashSet<ID> =
-            nodes . iter ()
-            . filter_map ( |n| n . primary_id () . ok () . cloned () )
-            . collect ();
-          let link_targets : HashSet<ID> =
-            link_targets_from_nodes (&nodes);
-          let ( contains_map, reverse_map )
-            : ( ContainsMap, ReverseContainsMap )
-            = contains_maps_from_nodes (&nodes);
-          return InitData {
-            driver : Arc::new (driver),
-            tantivy_index,
-            had_id_set,
-            all_node_ids,
-            link_targets,
-            contains_map,
-            reverse_map }; }
+          return init_data_from_nodes (
+            &nodes, Arc::new (driver), tantivy_index ); }
         Err (e) => {
           println! ("Incremental init failed ({}), \
                      falling back to full rebuild.", e); }} }
@@ -187,6 +170,31 @@ fn incremental_init (
             indexed, t3 . elapsed() . as_secs_f64());
   Ok (tantivy_index) }
 
+fn init_data_from_nodes (
+  nodes         : &[SkgNode],
+  driver        : Arc<TypeDBDriver>,
+  tantivy_index : TantivyIndex,
+) -> InitData {
+  let had_id_set : HashSet<ID> =
+    had_id_set_from_nodes (&nodes);
+  let all_node_ids : HashSet<ID> =
+    nodes . iter ()
+    . filter_map ( |n| n . primary_id () . ok () . cloned () )
+    . collect ();
+  let link_targets : HashSet<ID> =
+    link_targets_from_nodes (&nodes);
+  let ( map_to_content, map_to_containers )
+    : ( MapToContent, MapToContainers )
+    = contains_maps_from_nodes (&nodes);
+  InitData {
+    driver,
+    tantivy_index,
+    had_id_set,
+    all_node_ids,
+    link_targets,
+    map_to_content,
+    map_to_containers }}
+
 /// Full rebuild: reads all .skg files, populates both databases.
 /// Also computes had_id_set and contains maps from the loaded nodes,
 /// avoiding re-reading files or querying TypeDB for context computation.
@@ -204,24 +212,6 @@ fn full_init (
         std::process::exit (1); } ) } );
   println! ("{} .skg files were read from {} source(s)",
             nodes . len(), config . sources . len());
-  let ( had_id_set, all_node_ids, link_targets,
-        contains_map, reverse_map )
-    : ( HashSet<ID>, HashSet<ID>, HashSet<ID>,
-        ContainsMap, ReverseContainsMap )
-    = timed ( config, "extract_context_data_from_nodes", || {
-        let had_id_set : HashSet<ID> =
-          had_id_set_from_nodes (&nodes);
-        let all_node_ids : HashSet<ID> =
-          nodes . iter ()
-          . filter_map ( |n| n . primary_id () . ok () . cloned () )
-          . collect ();
-        let link_targets : HashSet<ID> =
-          link_targets_from_nodes (&nodes);
-        let ( contains_map, reverse_map )
-          : ( ContainsMap, ReverseContainsMap )
-          = contains_maps_from_nodes (&nodes);
-        ( had_id_set, all_node_ids, link_targets,
-          contains_map, reverse_map ) } );
   timed ( config, "populate_typedb", || {
     block_on ( async {
       if let Err (e) = populate_typedb_from_nodes (
@@ -233,14 +223,9 @@ fn full_init (
   let tantivy_index : TantivyIndex =
     timed ( config, "initialize_tantivy", || {
       initialize_tantivy_from_nodes (config, &nodes) } );
-  InitData {
-    driver : Arc::new (driver),
-    tantivy_index,
-    had_id_set,
-    all_node_ids,
-    link_targets,
-    contains_map,
-    reverse_map } }
+  timed ( config, "extract_context_data_from_nodes", ||
+    init_data_from_nodes (
+      &nodes, Arc::new (driver), tantivy_index ) ) }
 
 fn touch_init_marker (
   path : &Path,

@@ -9,12 +9,13 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* ONGOING skg import must preserve and define contexts
-** TODO review diff range
-   c1f58906a228786238f72cd0a7cc43fb1be3aebc
-   to
-   e84574d6500d8546833f11bdd1d8b9d4fda45b83
-** development history
+* DONE skg import must preserve and define contexts
+** DONE review diff range
+   enter magit
+   press r
+   enter this:
+     e84574d6..c1f58906
+** DONE development history
 *** full plan saved at [[./.claude/plans/beautiful/contexts-on-init-and-import.org]]
 *** an easier algorithm
 **** a 'context' is an (ID, Set (ID)) pair.
@@ -373,7 +374,7 @@ If anything blocks your progress that needs my attention, ping me.
  bigger ones only when you really need the data.
  You are free to make all the commits (on this branch!) that you want.
  Go wherever your creativity takes you.
-*** DONE earlier
+*** DONE earlier, radically revised
 **** instead index every node, but also whether it is a context
      The user can choose to search over contexts or over everything.
 **** goal

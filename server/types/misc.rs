@@ -60,10 +60,10 @@ pub struct SourceName ( pub String );
 #[derive (Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
-  pub index                    : Arc<Index>,
-  pub id_field                 : Field,
-  pub title_or_alias_field     : Field,
-  pub source_field             : Field,
+  pub index                     : Arc<Index>,
+  pub id_field                  : Field,
+  pub title_or_alias_field      : Field,
+  pub source_field              : Field,
   pub context_origin_type_field : Field,
 }
 

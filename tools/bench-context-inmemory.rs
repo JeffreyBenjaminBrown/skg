@@ -12,8 +12,8 @@ use skg::context::{
   contains_maps_from_nodes,
   had_id_set_from_nodes,
   link_targets_from_nodes,
-  ContainsMap,
-  ReverseContainsMap,
+  MapToContent,
+  MapToContainers,
 };
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -69,7 +69,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   let t4 : Instant = Instant::now ();
   let ( contains_map, reverse_map )
-    : ( ContainsMap, ReverseContainsMap )
+    : ( MapToContent, MapToContainers )
     = contains_maps_from_nodes (&nodes);
   let maps_time : f64 = t4 . elapsed () . as_secs_f64 ();
   let edge_count : usize =

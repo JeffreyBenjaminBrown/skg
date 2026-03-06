@@ -12,6 +12,7 @@ use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
 use tantivy::schema;
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
@@ -195,7 +196,7 @@ fn create_documents_from_node (
 /// Deletes and re-adds each document with the new context_origin_type.
 pub fn update_context_origin_types (
   tantivy_index       : &TantivyIndex,
-  context_types_by_id : &std::collections::HashMap<ID, String>,
+  context_types_by_id : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
   let reader : IndexReader =
     tantivy_index . index . reader () ?;
@@ -205,8 +206,8 @@ pub fn update_context_origin_types (
     tantivy_index . index . writer (50_000_000) ?;
   let mut updated_count : usize = 0;
   for (pid, context_type) in context_types_by_id {
-    // Find all documents with this ID.
     let query : Box < dyn Query > =
+      // Find all documents with this ID.
       Box::new ( tantivy::query::TermQuery::new (
         Term::from_field_text (
           tantivy_index . id_field, pid . as_str () ),
@@ -214,12 +215,11 @@ pub fn update_context_origin_types (
     let results : Vec < (f32, tantivy::DocAddress) > =
       searcher . search (&query, &TopDocs::with_limit (100)) ?;
     if results . is_empty () { continue; }
-    // Delete all documents for this ID.
-    writer . delete_term (
+    writer . delete_term ( // Delete all documents for this ID.
       Term::from_field_text (
         tantivy_index . id_field, pid . as_str () ));
-    // Re-add with the new context_origin_type.
     for (_score, doc_address) in &results {
+      // Re-add with the new context_origin_type.
       let retrieved_doc : Document =
         searcher . doc (*doc_address) ?;
       let title_or_alias : String =
