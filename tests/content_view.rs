@@ -5,7 +5,7 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::dbs::typedb::search::path_containerward_to_first_nonlinearity;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::memory::SkgNodeMap;
 
@@ -37,28 +37,27 @@ async fn run_path_and_root_tests (
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   // Test the path from node "4" to the root container
-  match path_containerward_to_end_cycle_and_or_branches (
+  match path_containerward_to_first_nonlinearity (
     & config . db_name,
     & driver,
     & ID("4" . to_string() )
   ) . await {
-    Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
-      path,
+    Ok(r) => { assert_eq!(
+      r.path,
       vec![
-        ID ( "4" . to_string() ),
         ID ( "2" . to_string() ),
         ID ( "1" . to_string() ) ],
       "Unexpected path to root container from node '4'.");
     }, Err (e) => {
       panic!("Error finding path to root container: {}", e); } }
 
-  match path_containerward_to_end_cycle_and_or_branches (
+  match path_containerward_to_first_nonlinearity (
     & config . db_name,
     & driver,
     & ID("4" . to_string() )
   ) . await {
-    Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
-      path . last () . cloned (),
+    Ok(r) => { assert_eq!(
+      r.path . last () . cloned (),
       Some ( ID ( "1" . to_string() ) ),
       "Root of node '4' should be 1." ) },
     Err (e) => { panic!(
@@ -66,15 +65,14 @@ async fn run_path_and_root_tests (
 
   // Test the path "to root" from node "cycle-3".
   // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_end_cycle_and_or_branches (
+  match path_containerward_to_first_nonlinearity (
     & config . db_name,
     & driver,
     & ID("cycle-3" . to_string() )
   ) . await {
-    Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
-      path,
+    Ok(r) => { assert_eq!(
+      r.path,
       vec![
-        ID ( "cycle-3" . to_string() ),
         ID ( "cycle-2" . to_string() ),
         ID ( "cycle-1" . to_string() ) ],
       "Unexpected path to \"root container\" from node 'cycle-3'.");
@@ -83,15 +81,14 @@ async fn run_path_and_root_tests (
 
   // Test the path "to root" from node "cycle-1".
   // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_end_cycle_and_or_branches (
+  match path_containerward_to_first_nonlinearity (
     & config . db_name,
     & driver,
     & ID("cycle-1" . to_string() )
   ) . await {
-    Ok((path, _cycle_node, _multi_containers)) => { assert_eq!(
-      path,
+    Ok(r) => { assert_eq!(
+      r.path,
       vec![
-        ID ( "cycle-1" . to_string() ),
         ID ( "cycle-3" . to_string() ),
         ID ( "cycle-2" . to_string() ),
       ],

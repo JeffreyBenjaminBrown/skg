@@ -4,7 +4,9 @@ pub mod contains_from_pids;
 
 use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::find_related_nodes;
-use skg::dbs::typedb::search::path_containerward_to_end_cycle_and_or_branches;
+use skg::dbs::typedb::search::{
+  path_containerward_to_first_nonlinearity,
+  PathToFirstNonlinearity};
 use skg::types::misc::{ID, SkgConfig};
 
 use std::collections::HashSet;
@@ -21,7 +23,7 @@ fn the_tests (
     |config, driver, _tantivy| Box::pin ( async move {
       test_find_containers_of (
         config, driver ) . await ?;
-      test_path_containerward_to_end_cycle_and_or_branches (
+      test_path_containerward_to_first_nonlinearity (
         config, driver ) . await ?;
       Ok (( )) } ) ) }
 
@@ -110,87 +112,82 @@ async fn test_find_containers_of (
 
   Ok (( )) }
 
-async fn test_path_containerward_to_end_cycle_and_or_branches (
+async fn test_path_containerward_to_first_nonlinearity (
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
 
   // The containerward paths from 11 and from 11_extra_id
   // (which are two distinct IDs for the same node)
-  // are [11, 1] and [11-extra-id, 1] respectively,
-  // with no option and no set.
-  let result_11 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  // are [1] and [1] respectively (paths begin without the origin)
+  // with no fork and no cycles.
+  let result_11 : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("11" . to_string() )) . await ?;
-  assert_eq! ( result_11.0, vec![ID("11" . to_string()),
-                                 ID("1" . to_string())] );
-  assert_eq! ( result_11.1, None );
-  assert_eq! ( result_11.2, HashSet::new() );
-  let result_11_extra : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  assert_eq! ( result_11.path, vec![ID("1" . to_string())] );
+  assert_eq! ( result_11.cycle_nodes, HashSet::new() );
+  assert_eq! ( result_11.branches, HashSet::new() );
+  let result_11_extra : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("11-extra-id" . to_string() )) . await ?;
-  assert_eq! ( result_11_extra . 0, vec![ID("11-extra-id" . to_string()),
-                                       ID("1" . to_string())] );
-  assert_eq! ( result_11_extra . 1, None );
-  assert_eq! ( result_11_extra . 2, HashSet::new() );
+  assert_eq! ( result_11_extra.path, vec![ID("1" . to_string())] );
+  assert_eq! ( result_11_extra.cycle_nodes, HashSet::new() );
+  assert_eq! ( result_11_extra.branches, HashSet::new() );
 
-  // The containerward path from 111 is [111, 11, 1].
-  // No option, no set.
-  let result_111 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  // The containerward path from 111 is [11, 1].
+  // No fork and no cycles.
+  let result_111 : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("111" . to_string() )) . await ?;
-  assert_eq! ( result_111.0, vec![ID("111" . to_string()),
-                                  ID("11" . to_string()),
-                                  ID("1" . to_string())] );
-  assert_eq! ( result_111.1, None );
-  assert_eq! ( result_111.2, HashSet::new() );
+  assert_eq! ( result_111.path, vec![ID("11" . to_string()),
+                                     ID("1" . to_string())] );
+  assert_eq! ( result_111.cycle_nodes, HashSet::new() );
+  assert_eq! ( result_111.branches, HashSet::new() );
 
-  // The result from 211 is Vec([211, 21, 2]), Some(211), {}.
-  // That is, it comes back to 211.
-  let result_211 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  // The result from 211 is path=[21, 2], Some(211), {}.
+  // That is, the path loops back at 211.
+  let result_211 : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("211" . to_string() )) . await ?;
-  assert_eq! ( result_211.0, vec![ID("211" . to_string()),
-                                  ID("21" . to_string()),
-                                  ID("2" . to_string())] );
-  assert_eq! ( result_211.1, Some(ID("211" . to_string())) );
-  assert_eq! ( result_211.2, HashSet::new() );
+  assert_eq! ( result_211.path, vec![ID("21" . to_string()),
+                                     ID("2" . to_string())] );
+  assert_eq! ( result_211.cycle_nodes,
+               HashSet::from([ID("211" . to_string())]) );
+  assert_eq! ( result_211.branches, HashSet::new() );
 
-  // The result from 21 is Vec([21, 2, 211]), Some(21), {}.
+  // The result from 21 is path=[2, 211], cycles = (21), fork = {}.
   // That is, it comes back to 21.
-  let result_21 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  let result_21 : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("21" . to_string() )) . await ?;
-  assert_eq! ( result_21.0, vec![ID("21" . to_string()),
-                                 ID("2" . to_string()),
-                                 ID("211" . to_string())] );
-  assert_eq! ( result_21.1, Some(ID("21" . to_string())) );
-  assert_eq! ( result_21.2, HashSet::new() );
+  assert_eq! ( result_21.path, vec![ID("2" . to_string()),
+                                    ID("211" . to_string())] );
+  assert_eq! ( result_21.cycle_nodes, HashSet::from([ID("21" . to_string())]) );
+  assert_eq! ( result_21.branches, HashSet::new() );
 
-  // The result from shared is [shared], None, {1,2}.
-  let result_shared : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  // The result from shared is path=[], cycles = empty, fork = {1,2}.
+  let result_shared : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("shared" . to_string() )) . await ?;
-  assert_eq! ( result_shared . 0, vec![ID("shared" . to_string())] );
-  assert_eq! ( result_shared . 1, None );
-  assert_eq! ( result_shared . 2, HashSet::from([ID("1" . to_string()),
-                                               ID("2" . to_string())]) );
+  assert_eq! ( result_shared.path, vec![] );
+  assert_eq! ( result_shared.cycle_nodes, HashSet::new() );
+  assert_eq! ( result_shared.branches, HashSet::from([ID("1" . to_string()),
+                                                      ID("2" . to_string())]) );
 
-  // The result from shared_1 is [shared_1, shared], None, {1,2}.
-  let result_shared_1 : ( Vec<ID>, Option<ID>, HashSet<ID> ) =
-    path_containerward_to_end_cycle_and_or_branches (
+  // from shared_1 we get path=[shared], cycles = {}, fork = {1,2}
+  let result_shared_1 : PathToFirstNonlinearity =
+    path_containerward_to_first_nonlinearity (
       & config . db_name, & driver,
       & ID("shared_1" . to_string() )) . await ?;
-  assert_eq! ( result_shared_1.0, vec![ID("shared_1" . to_string()),
-                                       ID("shared" . to_string())] );
-  assert_eq! ( result_shared_1.1, None );
-  assert_eq! ( result_shared_1.2,
+  assert_eq! ( result_shared_1.path, vec![ID("shared" . to_string())] );
+  assert_eq! ( result_shared_1.cycle_nodes, HashSet::new() );
+  assert_eq! ( result_shared_1.branches,
                HashSet::from([ID("1" . to_string()),
                               ID("2" . to_string())]) );
 

@@ -11,8 +11,8 @@ use crate::to_org::util::{
   get_id_from_treenode, skgnode_and_viewnode_from_id,
   remove_completed_view_request};
 use crate::dbs::typedb::search::{
-  path_containerward_to_end_cycle_and_or_branches,
-  path_sourceward_to_end_cycle_and_or_branches};
+  paths_to_first_nonlinearities,
+  PathToFirstNonlinearity};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{
@@ -55,16 +55,9 @@ pub async fn build_and_integrate_containerward_path (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let terminus_pid : ID =
-    get_id_from_treenode ( tree, node_id ) ?;
-  let ( path, cycle_node, branches )
-    : ( Vec < ID >, Option < ID >, HashSet < ID > )
-    = path_containerward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
-      & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle (
-    tree, map, node_id, path, branches, cycle_node, config, driver
+  build_and_integrate_backpaths (
+    tree, map, node_id, config, driver,
+    "contains", "contained", "container"
   ) . await }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
@@ -85,10 +78,6 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
     errors, result ) }
 
 /// Integrate a sourceward path into an ViewNode tree.
-/// TODO ? Can this be dedup'd w/r/t
-///   'build_and_integrate_containerward_path'?
-///   Claude thought extracting the common logic would be hard,
-///   due to async lifetime issues.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
@@ -96,17 +85,39 @@ pub async fn build_and_integrate_sourceward_path (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
+  build_and_integrate_backpaths (
+    tree, map, node_id, config, driver,
+    "textlinks_to", "dest", "source"
+  ) . await }
+
+/// Plural 'backpaths' because if the origin
+/// immediately forks in the backward direction,
+/// this will generate a path at each fork.
+/// Otherwise it will only generate one path.
+async fn build_and_integrate_backpaths (
+  tree        : &mut Tree<ViewNode>,
+  map         : &mut SkgNodeMap,
+  node_id     : NodeId,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str,
+) -> Result < (), Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
-  let ( path, cycle_node, branches )
-    : ( Vec < ID >, Option < ID >, HashSet < ID > )
-    = path_sourceward_to_end_cycle_and_or_branches (
-      & config . db_name,
-      driver,
-      & terminus_pid ) . await ?;
-  integrate_path_that_might_fork_or_cycle (
-    tree, map, node_id, path, branches, cycle_node, config, driver
-  ) . await }
+  let paths : Vec<PathToFirstNonlinearity> =
+    paths_to_first_nonlinearities (
+      &config.db_name, driver, &terminus_pid,
+      relation, input_role, output_role
+    ) . await ?;
+  for p in paths {
+    integrate_path_that_might_fork_or_cycle (
+      tree, map, node_id,
+      p.path, p.branches, p.cycle_nodes,
+      config, driver
+    ) . await ?; }
+  Ok(()) }
 
 /// Integrate a (maybe forked or cyclic) path into an ViewNode tree,
 /// using provided backpath data.
@@ -114,33 +125,22 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree<ViewNode>,
   map         : &mut SkgNodeMap,
   node_id     : NodeId,
-  mut path    : Vec < ID >,
+  path        : Vec < ID >,
   branches    : HashSet < ID >,
-  cycle_node  : Option < ID >,
+  cycle_nodes : HashSet < ID >,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let terminus_pid : ID =
-    get_id_from_treenode ( tree, node_id ) ?;
-  if ! path . is_empty () {
-    // The head of the path should be the terminus. We strip it.
-    if path[0] != terminus_pid {
-      return Err (
-        format! (
-          "Path head {:?} does not match terminus {:?}",
-          path[0], terminus_pid
-        ) . into () ); }
-    path . remove (0); }
   let last_node_id : NodeId =
     integrate_linear_portion_of_path (
       tree, map, node_id, &path, config, driver ) . await ?;
   if ! branches . is_empty () {
     integrate_branches_in_node (
       tree, map, last_node_id, branches, config, driver ) . await ?;
-  } else if let Some (cycle_id) = cycle_node {
-    // PITFALL: If there are branches, the cycle node is ignored.
-    integrate_cycle_in_node (
-      tree, map, last_node_id, cycle_id, config, driver ) . await ?; }
+  } else if ! cycle_nodes . is_empty () {
+    // PITFALL: If there are branches, cycle nodes are ignored.
+    integrate_cycle_nodes (
+      tree, map, last_node_id, cycle_nodes, config, driver ) . await ?; }
   Ok (( )) }
 
 /// Recursively integrate the remaining path into the tree.
@@ -199,17 +199,25 @@ async fn integrate_branches_in_node (
       tree, map, node_id, &branch_id, config, driver ) . await ?; }
   Ok (( )) }
 
-/// Add a cycle node as a child of the specified node.
-/// The cycle node is only added if it's not already a child.
-async fn integrate_cycle_in_node (
-  tree       : &mut Tree<ViewNode>,
-  map        : &mut SkgNodeMap,
-  node_id    : NodeId,
-  cycle_id   : ID,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
+/// Add cycle nodes as children of the specified node.
+/// Cycle nodes already present as children are skipped.
+async fn integrate_cycle_nodes (
+  tree        : &mut Tree<ViewNode>,
+  map         : &mut SkgNodeMap,
+  node_id     : NodeId,
+  cycle_nodes : HashSet < ID >,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  if find_child_by_id ( tree, node_id, &cycle_id ) . is_none () {
+  let found_children : HashMap < ID, NodeId > =
+    find_children_by_ids ( tree, node_id, &cycle_nodes );
+  let mut to_add : Vec < ID > =
+    cycle_nodes . into_iter ()
+    . filter ( | c |
+                 ! found_children . contains_key (c) )
+    . collect ();
+  { to_add . sort (); }
+  for cycle_id in to_add {
     prepend_indefinitive_child_with_parent_ignores (
       tree, map, node_id, &cycle_id, config, driver ) . await ?; }
   Ok (( )) }

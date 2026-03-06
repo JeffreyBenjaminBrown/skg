@@ -1,6 +1,3 @@
-* if the node immediately branches, these should show all branches
-** skg-branch-containerward
-** skg-branch-sourceward
 * These should be unavailable to the user.
   skg-request-title-matches
   skg-request-single-root-content-view-from-id
@@ -13,8 +10,6 @@
 * to reload skg in Emacs
   (load-file "~/hodal/skg/elisp/skg-init.el")
 * some skg-request-* functions save, others don't
-* rename path_to_end_cycle_and_or_branches
-  -> path_to_first_nonlinearity
 * figure out how to work in parallel with Claude
   Need two copies of the repo.
   Claude advances features while I review older code.

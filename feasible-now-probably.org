@@ -9,6 +9,69 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* if the backpath from a node immediately branches, show each branch
+** TODO test the multiple-cycles thing
+** DONE A fork could include multiple cycles!
+   If the end of the path is a fork, *any subset* of the fork might all be cycles.
+   So the cycle_node field should change to cycle_nodes,
+   and it should be a set rather than an option.
+   (If 'branches' is empty, 'cycle_nodes' contains at most one node.)
+** DONE the idea
+The algorithms in server/ used to respond
+when the user runs 'skg-branch-containerward'
+or 'skg-branch-sourceward' needs some changes.
+Currently, if the node we call that from is a fork,
+it only returns the first layer of that fork.
+Instead, it should build a linear path down each fork,
+until hitting the first nonlinearity (and include the nonlinearity).
+So for instance, after calling it on the node x,
+we might get this (where '}' means 'I contain my parent'):
+```
+  * x
+  ** } 1
+  *** } 11
+  **** } 111
+  **** } 112
+  ** } 2
+  *** } 21
+  *** } 22
+```
+Currently, if that were the graph, we would only get:
+```
+  * x
+  ** } 1
+  ** } 2
+```
+** DONE a test
+Consider this 'contains' graph:
+```
+  * a
+  ** a1
+  *** a1 // cycle
+  *** a11
+  ** a2
+  *** a11 // multi-contained
+  * b
+  ** a2 // multi-contained
+```
+Adding a containerward view request at a11 and saving
+should yield (letting '}' mean 'I contain my parent'):
+```
+  * a
+  ** a1
+  *** a1
+  *** a11
+  **** } a1 ;; NEW. The backpath from a1 ends at the fork [a1, a], one of which is also a cycle.
+  ***** } a1 ;; NEW.
+  ***** } a ;; NEW.
+  **** } a2 ;; NEW. The backpath from a2 ends at the fork [a, b].
+  ***** } a ;; NEW
+  ***** } b ;; NEW
+  ** a2
+  *** a11 // multi-contained
+  * b
+  ** a2 // multi-contained
+```
 * DONE skg import must preserve and define contexts
 ** DONE review diff range
    enter magit
@@ -461,11 +524,6 @@ If anything blocks your progress that needs my attention, ping me.
      If this discovery has not ended,
      start again with the container of
      the newest member of this discovery's nodes.
-* 'request backpaths from all children'
-* precompute graph centrality ~yields contexts
-  count recursive content
-  truncate at first nonlinearity,
-  then keep going upward to find the next ?'context'
 * DONE saving is slow now
 ** 1
   If I add a child to the root of a view and save,
@@ -520,6 +578,7 @@ There's already code somewhere for distinguishing None from Some([]) in a SkgNod
   (fuzzily, because I make typos)
   for every instance of the string 'integra',
   and replace it when it is used that way.
+* 'request backpaths from all children'
 * DONE no clobbering views when visiting a link
   Currently 'skg-visit-link' opens a new buffer.
   If the new buffer has the same title as a preexisting one,

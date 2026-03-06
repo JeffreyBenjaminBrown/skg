@@ -19,6 +19,13 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::{ID, SourceName};
 use crate::types::viewnode::ContainerwardPathStats;
 
+/// Most paths probably end without a fork or a cycle, but the same path can actually end in both: If it ends in a fork, any of the nodes in that fork might be cycles.
+pub struct PathToFirstNonlinearity {
+  pub path        : Vec<ID>,     // Does not include the origin.
+  pub cycle_nodes : HashSet<ID>, // Nodes already in the path, if any. Unless there's a fork, there can be at most one of these.
+  pub branches    : HashSet<ID>, // If the path ends in a fork, these are its's branches.
+}
+
 /// Compute containerward path stats for multiple nodes at once.
 /// Level-by-level traversal: each round issues one TypeDB query
 /// per frontier node (in parallel via join_all), then advances.
@@ -161,17 +168,14 @@ async fn find_container_ids_of_pid (
           & concept . to_string () )) ); } }
   Ok (result) }
 
-/// See path_to_end_cycle_and_or_branches.
+/// See path_to_first_nonlinearity.
 /// This is the case that searches sourceward.
-pub async fn path_containerward_to_end_cycle_and_or_branches (
+pub async fn path_containerward_to_first_nonlinearity (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
-) -> Result < ( Vec<ID>,    // the path, starting with the input
-                Option<ID>, // the first repeated node, if any
-                HashSet<ID> // branches, if any
-), Box<dyn Error> > {
-  path_to_end_cycle_and_or_branches (
+) -> Result < PathToFirstNonlinearity, Box<dyn Error> > {
+  path_to_first_nonlinearity (
     db_name,
     driver,
     node,
@@ -180,17 +184,14 @@ pub async fn path_containerward_to_end_cycle_and_or_branches (
     "container"
   ) . await }
 
-/// See path_to_end_cycle_and_or_branches.
+/// See path_to_first_nonlinearity.
 /// This is the case that searches containerward.
-pub async fn path_sourceward_to_end_cycle_and_or_branches (
+pub async fn path_sourceward_to_first_nonlinearity (
   db_name : &str,
   driver  : &TypeDBDriver,
   node    : &ID
-) -> Result < ( Vec<ID>,    // the path, starting with the input
-                Option<ID>, // the first repeated node, if any
-                HashSet<ID> // branches, if any
-), Box<dyn Error> > {
-  path_to_end_cycle_and_or_branches (
+) -> Result < PathToFirstNonlinearity, Box<dyn Error> > {
+  path_to_first_nonlinearity (
     db_name,
     driver,
     node,
@@ -199,39 +200,65 @@ pub async fn path_sourceward_to_end_cycle_and_or_branches (
     "source"
   ) . await }
 
-/* Follows a path via a single directed binary relation
-  until reaching a cycle and/or branches.
-The path begins with the input node.
-Following the specified relationship,
-  each time we find exactly one 'related node'
-  (meaning a node related in the specified manner),
-  we append it to the path.
-The process can end in three ways:
-1 - If no related node is found, we return the path and exit.
-    The option and the set are both null.
-2 - If at any point multiple related nodes are found,
-    the choice of 'next in path' has no answer,
-    so they are added to the set,
-    nothing is added to the path, and the function returns.
-3 - If at any point the related node is
-    equal to one already in the path, we have found a cycle.
-    That ID becomes the option, the path is not extended,
-    and the function returns.
-Note that 2 and 3 can coincide. That is the only case
-  in which are all three outputs non-null. */
-pub(super) async fn path_to_end_cycle_and_or_branches (
+pub(crate) async fn paths_to_first_nonlinearities (
   db_name     : &str,
   driver      : &TypeDBDriver,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
   output_role : &str
-) -> Result <
-    ( Vec<ID>,    // The path. Its first node is the input.
-      Option<ID>, // If the path cycles, this is the first repeated node.
-      HashSet<ID> // If the path forks, these are the fork's branches.
-    ), Box<dyn Error> > {
+) -> Result < Vec<PathToFirstNonlinearity>, Box<dyn Error> > {
+  let result : PathToFirstNonlinearity =
+    path_to_first_nonlinearity (
+      db_name, driver, node, relation, input_role, output_role
+    ) . await ?;
+  if result.path.is_empty() && ! result.branches.is_empty() {
+    let mut paths : Vec<PathToFirstNonlinearity> = Vec::new();
+    let mut sorted_branches : Vec<ID> =
+      result.branches.into_iter().collect();
+    sorted_branches.sort();
+    for branch_id in sorted_branches {
+      let mut sub : PathToFirstNonlinearity =
+        path_to_first_nonlinearity (
+          db_name, driver, &branch_id,
+          relation, input_role, output_role
+        ) . await ?;
+      sub.path.insert(0, branch_id);
+      paths.push(sub); }
+    Ok(paths)
+  } else {
+    Ok(vec![result]) } }
 
+/// Follows a path via a single directed binary relation
+///   until reaching a cycle and/or branches.
+/// The path does NOT begin with the origin node,
+///   but during computation the origin is retained
+///   to detect cycles, so it might appear later in the path.
+/// Following the specified relationship,
+///   each time we find exactly one 'related node'
+///   (meaning a node related in the specified manner),
+///   we append it to the path.
+/// The process can end in three ways:
+/// 1 - If no related node is found, we return the path and exit.
+///     The option and the set are both null.
+/// 2 - If at any point multiple related nodes are found,
+///     the choice of 'next in path' has no answer,
+///     so they are added to the set,
+///     nothing is added to the path, and the function returns.
+/// 3 - If at any point the related node is
+///     equal to one already in the path, we have found a cycle.
+///     That ID becomes the option, the path is not extended,
+///     and the function returns.
+/// Note that 2 and 3 can coincide. That is the only case
+///   in which are all three outputs non-null.
+pub(crate) async fn path_to_first_nonlinearity (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  node        : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str
+) -> Result < PathToFirstNonlinearity, Box<dyn Error> > {
   let mut path : Vec<ID> = vec![ node . clone () ];
   let mut path_set : HashSet<ID> =
     // path and path_set have the same nodes.
@@ -243,16 +270,17 @@ pub(super) async fn path_to_end_cycle_and_or_branches (
         db_name, driver, & [ current_node . clone () ],
         relation, input_role, output_role ) . await ?;
     if related_nodes . is_empty () {
-      // No related node found, so this is the end.
-      return Ok (( path, None, HashSet::new () ));
+      path . remove (0); // Strip origin.
+      return Ok ( PathToFirstNonlinearity {
+        path, cycle_nodes: HashSet::new (), branches: HashSet::new () } );
     } else {
-      let cycle_node : Option<ID> =
-        // 'Some' if the related node has been seen already.
+      let cycle_nodes : HashSet<ID> =
         related_nodes . iter ()
-          . find ( |&c| path_set . contains (c) )
-          . cloned ();
+          . filter ( |c| path_set . contains (c) )
+          . cloned ()
+          . collect ();
       if ( related_nodes . len () == 1
-           && cycle_node . is_none () ) {
+           && cycle_nodes . is_empty () ) {
         // Add the related node to the path and continue.
         let next_node : ID =
           related_nodes . into_iter() . next() . unwrap();
@@ -260,12 +288,13 @@ pub(super) async fn path_to_end_cycle_and_or_branches (
         path_set . insert ( next_node . clone () );
         current_node = next_node;
       } else { // We are at a fork, or a cycle, or both.
-        return Ok ((
+        path . remove (0); // Strip origin.
+        return Ok ( PathToFirstNonlinearity {
           path,
-          cycle_node,
-          ( if related_nodes . len () == 1 {
+          cycle_nodes,
+          branches: if related_nodes . len () == 1 {
             HashSet::new () }
-            else {related_nodes} ) ));
+            else {related_nodes} } );
         }} }}
 
 /// Generalized function to find related nodes via a specified relationship.
